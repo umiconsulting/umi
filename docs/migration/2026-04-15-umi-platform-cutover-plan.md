@@ -1,5 +1,7 @@
 # Umi Platform Cutover Plan — 2026-04-15
 
+Status: historical. Retained for audit context; superseded as an implementation driver by `docs/migration/2026-06-09-workspace-integration-implementation-plan.md` and its wrapped 05-23 checklist.
+
 ## Objective
 
 Move the shared Supabase project into the UMI platform role without destroying existing production data.

@@ -295,6 +295,23 @@ join platform.permissions p on (
 )
 on conflict (role_id, permission_id) do nothing;
 
+insert into platform.tenant_memberships (tenant_id, user_id, status)
+select t.id, u.id, 'active'
+from platform.tenants t
+join platform.users u on u.auth_subject = 'local-owner-1'
+where t.slug = 'kalalacafe'
+on conflict (tenant_id, user_id) do nothing;
+
+insert into platform.membership_roles (membership_id, role_id)
+select tm.id, r.id
+from platform.tenant_memberships tm
+join platform.tenants t on t.id = tm.tenant_id
+join platform.users u on u.id = tm.user_id
+join platform.roles r on r.tenant_id = tm.tenant_id and r.key = 'super_admin'
+where t.slug = 'kalalacafe'
+  and u.auth_subject = 'local-owner-1'
+on conflict (membership_id, role_id) do nothing;
+
 insert into platform.product_instances (tenant_id, product_key, status, enabled_at)
 select tenant_id, product_key, status, case when status = 'active' then now() else null end
 from (

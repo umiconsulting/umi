@@ -1,0 +1,106 @@
+      slug       |      name       |                                                                                                                                                                           products                                                                                                                                                                            
+-----------------+-----------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ cash-only-cafe  | Cash Only Cafe  | {"kds": {"config": {}, "status": "missing", "location_id": null}, "cash": {"config": {}, "status": "active", "location_id": null}, "dashboard": {"config": {}, "status": "active", "location_id": null}, "conversaflow": {"config": {}, "status": "missing", "location_id": null}, "observability": {"config": {}, "status": "missing", "location_id": null}}
+ elgranribera    | El Gran Ribera  | {"kds": {"config": {}, "status": "missing", "location_id": null}, "cash": {"config": {}, "status": "active", "location_id": null}, "dashboard": {"config": {}, "status": "active", "location_id": null}, "conversaflow": {"config": {}, "status": "missing", "location_id": null}, "observability": {"config": {}, "status": "missing", "location_id": null}}
+ full-stack-cafe | Full Stack Cafe | {"kds": {"config": {}, "status": "active", "location_id": null}, "cash": {"config": {}, "status": "active", "location_id": null}, "dashboard": {"config": {}, "status": "active", "location_id": null}, "conversaflow": {"config": {}, "status": "active", "location_id": null}, "observability": {"config": {}, "status": "active", "location_id": null}}
+ kalalacafe      | Kalala Café     | {"kds": {"config": {}, "status": "active", "location_id": null}, "cash": {"config": {}, "status": "missing", "location_id": null}, "dashboard": {"config": {}, "status": "active", "location_id": null}, "conversaflow": {"config": {}, "status": "active", "location_id": null}, "observability": {"config": {}, "status": "missing", "location_id": null}}
+ northwestcafe   | Northwest Café  | {"kds": {"config": {}, "status": "missing", "location_id": null}, "cash": {"config": {}, "status": "active", "location_id": null}, "dashboard": {"config": {}, "status": "active", "location_id": null}, "conversaflow": {"config": {}, "status": "missing", "location_id": null}, "observability": {"config": {}, "status": "missing", "location_id": null}}
+ umicafe         | Umi Cafe        | {"kds": {"config": {}, "status": "missing", "location_id": null}, "cash": {"config": {}, "status": "active", "location_id": null}, "dashboard": {"config": {}, "status": "active", "location_id": null}, "conversaflow": {"config": {}, "status": "missing", "location_id": null}, "observability": {"config": {}, "status": "missing", "location_id": null}}
+(6 rows)
+
+    slug    | location_count |                                                 product_statuses                                                  
+------------+----------------+-------------------------------------------------------------------------------------------------------------------
+ kalalacafe |              2 | {"kds": "active", "cash": "missing", "dashboard": "active", "conversaflow": "active", "observability": "missing"}
+(1 row)
+
+ slug | location_count | product_statuses 
+------+----------------+------------------
+(0 rows)
+
+ table_schema | table_name 
+--------------+------------
+(0 rows)
+
+ table_schema | table_name | column_name 
+--------------+------------+-------------
+(0 rows)
+
+ tenant_id | identity_type | normalized_value | duplicate_count 
+-----------+---------------+------------------+-----------------
+(0 rows)
+
+              tenant_id               | identity_type | normalized_value | candidate_count 
+--------------------------------------+---------------+------------------+-----------------
+ a0b84b45-1688-0a44-968c-58d95130c862 | phone         | +526672296855    |               2
+(1 row)
+
+ status | rows 
+--------+------
+(0 rows)
+
+              set_config              
+--------------------------------------
+ 2f5d807d-85bf-4190-93ee-47602b057be0
+(1 row)
+
+SET
+      slug       |      name       
+-----------------+-----------------
+ cash-only-cafe  | Cash Only Cafe
+ full-stack-cafe | Full Stack Cafe
+ kalalacafe      | Kalala Café
+(3 rows)
+
+RESET
+ set_config 
+------------
+ 
+(1 row)
+
+SET
+ visible_tenants_without_user 
+------------------------------
+                            0
+(1 row)
+
+RESET
+      slug       |  role_key   | permission_count 
+-----------------+-------------+------------------
+ cash-only-cafe  | admin       |                9
+ cash-only-cafe  | developer   |               10
+ cash-only-cafe  | owner       |               10
+ cash-only-cafe  | staff       |                4
+ cash-only-cafe  | super_admin |               10
+ cash-only-cafe  | tech_assist |                3
+ elgranribera    | admin       |                9
+ elgranribera    | developer   |               10
+ elgranribera    | owner       |               10
+ elgranribera    | staff       |                4
+ elgranribera    | super_admin |               10
+ elgranribera    | tech_assist |                3
+ full-stack-cafe | admin       |                9
+ full-stack-cafe | developer   |               10
+ full-stack-cafe | owner       |               10
+ full-stack-cafe | staff       |                4
+ full-stack-cafe | super_admin |               10
+ full-stack-cafe | tech_assist |                3
+ kalalacafe      | admin       |                9
+ kalalacafe      | developer   |               10
+ kalalacafe      | owner       |               10
+ kalalacafe      | staff       |                4
+ kalalacafe      | super_admin |               10
+ kalalacafe      | tech_assist |                3
+ northwestcafe   | admin       |                9
+ northwestcafe   | developer   |               10
+ northwestcafe   | owner       |               10
+ northwestcafe   | staff       |                4
+ northwestcafe   | super_admin |               10
+ northwestcafe   | tech_assist |                3
+ umicafe         | admin       |                9
+ umicafe         | developer   |               10
+ umicafe         | owner       |               10
+ umicafe         | staff       |                4
+ umicafe         | super_admin |               10
+ umicafe         | tech_assist |                3
+(36 rows)
+

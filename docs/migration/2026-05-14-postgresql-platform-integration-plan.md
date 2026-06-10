@@ -1,5 +1,7 @@
 # PostgreSQL Platform Integration Audit and Local Schema Plan - 2026-05-14
 
+Status: historical. Retained for schema-design evidence and local execution context; superseded as the active program driver by `docs/migration/2026-06-09-workspace-integration-implementation-plan.md`.
+
 ## Purpose
 
 Design the Umi ecosystem as a PostgreSQL-first platform database, independent of the current hosting layer.

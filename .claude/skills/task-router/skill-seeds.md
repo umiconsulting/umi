@@ -32,21 +32,23 @@ Observation ledger for **potential** skills. A seed is a pattern observed too fe
 - expected maturation: done; S2.3 will exercise it again for project-local skill trees.
 
 ### ledger-mirroring
-- status: seed
+- status: pruned into `adapter-sync-check` (Phase 2 checkpoint, 2026-06-10)
 - observed: 2026-06-09 audit ledger entry ("ledger entries should be written to the neutral source and mirrored, not written per-adapter"); same pattern re-executed for this plan's ledger writes.
 - trigger pattern: recording any cross-workspace trace while two adapter layers exist.
 - procedure sketch: write once to the declared neutral source, generate mirrors, verify identical content.
-- promotion gate: may merge into `adapter-sync-check` rather than promote separately — evaluate at the Phase 2 checkpoint instead of promoting two overlapping skills.
-- expected maturation: Phase 2 checkpoint.
+- promotion gate: failed as a standalone skill because the procedure is a subset of `adapter-sync-check` after S1.5 and S2.3.
+- expected maturation: done; keep using `adapter-sync-check` for write-once/mirror/verify work.
+- 2026-06-10 update: Phase 2 exercised ledger mirroring and KDS adapter mirroring; both used the same canonical-source/generated-mirror procedure. No separate skill promoted.
 
 ### staging-validation-runner
-- status: seed
+- status: **promoted** (Phase 3 checkpoint, 2026-06-10 → `.agents/skills/staging-validation-runner/`)
 - observed: `001_core_validation.sql` + row-count comparison will run at least three times with the same shape: local (plan S1.2), staging (S3.1), production cutovers (S4.1/S4.3). One historical trace exists (2026-05-15 plan inline results).
 - trigger pattern: any environment promotion of the 7-schema database.
 - procedure sketch: apply schema/backfill scripts in order, run validation SQL, diff row counts against the previous environment, record counts inline in the active checklist.
-- promotion gate: needs the S1.2 and S3.1 traces to confirm the procedure is stable across environments.
-- expected maturation: Phase 3 checkpoint.
+- promotion gate: passed — S1.2 local validation and S3.1 staging replay used the same apply/validate/count-diff procedure, and S3.1 caught two replay defects before the target was accepted.
+- expected maturation: done; use the promoted skill for S4.1/S4.3 cutover rehearsals.
 - 2026-06-10 update: S1.2 trace recorded — validation SQL + per-schema row-count export ran cleanly against the local transition DB (`audit-output/2026-06-10-phase-4f-execution.md`); one wrinkle worth keeping: FDW server ports had drifted (5432→5233) and needed `ALTER SERVER` before the gate could run. Awaiting the S3.1 staging trace.
+- 2026-06-10 update: S3.1 trace recorded — standalone staging replay caught the `010`/`030` Kalala slug conflict and missing local-owner Kalala membership; both were fixed in replay scripts before validation. Row-count diff now records an intentional synthetic-family cleanup delta against the older local transition target.
 
 ### cutover-soak-comparison
 - status: seed

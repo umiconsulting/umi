@@ -4,7 +4,6 @@ on conflict (auth_subject) do nothing;
 
 insert into platform.tenants (slug, name)
 values
-  ('kalalacafe', 'Kalala'),
   ('full-stack-cafe', 'Full Stack Cafe'),
   ('cash-only-cafe', 'Cash Only Cafe')
 on conflict (slug) do nothing;

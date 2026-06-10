@@ -23,8 +23,13 @@ Canonical cross-product documentation for the Umi workspace.
 - [governance/authority.md](./governance/authority.md)
 - [governance/ownership.md](./governance/ownership.md)
 - [governance/agent-safe-boundaries.md](./governance/agent-safe-boundaries.md)
+- [governance/github-push-matrix.md](./governance/github-push-matrix.md)
 - [reports/latest.md](./reports/latest.md)
 - [evals/index.md](./evals/index.md)
+- [migration/2026-06-09-workspace-integration-implementation-plan.md](./migration/2026-06-09-workspace-integration-implementation-plan.md)
+
+Historical background, not default-loading entrypoints:
+
 - [architecture/2026-04-15-kds-schema-normalization-spec.md](./architecture/2026-04-15-kds-schema-normalization-spec.md)
 - [migration/2026-04-15-supabase-multischema-state.md](./migration/2026-04-15-supabase-multischema-state.md)
 - [migration/2026-04-15-umi-platform-cutover-plan.md](./migration/2026-04-15-umi-platform-cutover-plan.md)

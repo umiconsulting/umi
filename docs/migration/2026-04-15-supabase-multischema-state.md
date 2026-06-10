@@ -1,5 +1,7 @@
 # Supabase Multi-Schema State — 2026-04-15
 
+Status: historical. Retained as an April 2026 state snapshot; superseded as an implementation driver by `docs/migration/2026-06-09-workspace-integration-implementation-plan.md` and its wrapped 05-23 checklist.
+
 ## Summary
 
 This workspace was restructured under the `Umi/` root and the shared Supabase database was expanded from a `public`-only application layout to a multi-schema layout.

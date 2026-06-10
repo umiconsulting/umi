@@ -21,6 +21,58 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-06-10 - Phase 3 shared foundations execution (S3.1-S3.3)
+- task type: cross-workspace program execution (shared foundations phase)
+- request summary: execute Phase 3 of the 2026-06-09 workspace integration implementation plan
+- filesystem slice inspected: root migration scripts/checklists/audit output, `apps/umi-dashboard` API/server/deploy config/env docs, local PostgreSQL 18 databases, Supabase project list, Vercel CLI project/team state
+- chosen owner: root `docs/migration` for staging database evidence and checklist status; `apps/umi-dashboard` for dashboard deployability and tenant/capability API validation; root `.agents/skills/` for phase checkpoint/promotion records
+- chosen path: direct execution; no subagent
+- skill or subagent used: `task-router`, `workspace-boundary-check`, `scientific-research-check`, `staging-validation-runner` (promoted at checkpoint)
+- files touched: `docs/migration/local-postgres/010_seed_product_matrix.sql`, `030_platform_identity_backfill.sql`, `docs/migration/audit-output/2026-06-10-phase-3-*`, 05-23 checklist, 06-09 plan status, Dashboard `server.js`, `api/index.js`, `vercel.json`, `.env.example`, `docs/deployment.md`, root skill registry/seeds/new skill, generated `.claude` mirror
+- tools used: official-doc research, `psql`, local PostgreSQL staging replay, `curl`, `npm run api:check`, `npm run build`, `npx vercel`, `rsync -ac --delete`, recursive diff
+- outcome: S3.1 executed as standalone PostgreSQL staging rehearsal with zero blocking validation findings and Phase 4F no-import rows archived; replay defects fixed in scripts; exact count equality intentionally not met because staging excludes five synthetic `+1555` conversation families that remain in the older transition DB. S3.2 deploy config/build complete but non-local Vercel reachability remains open because no Vercel project/staging DB secrets exist. S3.3 tenant/capability endpoints validated against staging (`health`, `me/tenants`, `tenants/:id/capabilities`).
+- reusable pattern observed: staging replay must stop on script defects and classify count deltas before exit; count equality is not enough when the older target contains synthetic production-facing rows.
+- promotion follow-up: promoted `staging-validation-runner`; held `three-lens-release-review` for another phase because Phase 3 produced useful evidence but still depends on external deploy closure.
+
+### 2026-06-10 - Phase 3 skill checkpoint review
+- task type: skill lifecycle review (per program plan Phase 3 checkpoint)
+- request summary: review Phase 3 routing evidence and evaluate `staging-validation-runner`, `three-lens-release-review`, and `secrets-environment-promotion`
+- filesystem slice inspected: `.agents/skills/task-router/{routing-ledger,skill-seeds,registry,promotion-criteria}.md`, Phase 1 and Phase 3 audit outputs, Dashboard deployment docs
+- chosen owner: root `.agents/skills/` (canonical layer)
+- chosen path: direct execution
+- skill or subagent used: `task-router`, `skill-creator`, `adapter-sync-check`
+- files touched: `.agents/skills/staging-validation-runner/SKILL.md`, `.agents/skills/task-router/{registry,skill-seeds,routing-ledger}.md`, generated `.claude` mirror
+- tools used: file edits, `rsync -ac --delete`, recursive diff verification
+- outcome: promoted `staging-validation-runner` after S1.2 and S3.1 traces; did not promote `three-lens-release-review` yet because Phase 3 is not fully closed externally; did not promote `secrets-environment-promotion` because actual Vercel env promotion did not happen.
+- reusable pattern observed: a promoted validation skill should include failure handling for script-order bugs and intentional count deltas, not just happy-path commands.
+- promotion follow-up: revisit `three-lens-release-review` and `secrets-environment-promotion` after non-local Dashboard preview and S4.1.
+
+### 2026-06-10 - Phase 2 standardization execution (S2.1-S2.3)
+- task type: cross-workspace program execution (standardization phase)
+- request summary: execute Phase 2 of the 2026-06-09 workspace integration implementation plan
+- filesystem slice inspected: workspace root docs, `docs/reports/latest.md`, `docs/README.md`, root and KDS adapter skill trees, all six app git remotes, GitHub org repository list, SSH host aliases
+- chosen owner: root docs for index/push-matrix/history state; root `.agents/skills/` for routing ledger and checkpoint records; app repos only for local git remote URL normalization; `apps/umi-kds` for local adapter hygiene
+- chosen path: direct execution; no subagent
+- skill or subagent used: `task-router`, `workspace-boundary-check`, `adapter-sync-check`
+- files touched: `docs/governance/github-push-matrix.md`, `docs/reports/latest.md`, `docs/README.md`, three historical migration docs, `.agents/skills/task-router/{routing-ledger,skill-seeds}.md`, `docs/migration/2026-06-09-workspace-integration-implementation-plan.md`, KDS `AGENTS.md`/`CLAUDE.md`/local skill pointers, generated `.claude` mirrors
+- tools used: git remote inspection/set-url, `git ls-remote`, `gh repo list`, `rg`, `sed`, `diff`, `rsync -ac --delete`
+- outcome: S2.1 complete for the six app repos — all remotes now use `git@github.com-umi:umiconsulting/...`; S2.2 complete — `latest.md` points to the active driver, historical migration plans are marked, and stale ledger path references are annotated; S2.3 complete — root `.agents` is canonical with `.claude` mirror, KDS local `.agents` is canonical with `.claude` mirror, and the KDS task-router copy is reduced to a root-router pointer.
+- reusable pattern observed: `ledger-mirroring` is fully covered by `adapter-sync-check`; a separate skill would duplicate the same write-once/regenerate/verify procedure.
+- promotion follow-up: Phase 2 checkpoint merged `ledger-mirroring` into `adapter-sync-check`; no new skill promoted.
+
+### 2026-06-10 - Phase 2 skill checkpoint review
+- task type: skill lifecycle review (per program plan Phase 2 checkpoint)
+- request summary: review Phase 2 routing evidence and evaluate the `ledger-mirroring` seed for promotion
+- filesystem slice inspected: `.agents/skills/task-router/{routing-ledger,skill-seeds,registry,promotion-criteria}.md`, root `.claude/skills`, KDS `.agents/skills`, KDS `.claude/skills`
+- chosen owner: root `.agents/skills/` for skill lifecycle records; KDS `.agents/skills/` for product-local procedure source
+- chosen path: direct execution
+- skill or subagent used: `task-router`, `adapter-sync-check`
+- files touched: `.agents/skills/task-router/skill-seeds.md`, `.agents/skills/task-router/routing-ledger.md`, generated `.claude` mirror
+- tools used: file edits, `rsync -ac --delete`, recursive diff verification
+- outcome: `ledger-mirroring` was not promoted as a separate skill because its stable procedure and trigger are now a strict subset of `adapter-sync-check`; KDS local adapter mirroring exercised the same pattern without creating another root skill.
+- reusable pattern observed: product-local adapters can use the same canonical-source/generated-mirror policy as root without needing their own root-level skill.
+- promotion follow-up: no new promotion; keep using `adapter-sync-check` for root skill/registry/ledger/seed writes and mirror verification.
+
 ### 2026-06-10 - Phase 1 stabilization execution (S1.1–S1.6)
 - task type: cross-workspace program execution (stabilization phase)
 - request summary: execute Phase 1 of the 2026-06-09 workspace integration implementation plan
@@ -137,6 +189,7 @@ Record successful and failed cross-workspace traces here before proposing new re
 - outcome: landing now presents Umi as a connected restaurant operations suite with responsive product mockups and product-aligned diagnostic/contact flows
 - reusable pattern observed: when brand positioning changes but a functional landing shell already exists, preserve the app/runtime owner and replace message/visual system in place
 - promotion follow-up: none
+- superseded note (2026-06-10 S2.2): `apps/umi-landing-page-1` no longer exists; current landing owner is `apps/umi-landing-page`. This entry is retained as historical evidence only.
 
 ### 2026-05-21 - Landing page redesign transplant
 - task type: product frontend redesign + backend form wiring
@@ -150,6 +203,7 @@ Record successful and failed cross-workspace traces here before proposing new re
 - outcome: redesigned landing page renders in the functional app; contact form remains wired to `/api/contact`; diagnostic quiz now posts the API-compatible shape to `/api/diagnostic`; email sequence tests pass
 - reusable pattern observed: when a redesign artifact has no backend/runtime shell, transplant it into the existing functional product app rather than moving API ownership
 - promotion follow-up: none
+- superseded note (2026-06-10 S2.2): `apps/umi-landing-page-1` no longer exists; current landing owner is `apps/umi-landing-page`. This entry is retained as historical evidence only.
 
 ### 2026-05-17 - Dashboard tenant, membership, branch, and entitlement implementation
 - task type: cross-workspace dashboard/platform implementation
@@ -291,6 +345,7 @@ Record successful and failed cross-workspace traces here before proposing new re
 - outcome: branch documentation now points to one forward architecture: a mini harness with deep backend tools, first-class customer memory, backend-owned operational truth, minimal resumable state, and an extensive test campaign
 - reusable pattern observed: when replacing an overgrown architecture, keep only the canonical forward path in docs; historical reports belong outside the active branch if they keep steering implementation back to discarded patterns
 - promotion follow-up: none
+- superseded note (2026-06-10 S2.2): `platform/conversaflow/docs/**` was consolidated into `apps/umi-conversaflow/docs/**`; this entry is retained as historical evidence only.
 
 ### 2026-04-15 - Umi KDS schema and organization architecture plan
 - task type: cross-workspace architecture analysis + documentation design
@@ -319,6 +374,7 @@ Record successful and failed cross-workspace traces here before proposing new re
 - outcome: spec-driven plan written; identified the orphaned `intent-extractor.ts` and unused `extracted_intent`/`pending_clarification` columns as the highest-leverage missing seams; phased rollout aligned with prior P0/P1/P3 recommendations from `tool-loop-failure-modes.md` and `responsibility-split-llm-vs-backend.md`
 - reusable pattern observed: when a planning task spans an existing review-doc cluster, place the new spec alongside the cluster (`docs/architecture/reviews/`), reference prior reviews explicitly, and keep ownership in the same repo as the write model — do not lift to root docs
 - promotion follow-up: none — this is a one-off architecture spec, not a reusable cross-workspace procedure (fails the `promotion-criteria.md` "pattern recurs across more than one trace" gate)
+- superseded note (2026-06-10 S2.2): `platform/conversaflow/docs/**` was consolidated into `apps/umi-conversaflow/docs/**`; this entry is retained as historical evidence only.
 
 ### 2026-04-21 - Intent Router with LLM Reasoning (Option B — Strict Tool Use)
 - task type: backend feature — new routing pipeline for `turn-process.ts`

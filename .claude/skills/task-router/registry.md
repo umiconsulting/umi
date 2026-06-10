@@ -55,10 +55,17 @@
   - placement hints: run from the workspace root; canonical writes go to `.agents/`, never the mirror.
   - confidence: high
   - provenance: promoted at the Phase 1 checkpoint (2026-06-10) from the `adapter-sync-check` seed — traces: 2026-06-09 audit drift diff, 2026-06-10 S1.5 re-convergence.
+- `staging-validation-runner`
+  - scope: reproduce the seven-schema platform transition database in a staging target, apply public-compat exclusion, validate, and compare row counts.
+  - trigger patterns: database environment promotion, staging rehearsal, production cutover rehearsal, row-count validation gates.
+  - placement hints: run from the workspace root using `docs/migration/local-postgres/**`, `docs/migration/validation/**`, and `docs/migration/audit-output/**`.
+  - confidence: high
+  - provenance: promoted at the Phase 3 checkpoint (2026-06-10) from traces in S1.2 local validation and S3.1 standalone staging replay.
 
 ## Selection rules
 - Workspace-level docs and planning: root `docs/` plus root `CLAUDE.md`.
 - Source-sensitive technical decisions: `scientific-research-check` before locking the recommendation.
+- Database staging, promotion, and cutover validation: `staging-validation-runner`.
 - Customer identity, phone normalization, and cross-product Customer 360 matching: `customer-identity-resolution`.
 - Logs-to-Dashboard owner insight migration: `owner-insights-migration`.
 - Dashboard customer UX validation and responsive owner-admin checks: `dashboard-customer-ux-validation`.

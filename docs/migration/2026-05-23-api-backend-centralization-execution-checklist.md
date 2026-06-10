@@ -45,14 +45,14 @@
 
 ## Phase 2 — Stage 7-Schema PostgreSQL
 
-- [ ] Create a staging PostgreSQL database, either Supabase staging or standalone PostgreSQL.
-- [ ] Apply schema scripts `001_platform_core.sql` through `007_legacy_migration_core.sql`.
-- [ ] Apply backfill scripts `010` through `044` in order.
-- [ ] Apply the Phase 4F exclusion decision; do not load `public.*` into production-facing schemas.
-- [ ] Run validation queries against staging.
-- [ ] Compare staging row counts against the local transition database.
+- [x] Create a staging PostgreSQL database, either Supabase staging or standalone PostgreSQL. *(2026-06-10: standalone local staging rehearsal `umi_platform_staging_phase3_20260610`; remote Supabase staging project still not provisioned.)*
+- [x] Apply schema scripts `001_platform_core.sql` through `007_legacy_migration_core.sql`. *(2026-06-10: applied cleanly.)*
+- [x] Apply backfill scripts `010` through `044` in order. *(2026-06-10: applied cleanly after fixing the `010` placeholder Kalala seed and adding local-owner Kalala membership in `030`.)*
+- [x] Apply the Phase 4F exclusion decision; do not load `public.*` into production-facing schemas. *(78 public-only rows recorded `archived_only`; 0 imported into production-facing tables.)*
+- [x] Run validation queries against staging. *(zero blocking findings; output in `audit-output/2026-06-10-phase-3-staging-validation.txt`.)*
+- [x] Compare staging row counts against the local transition database. *(diff recorded in `audit-output/2026-06-10-phase-3-row-count-diff.csv`; staging intentionally excludes five synthetic `+1555` conversation families that the older local transition DB still contains.)*
 
-**Exit criterion:** staging matches the local transition target and passes validation.
+**Exit criterion:** staging matches the local transition target and passes validation. **Partially met 2026-06-10:** validation passed; exact row-count equality is intentionally not met because the replayed staging target is cleaner than the older local transition DB for synthetic conversation families. A real remote Supabase staging project is still required before production cutover.
 
 ---
 
@@ -60,16 +60,16 @@
 
 This work can start in parallel with staging. It must not switch production traffic before schema validation.
 
-- [ ] Choose deployment shape for `umi-dashboard` backend:
+- [x] Choose deployment shape for `umi-dashboard` backend:
   - standalone Express service,
   - API routes inside `umi-dashboard`,
   - or another explicitly hosted Node runtime.
-- [ ] Add the required deployment config for the chosen shape.
-- [ ] Verify environment variables and secret handling outside local development.
-- [ ] Run a syntax/build check for the backend entrypoint.
-- [ ] Update the dashboard frontend API base URL configuration for deployed environments.
+- [x] Add the required deployment config for the chosen shape. *(Vite static frontend + Express API through Vercel Functions; see `apps/umi-dashboard/vercel.json` and `api/index.js`.)*
+- [x] Verify environment variables and secret handling outside local development. *(required variables documented in `apps/umi-dashboard/docs/deployment.md` and `.env.example`; actual Vercel envs not set because no project exists yet.)*
+- [x] Run a syntax/build check for the backend entrypoint. *(`npm run api:check` and `npm run build` passed.)*
+- [x] Update the dashboard frontend API base URL configuration for deployed environments. *(production uses same-origin relative `/api/*`; Vite proxy remains local-only.)*
 
-**Exit criterion:** dashboard backend can be deployed and reached in a non-local environment.
+**Exit criterion:** dashboard backend can be deployed and reached in a non-local environment. **Not yet met:** deploy config/build are ready, but no Vercel project exists under the authenticated account/team and no remote staging DB secrets are configured.
 
 ---
 

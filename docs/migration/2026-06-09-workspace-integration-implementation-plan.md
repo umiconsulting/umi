@@ -236,8 +236,8 @@ Order within this phase is deliberate: dashboard (internal-facing) cuts over bef
 ## Status
 
 - [ ] Phase 1 — Stabilization — **executed 2026-06-10**; S1.1/S1.2/S1.3/S1.5/S1.6 complete with three-lens evidence (see ledger entry "Phase 1 stabilization execution"); S1.4 remains open on one owner-manual action: roll the service_role key in the Supabase dashboard, then `select vault.update_secret(id, new_secret := '<new-jwt>')` for `service_role_key` and update dependent app `.env` files — all three cron jobs that need service_role now read it from Vault, so no SQL changes are needed post-roll. Phase 1 closes when one scheduled invocation succeeds after rotation.
-- [ ] Phase 2 — Standardization
-- [ ] Phase 3 — Shared Foundations
+- [x] Phase 2 — Standardization — **executed 2026-06-10**; S2.1/S2.2/S2.3 complete for the six app repos and procedure layers: all app remotes use `git@github.com-umi:umiconsulting/...`; push matrix recorded in `docs/governance/github-push-matrix.md`; `latest.md` and historical migration docs updated; stale ledger path references annotated; KDS local task-router reduced to a root-router pointer; `.agents` canonical layers mirrored into `.claude` with empty diffs. Root workspace GitHub remote remains intentionally unset because no existing `umiconsulting` root repo was found under `Umi`, `umi`, or `umi-workspace`.
+- [ ] Phase 3 — Shared Foundations — **executed 2026-06-10, not fully closed**; S3.1 standalone PostgreSQL staging rehearsal passed core validation with documented synthetic-family count deltas; S3.3 tenant/capability endpoints validated against staging; S3.2 deployability config/build complete but the non-local reachability exit gate remains open because no Vercel project/staging database secrets exist yet. See `docs/migration/audit-output/2026-06-10-phase-3-execution.md`.
 - [ ] Phase 4 — Backend Consolidation
 - [ ] Phase 5 — Monorepo Migration
 - [ ] Phase 6 — Platform Integration

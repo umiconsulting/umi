@@ -7,8 +7,10 @@ This file is the default report entrypoint for agents. Load individual reports o
 - **Active program driver (2026-06-09):** `docs/migration/2026-06-09-workspace-integration-implementation-plan.md` — 7-phase implementation plan from the integration audit, with per-step three-lens validation and skill-lifecycle checkpoints; wraps the 2026-05-23 execution checklist.
 - Current workspace integration audit (2026-06-09): `docs/reports/workspace-integration-audit.md` — full-state audit, debt register, integration scores, and consolidation roadmap.
 - Current operating model: `docs/architecture/agent-operating-system.md`.
+- Current GitHub push matrix: `docs/governance/github-push-matrix.md`.
 - Current restructuring direction: Model B federated cognitive workspace with a future path to Model C agent runtime mesh.
 - Historical PostgreSQL-first platform integration plan (superseded as driver by the 2026-06-09 implementation plan): `docs/migration/2026-05-14-postgresql-platform-integration-plan.md`.
+- Historical April platform cutover state: `docs/migration/2026-04-15-supabase-multischema-state.md` and `docs/migration/2026-04-15-umi-platform-cutover-plan.md`.
 
 ## ConversaFlow
 
