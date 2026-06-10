@@ -21,6 +21,19 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-06-10 - Phase 5 monorepo migration: S5.1 executed, S5.2 rehearsed, stoppers registered
+- task type: cross-workspace program execution (monorepo track) under an active sequencing gate
+- request summary: continue with Phase 5 of the integration plan; document all stoppers
+- filesystem slice inspected: workspace root (tooling, .gitignore), all six `apps/*` repos (remotes, branches, lockfiles, dirty state, full commit-message scan), `/tmp/umi-phase5-rehearsal`, S1.6 addendum, gh/vercel CLI auth state
+- chosen owner: workspace root (`docs/migration`, root tooling files); rehearsal isolated in `/tmp`
+- chosen path: direct execution; cutover-blocked work documented instead of forced
+- skill or subagent used: `task-router`, `scientific-research-check` (pnpm/Turborepo/Vercel-monorepo docs re-verified at execution time per S5.1), `adapter-sync-check` (post-write)
+- files touched: root `package.json`, `pnpm-workspace.yaml`, `turbo.json`, `.gitignore`, `docs/migration/audit-output/2026-06-10-phase-5-execution.md`, plan Status; `apps/umi-kds` commit `789bae5` (uncommitted S2.3 work)
+- tools used: git, git-filter-repo (Homebrew-installed), pnpm 10.29.3, turbo 2.8.8, gh, vercel CLI, WebFetch
+- outcome: S5.1 done (validated against rehearsal: 1,543-package lockfile resolution + turbo task graph); S5.2 mechanic proven with exact commit conservation (Cash 218/218; total 279); S5.3 assessed-blocked; 10-entry stopper register written (hard: Phase 4 incomplete, no monorepo remote, zero Vercel projects, offensive commit `9df2c40` in pushed conversaflow history, service_role rotation pending)
+- reusable pattern observed: pre-import repo hygiene scan (dirty trees + offensive/unprofessional commit messages across all repos) caught two real issues; filter-repo requires `--no-local` clones — first rehearsal attempt failed exactly as a rehearsal should
+- promotion follow-up: `repo-history-preserving-import` seed updated with its first real trace (was anticipated-only); prune-or-promote stays at the Phase 5 cutover checkpoint per the seed's own gate
+
 ### 2026-06-10 - Phase 4 S4.1 dashboard schema cutover
 - task type: cross-workspace program execution (backend consolidation, dashboard track)
 - request summary: continue with Phase 4; owner constraint recorded — umi-cash Supabase project `rrkzhisnadfrgnhntkiz` is the only real production DB and is untouchable until S4.3 readiness

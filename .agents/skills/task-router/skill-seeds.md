@@ -78,11 +78,11 @@ Observation ledger for **potential** skills. A seed is a pattern observed too fe
 
 ### repo-history-preserving-import
 - status: seed
-- observed: anticipated only — Phase 5 needs six history-preserving imports (Cash's 218 commits explicitly worth preserving; `umi-conversaflow` pre-reset history recovery pending S1.6).
+- observed: first real trace 2026-06-10 — six-repo rehearsal import in `/tmp/umi-phase5-rehearsal` (evidence: `docs/migration/audit-output/2026-06-10-phase-5-execution.md`). Procedure stabilized: `git clone --no-local` (filter-repo refuses hardlinked local clones), `git-filter-repo --to-subdirectory-filter apps/<name>` (beats subtree: paths rewritten, so per-path log/blame work without `--follow`), `merge --allow-unrelated-histories`, verify by exact commit-count conservation (Cash 218/218; total 279 = 7+266+6). New mandatory pre-step: repo hygiene scan — dirty trees and a full commit-message profanity scan (caught uncommitted S2.3 work in umi-kds and slur commit `9df2c40` pushed in umi-conversaflow → `--replace-message` at import).
 - trigger pattern: consolidating an external repo into the monorepo.
-- procedure sketch: choose subtree vs filter-repo per repo, import with history, verify `git log --follow` on a sampled file, repoint remotes/CI.
-- promotion gate: likely a **one-shot batch**, not a recurring skill — six imports in one phase, then never again. Default expectation: prune after Phase 5 and keep the procedure in the plan/runbook instead.
-- expected maturation: Phase 5; prune-or-promote decision at that checkpoint.
+- procedure sketch: hygiene scan (dirty trees, offensive messages) → `--no-local` clone → filter-repo subdirectory rewrite (+ `--replace-message` if needed) → unrelated-histories merge → commit-count conservation check → repoint remotes/CI.
+- promotion gate: likely a **one-shot batch**, not a recurring skill — six imports in one phase, then never again. Default expectation: prune after Phase 5 and keep the procedure in the plan/runbook instead (the cutover runbook in the 2026-06-10 evidence doc now holds it).
+- expected maturation: Phase 5 cutover (blocked on ST-1…ST-5); prune-or-promote decision at that checkpoint.
 
 ### timezone-correct-scheduling
 - status: seed (weak)
