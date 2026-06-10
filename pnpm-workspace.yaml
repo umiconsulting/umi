@@ -1,0 +1,4 @@
+# Workspace members: JS apps only. Directories without a package.json
+# (umi-kds Swift app, umi-conversaflow Supabase functions) are skipped by pnpm.
+packages:
+  - "apps/*"
