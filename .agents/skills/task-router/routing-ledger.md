@@ -21,6 +21,32 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-06-10 - Phase 1 stabilization execution (S1.1–S1.6)
+- task type: cross-workspace program execution (stabilization phase)
+- request summary: execute Phase 1 of the 2026-06-09 workspace integration implementation plan
+- filesystem slice inspected: workspace root, `docs/migration/**`, both adapter layers, `apps/umi-conversaflow` (supabase config/functions/migrations/.env), `apps/umi-dashboard` (server.js, env files), `apps/umi-landing-page`, local PostgreSQL 18 (port 5233), production Supabase (pooler)
+- chosen owner: workspace root for git/docs/skills; production DB state inspected via ConversaFlow's linked project
+- chosen path: direct execution; no subagent
+- skill or subagent used: `task-router`, three-lens protocol per step; `adapter-sync-check` procedure (promoted this phase)
+- files touched: `.gitignore` (new) + initial root commit; `legacy.public_compat_imports` (78 archive rows) + 05-23 checklist Phase 1 boxes + `audit-output/2026-06-10-phase-4f-execution.md` + `-final-local-row-counts.csv`; production `cron.job` (embed-backfill-scheduler → vault auth); `.agents` ledger/registry/seeds/SKILL fixes + `.claude` mirror regeneration; `CLAUDE.md`, `agent-operating-system.md`; `docs/reports/2026-06-10-audit-uncertainty-addendum.md`, `audit-output/2026-06-10-production-row-counts.csv`
+- tools used: git, psql (local 5233 + production pooler), supabase CLI (secrets/functions list), vercel CLI (npx), rsync/diff, SQL anti-joins, JWT payload decode (role/exp only)
+- outcome: S1.1 ✓ (root versioned, no payloads tracked); S1.2 ✓ (4F no-import gate recorded, validation zero-blocking); S1.3 ✓ (VOYAGE_API_KEY present, semantic stage proven live in production trace 2026-06-08 vs null control 2026-06-01; backfill of 30 real-customer messages deferred until synthetic deletion); S1.4 partial (embed-backfill cron converted to vault auth; **service_role rotation still pending — hardcoded cron JWT proven identical to current vault key, so the git-leaked credential remains valid**); S1.5 ✓ (.agents canonical, mirrors byte-identical, sync rule documented); S1.6 ✓ (all four uncertainties resolved, 3 new debt items recorded in the addendum)
+- reusable pattern observed: comparing a hardcoded credential against the vault copy by equality (never printing either) is the fastest way to prove whether a rotation actually happened
+- promotion follow-up: `adapter-sync-check` promoted; `three-lens-release-review`, `secrets-environment-promotion`, `staging-validation-runner` seeds updated with first traces
+
+### 2026-06-10 - Phase 1 skill checkpoint review
+- task type: skill lifecycle review (per program plan §Iteration loop step 5)
+- request summary: end-of-phase ledger review, promote/seed/prune pass
+- filesystem slice inspected: `.agents/skills/task-router/{routing-ledger,skill-seeds,registry,promotion-criteria}.md`
+- chosen owner: root `.agents/skills/` (canonical layer per S1.5 decision)
+- chosen path: direct execution
+- skill or subagent used: `task-router`
+- files touched: `skill-seeds.md` (4 seed updates), `registry.md` (+`postgresql-best-practices`, +`code-review`, +`adapter-sync-check`), `.agents/skills/adapter-sync-check/SKILL.md` (new), `.claude` mirror
+- tools used: file edits, rsync mirror regeneration
+- outcome: promoted `adapter-sync-check` (2 traces, gate passed); held `three-lens-release-review` despite 2 decision-changing traces (re-evaluate at Phase 3 — guard against premature promotion from a single phase); recorded first traces for `secrets-environment-promotion` and `staging-validation-runner`; no prunes yet (no seed has proven one-off)
+- reusable pattern observed: a phase checkpoint that re-reads its own phase's ledger entries catches promotion evidence that step-level work forgets to claim
+- promotion follow-up: next checkpoint at Phase 2 (evaluate `ledger-mirroring` merge into `adapter-sync-check`)
+
 ### 2026-06-09 - Workspace integration implementation plan + skill-seeds ledger
 - task type: cross-workspace program planning + agent-operating-system extension
 - request summary: turn the 2026-06-09 integration audit into a step-by-step implementation plan with per-step three-lens (customer / company-brand / code) scientific-research iteration, wire the routing ledger into a continuous promote-or-seed loop, and create a dedicated observation ledger for potential future skills
@@ -99,6 +125,32 @@ Record successful and failed cross-workspace traces here before proposing new re
 - reusable pattern observed: local KDS liveness should be treated as a dashboard-local heartbeat overlay, not as `last_used_at` from the durable device session row.
 - promotion follow-up: no new skill; this is a product-local stabilization pattern.
 
+### 2026-05-21 - Umi landing product-suite repositioning
+- task type: product frontend redesign + brand/message repositioning
+- request summary: transform Umi landing from data-consulting positioning into a product-suite landing faithful to ConversaFlow, KDS, Cash, Dashboard, Logs, and the original corporate manual
+- filesystem slice inspected: root workspace docs, routing maps, `apps/umi-landing-page-1`, legacy `apps/umi-landing-page`, manual corporativo PDF, product repo contexts for ConversaFlow, KDS, Cash, Dashboard, and Logs
+- chosen owner: `apps/umi-landing-page-1`
+- chosen path: direct implementation in the functional Next landing app, preserving contact and diagnostic routes
+- skill or subagent used: `task-router`, `workspace-boundary-check`, `frontend-design`
+- files touched: landing page sections/components, diagnostic copy and scoring, contact route templates, email templates, layout metadata, global styles
+- tools used: repo search, PDF text extraction, source-backed UX research, patch edits, Next build, Jest, Brave DevTools visual checks
+- outcome: landing now presents Umi as a connected restaurant operations suite with responsive product mockups and product-aligned diagnostic/contact flows
+- reusable pattern observed: when brand positioning changes but a functional landing shell already exists, preserve the app/runtime owner and replace message/visual system in place
+- promotion follow-up: none
+
+### 2026-05-21 - Landing page redesign transplant
+- task type: product frontend redesign + backend form wiring
+- request summary: adapt `apps/umi-landing-page-1` to the newer `apps/umi-landing-page` design while keeping the older app functional and connected to backend routes
+- filesystem slice inspected: root workspace routing docs, `apps/umi-landing-page`, `apps/umi-landing-page-1`, Next app routes, landing components, diagnostic API, email sequence integration
+- chosen owner: `apps/umi-landing-page-1`
+- chosen path: direct implementation in the functional Next app, using the newer landing design as source material
+- skill or subagent used: `task-router`, `workspace-boundary-check`, `frontend-design`
+- files touched: `apps/umi-landing-page-1/src/app/**`, landing page components, diagnostic backend route, email sequence integration, Next config, Tailwind config
+- tools used: repo search, patch edits, npm install for local dependencies, Next build, Jest, Brave DevTools browser check
+- outcome: redesigned landing page renders in the functional app; contact form remains wired to `/api/contact`; diagnostic quiz now posts the API-compatible shape to `/api/diagnostic`; email sequence tests pass
+- reusable pattern observed: when a redesign artifact has no backend/runtime shell, transplant it into the existing functional product app rather than moving API ownership
+- promotion follow-up: none
+
 ### 2026-05-17 - Dashboard tenant, membership, branch, and entitlement implementation
 - task type: cross-workspace dashboard/platform implementation
 - request summary: execute all phases of the tenant/membership/branch/product entitlement plan for Kalala, keep the implementation simple, and review/fix each phase critically
@@ -151,6 +203,50 @@ Record successful and failed cross-workspace traces here before proposing new re
 - reusable pattern observed: dashboard-facing cross-product data should resolve a product slug to both the product-local tenant and the backend business before choosing the owning schema for each route
 - promotion follow-up: none; this extends existing boundary-check guidance but does not require a new skill
 
+### 2026-05-14 - PostgreSQL platform local schema execution
+- task type: workspace-wide migration execution + local database validation
+- request summary: execute `docs/migration/2026-05-14-postgresql-platform-integration-plan.md`
+- filesystem slice inspected: root `AGENTS.md`, `WORKSPACE.md`, architecture maps, governance ownership docs, migration docs, each app `AGENTS.md` / `REPO_CONTEXT.md`, relevant schemas and route surfaces
+- chosen owner: root `docs/migration` for local platform draft; future runtime migrations route to owning product repos
+- chosen path: direct local SQL draft and validation
+- skill or subagent used: `task-router`, `workspace-boundary-check`, `scientific-research-check`
+- files touched:
+  - `docs/migration/local-postgres/001_platform_core.sql`
+  - `docs/migration/local-postgres/002_commerce_core.sql`
+  - `docs/migration/local-postgres/003_cash_core.sql`
+  - `docs/migration/local-postgres/004_conversaflow_core.sql`
+  - `docs/migration/local-postgres/005_kds_core.sql`
+  - `docs/migration/local-postgres/006_observability_core.sql`
+  - `docs/migration/local-postgres/010_seed_product_matrix.sql`
+  - `docs/migration/local-postgres/README.md`
+  - `docs/migration/audit-output/2026-05-14-platform-local-execution.md`
+  - `docs/migration/audit-output/local-platform-schema.sql`
+  - `.claude/skills/task-router/routing-ledger.md`
+- tools used: repo search, PostgreSQL 18 local server, psql, pg_dump, patch edits
+- outcome: local schema applied to `umi_platform_local`; product capability and tenant-scope validation passed; current production DB audit blocked because `UMI_CURRENT_DATABASE_URL` was unset
+- reusable pattern observed: root migration plans can produce local-only SQL drafts under root docs while runtime cutover remains product-owned
+- promotion follow-up: none
+
+### 2026-05-14 - Supabase production dump local restore and translation inventory
+- task type: local production dump restore + migration planning
+- request summary: decrypt the local Supabase dump, restore it locally, and start planning translation into the PostgreSQL platform model
+- filesystem slice inspected: root dump handoff directory, Desktop passphrase path by filename only, root migration audit output, local PostgreSQL server state
+- chosen owner: root `docs/migration/audit-output` for inventory and planning; future import SQL should remain local-only until validated
+- chosen path: direct local restore into `umi_supabase_dump_local`
+- skill or subagent used: `workspace-boundary-check`, `scientific-research-check`
+- files touched:
+  - `docs/migration/audit-output/supabase-local-schema.sql`
+  - `docs/migration/audit-output/supabase-local-tables.csv`
+  - `docs/migration/audit-output/supabase-local-columns.csv`
+  - `docs/migration/audit-output/supabase-local-foreign-keys.csv`
+  - `docs/migration/audit-output/supabase-local-row-counts.csv`
+  - `docs/migration/audit-output/2026-05-14-supabase-dump-local-restore-and-translation.md`
+  - `.claude/skills/task-router/routing-ledger.md`
+- tools used: OpenSSL, tar, Homebrew PostgreSQL 18, pgvector, pg_restore, psql, pg_dump
+- outcome: encrypted dump restored locally with application schemas/data; remaining restore gaps are unavailable hosted Supabase extensions (`pg_cron`, `pg_net`, `supabase_vault`); no decrypted dump was left under docs
+- reusable pattern observed: keep decrypted data in `/tmp`, commit only schema/count inventories, and separate local restore fidelity from canonical platform translation planning
+- promotion follow-up: none
+
 ### 2026-05-13 - Platform and output folder consolidation
 - task type: cross-workspace cleanup and ownership consolidation
 - request summary: move useful files out of `output` and `platform`, then delete those folders
@@ -175,6 +271,25 @@ Record successful and failed cross-workspace traces here before proposing new re
 - tools used: repo inspection, `rg`, `find`, `du`, direct cleanup commands, `apply_patch`
 - outcome: removed ignored generated artifacts and stale tracked docs/collateral while preserving active agent contracts, env files, dependencies, and pre-existing modified source files
 - reusable pattern observed: cleanup should first separate ignored/generated artifacts from tracked source/docs, then patch references before deleting tracked docs
+- promotion follow-up: none
+
+### 2026-05-11 - ConversaFlow canonical mini-harness cleanup
+- task type: architecture cleanup + forward implementation planning
+- request summary: remove obsolete architecture documentation and make the branch point to a single clean mini-harness direction with customer memory, deep tools, minimal state, and extensive testing
+- filesystem slice inspected: `platform/conversaflow/docs/**`, `apps/umi-conversaflow/*.md`, `apps/umi-conversaflow/reports/**`, root routing docs
+- chosen owner: `apps/umi-conversaflow` for implementation; `platform/conversaflow/docs/architecture/reviews/` for canonical architecture docs
+- chosen path: direct documentation cleanup and replacement
+- skill or subagent used: `task-router`, `workspace-boundary-check`, `scientific-research-check` procedure applied manually
+- files touched:
+  - `platform/conversaflow/docs/architecture/reviews/mini-harness-architecture.md` (new canonical architecture)
+  - `platform/conversaflow/docs/architecture/reviews/mini-harness-implementation-plan.md`
+  - `platform/conversaflow/docs/README.md`
+  - `platform/conversaflow/docs/architecture/ARCHITECTURE_TARGET.md`
+  - removed obsolete review docs, runbooks, baseline docs, and stale generated reports
+  - `.claude/skills/task-router/routing-ledger.md`
+- tools used: repo search, patch edits
+- outcome: branch documentation now points to one forward architecture: a mini harness with deep backend tools, first-class customer memory, backend-owned operational truth, minimal resumable state, and an extensive test campaign
+- reusable pattern observed: when replacing an overgrown architecture, keep only the canonical forward path in docs; historical reports belong outside the active branch if they keep steering implementation back to discarded patterns
 - promotion follow-up: none
 
 ### 2026-04-15 - Umi KDS schema and organization architecture plan

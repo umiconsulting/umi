@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dashboard Customer UX Validation"
+  short_description: "Validate customer admin UX across viewports"
+  default_prompt: "Use $dashboard-customer-ux-validation to verify the Dashboard customer experience on desktop and mobile."

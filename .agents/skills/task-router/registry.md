@@ -4,7 +4,7 @@
 - `task-router`
   - scope: route work to the correct Umi owner slice, then to direct execution, an existing project skill, or a subagent.
   - trigger patterns: multi-repo tasks, root-level docs, cross-product planning, ownership uncertainty.
-  - placement hints: start in root `.claude/skills/task-router/`, then descend into the owning repo if the task becomes local.
+  - placement hints: start in root `.agents/skills/task-router/` (canonical source; `.claude/` is a generated mirror), then descend into the owning repo if the task becomes local.
   - confidence: high
   - provenance: root workspace scaffold for Umi.
 - `scientific-research-check`
@@ -37,6 +37,24 @@
   - placement hints: use after Dashboard customer UI changes and before signoff; verify desktop and mobile layouts when a runnable app exists.
   - confidence: medium
   - provenance: promoted from the Dashboard customer/conversations migration plan gaps.
+- `postgresql-best-practices`
+  - scope: PostgreSQL table design, indexing, normalization, and migration safety reference.
+  - trigger patterns: new tables, schema design review, index planning, migration SQL authoring.
+  - placement hints: reference during schema work in any repo; pairs with `scientific-research-check` for version-sensitive claims.
+  - confidence: medium
+  - provenance: imported reference distilled from official PostgreSQL guidance.
+- `code-review`
+  - scope: AI-powered code review using CodeRabbit for changed code, PRs, and quality/security passes.
+  - trigger patterns: explicit review requests; pre-merge quality, security, or bug-hunt passes on changed code.
+  - placement hints: run from the repo whose diff is under review.
+  - confidence: medium
+  - provenance: adopted from the root `.claude` adapter layer during S1.5 re-convergence (2026-06-10).
+- `adapter-sync-check`
+  - scope: verify and restore convergence between canonical `.agents/skills/` and the generated `.claude/skills/` mirror.
+  - trigger patterns: any write to a root skill/registry/ledger/seed file; workspace health checks; suspected adapter drift.
+  - placement hints: run from the workspace root; canonical writes go to `.agents/`, never the mirror.
+  - confidence: high
+  - provenance: promoted at the Phase 1 checkpoint (2026-06-10) from the `adapter-sync-check` seed — traces: 2026-06-09 audit drift diff, 2026-06-10 S1.5 re-convergence.
 
 ## Selection rules
 - Workspace-level docs and planning: root `docs/` plus root `CLAUDE.md`.

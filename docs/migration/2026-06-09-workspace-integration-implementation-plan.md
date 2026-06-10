@@ -235,7 +235,7 @@ Order within this phase is deliberate: dashboard (internal-facing) cuts over bef
 
 ## Status
 
-- [ ] Phase 1 — Stabilization
+- [ ] Phase 1 — Stabilization — **executed 2026-06-10**; S1.1/S1.2/S1.3/S1.5/S1.6 complete with three-lens evidence (see ledger entry "Phase 1 stabilization execution"); S1.4 remains open on one owner-manual action: roll the service_role key in the Supabase dashboard, then `select vault.update_secret(id, new_secret := '<new-jwt>')` for `service_role_key` and update dependent app `.env` files — all three cron jobs that need service_role now read it from Vault, so no SQL changes are needed post-roll. Phase 1 closes when one scheduled invocation succeeds after rotation.
 - [ ] Phase 2 — Standardization
 - [ ] Phase 3 — Shared Foundations
 - [ ] Phase 4 — Backend Consolidation

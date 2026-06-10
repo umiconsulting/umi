@@ -1,0 +1,4 @@
+interface:
+  display_name: "Owner Insights Migration"
+  short_description: "Move Logs insights into Dashboard safely"
+  default_prompt: "Use $owner-insights-migration to adapt Logs-only insights into owner-facing Dashboard views."

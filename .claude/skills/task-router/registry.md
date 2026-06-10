@@ -4,7 +4,7 @@
 - `task-router`
   - scope: route work to the correct Umi owner slice, then to direct execution, an existing project skill, or a subagent.
   - trigger patterns: multi-repo tasks, root-level docs, cross-product planning, ownership uncertainty.
-  - placement hints: start in root `.claude/skills/task-router/`, then descend into the owning repo if the task becomes local.
+  - placement hints: start in root `.agents/skills/task-router/` (canonical source; `.claude/` is a generated mirror), then descend into the owning repo if the task becomes local.
   - confidence: high
   - provenance: root workspace scaffold for Umi.
 - `scientific-research-check`
@@ -19,10 +19,49 @@
   - placement hints: use before creating new files outside an existing project slice.
   - confidence: medium
   - provenance: created for Umi multi-product ownership decisions.
+- `customer-identity-resolution`
+  - scope: resolve tenant-scoped customer identity across Dashboard, ConversaFlow, Cash, and platform contacts using safe phone/WhatsApp matching.
+  - trigger patterns: customer unification, phone normalization, Customer 360, contact identity, merge candidates, Cash/WhatsApp matching, `platform.contacts`, `platform.contact_identities`.
+  - placement hints: use with `workspace-boundary-check`; keep canonical identity in `platform`, runtime normalization in ConversaFlow, loyalty-only behavior in Cash, and Dashboard as consumer.
+  - confidence: medium
+  - provenance: promoted from the Dashboard customer/conversations migration plan gaps.
+- `owner-insights-migration`
+  - scope: adapt Logs-only customer, conversation, memory, Voyage, WhatsApp, and integration health surfaces into owner-facing Dashboard views.
+  - trigger patterns: moving Logs views into Dashboard, owner-facing insights, WhatsApp health, Voyage embedding health, memory health, conversation triage.
+  - placement hints: classify each Logs surface as owner-facing, admin-gated, or internal-only before moving; keep raw traces and service-role diagnostics out of Dashboard.
+  - confidence: medium
+  - provenance: promoted from the Dashboard customer/conversations migration plan gaps.
+- `dashboard-customer-ux-validation`
+  - scope: validate Dashboard customer platform UX across Customers navigation, customer profile, conversations, Insights, entitlement gating, and responsive layout.
+  - trigger patterns: Customers sidebar UX, customer profile tabs, customer timeline, Dashboard conversation detail, responsive owner admin UI validation.
+  - placement hints: use after Dashboard customer UI changes and before signoff; verify desktop and mobile layouts when a runnable app exists.
+  - confidence: medium
+  - provenance: promoted from the Dashboard customer/conversations migration plan gaps.
+- `postgresql-best-practices`
+  - scope: PostgreSQL table design, indexing, normalization, and migration safety reference.
+  - trigger patterns: new tables, schema design review, index planning, migration SQL authoring.
+  - placement hints: reference during schema work in any repo; pairs with `scientific-research-check` for version-sensitive claims.
+  - confidence: medium
+  - provenance: imported reference distilled from official PostgreSQL guidance.
+- `code-review`
+  - scope: AI-powered code review using CodeRabbit for changed code, PRs, and quality/security passes.
+  - trigger patterns: explicit review requests; pre-merge quality, security, or bug-hunt passes on changed code.
+  - placement hints: run from the repo whose diff is under review.
+  - confidence: medium
+  - provenance: adopted from the root `.claude` adapter layer during S1.5 re-convergence (2026-06-10).
+- `adapter-sync-check`
+  - scope: verify and restore convergence between canonical `.agents/skills/` and the generated `.claude/skills/` mirror.
+  - trigger patterns: any write to a root skill/registry/ledger/seed file; workspace health checks; suspected adapter drift.
+  - placement hints: run from the workspace root; canonical writes go to `.agents/`, never the mirror.
+  - confidence: high
+  - provenance: promoted at the Phase 1 checkpoint (2026-06-10) from the `adapter-sync-check` seed — traces: 2026-06-09 audit drift diff, 2026-06-10 S1.5 re-convergence.
 
 ## Selection rules
 - Workspace-level docs and planning: root `docs/` plus root `CLAUDE.md`.
 - Source-sensitive technical decisions: `scientific-research-check` before locking the recommendation.
+- Customer identity, phone normalization, and cross-product Customer 360 matching: `customer-identity-resolution`.
+- Logs-to-Dashboard owner insight migration: `owner-insights-migration`.
+- Dashboard customer UX validation and responsive owner-admin checks: `dashboard-customer-ux-validation`.
 - Product app changes: descend into the owning app repo.
 - Shared Supabase contracts, normalization, projections, jobs, and backend orchestration: `apps/umi-conversaflow`.
 - ConversaFlow ops/logs UI changes: `apps/umi-logs`.

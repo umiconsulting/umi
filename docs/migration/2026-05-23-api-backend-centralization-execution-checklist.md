@@ -31,15 +31,15 @@
 
 ## Phase 1 — Complete Local Migration
 
-- [ ] Execute Phase 4F as an audit/no-import gate.
-- [ ] Use `2026-05-16-public-compatibility-legacy-audit.md` as the Phase 4F source checklist.
-- [ ] Confirm public-only rows remain excluded from production-facing product tables.
-- [ ] Mark public-only pending jobs as `do_not_replay` if preserving audit evidence is still needed.
-- [ ] Run `docs/migration/validation/001_core_validation.sql`.
-- [ ] Confirm zero blocking validation violations.
-- [ ] Record final local row counts after Phase 4F; expected production row counts should not increase from `public.*`.
+- [x] Execute Phase 4F as an audit/no-import gate. *(2026-06-10: no import; 78 public-only runtime rows recorded `archived_only` in `legacy.public_compat_imports`, batch `phase-4f-public-compat-no-import-gate`)*
+- [x] Use `2026-05-16-public-compatibility-legacy-audit.md` as the Phase 4F source checklist. *(deltas re-verified identical: 12 messages / 30 jobs / 30 job_attempts / 6 outbox; 0 canonical)*
+- [x] Confirm public-only rows remain excluded from production-facing product tables. *(anti-join recheck: all 78 absent from `conversaflow.*`)*
+- [x] Mark public-only pending jobs as `do_not_replay` if preserving audit evidence is still needed. *(2 pending jobs flagged via `metadata.replay`)*
+- [x] Run `docs/migration/validation/001_core_validation.sql`. *(2026-06-10, against `umi_platform_transition_exec_v2_20260515`)*
+- [x] Confirm zero blocking validation violations. *(only finding: 1 unverified duplicate phone candidate — pre-existing, non-blocking per 05-15 phase review)*
+- [x] Record final local row counts after Phase 4F; expected production row counts should not increase from `public.*`. *(`audit-output/2026-06-10-phase-4f-final-local-row-counts.csv`; narrative in `audit-output/2026-06-10-phase-4f-execution.md`)*
 
-**Exit criterion:** local transition database passes validation and is ready to reproduce in staging.
+**Exit criterion:** local transition database passes validation and is ready to reproduce in staging. **Met 2026-06-10.**
 
 ---
 

@@ -13,7 +13,7 @@ description: Verify which Umi repo, schema, and documentation layer should own a
 - Keep product apps thin and focused on consumption, not cross-channel normalization.
 
 ## Default ownership map
-- Umi-wide architecture and planning: root `docs/` and root `CLAUDE.md`
+- Umi-wide architecture and planning: root `docs/` and root `AGENTS.md`
 - KDS app UI and client code: `apps/umi-kds`
 - Shared Supabase schema work, jobs, and normalization: `apps/umi-conversaflow`
 - ConversaFlow ops/logs UI: `apps/umi-logs`

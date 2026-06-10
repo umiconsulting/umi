@@ -57,6 +57,18 @@ Current adapters:
 
 These adapters should stay aligned with `AGENTS.md`, not diverge from it.
 
+**Canonical procedure layer (decided 2026-06-10, plan S1.5):** root `.agents/skills/` is the
+single source of truth for skills, the registry, the routing ledger, and skill seeds. Root
+`.claude/skills/` is a generated mirror — never hand-edit it. Regenerate and verify with:
+
+```sh
+rsync -ac --delete .agents/skills/ .claude/skills/
+diff -r .claude/skills .agents/skills   # must be empty
+```
+
+Expected non-mirrored deltas: `.claude/settings.local.json` (machine-local) and `.agents/agents/`
+(neutral agent specs, no `.claude` equivalent yet).
+
 ## Principles
 
 ### Ownership first
@@ -129,4 +141,6 @@ When a workspace-wide rule changes:
 2. Update this document if the operating model changed
 3. Update maps, governance docs, or repo contexts if retrieval changed
 4. Update `CLAUDE.md` only as an adapter or shortcut
-5. Update `.claude/skills/` or `.agents/skills/` only if a procedure changed
+5. Update `.agents/skills/` (canonical) only if a procedure changed, then regenerate the
+   `.claude/skills/` mirror (`rsync -ac --delete .agents/skills/ .claude/skills/`) and verify
+   `diff -r` is empty before finishing the task
