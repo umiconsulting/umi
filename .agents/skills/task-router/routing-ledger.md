@@ -21,6 +21,20 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-06-10 - Phase 4 S4.1 dashboard schema cutover
+- task type: cross-workspace program execution (backend consolidation, dashboard track)
+- request summary: continue with Phase 4; owner constraint recorded — umi-cash Supabase project `rrkzhisnadfrgnhntkiz` is the only real production DB and is untouchable until S4.3 readiness
+- filesystem slice inspected: `apps/umi-dashboard` (server.js, prisma, env files, api/, vercel.json), `docs/migration/local-postgres/**`, staging DB `umi_platform_staging_phase3_20260610`, transition DB `dashboard_compat`/`kds` schemas
+- chosen owner: `apps/umi-dashboard` for the cutover; root `docs/migration` for replay scripts and evidence
+- chosen path: direct execution; no subagent
+- skill or subagent used: `task-router`, `staging-validation-runner` (replay-gap handling), three-lens walk
+- files touched: `apps/umi-dashboard/{server.js,prisma/schema.prisma,.env.example,docs/deployment.md}` (commits 4aba926, 5e49777), `docs/migration/local-postgres/008_dashboard_compat_core.sql` (new), `005_kds_core.sql` (pairing table appended), 05-23 checklist Phase 4, plan status, `audit-output/2026-06-10-phase-4-1-dashboard-cutover.md`
+- tools used: psql, pg_dump, node --check, prisma validate/generate, curl API matrix, puppeteer browser walkthrough, npm build
+- outcome: zero `PLATFORM_TRANSITION_SCHEMA` references; legacy branches and dead helpers deleted (server.js 3,570 → 2,952); Prisma schema remapped to compat views and trimmed; 28 API checks + write flows + browser walkthrough green against staging; two staging replay gaps found live and scripted additively; Cash production untouched (verified zero repo references before starting)
+- reusable pattern observed: before deleting dual-path branches, walk the route surface on the surviving path with entitlement-positive AND entitlement-negative tenants — the 403s are evidence the gating works, not failures; also, replay-gap discovery (ad-hoc schemas missing from numbered scripts) recurs every environment promotion — fold "diff live schema vs scripts" into `staging-validation-runner`
+- promotion follow-up: update `staging-validation-runner` with the schema-vs-scripts diff step at the Phase 4 checkpoint; `three-lens-release-review` gained its third decision-changing trace (the credential-orphan and pairing-table finds came from the lens walk)
+
+
 ### 2026-06-10 - Phase 3 shared foundations execution (S3.1-S3.3)
 - task type: cross-workspace program execution (shared foundations phase)
 - request summary: execute Phase 3 of the 2026-06-09 workspace integration implementation plan

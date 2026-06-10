@@ -77,14 +77,14 @@ This work can start in parallel with staging. It must not switch production traf
 
 The `PLATFORM_TRANSITION_SCHEMA=true` branches are the target path.
 
-- [ ] Point `server.js` or its replacement API layer at the staging PostgreSQL database.
-- [ ] Run dashboard flows in `PLATFORM_TRANSITION_SCHEMA=true` mode.
-- [ ] Verify auth, tenant routing, capabilities, staff, business hours, conversations, KDS views, Cash analytics, customers, rewards, gift cards, and notifications.
-- [ ] Delete `PLATFORM_TRANSITION_SCHEMA=false` branches route group by route group after verification.
-- [ ] Remove the dashboard duplicate Cash Prisma schema once dashboard no longer queries the legacy Cash project.
-- [ ] Remove `@prisma/client` from `umi-dashboard` if the final dashboard backend no longer uses Prisma directly.
+- [x] Point `server.js` or its replacement API layer at the staging PostgreSQL database. *(2026-06-10: ran against `umi_platform_staging_phase3_20260610`; two replay gaps found and scripted — `008_dashboard_compat_core.sql` (new) and `kds.device_pairing_requests` appended to `005_kds_core.sql`.)*
+- [x] Run dashboard flows in `PLATFORM_TRANSITION_SCHEMA=true` mode. *(28 API checks green incl. entitlement 403s; login pos/neg; staff CRUD; hours/settings patches; pairing PIN+list; order-transition guard.)*
+- [x] Verify auth, tenant routing, capabilities, staff, business hours, conversations, KDS views, Cash analytics, customers, rewards, gift cards, and notifications. *(Cash analytics/rewards/gift cards verified 200 on cash-active `full-stack-cafe`; correctly 403 `product_not_active` on `kalalacafe`. Browser walkthrough: login, overview, customers, customer 360, orders.)*
+- [x] Delete `PLATFORM_TRANSITION_SCHEMA=false` branches route group by route group after verification. *(All 41 references removed including the gate constant; dead legacy helpers deleted; `server.js` 3,570 → 2,952 lines; umi-dashboard commit `5e49777`.)*
+- [x] Remove the dashboard duplicate Cash Prisma schema once dashboard no longer queries the legacy Cash project. *(Schema is no longer a Cash duplicate: trimmed to the 9 models the dashboard queries, all resolving to `dashboard_compat.*` views over the platform DB; unused Session/OtpVerification/BirthdayReward/ApplePushToken removed.)*
+- [ ] Remove `@prisma/client` from `umi-dashboard` if the final dashboard backend no longer uses Prisma directly. *(Deliberately retained: Prisma is the active client for both `$queryRaw` and the compat-view models; removal would be a rewrite with no consolidation gain at this stage.)*
 
-**Exit criterion:** dashboard has one schema path and no dependency on the stale copied `umi_cash` schema or legacy Cash project for platform-owned reads.
+**Exit criterion:** dashboard has one schema path and no dependency on the stale copied `umi_cash` schema or legacy Cash project for platform-owned reads. **Met 2026-06-10** (single path; the stale `umi_cash` schema copy and the legacy Cash project are unreferenced by dashboard code; `@prisma/client` retained as the query client by design).
 
 ---
 

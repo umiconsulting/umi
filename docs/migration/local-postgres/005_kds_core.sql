@@ -112,3 +112,41 @@ create index kds_device_events_tenant_time_idx
   on kds.device_events (tenant_id, occurred_at desc);
 
 grant select on all tables in schema kds to umi_app, umi_worker, umi_readonly;
+
+-- kds.device_pairing_requests: added by the 2026-05-22 KDS pin-pairing plan; captured
+-- into this replay script 2026-06-10 after the staging replay was found missing it (S4.1).
+CREATE TABLE kds.device_pairing_requests (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id uuid NOT NULL,
+    location_id uuid,
+    station_id uuid NOT NULL,
+    device_name text NOT NULL,
+    requested_name text,
+    pin_hash text NOT NULL,
+    pin_salt text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    attempt_count integer DEFAULT 0 NOT NULL,
+    max_attempts integer DEFAULT 5 NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    approved_by uuid,
+    approved_at timestamp with time zone,
+    used_at timestamp with time zone,
+    denied_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT device_pairing_requests_attempts_check CHECK (((attempt_count >= 0) AND (max_attempts > 0))),
+    CONSTRAINT device_pairing_requests_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'denied'::text, 'expired'::text, 'used'::text])))
+);
+COMMENT ON TABLE kds.device_pairing_requests IS 'Short-lived admin-approved KDS first-pairing requests. PINs are salted and hashed; durable sessions live in kds.device_sessions.';
+ALTER TABLE ONLY kds.device_pairing_requests
+    ADD CONSTRAINT device_pairing_requests_pkey PRIMARY KEY (id);
+CREATE INDEX kds_device_pairing_pending_hash_idx ON kds.device_pairing_requests USING btree (status, expires_at) WHERE (status = 'pending'::text);
+CREATE INDEX kds_device_pairing_tenant_status_idx ON kds.device_pairing_requests USING btree (tenant_id, location_id, status, expires_at DESC);
+ALTER TABLE ONLY kds.device_pairing_requests
+    ADD CONSTRAINT device_pairing_requests_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES platform.users(id) ON DELETE SET NULL;
+ALTER TABLE ONLY kds.device_pairing_requests
+    ADD CONSTRAINT device_pairing_requests_location_id_fkey FOREIGN KEY (location_id) REFERENCES platform.locations(id) ON DELETE CASCADE;
+ALTER TABLE ONLY kds.device_pairing_requests
+    ADD CONSTRAINT device_pairing_requests_station_id_fkey FOREIGN KEY (station_id) REFERENCES kds.stations(id) ON DELETE RESTRICT;
+ALTER TABLE ONLY kds.device_pairing_requests
+    ADD CONSTRAINT device_pairing_requests_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES platform.tenants(id) ON DELETE CASCADE;
