@@ -1,0 +1,1059 @@
+table_schema,table_name,column_name,data_type,is_nullable
+auth,audit_log_entries,instance_id,uuid,YES
+auth,audit_log_entries,id,uuid,NO
+auth,audit_log_entries,payload,json,YES
+auth,audit_log_entries,created_at,timestamp with time zone,YES
+auth,audit_log_entries,ip_address,character varying,NO
+auth,custom_oauth_providers,id,uuid,NO
+auth,custom_oauth_providers,provider_type,text,NO
+auth,custom_oauth_providers,identifier,text,NO
+auth,custom_oauth_providers,name,text,NO
+auth,custom_oauth_providers,client_id,text,NO
+auth,custom_oauth_providers,client_secret,text,NO
+auth,custom_oauth_providers,acceptable_client_ids,ARRAY,NO
+auth,custom_oauth_providers,scopes,ARRAY,NO
+auth,custom_oauth_providers,pkce_enabled,boolean,NO
+auth,custom_oauth_providers,attribute_mapping,jsonb,NO
+auth,custom_oauth_providers,authorization_params,jsonb,NO
+auth,custom_oauth_providers,enabled,boolean,NO
+auth,custom_oauth_providers,email_optional,boolean,NO
+auth,custom_oauth_providers,issuer,text,YES
+auth,custom_oauth_providers,discovery_url,text,YES
+auth,custom_oauth_providers,skip_nonce_check,boolean,NO
+auth,custom_oauth_providers,cached_discovery,jsonb,YES
+auth,custom_oauth_providers,discovery_cached_at,timestamp with time zone,YES
+auth,custom_oauth_providers,authorization_url,text,YES
+auth,custom_oauth_providers,token_url,text,YES
+auth,custom_oauth_providers,userinfo_url,text,YES
+auth,custom_oauth_providers,jwks_uri,text,YES
+auth,custom_oauth_providers,created_at,timestamp with time zone,NO
+auth,custom_oauth_providers,updated_at,timestamp with time zone,NO
+auth,flow_state,id,uuid,NO
+auth,flow_state,user_id,uuid,YES
+auth,flow_state,auth_code,text,YES
+auth,flow_state,code_challenge_method,USER-DEFINED,YES
+auth,flow_state,code_challenge,text,YES
+auth,flow_state,provider_type,text,NO
+auth,flow_state,provider_access_token,text,YES
+auth,flow_state,provider_refresh_token,text,YES
+auth,flow_state,created_at,timestamp with time zone,YES
+auth,flow_state,updated_at,timestamp with time zone,YES
+auth,flow_state,authentication_method,text,NO
+auth,flow_state,auth_code_issued_at,timestamp with time zone,YES
+auth,flow_state,invite_token,text,YES
+auth,flow_state,referrer,text,YES
+auth,flow_state,oauth_client_state_id,uuid,YES
+auth,flow_state,linking_target_id,uuid,YES
+auth,flow_state,email_optional,boolean,NO
+auth,identities,provider_id,text,NO
+auth,identities,user_id,uuid,NO
+auth,identities,identity_data,jsonb,NO
+auth,identities,provider,text,NO
+auth,identities,last_sign_in_at,timestamp with time zone,YES
+auth,identities,created_at,timestamp with time zone,YES
+auth,identities,updated_at,timestamp with time zone,YES
+auth,identities,email,text,YES
+auth,identities,id,uuid,NO
+auth,instances,id,uuid,NO
+auth,instances,uuid,uuid,YES
+auth,instances,raw_base_config,text,YES
+auth,instances,created_at,timestamp with time zone,YES
+auth,instances,updated_at,timestamp with time zone,YES
+auth,mfa_amr_claims,session_id,uuid,NO
+auth,mfa_amr_claims,created_at,timestamp with time zone,NO
+auth,mfa_amr_claims,updated_at,timestamp with time zone,NO
+auth,mfa_amr_claims,authentication_method,text,NO
+auth,mfa_amr_claims,id,uuid,NO
+auth,mfa_challenges,id,uuid,NO
+auth,mfa_challenges,factor_id,uuid,NO
+auth,mfa_challenges,created_at,timestamp with time zone,NO
+auth,mfa_challenges,verified_at,timestamp with time zone,YES
+auth,mfa_challenges,ip_address,inet,NO
+auth,mfa_challenges,otp_code,text,YES
+auth,mfa_challenges,web_authn_session_data,jsonb,YES
+auth,mfa_factors,id,uuid,NO
+auth,mfa_factors,user_id,uuid,NO
+auth,mfa_factors,friendly_name,text,YES
+auth,mfa_factors,factor_type,USER-DEFINED,NO
+auth,mfa_factors,status,USER-DEFINED,NO
+auth,mfa_factors,created_at,timestamp with time zone,NO
+auth,mfa_factors,updated_at,timestamp with time zone,NO
+auth,mfa_factors,secret,text,YES
+auth,mfa_factors,phone,text,YES
+auth,mfa_factors,last_challenged_at,timestamp with time zone,YES
+auth,mfa_factors,web_authn_credential,jsonb,YES
+auth,mfa_factors,web_authn_aaguid,uuid,YES
+auth,mfa_factors,last_webauthn_challenge_data,jsonb,YES
+auth,oauth_authorizations,id,uuid,NO
+auth,oauth_authorizations,authorization_id,text,NO
+auth,oauth_authorizations,client_id,uuid,NO
+auth,oauth_authorizations,user_id,uuid,YES
+auth,oauth_authorizations,redirect_uri,text,NO
+auth,oauth_authorizations,scope,text,NO
+auth,oauth_authorizations,state,text,YES
+auth,oauth_authorizations,resource,text,YES
+auth,oauth_authorizations,code_challenge,text,YES
+auth,oauth_authorizations,code_challenge_method,USER-DEFINED,YES
+auth,oauth_authorizations,response_type,USER-DEFINED,NO
+auth,oauth_authorizations,status,USER-DEFINED,NO
+auth,oauth_authorizations,authorization_code,text,YES
+auth,oauth_authorizations,created_at,timestamp with time zone,NO
+auth,oauth_authorizations,expires_at,timestamp with time zone,NO
+auth,oauth_authorizations,approved_at,timestamp with time zone,YES
+auth,oauth_authorizations,nonce,text,YES
+auth,oauth_client_states,id,uuid,NO
+auth,oauth_client_states,provider_type,text,NO
+auth,oauth_client_states,code_verifier,text,YES
+auth,oauth_client_states,created_at,timestamp with time zone,NO
+auth,oauth_clients,id,uuid,NO
+auth,oauth_clients,client_secret_hash,text,YES
+auth,oauth_clients,registration_type,USER-DEFINED,NO
+auth,oauth_clients,redirect_uris,text,NO
+auth,oauth_clients,grant_types,text,NO
+auth,oauth_clients,client_name,text,YES
+auth,oauth_clients,client_uri,text,YES
+auth,oauth_clients,logo_uri,text,YES
+auth,oauth_clients,created_at,timestamp with time zone,NO
+auth,oauth_clients,updated_at,timestamp with time zone,NO
+auth,oauth_clients,deleted_at,timestamp with time zone,YES
+auth,oauth_clients,client_type,USER-DEFINED,NO
+auth,oauth_clients,token_endpoint_auth_method,text,NO
+auth,oauth_consents,id,uuid,NO
+auth,oauth_consents,user_id,uuid,NO
+auth,oauth_consents,client_id,uuid,NO
+auth,oauth_consents,scopes,text,NO
+auth,oauth_consents,granted_at,timestamp with time zone,NO
+auth,oauth_consents,revoked_at,timestamp with time zone,YES
+auth,one_time_tokens,id,uuid,NO
+auth,one_time_tokens,user_id,uuid,NO
+auth,one_time_tokens,token_type,USER-DEFINED,NO
+auth,one_time_tokens,token_hash,text,NO
+auth,one_time_tokens,relates_to,text,NO
+auth,one_time_tokens,created_at,timestamp without time zone,NO
+auth,one_time_tokens,updated_at,timestamp without time zone,NO
+auth,refresh_tokens,instance_id,uuid,YES
+auth,refresh_tokens,id,bigint,NO
+auth,refresh_tokens,token,character varying,YES
+auth,refresh_tokens,user_id,character varying,YES
+auth,refresh_tokens,revoked,boolean,YES
+auth,refresh_tokens,created_at,timestamp with time zone,YES
+auth,refresh_tokens,updated_at,timestamp with time zone,YES
+auth,refresh_tokens,parent,character varying,YES
+auth,refresh_tokens,session_id,uuid,YES
+auth,saml_providers,id,uuid,NO
+auth,saml_providers,sso_provider_id,uuid,NO
+auth,saml_providers,entity_id,text,NO
+auth,saml_providers,metadata_xml,text,NO
+auth,saml_providers,metadata_url,text,YES
+auth,saml_providers,attribute_mapping,jsonb,YES
+auth,saml_providers,created_at,timestamp with time zone,YES
+auth,saml_providers,updated_at,timestamp with time zone,YES
+auth,saml_providers,name_id_format,text,YES
+auth,saml_relay_states,id,uuid,NO
+auth,saml_relay_states,sso_provider_id,uuid,NO
+auth,saml_relay_states,request_id,text,NO
+auth,saml_relay_states,for_email,text,YES
+auth,saml_relay_states,redirect_to,text,YES
+auth,saml_relay_states,created_at,timestamp with time zone,YES
+auth,saml_relay_states,updated_at,timestamp with time zone,YES
+auth,saml_relay_states,flow_state_id,uuid,YES
+auth,schema_migrations,version,character varying,NO
+auth,sessions,id,uuid,NO
+auth,sessions,user_id,uuid,NO
+auth,sessions,created_at,timestamp with time zone,YES
+auth,sessions,updated_at,timestamp with time zone,YES
+auth,sessions,factor_id,uuid,YES
+auth,sessions,aal,USER-DEFINED,YES
+auth,sessions,not_after,timestamp with time zone,YES
+auth,sessions,refreshed_at,timestamp without time zone,YES
+auth,sessions,user_agent,text,YES
+auth,sessions,ip,inet,YES
+auth,sessions,tag,text,YES
+auth,sessions,oauth_client_id,uuid,YES
+auth,sessions,refresh_token_hmac_key,text,YES
+auth,sessions,refresh_token_counter,bigint,YES
+auth,sessions,scopes,text,YES
+auth,sso_domains,id,uuid,NO
+auth,sso_domains,sso_provider_id,uuid,NO
+auth,sso_domains,domain,text,NO
+auth,sso_domains,created_at,timestamp with time zone,YES
+auth,sso_domains,updated_at,timestamp with time zone,YES
+auth,sso_providers,id,uuid,NO
+auth,sso_providers,resource_id,text,YES
+auth,sso_providers,created_at,timestamp with time zone,YES
+auth,sso_providers,updated_at,timestamp with time zone,YES
+auth,sso_providers,disabled,boolean,YES
+auth,users,instance_id,uuid,YES
+auth,users,id,uuid,NO
+auth,users,aud,character varying,YES
+auth,users,role,character varying,YES
+auth,users,email,character varying,YES
+auth,users,encrypted_password,character varying,YES
+auth,users,email_confirmed_at,timestamp with time zone,YES
+auth,users,invited_at,timestamp with time zone,YES
+auth,users,confirmation_token,character varying,YES
+auth,users,confirmation_sent_at,timestamp with time zone,YES
+auth,users,recovery_token,character varying,YES
+auth,users,recovery_sent_at,timestamp with time zone,YES
+auth,users,email_change_token_new,character varying,YES
+auth,users,email_change,character varying,YES
+auth,users,email_change_sent_at,timestamp with time zone,YES
+auth,users,last_sign_in_at,timestamp with time zone,YES
+auth,users,raw_app_meta_data,jsonb,YES
+auth,users,raw_user_meta_data,jsonb,YES
+auth,users,is_super_admin,boolean,YES
+auth,users,created_at,timestamp with time zone,YES
+auth,users,updated_at,timestamp with time zone,YES
+auth,users,phone,text,YES
+auth,users,phone_confirmed_at,timestamp with time zone,YES
+auth,users,phone_change,text,YES
+auth,users,phone_change_token,character varying,YES
+auth,users,phone_change_sent_at,timestamp with time zone,YES
+auth,users,confirmed_at,timestamp with time zone,YES
+auth,users,email_change_token_current,character varying,YES
+auth,users,email_change_confirm_status,smallint,YES
+auth,users,banned_until,timestamp with time zone,YES
+auth,users,reauthentication_token,character varying,YES
+auth,users,reauthentication_sent_at,timestamp with time zone,YES
+auth,users,is_sso_user,boolean,NO
+auth,users,deleted_at,timestamp with time zone,YES
+auth,users,is_anonymous,boolean,NO
+auth,webauthn_challenges,id,uuid,NO
+auth,webauthn_challenges,user_id,uuid,YES
+auth,webauthn_challenges,challenge_type,text,NO
+auth,webauthn_challenges,session_data,jsonb,NO
+auth,webauthn_challenges,created_at,timestamp with time zone,NO
+auth,webauthn_challenges,expires_at,timestamp with time zone,NO
+auth,webauthn_credentials,id,uuid,NO
+auth,webauthn_credentials,user_id,uuid,NO
+auth,webauthn_credentials,credential_id,bytea,NO
+auth,webauthn_credentials,public_key,bytea,NO
+auth,webauthn_credentials,attestation_type,text,NO
+auth,webauthn_credentials,aaguid,uuid,YES
+auth,webauthn_credentials,sign_count,bigint,NO
+auth,webauthn_credentials,transports,jsonb,NO
+auth,webauthn_credentials,backup_eligible,boolean,NO
+auth,webauthn_credentials,backed_up,boolean,NO
+auth,webauthn_credentials,friendly_name,text,NO
+auth,webauthn_credentials,created_at,timestamp with time zone,NO
+auth,webauthn_credentials,updated_at,timestamp with time zone,NO
+auth,webauthn_credentials,last_used_at,timestamp with time zone,YES
+conversaflow,ai_turn_logs,id,uuid,NO
+conversaflow,ai_turn_logs,created_at,timestamp with time zone,NO
+conversaflow,ai_turn_logs,conversation_id,uuid,YES
+conversaflow,ai_turn_logs,customer_id,uuid,YES
+conversaflow,ai_turn_logs,business_id,uuid,YES
+conversaflow,ai_turn_logs,model,text,NO
+conversaflow,ai_turn_logs,prompt_version,text,YES
+conversaflow,ai_turn_logs,prompt_tokens,integer,YES
+conversaflow,ai_turn_logs,completion_tokens,integer,YES
+conversaflow,ai_turn_logs,total_tokens,integer,YES
+conversaflow,ai_turn_logs,cost_usd,numeric,YES
+conversaflow,ai_turn_logs,latency_ms,integer,YES
+conversaflow,ai_turn_logs,response_type,text,YES
+conversaflow,ai_turn_logs,products_referenced,jsonb,YES
+conversaflow,ai_turn_logs,customer_context,jsonb,YES
+conversaflow,ai_turn_logs,metadata,jsonb,YES
+conversaflow,ai_turn_logs,request_id,text,YES
+conversaflow,business_config_changes,id,uuid,NO
+conversaflow,business_config_changes,business_id,text,NO
+conversaflow,business_config_changes,slack_user_id,text,NO
+conversaflow,business_config_changes,changed_at,timestamp with time zone,NO
+conversaflow,business_config_changes,previous_config,jsonb,YES
+conversaflow,business_config_changes,new_config,jsonb,YES
+conversaflow,businesses,id,uuid,NO
+conversaflow,businesses,name,text,NO
+conversaflow,businesses,business_type,text,NO
+conversaflow,businesses,config,jsonb,YES
+conversaflow,businesses,open_times,jsonb,NO
+conversaflow,conversation_outcomes,id,uuid,NO
+conversaflow,conversation_outcomes,created_at,timestamp with time zone,NO
+conversaflow,conversation_outcomes,conversation_id,uuid,YES
+conversaflow,conversation_outcomes,customer_id,uuid,YES
+conversaflow,conversation_outcomes,business_id,uuid,YES
+conversaflow,conversation_outcomes,outcome,text,NO
+conversaflow,conversation_outcomes,turn_count,integer,YES
+conversaflow,conversation_outcomes,duration_seconds,integer,YES
+conversaflow,conversation_outcomes,total_tokens,integer,YES
+conversaflow,conversation_outcomes,total_cost_usd,numeric,YES
+conversaflow,conversation_outcomes,products_discussed,jsonb,YES
+conversaflow,conversation_outcomes,notes,text,YES
+conversaflow,conversation_turns,id,uuid,NO
+conversaflow,conversation_turns,conversation_id,uuid,NO
+conversaflow,conversation_turns,customer_id,uuid,NO
+conversaflow,conversation_turns,business_id,uuid,NO
+conversaflow,conversation_turns,status,text,NO
+conversaflow,conversation_turns,source_message_ids,ARRAY,NO
+conversaflow,conversation_turns,merged_user_text,text,NO
+conversaflow,conversation_turns,integrity_decision,text,NO
+conversaflow,conversation_turns,integrity_reason,text,NO
+conversaflow,conversation_turns,base_state_version,bigint,NO
+conversaflow,conversation_turns,first_message_at,timestamp with time zone,NO
+conversaflow,conversation_turns,last_message_at,timestamp with time zone,NO
+conversaflow,conversation_turns,hold_until,timestamp with time zone,YES
+conversaflow,conversation_turns,released_at,timestamp with time zone,YES
+conversaflow,conversation_turns,processed_at,timestamp with time zone,YES
+conversaflow,conversation_turns,superseded_at,timestamp with time zone,YES
+conversaflow,conversation_turns,extracted_intent,jsonb,YES
+conversaflow,conversation_turns,reconciled_action,jsonb,YES
+conversaflow,conversation_turns,assistant_message_id,uuid,YES
+conversaflow,conversation_turns,created_at,timestamp with time zone,NO
+conversaflow,conversations,id,uuid,NO
+conversaflow,conversations,business_id,uuid,YES
+conversaflow,conversations,customer_id,uuid,YES
+conversaflow,conversations,status,text,YES
+conversaflow,conversations,created_at,timestamp with time zone,YES
+conversaflow,conversations,conversation_history,jsonb,YES
+conversaflow,conversations,current_state,text,YES
+conversaflow,conversations,state_data,jsonb,YES
+conversaflow,conversations,last_message_at,timestamp with time zone,YES
+conversaflow,conversations,summary,text,YES
+conversaflow,conversations,history_migrated,boolean,NO
+conversaflow,conversations,draft_cart,jsonb,YES
+conversaflow,conversations,state_version,bigint,NO
+conversaflow,conversations,draft_cart_version,bigint,NO
+conversaflow,conversations,pending_clarification,jsonb,YES
+conversaflow,customer_preferences,customer_id,uuid,NO
+conversaflow,customer_preferences,favorite_services,ARRAY,YES
+conversaflow,customer_preferences,usual_modifications,jsonb,YES
+conversaflow,customer_preferences,total_transactions,integer,YES
+conversaflow,customer_preferences,avg_transaction_value,numeric,YES
+conversaflow,customer_preferences,last_transaction_at,timestamp with time zone,YES
+conversaflow,customer_preferences,updated_at,timestamp with time zone,YES
+conversaflow,customer_preferences,facts,jsonb,NO
+conversaflow,customers,id,uuid,NO
+conversaflow,customers,business_id,uuid,YES
+conversaflow,customers,phone,text,NO
+conversaflow,customers,created_at,timestamp with time zone,YES
+conversaflow,customers,name,text,YES
+conversaflow,daily_summaries,id,uuid,NO
+conversaflow,daily_summaries,business_id,text,NO
+conversaflow,daily_summaries,summary_date,date,NO
+conversaflow,daily_summaries,slack_channel,text,NO
+conversaflow,daily_summaries,slack_message_ts,text,YES
+conversaflow,daily_summaries,pinned,boolean,NO
+conversaflow,daily_summaries,created_at,timestamp with time zone,NO
+conversaflow,daily_summaries,last_updated_at,timestamp with time zone,NO
+conversaflow,dashboard_users,id,uuid,NO
+conversaflow,dashboard_users,auth_user_id,uuid,NO
+conversaflow,dashboard_users,business_id,uuid,NO
+conversaflow,dashboard_users,role,text,NO
+conversaflow,dashboard_users,created_at,timestamp with time zone,NO
+conversaflow,edge_function_logs,id,uuid,NO
+conversaflow,edge_function_logs,created_at,timestamp with time zone,NO
+conversaflow,edge_function_logs,function_name,text,NO
+conversaflow,edge_function_logs,status,text,NO
+conversaflow,edge_function_logs,duration_ms,integer,YES
+conversaflow,edge_function_logs,error_message,text,YES
+conversaflow,edge_function_logs,error_stack,text,YES
+conversaflow,edge_function_logs,metadata,jsonb,YES
+conversaflow,edge_function_logs,request_id,text,YES
+conversaflow,eval_traces,id,uuid,NO
+conversaflow,eval_traces,conversation_id,uuid,NO
+conversaflow,eval_traces,turn_id,uuid,YES
+conversaflow,eval_traces,business_id,uuid,YES
+conversaflow,eval_traces,turn_sequence,integer,YES
+conversaflow,eval_traces,authoritative_decision,jsonb,YES
+conversaflow,eval_traces,harness_decision,jsonb,YES
+conversaflow,eval_traces,agreement,boolean,YES
+conversaflow,eval_traces,metadata,jsonb,YES
+conversaflow,eval_traces,created_at,timestamp with time zone,NO
+conversaflow,inbound_events,id,uuid,NO
+conversaflow,inbound_events,business_id,uuid,NO
+conversaflow,inbound_events,source,text,NO
+conversaflow,inbound_events,source_event_id,text,YES
+conversaflow,inbound_events,event_type,text,NO
+conversaflow,inbound_events,payload_hash,text,YES
+conversaflow,inbound_events,payload,jsonb,NO
+conversaflow,inbound_events,status,text,NO
+conversaflow,inbound_events,request_id,uuid,NO
+conversaflow,inbound_events,received_at,timestamp with time zone,NO
+conversaflow,inbound_events,completed_at,timestamp with time zone,YES
+conversaflow,inbound_events,error,text,YES
+conversaflow,job_attempts,id,uuid,NO
+conversaflow,job_attempts,job_id,uuid,NO
+conversaflow,job_attempts,attempt,smallint,NO
+conversaflow,job_attempts,started_at,timestamp with time zone,NO
+conversaflow,job_attempts,finished_at,timestamp with time zone,YES
+conversaflow,job_attempts,outcome,text,NO
+conversaflow,job_attempts,error,text,YES
+conversaflow,job_attempts,metadata,jsonb,YES
+conversaflow,jobs,id,uuid,NO
+conversaflow,jobs,inbound_event_id,uuid,YES
+conversaflow,jobs,business_id,uuid,NO
+conversaflow,jobs,job_type,text,NO
+conversaflow,jobs,aggregate_type,text,YES
+conversaflow,jobs,aggregate_id,uuid,YES
+conversaflow,jobs,payload,jsonb,NO
+conversaflow,jobs,state,text,NO
+conversaflow,jobs,priority,smallint,NO
+conversaflow,jobs,max_attempts,smallint,NO
+conversaflow,jobs,attempt_count,smallint,NO
+conversaflow,jobs,next_run_at,timestamp with time zone,NO
+conversaflow,jobs,locked_at,timestamp with time zone,YES
+conversaflow,jobs,locked_by,text,YES
+conversaflow,jobs,completed_at,timestamp with time zone,YES
+conversaflow,jobs,error,text,YES
+conversaflow,jobs,created_at,timestamp with time zone,NO
+conversaflow,messages,id,uuid,NO
+conversaflow,messages,conversation_id,uuid,YES
+conversaflow,messages,role,text,NO
+conversaflow,messages,content,text,NO
+conversaflow,messages,intent,text,YES
+conversaflow,messages,entities,jsonb,YES
+conversaflow,messages,created_at,timestamp with time zone,YES
+conversaflow,messages,embedding,USER-DEFINED,YES
+conversaflow,messages,message_index,integer,YES
+conversaflow,messages,twilio_message_sid,text,YES
+conversaflow,messages,embedding_model,text,YES
+conversaflow,outbox,id,uuid,NO
+conversaflow,outbox,job_id,uuid,YES
+conversaflow,outbox,business_id,uuid,NO
+conversaflow,outbox,kind,text,NO
+conversaflow,outbox,aggregate_id,uuid,YES
+conversaflow,outbox,idempotency_key,text,NO
+conversaflow,outbox,payload,jsonb,NO
+conversaflow,outbox,state,text,NO
+conversaflow,outbox,attempts,smallint,NO
+conversaflow,outbox,max_attempts,smallint,NO
+conversaflow,outbox,next_run_at,timestamp with time zone,NO
+conversaflow,outbox,delivered_at,timestamp with time zone,YES
+conversaflow,outbox,error,text,YES
+conversaflow,outbox,created_at,timestamp with time zone,NO
+conversaflow,pipeline_traces,id,uuid,NO
+conversaflow,pipeline_traces,trace_id,text,NO
+conversaflow,pipeline_traces,conversation_id,uuid,YES
+conversaflow,pipeline_traces,turn_id,uuid,YES
+conversaflow,pipeline_traces,business_id,text,YES
+conversaflow,pipeline_traces,stage,text,NO
+conversaflow,pipeline_traces,event,text,NO
+conversaflow,pipeline_traces,detail,jsonb,YES
+conversaflow,pipeline_traces,error,text,YES
+conversaflow,pipeline_traces,ts,timestamp with time zone,NO
+conversaflow,products,id,uuid,NO
+conversaflow,products,business_id,uuid,YES
+conversaflow,products,name,text,NO
+conversaflow,products,price,numeric,YES
+conversaflow,products,category,text,YES
+conversaflow,products,available,boolean,YES
+conversaflow,products,zettle_uuid,text,YES
+conversaflow,products,description,text,YES
+conversaflow,products,variants,jsonb,YES
+conversaflow,products,synced_at,timestamp with time zone,YES
+conversaflow,products,name_embedding,USER-DEFINED,YES
+conversaflow,security_logs,id,uuid,NO
+conversaflow,security_logs,phone,text,NO
+conversaflow,security_logs,event_type,text,NO
+conversaflow,security_logs,input_text,text,YES
+conversaflow,security_logs,details,text,YES
+conversaflow,security_logs,timestamp,timestamp with time zone,NO
+conversaflow,security_logs,created_at,timestamp with time zone,YES
+conversaflow,security_logs,request_id,text,YES
+conversaflow,transaction_status_events,id,uuid,NO
+conversaflow,transaction_status_events,transaction_id,uuid,NO
+conversaflow,transaction_status_events,old_status,text,YES
+conversaflow,transaction_status_events,new_status,text,NO
+conversaflow,transaction_status_events,acted_by_slack_user,text,YES
+conversaflow,transaction_status_events,acted_in_channel,text,YES
+conversaflow,transaction_status_events,acted_at,timestamp with time zone,NO
+conversaflow,transactions,id,uuid,NO
+conversaflow,transactions,business_id,uuid,YES
+conversaflow,transactions,customer_id,uuid,YES
+conversaflow,transactions,service_id,uuid,YES
+conversaflow,transactions,transaction_type,text,YES
+conversaflow,transactions,status,text,YES
+conversaflow,transactions,total_amount,numeric,YES
+conversaflow,transactions,details,jsonb,YES
+conversaflow,transactions,created_at,timestamp with time zone,YES
+conversaflow,transactions,slack_message_ts,text,YES
+conversaflow,zettle_oauth_tokens,id,uuid,NO
+conversaflow,zettle_oauth_tokens,business_id,uuid,YES
+conversaflow,zettle_oauth_tokens,access_token,text,NO
+conversaflow,zettle_oauth_tokens,refresh_token,text,NO
+conversaflow,zettle_oauth_tokens,token_type,text,YES
+conversaflow,zettle_oauth_tokens,expires_at,timestamp with time zone,NO
+conversaflow,zettle_oauth_tokens,created_at,timestamp with time zone,YES
+conversaflow,zettle_oauth_tokens,updated_at,timestamp with time zone,YES
+extensions,pg_stat_statements,userid,oid,YES
+extensions,pg_stat_statements,dbid,oid,YES
+extensions,pg_stat_statements,toplevel,boolean,YES
+extensions,pg_stat_statements,queryid,bigint,YES
+extensions,pg_stat_statements,query,text,YES
+extensions,pg_stat_statements,plans,bigint,YES
+extensions,pg_stat_statements,total_plan_time,double precision,YES
+extensions,pg_stat_statements,min_plan_time,double precision,YES
+extensions,pg_stat_statements,max_plan_time,double precision,YES
+extensions,pg_stat_statements,mean_plan_time,double precision,YES
+extensions,pg_stat_statements,stddev_plan_time,double precision,YES
+extensions,pg_stat_statements,calls,bigint,YES
+extensions,pg_stat_statements,total_exec_time,double precision,YES
+extensions,pg_stat_statements,min_exec_time,double precision,YES
+extensions,pg_stat_statements,max_exec_time,double precision,YES
+extensions,pg_stat_statements,mean_exec_time,double precision,YES
+extensions,pg_stat_statements,stddev_exec_time,double precision,YES
+extensions,pg_stat_statements,rows,bigint,YES
+extensions,pg_stat_statements,shared_blks_hit,bigint,YES
+extensions,pg_stat_statements,shared_blks_read,bigint,YES
+extensions,pg_stat_statements,shared_blks_dirtied,bigint,YES
+extensions,pg_stat_statements,shared_blks_written,bigint,YES
+extensions,pg_stat_statements,local_blks_hit,bigint,YES
+extensions,pg_stat_statements,local_blks_read,bigint,YES
+extensions,pg_stat_statements,local_blks_dirtied,bigint,YES
+extensions,pg_stat_statements,local_blks_written,bigint,YES
+extensions,pg_stat_statements,temp_blks_read,bigint,YES
+extensions,pg_stat_statements,temp_blks_written,bigint,YES
+extensions,pg_stat_statements,shared_blk_read_time,double precision,YES
+extensions,pg_stat_statements,shared_blk_write_time,double precision,YES
+extensions,pg_stat_statements,local_blk_read_time,double precision,YES
+extensions,pg_stat_statements,local_blk_write_time,double precision,YES
+extensions,pg_stat_statements,temp_blk_read_time,double precision,YES
+extensions,pg_stat_statements,temp_blk_write_time,double precision,YES
+extensions,pg_stat_statements,wal_records,bigint,YES
+extensions,pg_stat_statements,wal_fpi,bigint,YES
+extensions,pg_stat_statements,wal_bytes,numeric,YES
+extensions,pg_stat_statements,wal_buffers_full,bigint,YES
+extensions,pg_stat_statements,jit_functions,bigint,YES
+extensions,pg_stat_statements,jit_generation_time,double precision,YES
+extensions,pg_stat_statements,jit_inlining_count,bigint,YES
+extensions,pg_stat_statements,jit_inlining_time,double precision,YES
+extensions,pg_stat_statements,jit_optimization_count,bigint,YES
+extensions,pg_stat_statements,jit_optimization_time,double precision,YES
+extensions,pg_stat_statements,jit_emission_count,bigint,YES
+extensions,pg_stat_statements,jit_emission_time,double precision,YES
+extensions,pg_stat_statements,jit_deform_count,bigint,YES
+extensions,pg_stat_statements,jit_deform_time,double precision,YES
+extensions,pg_stat_statements,parallel_workers_to_launch,bigint,YES
+extensions,pg_stat_statements,parallel_workers_launched,bigint,YES
+extensions,pg_stat_statements,stats_since,timestamp with time zone,YES
+extensions,pg_stat_statements,minmax_stats_since,timestamp with time zone,YES
+extensions,pg_stat_statements_info,dealloc,bigint,YES
+extensions,pg_stat_statements_info,stats_reset,timestamp with time zone,YES
+kds,device_sessions,device_id,uuid,NO
+kds,device_sessions,business_id,uuid,NO
+kds,device_sessions,device_name,text,NO
+kds,device_sessions,station_id,text,YES
+kds,device_sessions,token_hash,text,NO
+kds,device_sessions,created_at,timestamp with time zone,NO
+kds,device_sessions,last_used_at,timestamp with time zone,YES
+kds,device_sessions,is_active,boolean,NO
+kds,ticket_events,sequence,bigint,NO
+kds,ticket_events,ticket_id,uuid,NO
+kds,ticket_events,business_id,uuid,NO
+kds,ticket_events,source_transaction_id,uuid,NO
+kds,ticket_events,kind,USER-DEFINED,NO
+kds,ticket_events,status,USER-DEFINED,YES
+kds,ticket_events,occurred_at,timestamp with time zone,NO
+kds,ticket_events,source,text,NO
+kds,ticket_events,source_event_key,text,YES
+kds,ticket_events,payload,jsonb,NO
+kds,ticket_items,ticket_item_id,uuid,NO
+kds,ticket_items,ticket_id,uuid,NO
+kds,ticket_items,source_transaction_id,uuid,NO
+kds,ticket_items,display_order,integer,NO
+kds,ticket_items,product_id,uuid,YES
+kds,ticket_items,name,text,NO
+kds,ticket_items,quantity,integer,NO
+kds,ticket_items,variant_name,text,YES
+kds,ticket_items,notes,text,YES
+kds,ticket_items,unit_price,numeric,YES
+kds,ticket_items,is_cancelled,boolean,NO
+kds,tickets,ticket_id,uuid,NO
+kds,tickets,source_transaction_id,uuid,NO
+kds,tickets,business_id,uuid,NO
+kds,tickets,customer_id,uuid,YES
+kds,tickets,source_channel,text,NO
+kds,tickets,customer_name,text,YES
+kds,tickets,customer_phone,text,YES
+kds,tickets,pickup_person,text,YES
+kds,tickets,status,USER-DEFINED,NO
+kds,tickets,station_id,text,YES
+kds,tickets,station_name,text,YES
+kds,tickets,customer_note,text,YES
+kds,tickets,total_amount,numeric,YES
+kds,tickets,created_at,timestamp with time zone,NO
+kds,tickets,updated_at,timestamp with time zone,NO
+kds,tickets,last_event_sequence,bigint,YES
+kds,tickets,raw_details_hash,text,NO
+kds,tickets,last_projected_at,timestamp with time zone,NO
+kds,tickets,cancellation_reason,text,YES
+kds,tickets,partial_cancellation_reason,text,YES
+kds,tickets,cancellation_reason_code,USER-DEFINED,YES
+kds,tickets,cancellation_reason_note,text,YES
+kds,tickets,partial_cancellation_reason_code,USER-DEFINED,YES
+kds,tickets,partial_cancellation_reason_note,text,YES
+public,ai_turn_logs,id,uuid,NO
+public,ai_turn_logs,created_at,timestamp with time zone,NO
+public,ai_turn_logs,conversation_id,uuid,YES
+public,ai_turn_logs,customer_id,uuid,YES
+public,ai_turn_logs,business_id,uuid,YES
+public,ai_turn_logs,model,text,NO
+public,ai_turn_logs,prompt_version,text,YES
+public,ai_turn_logs,prompt_tokens,integer,YES
+public,ai_turn_logs,completion_tokens,integer,YES
+public,ai_turn_logs,total_tokens,integer,YES
+public,ai_turn_logs,cost_usd,numeric,YES
+public,ai_turn_logs,latency_ms,integer,YES
+public,ai_turn_logs,response_type,text,YES
+public,ai_turn_logs,products_referenced,jsonb,YES
+public,ai_turn_logs,customer_context,jsonb,YES
+public,ai_turn_logs,metadata,jsonb,YES
+public,ai_turn_logs,request_id,text,YES
+public,business_config_changes,id,uuid,NO
+public,business_config_changes,business_id,text,NO
+public,business_config_changes,slack_user_id,text,NO
+public,business_config_changes,changed_at,timestamp with time zone,NO
+public,business_config_changes,previous_config,jsonb,YES
+public,business_config_changes,new_config,jsonb,YES
+public,businesses,id,uuid,NO
+public,businesses,name,text,NO
+public,businesses,business_type,text,NO
+public,businesses,config,jsonb,YES
+public,businesses,open_times,jsonb,NO
+public,conversation_outcomes,id,uuid,NO
+public,conversation_outcomes,created_at,timestamp with time zone,NO
+public,conversation_outcomes,conversation_id,uuid,YES
+public,conversation_outcomes,customer_id,uuid,YES
+public,conversation_outcomes,business_id,uuid,YES
+public,conversation_outcomes,outcome,text,NO
+public,conversation_outcomes,turn_count,integer,YES
+public,conversation_outcomes,duration_seconds,integer,YES
+public,conversation_outcomes,total_tokens,integer,YES
+public,conversation_outcomes,total_cost_usd,numeric,YES
+public,conversation_outcomes,products_discussed,jsonb,YES
+public,conversation_outcomes,notes,text,YES
+public,conversation_turns,id,uuid,NO
+public,conversation_turns,conversation_id,uuid,NO
+public,conversation_turns,customer_id,uuid,NO
+public,conversation_turns,business_id,uuid,NO
+public,conversation_turns,status,text,NO
+public,conversation_turns,source_message_ids,ARRAY,NO
+public,conversation_turns,merged_user_text,text,NO
+public,conversation_turns,integrity_decision,text,NO
+public,conversation_turns,integrity_reason,text,NO
+public,conversation_turns,base_state_version,bigint,NO
+public,conversation_turns,first_message_at,timestamp with time zone,NO
+public,conversation_turns,last_message_at,timestamp with time zone,NO
+public,conversation_turns,hold_until,timestamp with time zone,YES
+public,conversation_turns,released_at,timestamp with time zone,YES
+public,conversation_turns,processed_at,timestamp with time zone,YES
+public,conversation_turns,superseded_at,timestamp with time zone,YES
+public,conversation_turns,extracted_intent,jsonb,YES
+public,conversation_turns,reconciled_action,jsonb,YES
+public,conversation_turns,assistant_message_id,uuid,YES
+public,conversation_turns,created_at,timestamp with time zone,NO
+public,conversations,id,uuid,NO
+public,conversations,business_id,uuid,YES
+public,conversations,customer_id,uuid,YES
+public,conversations,status,text,YES
+public,conversations,created_at,timestamp with time zone,YES
+public,conversations,conversation_history,jsonb,YES
+public,conversations,current_state,text,YES
+public,conversations,state_data,jsonb,YES
+public,conversations,last_message_at,timestamp with time zone,YES
+public,conversations,summary,text,YES
+public,conversations,history_migrated,boolean,NO
+public,conversations,draft_cart,jsonb,YES
+public,conversations,state_version,bigint,NO
+public,conversations,draft_cart_version,bigint,NO
+public,conversations,pending_clarification,jsonb,YES
+public,customer_preferences,customer_id,uuid,NO
+public,customer_preferences,favorite_services,ARRAY,YES
+public,customer_preferences,usual_modifications,jsonb,YES
+public,customer_preferences,total_transactions,integer,YES
+public,customer_preferences,avg_transaction_value,numeric,YES
+public,customer_preferences,last_transaction_at,timestamp with time zone,YES
+public,customer_preferences,updated_at,timestamp with time zone,YES
+public,customer_preferences,facts,jsonb,NO
+public,customers,id,uuid,NO
+public,customers,business_id,uuid,YES
+public,customers,phone,text,NO
+public,customers,created_at,timestamp with time zone,YES
+public,customers,name,text,YES
+public,daily_summaries,id,uuid,NO
+public,daily_summaries,business_id,text,NO
+public,daily_summaries,summary_date,date,NO
+public,daily_summaries,slack_channel,text,NO
+public,daily_summaries,slack_message_ts,text,YES
+public,daily_summaries,pinned,boolean,NO
+public,daily_summaries,created_at,timestamp with time zone,NO
+public,daily_summaries,last_updated_at,timestamp with time zone,NO
+public,dashboard_users,id,uuid,NO
+public,dashboard_users,auth_user_id,uuid,NO
+public,dashboard_users,business_id,uuid,NO
+public,dashboard_users,role,text,NO
+public,dashboard_users,created_at,timestamp with time zone,NO
+public,edge_function_logs,id,uuid,NO
+public,edge_function_logs,created_at,timestamp with time zone,NO
+public,edge_function_logs,function_name,text,NO
+public,edge_function_logs,status,text,NO
+public,edge_function_logs,duration_ms,integer,YES
+public,edge_function_logs,error_message,text,YES
+public,edge_function_logs,error_stack,text,YES
+public,edge_function_logs,metadata,jsonb,YES
+public,edge_function_logs,request_id,text,YES
+public,inbound_events,id,uuid,NO
+public,inbound_events,business_id,uuid,NO
+public,inbound_events,source,text,NO
+public,inbound_events,source_event_id,text,YES
+public,inbound_events,event_type,text,NO
+public,inbound_events,payload_hash,text,YES
+public,inbound_events,payload,jsonb,NO
+public,inbound_events,status,text,NO
+public,inbound_events,request_id,uuid,NO
+public,inbound_events,received_at,timestamp with time zone,NO
+public,inbound_events,completed_at,timestamp with time zone,YES
+public,inbound_events,error,text,YES
+public,job_attempts,id,uuid,NO
+public,job_attempts,job_id,uuid,NO
+public,job_attempts,attempt,smallint,NO
+public,job_attempts,started_at,timestamp with time zone,NO
+public,job_attempts,finished_at,timestamp with time zone,YES
+public,job_attempts,outcome,text,NO
+public,job_attempts,error,text,YES
+public,job_attempts,metadata,jsonb,YES
+public,jobs,id,uuid,NO
+public,jobs,inbound_event_id,uuid,YES
+public,jobs,business_id,uuid,NO
+public,jobs,job_type,text,NO
+public,jobs,aggregate_type,text,YES
+public,jobs,aggregate_id,uuid,YES
+public,jobs,payload,jsonb,NO
+public,jobs,state,text,NO
+public,jobs,priority,smallint,NO
+public,jobs,max_attempts,smallint,NO
+public,jobs,attempt_count,smallint,NO
+public,jobs,next_run_at,timestamp with time zone,NO
+public,jobs,locked_at,timestamp with time zone,YES
+public,jobs,locked_by,text,YES
+public,jobs,completed_at,timestamp with time zone,YES
+public,jobs,error,text,YES
+public,jobs,created_at,timestamp with time zone,NO
+public,messages,id,uuid,NO
+public,messages,conversation_id,uuid,YES
+public,messages,role,text,NO
+public,messages,content,text,NO
+public,messages,intent,text,YES
+public,messages,entities,jsonb,YES
+public,messages,created_at,timestamp with time zone,YES
+public,messages,embedding,USER-DEFINED,YES
+public,messages,message_index,integer,YES
+public,messages,twilio_message_sid,text,YES
+public,messages,embedding_model,text,YES
+public,outbox,id,uuid,NO
+public,outbox,job_id,uuid,YES
+public,outbox,business_id,uuid,NO
+public,outbox,kind,text,NO
+public,outbox,aggregate_id,uuid,YES
+public,outbox,idempotency_key,text,NO
+public,outbox,payload,jsonb,NO
+public,outbox,state,text,NO
+public,outbox,attempts,smallint,NO
+public,outbox,max_attempts,smallint,NO
+public,outbox,next_run_at,timestamp with time zone,NO
+public,outbox,delivered_at,timestamp with time zone,YES
+public,outbox,error,text,YES
+public,outbox,created_at,timestamp with time zone,NO
+public,pipeline_traces,id,uuid,NO
+public,pipeline_traces,trace_id,text,NO
+public,pipeline_traces,conversation_id,uuid,YES
+public,pipeline_traces,turn_id,uuid,YES
+public,pipeline_traces,business_id,text,YES
+public,pipeline_traces,stage,text,NO
+public,pipeline_traces,event,text,NO
+public,pipeline_traces,detail,jsonb,YES
+public,pipeline_traces,error,text,YES
+public,pipeline_traces,ts,timestamp with time zone,NO
+public,products,id,uuid,NO
+public,products,business_id,uuid,YES
+public,products,name,text,NO
+public,products,price,numeric,YES
+public,products,category,text,YES
+public,products,available,boolean,YES
+public,products,zettle_uuid,text,YES
+public,products,description,text,YES
+public,products,variants,jsonb,YES
+public,products,synced_at,timestamp with time zone,YES
+public,products,name_embedding,USER-DEFINED,YES
+public,security_logs,id,uuid,NO
+public,security_logs,phone,text,NO
+public,security_logs,event_type,text,NO
+public,security_logs,input_text,text,YES
+public,security_logs,details,text,YES
+public,security_logs,timestamp,timestamp with time zone,NO
+public,security_logs,created_at,timestamp with time zone,YES
+public,security_logs,request_id,text,YES
+public,transaction_status_events,id,uuid,NO
+public,transaction_status_events,transaction_id,uuid,NO
+public,transaction_status_events,old_status,text,YES
+public,transaction_status_events,new_status,text,NO
+public,transaction_status_events,acted_by_slack_user,text,YES
+public,transaction_status_events,acted_in_channel,text,YES
+public,transaction_status_events,acted_at,timestamp with time zone,NO
+public,transactions,id,uuid,NO
+public,transactions,business_id,uuid,YES
+public,transactions,customer_id,uuid,YES
+public,transactions,service_id,uuid,YES
+public,transactions,transaction_type,text,YES
+public,transactions,status,text,YES
+public,transactions,total_amount,numeric,YES
+public,transactions,details,jsonb,YES
+public,transactions,created_at,timestamp with time zone,YES
+public,transactions,slack_message_ts,text,YES
+public,zettle_oauth_tokens,id,uuid,NO
+public,zettle_oauth_tokens,business_id,uuid,YES
+public,zettle_oauth_tokens,access_token,text,NO
+public,zettle_oauth_tokens,refresh_token,text,NO
+public,zettle_oauth_tokens,token_type,text,YES
+public,zettle_oauth_tokens,expires_at,timestamp with time zone,NO
+public,zettle_oauth_tokens,created_at,timestamp with time zone,YES
+public,zettle_oauth_tokens,updated_at,timestamp with time zone,YES
+realtime,messages,topic,text,NO
+realtime,messages,extension,text,NO
+realtime,messages,payload,jsonb,YES
+realtime,messages,event,text,YES
+realtime,messages,private,boolean,YES
+realtime,messages,updated_at,timestamp without time zone,NO
+realtime,messages,inserted_at,timestamp without time zone,NO
+realtime,messages,id,uuid,NO
+realtime,messages_2026_05_06,topic,text,NO
+realtime,messages_2026_05_06,extension,text,NO
+realtime,messages_2026_05_06,payload,jsonb,YES
+realtime,messages_2026_05_06,event,text,YES
+realtime,messages_2026_05_06,private,boolean,YES
+realtime,messages_2026_05_06,updated_at,timestamp without time zone,NO
+realtime,messages_2026_05_06,inserted_at,timestamp without time zone,NO
+realtime,messages_2026_05_06,id,uuid,NO
+realtime,messages_2026_05_07,topic,text,NO
+realtime,messages_2026_05_07,extension,text,NO
+realtime,messages_2026_05_07,payload,jsonb,YES
+realtime,messages_2026_05_07,event,text,YES
+realtime,messages_2026_05_07,private,boolean,YES
+realtime,messages_2026_05_07,updated_at,timestamp without time zone,NO
+realtime,messages_2026_05_07,inserted_at,timestamp without time zone,NO
+realtime,messages_2026_05_07,id,uuid,NO
+realtime,messages_2026_05_08,topic,text,NO
+realtime,messages_2026_05_08,extension,text,NO
+realtime,messages_2026_05_08,payload,jsonb,YES
+realtime,messages_2026_05_08,event,text,YES
+realtime,messages_2026_05_08,private,boolean,YES
+realtime,messages_2026_05_08,updated_at,timestamp without time zone,NO
+realtime,messages_2026_05_08,inserted_at,timestamp without time zone,NO
+realtime,messages_2026_05_08,id,uuid,NO
+realtime,messages_2026_05_09,topic,text,NO
+realtime,messages_2026_05_09,extension,text,NO
+realtime,messages_2026_05_09,payload,jsonb,YES
+realtime,messages_2026_05_09,event,text,YES
+realtime,messages_2026_05_09,private,boolean,YES
+realtime,messages_2026_05_09,updated_at,timestamp without time zone,NO
+realtime,messages_2026_05_09,inserted_at,timestamp without time zone,NO
+realtime,messages_2026_05_09,id,uuid,NO
+realtime,messages_2026_05_10,topic,text,NO
+realtime,messages_2026_05_10,extension,text,NO
+realtime,messages_2026_05_10,payload,jsonb,YES
+realtime,messages_2026_05_10,event,text,YES
+realtime,messages_2026_05_10,private,boolean,YES
+realtime,messages_2026_05_10,updated_at,timestamp without time zone,NO
+realtime,messages_2026_05_10,inserted_at,timestamp without time zone,NO
+realtime,messages_2026_05_10,id,uuid,NO
+realtime,schema_migrations,version,bigint,NO
+realtime,schema_migrations,inserted_at,timestamp without time zone,YES
+realtime,subscription,id,bigint,NO
+realtime,subscription,subscription_id,uuid,NO
+realtime,subscription,entity,regclass,NO
+realtime,subscription,filters,ARRAY,NO
+realtime,subscription,claims,jsonb,NO
+realtime,subscription,claims_role,regrole,NO
+realtime,subscription,created_at,timestamp without time zone,NO
+realtime,subscription,action_filter,text,YES
+storage,buckets,id,text,NO
+storage,buckets,name,text,NO
+storage,buckets,owner,uuid,YES
+storage,buckets,created_at,timestamp with time zone,YES
+storage,buckets,updated_at,timestamp with time zone,YES
+storage,buckets,public,boolean,YES
+storage,buckets,avif_autodetection,boolean,YES
+storage,buckets,file_size_limit,bigint,YES
+storage,buckets,allowed_mime_types,ARRAY,YES
+storage,buckets,owner_id,text,YES
+storage,buckets,type,USER-DEFINED,NO
+storage,buckets_analytics,name,text,NO
+storage,buckets_analytics,type,USER-DEFINED,NO
+storage,buckets_analytics,format,text,NO
+storage,buckets_analytics,created_at,timestamp with time zone,NO
+storage,buckets_analytics,updated_at,timestamp with time zone,NO
+storage,buckets_analytics,id,uuid,NO
+storage,buckets_analytics,deleted_at,timestamp with time zone,YES
+storage,buckets_vectors,id,text,NO
+storage,buckets_vectors,type,USER-DEFINED,NO
+storage,buckets_vectors,created_at,timestamp with time zone,NO
+storage,buckets_vectors,updated_at,timestamp with time zone,NO
+storage,migrations,id,integer,NO
+storage,migrations,name,character varying,NO
+storage,migrations,hash,character varying,NO
+storage,migrations,executed_at,timestamp without time zone,YES
+storage,objects,id,uuid,NO
+storage,objects,bucket_id,text,YES
+storage,objects,name,text,YES
+storage,objects,owner,uuid,YES
+storage,objects,created_at,timestamp with time zone,YES
+storage,objects,updated_at,timestamp with time zone,YES
+storage,objects,last_accessed_at,timestamp with time zone,YES
+storage,objects,metadata,jsonb,YES
+storage,objects,path_tokens,ARRAY,YES
+storage,objects,version,text,YES
+storage,objects,owner_id,text,YES
+storage,objects,user_metadata,jsonb,YES
+storage,s3_multipart_uploads,id,text,NO
+storage,s3_multipart_uploads,in_progress_size,bigint,NO
+storage,s3_multipart_uploads,upload_signature,text,NO
+storage,s3_multipart_uploads,bucket_id,text,NO
+storage,s3_multipart_uploads,key,text,NO
+storage,s3_multipart_uploads,version,text,NO
+storage,s3_multipart_uploads,owner_id,text,YES
+storage,s3_multipart_uploads,created_at,timestamp with time zone,NO
+storage,s3_multipart_uploads,user_metadata,jsonb,YES
+storage,s3_multipart_uploads,metadata,jsonb,YES
+storage,s3_multipart_uploads_parts,id,uuid,NO
+storage,s3_multipart_uploads_parts,upload_id,text,NO
+storage,s3_multipart_uploads_parts,size,bigint,NO
+storage,s3_multipart_uploads_parts,part_number,integer,NO
+storage,s3_multipart_uploads_parts,bucket_id,text,NO
+storage,s3_multipart_uploads_parts,key,text,NO
+storage,s3_multipart_uploads_parts,etag,text,NO
+storage,s3_multipart_uploads_parts,owner_id,text,YES
+storage,s3_multipart_uploads_parts,version,text,NO
+storage,s3_multipart_uploads_parts,created_at,timestamp with time zone,NO
+storage,vector_indexes,id,text,NO
+storage,vector_indexes,name,text,NO
+storage,vector_indexes,bucket_id,text,NO
+storage,vector_indexes,data_type,text,NO
+storage,vector_indexes,dimension,integer,NO
+storage,vector_indexes,distance_metric,text,NO
+storage,vector_indexes,metadata_configuration,jsonb,YES
+storage,vector_indexes,created_at,timestamp with time zone,NO
+storage,vector_indexes,updated_at,timestamp with time zone,NO
+supabase_migrations,schema_migrations,version,text,NO
+supabase_migrations,schema_migrations,statements,ARRAY,YES
+supabase_migrations,schema_migrations,name,text,YES
+supabase_migrations,schema_migrations,created_by,text,YES
+supabase_migrations,schema_migrations,idempotency_key,text,YES
+supabase_migrations,schema_migrations,rollback,ARRAY,YES
+umi_cash,ApplePushToken,id,text,NO
+umi_cash,ApplePushToken,cardId,text,NO
+umi_cash,ApplePushToken,deviceToken,text,NO
+umi_cash,ApplePushToken,pushToken,text,NO
+umi_cash,ApplePushToken,createdAt,timestamp with time zone,NO
+umi_cash,GiftCard,id,text,NO
+umi_cash,GiftCard,tenantId,text,NO
+umi_cash,GiftCard,code,text,NO
+umi_cash,GiftCard,amountCentavos,integer,NO
+umi_cash,GiftCard,createdByStaffId,text,NO
+umi_cash,GiftCard,senderName,text,YES
+umi_cash,GiftCard,message,text,YES
+umi_cash,GiftCard,recipientEmail,text,YES
+umi_cash,GiftCard,recipientPhone,text,YES
+umi_cash,GiftCard,recipientName,text,YES
+umi_cash,GiftCard,isRedeemed,boolean,NO
+umi_cash,GiftCard,redeemedAt,timestamp with time zone,YES
+umi_cash,GiftCard,redeemedCardId,text,YES
+umi_cash,GiftCard,expiresAt,timestamp with time zone,YES
+umi_cash,GiftCard,createdAt,timestamp with time zone,NO
+umi_cash,Location,id,text,NO
+umi_cash,Location,tenantId,text,NO
+umi_cash,Location,name,text,NO
+umi_cash,Location,address,text,YES
+umi_cash,Location,latitude,double precision,YES
+umi_cash,Location,longitude,double precision,YES
+umi_cash,Location,isActive,boolean,NO
+umi_cash,LoyaltyCard,id,text,NO
+umi_cash,LoyaltyCard,tenantId,text,NO
+umi_cash,LoyaltyCard,userId,text,NO
+umi_cash,LoyaltyCard,cardNumber,text,NO
+umi_cash,LoyaltyCard,balanceCentavos,integer,NO
+umi_cash,LoyaltyCard,totalVisits,integer,NO
+umi_cash,LoyaltyCard,visitsThisCycle,integer,NO
+umi_cash,LoyaltyCard,pendingRewards,integer,NO
+umi_cash,LoyaltyCard,applePassSerial,text,YES
+umi_cash,LoyaltyCard,applePassAuthToken,text,YES
+umi_cash,LoyaltyCard,googlePassObjectId,text,YES
+umi_cash,LoyaltyCard,qrToken,text,NO
+umi_cash,LoyaltyCard,qrIssuedAt,timestamp with time zone,NO
+umi_cash,LoyaltyCard,createdAt,timestamp with time zone,NO
+umi_cash,LoyaltyCard,updatedAt,timestamp with time zone,NO
+umi_cash,OtpVerification,id,text,NO
+umi_cash,OtpVerification,phone,text,NO
+umi_cash,OtpVerification,tenantId,text,NO
+umi_cash,OtpVerification,codeHash,text,NO
+umi_cash,OtpVerification,expiresAt,timestamp with time zone,NO
+umi_cash,OtpVerification,attempts,integer,NO
+umi_cash,OtpVerification,verified,boolean,NO
+umi_cash,OtpVerification,createdAt,timestamp with time zone,NO
+umi_cash,RewardConfig,id,text,NO
+umi_cash,RewardConfig,tenantId,text,NO
+umi_cash,RewardConfig,visitsRequired,integer,NO
+umi_cash,RewardConfig,rewardName,text,NO
+umi_cash,RewardConfig,rewardDescription,text,YES
+umi_cash,RewardConfig,rewardCostCentavos,integer,NO
+umi_cash,RewardConfig,isActive,boolean,NO
+umi_cash,RewardConfig,activatedAt,timestamp with time zone,NO
+umi_cash,RewardConfig,createdAt,timestamp with time zone,NO
+umi_cash,RewardRedemption,id,text,NO
+umi_cash,RewardRedemption,cardId,text,NO
+umi_cash,RewardRedemption,configId,text,NO
+umi_cash,RewardRedemption,staffId,text,NO
+umi_cash,RewardRedemption,redeemedAt,timestamp with time zone,NO
+umi_cash,RewardRedemption,note,text,YES
+umi_cash,Session,id,text,NO
+umi_cash,Session,userId,text,NO
+umi_cash,Session,token,text,NO
+umi_cash,Session,expiresAt,timestamp with time zone,NO
+umi_cash,Session,createdAt,timestamp with time zone,NO
+umi_cash,Tenant,id,text,NO
+umi_cash,Tenant,slug,text,NO
+umi_cash,Tenant,name,text,NO
+umi_cash,Tenant,city,text,YES
+umi_cash,Tenant,cardPrefix,text,NO
+umi_cash,Tenant,primaryColor,text,NO
+umi_cash,Tenant,secondaryColor,text,YES
+umi_cash,Tenant,labelColor,text,YES
+umi_cash,Tenant,logoUrl,text,YES
+umi_cash,Tenant,stripImageUrl,text,YES
+umi_cash,Tenant,passStyle,text,NO
+umi_cash,Tenant,promoMessage,text,YES
+umi_cash,Tenant,selfRegistration,boolean,NO
+umi_cash,Tenant,subscriptionStatus,text,NO
+umi_cash,Tenant,suspendedAt,timestamp with time zone,YES
+umi_cash,Tenant,trialEndsAt,timestamp with time zone,YES
+umi_cash,Tenant,createdAt,timestamp with time zone,NO
+umi_cash,Tenant,updatedAt,timestamp with time zone,NO
+umi_cash,Tenant,topupEnabled,boolean,NO
+umi_cash,Tenant,promoDays,text,YES
+umi_cash,Tenant,promoEndsAt,timestamp with time zone,YES
+umi_cash,Tenant,promoStartsAt,timestamp with time zone,YES
+umi_cash,Tenant,timezone,text,NO
+umi_cash,Tenant,businessHours,jsonb,YES
+umi_cash,Transaction,id,text,NO
+umi_cash,Transaction,cardId,text,NO
+umi_cash,Transaction,staffId,text,YES
+umi_cash,Transaction,type,text,NO
+umi_cash,Transaction,amountCentavos,integer,NO
+umi_cash,Transaction,description,text,YES
+umi_cash,Transaction,createdAt,timestamp with time zone,NO
+umi_cash,User,id,text,NO
+umi_cash,User,tenantId,text,NO
+umi_cash,User,phone,text,YES
+umi_cash,User,email,text,YES
+umi_cash,User,name,text,YES
+umi_cash,User,role,text,NO
+umi_cash,User,passwordHash,text,YES
+umi_cash,User,createdAt,timestamp with time zone,NO
+umi_cash,User,updatedAt,timestamp with time zone,NO
+umi_cash,User,birthDate,date,YES
+umi_cash,User,device,text,YES
+umi_cash,User,os,text,YES
+umi_cash,User,phoneVerifiedAt,timestamp with time zone,YES
+umi_cash,Visit,id,text,NO
+umi_cash,Visit,cardId,text,NO
+umi_cash,Visit,staffId,text,NO
+umi_cash,Visit,scannedAt,timestamp with time zone,NO
+umi_cash,Visit,note,text,YES

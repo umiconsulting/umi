@@ -1,0 +1,4 @@
+interface:
+  display_name: "Customer Identity Resolution"
+  short_description: "Unify customer identities by phone safely"
+  default_prompt: "Use $customer-identity-resolution to plan safe customer identity matching and validation."

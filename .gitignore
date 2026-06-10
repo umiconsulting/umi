@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+
+# Six independent app repos — not tracked at root until Phase 5 monorepo migration
+# (versioned .gitignore chosen over .git/info/exclude so the rule is durable and shared;
+# ignoring the directory also prevents accidental gitlink/embedded-repo staging)
+apps/
+
+# Database dumps and handoff material — never version data payloads at root
+backups/
+prod-db-handoff-2026-05-13/
+*.dump
+*.sql.gz
+*.tar.gz.enc
+
+# Screenshots / visual artifacts
+artifacts/
+
+# Env and secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Build outputs
+node_modules/
+dist/
+build/
+.next/
