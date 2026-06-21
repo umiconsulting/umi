@@ -8,20 +8,15 @@ until dispatch.delivered (or timeout). Reports stage-by-stage timing.
 Usage:  python3 scripts/pipeline_trace.py ["message text"]
 """
 
-import sys, time, hmac, hashlib, base64, uuid, json
+import os, sys, time, hmac, hashlib, base64, uuid, json
 import urllib.parse, urllib.request, urllib.error
 from datetime import datetime, timezone
 
 # ── credentials ────────────────────────────────────────────────────────────────
-SUPABASE_URL      = "https://xbudknbimkgjjgohnjgp.supabase.co"
-SERVICE_ROLE_KEY  = (
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
-    "***REMOVED***"
-    "***REMOVED***"
-    ".***REMOVED***"
-)
-TWILIO_AUTH_TOKEN  = "***REMOVED***"
-TWILIO_ACCOUNT_SID = "***REMOVED***"
+SUPABASE_URL       = os.environ.get("SUPABASE_URL", "https://xbudknbimkgjjgohnjgp.supabase.co")
+SERVICE_ROLE_KEY   = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+TWILIO_AUTH_TOKEN  = os.environ["TWILIO_AUTH_TOKEN"]
+TWILIO_ACCOUNT_SID = os.environ["TWILIO_ACCOUNT_SID"]
 WEBHOOK_URL        = f"{SUPABASE_URL}/functions/v1/whatsapp-handler"
 
 TEST_PHONE   = "whatsapp:+15005550006"   # fake Twilio test number

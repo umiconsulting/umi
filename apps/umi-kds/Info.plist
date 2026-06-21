@@ -27,7 +27,7 @@
 	<key>KDSHeartbeatIntervalSeconds</key>
 	<real>5</real>
 	<key>KDSAnonKey</key>
-	<string>***REMOVED***</string>
+	<string>$(KDS_ANON_KEY)</string>
 	<key>KDSBusinessID</key>
 	<string>ef9005a2-efe1-45bf-9da0-313b5902d9b4</string>
 	<key>KDSStationID</key>
