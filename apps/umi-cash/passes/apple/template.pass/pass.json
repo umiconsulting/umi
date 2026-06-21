@@ -1,0 +1,84 @@
+{
+  "formatVersion": 1,
+  "passTypeIdentifier": "pass.co.umicash.loyalty",
+  "teamIdentifier": "PLACEHOLDER0",
+  "organizationName": "Umi Cash",
+  "description": "Tarjeta de lealtad",
+  "backgroundColor": "rgb(181, 96, 90)",
+  "foregroundColor": "rgb(255, 255, 255)",
+  "labelColor": "rgb(250, 235, 220)",
+  "storeCard": {
+    "headerFields": [
+      {
+        "key": "balance",
+        "label": "SALDO",
+        "value": "$0.00",
+        "textAlignment": "PKTextAlignmentRight"
+      }
+    ],
+    "primaryFields": [
+      {
+        "key": "memberName",
+        "label": "MIEMBRO",
+        "value": "Cliente"
+      }
+    ],
+    "secondaryFields": [
+      {
+        "key": "visits",
+        "label": "VISITAS",
+        "value": "0/10"
+      },
+      {
+        "key": "reward",
+        "label": "PRÓXIMA RECOMPENSA",
+        "value": "10 visitas"
+      }
+    ],
+    "auxiliaryFields": [
+      {
+        "key": "rewardName",
+        "label": "RECOMPENSA",
+        "value": "Cookie de temporada"
+      }
+    ],
+    "backFields": [
+      {
+        "key": "totalVisits",
+        "label": "Visitas totales",
+        "value": "0"
+      },
+      {
+        "key": "cardNumber",
+        "label": "Número de tarjeta",
+        "value": ""
+      },
+      {
+        "key": "terms",
+        "label": "Términos y condiciones",
+        "value": "Válido únicamente en El Gran Ribera. El saldo no es reembolsable en efectivo. Las recompensas deben canjearse en tienda. El saldo no expira."
+      },
+      {
+        "key": "contact",
+        "label": "Contáctanos",
+        "value": "Instagram: @elgranribera"
+      }
+    ]
+  },
+  "barcode": {
+    "message": "PLACEHOLDER",
+    "format": "PKBarcodeFormatQR",
+    "messageEncoding": "iso-8859-1",
+    "altText": "Tarjeta de lealtad El Gran Ribera"
+  },
+  "barcodes": [
+    {
+      "message": "PLACEHOLDER",
+      "format": "PKBarcodeFormatQR",
+      "messageEncoding": "iso-8859-1"
+    }
+  ],
+  "webServiceURL": "https://your-domain.com/api/passes/apple",
+  "authenticationToken": "PLACEHOLDER_TOKEN_",
+  "sharingProhibited": false
+}

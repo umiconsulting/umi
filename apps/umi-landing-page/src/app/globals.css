@@ -1,0 +1,334 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ──────────────────────────────────────────
+   Umi Consulting — design tokens
+   Brand: #223979 + #7692CB · Strategy register
+   ────────────────────────────────────────── */
+:root {
+  --color-umi-blue-dark: #223979;
+  --color-umi-blue-light: #7692cb;
+  --color-umi-blue-deep: #0a1430;
+  --color-umi-accent: #e7a85b;
+  --color-umi-paper: #fbf7ef;
+
+  --stroke: rgba(34, 57, 121, 0.12);
+  --stroke-strong: rgba(34, 57, 121, 0.2);
+  --ink: #142142;
+  --ink-dim: rgba(20, 33, 66, 0.7);
+  --ink-faint: rgba(20, 33, 66, 0.48);
+  --surface: rgba(255, 255, 255, 0.72);
+  --surface-strong: #fffdf8;
+}
+
+* {
+  box-sizing: border-box;
+  letter-spacing: 0 !important;
+}
+
+html,
+body {
+  background: var(--color-umi-paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+/* Shader canvas — fixed under all content */
+#umi-shader-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.22;
+}
+#umi-shader-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(251, 247, 239, 0.58) 0%, rgba(251, 247, 239, 0.72) 48%, rgba(251, 247, 239, 0.96) 92%),
+    radial-gradient(circle at 82% 12%, rgba(231, 168, 91, 0.16), transparent 28%);
+}
+main {
+  position: relative;
+  z-index: 2;
+  background:
+    linear-gradient(180deg, rgba(251, 247, 239, 0) 0, rgba(251, 247, 239, 0) 620px, var(--color-umi-paper) 840px),
+    transparent;
+}
+
+@layer components {
+  .container-wide {
+    @apply mx-auto max-w-[1320px] px-6 sm:px-8 lg:px-10;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center gap-2.5 px-5 py-3 text-sm font-extrabold;
+    @apply rounded-full transition-all duration-200 cursor-pointer whitespace-nowrap;
+    @apply border border-transparent;
+  }
+  .btn-lg {
+    @apply px-6 py-4 text-[15px];
+  }
+  .btn-sm {
+    @apply px-4 py-2 text-xs;
+  }
+
+  .btn-primary {
+    @apply bg-umi-blue-dark text-white border-umi-blue-dark shadow-[0_14px_36px_rgba(34,57,121,0.22)];
+  }
+  .btn-primary:hover {
+    background: #2e4ba5;
+    border-color: #2e4ba5;
+  }
+
+  .btn-ghost {
+    background: rgba(255, 255, 255, 0.56);
+    color: var(--ink);
+    border: 1px solid var(--stroke-strong);
+  }
+  .btn-ghost:hover {
+    background: rgba(191, 209, 242, 0.08);
+    border-color: #bfd1f2;
+  }
+
+  .btn-link {
+    background: transparent;
+    color: var(--color-umi-blue-dark);
+    border-bottom: 1px solid var(--color-umi-blue-dark);
+    border-radius: 0;
+    padding: 12px 0;
+  }
+  .btn-link:hover {
+    color: var(--color-umi-blue-deep);
+    gap: 14px;
+  }
+
+  /* Used to keep typography utilities */
+  .section-eyebrow {
+    @apply inline-flex items-center gap-3 text-[12px] font-extrabold uppercase;
+    color: var(--color-umi-blue-dark);
+  }
+  .section-eyebrow-rule {
+    @apply h-2 w-2 rounded-full;
+    background: var(--color-umi-accent);
+  }
+  .section-eyebrow.dark {
+    color: var(--color-umi-blue-dark);
+  }
+  .section-eyebrow.dark .section-eyebrow-rule {
+    background: var(--color-umi-blue-dark);
+  }
+
+  .section-title {
+    @apply font-sans text-[clamp(32px,4.2vw,56px)] font-extrabold leading-[1.02];
+    color: var(--ink);
+  }
+  .section-title em {
+    @apply font-serif font-medium not-italic;
+    color: var(--color-umi-blue-dark);
+  }
+  .section-lede {
+    @apply text-lg leading-[1.55] font-medium max-w-[660px];
+    color: var(--ink-dim);
+  }
+
+  .product-cockpit {
+    @apply relative overflow-hidden border border-white/50 bg-white/80 p-3 sm:p-4 rounded-[28px];
+    box-shadow: 0 28px 90px rgba(34, 57, 121, 0.18);
+  }
+
+  .product-cockpit::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(rgba(191, 209, 242, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(191, 209, 242, 0.05) 1px, transparent 1px);
+    background-size: 34px 34px;
+    opacity: 0.18;
+    pointer-events: none;
+  }
+
+  .cockpit-header,
+  .cockpit-grid,
+  .product-dock {
+    position: relative;
+    z-index: 1;
+  }
+
+  .cockpit-header {
+    @apply flex items-start justify-between gap-4 pb-4 mb-4;
+  }
+
+  .cockpit-header strong {
+    @apply block text-[22px] leading-tight font-extrabold text-umi-blue-deep;
+  }
+
+  .cockpit-kicker {
+    @apply block text-[11px] uppercase text-umi-accent mb-1.5 font-extrabold;
+  }
+
+  .live-pill {
+    @apply text-[11px] uppercase text-[#21715d] border border-[#8FD2C0]/60 bg-[#ecfbf6] px-2.5 py-1 rounded-full font-extrabold;
+  }
+
+  .cockpit-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 gap-3;
+  }
+
+  .cockpit-panel {
+    @apply min-h-[122px] border border-[var(--stroke)] bg-white/70 p-4 flex flex-col justify-between rounded-[20px];
+  }
+
+  .cockpit-panel.wide {
+    @apply sm:col-span-2 min-h-[172px];
+  }
+
+  .panel-label {
+    @apply text-[11px] uppercase text-[var(--ink-faint)] mb-4 font-extrabold;
+  }
+
+  .chat-line {
+    @apply max-w-[86%] px-3 py-2 text-[12px] leading-[1.35] border rounded-[14px];
+  }
+
+  .chat-line.incoming {
+    @apply bg-[#F4F1EA] text-umi-blue-deep border-[#F4F1EA] mb-2;
+  }
+
+  .chat-line.outgoing {
+    @apply ml-auto bg-[rgba(118,146,203,0.16)] text-umi-blue-deep border-[rgba(34,57,121,0.16)];
+  }
+
+  .pipeline {
+    @apply grid grid-cols-3 gap-2 mt-4;
+  }
+
+  .pipeline span {
+    @apply border border-[var(--stroke)] px-2.5 py-1.5 text-center text-[11px] text-[var(--ink-faint)] rounded-full;
+  }
+
+  .pipeline span.active {
+    @apply bg-umi-accent text-umi-blue-deep border-umi-accent font-semibold;
+  }
+
+  .ticket-stack {
+    @apply border-l-2 border-[#F1C66B] pl-3;
+  }
+
+  .ticket-stack span,
+  .cockpit-panel small {
+    @apply text-[12px] text-[var(--ink-faint)];
+  }
+
+  .ticket-stack strong {
+    @apply block text-[22px] font-extrabold text-umi-blue-deep my-2;
+  }
+
+  .wallet-ring {
+    @apply h-16 w-16 rounded-full border border-[#F08D74] text-[#F08D74] flex items-center justify-center font-serif text-[24px] mx-auto;
+    box-shadow: inset 0 0 0 8px rgba(240, 141, 116, 0.12);
+  }
+
+  .product-dock {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 mt-3;
+  }
+
+  .dock-item {
+    @apply bg-white/75 p-3 flex items-start gap-2.5 min-h-[62px] rounded-[16px] border border-[var(--stroke)];
+  }
+
+  .dock-item strong {
+    @apply block text-[13px] text-umi-blue-deep leading-tight;
+  }
+
+  .dock-item span {
+    @apply block text-[11px] text-[var(--ink-faint)] mt-1 leading-snug;
+  }
+
+  .product-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5;
+  }
+
+  .product-card {
+    @apply bg-[var(--surface-strong)] p-5 sm:p-6 lg:p-7 flex flex-col min-h-[460px] transition-all border border-[var(--stroke)] rounded-[26px];
+    box-shadow: 0 18px 60px rgba(34, 57, 121, 0.08);
+  }
+
+  .product-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 24px 70px rgba(34, 57, 121, 0.12);
+  }
+
+  .product-icon {
+    @apply h-11 w-11 flex items-center justify-center border border-[var(--stroke)] text-umi-blue-dark bg-[rgba(118,146,203,0.1)] rounded-2xl;
+  }
+
+  .photo-placeholder {
+    @apply relative overflow-hidden border border-[rgba(34,57,121,0.14)] bg-[#f2eadf] rounded-[28px];
+    background:
+      linear-gradient(135deg, rgba(34, 57, 121, 0.12), rgba(231, 168, 91, 0.18)),
+      repeating-linear-gradient(135deg, rgba(255,255,255,0.45) 0 12px, rgba(255,255,255,0.18) 12px 24px);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+  }
+
+  .photo-placeholder::after {
+    content: "Foto pendiente";
+    position: absolute;
+    left: 18px;
+    bottom: 18px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(255, 253, 248, 0.82);
+    color: var(--color-umi-blue-deep);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .placeholder-caption {
+    @apply absolute left-5 top-5 rounded-full bg-white/80 px-3 py-1.5 text-xs font-extrabold text-umi-blue-deep;
+  }
+
+  .hero-photo {
+    background:
+      radial-gradient(circle at 30% 22%, rgba(255, 253, 248, 0.5), transparent 22%),
+      linear-gradient(135deg, #172758 0%, #31599d 48%, #e7a85b 120%);
+    box-shadow: 0 30px 90px rgba(34, 57, 121, 0.22);
+  }
+
+  .hero-photo::before {
+    content: "";
+    position: absolute;
+    inset: 22% 12% 24%;
+    border-radius: 999px 999px 42px 42px;
+    background: rgba(255, 253, 248, 0.16);
+    transform: rotate(-8deg);
+  }
+
+  .hero-photo::after {
+    background: rgba(10, 20, 48, 0.58);
+    color: #fffdf8;
+  }
+}
+
+@media (max-width: 640px) {
+  .container-wide {
+    @apply px-0;
+  }
+
+  .product-card {
+    min-height: auto;
+  }
+
+  .chat-line {
+    max-width: 100%;
+  }
+}

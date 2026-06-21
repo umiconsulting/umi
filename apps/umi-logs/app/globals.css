@@ -1,0 +1,632 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is([data-depth="trace"] *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-serif: var(--font-serif);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  /* Semantic radius */
+  --radius-sm: var(--radius-container);
+  --radius-md: var(--radius-panel);
+  --radius-lg: var(--radius-panel);
+  --radius-xl: var(--radius-elevated);
+  --radius-2xl: var(--radius-elevated);
+  --radius-3xl: var(--radius-elevated);
+  --radius-4xl: var(--radius-elevated);
+  /* Surface layers */
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-4: var(--surface-4);
+  /* Semantic status tokens */
+  --color-status-active: var(--status-active);
+  --color-status-pending: var(--status-pending);
+  --color-status-error: var(--status-error);
+  --color-status-info: var(--status-info);
+  /* Event type colors */
+  --color-event-incoming: var(--event-incoming);
+  --color-event-claude: var(--event-claude);
+  --color-event-tool: var(--event-tool);
+  --color-event-result: var(--event-result);
+  --color-event-memory: var(--event-memory);
+  /* Text hierarchy */
+  --color-dim: var(--text-dim);
+  --color-subdued: var(--text-secondary);
+}
+
+/* ── Design Tokens ──────────────────────────────────────────────── */
+:root {
+  /* ── Semantic Radius System ── */
+  --radius: 0px;
+  --radius-data: 0px;
+  --radius-container: 2px;
+  --radius-panel: 4px;
+  --radius-elevated: 6px;
+
+  /* ── Fluid Typography (clamp: min @ 320px → max @ 1920px) ── */
+  --text-log-xs:  clamp(10px, 0.600rem + 0.10vw, 12px);
+  --text-log-sm:  clamp(11px, 0.650rem + 0.15vw, 13px);
+  --text-log-base:clamp(12px, 0.700rem + 0.15vw, 14px);
+  --text-ui:      clamp(12px, 0.700rem + 0.20vw, 14px);
+  --text-label:   clamp(10px, 0.600rem + 0.10vw, 11px);
+  --text-heading: clamp(14px, 0.850rem + 0.30vw, 18px);
+  --text-metric:  clamp(22px, 1.300rem + 0.80vw, 32px);
+  --text-title:   clamp(16px, 1.000rem + 0.40vw, 20px);
+  --text-narrative:clamp(18px, 1.100rem + 0.50vw, 28px);
+
+  /* ── Warm Neutral Palette ── */
+  --background: #FAFAF7;
+  --foreground: #1A1A18;
+  --card: #F5F3EE;
+  --card-foreground: #1A1A18;
+  --popover: #F5F3EE;
+  --popover-foreground: #1A1A18;
+  --primary: #2D8A4E;
+  --primary-foreground: #FAFAF7;
+  --secondary: #EDEAE3;
+  --secondary-foreground: #1A1A18;
+  --muted: #EDEAE3;
+  --muted-foreground: #6B6860;
+  --accent: #F5F3EE;
+  --accent-foreground: #1A1A18;
+  --destructive: #C4392D;
+  --border: #D4D0C8;
+  --input: #D4D0C8;
+  --ring: #2D8A4E;
+  --chart-1: #2D8A4E;
+  --chart-2: #3B7CC9;
+  --chart-3: #C4880D;
+  --chart-4: #7C6B8A;
+  --chart-5: #C4392D;
+  --sidebar: #FAFAF7;
+  --sidebar-foreground: #1A1A18;
+  --sidebar-primary: #2D8A4E;
+  --sidebar-primary-foreground: #FAFAF7;
+  --sidebar-accent: #F5F3EE;
+  --sidebar-accent-foreground: #1A1A18;
+  --sidebar-border: #D4D0C8;
+  --sidebar-ring: #2D8A4E;
+
+  /* ── Surface Stack ── */
+  --surface-0: #FAFAF7;
+  --surface-1: #F5F3EE;
+  --surface-2: #EDEAE3;
+  --surface-3: #E5E2DA;
+  --surface-4: #DDD9D0;
+
+  /* ── Ruled Line ── */
+  --ruled-line: #D4D0C8;
+
+  /* ── Status Colors (color ONLY for status) ── */
+  --status-active:  #2D8A4E;
+  --status-pending: #C4880D;
+  --status-error:   #C4392D;
+  --status-info:    #3B7CC9;
+
+  /* ── Event Colors (mapped to status) ── */
+  --event-incoming: #3B7CC9;
+  --event-claude:   #7C6B8A;
+  --event-tool:     #C4880D;
+  --event-result:   #2D8A4E;
+  --event-memory:   #3B9B8A;
+  --event-error:    #C4392D;
+  --event-neutral:  #9C9890;
+
+  /* ── Text Hierarchy ── */
+  --text-primary:   #1A1A18;
+  --text-secondary: #6B6860;
+  --text-dim:       #9C9890;
+
+  /* ── Layout Dimensions ── */
+  --sidebar-width:    48px;
+  --sidebar-expanded: 220px;
+  --panel-width:      460px;
+  --topbar-height:    40px;
+
+  /* ── Certainty Tokens (5-step discrete opacity) ── */
+  --certainty-full:    1.0;
+  --certainty-high:    0.72;
+  --certainty-medium:  0.45;
+  --certainty-low:     0.25;
+  --certainty-absent:  0.10;
+
+  /* ── Temporal / Timeline Tokens ── */
+  --timeline-node-height: 28px;
+  --timeline-gap-min: 4px;
+  --timeline-gap-max: 24px;
+  --timeline-connector: 1px solid var(--ruled-line);
+  --timeline-node-border: 2px;
+
+  /* ── Depth Mode Tokens (Surface → System → Trace) ── */
+  --depth-surface-density: 0.3;
+  --depth-system-density: 0.6;
+  --depth-trace-density: 0.9;
+  --depth-surface-font: var(--text-ui);
+  --depth-system-font: var(--text-log-base);
+  --depth-trace-font: var(--text-log-xs);
+
+  /* ── Absence Tokens ── */
+  --absent-border: 1px dashed var(--text-dim);
+  --absent-text: var(--text-dim);
+  --absent-bg: #F5F3EE;
+}
+
+/* ── Trace Mode (dark warm charcoal) ── */
+[data-depth="trace"] {
+  --background: #1C1B19;
+  --foreground: #E8E5DE;
+  --card: #252420;
+  --card-foreground: #E8E5DE;
+  --popover: #252420;
+  --popover-foreground: #E8E5DE;
+  --primary: #4AA56B;
+  --primary-foreground: #1C1B19;
+  --secondary: #2A2924;
+  --secondary-foreground: #E8E5DE;
+  --muted: #2A2924;
+  --muted-foreground: #8A8780;
+  --accent: #2A2924;
+  --accent-foreground: #E8E5DE;
+  --destructive: #D4544A;
+  --border: #3A3830;
+  --input: #3A3830;
+  --ring: #4AA56B;
+  --chart-1: #4AA56B;
+  --chart-2: #5A9AD5;
+  --chart-3: #D4A030;
+  --chart-4: #9A8AAA;
+  --chart-5: #D4544A;
+  --sidebar: #1C1B19;
+  --sidebar-foreground: #E8E5DE;
+  --sidebar-primary: #4AA56B;
+  --sidebar-primary-foreground: #1C1B19;
+  --sidebar-accent: #2A2924;
+  --sidebar-accent-foreground: #E8E5DE;
+  --sidebar-border: #3A3830;
+  --sidebar-ring: #4AA56B;
+  --surface-0: #1C1B19;
+  --surface-1: #252420;
+  --surface-2: #2A2924;
+  --surface-3: #33322C;
+  --surface-4: #3D3B34;
+  --ruled-line: #3A3830;
+  --status-active:  #4AA56B;
+  --status-pending: #D4A030;
+  --status-error:   #D4544A;
+  --status-info:    #5A9AD5;
+  --event-incoming: #5A9AD5;
+  --event-claude:   #9A8AAA;
+  --event-tool:     #D4A030;
+  --event-result:   #4AA56B;
+  --event-memory:   #5AABA0;
+  --event-error:    #D4544A;
+  --event-neutral:  #5A5850;
+  --text-primary:   #E8E5DE;
+  --text-secondary: #8A8780;
+  --text-dim:       #5A5850;
+  --absent-bg: #252420;
+}
+
+/* ── View Transitions API ───────────────────────────────────────── */
+@view-transition {
+  navigation: auto;
+}
+
+.page-title       { view-transition-name: page-title; }
+.sidebar-indicator { view-transition-name: nav-indicator; }
+.breadcrumb-root  { view-transition-name: breadcrumb; }
+
+::view-transition-old(page-title) {
+  animation: vt-slide-out 180ms ease-in both;
+}
+::view-transition-new(page-title) {
+  animation: vt-slide-in 220ms ease both;
+}
+::view-transition-old(nav-indicator),
+::view-transition-new(nav-indicator) {
+  animation: none;
+}
+::view-transition-group(nav-indicator) {
+  animation-duration: 220ms;
+  animation-timing-function: ease;
+}
+
+/* ── @layer Base ─────────────────────────────────────────────────── */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    color-scheme: light;
+    scroll-behavior: smooth;
+    container-type: normal;
+  }
+
+  html[data-depth="trace"] {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    font-size: var(--text-ui);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+}
+
+/* ── Scrollbars ──────────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 4px; height: 4px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  {
+  background: var(--ruled-line);
+  border-radius: 2px;
+  transition: background 150ms ease;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+* { scrollbar-width: thin; scrollbar-color: var(--ruled-line) transparent; }
+
+/* ── Text Selection ──────────────────────────────────────────────── */
+::selection {
+  background: color-mix(in srgb, var(--status-active), transparent 70%);
+  color: var(--foreground);
+}
+
+/* ── Focus Rings ─────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 1px solid var(--status-active);
+  outline-offset: 2px;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────── */
+.sidebar-nav {
+  width: var(--sidebar-width);
+  overflow: hidden;
+  will-change: width;
+  transition: width 280ms ease;
+  box-shadow: inset -1px 0 0 var(--ruled-line);
+}
+.sidebar-nav:hover {
+  width: var(--sidebar-expanded);
+}
+
+.sidebar-label {
+  opacity: 0;
+  white-space: nowrap;
+  transition: opacity 180ms ease;
+  pointer-events: none;
+}
+.sidebar-nav:hover .sidebar-label {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sidebar-section {
+  opacity: 0;
+  white-space: nowrap;
+  transition: opacity 180ms ease;
+  pointer-events: none;
+  font-size: var(--text-label);
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+.sidebar-nav:hover .sidebar-section {
+  opacity: 1;
+}
+
+/* ── Nav Links ───────────────────────────────────────────────────── */
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-left: 2px solid transparent;
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease;
+}
+.nav-link:hover:not(.nav-link-active) {
+  background-color: var(--surface-2);
+  color: var(--foreground);
+}
+.nav-link-active {
+  border-left-color: var(--status-active);
+  color: var(--text-primary);
+  background-color: var(--surface-1);
+}
+
+/* ── Metric Card ─────────────────────────────────────────────────── */
+a:hover .metric-card-inner {
+  background: var(--surface-2) !important;
+}
+
+.metric-card-container {
+  container-type: inline-size;
+  container-name: metric-card;
+}
+
+@container metric-card (max-width: 160px) {
+  .metric-subtitle    { display: none; }
+  .metric-icon-area   { display: none; }
+  .metric-value       { font-size: 18px; }
+}
+@container metric-card (min-width: 200px) {
+  .metric-value { font-size: var(--text-metric); }
+}
+
+/* ── Detail Panel ─────────────────────────────────────────────────── */
+.detail-panel {
+  transform: translateX(0);
+  opacity: 1;
+  transition:
+    transform 300ms ease,
+    opacity   200ms ease;
+}
+@starting-style {
+  .detail-panel {
+    transform: translateX(48px);
+    opacity: 0;
+  }
+}
+
+.table-dimmed {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+
+/* ── Log Row Interactions ────────────────────────────────────────── */
+.log-row {
+  border-left: 2px solid transparent;
+  transition:
+    background-color 100ms ease,
+    border-color     100ms ease;
+  cursor: pointer;
+}
+.log-row:hover {
+  background-color: var(--surface-2);
+  border-left-color: color-mix(in srgb, var(--event-color, var(--ruled-line)), transparent 40%);
+}
+.log-row.row-expanded {
+  background-color: var(--surface-3);
+  border-left-color: var(--event-color, var(--status-active));
+}
+.log-row.row-expanded .row-content {
+  animation: row-content-enter 180ms ease both;
+}
+.log-row.row-focused {
+  border-left-color: var(--event-color, var(--status-active));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--event-color, var(--status-active)), transparent 80%);
+}
+
+/* ── Event Color Utilities ───────────────────────────────────────── */
+.event-incoming   { --event-color: var(--event-incoming);   }
+.event-claude     { --event-color: var(--event-claude);     }
+.event-tool       { --event-color: var(--event-tool);       }
+.event-result     { --event-color: var(--event-result);     }
+.event-memory     { --event-color: var(--event-memory);     }
+.event-error      { --event-color: var(--event-error);      }
+.event-neutral    { --event-color: var(--event-neutral);    }
+
+/* ── Terminal Select / Input ─────────────────────────────────────── */
+.terminal-select {
+  font-size: var(--text-log-sm);
+  border: 1px solid var(--ruled-line);
+  border-radius: var(--radius-data);
+  background: var(--surface-1);
+  color: var(--foreground);
+  padding: 4px 8px;
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 150ms ease;
+}
+.terminal-select:hover {
+  border-color: var(--text-secondary);
+}
+.terminal-select:focus {
+  border-color: var(--status-active);
+}
+
+/* ── Convo Row ───────────────────────────────────────────────────── */
+.convo-row-hover:hover {
+  background: var(--surface-2);
+  border-left-color: var(--status-active) !important;
+}
+
+/* ── Live Indicator ──────────────────────────────────────────────── */
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--status-active);
+  animation: live-pulse 2.5s ease-in-out infinite;
+}
+
+/* ── Scroll-Driven Animation ─────────────────────────────────────── */
+@supports (animation-timeline: view()) {
+  .log-stream-row {
+    animation: log-materialize linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 25%;
+  }
+}
+
+/* ── Keyframes ───────────────────────────────────────────────────── */
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+@keyframes log-materialize {
+  from { opacity: 0; translate: 0 6px; }
+  to   { opacity: 1; translate: 0 0; }
+}
+
+@keyframes row-content-enter {
+  from { opacity: 0; translate: 0 -4px; }
+  to   { opacity: 1; translate: 0 0; }
+}
+
+@keyframes panel-enter {
+  from { transform: translateX(40px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+@keyframes vt-slide-out {
+  to { opacity: 0; translate: 0 -8px; }
+}
+@keyframes vt-slide-in {
+  from { opacity: 0; translate: 0 8px; }
+}
+
+/* ── Depth Toggle ───────────────────────────────────────────────── */
+.depth-toggle {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--ruled-line);
+}
+.depth-tab {
+  padding: 8px 16px;
+  font-size: var(--text-label);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+.depth-tab:hover {
+  color: var(--text-secondary);
+}
+.depth-tab-active {
+  color: var(--status-active);
+  border-bottom-color: var(--status-active);
+}
+
+/* Depth content transitions */
+.depth-content-enter {
+  animation: depth-fade-in 150ms ease both;
+}
+@keyframes depth-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Timeline ───────────────────────────────────────────────────── */
+.timeline-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.timeline-node {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--timeline-node-height);
+  padding: 4px 12px;
+  border-left: var(--timeline-node-border) solid var(--event-color, var(--ruled-line));
+  font-size: var(--text-log-sm);
+  cursor: pointer;
+  transition: background-color 100ms ease;
+}
+.timeline-node:hover {
+  background-color: var(--surface-2);
+}
+.timeline-node-active {
+  background-color: var(--surface-3);
+}
+.timeline-connector {
+  width: 0;
+  margin-left: calc(var(--timeline-node-border) / 2);
+  border-left: var(--timeline-connector);
+}
+.timeline-gap {
+  border-left: 1px dashed var(--text-dim);
+  margin-left: calc(var(--timeline-node-border) / 2);
+  opacity: 0.4;
+}
+
+/* ── Certainty Bar ──────────────────────────────────────────────── */
+.certainty-bar {
+  display: flex;
+  gap: 2px;
+  height: 4px;
+}
+.certainty-bar-step {
+  flex: 1;
+  background: currentColor;
+}
+
+/* ── Absence Cell ───────────────────────────────────────────────── */
+.absence-cell {
+  border-bottom: var(--absent-border);
+  color: var(--absent-text);
+  background: transparent;
+  font-size: var(--text-log-sm);
+  padding: 4px 8px;
+  text-align: center;
+}
+
+/* ── Reduced Motion ──────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .live-dot { animation: none; }
+  @view-transition { navigation: none; }
+}

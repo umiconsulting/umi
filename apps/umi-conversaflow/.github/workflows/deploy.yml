@@ -1,0 +1,69 @@
+name: Deploy Edge Functions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+  workflow_dispatch:
+
+env:
+  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+  PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Lint
+        working-directory: supabase/functions
+        run: deno lint
+      - name: Type check
+        working-directory: supabase/functions
+        run: |
+          deno check whatsapp-handler/index.ts
+          deno check job-worker/index.ts
+
+  deploy-staging:
+    needs: lint
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Deploy whatsapp-handler
+        run: |
+          supabase functions deploy whatsapp-handler \
+            --project-ref $PROJECT_REF --no-verify-jwt \
+            --workdir . --use-api
+      - name: Deploy job-worker
+        run: |
+          supabase functions deploy job-worker \
+            --project-ref $PROJECT_REF --no-verify-jwt \
+            --workdir . --use-api
+
+  deploy-production:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Deploy whatsapp-handler
+        run: |
+          supabase functions deploy whatsapp-handler \
+            --project-ref $PROJECT_REF --no-verify-jwt \
+            --workdir . --use-api
+      - name: Deploy job-worker
+        run: |
+          supabase functions deploy job-worker \
+            --project-ref $PROJECT_REF --no-verify-jwt \
+            --workdir . --use-api

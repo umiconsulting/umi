@@ -1,10 +1,9 @@
 # macOS
 .DS_Store
 
-# Six independent app repos — not tracked at root until Phase 5 monorepo migration
-# (versioned .gitignore chosen over .git/info/exclude so the rule is durable and shared;
-# ignoring the directory also prevents accidental gitlink/embedded-repo staging)
-apps/
+# apps/ are tracked in this monorepo (fresh-snapshot migration 2026-06-20).
+# Per-app .gitignore files still apply within each app subtree; nested .git
+# histories were archived to backups/nested-git/ and to each origin repo.
 
 # Database dumps and handoff material — never version data payloads at root
 backups/
@@ -16,11 +15,15 @@ prod-db-handoff-2026-05-13/
 # Screenshots / visual artifacts
 artifacts/
 
-# Env and secrets
+# Env and secrets — templates are tracked, real env files never are
 .env
 .env.*
+!.env.example
+!**/.env.example
 *.pem
 *.key
+*.p12
+*.p8
 
 # Build outputs
 node_modules/

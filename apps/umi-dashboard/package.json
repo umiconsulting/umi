@@ -1,0 +1,36 @@
+{
+  "name": "umi-dashboard",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "dev": "concurrently --names \"API,UI\" -c \"cyan,magenta\" \"node --watch --env-file=.env server.js\" \"vite\"",
+    "dev:local": "concurrently --names \"API,UI\" -c \"cyan,magenta\" \"node --watch --env-file=.env.local-postgres server.js\" \"vite --mode local-postgres\"",
+    "api:local": "node --env-file=.env.local-postgres server.js",
+    "postinstall": "prisma generate",
+    "build": "npx vite build",
+    "api:check": "node --check server.js && node --check api/index.js",
+    "preview": "node --env-file=.env server.js",
+    "preview:local": "node --env-file=.env.local-postgres server.js",
+    "db:generate": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.17.0",
+    "@supabase/supabase-js": "^2.45.4",
+    "express": "^4.21.2",
+    "nodemailer": "^8.0.7",
+    "react": "^18.3.1",
+    "react-colorful": "^5.7.0",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "prisma": "^5.17.0",
+    "vite": "^5.4.11"
+  }
+}

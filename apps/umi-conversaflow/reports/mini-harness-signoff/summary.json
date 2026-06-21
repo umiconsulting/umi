@@ -1,0 +1,170 @@
+{
+  "status": "passed_plan_b_and_c_with_findings",
+  "generated_at": "2026-05-12",
+  "run_id": "signoff-20260511230208-fullaftercredits",
+  "artifacts_dir": "reports/mini-harness-signoff/signoff-20260511230208-fullaftercredits",
+  "local_regression": {
+    "tests_passed": 61,
+    "tests_failed": 0,
+    "deno_check": "passed"
+  },
+  "online_signoff": {
+    "http_200_suites": 5,
+    "llm_errors": 0,
+    "missing_expected_tools_total": 0,
+    "irreversible_tools_intercepted_total": 7,
+    "signoff_function_deleted_after_run": true
+  },
+  "plan_c_probe": {
+    "status": "historical_probe_only",
+    "date": "2026-05-12",
+    "test_phone_mask": "+521***6855",
+    "probe_message": "Que horario tienen hoy?",
+    "whatsapp_handler_redeployed_no_verify_jwt": true,
+    "webhook_http_status": 200,
+    "conversation_id": "8294c4cb-1723-45cf-b885-4faf81016c55",
+    "pipeline": {
+      "inbound": "enqueued",
+      "integrity": "completed",
+      "process": "completed",
+      "dispatch": "twilio_api_accepted"
+    },
+    "twilio_final_status": "undelivered",
+    "twilio_error_code": 63016,
+    "finding": "Simulated signed webhook does not open the real WhatsApp 24-hour customer-service window; complete real-delivery testing requires an actual inbound message from the test phone or a template send path."
+  },
+  "plan_c_live": {
+    "status": "passed_with_operational_findings",
+    "date": "2026-05-12",
+    "test_phone_mask": "+521***8408",
+    "real_session_opened_by_inbound": true,
+    "session_open_message": "join quarter-push",
+    "sandbox_join_created_backend_turn": false,
+    "conversation_id": "762559f0-5112-4040-9166-3fdd38d177ea",
+    "transaction_id": "73fa0051-ebd6-41a4-b421-50850cd7fd47",
+    "ticket_id": "db694244-2ff7-4d5d-b470-7aa70f756cb7",
+    "conversation_steps": [
+      "Quiero una galleta chocolatechip.",
+      "Si confirmo."
+    ],
+    "delivered_messages": [
+      "cart_summary",
+      "order_confirmation",
+      "status_accepted",
+      "status_preparing",
+      "status_ready",
+      "status_completed"
+    ],
+    "final_transaction_status": "completed",
+    "final_ticket_status": "completed",
+    "findings": [
+      "Real WhatsApp -> webhook -> mini_harness -> outbox -> transaction -> KDS -> Twilio status notifications worked end to end.",
+      "Twilio sandbox join opened the customer-service window but did not appear as a semantic backend turn.",
+      "KDS status notifications were eventually delivered but were not pushed immediately from the RPC path; they waited for a later worker tick.",
+      "KDS ticket event history includes projection-generated status events that deserve cleanup for clearer operator semantics."
+    ]
+  },
+  "suites": [
+    {
+      "suite_id": "suite_1",
+      "suite_name": "Vague browse, cart build, revision, confirmation",
+      "expected_tools": [
+        "search_menu",
+        "add_to_cart",
+        "edit_cart",
+        "confirm_order"
+      ],
+      "used_tools": [
+        "search_menu",
+        "add_to_cart",
+        "edit_cart",
+        "confirm_order"
+      ],
+      "missing_expected_tools": [],
+      "irreversible_tools_intercepted_count": 1,
+      "verdict": "pass"
+    },
+    {
+      "suite_id": "suite_2",
+      "suite_name": "Memory, preferences, repeat order, safe confirmation",
+      "expected_tools": [
+        "get_recent_customer_orders",
+        "search_menu",
+        "add_to_cart",
+        "reorder_last_order",
+        "confirm_order"
+      ],
+      "used_tools": [
+        "get_recent_customer_orders",
+        "reorder_last_order",
+        "search_menu",
+        "add_to_cart",
+        "confirm_order"
+      ],
+      "missing_expected_tools": [],
+      "irreversible_tools_intercepted_count": 3,
+      "verdict": "pass"
+    },
+    {
+      "suite_id": "suite_3",
+      "suite_name": "Frustration, contact, cancellation, recovery",
+      "expected_tools": [
+        "get_business_info",
+        "cancel_order",
+        "get_business_hours",
+        "search_menu"
+      ],
+      "used_tools": [
+        "get_business_info",
+        "cancel_order",
+        "get_business_hours",
+        "search_menu"
+      ],
+      "missing_expected_tools": [],
+      "irreversible_tools_intercepted_count": 1,
+      "verdict": "pass"
+    },
+    {
+      "suite_id": "suite_4",
+      "suite_name": "Hours, payment, complex cart corrections",
+      "expected_tools": [
+        "get_business_hours",
+        "get_business_info",
+        "add_to_cart",
+        "edit_cart",
+        "search_menu",
+        "confirm_order"
+      ],
+      "used_tools": [
+        "get_business_hours",
+        "get_business_info",
+        "add_to_cart",
+        "edit_cart",
+        "search_menu",
+        "confirm_order"
+      ],
+      "missing_expected_tools": [],
+      "irreversible_tools_intercepted_count": 1,
+      "verdict": "pass"
+    },
+    {
+      "suite_id": "suite_5",
+      "suite_name": "Ambiguous product, category confusion, typo recovery",
+      "expected_tools": [
+        "search_menu",
+        "add_to_cart",
+        "edit_cart",
+        "confirm_order"
+      ],
+      "used_tools": [
+        "search_menu",
+        "add_to_cart",
+        "edit_cart",
+        "confirm_order"
+      ],
+      "missing_expected_tools": [],
+      "irreversible_tools_intercepted_count": 1,
+      "verdict": "pass"
+    }
+  ]
+}

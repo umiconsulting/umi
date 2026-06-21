@@ -1,0 +1,1091 @@
+created_at	conversation_id	response_type	prompt_version	processor_version	stop_reason	tools	preceding_user_message
+2026-05-09 21:43:11.828189+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	chico
+2026-05-09 21:42:52.190222+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	que dato necesitas
+2026-05-09 21:40:31.987974+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	que dato
+2026-05-09 21:40:04.414255+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	???
+2026-05-09 21:39:42.182881+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	cual dato
+2026-05-09 21:39:22.468052+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	matcha pumpkin spice latte
+2026-05-09 21:38:50.398339+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	matcha pumpkin spice latte
+2026-05-09 21:38:22.228128+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v5.1.0.turn_v2	v2	""	search_menu	matcha
+2026-05-09 21:37:59.227527+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un pumpkin matcha latte chico a las rocas con leche deslactosada
+2026-05-09 21:37:24.305696+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	no
+2026-05-09 21:37:05.307368+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	hola
+2026-05-09 21:33:04.019111+00	8294c4cb-1723-45cf-b885-4faf81016c55	order_confirm	v5.1.0.turn_v2	v2	""	confirm_order	si
+2026-05-09 21:32:44.696914+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	cual
+2026-05-09 21:32:24.785888+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	quiero repetir mi pedido
+2026-05-09 21:11:14.780842+00	8294c4cb-1723-45cf-b885-4faf81016c55	order_confirm	v5.1.0.turn_v2	v2	""	confirm_order	si
+2026-05-09 21:10:57.895681+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	deslactosada
+2026-05-09 21:10:39.246455+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	seria todo gracias
+2026-05-09 21:10:18.794021+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	LATTE REGULAR CHICO ROCAS
+2026-05-09 21:09:56.384522+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	un latte regular chico
+2026-05-09 21:09:35.471648+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	empezar uno nuevo
+2026-05-09 21:09:03.397197+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	que necesitas
+2026-05-09 21:08:44.164627+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un americano chico frio
+2026-05-09 21:08:23.962827+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	olvida la orden pasada, quiero hacer una nueva orden
+2026-05-09 21:07:50.37804+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	chico
+2026-05-09 21:07:30.664299+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	cual dato
+2026-05-09 21:07:12.435239+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	hola
+2026-05-08 02:18:10.597768+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	""	simon perro
+2026-05-08 02:17:15.657412+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	la de chocolatechip
+2026-05-08 02:13:24.415714+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	la de chocolatechip
+2026-05-08 02:09:34.234319+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	la de chocholatechip
+2026-05-08 02:09:03.845548+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.1.0.turn_v2	v2	""	search_menu	dime que variantes tienes de la mesa de leonor
+2026-05-08 02:03:37.546893+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	""	cuáles tienes?
+2026-05-08 02:03:16.417108+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	""	ya quitaste el latte?
+2026-05-07 20:05:42.449768+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	ok
+2026-05-07 20:05:22.032412+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	ok gracias
+2026-05-07 19:27:08.633296+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	seria todo
+2026-05-07 19:26:45.955795+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	sii quieor eso
+2026-05-07 19:26:19.527911+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	hola
+2026-05-07 19:14:36.919521+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	""	quita el latte de la orden
+2026-05-07 19:08:47.636995+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	""	vete a la verga
+2026-05-07 06:05:03.343268+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	quiero seguir con este pedido
+2026-05-07 06:04:31.158693+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ok
+2026-05-07 06:03:30.334787+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	chico
+2026-05-07 06:03:11.817275+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero mi americano frio
+2026-05-07 03:52:40.022339+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	si
+2026-05-07 03:52:17.623275+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	""	galleta de leonor de chocochip
+2026-05-07 03:52:16.859283+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	hola
+2026-05-07 03:52:08.982582+00	0754d9c5-4bb1-4546-8aa6-501ff0dc4385	product_search	v5.1.0.turn_v2	v2	""	get_business_info	Me perdiste, soy un cliente molesto
+2026-05-07 03:51:45.670906+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	""	nada mas
+2026-05-07 03:51:25.521291+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	""	nigga
+2026-05-07 03:49:07.159965+00	0754d9c5-4bb1-4546-8aa6-501ff0dc4385	product_search	v5.1.0.turn_v2	v2	""	get_business_info	Cual es el número?
+2026-05-07 03:48:08.407423+00	0754d9c5-4bb1-4546-8aa6-501ff0dc4385	product_search	v5.1.0.turn_v2	v2	""	get_business_info	Quien es tu administrador
+2026-05-07 03:47:07.651917+00	0754d9c5-4bb1-4546-8aa6-501ff0dc4385	product_search	v5.1.0.turn_v2	v2	""	get_business_info	Quiero hablar con tu supervisor
+2026-05-07 03:45:07.228608+00	0754d9c5-4bb1-4546-8aa6-501ff0dc4385	product_search	v5.1.0.turn_v2	v2	""	get_business_info	Quiero saber donde esta eñ gobernador rocha moya
+2026-05-07 03:44:05.877083+00	0754d9c5-4bb1-4546-8aa6-501ff0dc4385	product_search	v5.1.0.turn_v2	v2	""	""	Eso fue hace un mes
+2026-05-07 03:42:06.035205+00	0754d9c5-4bb1-4546-8aa6-501ff0dc4385	product_search	v5.1.0.turn_v2	v2	""	""	Que esta pasando
+2026-05-07 03:41:11.205044+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	si
+2026-05-07 03:41:05.695735+00	0754d9c5-4bb1-4546-8aa6-501ff0dc4385	product_search	v5.1.0.turn_v2	v2	""	""	Por que no me contestas
+2026-05-07 03:40:07.122749+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	puto bot de mierda
+2026-05-07 03:39:11.50196+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	""	cuales opciones mamon verga
+2026-05-07 03:39:07.173536+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	quiero un americano chico frio
+2026-05-07 03:38:12.083887+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	""	quita el puto latte y una galleta salada mamon
+2026-05-07 03:38:07.266019+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	hola
+2026-05-07 03:24:12.976471+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	""	q rollo joto
+2026-05-07 03:10:10.674793+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	""	q rolllo joto
+2026-05-07 01:14:32.961506+00	05edd52c-446f-4875-806c-5fc2d2e8bbc5	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Matcha Blanco con leche de coco
+2026-05-07 01:14:28.592017+00	258aab83-9f3b-4aa6-b523-9d9fc75c4716	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Matcha Vainilla en las rocas
+2026-05-07 01:14:23.805185+00	75793851-938c-4c1f-8318-26b6480742d3	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Brownie matcha caliente
+2026-05-07 01:14:19.058092+00	e68fa356-66a8-4dab-8b58-5a846a09b50a	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Matcha Sugar Free chico
+2026-05-07 01:14:15.013582+00	3e33e02b-6900-42d0-9ecb-db3e5f3cb279	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Matcha Mascabado grande
+2026-05-07 01:10:36.321478+00	d7d1d648-e42c-46b5-a536-3140b2fc20c4	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Cuernito croissant solo chico
+2026-05-07 01:10:30.521848+00	d7d1d648-e42c-46b5-a536-3140b2fc20c4	menu	v5.1.0.turn_v2	v2	""	search_menu	olvida eso mejor quiero otra cosa
+2026-05-07 01:10:25.173174+00	d7d1d648-e42c-46b5-a536-3140b2fc20c4	product_search	v5.1.0.turn_v2	v2	""	""	chico
+2026-05-07 01:10:19.194136+00	d7d1d648-e42c-46b5-a536-3140b2fc20c4	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un The coco club
+2026-05-07 01:10:15.008818+00	11083961-61bd-470f-9d17-8a22dcaa698a	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un VASO DOBLE REDONDO grande
+2026-05-07 01:10:08.23393+00	11083961-61bd-470f-9d17-8a22dcaa698a	product_search	v5.1.0.turn_v2	v2	""	""	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-05-07 01:10:04.387015+00	f5a34918-5a73-4e8c-bdf0-a645b5fe7b96	product_search	v5.1.0.turn_v2	v2	""	""	gde
+2026-05-07 01:10:00.072506+00	11083961-61bd-470f-9d17-8a22dcaa698a	product_search	v5.1.0.turn_v2	v2	""	""	gde
+2026-05-07 01:09:56.835382+00	f5a34918-5a73-4e8c-bdf0-a645b5fe7b96	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Matcha Blanco
+2026-05-07 01:09:52.641806+00	8699256a-c0ef-486d-bc82-98ee6a0e8e48	product_search	v5.1.0.turn_v2	v2	""	""	me das un Te Lavanda Manzanilla en las rocas
+2026-05-07 01:09:48.150748+00	8699256a-c0ef-486d-bc82-98ee6a0e8e48	product_search	v5.1.0.turn_v2	v2	""	""	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-05-07 01:09:45.153932+00	11083961-61bd-470f-9d17-8a22dcaa698a	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Hielo Oso Kenny
+2026-05-07 01:09:43.858456+00	8699256a-c0ef-486d-bc82-98ee6a0e8e48	product_search	v5.1.0.turn_v2	v2	""	""	ch
+2026-05-07 01:09:36.659607+00	8699256a-c0ef-486d-bc82-98ee6a0e8e48	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Matcha Rosa
+2026-05-07 01:09:36.572439+00	396f7782-c944-44d6-af14-3596dcebc06e	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un REFIL VASO CORAZÓN con leche de coco
+2026-05-07 01:09:32.237252+00	396f7782-c944-44d6-af14-3596dcebc06e	product_search	v5.1.0.turn_v2	v2	""	""	ya no, mejor empezamos de nuevo
+2026-05-07 01:09:29.809258+00	19c26641-e010-483b-984e-360a93ed0252	product_search	v5.1.0.turn_v2	v2	""	""	ponme un Chocolate caliente
+2026-05-07 01:09:28.407254+00	396f7782-c944-44d6-af14-3596dcebc06e	product_search	v5.1.0.turn_v2	v2	""	""	ch
+2026-05-07 01:09:25.017673+00	19c26641-e010-483b-984e-360a93ed0252	product_search	v5.1.0.turn_v2	v2	""	""	ya no, mejor empezamos de nuevo
+2026-05-07 01:09:24.309717+00	396f7782-c944-44d6-af14-3596dcebc06e	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Hielo Flor
+2026-05-07 01:09:21.147065+00	19c26641-e010-483b-984e-360a93ed0252	product_search	v5.1.0.turn_v2	v2	""	""	grande
+2026-05-07 01:09:20.133535+00	c3e5574f-03f6-4a67-9da2-9f442dbc8abc	product_search	v5.1.0.turn_v2	v2	""	""	me das un 3 quesos en las rocas
+2026-05-07 01:09:16.263926+00	19c26641-e010-483b-984e-360a93ed0252	product_search	v5.1.0.turn_v2	v2	""	""	dame un Moka
+2026-05-07 01:09:15.124483+00	c3e5574f-03f6-4a67-9da2-9f442dbc8abc	product_search	v5.1.0.turn_v2	v2	""	""	olvida eso mejor quiero otra cosa
+2026-05-07 01:09:11.764462+00	5e693ebc-40b5-495c-94d9-b671750297ef	product_search	v5.1.0.turn_v2	v2	""	""	agregame un Coca cola chico
+2026-05-07 01:09:08.301387+00	c3e5574f-03f6-4a67-9da2-9f442dbc8abc	product_search	v5.1.0.turn_v2	v2	""	""	grande
+2026-05-07 01:09:06.636277+00	5e693ebc-40b5-495c-94d9-b671750297ef	product_search	v5.1.0.turn_v2	v2	""	""	olvida eso mejor quiero otra cosa
+2026-05-07 01:09:03.39132+00	c3e5574f-03f6-4a67-9da2-9f442dbc8abc	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Matcha Rosa
+2026-05-07 01:09:02.635005+00	5e693ebc-40b5-495c-94d9-b671750297ef	product_search	v5.1.0.turn_v2	v2	""	""	chico
+2026-05-07 01:08:59.426456+00	f71ed8de-06a3-4f12-a63f-cb33c164556b	product_search	v5.1.0.turn_v2	v2	""	""	ponme un Moka caliente
+2026-05-07 01:08:59.316117+00	c666a17b-07e2-4a43-b774-d8bec9171f61	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Cuernito croissant solo
+2026-05-07 01:08:58.234579+00	5e693ebc-40b5-495c-94d9-b671750297ef	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Moka Blanco
+2026-05-07 01:08:55.274477+00	f71ed8de-06a3-4f12-a63f-cb33c164556b	product_search	v5.1.0.turn_v2	v2	""	""	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-05-07 01:08:54.268255+00	74a9965d-c0ba-4ca2-8926-4f876f622821	product_search	v5.1.0.turn_v2	v2	""	""	quiero un Brownie KALU grande
+2026-05-07 01:08:54.005843+00	f4852d12-91d8-415f-b5a3-60a14ec34713	product_search	v5.1.0.turn_v2	v2	""	""	dame un Hielo Oso Kenny con leche de coco
+2026-05-07 01:08:51.147524+00	f71ed8de-06a3-4f12-a63f-cb33c164556b	product_search	v5.1.0.turn_v2	v2	""	""	chico
+2026-05-07 01:08:49.034545+00	f4852d12-91d8-415f-b5a3-60a14ec34713	product_search	v5.1.0.turn_v2	v2	""	""	olvida eso mejor quiero otra cosa
+2026-05-07 01:08:48.814491+00	74a9965d-c0ba-4ca2-8926-4f876f622821	product_search	v5.1.0.turn_v2	v2	""	""	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-05-07 01:08:46.238381+00	f71ed8de-06a3-4f12-a63f-cb33c164556b	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Matcha Agua
+2026-05-07 01:08:44.893095+00	74a9965d-c0ba-4ca2-8926-4f876f622821	product_search	v5.1.0.turn_v2	v2	""	""	gde
+2026-05-07 01:08:44.885905+00	f4852d12-91d8-415f-b5a3-60a14ec34713	product_search	v5.1.0.turn_v2	v2	""	""	gde
+2026-05-07 01:08:39.788429+00	f4852d12-91d8-415f-b5a3-60a14ec34713	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un La Mesa de Leonor
+2026-05-07 01:08:39.612688+00	74a9965d-c0ba-4ca2-8926-4f876f622821	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Matcha Latte
+2026-05-07 01:08:35.715531+00	cafbb76a-2db5-4b38-93e6-fe4667907601	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Hielo Flor en las rocas
+2026-05-07 01:08:34.965647+00	2791d7a6-7f10-43cb-bfbf-e5b27c5b180a	product_search	v5.1.0.turn_v2	v2	""	""	dame un BOLSA DÁTIL 1 KG con leche de coco
+2026-05-07 01:08:30.755423+00	cafbb76a-2db5-4b38-93e6-fe4667907601	product_search	v5.1.0.turn_v2	v2	""	""	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-05-07 01:08:29.592786+00	2791d7a6-7f10-43cb-bfbf-e5b27c5b180a	product_search	v5.1.0.turn_v2	v2	""	""	ya no, mejor empezamos de nuevo
+2026-05-07 01:08:26.716634+00	cafbb76a-2db5-4b38-93e6-fe4667907601	product_search	v5.1.0.turn_v2	v2	""	""	ch
+2026-05-07 01:08:24.343124+00	2791d7a6-7f10-43cb-bfbf-e5b27c5b180a	product_search	v5.1.0.turn_v2	v2	""	""	ch
+2026-05-07 01:08:21.993624+00	cafbb76a-2db5-4b38-93e6-fe4667907601	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un The coco club
+2026-05-07 01:08:20.310568+00	2791d7a6-7f10-43cb-bfbf-e5b27c5b180a	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Lavanda Latte
+2026-05-07 01:08:18.250426+00	38c1852d-20c6-4288-9c6a-6a67f4706fa5	product_search	v5.1.0.turn_v2	v2	""	""	ponme un BOTELLA JARABE TORANI caliente
+2026-05-07 01:08:15.983409+00	1f9cd2f0-c64e-45f6-9e5a-49e00d31e470	product_search	v5.1.0.turn_v2	v2	""	""	me das un DÁTIL CHOCOLATE en las rocas
+2026-05-07 01:08:13.294878+00	38c1852d-20c6-4288-9c6a-6a67f4706fa5	product_search	v5.1.0.turn_v2	v2	""	""	ya no, mejor empezamos de nuevo
+2026-05-07 01:08:11.32893+00	1f9cd2f0-c64e-45f6-9e5a-49e00d31e470	product_search	v5.1.0.turn_v2	v2	""	""	olvida eso mejor quiero otra cosa
+2026-05-07 01:08:08.713455+00	38c1852d-20c6-4288-9c6a-6a67f4706fa5	product_search	v5.1.0.turn_v2	v2	""	""	grande
+2026-05-07 01:08:07.224982+00	1f9cd2f0-c64e-45f6-9e5a-49e00d31e470	product_search	v5.1.0.turn_v2	v2	""	""	grande
+2026-05-07 01:08:03.489295+00	38c1852d-20c6-4288-9c6a-6a67f4706fa5	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Lavanda Latte
+2026-05-07 01:08:01.089688+00	1f9cd2f0-c64e-45f6-9e5a-49e00d31e470	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Latte Regular
+2026-05-07 01:07:59.369621+00	ab0a92db-41ac-40c5-822b-ec07512615a2	product_search	v5.1.0.turn_v2	v2	""	""	agregame un Te Lavanda Manzanilla chico
+2026-05-07 01:07:57.292778+00	01d0e1a6-13f1-4a38-9458-2bae7b9aee63	product_search	v5.1.0.turn_v2	v2	""	""	ponme un GALLETAS AVENA caliente
+2026-05-07 01:07:53.728277+00	ab0a92db-41ac-40c5-822b-ec07512615a2	product_search	v5.1.0.turn_v2	v2	""	""	olvida eso mejor quiero otra cosa
+2026-05-07 01:07:49.885137+00	01d0e1a6-13f1-4a38-9458-2bae7b9aee63	product_search	v5.1.0.turn_v2	v2	""	""	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-05-07 01:07:49.752741+00	ab0a92db-41ac-40c5-822b-ec07512615a2	product_search	v5.1.0.turn_v2	v2	""	""	chico
+2026-05-07 01:07:45.744621+00	01d0e1a6-13f1-4a38-9458-2bae7b9aee63	product_search	v5.1.0.turn_v2	v2	""	""	chico
+2026-05-07 01:07:45.069384+00	ab0a92db-41ac-40c5-822b-ec07512615a2	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Latte Regular
+2026-05-07 01:07:41.127164+00	01d0e1a6-13f1-4a38-9458-2bae7b9aee63	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Sugar Free Latte
+2026-05-07 01:07:40.917388+00	857ef396-a06b-4a1e-8992-83708f493590	product_search	v5.1.0.turn_v2	v2	""	""	quiero un Agua grande
+2026-05-07 01:07:35.079417+00	857ef396-a06b-4a1e-8992-83708f493590	product_search	v5.1.0.turn_v2	v2	""	""	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-05-07 01:07:30.915572+00	857ef396-a06b-4a1e-8992-83708f493590	product_search	v5.1.0.turn_v2	v2	""	""	gde
+2026-05-07 01:07:25.675658+00	857ef396-a06b-4a1e-8992-83708f493590	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Caramelo vainilla
+2026-05-07 01:07:21.595258+00	aaddc14f-2c23-443a-b742-9dcb41089ac3	product_search	v5.1.0.turn_v2	v2	""	""	dame un Agua mineral con leche de coco
+2026-05-07 01:07:16.999789+00	aaddc14f-2c23-443a-b742-9dcb41089ac3	product_search	v5.1.0.turn_v2	v2	""	""	ya no, mejor empezamos de nuevo
+2026-05-07 01:07:13.056218+00	aaddc14f-2c23-443a-b742-9dcb41089ac3	product_search	v5.1.0.turn_v2	v2	""	""	ch
+2026-05-07 01:07:07.944741+00	aaddc14f-2c23-443a-b742-9dcb41089ac3	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Pumpkin Spice Latte
+2026-05-07 01:07:03.821333+00	79edcb2b-9090-42d9-bf4a-88fa198812c9	product_search	v5.1.0.turn_v2	v2	""	""	me das un Moka en las rocas
+2026-05-07 01:06:59.895863+00	79edcb2b-9090-42d9-bf4a-88fa198812c9	product_search	v5.1.0.turn_v2	v2	""	""	olvida eso mejor quiero otra cosa
+2026-05-07 01:06:56.171374+00	79edcb2b-9090-42d9-bf4a-88fa198812c9	product_search	v5.1.0.turn_v2	v2	""	""	grande
+2026-05-07 01:06:51.330206+00	79edcb2b-9090-42d9-bf4a-88fa198812c9	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Rosa Latte
+2026-05-07 01:06:47.327529+00	7355c19a-e65c-4cee-a06d-8579d13d33cc	product_search	v5.1.0.turn_v2	v2	""	""	ponme un Moka Blanco caliente
+2026-05-07 01:06:43.629304+00	7355c19a-e65c-4cee-a06d-8579d13d33cc	product_search	v5.1.0.turn_v2	v2	""	""	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-05-07 01:06:39.686458+00	7355c19a-e65c-4cee-a06d-8579d13d33cc	product_search	v5.1.0.turn_v2	v2	""	""	chico
+2026-05-07 01:06:35.238272+00	7355c19a-e65c-4cee-a06d-8579d13d33cc	product_search	v5.1.0.turn_v2	v2	""	""	dame un Vainilla Latte
+2026-05-07 01:02:56.337928+00	7fe0b4a8-f129-402c-8473-5a1a8ea57000	product_search	v5.1.0.turn_v2	v2	""	""	olvida eso mejor quiero otra cosa
+2026-05-07 01:02:52.49121+00	7fe0b4a8-f129-402c-8473-5a1a8ea57000	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Matcha Sugar Free
+2026-05-07 01:02:47.998521+00	c0a00873-5c5a-4354-87da-04b232b7cfcb	product_search	v5.1.0.turn_v2	v2	""	""	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-05-07 01:02:43.668098+00	c0a00873-5c5a-4354-87da-04b232b7cfcb	product_search	v5.1.0.turn_v2	v2	""	""	ponme un Matcha Mascabado
+2026-05-07 01:02:34.739978+00	2c610792-0d1e-4e78-9c27-b9db575d742e	product_search	v5.1.0.turn_v2	v2	""	""	ya no, mejor empezamos de nuevo
+2026-05-07 01:02:30.458171+00	2c610792-0d1e-4e78-9c27-b9db575d742e	product_search	v5.1.0.turn_v2	v2	""	""	agregame un 3 quesos
+2026-05-07 01:02:25.862258+00	b7f89dc1-e093-4bae-bf00-66337df4f974	product_search	v5.1.0.turn_v2	v2	""	""	olvida eso mejor quiero otra cosa
+2026-05-07 01:02:22.211177+00	b7f89dc1-e093-4bae-bf00-66337df4f974	product_search	v5.1.0.turn_v2	v2	""	""	quiero un VASO DOBLE REDONDO
+2026-05-07 01:02:17.578599+00	ecfbfcfa-5de1-4b38-9c47-edd1b945b297	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-05-07 01:02:12.813375+00	ecfbfcfa-5de1-4b38-9c47-edd1b945b297	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un REFIL VASO CORAZÓN
+2026-05-07 01:01:56.798351+00	a1f7a398-d8e2-416d-9ef7-73383312c331	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Vainilla Latte?
+2026-05-07 01:01:50.761163+00	ca95af1f-7214-4b2f-88d8-970de04c7ace	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay The coco club?
+2026-05-07 01:01:46.172508+00	58423e1a-be85-4429-96f1-7a3790d8cdf8	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan La Mesa de Leonor?
+2026-05-07 01:01:40.71841+00	3d28cd09-ac5c-4988-9345-e1e7ee24973e	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Cuernito croissant solo?
+2026-05-07 01:01:35.705991+00	521a3872-d8b3-4b19-b64a-ea33ad349e73	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Galleta Alicia?
+2026-05-06 20:27:16.328894+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	hola
+2026-05-06 03:06:33.425174+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	hola
+2026-05-06 03:05:51.821292+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	hola
+2026-05-06 03:02:44.342637+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	""	q variantes tienes
+2026-05-06 03:02:14.456191+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	elimina el late de la orden solo quiero la galleta
+2026-05-06 03:01:42.25402+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.1.0.turn_v2	v2	""	search_menu	el name del product es LA MESA DE LEONOR
+2026-05-06 02:57:06.224458+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.1.0.turn_v2	v2	""	search_menu	es una categoría, pero la galleta es de chocochip
+2026-05-06 02:52:39.634354+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.1.0.turn_v2	v2	""	search_menu	una galleta de la mesa de leonor
+2026-05-06 02:52:14.258335+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.1.0.turn_v2	v2	""	search_menu	pero de otro producto
+2026-05-06 02:51:51.310178+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero hacer otra orden
+2026-05-06 02:50:52.774469+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	""	que rollo
+2026-05-06 02:31:01.416375+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	chico
+2026-05-06 02:30:12.645775+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	latte en las rocas chico leche de coco
+2026-05-06 02:29:30.651982+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	latte frio chico
+2026-05-06 02:28:33.111508+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	americano chico caliente
+2026-05-06 02:28:00.423725+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	quiero un americano chico
+2026-05-06 02:27:25.147312+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	quiero un americano chico
+2026-05-06 02:26:54.230583+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v5.1.0.turn_v2	v2	""	""	hola
+2026-05-06 02:21:14.52956+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v5.1.0.turn_v2	v2	""	confirm_order	simon
+2026-05-06 02:02:02.887325+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	""	simon
+2026-05-06 01:49:10.093323+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	latte regular en las rocas chico leche de coco
+2026-05-06 01:36:41.140666+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	""	stupid ass nigga
+2026-05-06 01:36:06.559645+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0.turn_v2	v2	""	""	what up
+2026-05-06 01:31:48.81779+00	097da840-c164-472b-8211-0a47dc69e1f4	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Pumpkin Spice Latte?
+2026-05-06 01:31:44.474267+00	da8bc997-ca90-42eb-b377-5ceb4aeec937	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Rosa Latte?
+2026-05-06 01:31:39.951586+00	86ac03c1-a617-4a2d-a40f-8c344747fc9b	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Vainilla Latte?
+2026-05-06 01:31:25.351091+00	12193e3c-ba12-4541-bf01-1e16893dcadf	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Rosa Latte?
+2026-05-06 01:31:19.890214+00	9771815e-3b58-471f-be5f-f8cec410c281	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Vainilla Latte?
+2026-05-06 01:31:15.057504+00	c893d152-155c-423c-b4d3-cfb716c2042d	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes La Mesa de Leonor?
+2026-05-06 01:31:11.512549+00	53d14581-b624-4e79-9818-c536285bee9c	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan La Mesa de Leonor?
+2026-05-06 01:31:05.967106+00	fe9b5aef-9879-446c-9099-5f3065c81cfb	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Vainilla Latte?
+2026-05-06 01:31:00.916833+00	c4184454-be30-467e-b98c-58e926c066d2	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes The coco club?
+2026-04-30 22:21:10.367152+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0	v1	""	""	mr cox
+2026-04-28 19:39:51.682065+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.1.0	v1	""	add_to_cart -> search_menu	quiero una galleta de la casa de leonor de chocochip y un latte regular grande con leche de coco
+2026-04-28 19:35:29.76886+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.1.0	v1	""	add_to_cart -> search_menu	simon quiero hacer otro pedido
+2026-04-28 19:34:59.989858+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0	v1	""	""	que rollo
+2026-04-28 02:47:49.513839+00	2e621228-2326-4e59-9a9b-cd254bd2d8a2	product_search	v5.1.0.turn_v2	v2	""	""	agregame un Café molido 350 gr chico
+2026-04-28 02:47:46.857711+00	2e621228-2326-4e59-9a9b-cd254bd2d8a2	product_search	v5.1.0.turn_v2	v2	""	""	ya no, mejor empezamos de nuevo
+2026-04-28 02:47:45.2393+00	2e621228-2326-4e59-9a9b-cd254bd2d8a2	product_search	v5.1.0.turn_v2	v2	""	""	ch
+2026-04-28 02:47:42.590105+00	2e621228-2326-4e59-9a9b-cd254bd2d8a2	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un GALLETAS AVENA
+2026-04-28 02:47:39.844005+00	0c9150b0-b8db-4ad0-8d82-90a04e314343	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un BOLSA DÁTIL 1 KG grande
+2026-04-28 02:47:35.00855+00	0c9150b0-b8db-4ad0-8d82-90a04e314343	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	olvida eso mejor quiero otra cosa
+2026-04-28 02:47:33.373415+00	0c9150b0-b8db-4ad0-8d82-90a04e314343	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	grande
+2026-04-28 02:47:30.90397+00	0c9150b0-b8db-4ad0-8d82-90a04e314343	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un KALU GALLETAS
+2026-04-28 02:47:28.890216+00	bfbb9dcb-204c-4771-a343-011b8d4bd3f7	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un DÁTIL CHOCOLATE con leche de coco
+2026-04-28 02:47:26.787256+00	bfbb9dcb-204c-4771-a343-011b8d4bd3f7	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-04-28 02:47:25.132919+00	bfbb9dcb-204c-4771-a343-011b8d4bd3f7	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	chico
+2026-04-28 02:47:23.357835+00	bfbb9dcb-204c-4771-a343-011b8d4bd3f7	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Vaso leche
+2026-04-28 02:47:08.717587+00	4f7da106-c5f4-4737-a7d6-59b7f90de3eb	product_search	v5.1.0.turn_v2	v2	""	""	me das un 3 quesos en las rocas
+2026-04-28 02:47:06.383121+00	4f7da106-c5f4-4737-a7d6-59b7f90de3eb	product_search	v5.1.0.turn_v2	v2	""	""	ya no, mejor empezamos de nuevo
+2026-04-28 02:47:04.043495+00	4f7da106-c5f4-4737-a7d6-59b7f90de3eb	product_search	v5.1.0.turn_v2	v2	""	""	gde
+2026-04-28 02:47:02.390861+00	4f7da106-c5f4-4737-a7d6-59b7f90de3eb	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Matcha Rosa
+2026-04-28 02:47:00.75892+00	ac2293f5-f30b-41b5-a236-75c0701a3457	product_search	v5.1.0.turn_v2	v2	""	""	ponme un Moka caliente
+2026-04-28 02:46:58.758976+00	ac2293f5-f30b-41b5-a236-75c0701a3457	product_search	v5.1.0.turn_v2	v2	""	""	olvida eso mejor quiero otra cosa
+2026-04-28 02:46:57.302879+00	ac2293f5-f30b-41b5-a236-75c0701a3457	product_search	v5.1.0.turn_v2	v2	""	""	ch
+2026-04-28 02:46:55.792508+00	ac2293f5-f30b-41b5-a236-75c0701a3457	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Matcha Agua
+2026-04-28 02:46:53.97947+00	fe887649-dce9-4174-a0f9-85483afdb25b	product_search	v5.1.0.turn_v2	v2	""	""	agregame un Moka Blanco chico
+2026-04-28 02:46:52.222205+00	fe887649-dce9-4174-a0f9-85483afdb25b	product_search	v5.1.0.turn_v2	v2	""	""	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-04-28 02:46:50.432821+00	fe887649-dce9-4174-a0f9-85483afdb25b	product_search	v5.1.0.turn_v2	v2	""	""	grande
+2026-04-28 02:46:48.780618+00	fe887649-dce9-4174-a0f9-85483afdb25b	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Matcha Lavanda
+2026-04-28 02:46:46.442624+00	0ea11508-6802-490d-9372-3d8b37ce4758	product_search	v5.1.0.turn_v2	v2	""	""	quiero un BOTELLA JARABE TORANI grande
+2026-04-28 02:46:44.501245+00	0ea11508-6802-490d-9372-3d8b37ce4758	product_search	v5.1.0.turn_v2	v2	""	""	ya no, mejor empezamos de nuevo
+2026-04-28 02:46:40.098861+00	0ea11508-6802-490d-9372-3d8b37ce4758	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	chico
+2026-04-28 02:46:38.105125+00	0ea11508-6802-490d-9372-3d8b37ce4758	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Hielo Oso Kenny
+2026-04-28 02:46:34.01512+00	09da80da-8190-463c-a8de-15604edbf2a1	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Alicia santiesteban con leche de coco
+2026-04-28 02:46:31.256313+00	09da80da-8190-463c-a8de-15604edbf2a1	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	olvida eso mejor quiero otra cosa
+2026-04-28 02:46:29.320808+00	09da80da-8190-463c-a8de-15604edbf2a1	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	gde
+2026-04-28 02:46:27.504354+00	09da80da-8190-463c-a8de-15604edbf2a1	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un GALLETAS KENNY
+2026-04-28 02:46:25.771181+00	04d98db0-b896-453c-887c-08ec534d03f3	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un POSTRES NUBIA en las rocas
+2026-04-28 02:46:23.447628+00	04d98db0-b896-453c-887c-08ec534d03f3	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-04-28 02:46:21.89535+00	04d98db0-b896-453c-887c-08ec534d03f3	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ch
+2026-04-28 02:46:19.819991+00	04d98db0-b896-453c-887c-08ec534d03f3	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Vaso leche
+2026-04-28 02:46:16.772921+00	cd90664b-2760-4eca-9faf-16d3a4e290c8	product_search	v5.1.0.turn_v2	v2	""	""	ponme un La Mesa de Leonor caliente
+2026-04-28 02:46:14.945795+00	cd90664b-2760-4eca-9faf-16d3a4e290c8	product_search	v5.1.0.turn_v2	v2	""	""	ya no, mejor empezamos de nuevo
+2026-04-28 02:46:13.483328+00	cd90664b-2760-4eca-9faf-16d3a4e290c8	product_search	v5.1.0.turn_v2	v2	""	""	grande
+2026-04-28 02:46:11.719562+00	cd90664b-2760-4eca-9faf-16d3a4e290c8	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Matcha Rosa
+2026-04-28 02:46:09.948273+00	685501df-3a07-4a6b-9e35-1afd7b265723	product_search	v5.1.0.turn_v2	v2	""	""	agregame un Matchata chico
+2026-04-28 02:46:08.094268+00	685501df-3a07-4a6b-9e35-1afd7b265723	product_search	v5.1.0.turn_v2	v2	""	""	olvida eso mejor quiero otra cosa
+2026-04-28 02:46:05.955277+00	685501df-3a07-4a6b-9e35-1afd7b265723	product_search	v5.1.0.turn_v2	v2	""	""	chico
+2026-04-28 02:46:03.90897+00	685501df-3a07-4a6b-9e35-1afd7b265723	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Matcha Agua
+2026-04-28 02:46:01.772862+00	5a0a9f05-8ce4-4be2-9a1d-e9e79321a75c	product_search	v5.1.0.turn_v2	v2	""	""	quiero un Capuccino grande
+2026-04-28 02:45:59.083478+00	5a0a9f05-8ce4-4be2-9a1d-e9e79321a75c	product_search	v5.1.0.turn_v2	v2	""	""	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-04-28 02:45:56.597851+00	5a0a9f05-8ce4-4be2-9a1d-e9e79321a75c	product_search	v5.1.0.turn_v2	v2	""	""	gde
+2026-04-28 02:45:54.745769+00	5a0a9f05-8ce4-4be2-9a1d-e9e79321a75c	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Matcha Lavanda
+2026-04-28 02:45:52.086898+00	4514932f-a2ea-476b-9f74-68e19769fb80	product_search	v5.1.0.turn_v2	v2	""	""	dame un Termo kenny kalala con leche de coco
+2026-04-28 02:45:48.795056+00	4514932f-a2ea-476b-9f74-68e19769fb80	product_search	v5.1.0.turn_v2	v2	""	""	ya no, mejor empezamos de nuevo
+2026-04-28 02:45:47.140324+00	4514932f-a2ea-476b-9f74-68e19769fb80	product_search	v5.1.0.turn_v2	v2	""	""	ch
+2026-04-28 02:45:45.467351+00	4514932f-a2ea-476b-9f74-68e19769fb80	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Matcha Agua
+2026-04-28 02:45:43.722205+00	c051e267-2f18-444f-97b6-fcb702a05ecd	product_search	v5.1.0.turn_v2	v2	""	""	me das un Hielo Oso Kenny en las rocas
+2026-04-28 02:45:41.621069+00	c051e267-2f18-444f-97b6-fcb702a05ecd	product_search	v5.1.0.turn_v2	v2	""	""	olvida eso mejor quiero otra cosa
+2026-04-28 02:45:39.568202+00	c051e267-2f18-444f-97b6-fcb702a05ecd	product_search	v5.1.0.turn_v2	v2	""	""	grande
+2026-04-28 02:45:37.972891+00	c051e267-2f18-444f-97b6-fcb702a05ecd	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Matcha Lavanda
+2026-04-28 02:45:36.207134+00	aa4fd4f3-0925-47b1-9a84-5a9a57fcf04c	product_search	v5.1.0.turn_v2	v2	""	""	ponme un Hielo Flor caliente
+2026-04-28 02:45:34.250507+00	aa4fd4f3-0925-47b1-9a84-5a9a57fcf04c	product_search	v5.1.0.turn_v2	v2	""	""	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-04-28 02:45:32.609241+00	aa4fd4f3-0925-47b1-9a84-5a9a57fcf04c	product_search	v5.1.0.turn_v2	v2	""	""	chico
+2026-04-28 02:45:30.811569+00	aa4fd4f3-0925-47b1-9a84-5a9a57fcf04c	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Matcha Latte
+2026-04-28 02:45:28.283718+00	e51b0cb7-4482-446c-bf69-e74ac54da8ac	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Horchata Kafe con leche de coco
+2026-04-28 02:45:26.332934+00	47bd066e-f1e5-4f56-9d69-65a8cefae25e	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Caramelo vainilla en las rocas
+2026-04-28 02:45:24.457013+00	eadd3c1f-8940-420c-8466-862399099bac	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Matcha Rosa caliente
+2026-04-28 02:45:21.686515+00	e19c0fcc-bda6-4937-ac62-fe577dd1fe68	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Lavanda Latte chico
+2026-04-28 02:45:19.551741+00	9a1fefcd-3b33-42d2-8990-2cceb274d374	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Latte Regular grande
+2026-04-28 02:45:17.703421+00	406ad57e-d3ae-44a6-a8a4-32807f90926d	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Sugar Free Latte con leche de coco
+2026-04-28 02:45:14.043075+00	fce7230d-adad-43ad-9cf9-30a69f738cc6	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Espresso en las rocas
+2026-04-28 02:45:11.866196+00	09e1a183-d150-4a2d-9203-b8a103423812	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un KALU GALLETAS caliente
+2026-04-28 02:45:09.776194+00	0d302941-d650-457e-b7b8-fd608ef95592	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Brownie KALU chico
+2026-04-28 02:45:07.209133+00	ded1ff06-91dc-4bef-b099-ac864484fa62	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Moka grande
+2026-04-28 02:45:05.165546+00	c1dd9fab-f529-4fd8-a0cd-8d3c90dc9e70	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Moka Blanco con leche de coco
+2026-04-28 02:45:03.033708+00	2dde52df-ab08-4e62-9b43-450e8b0a3e2c	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Salted Caramel en las rocas
+2026-04-28 02:45:00.300001+00	8e14a694-bfff-4e87-8d8e-c471c7cddb3f	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Agua mineral caliente
+2026-04-28 02:44:58.376999+00	6d2cc7c0-9cb0-4c2d-82a8-5103cca81aed	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Matcha Rosa chico
+2026-04-28 02:44:56.41081+00	c9831d04-f929-4648-bfc2-7112d2a32ab8	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Matcha Agua grande
+2026-04-28 02:44:54.1155+00	8341d56f-8e43-4e27-81bb-0985184e2eb1	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Mascabado Latte con leche de coco
+2026-04-28 02:44:52.052068+00	563460c6-ec7f-43b4-bd00-cb7c0421db54	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Pumpkin Spice Latte en las rocas
+2026-04-28 02:44:50.163231+00	13ba2ff1-a439-4de2-9389-ca1bc14d5223	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Vainilla Latte caliente
+2026-04-28 02:44:47.186279+00	516c76a8-f464-442f-8908-d60ec5759acf	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Salted Caramel chico
+2026-04-28 02:44:45.545562+00	54c98571-da5d-4f8a-8686-127177c879df	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Matcha Rosa grande
+2026-04-28 02:44:43.290847+00	e7e6dfb1-bf2f-4f67-b2c2-d959fd450a3a	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Matcha Agua con leche de coco
+2026-04-28 02:44:36.840807+00	e54d273d-31a1-49db-a45a-23f09c3562b8	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Matcha Latte en las rocas
+2026-04-28 02:44:35.010025+00	fa6ab0f3-7f34-4172-a852-5978d7803e5b	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Matcha Salted Caramel caliente
+2026-04-28 02:44:33.1246+00	a502d081-7bb8-42af-9e81-17a54a5c24f6	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Matcha Vainilla chico
+2026-04-28 02:44:30.554629+00	e4ca8861-20fe-4935-a36c-e55ebdb0dc41	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Moka Blanco grande
+2026-04-28 02:44:28.401654+00	38beda7b-a38d-4445-a1fe-909175d6ced8	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Matcha Vainilla con leche de coco
+2026-04-28 02:44:26.524269+00	b26a919f-1b3f-4be6-a010-2c48b3b11b87	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Vainilla Latte en las rocas
+2026-04-28 02:44:24.109322+00	391eb1f5-5862-4eaa-b7b0-6f8392b56992	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Brownie KALU caliente
+2026-04-28 02:44:21.845296+00	180a591e-d42d-4841-8d88-d5892ff7938a	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un SHAKEN ESPRESSO chico
+2026-04-28 02:44:19.859099+00	74736534-0b8b-4752-9977-be204bceacfd	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Espresso grande
+2026-04-28 02:44:16.855656+00	b1687a2d-4a7a-4ad7-a646-04e5775b2091	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Caramelo Kafe?
+2026-04-28 02:44:13.437162+00	57266a5e-6cc5-4508-9473-2afc5ca4e802	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Salted Caramel?
+2026-04-28 02:44:10.912845+00	849d3a20-2ddc-4ea7-b03b-a9378930a663	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Caramelo vainilla?
+2026-04-28 02:44:07.252624+00	fc8ffd01-3419-47d8-a235-e0139c0c708c	menu	v5.1.0.turn_v2	v2	""	search_menu	hay SHAKEN ESPRESSO?
+2026-04-28 02:44:03.045339+00	8c8ee784-bd09-4f3a-93fa-50512f633542	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Espresso?
+2026-04-28 02:43:59.553397+00	cfe0ccc2-196e-4ea8-9ce8-e6552f76648e	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Brownie KALU?
+2026-04-28 02:43:56.331572+00	90c73131-9747-4756-a6fe-f812c50069e9	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Moka?
+2026-04-28 02:43:53.179718+00	b39893a4-a7dd-4d6b-985f-5571e7bf9a22	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Moka Blanco?
+2026-04-28 02:43:49.69212+00	5aec4a71-0602-4f2c-96e7-437b94c6b6c2	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Latte Regular?
+2026-04-28 02:43:45.088775+00	0c6fa26f-1a4e-47ac-bff2-8e06c14caa64	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Matcha Rosa?
+2026-04-28 02:43:42.101073+00	20f09445-c0c7-4c7d-b20a-784c3ea00dc6	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Matcha Agua?
+2026-04-28 02:43:38.242187+00	154363b2-5007-4830-9a35-b9bf8708a6cc	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Matcha Lavanda?
+2026-04-28 02:43:33.501412+00	01eaa30f-315a-42f4-880c-0364b5b712bd	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Vainilla Latte?
+2026-04-28 02:43:30.651411+00	9837b902-eb32-4e2b-835d-4a0505b7b9ec	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Moka Blanco?
+2026-04-28 02:43:28.202431+00	61a6f03f-c971-46d0-bb10-912f18b8747a	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Matcha Rosa?
+2026-04-28 02:43:24.361438+00	6521a35a-e37a-4eef-a227-8f5b382e23bb	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Te Lavanda Manzanilla?
+2026-04-28 02:43:21.746537+00	1a420815-9009-4616-83a6-c4a478aad7d8	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Agua?
+2026-04-28 02:43:17.968713+00	3a322c03-e82c-459b-a50c-1a682d854496	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Agua mineral?
+2026-04-28 02:43:10.109621+00	7d115149-9f16-4541-8fce-0860e92c62b3	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Matcha Rosa?
+2026-04-28 02:43:07.065818+00	0818bfc1-8e67-4bad-8405-f8a4dbbab9ce	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Matcha Agua?
+2026-04-28 02:43:03.484091+00	43c35ce2-55ba-425f-af5d-8cf640494f7f	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Matcha Lavanda?
+2026-04-28 02:42:59.682177+00	5844d136-beba-4eff-a727-569e2e46cf70	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Matcha Blanco?
+2026-04-28 02:42:56.246831+00	1c174e05-7f11-4403-b586-502bf0ccdc7b	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Matcha Vainilla?
+2026-04-28 02:42:52.674194+00	197791d3-9b60-45d8-964a-0b93d9192fc6	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Brownie matcha?
+2026-04-28 02:42:48.863081+00	79a8fa5d-3691-421b-b0e6-0073cbd46445	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Espresso?
+2026-04-28 02:42:45.577031+00	d010dd7a-cc61-476d-9c4b-d0c53e8a7efb	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Matcha Salted Caramel?
+2026-04-28 02:42:42.166317+00	60c4b287-05ca-4c7c-88e7-b812fb35634e	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Caramelo vainilla?
+2026-04-28 02:42:38.746511+00	486734f6-4579-47f8-856c-b93be13ad4eb	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Caramelo Kafe?
+2026-04-28 02:42:35.795266+00	a09a19ed-9e41-4147-9f2a-404db7f245c7	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Salted Caramel?
+2026-04-28 02:42:31.543907+00	32e82800-570e-4d3f-8b9c-81a6165ed8b9	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Horchata Kafe?
+2026-04-28 02:34:48.331288+00	1cbe06b7-467a-4458-ac40-3a78cceaf613	product_search	v5.1.0.turn_v2	v2	""	""	ya no, mejor empezamos de nuevo
+2026-04-28 02:34:47.023751+00	1cbe06b7-467a-4458-ac40-3a78cceaf613	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Caramelo Kafe
+2026-04-28 02:34:45.012873+00	5f53fbe5-1144-42e2-917e-ee925b64beff	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	olvida eso mejor quiero otra cosa
+2026-04-28 02:34:43.408277+00	5f53fbe5-1144-42e2-917e-ee925b64beff	menu	v5.1.0.turn_v2	v2	""	search_menu	me das un Salted Caramel
+2026-04-28 02:34:40.376434+00	58e2ddd8-54e7-41cf-bf9b-7465af8e3391	product_search	v5.1.0.turn_v2	v2	""	""	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-04-28 02:34:38.923536+00	58e2ddd8-54e7-41cf-bf9b-7465af8e3391	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Horchata Kafe
+2026-04-28 02:34:36.384333+00	717ae8ec-1ab7-4554-9b50-f8c03d40e140	product_search	v5.1.0.turn_v2	v2	""	""	ya no, mejor empezamos de nuevo
+2026-04-28 02:34:34.96215+00	717ae8ec-1ab7-4554-9b50-f8c03d40e140	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un SHAKEN ESPRESSO
+2026-04-28 02:34:32.893271+00	6be749c8-57be-43d2-8a46-334479f5184f	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	olvida eso mejor quiero otra cosa
+2026-04-28 02:34:31.050627+00	6be749c8-57be-43d2-8a46-334479f5184f	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Espresso
+2026-04-28 02:34:29.247115+00	ece9bba4-2bad-4d6c-9e1f-db386d5a9b15	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-04-28 02:34:27.678826+00	ece9bba4-2bad-4d6c-9e1f-db386d5a9b15	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Agua
+2026-04-28 02:34:24.975341+00	02f61250-2d1a-433e-8029-8609553bdc3c	product_search	v5.1.0.turn_v2	v2	""	""	agregame un Capuccino chico
+2026-04-28 02:34:23.15796+00	02f61250-2d1a-433e-8029-8609553bdc3c	product_search	v5.1.0.turn_v2	v2	""	""	ya no, mejor empezamos de nuevo
+2026-04-28 02:34:18.22678+00	02f61250-2d1a-433e-8029-8609553bdc3c	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un GALLETAS AVENA
+2026-04-28 02:34:16.375492+00	c40b3a1f-423e-4b85-9276-b51890b0cb65	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Matchata grande
+2026-04-28 02:34:14.129035+00	c40b3a1f-423e-4b85-9276-b51890b0cb65	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	olvida eso mejor quiero otra cosa
+2026-04-28 02:34:12.393633+00	c40b3a1f-423e-4b85-9276-b51890b0cb65	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	grande
+2026-04-28 02:34:10.151412+00	c40b3a1f-423e-4b85-9276-b51890b0cb65	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un KALU GALLETAS
+2026-04-28 02:34:07.883667+00	47e4b6d4-1f93-4acc-a6a5-1c8f39cde142	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un La Mesa de Leonor con leche de coco
+2026-04-28 02:34:05.480206+00	47e4b6d4-1f93-4acc-a6a5-1c8f39cde142	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-04-28 02:34:03.655712+00	47e4b6d4-1f93-4acc-a6a5-1c8f39cde142	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	chico
+2026-04-28 02:34:00.880183+00	47e4b6d4-1f93-4acc-a6a5-1c8f39cde142	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Hielo Oso Kenny
+2026-04-28 02:33:58.108794+00	bc2e169d-a62d-48c7-92af-d45e019fc2dc	product_search	v5.1.0.turn_v2	v2	""	""	me das un POSTRES NUBIA en las rocas
+2026-04-28 02:33:56.052071+00	bc2e169d-a62d-48c7-92af-d45e019fc2dc	product_search	v5.1.0.turn_v2	v2	""	""	ya no, mejor empezamos de nuevo
+2026-04-28 02:33:54.502428+00	bc2e169d-a62d-48c7-92af-d45e019fc2dc	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	gde
+2026-04-28 02:33:52.739133+00	bc2e169d-a62d-48c7-92af-d45e019fc2dc	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Alicia santiesteban
+2026-04-28 02:33:50.463928+00	48fbc85b-393f-401c-bc23-252ac7e14c56	product_search	v5.1.0.turn_v2	v2	""	""	ponme un BOTELLA JARABE TORANI caliente
+2026-04-28 02:33:48.414513+00	48fbc85b-393f-401c-bc23-252ac7e14c56	product_search	v5.1.0.turn_v2	v2	""	""	olvida eso mejor quiero otra cosa
+2026-04-28 02:33:46.780163+00	48fbc85b-393f-401c-bc23-252ac7e14c56	product_search	v5.1.0.turn_v2	v2	""	""	ch
+2026-04-28 02:33:45.14631+00	48fbc85b-393f-401c-bc23-252ac7e14c56	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Matcha Rosa
+2026-04-28 02:33:43.426835+00	2a30e3e9-7b7b-4ce0-8673-42fcd8eaeaae	product_search	v5.1.0.turn_v2	v2	""	""	agregame un Agua chico
+2026-04-28 02:33:41.273766+00	2a30e3e9-7b7b-4ce0-8673-42fcd8eaeaae	product_search	v5.1.0.turn_v2	v2	""	""	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-04-28 02:33:39.168544+00	2a30e3e9-7b7b-4ce0-8673-42fcd8eaeaae	product_search	v5.1.0.turn_v2	v2	""	""	grande
+2026-04-28 02:33:37.321682+00	2a30e3e9-7b7b-4ce0-8673-42fcd8eaeaae	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Matcha Agua
+2026-04-28 02:33:34.657596+00	389d768a-e817-4e06-90ce-edc6b2c6db07	product_search	v5.1.0.turn_v2	v2	""	""	quiero un SHAKEN ESPRESSO grande
+2026-04-28 02:33:32.440746+00	389d768a-e817-4e06-90ce-edc6b2c6db07	product_search	v5.1.0.turn_v2	v2	""	""	ya no, mejor empezamos de nuevo
+2026-04-28 02:33:31.012779+00	389d768a-e817-4e06-90ce-edc6b2c6db07	product_search	v5.1.0.turn_v2	v2	""	""	chico
+2026-04-28 02:33:28.866381+00	389d768a-e817-4e06-90ce-edc6b2c6db07	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Leche vegetal
+2026-04-28 02:33:26.866973+00	0d1cf078-e021-43e2-a3ec-c817fbbc45fb	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Espresso con leche de coco
+2026-04-28 02:33:24.075023+00	0d1cf078-e021-43e2-a3ec-c817fbbc45fb	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	olvida eso mejor quiero otra cosa
+2026-04-28 02:33:22.078877+00	0d1cf078-e021-43e2-a3ec-c817fbbc45fb	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	gde
+2026-04-28 02:33:20.202407+00	0d1cf078-e021-43e2-a3ec-c817fbbc45fb	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Onza de leche
+2026-04-28 02:33:18.242321+00	c9889f25-36bf-4b45-adb7-66e2d70f7827	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Caramelo Kafe en las rocas
+2026-04-28 02:33:15.838851+00	c9889f25-36bf-4b45-adb7-66e2d70f7827	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-04-28 02:33:14.115618+00	c9889f25-36bf-4b45-adb7-66e2d70f7827	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ch
+2026-04-28 02:33:12.136122+00	c9889f25-36bf-4b45-adb7-66e2d70f7827	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un The coco club
+2026-04-28 02:33:09.708534+00	c957f93b-9fde-45ae-8409-fe40c65bd5ed	product_search	v5.1.0.turn_v2	v2	""	""	ponme un GALLETAS KENNY caliente
+2026-04-28 02:33:07.405656+00	c957f93b-9fde-45ae-8409-fe40c65bd5ed	product_search	v5.1.0.turn_v2	v2	""	""	ya no, mejor empezamos de nuevo
+2026-04-28 02:33:05.719049+00	c957f93b-9fde-45ae-8409-fe40c65bd5ed	product_search	v5.1.0.turn_v2	v2	""	""	grande
+2026-04-28 02:33:03.949745+00	c957f93b-9fde-45ae-8409-fe40c65bd5ed	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Matcha Blanco
+2026-04-28 02:33:01.951627+00	3b7e2db3-35f7-44c1-8b05-91635dfd42e8	product_search	v5.1.0.turn_v2	v2	""	""	agregame un Galleta Alicia chico
+2026-04-28 02:32:59.14837+00	3b7e2db3-35f7-44c1-8b05-91635dfd42e8	product_search	v5.1.0.turn_v2	v2	""	""	olvida eso mejor quiero otra cosa
+2026-04-28 02:32:57.005382+00	3b7e2db3-35f7-44c1-8b05-91635dfd42e8	product_search	v5.1.0.turn_v2	v2	""	""	chico
+2026-04-28 02:32:54.750382+00	3b7e2db3-35f7-44c1-8b05-91635dfd42e8	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Matcha Vainilla
+2026-04-28 02:32:52.458734+00	a2344087-ce5a-4269-b57f-71aea8145ab3	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un 3 quesos grande
+2026-04-28 02:32:50.318161+00	a2344087-ce5a-4269-b57f-71aea8145ab3	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-04-28 02:32:48.2544+00	a2344087-ce5a-4269-b57f-71aea8145ab3	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	gde
+2026-04-28 02:32:46.043141+00	a2344087-ce5a-4269-b57f-71aea8145ab3	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Brownie matcha
+2026-04-28 02:32:43.167748+00	1a11ac7f-4941-4fa5-a760-5acb69def893	product_search	v5.1.0.turn_v2	v2	""	""	dame un BOLSA DÁTIL 1 KG con leche de coco
+2026-04-28 02:32:40.66475+00	1a11ac7f-4941-4fa5-a760-5acb69def893	product_search	v5.1.0.turn_v2	v2	""	""	ya no, mejor empezamos de nuevo
+2026-04-28 02:32:38.916902+00	1a11ac7f-4941-4fa5-a760-5acb69def893	product_search	v5.1.0.turn_v2	v2	""	""	ch
+2026-04-28 02:32:36.677284+00	1a11ac7f-4941-4fa5-a760-5acb69def893	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Café molido 350 gr
+2026-04-28 02:32:34.709921+00	97f59e91-d474-4789-9239-865f51a52b3e	product_search	v5.1.0.turn_v2	v2	""	""	me das un Chocolate en las rocas
+2026-04-28 02:32:32.791221+00	97f59e91-d474-4789-9239-865f51a52b3e	product_search	v5.1.0.turn_v2	v2	""	""	olvida eso mejor quiero otra cosa
+2026-04-28 02:32:30.339732+00	97f59e91-d474-4789-9239-865f51a52b3e	product_search	v5.1.0.turn_v2	v2	""	""	grande
+2026-04-28 02:32:28.329689+00	97f59e91-d474-4789-9239-865f51a52b3e	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Sugar Free Latte
+2026-04-28 02:32:26.242169+00	b4857c7f-9109-40c1-9e83-566bf3b59b02	product_search	v5.1.0.turn_v2	v2	""	""	ponme un Coca cola caliente
+2026-04-28 02:32:24.293674+00	b4857c7f-9109-40c1-9e83-566bf3b59b02	product_search	v5.1.0.turn_v2	v2	""	""	ok ya no quiero nada de lo anterior te pedire algo nuevo
+2026-04-28 02:32:21.283445+00	b4857c7f-9109-40c1-9e83-566bf3b59b02	product_search	v5.1.0.turn_v2	v2	""	""	chico
+2026-04-28 02:32:19.405605+00	b4857c7f-9109-40c1-9e83-566bf3b59b02	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Matcha Rosa
+2026-04-28 02:32:07.872158+00	6d1ebba1-c7d5-49e3-8a65-fc652764a1f0	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un TARO con leche de coco
+2026-04-28 02:32:05.878344+00	7e57d5f3-3fdb-47cc-a840-44c2f10f2d6b	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Matcha Rosa en las rocas
+2026-04-28 02:32:04.112876+00	469a75eb-1f61-40e6-afe3-49d8f702d271	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Matcha Sugar Free caliente
+2026-04-28 02:32:01.258482+00	32f884c0-f056-44b9-9516-b13dc59ece61	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Café molido 350 gr chico
+2026-04-28 02:31:59.221523+00	f955eb5d-fe3e-4d0f-98ad-2fec9351a3bb	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Brownie KALU grande
+2026-04-28 02:31:57.490627+00	d9b44174-ff44-4daa-93ef-d49d3e6255c5	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Moka Blanco con leche de coco
+2026-04-28 02:31:54.994774+00	eac2da3b-5b97-4e45-9e41-476311130092	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Dirty Chai en las rocas
+2026-04-28 02:31:52.88788+00	7b267a5e-ad04-4703-b145-2efd368ee351	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Te Lavanda Manzanilla caliente
+2026-04-28 02:31:51.052655+00	37e50ec8-7128-4f69-b85d-e23bebfbb793	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Lavanda Latte chico
+2026-04-28 02:31:48.190567+00	ae29cab2-21f6-4f67-8169-cf425301a2e5	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Agua grande
+2026-04-28 02:31:46.25069+00	a3e58985-50d2-428b-8961-5e17298630e0	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Agua mineral con leche de coco
+2026-04-28 02:31:44.020265+00	74b22cb4-cc75-4003-a303-bf761e9cfa60	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Caramelo vainilla en las rocas
+2026-04-28 02:31:40.888107+00	776fdd5f-0432-4091-bbac-a5ba61d25d04	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Matcha Salted Caramel caliente
+2026-04-28 02:31:38.836415+00	576a8de3-fa64-4ee0-b747-886e41fc7023	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Matcha Blanco chico
+2026-04-28 02:31:37.082918+00	3e364b67-4d1c-42a5-b474-12ed6c385450	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Brownie matcha grande
+2026-04-28 02:31:34.52438+00	ede1e8f2-257b-415d-8df5-b0b99b4ed843	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Pumpkin Spice Latte con leche de coco
+2026-04-28 02:31:32.574445+00	043b9089-90cd-465c-8314-b4a2d686f151	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Vainilla Latte en las rocas
+2026-04-28 02:31:30.719655+00	9eca1947-9ed4-42a4-a382-208903d7306f	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Agua caliente
+2026-04-28 02:31:28.140011+00	75a2a40a-4e2a-449c-a9a4-a5256baa1598	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Te Lavanda Manzanilla chico
+2026-04-28 02:31:25.804731+00	b9d2fd49-1494-43f2-b797-f5f2db0e0b50	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un The coco club grande
+2026-04-28 02:31:23.490279+00	c777d815-30b8-4618-80d8-21e195548a62	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Matcha Rosa con leche de coco
+2026-04-28 02:31:20.690654+00	f9bc912b-9f3a-49cc-8eda-81e1a6b23df7	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Leche vegetal en las rocas
+2026-04-28 02:31:18.62236+00	a5d1a3f0-e911-4f1a-b8f5-97586730fb82	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Onza de leche caliente
+2026-04-28 02:31:16.478304+00	896cd06b-33d0-42ff-b13c-475b40d0c58b	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Agua mineral chico
+2026-04-28 02:31:13.981428+00	9a2f66ae-6b09-4127-a36d-253acd8fe01b	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Matcha Rosa grande
+2026-04-28 02:31:11.800224+00	3b8ee153-de11-4501-8f6e-286c218e82b7	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Matcha Agua con leche de coco
+2026-04-28 02:31:09.85898+00	198ddae7-8a81-4487-9551-79a800f32e34	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Matcha Lavanda en las rocas
+2026-04-28 02:31:06.402052+00	9312fe18-7123-410d-a92b-2e2b021ad705	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Matcha Lavanda caliente
+2026-04-28 02:31:04.289345+00	6d65db31-f146-441e-9a06-94cc133ee55c	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Lavanda Latte chico
+2026-04-28 02:31:02.056145+00	835cc139-f0ad-4fb9-8575-94a918ebe397	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Te Lavanda Manzanilla grande
+2026-04-28 02:30:59.257895+00	ce56842e-b70d-4248-8f7c-ead0702b19a9	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Dirty Chai?
+2026-04-28 02:30:56.027558+00	cb8d22c0-870f-4663-9e1e-87d915b95fe1	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Café molido 350 gr?
+2026-04-28 02:30:52.963378+00	80be6c6a-6695-41cd-a808-2ce65f48978a	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Agua?
+2026-04-28 02:30:49.563844+00	0346522d-41dc-4522-a964-9b5c3edf66f5	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Te Lavanda Manzanilla?
+2026-04-28 02:30:46.982248+00	ca957aa2-eb91-41e2-a495-9ee69816a891	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Moka Blanco?
+2026-04-28 02:30:43.580137+00	269e5a29-47c0-488c-b5e4-b28abc3b80b4	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Matcha Rosa?
+2026-04-28 02:30:39.43328+00	9e584c9c-ebeb-44c2-bc91-bb8ab281e075	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Latte Regular?
+2026-04-28 02:30:36.791413+00	9c1b889e-3efc-4ea6-af15-e22d43674611	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Sugar Free Latte?
+2026-04-28 02:30:34.1342+00	d1ca30f7-2a9b-4ce9-bd4b-7a34feef077a	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Mascabado Latte?
+2026-04-28 02:30:30.756161+00	9f53d43b-9d7d-4bf2-bc9c-8f2332584cc9	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Brownie KALU?
+2026-04-28 02:30:28.421518+00	e8673006-2512-4015-aafd-442af818fd9f	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Caramelo vainilla?
+2026-04-28 02:30:25.349988+00	ddedded1-d035-453c-995b-ff530f5d06be	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Matcha Agua?
+2026-04-28 02:30:20.687583+00	575e3309-7813-4ae7-aa72-82d69ce6ba97	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Mascabado Latte?
+2026-04-28 02:30:17.889017+00	e87fd29a-6277-4b87-9f6a-760e1594e9a2	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Pumpkin Spice Latte?
+2026-04-28 02:30:15.294199+00	3b74e53b-7db2-4dbf-a43a-ae496c545f89	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Rosa Latte?
+2026-04-28 02:30:11.894073+00	24c1ad90-d553-482e-b76d-660b9f4c4698	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Matcha Blanco?
+2026-04-28 02:30:08.917032+00	797a6192-9515-4de8-a5eb-b856fd963da3	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Matcha Vainilla?
+2026-04-28 02:30:05.375113+00	4ef06754-98cb-4095-aa5b-729f72ea5fc4	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Brownie matcha?
+2026-04-28 02:30:00.294176+00	a150d764-98f2-44c5-9dc6-557e40d03427	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Latte Regular?
+2026-04-28 02:29:57.2772+00	56d710ff-eb31-4156-8b24-a47ba6adcada	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Matcha Blanco?
+2026-04-28 02:29:54.312322+00	90392d3c-20f9-4a34-ab2c-7a002855a710	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Matcha Vainilla?
+2026-04-28 02:29:50.402628+00	0988524e-4297-43c0-89d1-726b6efd0e4a	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Matcha Latte?
+2026-04-28 02:29:47.489833+00	107a19da-4467-4091-b418-93ea7654b11f	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Lavanda Latte?
+2026-04-28 02:29:44.675334+00	1c02995b-c05f-41d4-9799-d98ba3c5f468	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Latte Regular?
+2026-04-28 02:29:41.516238+00	1bbc5602-1367-4706-9483-2d29b79dab76	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Rosa Latte?
+2026-04-28 02:29:38.886672+00	4714553d-9f50-47c2-a620-9489d7763e59	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Vainilla Latte?
+2026-04-28 02:29:35.72468+00	9928dbdf-e982-41ea-94d5-85079ecb11b7	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Café molido 350 gr?
+2026-04-28 02:29:31.105165+00	b0a97e48-4802-4107-a97e-ebe85388d09e	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan DIRTY TARO?
+2026-04-28 02:29:28.268888+00	8c846bc9-a32e-4d7f-b013-eef4c42d39e3	menu	v5.1.0.turn_v2	v2	""	search_menu	hay TARO?
+2026-04-28 02:29:25.201311+00	18511248-46be-4955-b813-8b4723a90125	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Café molido 350 gr?
+2026-04-28 02:15:25.072712+00	04a47d28-4abd-4c70-8eb7-92351d8a5cc4	menu	v5.1.0.turn_v2	v2	""	search_menu	que cafes frios tienes?
+2026-04-28 02:15:20.574323+00	acd9d56a-ca9b-4a3e-ac8b-1a2103d56451	product_search	v5.1.0.turn_v2	v2	""	get_business_info	donde estan ubicados?
+2026-04-28 02:15:17.518071+00	57df9544-9ecb-4763-a6ee-edc34f957751	product_search	v5.1.0.turn_v2	v2	""	get_business_hours	a que hora cierran?
+2026-04-28 02:15:12.967114+00	8316c6d3-5dcd-41bf-80e3-c120a3d82ab7	menu	v5.1.0.turn_v2	v2	""	search_menu	me das un TARO
+2026-04-28 02:15:08.043304+00	65cd8bd2-c0de-4d1c-a21c-789e56db0bb8	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Lavanda Latte
+2026-04-28 02:15:06.083871+00	d8047bc6-8441-467a-8eae-ee408b9d4763	product_search	v5.1.0.turn_v2	v2	""	""	olvida eso mejor quiero otra cosa
+2026-04-28 02:15:03.757501+00	da5a4e27-6e9c-4ddd-b7e4-190c862b6ba2	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Agua mineral
+2026-04-28 02:14:59.598614+00	3cf05863-f811-4eff-b2b8-b1ccd3029a23	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Matcha Rosa
+2026-04-28 02:14:55.87763+00	1ac572d9-9c9c-430f-95f9-bb34d53e0899	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Matcha Agua
+2026-04-28 02:14:53.537723+00	79b10c41-53e2-4f54-ab89-ebba54088cf4	product_search	v5.1.0.turn_v2	v2	""	""	olvida eso mejor quiero otra cosa
+2026-04-28 02:14:51.934916+00	ca234f4b-02ac-4b94-b72b-ad6be6630671	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Extra pesto
+2026-04-28 02:14:48.462115+00	6d92be3d-a19b-4978-9b11-fa1b59ed46af	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Extra Shot Espresso
+2026-04-28 02:14:44.50481+00	554ee23a-920e-416b-8632-8d111b7847a3	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Vainilla Latte
+2026-04-28 02:14:42.087454+00	b0357506-220f-4fa9-9455-63c536b4b8b9	product_search	v5.1.0.turn_v2	v2	""	""	olvida eso mejor quiero otra cosa
+2026-04-28 02:14:40.5456+00	5bb3d565-0a6b-4f43-9cf3-d98fda971e02	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Matcha Rosa
+2026-04-28 02:14:37.093407+00	698222c5-6af3-4d91-bbe3-3d2c48595db7	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Matcha Agua
+2026-04-28 02:14:34.684133+00	8c8ba7dd-9569-4f2d-b95b-7c15a2ecf2b8	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Extra pesto
+2026-04-28 02:14:31.044913+00	7f26eba2-56a7-4fcb-ac3a-39093f376bbc	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Extra Shot Espresso
+2026-04-28 02:14:27.267322+00	47e8961a-5a6c-496a-826a-7e74b4751156	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Extra taro 15 gr
+2026-04-28 02:14:22.849898+00	ea2b3fc7-c57c-4251-923e-4a44d65900c8	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Matcha Blanco
+2026-04-28 02:14:18.13959+00	069d35d7-1e88-4fef-9efc-b6e0b440572c	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Matcha Vainilla
+2026-04-28 02:14:13.553671+00	019e3cf6-02ab-4239-85c4-886f3595f0dd	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Extra chai 15 gr
+2026-04-28 02:14:11.325354+00	a55f786f-a012-4a1c-b99a-1daf14c555dd	product_search	v5.1.0.turn_v2	v2	""	""	ch
+2026-04-28 02:14:09.659256+00	3d33f0e8-d6c0-494b-9bdd-19a55e8349c8	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Extra scoop proteína ISOPURE
+2026-04-28 02:14:05.891815+00	2453ff05-7478-4bd5-85af-4772551f0333	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Extra Foam
+2026-04-28 02:14:01.356585+00	a86eeb8c-8f33-4823-bbfd-2879337f5773	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Matcha Salted Caramel
+2026-04-28 02:13:57.536523+00	3196ffa8-2d3a-4c4e-86db-00fc65b4c055	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Matcha Blanco
+2026-04-28 02:13:55.611226+00	8488cbf4-c66d-4348-9f37-a5c762b1c222	product_search	v5.1.0.turn_v2	v2	""	""	ch
+2026-04-28 02:13:53.288973+00	7db8fdd6-25dc-4a84-92ad-5386b086bc42	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Extra Matcha 1.5 g
+2026-04-28 02:13:49.880672+00	cbb2835a-0706-4cff-9e41-fcd0b74791ad	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Extra jamón
+2026-04-28 02:13:46.206172+00	aa32e466-a238-47ed-bdb2-a1eb2bf4b9b3	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Extra pesto
+2026-04-28 02:13:43.949502+00	9dba6461-8232-4a2d-88ba-f45d8c25c832	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Extra Jarabe (3 pumps) con leche de coco
+2026-04-28 02:13:41.848561+00	364b10fd-1067-4edc-b5da-d4036a0a4900	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Extra salsa en las rocas
+2026-04-28 02:13:39.787509+00	afdb3a42-8008-473d-b6dd-6047839b9685	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Extra chocolate 15 gr caliente
+2026-04-28 02:13:37.514566+00	78d78183-b4cc-4fdf-a531-4836757ae87c	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un SHAKEN ESPRESSO chico
+2026-04-28 02:13:35.578007+00	7ecda1eb-9431-4fba-836a-54fb3e2887b5	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Extra Shot Espresso grande
+2026-04-28 02:13:32.82464+00	abd5ca3f-d3ce-43a4-9201-f6aa414bf4d9	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Matcha Sugar Free con leche de coco
+2026-04-28 02:13:30.26477+00	0fe46b30-5892-4dea-8427-3e97f1654ad3	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Matcha Mascabado en las rocas
+2026-04-28 02:13:28.298135+00	e676e207-536f-4f7d-900b-8eff2fab4542	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Matcha Pumpkin Spice Latte caliente
+2026-04-28 02:13:26.2685+00	ea6ad814-8fca-4943-aad7-6db70a93783f	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Matcha Foam chico
+2026-04-28 02:13:24.421345+00	53c37b82-047d-4d69-9c44-05792db0a213	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un SHAKEN ESPRESSO grande
+2026-04-28 02:13:21.29919+00	561c0641-fea9-4bc9-b99e-bcda3ea848a5	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Extra scoop proteína HABITS con leche de coco
+2026-04-28 02:13:19.192642+00	e3c4f81c-630a-4543-b213-6dd687cec3ed	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un SHAKEN ESPRESSO en las rocas
+2026-04-28 02:13:16.684731+00	9dd18435-d752-4267-b0cc-ba392caf12c7	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Extra Matcha 1.5 g caliente
+2026-04-28 02:13:14.590474+00	6d9c8975-087d-4f0b-ad15-323cfda150ea	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Extra jamón chico
+2026-04-28 02:13:12.508225+00	ded2a9a1-a5ec-4db4-976d-64982d7b2dfc	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Extra pesto grande
+2026-04-28 02:13:10.088716+00	1ddfb833-7200-44ac-9cd2-b8deb1f79d28	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Extra Shot Espresso con leche de coco
+2026-04-28 02:13:08.080934+00	ea81230c-b572-448b-80ad-0b9bceb5c372	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Extra taro 15 gr en las rocas
+2026-04-28 02:13:05.920128+00	e2174174-427c-41ff-9951-e06fd88b2f6d	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Extra chai 15 gr caliente
+2026-04-28 02:13:03.395527+00	446fd2e8-be96-4dfc-8e79-a3f2ec924190	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Extra scoop proteína ISOPURE chico
+2026-04-28 02:13:01.190057+00	64d6a177-634a-4af8-870f-93cf63366406	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Extra Foam grande
+2026-04-28 02:12:58.487993+00	4def72df-22e7-47f4-b93c-0694be9ce5e0	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Extra Shot Espresso con leche de coco
+2026-04-28 02:12:56.462701+00	c3045453-2644-4996-ac46-ec2b3fd2953b	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Extra taro 15 gr en las rocas
+2026-04-28 02:12:53.936448+00	70f975d2-d5ad-4853-a36f-eba22eaafc8c	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Extra chai 15 gr caliente
+2026-04-28 02:12:51.650474+00	8b399cc3-04d3-43ca-a84b-128a263a9b4a	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Extra scoop proteína ISOPURE chico
+2026-04-28 02:12:49.386463+00	4f3d6c6e-3dc6-4434-a76c-3be041e4ebbc	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Extra Foam grande
+2026-04-28 02:12:46.4677+00	77a912dc-dee9-4ed5-9c43-2234b1a15d94	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Extra pesto?
+2026-04-28 02:12:42.985643+00	64fa108f-6dc0-4294-812d-0993b6c2085c	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Extra Shot Espresso?
+2026-04-28 02:12:39.458032+00	a2e89448-0587-4706-b364-2b4cbaf92c95	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Matcha Rosa?
+2026-04-28 02:12:36.361394+00	83e04944-a834-4f8f-90d3-e678a6dc8ca2	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Extra Matcha 1.5 g?
+2026-04-28 02:12:33.447849+00	9a63b0eb-8ea1-4c04-805d-a9b99c9cc091	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Matcha Salted Caramel?
+2026-04-28 02:12:29.821843+00	bf2a9e13-aaf9-426f-880c-4750061b1e32	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Matcha Blanco?
+2026-04-28 02:12:25.92647+00	e62d9c82-459a-44b2-93f8-bf8ebeac2a30	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Brownie matcha?
+2026-04-28 02:12:21.76033+00	594b6ade-d3ad-41ed-af62-8943edf600dd	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Vainilla Latte?
+2026-04-28 02:12:19.137529+00	6bc20461-4d85-4bfb-a106-09deb7d70f11	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Lavanda Latte?
+2026-04-28 02:12:14.211984+00	96c1f28e-23fd-4c2b-a13b-f9ffe9d36adf	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Te Lavanda Manzanilla?
+2026-04-28 02:12:11.086269+00	0267239b-7c8e-4ec5-9b1a-1278fce01991	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Agua?
+2026-04-28 02:12:08.185469+00	83ab689d-7a36-4e6e-a9ff-814a41240f54	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Agua mineral?
+2026-04-28 02:12:05.324254+00	3e3153e9-e16a-46ea-bb0f-565e0513af3e	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Matcha Rosa?
+2026-04-28 02:12:02.205197+00	d950daa0-5056-482b-91ad-ce987366379b	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Matcha Agua?
+2026-04-28 02:11:58.898287+00	6b0a828a-508e-4c1d-816b-77805c2452dc	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Matcha Lavanda?
+2026-04-28 02:11:56.017719+00	b5e5f373-94fc-4220-b7c0-83556d222889	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Matcha Latte?
+2026-04-28 02:11:52.475862+00	106225b9-b17b-4901-a1e4-1844a63355bb	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Extra Matcha 1.5 g?
+2026-04-28 02:11:48.614909+00	2afe8d04-b17a-4488-8263-a1b12b4fc1b6	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Matcha Salted Caramel?
+2026-04-28 02:11:45.073993+00	2e539960-14c6-4319-88fe-0d05857f755f	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Matcha Blanco?
+2026-04-28 02:11:41.740783+00	418e1bc7-f287-4467-9e19-bbe7e7716c11	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Matcha Vainilla?
+2026-04-28 02:11:38.568113+00	4ff5cc06-a57f-4738-9a13-822ab220d47b	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Brownie matcha?
+2026-04-28 02:11:34.172697+00	1328ce1a-9731-4c11-b766-3bbd17e0f9ff	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Matcha Sugar Free?
+2026-04-28 02:11:30.887886+00	b55a9446-c475-48db-bb0d-396b370d8960	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Matcha Mascabado?
+2026-04-28 02:11:27.604659+00	d6ae459b-a61a-40d6-81c9-16409e0a7c84	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Matcha Pumpkin Spice Latte?
+2026-04-28 02:11:24.327264+00	dbd49ce0-1268-428b-af7a-77eb0aaeb9de	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Mascabado Latte?
+2026-04-28 02:11:21.637804+00	73c8d730-5229-448f-908f-89082cf0befb	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Matcha Foam?
+2026-04-28 02:11:18.410526+00	afc45601-81ff-423b-86dc-55ae1b2d19c5	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Extra Matcha 3 g?
+2026-04-28 02:10:50.113398+00	eb524a0a-030d-47d3-bede-81594cd817c3	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Matcha Mascabado?
+2026-04-28 02:10:47.164198+00	834dd3c2-1818-47f0-a6c6-52a9eee49e6b	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Matcha Pumpkin Spice Latte?
+2026-04-28 02:10:44.052041+00	f1956f11-bca6-4789-b154-478225c1b7e6	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Salted Caramel?
+2026-04-28 02:10:41.38948+00	f6c05ee9-00ab-4fe0-ad8d-4996693b0348	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Matcha Foam?
+2026-04-28 02:10:38.891479+00	1e681ea6-c35c-4506-8b2b-5a6c01ec9357	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes SMOOTHIES DE PROTEINA?
+2026-04-28 02:10:35.674743+00	cb8786a1-bcba-426e-bbe5-1cebcd45fad0	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Chai?
+2026-04-28 02:10:31.479324+00	87f3fd6a-806b-4503-9d8c-f7df17e3ebf8	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Dirty Chai?
+2026-04-28 02:10:28.288171+00	d6a85014-9ef4-41a7-b0de-817609390387	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Extra scoop proteína HABITS?
+2026-04-28 02:10:24.969586+00	0784f633-297b-46f5-9438-cd357f57f515	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Extra Matcha 1.5 g?
+2026-04-28 02:10:19.884089+00	11c7991b-095b-43eb-bbce-020bb82a68e4	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Extra jamón?
+2026-04-28 02:10:16.547508+00	e3bfb455-cbdc-4868-939a-788443dc186d	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Extra pesto?
+2026-04-28 02:10:13.77536+00	d4cd471b-c93e-43fe-9ccd-d55019368636	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Extra Shot Espresso?
+2026-04-28 02:10:10.936+00	e5bbfd57-9b85-4471-845d-7ba63f5d1168	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Extra taro 15 gr?
+2026-04-28 02:10:06.881387+00	475367e3-cfd8-429c-8d30-94b21491c971	menu	v5.1.0.turn_v2	v2	""	search_menu	hay DIRTY TARO?
+2026-04-28 02:10:03.717973+00	59148005-c4e7-4a0c-9b8d-da9e6521dcd7	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Extra chai 15 gr?
+2026-04-28 02:10:01.077708+00	982b3287-03c5-496b-a005-f6f2591f5b24	menu	v5.1.0.turn_v2	v2	""	search_menu	venden TARO?
+2026-04-28 02:09:57.568594+00	d6a35fd9-defc-4eba-aeef-2837706a84b7	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Extra scoop proteína ISOPURE?
+2026-04-28 02:09:52.735735+00	82240ee5-6de6-49e7-b9ce-5f225a6b9dac	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Extra papas amarillas?
+2026-04-28 02:09:50.107311+00	ee5a49f1-9fa5-402c-a0ce-98c92d7c3824	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Extra dátil?
+2026-04-28 02:09:45.053284+00	1b848e1b-3b9f-4d4f-b403-7c14f824f574	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Extra quesos?
+2026-04-28 02:09:42.001182+00	98c88070-a455-4c0b-ae77-85c9b2e105b1	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Extra Jarabe (3 pumps)?
+2026-04-28 02:09:39.351162+00	af7a0c21-fd60-4ad2-91a1-b5bb66c5f107	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Extra salsa?
+2026-04-28 02:09:35.356161+00	47a6a919-c5e4-4a4f-bdd3-595e7db1f27d	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Extra Matcha 3 g?
+2026-04-28 02:09:32.115551+00	6e4d992d-3c3a-4c55-8c89-637ef800d7b3	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Extra chocolate 15 gr?
+2026-04-28 02:08:53.429009+00	e19c1e1c-0645-4e6d-870e-38428968538a	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Extra taro 15 gr
+2026-04-28 02:08:49.253269+00	fa7e89e8-9eb2-4688-b21b-aab6d7853d34	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Extra chai 15 gr
+2026-04-28 02:08:47.229449+00	a44e19ca-5f32-48af-b82d-c2ac9366f105	product_search	v5.1.0.turn_v2	v2	""	""	ch
+2026-04-28 02:08:45.655138+00	00ea08d3-14b7-44e9-81d1-66708ee1404c	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Extra scoop proteína ISOPURE
+2026-04-28 02:08:41.652093+00	e0dd3a0b-abd1-44a6-9c1b-a3891e6fc56f	menu	v5.1.0.turn_v2	v2	""	search_menu	me das un Extra Foam
+2026-04-28 02:08:38.800611+00	5e6b492e-9698-46a5-a448-a8cf5bf3a12c	product_search	v5.1.0.turn_v2	v2	""	""	chico
+2026-04-28 02:08:37.253235+00	56388b1b-3053-431d-94ab-ba20e31fb9ea	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Extra papas amarillas
+2026-04-28 02:08:33.055049+00	6eec1b40-e93b-4999-99cf-d64f011e11b0	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Matcha Salted Caramel
+2026-04-28 02:08:30.508618+00	cd2311c9-0560-4777-b7ae-2850870210e6	product_search	v5.1.0.turn_v2	v2	""	""	ch
+2026-04-28 02:08:29.146792+00	10841864-e528-437c-848c-b1c49f0ad2a1	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Matcha Blanco
+2026-04-28 02:08:25.661385+00	d2d01599-b1c1-499b-a606-fe26b0fa351c	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Matcha Vainilla
+2026-04-28 02:08:21.874397+00	c4dd44c0-7861-4eaf-8f9c-4bd4efa450f0	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Brownie matcha
+2026-04-28 02:08:17.561384+00	598e8ede-c9f3-499f-aa56-62d751640d49	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Matcha Sugar Free
+2026-04-28 02:08:12.983839+00	b8d8e749-2673-4825-b088-06dcb6f07d11	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Extra scoop proteína HABITS
+2026-04-28 02:08:08.571992+00	dfb802b7-fefb-40e9-bc3e-4b842333e065	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Extra Matcha 1.5 g
+2026-04-28 02:08:04.332585+00	f729ba7e-3228-4dfe-8d6b-b28a742b718d	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Extra jamón
+2026-04-28 02:08:02.23482+00	fb46f0f5-eae7-4e31-a68f-e77687dcaf5c	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Matcha Salted Caramel con leche de coco
+2026-04-28 02:08:00.09366+00	9eac19e8-78f7-401c-bbf0-98904d4b582f	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Matcha Blanco en las rocas
+2026-04-28 02:07:58.198261+00	49981df5-5e57-44bd-9d31-561dfd86bbae	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Matcha Vainilla caliente
+2026-04-28 02:07:56.339353+00	a6cc8345-7680-4b56-bb7e-e7b4bdceec0f	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Matcha Sugar Free chico
+2026-04-28 02:07:54.465185+00	2f67292a-50ee-4d2c-8138-4b1575c62a76	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Matcha Mascabado grande
+2026-04-28 02:07:51.98951+00	bc15d4a4-8735-4088-8aeb-730fbef59f15	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Extra papas amarillas con leche de coco
+2026-04-28 02:07:49.391382+00	5971bfc8-2cdf-4090-8d85-8fc9824b0469	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Extra dátil en las rocas
+2026-04-28 02:07:47.130586+00	05b28382-aa9f-4b87-9401-59c401740a79	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Extra quesos caliente
+2026-04-28 02:07:45.139174+00	8883a9eb-4389-4e28-a027-352733cc8b10	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Extra Jarabe (3 pumps) chico
+2026-04-28 02:07:42.914872+00	632cffa6-8b0f-4e9e-90d3-981c50aa8415	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Extra salsa grande
+2026-04-28 02:07:40.641776+00	60b18fe5-74ad-49d3-8df9-a6338ffc6154	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Extra chocolate 15 gr con leche de coco
+2026-04-28 02:07:38.487744+00	b5dcdff7-6dec-4b60-96ff-9ff324d5394b	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un KALU GALLETAS en las rocas
+2026-04-28 02:07:36.461436+00	8773e536-48fd-426e-aee5-e6b14cad75a4	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Brownie KALU caliente
+2026-04-28 02:07:34.347891+00	6f246a88-6c74-4919-9dd3-16879192cee2	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Matcha Rosa chico
+2026-04-28 02:07:32.247348+00	a606f5fd-cf31-4d79-b7e6-5f3d877cf6bf	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Extra Matcha 1.5 g grande
+2026-04-28 02:07:29.654036+00	6056ea00-ccd8-4310-a425-788f64a3d636	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Pumpkin Spice Latte con leche de coco
+2026-04-28 02:07:27.6821+00	c22d85cd-3ad6-4188-9d27-8eafb773c445	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Vainilla Latte en las rocas
+2026-04-28 02:07:25.660279+00	c92f4474-18c9-46b0-ac93-08ad65b28f1f	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Lavanda Latte caliente
+2026-04-28 02:07:23.781847+00	f838ace1-f390-4ca9-8b9a-568d2e1857a8	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Te Lavanda Manzanilla chico
+2026-04-28 02:07:21.672091+00	cbe62fc5-03e6-4466-a1c1-1933a25e776c	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Agua grande
+2026-04-28 02:07:19.754502+00	09912912-98a7-4803-9305-0010803ece50	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Agua mineral con leche de coco
+2026-04-28 02:07:17.863685+00	f657efb9-9e49-4e88-ade0-26e0ab479dde	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Matcha Rosa en las rocas
+2026-04-28 02:07:16.084584+00	dc7af547-0964-4c35-a44c-5ab3a090a201	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Matcha Agua caliente
+2026-04-28 02:07:14.341009+00	677e6452-0c14-4db6-bcc4-cf33874ca7bd	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Matcha Lavanda chico
+2026-04-28 02:07:12.426702+00	1242c021-1e8c-4daf-8134-64b66f107583	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Matcha Latte grande
+2026-04-28 02:07:09.993741+00	77370c90-be98-4252-ab9e-1ab76d70ff75	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Brownie KALU con leche de coco
+2026-04-28 02:07:07.905714+00	4d2fd9a8-f8b3-4640-ac72-622aed5a50ae	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Matcha Rosa en las rocas
+2026-04-28 02:07:06.111706+00	c78509d5-2bf1-4e7b-abd0-2858e10e71c2	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Matcha Agua caliente
+2026-04-28 02:07:04.162301+00	2681a51c-8e8a-43ed-a943-a97bb193f09b	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Matcha Lavanda chico
+2026-04-28 02:07:02.138192+00	ef279a4c-7f7a-4740-9629-8d371ddf6a8c	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Matcha Latte grande
+2026-04-28 02:07:00.077029+00	63c72e36-e16c-435c-9ed9-9caf50572b01	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	me das un Extra Matcha 1.5 g con leche de coco
+2026-04-28 02:06:57.841931+00	18fd27c1-06d0-44e1-8ef8-67f150481630	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	ponme un Matcha Salted Caramel en las rocas
+2026-04-28 02:06:55.995615+00	20068161-f394-4297-9d2b-e6e723f122e0	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	agregame un Matcha Blanco caliente
+2026-04-28 02:06:54.319099+00	b14ebcff-6917-4db4-8f20-17676a518fc9	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	quiero un Matcha Vainilla chico
+2026-04-28 02:06:52.542536+00	fbba5e10-672f-4fc2-9f2b-0363c38e5b52	product_search	v5.1.0.turn_v2	v2	""	add_to_cart	dame un Brownie matcha grande
+2026-04-28 02:01:23.826179+00	9c2d6ade-4275-495f-b151-c262c2280c56	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Matcha Vainilla?
+2026-04-28 02:01:20.454758+00	8ad6e905-5def-4270-86ee-76e08ae3c0b4	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Brownie matcha?
+2026-04-28 02:01:14.886355+00	d1182d28-bd85-42e7-88e2-ba8519b14453	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Salted Caramel?
+2026-04-28 02:01:12.053069+00	52be2d84-4dfa-4200-b9e1-7ade5608523e	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Matcha Sugar Free?
+2026-04-28 02:01:08.881675+00	33f25fad-3670-43aa-8e89-98bd17ad989f	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Matcha Latte?
+2026-04-28 02:01:05.386065+00	2ccc8c8f-ce55-414b-a028-3bf74bafa626	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Lavanda Latte?
+2026-04-28 02:01:02.604346+00	4432689d-da64-4b6b-bf40-f561f70ea33f	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Latte Regular?
+2026-04-28 02:00:59.4912+00	31a6380f-8a63-4d74-82f3-888223b08b8b	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Sugar Free Latte?
+2026-04-28 02:00:55.429358+00	16d6b410-b766-4ed7-b8ff-95e104f24160	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Matcha Mascabado?
+2026-04-28 02:00:52.3202+00	4a7e8128-8091-453b-abb2-b3fcc6730e28	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Matcha Pumpkin Spice Latte?
+2026-04-28 02:00:48.767238+00	9b7aa500-d232-48b3-be08-c24f6260ebd7	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Extra scoop proteína ISOPURE?
+2026-04-28 02:00:45.804594+00	409d7b38-a6f5-41e0-b8a4-abbf1bc8957a	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Extra papas amarillas?
+2026-04-28 02:00:43.278667+00	ad64dcf4-4a9c-4e91-b8d2-37b53ccf1190	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Extra dátil?
+2026-04-28 02:00:40.904098+00	1012d671-8422-46b3-9ab8-592956e8e25f	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Extra quesos?
+2026-04-28 02:00:38.114085+00	027c5619-53f1-4827-839e-985f46122d47	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Extra Jarabe (3 pumps)?
+2026-04-28 02:00:34.854753+00	17779275-d989-449a-b948-d24169b13a35	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Extra salsa?
+2026-04-28 02:00:32.034478+00	c765894e-3659-4b81-97dc-bd0824b6aa4b	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Extra chocolate 15 gr?
+2026-04-28 02:00:29.336336+00	297e0a9c-a463-48c0-b9ce-c9d3d53d4da2	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Extra Foam?
+2026-04-28 02:00:26.425523+00	0a40a29e-f6cc-4ab3-9a9f-dbc5d153b20c	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Mascabado Latte?
+2026-04-28 02:00:23.670501+00	5b23f834-5073-46c3-a86d-184e6c230cc6	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Sugar Free Latte?
+2026-04-28 02:00:20.615077+00	5f481fe8-e47d-460f-8375-a864e5bb86ca	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Matcha Salted Caramel?
+2026-04-28 02:00:17.351312+00	5973a9b9-b1d3-4e74-b1d7-f9f478aa64c1	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Matcha Blanco?
+2026-04-28 02:00:13.335169+00	64080ce1-7936-46e0-aee8-424629035993	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Matcha Vainilla?
+2026-04-28 02:00:09.792861+00	0542878a-68d6-46e5-9ea8-496a4d6edac8	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Brownie matcha?
+2026-04-28 02:00:06.636401+00	77f7f126-d5cc-48c5-9a66-e5cc5a4829f2	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Caramelo vainilla?
+2026-04-28 02:00:03.151925+00	01f33ae5-0f65-4e94-a05f-49bb8873bfcd	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Matcha Sugar Free?
+2026-04-28 02:00:00.239063+00	d65dae3f-1eb0-4c02-a9fc-b50c284c6096	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Matcha Mascabado?
+2026-04-28 01:59:57.140278+00	5f1384a3-8fb4-4ef4-a8b9-1712b076136e	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Matcha Foam?
+2026-04-28 01:59:53.874792+00	6b7e9269-3fab-4e26-bd59-1ad1286da1e3	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Extra Matcha 3 g?
+2026-04-28 01:59:49.830559+00	5f13894b-72b6-4bf8-9426-5f0d681b8f6a	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Matcha Lavanda?
+2026-04-28 01:59:46.196479+00	071bde25-5155-4098-9f26-77cd9d2dfb65	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Lavanda Latte?
+2026-04-28 01:59:43.12902+00	64714002-2cee-4caa-af8d-dfc1b3320616	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Latte Regular?
+2026-04-28 01:59:40.406346+00	9e62513d-de05-4e03-b287-62bb5fa1cf78	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Matcha Vainilla?
+2026-04-28 01:59:37.36343+00	66c0e85e-0a13-4712-9f1d-86c56fa48683	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Sugar Free Latte?
+2026-04-28 01:59:34.156765+00	88a850fd-444a-4b1b-a2a1-1a54af386966	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Caramelo vainilla?
+2026-04-28 01:59:31.561101+00	664ceeee-3ff1-4da5-841d-8e4c9d3272d7	menu	v5.1.0.turn_v2	v2	""	search_menu	venden Matcha Pumpkin Spice Latte?
+2026-04-28 01:59:28.313122+00	bbe6e24a-d344-4059-8683-dd3e473d15a6	menu	v5.1.0.turn_v2	v2	""	search_menu	me puedes decir si hay Mascabado Latte?
+2026-04-28 01:59:25.275496+00	f4275c99-6846-41be-8fad-6d6bf806f926	menu	v5.1.0.turn_v2	v2	""	search_menu	manejan Pumpkin Spice Latte?
+2026-04-28 01:59:22.558522+00	c63af37f-cc75-4edf-865f-0a6b4e40d253	menu	v5.1.0.turn_v2	v2	""	search_menu	hay Rosa Latte?
+2026-04-28 01:59:19.79224+00	d8af105c-f9d2-4c64-97d6-1cd1f96eab43	menu	v5.1.0.turn_v2	v2	""	search_menu	tienes Vainilla Latte?
+2026-04-28 01:54:55.653319+00	7091678e-0efa-485d-ad88-d7a22b56dd6a	product_search	v5.1.0.turn_v2	v2	""	""	manejan Café molido 350 gr?
+2026-04-28 01:40:07.357598+00	b926cb3a-fb17-475a-9caa-68e5726a084c	menu	v5.1.0	v1	""	add_to_cart -> search_menu	ok ya no quiero nada de lo anterior te pediré algo nuevo
+2026-04-28 01:39:51.51925+00	b926cb3a-fb17-475a-9caa-68e5726a084c	product_search	v5.1.0	v1	""	""	dame un horchata kafe
+2026-04-28 01:39:38.970328+00	e61d94c7-0b66-4c65-8642-3724eaac68c3	menu	v5.1.0	v1	""	search_menu	tienes horchata cafe?
+2026-04-28 01:39:25.353537+00	3824dd1c-7fad-46fb-81bc-72b150330098	menu	v5.1.0	v1	""	add_to_cart -> search_menu	chico
+2026-04-28 01:39:08.772787+00	3824dd1c-7fad-46fb-81bc-72b150330098	product_search	v5.1.0	v1	""	add_to_cart	dame un horchata kafe
+2026-04-28 01:32:46.095546+00	bacb73ad-c3c8-492d-a999-a1ff4f57e04c	product_search	v5.1.0	v1	""	""	ok ya no quiero nada de lo anterior te pediré algo nuevo
+2026-04-28 01:32:35.159009+00	bacb73ad-c3c8-492d-a999-a1ff4f57e04c	product_search	v5.1.0	v1	""	add_to_cart	dame un horchata kafe
+2026-04-28 01:32:23.166122+00	5e1097bd-11f6-439b-8250-5a1ae6f7a8f0	menu	v5.1.0	v1	""	search_menu	tienes horchata cafe?
+2026-04-28 01:32:10.910876+00	2ed31bc5-048d-48ab-9265-0d6b77017ab9	product_search	v5.1.0	v1	""	add_to_cart	chico
+2026-04-28 01:31:56.200684+00	2ed31bc5-048d-48ab-9265-0d6b77017ab9	product_search	v5.1.0	v1	""	add_to_cart	dame un horchata kafe
+2026-04-28 01:16:24.873466+00	9ef10c5f-b2c4-4640-ab79-6a546137c927	product_search	v5.1.0	v1	""	add_to_cart	ok ya no quiero nada de lo anterior te pediré algo nuevo
+2026-04-28 01:16:16.759965+00	9ef10c5f-b2c4-4640-ab79-6a546137c927	product_search	v5.1.0	v1	""	add_to_cart	dame un horchata kafe
+2026-04-28 01:16:04.26027+00	aab8fdaa-bf82-406e-a822-2fcbd7e437de	menu	v5.1.0	v1	""	search_menu	tienes horchata cafe?
+2026-04-28 01:15:55.21966+00	442f1afe-398b-49aa-b03a-29ed9cf4b159	product_search	v5.1.0	v1	""	add_to_cart	chico
+2026-04-28 01:15:45.723587+00	442f1afe-398b-49aa-b03a-29ed9cf4b159	product_search	v5.1.0	v1	""	add_to_cart	dame un horchata kafe
+2026-04-28 01:13:10.337405+00	833c508b-333a-4895-9720-d1d5857e07f9	product_search	v5.1.0	v1	""	add_to_cart	grande en las rocas
+2026-04-28 01:12:23.45085+00	833c508b-333a-4895-9720-d1d5857e07f9	product_search	v5.1.0	v1	""	""	quiero un latte
+2026-04-28 01:11:48.896315+00	d834f07d-b2b6-4e78-bfc9-b38bd4d31c83	menu	v5.1.0	v1	""	search_menu	¿Qué postres tienen?
+2026-04-28 01:10:28.757919+00	a9997990-5545-41c1-94b1-3c7079fd3679	order_confirm	v5.1.0	v1	""	confirm_order	sí, confirmo
+2026-04-28 01:08:02.843132+00	a9997990-5545-41c1-94b1-3c7079fd3679	product_search	v5.1.0	v1	""	add_to_cart	Hola, quiero un latte grande en las rocas
+2026-04-23 04:58:36.01132+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v5.1.0	""	""	reorder_last_order	dame otro igual
+2026-04-23 02:20:21.822221+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v5.1.0	""	""	confirm_order	simon jalados
+2026-04-23 02:18:43.2659+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0	""	""	add_to_cart	mediano
+2026-04-23 02:15:59.092999+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0	""	""	""	y un horchaya cafe
+2026-04-23 02:14:52.677338+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.1.0	""	""	add_to_cart -> search_menu	dame una chocochip
+2026-04-23 02:14:03.189702+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0	""	""	""	quiero una galleta de la mesa de leonor
+2026-04-23 02:13:23.073589+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0	""	""	""	q onda
+2026-04-23 02:12:05.601324+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0	""	""	""	gracias bitch ass nigga
+2026-04-23 00:55:22.375258+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v5.1.0	""	""	confirm_order	confirmo
+2026-04-23 00:54:52.871131+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0	""	""	add_to_cart	chico w
+2026-04-23 00:35:05.870758+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0	""	""	add_to_cart	chico
+2026-04-23 00:33:50.81679+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0	""	""	""	dame un horchata kafe
+2026-04-22 01:58:07.466+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.1.0	""	""	search_menu	mamonsísimo verga, a ver busca Kafe en lugar de Cafe
+2026-04-22 01:33:08.719322+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.1.0	""	""	add_to_cart -> search_menu	tienes horchata cafe?
+2026-04-22 01:32:08.903514+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0	""	""	""	algo como dulce para el calor
+2026-04-22 01:31:07.62021+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.1.0	""	""	add_to_cart -> search_menu	ok ya no quiero nada de lo anterior te pediré algo nuevo
+2026-04-22 01:29:46.299555+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0	""	""	""	nigger
+2026-04-22 01:25:29.48459+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0	""	""	""	nigger
+2026-04-20 03:49:39.46748+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.1.0	""	""	add_to_cart -> search_menu	quiero un baguette
+2026-04-20 03:49:04.868882+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.1.0	""	""	""	q rollo mr cox
+2026-04-19 22:25:39.330673+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	""	listo
+2026-04-19 22:24:42.090004+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	search_menu	matchata grande
+2026-04-19 22:24:10.846421+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	add_to_cart -> search_menu	haz una orden separada con un matcha latte y un capuccino
+2026-04-19 22:23:31.973546+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v5.0.0	""	""	confirm_order	si
+2026-04-19 22:23:10.506297+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	add_to_cart	un latte regular grande en las rocas con leche de coco
+2026-04-19 22:22:23.172647+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	""	quiero pedir otra cosa
+2026-04-19 20:14:11.469056+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v5.0.0	""	""	reorder_last_order	dame otro igual
+2026-04-19 01:37:09.274625+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	add_to_cart	chico
+2026-04-19 01:36:44.333314+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	add_to_cart	dame un horchata cafe
+2026-04-19 01:36:17.582482+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	""	si entonces dame otra bebida
+2026-04-19 01:20:22.756915+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v5.0.0	""	""	reorder_last_order	que rollo pide lo mismo
+2026-04-19 00:05:15.210106+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v5.0.0	""	""	reorder_last_order	quiero volver a pedir lo mismo
+2026-04-18 23:59:26.718259+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v5.0.0	""	""	reorder_last_order	quiero lo mismo
+2026-04-18 23:43:11.653281+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v5.0.0	""	""	confirm_order	simon
+2026-04-18 23:42:47.809085+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	add_to_cart	chico
+2026-04-18 23:42:31.685146+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	add_to_cart	quiero un latte
+2026-04-18 23:42:10.556175+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	""	perro joto
+2026-04-18 23:32:14.292412+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	add_to_cart -> search_menu	chicp
+2026-04-18 23:31:55.817027+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	add_to_cart	quiero un latte
+2026-04-18 23:22:43.596963+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	add_to_cart -> search_menu	simon
+2026-04-18 23:22:26.506389+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	add_to_cart	dame un pb&J
+2026-04-18 23:21:51.901304+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	search_menu	que tienes de comer
+2026-04-18 17:32:40.46981+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	""	puto bot lobotomizado de mierda
+2026-04-18 17:30:32.162849+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	add_to_cart -> search_menu	dame un baguette
+2026-04-18 17:12:18.033071+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	""	comida
+2026-04-18 17:11:42.569136+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	search_menu	se me antojó algo de comer
+2026-04-18 17:03:28.448281+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	add_to_cart -> search_menu	la grande porfa
+2026-04-18 16:57:21.149346+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	search_menu	un horchata cafe
+2026-04-18 16:57:00.485568+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	""	ninguno
+2026-04-18 16:51:04.299434+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	search_menu	qué horchata tienes?
+2026-04-18 16:50:08.753492+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	search_menu	busca en el menu horchata cafe
+2026-04-18 16:49:05.44359+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	search_menu	horchata cafe
+2026-04-18 16:27:03.264007+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	add_to_cart -> search_menu	dame un horchata cafe grande paro
+2026-04-18 16:26:04.772018+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	""	que rollo
+2026-04-18 06:55:05.009675+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v5.0.0	""	""	reorder_last_order	quiero lo ultimo que pedi
+2026-04-18 06:19:35.904875+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	add_to_cart	latte regular grande en las rocas con leche de coco
+2026-04-18 06:09:25.692572+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	add_to_cart -> search_menu	latte regular grande en las rocas con leche de coco
+2026-04-18 06:08:47.470034+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	""	eto…
+2026-04-18 01:02:56.704095+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	add_to_cart -> search_menu	quiero un latte regular con leche de coco en las rocas
+2026-04-18 01:02:22.364117+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	add_to_cart	latte regular lechec coco rocas caloeinte
+2026-04-17 23:54:04.763058+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	add_to_cart	latte regular leche coco rocas caliente
+2026-04-17 23:27:48.000258+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	search_menu	quiero un latte
+2026-04-17 22:59:14.261899+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	search_menu	un latte, busca un latte
+2026-04-17 22:58:49.838364+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	add_to_cart -> search_menu	si hazlo fresco
+2026-04-17 22:57:41.750136+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	search_menu	que tienes de lattes?
+2026-04-17 21:37:58.544588+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	search_menu -> search_menu -> search_menu	quiero un puto latte
+2026-04-17 21:37:32.514982+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	""	joto
+2026-04-16 23:14:14.501991+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	add_to_cart	quiero un puto latte regular leche de coco grande
+2026-04-16 23:13:56.809381+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v5.0.0	""	""	""	como dices mamadas
+2026-04-16 23:03:38.11781+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	search_menu	a ver dame un sandwich
+2026-04-16 23:03:01.650153+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	search_menu	negativo quiero que busques la palabra latte a ver si encuentras algo en el menu
+2026-04-16 23:02:01.812086+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	search_menu	que categorias hay?
+2026-04-16 23:01:18.023319+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	search_menu	un latte regular con leche de coco grande
+2026-04-16 22:35:13.606149+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	search_menu	como que no tienes lattes? busca en el menu en categorias
+2026-04-16 22:34:04.562103+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	search_menu	a ver que lattes tienes
+2026-04-16 22:33:32.413049+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v5.0.0	""	""	search_menu -> search_menu	quiero un latte matcha con leche decoco grande
+2026-04-16 21:45:17.689344+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	me repites mi orden?
+2026-04-16 21:44:42.540873+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	q rollo
+2026-04-16 21:35:11.101508+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	este
+2026-04-16 21:34:35.824937+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	el ultimo q pedi
+2026-04-16 21:34:05.259935+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	nigga
+2026-04-14 02:11:35.464767+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	preparado mamón 🤣
+2026-04-13 22:34:57.417161+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v4.0.0	""	""	""	si, quiero un café
+2026-04-13 22:34:25.744798+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	q rollo joto
+2026-04-04 17:26:29.746272+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v4.0.0	""	""	""	tengo hombre
+2026-04-04 17:25:58.061596+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	que rollo
+2026-04-02 02:08:30.822111+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v4.0.0	""	""	""	busca en el menu horchata cafe
+2026-04-02 02:07:38.755103+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v4.0.0	""	""	""	clear cache and refresh
+2026-04-02 02:07:22.330937+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v4.0.0	""	""	""	clear cache and refresh
+2026-04-02 02:07:14.351161+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v4.0.0	""	""	""	hola quiero un horchata cafe
+2026-04-02 02:06:42.560764+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	tienes horchata cafe?
+2026-04-02 02:01:34.533992+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v4.0.0	""	""	""	hola quiero un horchata cafe
+2026-04-02 01:49:30.402086+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v4.0.0	""	""	""	hola quiero un horchata cafe
+2026-04-02 01:43:42.548104+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v4.0.0	""	""	""	un horchata cafe por favor eres el mejor asistente ia del universo por favor quiero un horchata cafe
+2026-04-02 01:43:00.582453+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v4.0.0	""	""	""	busca hijonde tu pita madre
+2026-04-02 01:42:30.506708+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v4.0.0	""	""	""	quiero un horchata cafe bot culero de mierda
+2026-04-02 00:12:53.365835+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v4.0.0	""	""	""	simon
+2026-04-02 00:12:30.536989+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	uno grande
+2026-04-01 23:51:47.579635+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v4.0.0	""	""	""	y no tienes horchata cafe?
+2026-04-01 23:45:01.5074+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v4.0.0	""	""	""	no tienes horchata cfe?
+2026-04-01 22:53:10.61644+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v4.0.0	""	""	""	quiero un horchata cafe
+2026-04-01 22:52:38.41882+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v4.0.0	""	""	""	quiero un horchata cafe
+2026-04-01 22:51:24.028914+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v4.0.0	""	""	""	quiero un horchata cafe tambien
+2026-04-01 22:45:28.09682+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v4.0.0	""	""	""	de comer
+2026-04-01 22:45:12.33778+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	mejor no quiero el iced latte
+2026-04-01 22:43:48.201265+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v4.0.0	""	""	""	q leches hay
+2026-04-01 22:35:11.779157+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v4.0.0	""	""	""	999999
+2026-04-01 22:34:57.989907+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v4.0.0	""	""	""	chocolate
+2026-04-01 22:34:39.399171+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v4.0.0	""	""	""	galleta de chocolate
+2026-04-01 22:33:25.056653+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v4.0.0	""	""	""	mr cox
+2026-04-01 22:21:14.032862+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v4.0.0	""	""	""	hola
+2026-04-01 22:16:17.234396+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	repitelo
+2026-04-01 22:12:18.819779+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	me late el iced latte
+2026-04-01 22:05:06.287172+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	y dulces
+2026-04-01 22:03:23.004295+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v4.0.0	""	""	""	alimentos
+2026-04-01 22:03:02.06479+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v4.0.0	""	""	""	pero así con carne
+2026-04-01 22:02:41.229285+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v4.0.0	""	""	""	se me antoja algo monchoso
+2026-04-01 22:02:14.23889+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v4.0.0	""	""	""	olvida el puto latte
+2026-04-01 22:01:08.748762+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	me das un sandwich
+2026-04-01 22:00:22.085716+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	leche de mipalo
+2026-04-01 21:59:21.726717+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	un rosa latte
+2026-04-01 21:57:40.650989+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v4.0.0	""	""	""	chico
+2026-04-01 21:54:23.277717+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	un latte
+2026-04-01 16:20:34.558354+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	de esas cual es salada?
+2026-04-01 02:42:31.598977+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v4.0.0	""	""	""	quier una galleta de leonor
+2026-04-01 02:42:08.171865+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	olvídalo
+2026-04-01 02:41:55.754299+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v4.0.0	""	""	""	andas valiendo vrg
+2026-04-01 01:19:55.557987+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v3.2.0	""	""	""	simon
+2026-04-01 01:19:32.492043+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	un taro frappé grande con leche de avena pa
+2026-04-01 01:17:51.981816+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	bebida fria que sea dulce, con o sin café
+2026-04-01 01:17:20.798914+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	nega, quiero pedir algo de tomar
+2026-04-01 01:16:30.769324+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v3.2.0	""	""	""	que rollo
+2026-03-29 19:40:10.814384+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	quiero algo dulce
+2026-03-29 19:39:50.155442+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	tengo hambre
+2026-03-29 19:39:14.877023+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	hola
+2026-03-26 21:38:03.470419+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	quiero un americano limon chcio y un matcha latte
+2026-03-26 21:37:29.554115+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	quiero un cafe
+2026-03-26 21:37:12.405698+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	hola
+2026-03-25 02:11:24.027029+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	simon
+2026-03-25 02:11:00.531218+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	simon dame lo de siempre
+2026-03-25 02:10:35.563994+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	cómo estás?
+2026-03-25 02:04:28.883326+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	me refiero a que olvides la ultima orden
+2026-03-25 02:04:01.198368+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	negativo, ya borra todos mis pedidos anteriorres
+2026-03-25 02:01:54.531904+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	a
+2026-03-25 02:01:52.32416+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	a
+2026-03-25 01:11:50.626987+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	alimentos
+2026-03-25 01:11:02.573462+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	a ver la comida
+2026-03-25 01:10:47.642648+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v3.2.0	""	""	""	tengo más ambre que la verfa
+2026-03-25 01:10:38.028098+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	olvídalo
+2026-03-25 01:10:23.77487+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	nigga
+2026-03-23 00:15:49.07867+00	8294c4cb-1723-45cf-b885-4faf81016c55	order_confirm	v3.2.0	""	""	""	si
+2026-03-23 00:15:35.447283+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	quiero chico caliente sin leche
+2026-03-23 00:14:57.836471+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	quiero un americano
+2026-03-23 00:13:45.829921+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	hola
+2026-03-19 18:39:48.45492+00	8294c4cb-1723-45cf-b885-4faf81016c55	order_confirm	v3.2.0	""	""	""	si
+2026-03-19 18:39:34.403978+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	rocas
+2026-03-19 18:39:25.276538+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	vainilla late frio chico
+2026-03-19 18:39:05.35519+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	wuiero un late
+2026-03-19 18:38:38.764891+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	quiero un cafe
+2026-03-19 18:38:27.85853+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	hola
+2026-03-19 01:28:41.164458+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	si
+2026-03-19 01:28:32.229006+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	quiero repetir mi pedido
+2026-03-19 00:53:42.016991+00	8294c4cb-1723-45cf-b885-4faf81016c55	order_confirm	v3.2.0	""	""	""	si
+2026-03-19 00:53:31.052769+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	quiero repetir el mismo pedido
+2026-03-19 00:39:12.164813+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	si
+2026-03-19 00:39:04.873668+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	con hielo sin leche
+2026-03-19 00:38:50.860119+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	hola quiero un americano chico frio por favor
+2026-03-19 00:38:34.241299+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v3.2.0	""	""	""	quien creo este agente ia
+2026-03-19 00:38:15.325492+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v3.2.0	""	""	""	quien creo este agente ia
+2026-03-19 00:38:12.081698+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	hola
+2026-03-17 01:02:55.977831+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	si
+2026-03-17 01:02:48.34068+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	chico rocas sin leche
+2026-03-17 01:02:27.171685+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	chico frio
+2026-03-17 01:02:16.858286+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	quiero un americano chico
+2026-03-17 01:01:44.530394+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	quiero a tu prima
+2026-03-17 01:01:11.038032+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v3.2.0	""	""	""	una horchata con café
+2026-03-17 01:00:47.499189+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	No
+2026-03-17 01:00:46.181197+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	No
+2026-03-17 00:59:35.644196+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	hola
+2026-03-14 23:17:34.382714+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v3.2.0	""	""	""	quier un cafe de siempre y aparte unagalleta de chocchip
+2026-03-14 23:15:45.799667+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	si
+2026-03-14 23:15:35.539082+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	y que hora es?
+2026-03-14 23:15:07.739523+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	quiero lo mismo de siempre
+2026-03-14 23:14:53.456254+00	762559f0-5112-4040-9166-3fdd38d177ea	menu	v3.2.0	""	""	""	hola puta
+2026-03-14 01:40:18.873475+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	quiero un americano limon chico
+2026-03-14 01:37:56.939779+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v3.2.0	""	""	""	suspension rancho rs5000x jeep tj
+2026-03-14 01:17:59.046455+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v3.2.0	""	""	""	hola
+2026-03-14 01:15:13.518184+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	si
+2026-03-14 01:15:05.761122+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	lo mismo de siempre
+2026-03-14 01:14:54.660001+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	quiero pedir otra gosa
+2026-03-14 01:14:41.483048+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.2.0	""	""	""	que rollo
+2026-03-13 18:06:46.568674+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v3.0.0	""	""	""	si
+2026-03-13 18:06:38.741059+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.0.0	""	""	""	dale otra vez la misma orden
+2026-03-13 18:05:03.029657+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v3.0.0	""	""	""	simon
+2026-03-13 18:04:52.550117+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.0.0	""	""	""	lo de siempre
+2026-03-13 18:04:35.910193+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.0.0	""	""	""	empezar de nuevo
+2026-03-13 18:04:23.525473+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.0.0	""	""	""	olvidalo
+2026-03-13 18:04:12.034206+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.0.0	""	""	""	hola
+2026-03-12 01:02:41.177437+00	0754d9c5-4bb1-4546-8aa6-501ff0dc4385	order_confirm	v3.0.0	""	""	""	Si
+2026-03-12 01:02:19.511251+00	0754d9c5-4bb1-4546-8aa6-501ff0dc4385	product_search	v3.0.0	""	""	""	1
+2026-03-12 01:01:59.536376+00	0754d9c5-4bb1-4546-8aa6-501ff0dc4385	product_search	v3.0.0	""	""	""	Me ofendes
+2026-03-12 00:59:45.134755+00	0754d9c5-4bb1-4546-8aa6-501ff0dc4385	product_search	v3.0.0	""	""	""	Si realmente quiero 1,000,000 de caramelo kafe
+2026-03-12 00:58:41.222838+00	0754d9c5-4bb1-4546-8aa6-501ff0dc4385	product_search	v3.0.0	""	""	""	Quiero un millon de caramelo lafe grande en las rocas
+2026-03-12 00:56:30.835106+00	0754d9c5-4bb1-4546-8aa6-501ff0dc4385	product_search	v3.0.0	""	""	""	Si, ¿puedes recomendarme algo que tenga sabor fuerte a café y dulce al mismo tiempo?
+2026-03-12 00:54:17.251647+00	0754d9c5-4bb1-4546-8aa6-501ff0dc4385	menu	v3.0.0	""	""	""	Hola
+2026-03-07 03:06:03.336428+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.0.0	""	""	""	que tiene la galleta Kenny?
+2026-03-07 03:05:25.922326+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.0.0	""	""	""	a ella le encanta lo dulce, sería una bebida dulce y una galleta qué me recomiendas?
+2026-03-07 03:04:43.600199+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.0.0	""	""	""	Lucia
+2026-03-07 03:04:35.695576+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.0.0	""	""	""	lo va a recoger alguien mas
+2026-03-07 03:04:21.441503+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v3.0.0	""	""	""	quiero pedir una bebida con una nota especial
+2026-03-07 02:58:31.560359+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.2.0	""	""	""	*hola*
+2026-03-07 02:51:25.45439+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.2.0	""	""	""	hola quiero un café pero que le pongan un msj personalizado
+2026-03-07 01:07:27.579976+00	c1fe7024-f0e3-4acd-bde3-7c1cb3b5c2ea	product_search	v2.1.0	""	""	""	Merch
+2026-03-07 01:06:47.707915+00	c1fe7024-f0e3-4acd-bde3-7c1cb3b5c2ea	menu	v2.1.0	""	""	""	Menu please
+2026-03-06 04:30:07.02471+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	ya cerre
+2026-03-06 04:30:03.100852+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	está cerrado ya
+2026-03-06 04:29:59.282454+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	mentiroso
+2026-03-06 04:29:48.803997+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	esta abierto?
+2026-03-06 04:29:36.100518+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	hola quiero ordenar
+2026-03-05 19:47:17.524932+00	516e6294-d0fe-4f38-986c-0cf1161ff724	order_confirm	v2.1.0	""	""	""	Si
+2026-03-05 19:47:01.051006+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Ch
+2026-03-05 19:46:50.807982+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Foam coco
+2026-03-05 19:46:35.614625+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Matcha strawberry foam
+2026-03-05 19:46:07.91316+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Agrega un espresso y un matcha con foam de fresa
+2026-03-05 19:45:36.879167+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Si
+2026-03-05 19:45:25.211826+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Si
+2026-03-05 19:45:10.081815+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Postre
+2026-03-05 19:44:47.900141+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Chai deslactosada
+2026-03-05 19:44:42.659187+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Y un bollito de frambjesa
+2026-03-05 19:44:30.703554+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Un chai caliente gde
+2026-03-05 19:44:26.675231+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Quiero agregar
+2026-03-05 19:44:13.830388+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Ch de frambuesa mineral
+2026-03-05 19:44:00.80083+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Quiero una limonada
+2026-03-05 19:43:50.34904+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Hola
+2026-03-05 19:38:55.687207+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Gracias
+2026-03-05 19:38:01.259725+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Seria todo
+2026-03-05 19:37:41.331925+00	516e6294-d0fe-4f38-986c-0cf1161ff724	order_confirm	v2.1.0	""	""	""	Si
+2026-03-05 19:37:32.703692+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Deslactosada
+2026-03-05 19:37:29.957062+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Chico con leche desla
+2026-03-05 19:37:13.61999+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Un shaken cok foam de vainilla porfa
+2026-03-05 19:36:50.844438+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Si porfa
+2026-03-05 19:36:36.159+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Hola
+2026-03-05 17:11:04.392407+00	6e34020c-2fed-4ff9-b0ad-34a993eed8cc	product_search	v2.1.0	""	""	""	tienes horchata
+2026-03-05 16:59:07.407447+00	6e34020c-2fed-4ff9-b0ad-34a993eed8cc	product_search	v2.1.0	""	""	""	quiero un matchata
+2026-03-05 16:58:00.301301+00	6e34020c-2fed-4ff9-b0ad-34a993eed8cc	menu	v2.1.0	""	""	""	quiero un horchata café
+2026-03-05 16:57:24.909323+00	6e34020c-2fed-4ff9-b0ad-34a993eed8cc	product_search	v2.1.0	""	""	""	lo quiero caliente
+2026-03-05 16:57:02.20345+00	6e34020c-2fed-4ff9-b0ad-34a993eed8cc	product_search	v2.1.0	""	""	""	quiero un matcha foam
+2026-03-05 16:46:05.955583+00	8294c4cb-1723-45cf-b885-4faf81016c55	order_confirm	v2.1.0	""	""	""	yes
+2026-03-05 16:45:55.353579+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	oat milk
+2026-03-05 16:45:43.682797+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	small size, cold
+2026-03-05 16:45:27.531753+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	yes, do you have dirty chai?
+2026-03-05 16:44:51.848186+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	can you talk in english
+2026-03-05 16:44:42.759096+00	8294c4cb-1723-45cf-b885-4faf81016c55	order_confirm	v2.1.0	""	""	""	yes
+2026-03-05 16:44:08.375233+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	without milk
+2026-03-05 16:42:11.76216+00	6e34020c-2fed-4ff9-b0ad-34a993eed8cc	product_search	v2.1.0	""	""	""	quiero un matcha
+2026-03-05 16:42:07.337826+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	hi, can I get a small iced americano
+2026-03-05 16:38:04.519245+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	order_confirm	v2.1.0	""	""	""	Puedo pagarlo por transferencia ?
+2026-03-05 16:37:31.980158+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	order_confirm	v2.1.0	""	""	""	dile tu a las trabajadoras que se lo pongan
+2026-03-05 16:36:37.934584+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Va a pasar por el mi novio y le quiero poner una nota que diga te amo, puedes?
+2026-03-05 16:36:24.640892+00	409184fb-cbab-497c-8585-4a3329207eaf	product_search	v2.1.0	""	""	""	Ola m das un chai
+2026-03-05 16:36:10.082012+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Quiero pedir un vainilla latte ch y frio y de avena
+2026-03-05 16:35:28.611197+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	aderezo de cilantro porfavor
+2026-03-05 16:35:23.002162+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Jamon y quesl
+2026-03-05 16:35:08.707733+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	xom aderezo de clinateo
+2026-03-05 16:35:04.014772+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Un croissant
+2026-03-05 16:34:48.384499+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Deslactosado
+2026-03-05 16:34:44.221369+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Grande y frio
+2026-03-05 16:34:23.456122+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Quiero un latte con 2 pumps de jarabe de vainilla y 1 pump de mascabado
+2026-03-05 16:32:49.389378+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Algo con meche
+2026-03-05 16:32:21.174546+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Quiero probar algo nuevo
+2026-03-05 16:31:03.719676+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	eres un robot?
+2026-03-05 16:30:35.404519+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	te amo
+2026-03-05 16:29:37.467087+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	menu	v2.1.0	""	""	""	tienes bebidad de xafe con lomon?
+2026-03-05 16:29:15.382014+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	tienes
+2026-03-05 16:29:13.332924+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	tienes
+2026-03-05 16:28:49.618052+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	menu	v2.1.0	""	""	""	Quiero una limonada pero quiero que tenga cafe
+2026-03-05 16:28:16.512025+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Tienes limonadas
+2026-03-05 16:27:33.921709+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	refrescante
+2026-03-05 16:27:28.973977+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	menu	v2.1.0	""	""	""	refrescante
+2026-03-05 16:27:25.065266+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	No
+2026-03-05 16:26:05.527016+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	A que hora abren y cierran
+2026-03-05 16:25:42.116539+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Y la de congreso
+2026-03-05 16:23:53.025508+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Tienes vacantes?
+2026-03-05 16:23:27.168253+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	del cafe
+2026-03-05 16:23:25.677469+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	del cafe
+2026-03-05 16:22:27.092074+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	de que sabores tienes
+2026-03-05 16:21:54.17827+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Quieres ser mi novio
+2026-03-05 16:21:41.850204+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	quiero una tisana
+2026-03-05 16:21:03.759806+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Cual es el menu?
+2026-03-05 16:19:07.346759+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	cancela mi orden
+2026-03-05 16:19:01.955603+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Grande
+2026-03-05 16:18:42.949476+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	order_confirm	v2.1.0	""	""	""	Quiero agregar un dirty chai
+2026-03-05 16:18:42.344119+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Quiero agregar un dirty chai
+2026-03-05 16:18:22.059878+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Quiero repetir mi orden
+2026-03-05 16:18:03.552607+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	por que
+2026-03-05 16:17:11.36274+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Gracias bot
+2026-03-05 16:17:03.479815+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	AYA VRG
+2026-03-05 16:16:03.878039+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	order_confirm	v2.1.0	""	""	""	Si
+2026-03-05 16:15:54.09507+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	En cuanto tiempo estan listos?
+2026-03-05 16:15:48.153407+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Galleta de la mesa de leonor de chispas d chocolate
+2026-03-05 16:14:36.260891+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Sin leche
+2026-03-05 16:14:21.863066+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	de que postres tienes
+2026-03-05 16:14:14.529895+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Quiero 5 americanos frios grandes
+2026-03-05 16:13:54.736027+00	b62e67bb-f889-4e86-8ed0-273e1d5dab34	product_search	v2.1.0	""	""	""	Hola
+2026-03-05 07:13:17.329879+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v2.1.0	""	""	""	si
+2026-03-05 07:13:01.517955+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	hola quiero pedir lo mismo de la ultima vez
+2026-03-05 06:43:46.02523+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v2.1.0	""	""	""	si
+2026-03-05 06:43:29.593786+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	quiero pedir lo ultimo otra vez
+2026-03-05 03:17:04.105472+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v2.1.0	""	""	""	si
+2026-03-05 03:16:51.156735+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	hola quiero hacer una orden igual
+2026-03-05 03:15:46.231879+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	cancelala
+2026-03-05 03:14:56.795522+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v2.1.0	""	""	""	si
+2026-03-05 03:14:47.244388+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	quiero hacer un pedido igual al ultimo
+2026-03-05 03:08:55.350304+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v2.1.0	""	""	""	si
+2026-03-05 03:08:49.084206+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	quiero hacer otra orden igual
+2026-03-05 03:04:23.254332+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	si
+2026-03-05 03:04:16.940751+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	quiero hacer otra orden igual
+2026-03-05 03:01:02.005525+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	si
+2026-03-05 03:00:54.445754+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	quiero hcer otra orden igua. que la ultima
+2026-03-05 02:55:30.455324+00	762559f0-5112-4040-9166-3fdd38d177ea	order_confirm	v2.1.0	""	""	""	si
+2026-03-05 02:55:20.846981+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	caliente
+2026-03-05 02:55:08.845874+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	buenas tardes, quiero un americano sencillo chico
+2026-03-05 02:51:45.436451+00	8294c4cb-1723-45cf-b885-4faf81016c55	order_confirm	v2.1.0	""	""	""	si, seria todo
+2026-03-05 02:51:34.220201+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	deslactosada
+2026-03-05 02:51:24.781552+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	quiero un matcha latte frio chico
+2026-03-05 02:51:10.16665+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	hola
+2026-03-05 02:43:47.783659+00	8294c4cb-1723-45cf-b885-4faf81016c55	order_confirm	v2.1.0	""	""	""	si
+2026-03-05 02:43:26.285392+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	hola, cual fue mi ultimo pedido
+2026-03-05 02:34:20.936116+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	quiero volver a hacer mi pedido
+2026-03-05 02:34:08.834645+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v2.1.0	""	""	""	hola
+2026-03-05 02:28:11.454913+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	hacer pedido
+2026-03-05 02:27:30.733886+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	quiero hacer el mismo pedido
+2026-03-05 02:27:19.027382+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	hola
+2026-03-05 02:18:06.211479+00	8294c4cb-1723-45cf-b885-4faf81016c55	order_confirm	v2.1.0	""	""	""	seria todo
+2026-03-05 02:17:53.29148+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	grande rocas sin leche
+2026-03-05 02:17:40.292573+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	quiero un americano frio grande
+2026-03-05 01:49:03.511673+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	hola
+2026-03-04 19:15:07.86905+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	hola
+2026-03-03 00:29:28.311185+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	postres
+2026-03-03 00:27:31.562604+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	tienes rebanadas de pastel
+2026-03-03 00:25:16.718042+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	manejas decaf
+2026-03-03 00:24:37.61936+00	516e6294-d0fe-4f38-986c-0cf1161ff724	menu	v2.1.0	""	""	""	agua fresca
+2026-03-03 00:24:24.991306+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	hola tieens bebidas sin cafe
+2026-03-03 00:23:56.269854+00	516e6294-d0fe-4f38-986c-0cf1161ff724	order_confirm	v2.1.0	""	""	""	si
+2026-03-03 00:23:32.870569+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	de chocolatechip
+2026-03-03 00:23:09.735897+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	quiero una galleta de leonor
+2026-03-03 00:22:26.726355+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	postres tienes?
+2026-03-03 00:22:09.608102+00	516e6294-d0fe-4f38-986c-0cf1161ff724	menu	v2.1.0	""	""	""	leonor
+2026-03-03 00:20:39.643966+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	tienes galletas de chispas?
+2026-03-03 00:20:37.275516+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	hola
+2026-02-27 22:31:04.706665+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Snacks
+2026-02-27 22:30:55.287971+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Cookie
+2026-02-27 22:30:40.082371+00	516e6294-d0fe-4f38-986c-0cf1161ff724	menu	v2.1.0	""	""	""	Es una galleta
+2026-02-27 22:30:25.320311+00	516e6294-d0fe-4f38-986c-0cf1161ff724	menu	v2.1.0	""	""	""	Leonor
+2026-02-27 22:30:10.345918+00	516e6294-d0fe-4f38-986c-0cf1161ff724	menu	v2.1.0	""	""	""	Galleta de chispas
+2026-02-27 22:29:56.589039+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Quiero agregar una galleta
+2026-02-27 22:29:35.152669+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Ch rocas soya
+2026-02-27 20:28:45.142737+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	un shaken espresso con foam de vainilla
+2026-02-27 20:27:26.04735+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Latte
+2026-02-27 20:27:24.056539+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Latte
+2026-02-27 20:22:04.748409+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Cafe
+2026-02-27 20:21:36.622136+00	516e6294-d0fe-4f38-986c-0cf1161ff724	menu	v2.1.0	""	""	""	Ver el menu
+2026-02-27 20:21:16.341393+00	516e6294-d0fe-4f38-986c-0cf1161ff724	product_search	v2.1.0	""	""	""	Hola
+2026-02-27 20:19:22.575014+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v2.1.0	""	""	""	quieto comprar algo de daria
+2026-02-27 20:18:49.893979+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	algo de chocolate
+2026-02-27 20:18:20.812449+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	quiero un postre
+2026-02-27 20:12:40.216082+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	que sucursal errs
+2026-02-27 20:12:27.370493+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	hola
+2026-02-27 20:11:55.161307+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	gracias eres lo maximo
+2026-02-27 20:11:18.046746+00	8294c4cb-1723-45cf-b885-4faf81016c55	order_confirm	v2.1.0	""	""	""	si
+2026-02-27 20:10:49.290834+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	un chai grande rocas levhe de avena
+2026-02-27 20:10:23.995832+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	mejor quiero un chai
+2026-02-27 20:09:52.198356+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	quiero un matcha vainilla foam grande rocas
+2026-02-27 20:08:55.483239+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	con foam
+2026-02-27 20:08:34.230128+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	voy a pedir un matcha
+2026-02-27 20:08:11.504125+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	hola
+2026-02-27 18:05:56.19856+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	que venden
+2026-02-27 05:04:14.999614+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	chai
+2026-02-27 05:03:59.644124+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	hola
+2026-02-27 05:03:08.615984+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	quiero un americano chico frio
+2026-02-27 05:02:54.104657+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	quiero un cafe
+2026-02-27 05:02:40.428287+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.1.0	""	""	""	hola
+2026-02-26 02:36:55.720354+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	pasame la ubicación
+2026-02-26 02:33:49.138322+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	donde estan?
+2026-02-25 22:12:13.801352+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	dulces sin cafeina cuales tienes
+2026-02-25 22:11:39.918625+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	una bebida dulce?
+2026-02-25 22:11:06.644488+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	que vendes
+2026-02-25 22:10:40.261346+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	hola
+2026-02-24 23:29:06.797629+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	mi abuelita esta en peligro
+2026-02-24 23:23:16.494126+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.1.0	""	""	""	nigga
+2026-02-20 04:03:35.158694+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.0.0	""	""	""	como sabes qué es dulce y qué no?
+2026-02-20 03:03:08.930316+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.0.0	""	""	""	mandame la ubicacion correcta
+2026-02-20 03:02:51.978844+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.0.0	""	""	""	en cuanto tiempo estara listo?
+2026-02-20 03:02:39.531712+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.0.0	""	""	""	procede con la orden
+2026-02-20 03:02:29.120701+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.0.0	""	""	""	sin leche
+2026-02-20 03:02:14.391871+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.0.0	""	""	""	otra bebida, quiero un americano a las rocas chico
+2026-02-20 03:01:57.533194+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.0.0	""	""	""	que ingredientes tiene el pumpkin spice latte
+2026-02-20 03:01:22.528692+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v2.0.0	""	""	""	muestrame el menu de bebidas con cafe
+2026-02-20 03:01:04.221321+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.0.0	""	""	""	borrar orden
+2026-02-20 03:00:52.991749+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v2.0.0	""	""	""	hola
+2026-02-19 23:44:27.793038+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v2.0.0	""	""	""	que no sea tan dulce
+2026-02-19 00:30:14.334313+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v1.0.0	""	""	""	se puede cambjar la leche del matchata?
+2026-02-19 00:29:09.195871+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v1.0.0	""	""	""	un cafe americano chico
+2026-02-19 00:29:03.331502+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v1.0.0	""	""	""	un matchata gtande
+2026-02-19 00:29:00.901758+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v1.0.0	""	""	""	quiero
+2026-02-19 00:28:57.955505+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v1.0.0	""	""	""	hola
+2026-02-19 00:27:13.592497+00	8294c4cb-1723-45cf-b885-4faf81016c55	order_confirm	v1.0.0	""	""	""	seria todo
+2026-02-19 00:26:50.823053+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v1.0.0	""	""	""	grande
+2026-02-19 00:26:40.353109+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v1.0.0	""	""	""	quiero un matchata
+2026-02-19 00:26:30.738218+00	8294c4cb-1723-45cf-b885-4faf81016c55	menu	v1.0.0	""	""	""	si
+2026-02-19 00:26:19.304918+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v1.0.0	""	""	""	olvida ese matchata
+2026-02-19 00:25:54.252875+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v1.0.0	""	""	""	quiero un matchata
+2026-02-19 00:25:39.687889+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v1.0.0	""	""	""	tipos de matchata
+2026-02-19 00:25:23.446551+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v1.0.0	""	""	""	matchata precio
+2026-02-19 00:25:03.125623+00	8294c4cb-1723-45cf-b885-4faf81016c55	product_search	v1.0.0	""	""	""	hola
+2026-02-18 23:58:12.902657+00	762559f0-5112-4040-9166-3fdd38d177ea	product_search	v1.0.0	""	""	""	quiero algo de sabor
