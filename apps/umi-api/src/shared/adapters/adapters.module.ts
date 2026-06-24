@@ -3,6 +3,7 @@ import { AnthropicAdapter } from './anthropic.adapter';
 import { VoyageAdapter } from './voyage.adapter';
 import { TwilioAdapter } from './twilio.adapter';
 import { EmailAdapter } from './email.adapter';
+import { ZettleAdapter } from './zettle.adapter';
 
 /**
  * One canonical wrapper per external service (the only place each is reached).
@@ -10,7 +11,19 @@ import { EmailAdapter } from './email.adapter';
  */
 @Global()
 @Module({
-  providers: [AnthropicAdapter, VoyageAdapter, TwilioAdapter, EmailAdapter],
-  exports: [AnthropicAdapter, VoyageAdapter, TwilioAdapter, EmailAdapter],
+  providers: [
+    AnthropicAdapter,
+    VoyageAdapter,
+    TwilioAdapter,
+    EmailAdapter,
+    ZettleAdapter,
+  ],
+  exports: [
+    AnthropicAdapter,
+    VoyageAdapter,
+    TwilioAdapter,
+    EmailAdapter,
+    ZettleAdapter,
+  ],
 })
 export class AdaptersModule {}
