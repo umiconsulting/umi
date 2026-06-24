@@ -1,0 +1,2 @@
+# Sqitch migrations land here when the DB is lifted onto PostgreSQL on the VPS.
+# Until then, schema changes go through Supabase migrations (see ../README.md).

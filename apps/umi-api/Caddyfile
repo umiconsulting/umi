@@ -1,0 +1,7 @@
+# Reverse proxy + automatic TLS. API_DOMAIN comes from the environment:
+#   - local:  API_DOMAIN=:80        (plain HTTP)
+#   - VPS:    API_DOMAIN=api.umiconsulting.co   (Caddy provisions a cert)
+{$API_DOMAIN} {
+	encode gzip
+	reverse_proxy umi-api:3000
+}

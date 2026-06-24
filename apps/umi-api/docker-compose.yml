@@ -1,0 +1,53 @@
+# umi-api on a VPS: web + worker (one image, two commands) + redis + caddy.
+# `docker compose up -d --build` after creating .env from .env.example.
+
+services:
+  umi-api:
+    build: .
+    command: node dist/main.js
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+    expose:
+      - "3000"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  umi-worker:
+    build: .
+    command: node dist/worker.js
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Set API_DOMAIN in .env to a real hostname on the VPS for automatic TLS.
+      - API_DOMAIN=${API_DOMAIN:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - umi-api
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  caddy-data:
+  caddy-config:

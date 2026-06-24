@@ -1,0 +1,39 @@
+name: umi-api CI
+
+on:
+  push:
+    paths:
+      - "apps/umi-api/**"
+      - ".github/workflows/umi-api-ci.yml"
+  pull_request:
+    paths:
+      - "apps/umi-api/**"
+      - ".github/workflows/umi-api-ci.yml"
+
+defaults:
+  run:
+    working-directory: apps/umi-api
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/umi-api/package-lock.json
+
+      - name: Install
+        run: npm ci || npm install
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm run test
