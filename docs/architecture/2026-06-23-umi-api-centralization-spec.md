@@ -374,7 +374,8 @@ The Swift client calls three endpoints and depends on **exact** field names, enu
 
 ### 8.3 Observability (for `umi-logs`)
 
-- The logging/trace layer keeps writing the same `observability.*` tables (`pipeline_traces`, `ai_turn_logs`, `security_logs`, data-quality findings). `umi-logs` reads them unchanged.
+- **Confirmed live binding (Phase 1b):** `umi-logs` reads its runtime trace tables from schema **`conversaflow`** (its client default is `DB_SCHEMA || 'conversaflow'`), specifically **`ai_turn_logs`, `edge_function_logs`, `security_logs`** (it does *not* read `pipeline_traces`/`eval_traces` — those are internal). So `umi-api`'s `TraceService` writes those exact tables/columns in the configured `OBSERVABILITY_SCHEMA` (default `conversaflow`), best-effort, via the `umi_worker` pool — `umi-logs` keeps working unchanged.
+- This is *not yet* the canonical `observability.ai_runs`/`pipeline_spans`/`security_events` model from `platform-database-architecture.md` — that rename hasn't been applied to the live runtime trace tables. Rebinding is a one-line `OBSERVABILITY_SCHEMA`/table-name change when/if the observability migration lands and `umi-logs` cuts over.
 
 ---
 

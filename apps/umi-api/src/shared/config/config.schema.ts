@@ -28,6 +28,15 @@ export const configSchema = z.object({
   // Redis / BullMQ.
   REDIS_URL: z.string().url(),
 
+  // Observability schema that holds the runtime trace tables umi-logs reads
+  // (ai_turn_logs, edge_function_logs, security_logs, pipeline_traces). Live
+  // default is `conversaflow`; confirm against the platform DB. Validated as a
+  // safe SQL identifier since it's interpolated into INSERT statements.
+  OBSERVABILITY_SCHEMA: z
+    .string()
+    .regex(/^[A-Za-z_][A-Za-z0-9_]*$/)
+    .default('conversaflow'),
+
   // Feature flags.
   CASH_WRITE_ENABLED: booleanFromEnv.default(false), // D11 — inert cash writes
 
