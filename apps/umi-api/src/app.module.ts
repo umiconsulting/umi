@@ -7,6 +7,7 @@ import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { AppConfigModule } from './shared/config/config.module';
 import { DatabaseModule } from './shared/database/database.module';
 import { RequestContextMiddleware } from './shared/database/request-context.middleware';
+import { AdaptersModule } from './shared/adapters/adapters.module';
 import { LoggingModule } from './shared/logging/logging.module';
 import { LoggingInterceptor } from './shared/logging/logging.interceptor';
 import { AllExceptionsFilter } from './shared/http/all-exceptions.filter';
@@ -22,6 +23,7 @@ import { HealthModule } from './modules/health/health.module';
   imports: [
     AppConfigModule,
     DatabaseModule,
+    AdaptersModule,
     LoggingModule,
     QueueModule,
     HealthModule,
