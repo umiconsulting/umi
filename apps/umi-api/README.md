@@ -22,7 +22,7 @@ Every file is named `<thing>.<role>.ts` — `.controller`, `.service`,
 `.processor`, `.scheduler`, `.adapter`, `.module`.
 Folders are business nouns. Nothing is buried; no `utils/` grab-bags.
 
-### Current tree (Phase 0)
+### Current tree (Phase 1c)
 
 ```
 src/
@@ -32,10 +32,16 @@ src/
   worker.module.ts              # worker root module
   modules/
     health/                     # GET /health → DB + Redis status
-  jobs/
+  jobs/                         # the durable work engine (Phase 1c)
     queues.ts                   # queue names — single source of truth
-    queue.module.ts             # BullMQ + Redis wiring (shared)
-    system.processor.ts         # no-op processor proving the wiring
+    queue.module.ts             # BullMQ + Redis wiring; provides EnqueueService/QueueRepository/OutboxRouter
+    job-options.ts              # priority inversion + per-queue retry/backoff + lock sizing
+    enqueue.service.ts          # the one producer entry point (applies the policy)
+    queue.repository.ts         # raw SQL for queue.* (dead_letters, inbound gate, idempotency, outbox)
+    dead-letter.service.ts      # terminal failures → queue.dead_letters (tenant-scoped)
+    base.processor.ts           # WorkerHost base: logs retries, routes exhausted jobs to dead-letter
+    outbox-relay.service.ts     # transactional-outbox relay + route registry (inert until OUTBOX_RELAY_ENABLED)
+    system.processor.ts         # infra processor; proves the wiring + reliability tail
   shared/
     config/                     # typed, validated env (zod)
     database/

@@ -4,6 +4,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import type { RedisOptions } from 'bullmq';
 import type { AppConfig } from '../shared/config/config.schema';
 import { ALL_QUEUES } from './queues';
+import { EnqueueService } from './enqueue.service';
+import { QueueRepository } from './queue.repository';
+import { OutboxRouter } from './outbox-relay.service';
 
 /** Parse REDIS_URL into BullMQ-compatible RedisOptions (no ioredis instance). */
 function redisOptionsFromUrl(url: string): RedisOptions {
@@ -47,6 +50,11 @@ function redisOptionsFromUrl(url: string): RedisOptions {
     }),
     ...ALL_QUEUES.map((name) => BullModule.registerQueue({ name })),
   ],
-  exports: [BullModule],
+  // Producer-side infra shared by both processes: the single enqueue entry
+  // point, the queue.* durability repository, and the outbox route registry.
+  // Consumers (processors, dead-letter wiring, the relay loop) live in
+  // WorkerModule so they only run in the worker process.
+  providers: [EnqueueService, QueueRepository, OutboxRouter],
+  exports: [BullModule, EnqueueService, QueueRepository, OutboxRouter],
 })
 export class QueueModule {}

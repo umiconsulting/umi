@@ -39,6 +39,9 @@ export const configSchema = z.object({
 
   // Feature flags.
   CASH_WRITE_ENABLED: booleanFromEnv.default(false), // D11 — inert cash writes
+  // Transactional-outbox relay (§10.4). Built in Phase 1c but inert until
+  // Phase 3 registers event_type→queue routes and flips this on.
+  OUTBOX_RELAY_ENABLED: booleanFromEnv.default(false),
 
   // CORS.
   CORS_ORIGINS: z.string().optional(), // comma-separated origins
