@@ -13,8 +13,17 @@ set -euo pipefail
 VPS="${UMI_API_VPS:?set UMI_API_VPS, e.g. UMI_API_VPS=user@1.2.3.4}"
 DEST="${UMI_API_DEST:-umi-api}"
 
+# DEST is interpolated into the remote shell command below, so restrict it to a
+# safe path charset to avoid breaking `cd` or injecting shell tokens.
+if [[ ! "${DEST}" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+  echo "Invalid UMI_API_DEST: ${DEST}" >&2
+  exit 1
+fi
+
 echo "→ syncing $(pwd) to ${VPS}:~/${DEST}/"
-rsync -av \
+# --delete keeps the remote matching local (no stale artifacts); the excludes
+# also protect remote .env / node_modules / dist from deletion.
+rsync -av --delete \
   --exclude node_modules --exclude dist --exclude .env \
   ./ "${VPS}:${DEST}/"
 
