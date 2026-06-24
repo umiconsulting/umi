@@ -31,6 +31,15 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
     this.worker = new Pool({
       connectionString: config.get('DATABASE_URL_WORKER', { infer: true }),
     });
+    // pg.Pool emits 'error' for idle clients (DB restart, network drop). Without
+    // a listener, that unhandled event would crash the process — log and let the
+    // pool replace the client.
+    this.app.on('error', (err) =>
+      this.logger.error(`app pool error: ${err.message}`, err.stack),
+    );
+    this.worker.on('error', (err) =>
+      this.logger.error(`worker pool error: ${err.message}`, err.stack),
+    );
   }
 
   async onModuleInit(): Promise<void> {
@@ -91,7 +100,16 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
       await client.query('COMMIT');
       return result;
     } catch (err) {
-      await client.query('ROLLBACK');
+      // Guard ROLLBACK: on a broken connection it can throw and mask the real
+      // error. Always rethrow the original.
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackErr) {
+        this.logger.error(
+          'ROLLBACK failed',
+          rollbackErr instanceof Error ? rollbackErr.stack : String(rollbackErr),
+        );
+      }
       throw err;
     } finally {
       client.release();

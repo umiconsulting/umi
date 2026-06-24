@@ -36,6 +36,8 @@ export class AppModule implements NestModule {
     // Establish the per-request AsyncLocalStorage context (tenant/user/requestId)
     // for the whole request, so repositories can set RLS context. The AuthGuard
     // (Phase 2) populates tenant/user into this context after authentication.
-    consumer.apply(RequestContextMiddleware).forRoutes('*');
+    // NestJS 11 uses path-to-regexp v8 — the bare '*' wildcard is deprecated;
+    // '{*splat}' matches all paths including the root.
+    consumer.apply(RequestContextMiddleware).forRoutes('{*splat}');
   }
 }

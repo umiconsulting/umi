@@ -4,7 +4,7 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci || npm install
+RUN npm ci
 COPY tsconfig*.json nest-cli.json ./
 COPY src ./src
 RUN npm run build
@@ -14,7 +14,7 @@ FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev || npm install --omit=dev
+RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 # Run as the unprivileged built-in node user, not root.
 RUN chown -R node:node /app

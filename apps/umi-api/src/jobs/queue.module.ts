@@ -16,8 +16,10 @@ function redisOptionsFromUrl(url: string): RedisOptions {
   return {
     host: u.hostname,
     port: Number(u.port || 6379),
-    username: u.username || undefined,
-    password: u.password || undefined,
+    // WHATWG URL keeps username/password percent-encoded; ioredis wants them
+    // decoded, so special chars (@ : / # %) in the password authenticate correctly.
+    username: u.username ? decodeURIComponent(u.username) : undefined,
+    password: u.password ? decodeURIComponent(u.password) : undefined,
     db,
     tls: u.protocol === 'rediss:' ? {} : undefined,
     // Required by BullMQ for blocking operations.

@@ -233,8 +233,9 @@ apps/umi-api/
     shared/                     # ← cross-cutting infra. Obvious names.
       database/
         database.module.ts
-        pg.service.ts           # the two pg pools: umi_app (RLS) + umi_worker (BYPASSRLS)
-        rls.interceptor.ts      # per-request txn: BEGIN; SET LOCAL app.tenant_id/user_id; …; COMMIT
+        pg.service.ts           # two pg pools (umi_app RLS / umi_worker) + withTenant() per-req txn
+        request-context.ts      # AsyncLocalStorage store: tenant/user/requestId
+        request-context.middleware.ts  # sets the request context so withTenant() can apply RLS
       adapters/                 # ONE file per external service
         twilio.adapter.ts
         anthropic.adapter.ts
@@ -409,7 +410,7 @@ The platform DB uses **domain-named canonical schemas**, confirmed by the normat
 
 - Schema-qualify every table (`comms.messages`, `loyalty.cards`, …). The repository is constrained to its write column in the product→schema matrix (§9.1).
 - Sensitive writes (loyalty) call the existing `SECURITY DEFINER` RPCs via `SELECT * FROM award_points($1,…)` rather than touching tables directly — the DB enforces the invariants.
-- **RLS context:** tenant-scoped schemas (`ops`/`comms`/`loyalty`/`device`/`kitchen`) are RLS-enforced and `umi_app` is non-`BYPASSRLS`. Because `SET LOCAL` is transaction-scoped, the `rls.interceptor.ts` wraps each web request's DB work in a transaction: check out a client, `BEGIN`, `SET LOCAL app.tenant_id = $1; SET LOCAL app.user_id = $2`, run the repository queries on that client, `COMMIT`. The worker (`umi_worker`, `BYPASSRLS`) skips this.
+- **RLS context:** tenant-scoped schemas (`ops`/`comms`/`loyalty`/`device`/`kitchen`) are RLS-enforced and `umi_app` is non-`BYPASSRLS`. `request-context.middleware.ts` establishes the per-request tenant/user context (AsyncLocalStorage), and because `SET LOCAL` is transaction-scoped, `PgService.withTenant()` wraps each tenant-scoped web request in a transaction: check out a client, `BEGIN`, `set_config('app.tenant_id', …, true)` + `set_config('app.user_id', …, true)`, run the repository queries on that client, `COMMIT`. The worker (`umi_worker`, `BYPASSRLS`) skips this.
 
 **Migrations (D8).** `umi-api` ships **no ORM migrate**. While the DB is on Supabase, schema changes go through **Supabase migrations** (the existing mechanism + the canonical `docs/migration/local-postgres/*.sql` scripts). When the database is lifted onto PostgreSQL on the VPS, migrations become a **Sqitch** plan of hand-written PostgreSQL SQL (`db/migrations/`). Application queries are raw SQL throughout, so the data layer is unaffected by that move — only the migration tool changes.
 
@@ -557,7 +558,7 @@ VPS env file (root-only) or SOPS/Doppler: `DATABASE_URL` (+ direct/session), `RE
 Each phase ships independently, is reversible, and has explicit acceptance criteria. Edge functions stay deployed until each domain is verified on the VPS — **the cutover point per domain is a single webhook/URL/config flip, which can be flipped back.**
 
 ### Phase 0 — Foundations
-**Scope:** Scaffold `apps/umi-api` (NestJS + Fastify, the §6 structure, root `README.md` map). `DatabaseModule` (`pg.service.ts` with the `umi_app`/`umi_worker` pools + `rls.interceptor.ts` per-request `SET LOCAL` context §9.2/§11.2), `ConfigModule` (typed env), `LoggingModule`, `HealthModule`. BullMQ + Redis wired with an empty queue. Dual bootstrap (`main.ts` / `worker.ts`). Dockerfile + compose + Caddy. CI. Deploy a hello-world to the VPS with TLS. Confirm the live `v_kds_tickets` projection + loyalty write-RPC names and write the repository SQL accordingly.
+**Scope:** Scaffold `apps/umi-api` (NestJS + Fastify, the §6 structure, root `README.md` map). `DatabaseModule` (`pg.service.ts` two pools + `request-context.middleware.ts` per-request context + `PgService.withTenant` `SET LOCAL` §9.2/§11.2), `ConfigModule` (typed env), `LoggingModule`, `HealthModule`. BullMQ + Redis wired with an empty queue. Dual bootstrap (`main.ts` / `worker.ts`). Dockerfile + compose + Caddy. CI. Deploy a hello-world to the VPS with TLS. Confirm the live `v_kds_tickets` projection + loyalty write-RPC names and write the repository SQL accordingly.
 **Done when:** VPS serves `GET /health` over HTTPS (DB + Redis green); CI deploys; a tenant-scoped test query proves RLS isolation under `umi_app`.
 
 ### Phase 1 — Shared core & adapters
