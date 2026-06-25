@@ -40,6 +40,21 @@ export class AnthropicAdapter {
     return this.client;
   }
 
+  /**
+   * Sampling params only when meaningful: an explicit caller value always wins;
+   * otherwise default to 0 (deterministic) for the default Haiku model, and OMIT
+   * temperature entirely for any model override — Opus 4.7+/Fable reject sampling
+   * params and would 400 on a defaulted `temperature` (§9-10 contract).
+   */
+  private temperature(
+    model: string,
+    explicit?: number,
+  ): { temperature: number } | Record<string, never> {
+    if (explicit !== undefined) return { temperature: explicit };
+    if (model === DEFAULT_MODEL) return { temperature: 0 };
+    return {};
+  }
+
   /** Single-turn completion (summarize, extract-facts). Null on failure. */
   async createCompletion(params: {
     system: string;
@@ -48,11 +63,12 @@ export class AnthropicAdapter {
     maxTokens?: number;
     temperature?: number;
   }): Promise<CompletionResult | null> {
+    const model = params.model ?? DEFAULT_MODEL;
     try {
       const response = await this.getClient().messages.create({
-        model: params.model ?? DEFAULT_MODEL,
+        model,
         max_tokens: params.maxTokens ?? DEFAULT_MAX_TOKENS,
-        temperature: params.temperature ?? 0,
+        ...this.temperature(model, params.temperature),
         system: params.system,
         messages: [{ role: 'user', content: params.userMessage }],
       });
@@ -81,11 +97,12 @@ export class AnthropicAdapter {
     maxTokens?: number;
     temperature?: number;
   }): Promise<MessageResult | null> {
+    const model = params.model ?? DEFAULT_MODEL;
     try {
       const response = await this.getClient().messages.create({
-        model: params.model ?? DEFAULT_MODEL,
+        model,
         max_tokens: params.maxTokens ?? DEFAULT_MAX_TOKENS,
-        temperature: params.temperature ?? 0,
+        ...this.temperature(model, params.temperature),
         system: params.system,
         messages: params.messages,
         ...(params.tools ? { tools: params.tools } : {}),

@@ -1,13 +1,18 @@
 import { z } from 'zod';
 
-/** Parse common truthy strings ("true"/"1"/"yes"/"on") into a boolean. */
-const booleanFromEnv = z.preprocess(
-  (v) =>
-    typeof v === 'string'
-      ? ['1', 'true', 'yes', 'on'].includes(v.toLowerCase())
-      : v,
-  z.boolean(),
-);
+/**
+ * Parse recognized boolean strings; leave anything else UNTOUCHED so `z.boolean()`
+ * rejects it. This makes a typo'd rollout flag (`CASH_WRITE_ENABLED=enabld`,
+ * `OUTBOX_RELAY_ENABLED=ture`) fail boot loudly instead of silently coercing to
+ * `false` and shipping the feature disabled.
+ */
+const booleanFromEnv = z.preprocess((v) => {
+  if (typeof v !== 'string') return v;
+  const s = v.toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(s)) return true;
+  if (['0', 'false', 'no', 'off'].includes(s)) return false;
+  return v; // unrecognized → falls through to z.boolean() → boot fails
+}, z.boolean());
 
 /**
  * The full environment contract. Required values have no `.optional()` — boot

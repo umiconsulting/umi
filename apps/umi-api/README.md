@@ -107,6 +107,7 @@ and Redis are reachable, else `503 {"status":"degraded",...}`.
 
 ## Roadmap
 
-Phase 0 (this) → 1 adapters → 2 auth + dashboard admin (incl. inert cash writes)
-→ 3 conversations + worker → 4 KDS → 5 landing leads → 6 decommission edge
-functions. See the spec for acceptance criteria per phase.
+Phase 0 foundations → 1 adapters + durable engine (this) → 2 auth + dashboard
+admin (incl. inert cash writes) → 3 conversations + worker → 4 KDS → 5 landing
+leads → 6 decommission edge functions. See the spec for acceptance criteria per
+phase.

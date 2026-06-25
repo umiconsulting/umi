@@ -51,6 +51,30 @@ describe('AnthropicAdapter', () => {
     );
   });
 
+  it('omits temperature for a model override (Opus/Fable reject sampling)', async () => {
+    const adapter = adapterWith(WITH_KEY);
+    const create = vi.fn().mockResolvedValue({
+      content: [{ type: 'text', text: 'ok' }],
+      usage: { input_tokens: 1, output_tokens: 1 },
+    });
+    withClient(adapter, create);
+
+    await adapter.createCompletion({ system: 's', userMessage: 'u', model: 'claude-opus-4-8' });
+    expect(create.mock.calls[0][0]).not.toHaveProperty('temperature');
+  });
+
+  it('honours an explicit temperature even on an override model', async () => {
+    const adapter = adapterWith(WITH_KEY);
+    const create = vi.fn().mockResolvedValue({
+      content: [{ type: 'text', text: 'ok' }],
+      usage: { input_tokens: 1, output_tokens: 1 },
+    });
+    withClient(adapter, create);
+
+    await adapter.createCompletion({ system: 's', userMessage: 'u', model: 'claude-opus-4-8', temperature: 0.7 });
+    expect(create.mock.calls[0][0]).toMatchObject({ temperature: 0.7 });
+  });
+
   it('createCompletion returns null when the SDK throws', async () => {
     const adapter = adapterWith(WITH_KEY);
     withClient(adapter, vi.fn().mockRejectedValue(new Error('rate_limit')));

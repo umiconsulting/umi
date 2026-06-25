@@ -44,10 +44,15 @@ export class EmailAdapter {
     const transporter = this.getTransporter();
     if (!transporter) return null;
 
-    const from =
-      params.from ??
-      this.config.get('EMAIL_FROM', { infer: true }) ??
-      'hola@umiconsulting.co';
+    // No hard-coded sender — a shared adapter must not send under a fixed tenant
+    // identity. Require an explicit `from` or the configured EMAIL_FROM; skip
+    // (best-effort null) when neither is set so a misconfig fails loud in logs
+    // rather than mailing from the wrong domain.
+    const from = params.from ?? this.config.get('EMAIL_FROM', { infer: true });
+    if (!from) {
+      this.logger.warn('email_adapter_missing_from');
+      return null;
+    }
 
     try {
       const info = await transporter.sendMail({

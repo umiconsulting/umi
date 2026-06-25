@@ -22,6 +22,7 @@ const SMTP = {
   SMTP_HOST: 'smtp.brevo.com',
   SMTP_USER: 'u',
   SMTP_PASSWORD: 'p',
+  EMAIL_FROM: 'noreply@umi.test',
 };
 
 describe('EmailAdapter', () => {
@@ -47,15 +48,29 @@ describe('EmailAdapter', () => {
     );
   });
 
-  it('falls back to the default from address', async () => {
-    const adapter = adapterWith(SMTP); // no EMAIL_FROM
+  it('uses EMAIL_FROM as the sender (no hard-coded fallback)', async () => {
+    const adapter = adapterWith(SMTP);
     const sendMail = vi.fn().mockResolvedValue({ messageId: 'm-2' });
     withTransporter(adapter, sendMail);
 
     await adapter.send({ to: 'a@b.co', subject: 's', html: '<p>x</p>' });
     expect(sendMail).toHaveBeenCalledWith(
-      expect.objectContaining({ from: 'hola@umiconsulting.co' }),
+      expect.objectContaining({ from: 'noreply@umi.test' }),
     );
+  });
+
+  it('skips (returns null) when no from address is configured', async () => {
+    const adapter = adapterWith({
+      SMTP_HOST: 'smtp.brevo.com',
+      SMTP_USER: 'u',
+      SMTP_PASSWORD: 'p',
+    }); // no EMAIL_FROM, no explicit from
+    const sendMail = vi.fn();
+    withTransporter(adapter, sendMail);
+
+    const r = await adapter.send({ to: 'a@b.co', subject: 's', html: '<p>x</p>' });
+    expect(r).toBeNull();
+    expect(sendMail).not.toHaveBeenCalled();
   });
 
   it('returns null when sendMail throws', async () => {

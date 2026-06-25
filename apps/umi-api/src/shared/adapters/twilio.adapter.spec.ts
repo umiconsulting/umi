@@ -17,7 +17,10 @@ const FULL = {
 };
 
 describe('TwilioAdapter', () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
 
   it('returns null when config is missing', async () => {
     const r = await adapterWith({}).sendWhatsAppMessage({ to: '+1', body: 'hi' });
@@ -62,6 +65,21 @@ describe('TwilioAdapter', () => {
       body: 'hi',
     });
     expect(r).toBeNull();
+  });
+
+  it('never double-prefixes an already-prefixed whatsapp: address', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ sid: 'SM7' }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await adapterWith({ ...FULL, TWILIO_WHATSAPP_FROM: 'whatsapp:+1555' }).sendWhatsAppMessage({
+      to: 'whatsapp:+1999',
+      body: 'hi',
+    });
+    const body = fetchMock.mock.calls[0][1].body as string;
+    expect(body).toContain('From=whatsapp%3A%2B1555');
+    expect(body).not.toContain('whatsapp%3Awhatsapp');
   });
 
   it('builds a geo PersistentAction for location pins', async () => {

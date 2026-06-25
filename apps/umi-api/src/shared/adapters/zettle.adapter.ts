@@ -59,11 +59,14 @@ export class ZettleAdapter {
       return null;
     }
 
+    // Bound the external call so a hung socket can't stall the worker (and its
+    // retries). AbortSignal.timeout rejects the fetch → throws → BullMQ retries.
     const res = await fetch(ZETTLE_PRODUCTS_API, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!res.ok) {

@@ -9,9 +9,15 @@ import { QUEUES, type QueueName } from './queues';
  * ⚠️ Sign inversion (confirmed by the 2026-06-24 preflight): the live
  * `queue.jobs.priority` used a higher-number-is-more-urgent convention
  * (claimable index `ORDER BY priority DESC`, legacy INTERACTIVE=100 > BACKGROUND=-10).
- * BullMQ is the opposite — a LOWER number is more urgent, and an unset/0 priority
- * is treated as the LEAST urgent. We invert here so interactive customer turns
- * always preempt background enrichment (port analysis §3).
+ * BullMQ is the opposite — a LOWER number is more urgent. We invert here so
+ * interactive customer turns always preempt background enrichment (port analysis §3).
+ *
+ * ⚠️ BullMQ treats an unset/0 priority as the MOST urgent (it preempts a job
+ * mapped to Interactive=1). So every job MUST carry a mapped priority: the
+ * `EnqueueService.enqueue` path always sets `toBullPriority(...)`, and the
+ * queues are registered with a `Default` (5) `defaultJobOptions.priority` so a
+ * raw `getQueue().add(...)` without a priority still can't default to 0 and
+ * jump the interactive lane (queue.module.ts).
  */
 export enum JobPriority {
   Interactive = 'interactive', // customer-facing turns/replies — preempt everything

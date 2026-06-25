@@ -49,8 +49,11 @@ export class VoyageAdapter {
 
         if (!res.ok) {
           const body = await res.text();
-          // Only retry server errors; 4xx are permanent.
-          if (res.status >= 500) throw new Error(`Voyage ${res.status}: ${body}`);
+          // Retry transient failures: 5xx and 429 (rate limit). Other 4xx are
+          // permanent (bad request/auth) and fail immediately.
+          if (res.status >= 500 || res.status === 429) {
+            throw new Error(`Voyage ${res.status}: ${body}`);
+          }
           this.logger.error(
             `voyage_api_error status=${res.status} ${body.slice(0, 200)}`,
           );

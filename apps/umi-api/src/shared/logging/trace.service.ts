@@ -158,7 +158,17 @@ export class TraceService {
   }
 
   private json(value: unknown): string | null {
-    return value == null ? null : JSON.stringify(value);
+    if (value == null) return null;
+    // Truly best-effort: JSON.stringify throws on circular/BigInt values, and a
+    // trace must never break its caller (see insert()'s contract).
+    try {
+      return JSON.stringify(value);
+    } catch (err) {
+      this.logger.warn(
+        `trace_json_serialize_failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return JSON.stringify({ _unserializable: true });
+    }
   }
 
   /** Best-effort insert: never throws — a failed trace must not break the caller. */

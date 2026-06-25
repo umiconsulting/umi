@@ -25,6 +25,20 @@ describe('validateConfig', () => {
     expect(cfg.CASH_WRITE_ENABLED).toBe(true);
   });
 
+  it('rejects a typo\'d boolean flag instead of silently disabling it', () => {
+    expect(() =>
+      validateConfig({ ...base, CASH_WRITE_ENABLED: 'ture' }),
+    ).toThrowError(/CASH_WRITE_ENABLED/);
+    expect(() =>
+      validateConfig({ ...base, OUTBOX_RELAY_ENABLED: 'enabled' }),
+    ).toThrowError(/OUTBOX_RELAY_ENABLED/);
+  });
+
+  it('accepts on/off/yes/no boolean spellings', () => {
+    expect(validateConfig({ ...base, CASH_WRITE_ENABLED: 'on' }).CASH_WRITE_ENABLED).toBe(true);
+    expect(validateConfig({ ...base, CASH_WRITE_ENABLED: 'off' }).CASH_WRITE_ENABLED).toBe(false);
+  });
+
   it('throws when a required database url is missing', () => {
     expect(() =>
       validateConfig({ REDIS_URL: base.REDIS_URL }),

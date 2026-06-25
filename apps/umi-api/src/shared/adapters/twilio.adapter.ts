@@ -6,6 +6,16 @@ import type { AppConfig } from '../config/config.schema';
 // Twilio REST API. Node port: `btoa` → Buffer, `Deno.env` → ConfigService.
 const TWILIO_API = 'https://api.twilio.com/2010-04-01/Accounts';
 
+/**
+ * Normalize a WhatsApp address to exactly one `whatsapp:` prefix. Idempotent, so
+ * a value that already carries the prefix (`TWILIO_WHATSAPP_FROM=whatsapp:+1555`
+ * or a pre-prefixed `from` from the inbound webhook) never becomes
+ * `whatsapp:whatsapp:+1555`, which Twilio rejects.
+ */
+function toWhatsApp(addr: string): string {
+  return `whatsapp:${addr.replace(/^whatsapp:/, '')}`;
+}
+
 @Injectable()
 export class TwilioAdapter {
   private readonly logger = new Logger(TwilioAdapter.name);
@@ -29,8 +39,8 @@ export class TwilioAdapter {
     }
 
     const body = new URLSearchParams({
-      From: `whatsapp:${from}`,
-      To: `whatsapp:${params.to}`,
+      From: toWhatsApp(from),
+      To: toWhatsApp(params.to),
       Body: params.body,
     });
     return this.post(accountSid, authToken, body, 'twilio_send');
@@ -39,7 +49,7 @@ export class TwilioAdapter {
   /** Send a WhatsApp location pin via PersistentAction. Returns SID, or null. */
   async sendLocationPin(params: {
     to: string;
-    from: string; // already has the whatsapp: prefix (from the inbound webhook)
+    from: string; // with or without the whatsapp: prefix — normalized below
     body: string;
     lat: number;
     lng: number;
@@ -54,8 +64,8 @@ export class TwilioAdapter {
     }
 
     const body = new URLSearchParams({
-      From: params.from,
-      To: `whatsapp:${params.to}`,
+      From: toWhatsApp(params.from),
+      To: toWhatsApp(params.to),
       Body: params.body,
       PersistentAction: `geo:${params.lat},${params.lng}|${params.label}`,
     });

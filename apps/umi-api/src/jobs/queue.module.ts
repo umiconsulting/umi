@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import type { RedisOptions } from 'bullmq';
 import type { AppConfig } from '../shared/config/config.schema';
 import { ALL_QUEUES } from './queues';
+import { JobPriority, toBullPriority } from './job-options';
 import { EnqueueService } from './enqueue.service';
 import { QueueRepository } from './queue.repository';
 import { OutboxRouter } from './outbox-relay.service';
@@ -48,7 +49,16 @@ function redisOptionsFromUrl(url: string): RedisOptions {
         ),
       }),
     }),
-    ...ALL_QUEUES.map((name) => BullModule.registerQueue({ name })),
+    // Register every queue with a non-zero default priority so a raw
+    // `getQueue().add(...)` (e.g. repeatable jobs) can never default to BullMQ's
+    // priority 0 — which is the MOST urgent and would preempt interactive turns.
+    // `EnqueueService.enqueue` overrides this per-job with the mapped priority.
+    ...ALL_QUEUES.map((name) =>
+      BullModule.registerQueue({
+        name,
+        defaultJobOptions: { priority: toBullPriority(JobPriority.Default) },
+      }),
+    ),
   ],
   // Producer-side infra shared by both processes: the single enqueue entry
   // point, the queue.* durability repository, and the outbox route registry.

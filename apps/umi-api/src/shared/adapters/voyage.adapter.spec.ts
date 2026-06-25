@@ -13,7 +13,10 @@ function adapterWith(values: Record<string, unknown>): VoyageAdapter {
 const WITH_KEY = { VOYAGE_API_KEY: 'k' };
 
 describe('VoyageAdapter', () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
 
   it('returns null without an API key', async () => {
     expect(await adapterWith({}).generateEmbedding('hi')).toBeNull();
@@ -46,6 +49,20 @@ describe('VoyageAdapter', () => {
 
     expect(await adapterWith(WITH_KEY).generateEmbeddings(['a'])).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a 429 rate limit as transient (not a permanent 4xx)', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 429, text: async () => 'slow down' })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: [{ index: 0, embedding: [0.9] }] }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await adapterWith(WITH_KEY).generateEmbeddings(['a'])).toEqual([[0.9]]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('retries on a 5xx and then succeeds', async () => {
