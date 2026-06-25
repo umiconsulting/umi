@@ -217,9 +217,12 @@ export class CashWriteRepository {
       );
       const gc = rows[0];
       await c.query(
+        // reason must satisfy gift_card_ledger_reason_check (load/redeem/
+        // adjustment/expire) — umi-cash's 'issue' is rejected by the canonical
+        // schema; 'load' is the issuance reason.
         `INSERT INTO loyalty.gift_card_ledger
            (tenant_id, gift_card_id, delta, reason, source_type, source_id, idempotency_key)
-         VALUES ($1::uuid, $2::uuid, $3, 'issue', 'gift_card', $2::text, $4)`,
+         VALUES ($1::uuid, $2::uuid, $3, 'load', 'gift_card', $2::text, $4)`,
         [input.tenantId, gc.id, input.amountCents, `giftissue_${gc.id}`],
       );
       return gc;
@@ -321,9 +324,12 @@ export class CashWriteRepository {
       if (!claim.rows[0]) throw new GiftCardAlreadyRedeemedError();
 
       await c.query(
+        // gift_card_ledger.reason='redeem' (canonical CHECK) — the wallet credit
+        // below still uses points_ledger reason 'gift_card_redeem' (its own CHECK
+        // allows it).
         `INSERT INTO loyalty.gift_card_ledger
            (tenant_id, gift_card_id, delta, reason, source_type, source_id, idempotency_key)
-         VALUES ($1::uuid, $2::uuid, $3, 'gift_card_redeem', 'loyalty_card', $4::text, $5)`,
+         VALUES ($1::uuid, $2::uuid, $3, 'redeem', 'loyalty_card', $4::text, $5)`,
         [args.tenantId, args.giftCardId, -args.amountCents, args.cardId, `giftledger_${args.giftCardId}`],
       );
 
