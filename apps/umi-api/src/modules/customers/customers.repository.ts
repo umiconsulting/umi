@@ -309,22 +309,27 @@ export class CustomersRepository {
     return this.pg.withTenant(async (c) => {
       const rows = (
         await c.query<Row>(
+          // Bound to the CANONICAL columns (server.js's c.opened_at / co.phone
+          // don't exist on comms.conversations / core.people — its own
+          // /admin/conversations query would 500; caught by the live read-path
+          // verification). created_at + normalized_phone + the real
+          // current_state/summary columns.
           `SELECT
              c.id::text,
              c.status,
-             NULL::text AS "currentState",
-             c.metadata->>'summary' AS summary,
-             c.opened_at AS "createdAt",
+             c.current_state AS "currentState",
+             COALESCE(c.summary, c.metadata->>'summary') AS summary,
+             c.created_at AS "createdAt",
              co.display_name AS "customerName",
-             co.phone AS "customerPhone",
+             co.normalized_phone AS "customerPhone",
              count(m.id)::int AS "messageCount",
-             max(coalesce(m.created_at, m.received_at)) AS "lastMessageAt"
+             max(m.created_at) AS "lastMessageAt"
            FROM comms.conversations AS c
            LEFT JOIN core.people AS co ON co.id = c.person_id
            LEFT JOIN comms.messages AS m ON m.conversation_id = c.id
            WHERE c.tenant_id = $1::uuid
            GROUP BY c.id, co.id
-           ORDER BY COALESCE(max(coalesce(m.created_at, m.received_at)), c.opened_at) DESC
+           ORDER BY COALESCE(max(m.created_at), c.created_at) DESC
            OFFSET $2 LIMIT $3`,
           [tenantId, skip, limit],
         )
