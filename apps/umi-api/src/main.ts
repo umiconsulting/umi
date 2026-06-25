@@ -6,6 +6,7 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { ConfigService } from '@nestjs/config';
+import fastifyCookie from '@fastify/cookie';
 import { AppModule } from './app.module';
 import type { AppConfig } from './shared/config/config.schema';
 
@@ -19,6 +20,10 @@ async function bootstrap(): Promise<void> {
     AppModule,
     new FastifyAdapter({ trustProxy: true }),
   );
+
+  // Cookie parsing/signing for the JWT auth cookies (D9). Reads `req.cookies`
+  // and enables `reply.setCookie`/`clearCookie` used by AuthController.
+  await app.register(fastifyCookie);
 
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true }),
