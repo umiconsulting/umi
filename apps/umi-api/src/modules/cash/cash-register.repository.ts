@@ -22,7 +22,7 @@ export class CashRegisterRepository {
   constructor(private readonly pg: PgService) {}
 
   async tenantConfig(tenantId: string): Promise<RegisterTenantConfig | null> {
-    const { rows } = await this.pg.withTenant((c) =>
+    const { rows } = await this.pg.workerTx((c) =>
       c.query<Row>(
         `SELECT t.name,
                 p.id::text         AS program_id,
@@ -45,7 +45,7 @@ export class CashRegisterRepository {
   }
 
   async normalizePhone(raw: string): Promise<string | null> {
-    const { rows } = await this.pg.withTenant((c) =>
+    const { rows } = await this.pg.workerTx((c) =>
       c.query<{ n: string | null }>(`SELECT core.normalize_phone($1) AS n`, [raw]),
     );
     return rows[0]?.n ?? null;
@@ -57,7 +57,7 @@ export class CashRegisterRepository {
     normalizedPhone: string,
     programId: string,
   ): Promise<{ personId: string; displayName: string | null; hasCard: boolean } | null> {
-    return this.pg.withTenant(async (c) => {
+    return this.pg.workerTx(async (c) => {
       const person = (
         await c.query<Row>(
           `SELECT id::text, display_name FROM core.people
@@ -85,7 +85,7 @@ export class CashRegisterRepository {
     rawPhone: string,
     displayName: string,
   ): Promise<string> {
-    const { rows } = await this.pg.withTenant((c) =>
+    const { rows } = await this.pg.workerTx((c) =>
       c.query<{ person_id: string }>(
         `SELECT core.resolve_contact($1::uuid, 'phone', $2, $3, 'umi-cash', NULL) AS person_id`,
         [tenantId, rawPhone, displayName],
@@ -100,7 +100,7 @@ export class CashRegisterRepository {
     birthDate: string,
     metadata: Record<string, unknown>,
   ): Promise<void> {
-    await this.pg.withTenant((c) =>
+    await this.pg.workerTx((c) =>
       c.query(
         `UPDATE core.people
          SET display_name=$2, birth_date=$3::date, metadata=$4::jsonb, updated_at=now()
@@ -118,7 +118,7 @@ export class CashRegisterRepository {
     cardNumber: string;
     qrToken: string;
   }): Promise<{ cardId: string; cardNumber: string }> {
-    return this.pg.withTenant(async (c) => {
+    return this.pg.workerTx(async (c) => {
       let accountId = (
         await c.query<{ id: string }>(
           `SELECT id::text FROM loyalty.accounts

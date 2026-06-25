@@ -234,7 +234,7 @@ export class CashWriteRepository {
     tenantId: string,
     code: string,
   ): Promise<{ code: string; isRedeemed: boolean; hasMessage: boolean } | null> {
-    const { rows } = await this.pg.withTenant((c) =>
+    const { rows } = await this.pg.workerTx((c) =>
       c.query<Row>(
         `SELECT code, (redeemed_at IS NOT NULL) AS is_redeemed, (message IS NOT NULL) AS has_message
          FROM loyalty.gift_cards
@@ -248,7 +248,7 @@ export class CashWriteRepository {
   }
 
   async findGiftCardByCode(tenantId: string, code: string): Promise<Row | null> {
-    const { rows } = await this.pg.withTenant((c) =>
+    const { rows } = await this.pg.workerTx((c) =>
       c.query<Row>(
         `SELECT id::text, amount_cents, sender_name, redeemed_at, expires_at
          FROM loyalty.gift_cards
@@ -264,7 +264,7 @@ export class CashWriteRepository {
     tenantId: string,
     by: { phone?: string; email?: string },
   ): Promise<{ personId: string; displayName: string | null; cardId: string } | null> {
-    return this.pg.withTenant(async (c) => {
+    return this.pg.workerTx(async (c) => {
       let personRow: Row | undefined;
       if (by.phone) {
         const norm = (
@@ -313,7 +313,7 @@ export class CashWriteRepository {
     amountCents: number;
     senderName: string | null;
   }): Promise<number> {
-    return this.pg.withTenant(async (c) => {
+    return this.pg.workerTx(async (c) => {
       const claim = await c.query<Row>(
         `UPDATE loyalty.gift_cards
          SET redeemed_at=now(), redeemed_loyalty_card_id=$3::uuid
