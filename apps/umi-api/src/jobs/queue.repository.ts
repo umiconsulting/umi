@@ -124,11 +124,17 @@ export class QueueRepository {
   // ── queue.outbox_events — transactional outbox (relay drains this) ─────────
 
   /**
-   * Atomically claim a batch of deliverable outbox rows (status='pending',
-   * run_at<=now()), flipping them to 'delivering'. FOR UPDATE SKIP LOCKED makes
-   * it safe to run multiple relay workers.
+   * Atomically claim a batch of deliverable outbox rows, flipping them to
+   * 'delivering' and stamping `run_at = now()` as the lease start. Claims both
+   * fresh rows (`status='pending'`, `run_at<=now()`) AND stale leases
+   * (`status='delivering'` older than `leaseSeconds`) — so a row left
+   * 'delivering' by a crashed relay is reclaimed instead of stranded. FOR UPDATE
+   * SKIP LOCKED makes it safe to run multiple relay workers concurrently.
    */
-  async claimPendingOutbox(limit: number): Promise<OutboxEventRow[]> {
+  async claimPendingOutbox(
+    limit: number,
+    leaseSeconds: number,
+  ): Promise<OutboxEventRow[]> {
     const res = await this.pg.query<{
       id: string;
       tenant_id: string;
@@ -140,10 +146,12 @@ export class QueueRepository {
       max_attempts: number;
     }>(
       `UPDATE queue.outbox_events o
-          SET status = 'delivering'
+          SET status = 'delivering', run_at = now()
         FROM (
           SELECT id FROM queue.outbox_events
-           WHERE status = 'pending' AND run_at <= now()
+           WHERE (status = 'pending' AND run_at <= now())
+              OR (status = 'delivering'
+                  AND run_at < now() - make_interval(secs => $2))
            ORDER BY created_at
            FOR UPDATE SKIP LOCKED
            LIMIT $1
@@ -151,7 +159,7 @@ export class QueueRepository {
        WHERE o.id = c.id
        RETURNING o.id, o.tenant_id, o.event_type, o.aggregate_id,
                  o.idempotency_key, o.payload, o.attempts, o.max_attempts`,
-      [limit],
+      [limit, leaseSeconds],
     );
     return res.rows.map((r) => ({
       id: r.id,

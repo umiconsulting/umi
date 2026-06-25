@@ -61,9 +61,13 @@ export class EnqueueService {
       jobId: opts.jobId,
       delay: opts.delayMs,
     });
-    // BullMQ assigns an id even when none is supplied; it is only undefined for
-    // job templates, which we never add here.
-    return job.id ?? '';
+    // BullMQ always assigns an id for a queued job; a missing id signals an
+    // unexpected enqueue state, so fail fast rather than returning a fake id
+    // that a caller might persist or dedup against.
+    if (job.id == null) {
+      throw new Error(`enqueue ${queue}/${name} returned no job id`);
+    }
+    return job.id;
   }
 
   /** Escape hatch for callers that need the raw queue (e.g. repeatable jobs). */

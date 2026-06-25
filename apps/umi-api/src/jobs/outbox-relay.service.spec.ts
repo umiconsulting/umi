@@ -87,6 +87,22 @@ describe('OutboxRelayService', () => {
     expect(repo.markOutboxFailed).not.toHaveBeenCalled();
   });
 
+  it('does NOT re-deliver when only the ack fails after a successful enqueue', async () => {
+    const { svc, repo, enqueue, router } = harness();
+    router.register('turn.completed', {
+      queue: QUEUES.outbound,
+      jobName: 'twilio.reply',
+    });
+    // enqueue succeeds; the post-enqueue ack write fails.
+    repo.markOutboxDelivered.mockRejectedValueOnce(new Error('db blip'));
+
+    await svc.relayOne(event());
+
+    expect(enqueue.enqueue).toHaveBeenCalledOnce();
+    // must not mark failed (would re-enqueue an already-accepted job)
+    expect(repo.markOutboxFailed).not.toHaveBeenCalled();
+  });
+
   it('marks the row failed when enqueue throws', async () => {
     const { svc, repo, enqueue, router } = harness();
     router.register('turn.completed', {

@@ -62,6 +62,11 @@ export class OutboxRelayService implements OnModuleInit, OnModuleDestroy {
   private readonly intervalMs = 1_000;
   /** No-route rows are deferred this long so the relay never hot-loops on them. */
   private readonly noRouteDeferSeconds = 60;
+  /**
+   * A 'delivering' row older than this is treated as a stale lease (crashed
+   * relay) and reclaimed. Generous vs the sub-second enqueue it guards.
+   */
+  private readonly outboxLeaseSeconds = 120;
   private timer: NodeJS.Timeout | null = null;
   private draining = false;
 
@@ -97,7 +102,10 @@ export class OutboxRelayService implements OnModuleInit, OnModuleDestroy {
     if (this.draining) return;
     this.draining = true;
     try {
-      const events = await this.repo.claimPendingOutbox(this.batchSize);
+      const events = await this.repo.claimPendingOutbox(
+        this.batchSize,
+        this.outboxLeaseSeconds,
+      );
       for (const event of events) {
         await this.relayOne(event);
       }
@@ -125,11 +133,25 @@ export class OutboxRelayService implements OnModuleInit, OnModuleDestroy {
         priority: route.priority,
         jobId: route.jobId?.(event) ?? event.idempotencyKey,
       });
-      await this.repo.markOutboxDelivered(event.id);
     } catch (err) {
+      // Enqueue itself failed — BullMQ did NOT accept the job. Safe to retry
+      // with backoff (→ 'dead' at max_attempts).
       await this.repo.markOutboxFailed(
         event.id,
         err instanceof Error ? err.message : String(err),
+      );
+      return;
+    }
+
+    // Enqueue succeeded — BullMQ owns the job now. A failed ack must NOT
+    // re-deliver (that would double-enqueue); leave the row 'delivering' and let
+    // the stale-lease reclaim retry the ack, deduped by the deterministic jobId.
+    try {
+      await this.repo.markOutboxDelivered(event.id);
+    } catch (err) {
+      this.logger.error(
+        `outbox ack failed for ${event.id} (already enqueued; lease will reconcile): ` +
+          `${err instanceof Error ? err.message : String(err)}`,
       );
     }
   }
