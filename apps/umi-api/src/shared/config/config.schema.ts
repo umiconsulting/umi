@@ -1,13 +1,18 @@
 import { z } from 'zod';
 
-/** Parse common truthy strings ("true"/"1"/"yes"/"on") into a boolean. */
-const booleanFromEnv = z.preprocess(
-  (v) =>
-    typeof v === 'string'
-      ? ['1', 'true', 'yes', 'on'].includes(v.toLowerCase())
-      : v,
-  z.boolean(),
-);
+/**
+ * Parse recognized boolean strings; leave anything else UNTOUCHED so `z.boolean()`
+ * rejects it. This makes a typo'd rollout flag (`CASH_WRITE_ENABLED=enabld`,
+ * `OUTBOX_RELAY_ENABLED=ture`) fail boot loudly instead of silently coercing to
+ * `false` and shipping the feature disabled.
+ */
+const booleanFromEnv = z.preprocess((v) => {
+  if (typeof v !== 'string') return v;
+  const s = v.toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(s)) return true;
+  if (['0', 'false', 'no', 'off'].includes(s)) return false;
+  return v; // unrecognized → falls through to z.boolean() → boot fails
+}, z.boolean());
 
 /**
  * The full environment contract. Required values have no `.optional()` — boot
@@ -28,8 +33,20 @@ export const configSchema = z.object({
   // Redis / BullMQ.
   REDIS_URL: z.string().url(),
 
+  // Observability schema that holds the runtime trace tables umi-logs reads
+  // (ai_turn_logs, edge_function_logs, security_logs, pipeline_traces). Live
+  // default is `conversaflow`; confirm against the platform DB. Validated as a
+  // safe SQL identifier since it's interpolated into INSERT statements.
+  OBSERVABILITY_SCHEMA: z
+    .string()
+    .regex(/^[A-Za-z_][A-Za-z0-9_]*$/)
+    .default('conversaflow'),
+
   // Feature flags.
   CASH_WRITE_ENABLED: booleanFromEnv.default(false), // D11 — inert cash writes
+  // Transactional-outbox relay (§10.4). Built in Phase 1c but inert until
+  // Phase 3 registers event_type→queue routes and flips this on.
+  OUTBOX_RELAY_ENABLED: booleanFromEnv.default(false),
 
   // CORS.
   CORS_ORIGINS: z.string().optional(), // comma-separated origins
