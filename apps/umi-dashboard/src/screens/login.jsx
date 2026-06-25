@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CFG } from '../lib/config.js'
+import { CFG, apiUrl, withCreds } from '../lib/config.js'
 import { signIn } from '../lib/auth.jsx'
 import '../styles.css'
 
@@ -32,11 +32,11 @@ export default function LoginScreen() {
     setError(null)
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/local/forgot-password', {
+      const res = await fetch(apiUrl('/api/auth/local/forgot-password'), withCreds({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgot.trim() }),
-      })
+      }))
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'Error al enviar el correo')
