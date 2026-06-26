@@ -20,6 +20,13 @@ export class TopupDto {
   @IsString()
   @MaxLength(200)
   note?: string;
+
+  // Client-supplied, stable per user action: a retry with the same key is a
+  // no-op rather than a double credit (deduped on points_ledger.idempotency_key).
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  idempotencyKey?: string;
 }
 
 export class PurchaseDto {
@@ -34,6 +41,11 @@ export class PurchaseDto {
   @IsString()
   @MaxLength(200)
   note?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  idempotencyKey?: string;
 }
 
 export class GiftCardCreateDto {

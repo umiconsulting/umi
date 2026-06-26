@@ -9,21 +9,23 @@
 -- policy `USING core.rls_tenant_check(tenant_id)`) — do NOT recreate them; this
 -- file only adds the role privileges the policies sit on top of.
 --
--- ⚠️ Connection model (Supabase): on the pooler you connect as `postgres.<ref>`.
--- Two ways to make umi-api actually run AS these roles:
---   (a) connect-as: give umi_app/umi_worker LOGIN + rotated passwords (below) and
---       point DATABASE_URL_APP/WORKER at them — IF the pooler accepts them.
---   (b) SET ROLE: keep connecting as the pooler role and `SET ROLE umi_app` per
---       request (requires `GRANT umi_app TO <pooler_role>`). pg.service would
---       issue `SET ROLE` inside withTenant/workerTx instead of separate creds.
--- Pick one with the deploy; the grants below are identical either way.
--- ⚠️ Rotate the historically-leaked platform password; never reuse it.
+-- This file contains ONLY grants — no credentials. It is safe to keep in git.
+--
+-- Role LOGIN + passwords are NOT set here (a migration must never ship literal
+-- placeholder passwords — applied unchanged that would make BYPASSRLS roles
+-- connectable with predictable credentials). Set them out-of-band with
+-- secret-managed values, e.g. from a shell where the secrets live in env:
+--   psql "$ADMIN_URL" -c "ALTER ROLE umi_app LOGIN PASSWORD '$UMI_APP_PW' NOSUPERUSER NOBYPASSRLS;"
+-- (On Supabase, run that in the SQL Editor with a freshly-generated value —
+-- never reuse the historically-leaked platform password.)
+--
+-- ⚠️ Realized deployment (2026-06-25): the request pool connects as `umi_app`
+-- (NOBYPASSRLS, RLS-enforced) via the dotted Supavisor username
+-- `umi_app.<project_ref>`; the worker/bypass pool connects as the existing
+-- Supabase `postgres` role (which already has rolbypassrls), because Supabase
+-- won't let a non-superuser grant BYPASSRLS to a custom role from SQL. So
+-- `umi_worker` is currently UNUSED — but the grants below keep it ready.
 -- ───────────────────────────────────────────────────────────────────────────
-
--- 0. Make the roles connectable (connect-as model). Skip if using SET ROLE.
-alter role umi_app    with login password 'CHANGE_ME_APP_ROTATED'    nosuperuser nobypassrls;
-alter role umi_worker with login password 'CHANGE_ME_WORKER_ROTATED' nosuperuser bypassrls;
-alter role umi_readonly with login password 'CHANGE_ME_RO_ROTATED'   nosuperuser nobypassrls;
 
 -- 1. Schema usage.
 grant usage on schema core, ops, comms, loyalty, observability, queue to umi_worker;

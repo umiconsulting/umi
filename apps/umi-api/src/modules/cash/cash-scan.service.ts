@@ -230,7 +230,13 @@ export class CashScanService {
   ): string {
     const parts: string[] = [];
     if (performed.includes(BIRTHDAY)) {
-      parts.push(`🎂 Regalo de cumpleaños canjeado: ${birthdayRewardName}`);
+      // Tenants without a configured birthday-reward name would otherwise render
+      // the literal string "null" to the customer.
+      parts.push(
+        birthdayRewardName
+          ? `🎂 Regalo de cumpleaños canjeado: ${birthdayRewardName}`
+          : '🎂 Regalo de cumpleaños canjeado',
+      );
     }
     if (performed.includes(REDEEM)) {
       parts.push(`✓ Recompensa canjeada: ${rewardName}`);

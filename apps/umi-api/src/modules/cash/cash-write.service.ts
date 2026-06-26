@@ -51,7 +51,7 @@ export class CashWriteService {
   async topup(
     tenantId: string,
     userId: string,
-    input: { cardId: string; amountCentavos: number; note?: string },
+    input: { cardId: string; amountCentavos: number; note?: string; idempotencyKey?: string },
   ) {
     if (input.amountCentavos < 100 || input.amountCentavos > MAX_TOPUP_CENTAVOS) {
       throw new BadRequestException('Monto inválido');
@@ -85,7 +85,8 @@ export class CashWriteService {
       cardId: card.id,
       deltaCents: input.amountCentavos,
       type: 'topup',
-      idempotencyKey: `topup_${card.id}_${Date.now()}`,
+      // Prefer the client's stable key (retry-safe); fall back to a generated one.
+      idempotencyKey: input.idempotencyKey?.trim() || `topup_${card.id}_${Date.now()}`,
       staffMemberId,
       description: input.note ?? 'Recarga en tienda',
     });
@@ -103,7 +104,7 @@ export class CashWriteService {
   async purchase(
     tenantId: string,
     userId: string,
-    input: { cardId: string; amountCentavos: number; note?: string },
+    input: { cardId: string; amountCentavos: number; note?: string; idempotencyKey?: string },
   ) {
     const card = await this.repo.findCard(tenantId, input.cardId);
     if (!card) throw new NotFoundException({ error: 'Tarjeta no encontrada' });
@@ -117,7 +118,7 @@ export class CashWriteService {
         deltaCents: -input.amountCentavos,
         amountCents: input.amountCentavos,
         type: 'purchase',
-        idempotencyKey: `purchase_${card.id}_${Date.now()}`,
+        idempotencyKey: input.idempotencyKey?.trim() || `purchase_${card.id}_${Date.now()}`,
         staffMemberId,
         description: input.note || 'Pago con saldo',
         newQrToken: randomToken(),

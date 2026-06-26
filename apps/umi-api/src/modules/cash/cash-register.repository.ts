@@ -119,6 +119,11 @@ export class CashRegisterRepository {
     qrToken: string;
   }): Promise<{ cardId: string; cardNumber: string }> {
     return this.pg.workerTx(async (c) => {
+      // Serialize concurrent/duplicate registrations for the same identity so the
+      // find-or-create below can't race into duplicate accounts or cards.
+      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `register:${input.tenantId}:${input.personId}:${input.programId}`,
+      ]);
       let accountId = (
         await c.query<{ id: string }>(
           `SELECT id::text FROM loyalty.accounts
@@ -134,6 +139,19 @@ export class CashRegisterRepository {
             [input.tenantId, input.personId, input.programId],
           )
         ).rows[0].id;
+      }
+      // Idempotent: a person already holding an active card on this account gets
+      // it back rather than a second card (re-registration with the same phone).
+      const existing = (
+        await c.query<{ id: string; card_number: string }>(
+          `SELECT id::text, card_number FROM loyalty.cards
+           WHERE tenant_id=$1::uuid AND account_id=$2::uuid AND status='active'
+           ORDER BY created_at LIMIT 1`,
+          [input.tenantId, accountId],
+        )
+      ).rows[0];
+      if (existing) {
+        return { cardId: existing.id, cardNumber: existing.card_number };
       }
       const card = (
         await c.query<{ id: string; card_number: string }>(

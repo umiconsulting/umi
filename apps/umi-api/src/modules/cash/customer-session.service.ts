@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SignJWT } from 'jose';
@@ -34,13 +35,18 @@ export class CustomerSessionService {
     if (!this.accessKey || !this.refreshKey) {
       throw new Error('JWT_ACCESS_SECRET/JWT_REFRESH_SECRET not configured.');
     }
+    // jti makes each token unique even for the same subject within the same
+    // second — without it two sessions collide on core.sessions.token's UNIQUE
+    // index (e.g. a double-submitted registration), 500ing instead of 409ing.
     const accessToken = await new SignJWT({ sub: subjectId, role, tenantId })
       .setProtectedHeader({ alg: 'HS256' })
+      .setJti(randomUUID())
       .setIssuedAt()
       .setExpirationTime('24h')
       .sign(this.accessKey);
     const refreshToken = await new SignJWT({ sub: subjectId })
       .setProtectedHeader({ alg: 'HS256' })
+      .setJti(randomUUID())
       .setIssuedAt()
       .setExpirationTime('30d')
       .sign(this.refreshKey);

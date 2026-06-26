@@ -182,10 +182,16 @@ export class CashReadService {
     if (!visitsRequired || !rewardName) {
       throw new BadRequestException('visitsRequired and rewardName are required');
     }
+    // parseInt('abc') === NaN passes the truthiness check above but would persist
+    // a NaN visit target — require a positive integer.
+    const visits = parseInt(visitsRequired, 10);
+    if (!Number.isInteger(visits) || visits <= 0) {
+      throw new BadRequestException('visitsRequired must be a positive integer');
+    }
     const programId = await this.programId(tenantId);
     if (!programId) throw new BadRequestException('tenant has no loyalty program');
     const newConfig = await this.repo.upsertRewardConfig(tenantId, programId, {
-      visitsRequired: parseInt(visitsRequired),
+      visitsRequired: visits,
       rewardName,
       rewardDescription: rewardDescription ?? null,
       rewardCostCentavos: rewardCostCentavos ?? 0,

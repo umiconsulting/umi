@@ -102,8 +102,9 @@ export class TenantsService {
     locationId: string,
     patch: { name?: string; timezone?: string; status?: string },
   ): Promise<LocationRow> {
-    const existing = await this.repo.findActiveLocation(tenantId, locationId);
-    if (!existing) throw new NotFoundException({ error: 'location_not_found' });
+    // Don't pre-filter on status: updateLocation already scopes by tenant+id and
+    // returns null when absent, and gating on `active` would 404 any patch to an
+    // inactive location — including reactivating it with status:'active'.
     const updated = await this.repo.updateLocation(tenantId, locationId, patch);
     if (!updated) throw new NotFoundException({ error: 'location_not_found' });
     return updated;

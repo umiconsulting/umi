@@ -87,8 +87,11 @@ export class JwtService {
     token: string,
     expected: TokenKind,
   ): Promise<JWTPayload & { email?: unknown }> {
+    // Resolve the key OUTSIDE the try so a missing JWT_SECRET surfaces as a
+    // config failure (500), not a blanket 401 on every request.
+    const key = this.key();
     try {
-      const { payload } = await jwtVerify(token, this.key(), {
+      const { payload } = await jwtVerify(token, key, {
         issuer: ISSUER,
         audience: AUDIENCE,
       });

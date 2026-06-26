@@ -351,8 +351,11 @@ export class CustomersRepository {
     return this.pg.withTenant(async (c) => {
       const [identities, candidates, findings] = await Promise.all([
         c.query<Row>(
+          // String contract ('verified'/'unverified') matches the customers-list
+          // shape (server.js line 724); a raw boolean here diverged from it.
           `SELECT id::text, kind AS identity_type, display_value AS identity_value, normalized_value,
-                  (verified_at IS NOT NULL) AS verification_status, metadata, created_at
+                  CASE WHEN verified_at IS NOT NULL THEN 'verified' ELSE 'unverified' END AS verification_status,
+                  metadata, created_at
            FROM core.contact_methods
            WHERE person_id = $1::uuid AND tenant_id = $2::uuid
            ORDER BY kind, created_at`,

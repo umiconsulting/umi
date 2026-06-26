@@ -91,18 +91,18 @@ describe('TenantsService.buildSettings', () => {
 });
 
 describe('TenantsService.updateLocation', () => {
-  it('404s when the location is not an active tenant location', async () => {
+  it('404s when the location does not exist (repo returns null)', async () => {
     const h = make();
-    h.repo.findActiveLocation.mockResolvedValue(null);
+    // No active-status pre-check: 404 comes from updateLocation returning null,
+    // which lets inactive locations be patched/reactivated.
+    h.repo.updateLocation.mockResolvedValue(null);
     await expect(
       h.svc.updateLocation('t1', 'lX', { name: 'x' }),
     ).rejects.toBeInstanceOf(NotFoundException);
-    expect(h.repo.updateLocation).not.toHaveBeenCalled();
   });
 
   it('updates and returns the location when valid', async () => {
     const h = make();
-    h.repo.findActiveLocation.mockResolvedValue(LOCS[1]);
     h.repo.updateLocation.mockResolvedValue({ ...LOCS[1], name: 'New' });
     const r = await h.svc.updateLocation('t1', 'l2', { name: 'New' });
     expect(r.name).toBe('New');

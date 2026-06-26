@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -243,6 +243,9 @@ export class CashScanRepository {
           input.newQrToken,
         ],
       );
+      // No row → card vanished mid-scan or is RLS-filtered; surface a clear 404
+      // instead of returning undefined (which callers read as ScannedCard).
+      if (!rows[0]) throw new NotFoundException('card_not_found');
       return rows[0];
     });
   }

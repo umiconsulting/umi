@@ -89,10 +89,14 @@ export async function signOut() {
   if (LOCAL_SESSION) {
     // umi-api: clear the httpOnly cookie server-side (best-effort) before dropping local state.
     if (COOKIE_AUTH) {
+      // fetch only rejects on network errors and a non-OK status is not thrown,
+      // so check both — a failed server logout can leave the httpOnly cookie
+      // valid. We still clear local state + redirect, but never silently.
       try {
-        await fetch(apiUrl('/api/auth/local/logout'), withCreds({ method: 'POST' }))
-      } catch {
-        // ignore — we still clear local state + redirect below
+        const res = await fetch(apiUrl('/api/auth/local/logout'), withCreds({ method: 'POST' }))
+        if (!res.ok) console.warn(`logout failed (${res.status}); auth cookie may persist server-side`)
+      } catch (err) {
+        console.warn('logout request failed; auth cookie may persist server-side', err)
       }
     }
     window.localStorage.removeItem(LOCAL_SESSION_KEY)

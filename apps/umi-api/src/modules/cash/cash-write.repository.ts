@@ -127,12 +127,23 @@ export class CashWriteRepository {
 
   /** Append a wallet delta on an existing transaction client; returns new balance. */
   private async applyWalletDelta(c: PoolClient, d: WalletDelta): Promise<number> {
-    await c.query(
+    const ledger = await c.query(
       `INSERT INTO loyalty.points_ledger
          (tenant_id, loyalty_card_id, delta, reason, source_type, source_id, idempotency_key)
-       VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7)`,
+       VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7)
+       ON CONFLICT (idempotency_key) DO NOTHING`,
       [d.tenantId, d.cardId, d.deltaCents, d.reason ?? d.type, d.sourceType ?? d.type, d.sourceId ?? null, d.idempotencyKey],
     );
+    if (ledger.rowCount === 0) {
+      // Already applied under the same idempotency key (retry) — return the
+      // current balance without a duplicate wallet_transaction / double credit.
+      const { rows } = await c.query<Row>(
+        `SELECT COALESCE(sum(delta),0)::int AS balance
+         FROM loyalty.points_ledger WHERE tenant_id=$1::uuid AND loyalty_card_id=$2::uuid`,
+        [d.tenantId, d.cardId],
+      );
+      return Number(rows[0].balance);
+    }
     await c.query(
       `INSERT INTO loyalty.wallet_transactions
          (tenant_id, loyalty_card_id, staff_member_id, type, amount_cents, description)

@@ -50,8 +50,12 @@ export class QrService {
         algorithms: ['HS256'], // do NOT drop — prevents alg downgrade
       });
       const data = p as { sub?: unknown; tok?: unknown };
+      const cardId = String(data.sub ?? '');
+      // A verified token with no `sub` is malformed — reject rather than return
+      // a valid-looking result with an empty cardId.
+      if (!cardId) return null;
       return {
-        cardId: String(data.sub ?? ''),
+        cardId,
         qrToken: String(data.tok ?? ''),
         isWalletScan: false,
       };

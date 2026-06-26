@@ -48,6 +48,9 @@ export class WalletPassAdapter {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ cardId }),
+      // Bound the request — refreshCard() is awaited after the write commits, so a
+      // hung push endpoint would otherwise stall the caller (matches zettle.adapter).
+      signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) throw new Error(`pass push ${res.status}`);
   }

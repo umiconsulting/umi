@@ -103,7 +103,8 @@ export class CashCustomerController {
 }
 
 function clientIp(req: FastifyRequest): string {
-  const xff = req.headers['x-forwarded-for'];
-  const first = Array.isArray(xff) ? xff[0] : xff;
-  return first?.split(',')[0]?.trim() ?? 'unknown';
+  // Fastify resolves req.ip from X-Forwarded-For using its configured trustProxy
+  // hop count (set in main.ts). Trusting the raw leftmost XFF here instead would
+  // let a caller spoof the header and rotate past the per-IP rate-limit buckets.
+  return req.ip || 'unknown';
 }

@@ -132,7 +132,12 @@ export class AuthService {
     if (!email) return;
 
     const credential = await this.repo.findCredentialByEmail(email);
-    if (!credential) return;
+    if (!credential) {
+      // Spend comparable CPU on the no-account path so response timing doesn't
+      // leak which emails have local accounts (the real path hashes below).
+      createHash('sha256').update(randomBytes(32)).digest('hex');
+      return;
+    }
 
     const token = randomBytes(32).toString('hex');
     const tokenHash = createHash('sha256').update(token).digest('hex');

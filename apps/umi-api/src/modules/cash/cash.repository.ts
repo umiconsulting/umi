@@ -71,7 +71,7 @@ export class CashRepository {
         `UPDATE loyalty.programs
          SET card_prefix = COALESCE($2, card_prefix),
              pass_style  = COALESCE($3, pass_style),
-             branding    = branding || $4::jsonb,
+             branding    = COALESCE(branding, '{}'::jsonb) || $4::jsonb,
              updated_at  = now()
          WHERE tenant_id = $1::uuid`,
         [
@@ -282,6 +282,11 @@ export class CashRepository {
     data: { visitsRequired: number; rewardName: string; rewardDescription: string | null; rewardCostCentavos: number },
   ): Promise<Row> {
     return this.pg.withTenant(async (c) => {
+      // Serialize concurrent reward-config saves per tenant so the
+      // deactivate-then-insert can't interleave into two is_active=true rows.
+      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `reward_config:${tenantId}`,
+      ]);
       await c.query(
         `UPDATE loyalty.reward_configs SET is_active = false
          WHERE tenant_id = $1::uuid AND is_active = true`,
