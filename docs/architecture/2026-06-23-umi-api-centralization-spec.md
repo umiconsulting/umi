@@ -1,7 +1,7 @@
 # Umi API — Backend Centralization Spec & Implementation Plan
 
 **Date:** 2026-06-23
-**Status:** Approved direction, pre-implementation
+**Status:** **Phases 0–2 LIVE in production (2026-06-25).** Phase 0 (deploy + health), Phase 1 (durable BullMQ work engine + adapters), and Phase 2 (dashboard backend + **live** cash on canonical `loyalty.*`) are deployed at `https://api.umiconsulting.co`; the umi-dashboard SPA is cut over to umi-api (httpOnly-cookie auth). Realized deploy/role model in [`apps/umi-api/docs/vps-setup.md`](../../apps/umi-api/docs/vps-setup.md). Remaining: Stage 4 dual-writer cutover (umi-cash still writes `loyalty.*`), then Phases 3–7 (conversaflow, KDS repoint, landing, decommission).
 **Owner decision:** Build a single centralized backend API (`apps/umi-api`) on a VPS. Eliminate Supabase Edge Functions. Route every app except `umi-logs` to it. Keep `umi-cash` running on its own repo for now.
 **Supersedes / reconciles:** `docs/architecture/2026-05-23-api-backend-centralization-audit.md` (which recommended *not* building a central API and *keeping* edge functions). That recommendation was correct for its moment — it was gated on the database consolidation completing first. The unified platform database **launched to production on 2026-06-20**, which satisfies the program's sequencing invariant (*database consolidation → backend consolidation → monorepo*). We are now at the backend-consolidation step, and the owner has chosen a single VPS-hosted API over the edge-function model.
 
@@ -46,7 +46,7 @@ Each decision is tagged with its basis per the workspace research standard (`AGE
 | D8 | **No ORM. Raw SQL via `pg` (node-postgres)** — hand-written parameterized queries in repositories. Migrations stay **Supabase migrations** while the DB is on Supabase, and become **Sqitch + hand-written PostgreSQL SQL** when the database is lifted onto PostgreSQL on the VPS. (The dashboard already used only raw SQL through Prisma `$queryRaw`, so dropping the ORM is a small change.) | [Owner] |
 | D9 | **Unified auth:** JWT (access + refresh) in httpOnly cookies, `scrypt` password verification (preserve existing hashes), entitlement + role guards. Replaces the dashboard's header-only "session" and the three separate JWT schemes. | [Tradeoff] + [Inference] |
 | D10 | **File structure is flat, business-named, and self-describing** (§6). This is a hard requirement, not a preference. | [Owner] |
-| D11 | **Cash domain logic is BUILT in `umi-api` (read + write), but the customer-facing write paths are feature-flagged OFF and ship inert.** Reads serve the dashboard now; writes stay dormant so `umi-cash` remains the sole active writer until a future activation (flag flip + cutover, not a rebuild). | [Owner] |
+| D11 | ~~Cash write paths feature-flagged OFF and ship inert.~~ **REVERSED by owner (2026-06-25): cash ships fully LIVE.** umi-api now serves customer-facing writes on canonical `loyalty.*` (top-up, purchase, gift-card issue/redeem, scan, self-registration). `CASH_WRITE_ENABLED` is vestigial. `umi-cash` still also writes `loyalty.*` — the two coexist (append-only ledger, `balance = SUM`); retiring umi-cash's writes is the Stage 4 dual-writer decision. | [Owner] |
 
 ### 2.1 Coexistence boundaries (accepted defaults — vetoable in review)
 
@@ -558,18 +558,19 @@ VPS env file (root-only) or SOPS/Doppler: `DATABASE_URL` (+ direct/session), `RE
 
 Each phase ships independently, is reversible, and has explicit acceptance criteria. Edge functions stay deployed until each domain is verified on the VPS — **the cutover point per domain is a single webhook/URL/config flip, which can be flipped back.**
 
-### Phase 0 — Foundations
+### Phase 0 — Foundations ✅ LIVE
 **Scope:** Scaffold `apps/umi-api` (NestJS + Fastify, the §6 structure, root `README.md` map). `DatabaseModule` (`pg.service.ts` two pools + `request-context.middleware.ts` per-request context + `PgService.withTenant` `SET LOCAL` §9.2/§11.2), `ConfigModule` (typed env), `LoggingModule`, `HealthModule`. BullMQ + Redis wired with an empty queue. Dual bootstrap (`main.ts` / `worker.ts`). Dockerfile + compose + Caddy. CI. Deploy a hello-world to the VPS with TLS. Confirm the live `v_kds_tickets` projection + loyalty write-RPC names and write the repository SQL accordingly.
 **Done when:** VPS serves `GET /health` over HTTPS (DB + Redis green); CI deploys; a tenant-scoped test query proves RLS isolation under `umi_app`.
 
-### Phase 1 — Shared core & adapters
+### Phase 1 — Shared core & adapters ✅ LIVE
 **Scope:** Port adapters (`twilio`, `anthropic`, `voyage`, `zettle`, `email`) as injectable providers with unit tests. Port logging/tracing (`observability.*` writes verified readable by `umi-logs`). Stand up `jobs/queues.ts` + BullMQ worker bootstrap with idempotency/retry/dead-letter policy (no domain processors yet).
 **Done when:** adapters unit-tested; a no-op job round-trips through BullMQ with retry + dead-letter; a trace row appears in `umi-logs`.
 
-### Phase 2 — Auth + admin/owner domain (dashboard backend) ← biggest "route everything" chunk
-**Scope:** `AuthModule` (JWT cookies, scrypt verify, guards, entitlement, Brevo reset). `TenantsModule`, `StaffModule`, `HoursModule`, `CustomersModule` (Customer 360 reads, decomposed), `CashModule` — **read side live; write side built-but-inert** (`CASH_WRITE_ENABLED=false`, SELECT-only DB grant; §11.5), ported from `umi-cash` `src/lib/wallet.ts` and tested against staging. Decompose `server.js` into these. Point the **dashboard frontend** at the new API base URL (env), behind a flag.
-**Done when:** the full dashboard admin-panel flow (login, tenants, staff, hours, customers, customer-360, cash analytics, entitlement 403s) runs against `umi-api` on the VPS, parity-checked against `server.js`; cash write services pass staging tests while remaining unmounted in prod.
-**Rollback:** point the dashboard frontend back at `server.js`.
+### Phase 2 — Auth + admin/owner domain (dashboard backend) ✅ LIVE (cash shipped LIVE, not inert)
+**Scope:** `AuthModule` (JWT cookies, scrypt verify, guards, entitlement, Brevo reset). `TenantsModule`, `StaffModule`, `HoursModule`, `CustomersModule` (Customer 360 reads, decomposed), `CashModule`. Decompose `server.js` into these. Point the **dashboard frontend** at the new API base URL (env), behind a flag.
+**Shipped reality (D11 reversed):** the cash **write** side is LIVE, not inert — top-up, purchase, gift-card issue/redeem, scan, and customer self-registration write canonical `loyalty.*` directly. The dashboard SPA is cut over (`cookie` auth mode). Verified against a prod-schema replica (36/36 integration under enforced RLS, cross-tenant isolation, `server.js` parity) and in-browser.
+**Done when:** ✅ the full dashboard admin-panel flow (login, tenants, staff, hours, customers, customer-360, cash analytics + writes, entitlement 403s) runs against `umi-api` on the VPS, parity-checked against `server.js`.
+**Rollback:** clear the dashboard's `VITE_AUTH_MODE`/`VITE_API_BASE` Vercel vars → redeploy → back on `server.js`.
 
 ### Phase 3 — Conversational engine (ConversaFlow ingress + worker)
 **Scope:** `modules/conversations/*` (whatsapp ingress, security, prompts, intent, memory, tools split by concern). `jobs/turns.processor.ts`, `enrichment.processor.ts`, `outbound.processor.ts`, `integrations.processor.ts`. Transactional-outbox relay for the reply path (§10.4). Cash lifecycle crons in `lifecycle.scheduler.ts` (§2.1.1).
@@ -592,8 +593,8 @@ Each phase ships independently, is reversible, and has explicit acceptance crite
 **Scope:** Remove the Supabase Edge Functions (whatsapp-handler, job-worker, kds-*, zettle-oauth) and the `pg_cron` schedules now served by BullMQ. Remove `umi-dashboard/server.js` + `api/index.js`. Consolidate any remaining duplicate Twilio/email code. Confirm `umi-logs` still reads `observability.*` and `umi-cash` still works untouched. Final spaghetti/dup sweep.
 **Done when:** no live traffic hits any edge function; `umi-api` is the sole backend for all routed apps; duplication removed.
 
-### Phase 7 — Activate cash writes + decommission `umi-cash` (LATER)
-Deferred per D6/D11. Because the cash write logic is already **built and tested** (Phase 2, inert), activation is a cutover, not a rebuild: flip `CASH_WRITE_ENABLED=true`, grant the `umi-api` DB role write privileges on the cash mutation tables (one reviewed change, §11.5), soak-compare against `umi-cash`, then retire `umi-cash`'s writers. The remaining build at this point is **passes/APN** if deferred (§7.4) — `.pkpass` generation, the PassKit v1 web-service protocol, Google Wallet, APN push — plus repointing the pass `webServiceURL` to the VPS and moving wallet certs into VPS secrets. Highest-risk (customer-facing money/loyalty) — own soak window.
+### Phase 7 — Dual-writer cutover + decommission `umi-cash` (LATER)
+**Cash writes already activated early (D11 reversed, Phase 2 — LIVE).** So this phase is no longer "activate"; it's the **Stage 4 dual-writer decision**: umi-api and `umi-cash` both currently write `loyalty.*` (safe coexistence — append-only ledger, `balance = SUM`). Soak-compare the two writers, then route customer cash-write traffic off `umi-cash` and retire its writers. The remaining build at this point is **passes/APN** if deferred (§7.4) — `.pkpass` generation, the PassKit v1 web-service protocol, Google Wallet, APN push — plus repointing the pass `webServiceURL` to the VPS and moving wallet certs into VPS secrets. Highest-risk (customer-facing money/loyalty) — own soak window.
 
 ---
 
