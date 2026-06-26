@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { CashController } from './cash.controller';
+import { CashTenantController } from './cash-tenant.controller';
 import { CashReadService } from './cash-read.service';
 import { CashRepository } from './cash.repository';
 import { CashWriteController } from './cash-write.controller';
@@ -27,6 +28,7 @@ import { CustomerSessionService } from './customer-session.service';
   imports: [AuthModule, TenantsModule],
   controllers: [
     CashController,
+    CashTenantController,
     CashWriteController,
     CashScanController,
     CashCustomerController,
