@@ -1,5 +1,5 @@
 import { useState as useStateD, useEffect as useEffectD } from 'react'
-import { LIVE as _LIVE } from './lib/config.js'
+import { LIVE as _LIVE, COOKIE_AUTH, apiUrl, withCreds } from './lib/config.js'
 import { getAuthHeaders } from './lib/auth.jsx'
 import { useTenant } from './lib/tenant-context.jsx'
 import { isProductActive } from './lib/module-registry.js'
@@ -45,12 +45,12 @@ function _withLocation(ctx, path) {
 async function _apiFetch(path, opts) {
   opts = opts || {}
   const authHeaders = await getAuthHeaders()
-  const res = await fetch(path, Object.assign({}, opts, {
+  const res = await fetch(apiUrl(path), withCreds(Object.assign({}, opts, {
     headers: Object.assign({
       'Content-Type': 'application/json',
       ...authHeaders,
     }, opts.headers || {}),
-  }))
+  })))
   const payload = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(payload.error || `${res.status} ${path}`)
   return payload
@@ -556,7 +556,8 @@ function useKdsConnection() {
       const ctrl = new AbortController()
       const timeout = setTimeout(() => ctrl.abort(), 5000)
       try {
-        const res = await fetch('/api/health', { cache: 'no-store', signal: ctrl.signal })
+        // umi-api exposes /health; server.js exposes /api/health.
+        const res = await fetch(apiUrl(COOKIE_AUTH ? '/health' : '/api/health'), { cache: 'no-store', signal: ctrl.signal })
         clearTimeout(timeout)
         if (cancelled) return
         if (res.ok) {

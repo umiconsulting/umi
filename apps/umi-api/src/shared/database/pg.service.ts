@@ -116,6 +116,35 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Transaction on the BYPASSRLS worker pool — for service/public operations
+   * that have no authenticated member user and so can't satisfy the RLS
+   * `can_access_tenant` check (customer self-service: registration, gift
+   * redemption). Isolation is enforced by the explicit `tenant_id = $1`
+   * predicate in every query, not by RLS. Never sets app.tenant_id/user_id.
+   */
+  async workerTx<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+    const client = await this.worker.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await work(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (err) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackErr) {
+        this.logger.error(
+          'ROLLBACK failed',
+          rollbackErr instanceof Error ? rollbackErr.stack : String(rollbackErr),
+        );
+      }
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
   async healthCheck(): Promise<boolean> {
     const res = await this.worker.query<{ ok: number }>('SELECT 1 AS ok');
     return res.rows[0]?.ok === 1;

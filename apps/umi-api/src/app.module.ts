@@ -11,8 +11,16 @@ import { AdaptersModule } from './shared/adapters/adapters.module';
 import { LoggingModule } from './shared/logging/logging.module';
 import { LoggingInterceptor } from './shared/logging/logging.interceptor';
 import { AllExceptionsFilter } from './shared/http/all-exceptions.filter';
+import { SharedAuthModule } from './shared/auth/auth.shared.module';
+import { RateLimitModule } from './shared/ratelimit/rate-limit.module';
 import { QueueModule } from './jobs/queue.module';
 import { HealthModule } from './modules/health/health.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { TenantsModule } from './modules/tenants/tenants.module';
+import { StaffModule } from './modules/staff/staff.module';
+import { HoursModule } from './modules/hours/hours.module';
+import { CustomersModule } from './modules/customers/customers.module';
+import { CashModule } from './modules/cash/cash.module';
 
 /**
  * Root module for the WEB process. Imports shared infrastructure + domain
@@ -24,9 +32,17 @@ import { HealthModule } from './modules/health/health.module';
     AppConfigModule,
     DatabaseModule,
     AdaptersModule,
+    SharedAuthModule,
+    RateLimitModule,
     LoggingModule,
     QueueModule,
     HealthModule,
+    AuthModule,
+    TenantsModule,
+    StaffModule,
+    HoursModule,
+    CustomersModule,
+    CashModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

@@ -42,8 +42,13 @@ export const configSchema = z.object({
     .regex(/^[A-Za-z_][A-Za-z0-9_]*$/)
     .default('conversaflow'),
 
+  // Wallet-pass refresh (Apple PassKit + Google Wallet). Best-effort push fired
+  // after cash money writes; when unset, the refresh is skipped (money write is
+  // unaffected). Points at the pass-push service once cert infra is provisioned.
+  WALLET_PASS_PUSH_URL: z.string().url().optional(),
+
   // Feature flags.
-  CASH_WRITE_ENABLED: booleanFromEnv.default(false), // D11 — inert cash writes
+  CASH_WRITE_ENABLED: booleanFromEnv.default(false), // retained; cash writes are live
   // Transactional-outbox relay (§10.4). Built in Phase 1c but inert until
   // Phase 3 registers event_type→queue routes and flips this on.
   OUTBOX_RELAY_ENABLED: booleanFromEnv.default(false),
@@ -51,8 +56,26 @@ export const configSchema = z.object({
   // CORS.
   CORS_ORIGINS: z.string().optional(), // comma-separated origins
 
-  // ── Added in later phases (optional until wired) ──
+  // ── Auth (Phase 2, D9) — JWT access+refresh in httpOnly cookies ──
+  // JWT_SECRET stays optional in the schema (so non-auth phases/tests boot
+  // without it); JwtService throws a clear error if it's actually used without
+  // one. Set it in any environment that serves the dashboard API.
   JWT_SECRET: z.string().min(16).optional(),
+  JWT_ACCESS_TTL: z.string().default('15m'), // jose duration (e.g. 15m, 1h)
+  JWT_REFRESH_TTL: z.string().default('30d'),
+  COOKIE_SECURE: booleanFromEnv.default(true), // false for local http dev
+  COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).default('lax'),
+  COOKIE_DOMAIN: z.string().optional(), // e.g. .umiconsulting.co
+  APP_URL: z.string().url().optional(), // password-reset link base
+
+  // Cash QR + customer-auth secrets (ported from umi-cash; MUST be byte-identical
+  // to umi-cash's values or already-issued wallet passes / customer tokens fail).
+  // APP_QR_SECRET is used TWO ways: HS256 JWT key (UTF-8 bytes) for in-app QR, and
+  // RAW string HMAC key for static wallet barcodes — never pre-transform it.
+  APP_QR_SECRET: z.string().min(32).optional(),
+  JWT_ACCESS_SECRET: z.string().min(32).optional(), // cash CUSTOMER access token (24h)
+  JWT_REFRESH_SECRET: z.string().min(32).optional(), // cash CUSTOMER refresh token (30d)
+
   ANTHROPIC_API_KEY: z.string().optional(),
   VOYAGE_API_KEY: z.string().optional(),
   TWILIO_ACCOUNT_SID: z.string().optional(),

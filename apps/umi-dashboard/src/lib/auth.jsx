@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { CFG } from './config.js'
+import { CFG, COOKIE_AUTH, LOCAL_SESSION, apiUrl, withCreds } from './config.js'
 import { supabase } from './supabase.js'
 
 const AuthContext = createContext(null)
@@ -17,11 +17,14 @@ function getLocalSession() {
 }
 
 export function getStoredSession() {
-  if (CFG.authMode === 'local') return getLocalSession()
+  if (LOCAL_SESSION) return getLocalSession()
   return null
 }
 
 export async function getAuthHeaders() {
+  // umi-api: auth rides in the httpOnly cookie (sent via credentials:'include'), no header.
+  if (COOKIE_AUTH) return {}
+
   if (CFG.authMode === 'local') {
     const session = getLocalSession()
     return session?.user?.id ? { 'X-UMI-User-ID': session.user.id } : {}
@@ -36,7 +39,7 @@ export function AuthProvider({ children }) {
   const [needsPasswordReset, setNeedsPasswordReset] = useState(false)
 
   useEffect(() => {
-    if (CFG.authMode === 'local') {
+    if (LOCAL_SESSION) {
       setSession(getLocalSession())
       return undefined
     }
@@ -61,12 +64,15 @@ export function useAuth() {
 }
 
 export async function signIn(email, password) {
-  if (CFG.authMode === 'local') {
-    const res = await fetch('/api/auth/local/login', {
+  // 'local' (server.js) and 'cookie' (umi-api) both POST the same login route; the difference
+  // is umi-api sets an httpOnly cookie (withCreds sends/stores it) while server.js relies on the
+  // localStorage session id echoed as X-UMI-User-ID. Either way we cache session.* for the UI.
+  if (LOCAL_SESSION) {
+    const res = await fetch(apiUrl('/api/auth/local/login'), withCreds({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: email, password }),
-    })
+    }))
     const payload = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(payload.error || 'Credenciales incorrectas')
     window.localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(payload.session))
@@ -80,7 +86,19 @@ export async function signIn(email, password) {
 }
 
 export async function signOut() {
-  if (CFG.authMode === 'local') {
+  if (LOCAL_SESSION) {
+    // umi-api: clear the httpOnly cookie server-side (best-effort) before dropping local state.
+    if (COOKIE_AUTH) {
+      // fetch only rejects on network errors and a non-OK status is not thrown,
+      // so check both — a failed server logout can leave the httpOnly cookie
+      // valid. We still clear local state + redirect, but never silently.
+      try {
+        const res = await fetch(apiUrl('/api/auth/local/logout'), withCreds({ method: 'POST' }))
+        if (!res.ok) console.warn(`logout failed (${res.status}); auth cookie may persist server-side`)
+      } catch (err) {
+        console.warn('logout request failed; auth cookie may persist server-side', err)
+      }
+    }
     window.localStorage.removeItem(LOCAL_SESSION_KEY)
     window.location.assign('/login')
     return

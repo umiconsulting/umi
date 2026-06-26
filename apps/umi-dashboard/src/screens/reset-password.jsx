@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../lib/auth.jsx'
+import { apiUrl, withCreds } from '../lib/config.js'
 import '../styles.css'
 
 export default function ResetPasswordScreen() {
@@ -39,11 +40,11 @@ export default function ResetPasswordScreen() {
     setLoading(true)
     try {
       if (isLocal) {
-        const res = await fetch('/api/auth/local/reset-password', {
+        const res = await fetch(apiUrl('/api/auth/local/reset-password'), withCreds({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token: localToken, password }),
-        })
+        }))
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data.error || 'Error al reestablecer la contraseña')
         setDone(true)
