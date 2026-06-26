@@ -1,4 +1,10 @@
-# umi-api — VPS setup runbook (Phase 0 deploy)
+# umi-api — VPS setup + deploy runbook
+
+> **Current state (2026-06-25): Phase 2 is LIVE in production** at
+> `https://api.umiconsulting.co`, and the umi-dashboard SPA is cut over to it
+> (httpOnly-cookie auth). For day-to-day deploys and the realized role/env model,
+> jump to **[Phase 2 — live deployment](#phase-2--live-deployment-current-state)**.
+> The Steps below are the original Phase 0 bring-up, kept for history.
 
 Goal: get `umi-api` running on the VPS and `GET /health` returning green.
 Prereqs already done: VPS provisioned, a non-root user created, Docker + Docker
@@ -91,16 +97,9 @@ curl https://api.umiconsulting.co/health
 
 ## Step 6 — Harden the DB roles (before Phase 2)
 
-Run `db/roles/001_api_roles.sql` in the Supabase SQL Editor, then split the two
-URLs onto the dedicated roles (session pooler username = `role.project-ref`):
-
-```ini
-DATABASE_URL_APP=postgresql://umi_app.xbudknbimkgjjgohnjgp:APP_PW@aws-1-us-east-2.pooler.supabase.com:5432/postgres
-DATABASE_URL_WORKER=postgresql://umi_worker.xbudknbimkgjjgohnjgp:WORKER_PW@aws-1-us-east-2.pooler.supabase.com:5432/postgres
-```
-
-`docker compose up -d` to apply. (If the custom-role pooler login fails, verify
-the role/password in Supabase; worst case use the direct connection host.)
+Run `db/roles/001_api_roles.sql` (roles) + `db/roles/002_api_grants.sql` (grants)
+in the Supabase SQL Editor. **Realized model — see the Phase 2 section for why the
+worker pool stays on `postgres` rather than `umi_worker`.**
 
 ---
 
@@ -112,3 +111,85 @@ docker compose restart umi-api
 docker compose down                     # stop everything
 docker compose up -d --build            # redeploy after a code change
 ```
+
+---
+
+## Phase 2 — live deployment (current state)
+
+Phase 2 (dashboard backend + live cash on canonical `loyalty.*`) is deployed and
+the umi-dashboard SPA is cut over to it.
+
+### Code lives in a git checkout (not rsync)
+
+The VPS runs a **sparse git checkout** of `umiconsulting/umi` (`main`), so deploys
+are `git pull` + rebuild — no copying from a laptop, and the deployed commit is
+always known:
+
+```sh
+# one-time:  git clone --filter=blob:none --no-checkout git@github.com:umiconsulting/umi.git ~/umi
+#            cd ~/umi && git sparse-checkout set apps/umi-api && git checkout main
+# every deploy:
+cd ~/umi && git pull origin main
+cd apps/umi-api && docker compose up -d --build && docker compose ps
+curl -s https://api.umiconsulting.co/health     # {"status":"ok","db":true,"redis":true}
+```
+
+The remote `.env` is gitignored and preserved across pulls.
+
+### DB roles — the realized split
+
+Supabase will **not** let a non-superuser grant `BYPASSRLS` to a custom role from
+SQL (the SQL Editor role isn't a true superuser). So:
+
+| Pool | Role | Why |
+|---|---|---|
+| `DATABASE_URL_APP` | **`umi_app`** (NOBYPASSRLS) | The request path. RLS `tenant_isolation` enforces tenant scoping; the app sets `app.tenant_id`/`app.user_id` per request. |
+| `DATABASE_URL_WORKER` | **`postgres`** (the Supabase pooler role — it already has `rolbypassrls=t`) | The service/worker + public-customer (no-member) path needs to bypass RLS. `umi_worker` exists with grants but is **unused** until BYPASSRLS can be granted (superuser / SET ROLE). |
+
+`umi_app` connects through the Supavisor pooler with the **dotted** username
+`umi_app.<project_ref>`. Passwords are set out-of-band (never in `db/roles/*.sql`,
+which is grants-only).
+
+### Phase 2 `.env` (additions over Phase 0)
+
+```ini
+DATABASE_URL_APP=postgresql://umi_app.xbudknbimkgjjgohnjgp:APP_PW@aws-1-us-east-2.pooler.supabase.com:5432/postgres
+DATABASE_URL_WORKER=postgresql://postgres.xbudknbimkgjjgohnjgp:PLATFORM_PW@aws-1-us-east-2.pooler.supabase.com:5432/postgres
+
+JWT_SECRET=<strong, stable — signs the dashboard session cookie>
+# These THREE must be byte-identical to umi-cash's prod values, or wallet-pass QR
+# scans and customer tokens fail to verify during coexistence:
+APP_QR_SECRET=<= umi-cash>
+JWT_ACCESS_SECRET=<= umi-cash>
+JWT_REFRESH_SECRET=<= umi-cash>
+
+COOKIE_SECURE=true
+COOKIE_SAMESITE=lax
+COOKIE_DOMAIN=.umiconsulting.co          # cookies flow dashboard.→api. (same-site)
+APP_URL=https://dashboard.umiconsulting.co
+CORS_ORIGINS=https://dashboard.umiconsulting.co   # required for the SPA's cross-origin cookie calls
+```
+
+`CASH_WRITE_ENABLED` is vestigial (no code reads it — cash writes are always live).
+
+### Dashboard frontend cutover (Vercel)
+
+The SPA repoint is flag-gated and lives in `apps/umi-dashboard` (`cookie` auth
+mode). To point the dashboard at umi-api, set **Production** env vars and redeploy
+(Vite bakes `VITE_*` at build time — a redeploy is required):
+
+```ini
+VITE_AUTH_MODE=cookie
+VITE_API_BASE=https://api.umiconsulting.co
+```
+
+**Rollback:** delete those two vars → redeploy → the SPA is back on `server.js`
+(same-origin, `X-UMI-User-ID` header) with zero backend change.
+
+### Not yet done
+
+- **Stage 4 — dual-writer cutover:** `umi-cash` still live-writes `loyalty.*`.
+  Both writers coexist safely (append-only ledger, `balance = SUM`); retiring
+  umi-cash's writes is a separate decision.
+- PassKit/Google-Wallet cert port; CSRF double-submit guard (SameSite=Lax is the
+  current mitigation); `TraceService` → `observability.*` rebind.

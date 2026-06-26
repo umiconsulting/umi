@@ -22,7 +22,7 @@ Every file is named `<thing>.<role>.ts` — `.controller`, `.service`,
 `.processor`, `.scheduler`, `.adapter`, `.module`.
 Folders are business nouns. Nothing is buried; no `utils/` grab-bags.
 
-### Current tree (Phase 1c)
+### Current tree (Phase 2 — live in production)
 
 ```
 src/
