@@ -37,6 +37,26 @@ export class HoursRepository {
     return rows;
   }
 
+  /**
+   * Worker-pool (BYPASSRLS) variant of read() — same query, for the
+   * unauthenticated WhatsApp bot path (no member user → can't use withTenant).
+   * Isolation is the explicit tenant_id predicate.
+   */
+  async readWorker(
+    tenantId: string,
+    locationId: string | null,
+  ): Promise<BusinessHourRow[]> {
+    const { rows } = await this.pg.query<BusinessHourRow>(
+      `SELECT day_of_week, opens_at::text AS opens_at,
+              closes_at::text AS closes_at, is_closed
+       FROM ops.business_hours
+       WHERE tenant_id = $1::uuid
+         AND location_id IS NOT DISTINCT FROM $2::uuid`,
+      [tenantId, locationId],
+    );
+    return rows;
+  }
+
   /** Atomic replace: delete + reinsert the day rows in one transaction. */
   async replace(
     tenantId: string,

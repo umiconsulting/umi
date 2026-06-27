@@ -21,6 +21,7 @@ import { StaffModule } from './modules/staff/staff.module';
 import { HoursModule } from './modules/hours/hours.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { CashModule } from './modules/cash/cash.module';
+import { ConversationsModule } from './modules/conversations/conversations.module';
 
 /**
  * Root module for the WEB process. Imports shared infrastructure + domain
@@ -43,6 +44,7 @@ import { CashModule } from './modules/cash/cash.module';
     HoursModule,
     CustomersModule,
     CashModule,
+    ConversationsModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
