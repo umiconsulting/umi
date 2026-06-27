@@ -49,9 +49,15 @@ export const configSchema = z.object({
 
   // Feature flags.
   CASH_WRITE_ENABLED: booleanFromEnv.default(false), // retained; cash writes are live
-  // Transactional-outbox relay (§10.4). Built in Phase 1c but inert until
-  // Phase 3 registers event_type→queue routes and flips this on.
-  OUTBOX_RELAY_ENABLED: booleanFromEnv.default(false),
+  // Transactional-outbox relay (§10.4). Phase 3d registered the event_type→queue
+  // routes (twilio.reply etc.), so it's on by default now. Worker-only +
+  // idempotent (deterministic jobIds); set false to pause delivery in an emergency.
+  OUTBOX_RELAY_ENABLED: booleanFromEnv.default(true),
+  // Lifecycle WhatsApp crons (reward_expiring / streak / welcome_no_visit /
+  // winback). OFF by default: umi-cash still runs these journeys during the
+  // dual-writer window, so enabling here before umi-cash stops would double-send.
+  // Owner flips to true at the Phase 3 cutover (and disables the umi-cash crons).
+  LIFECYCLE_CRONS_ENABLED: booleanFromEnv.default(false),
 
   // CORS.
   CORS_ORIGINS: z.string().optional(), // comma-separated origins
@@ -81,6 +87,15 @@ export const configSchema = z.object({
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_WHATSAPP_FROM: z.string().optional(),
+  // The EXACT public URL Twilio signs (e.g. https://api.umiconsulting.co/conversations/whatsapp).
+  // Used for HMAC-SHA1 signature validation — never inferred from req.url (Phase 3d, spec §8.2).
+  TWILIO_WEBHOOK_URL: z.string().url().optional(),
+  // Location-pin tool (geo). Optional; the tool degrades to text when unset.
+  GOOGLE_MAPS_API_KEY: z.string().optional(),
+  // Tenant-resolution fallback (Phase 3): when an inbound WhatsApp number has no
+  // matching ops.channel_accounts row, messages resolve to this tenant. Lets the
+  // single live tenant keep working before its number is seeded in channel_accounts.
+  DEFAULT_TENANT_ID: z.string().uuid().optional(),
   ZETTLE_CLIENT_ID: z.string().optional(),
   ZETTLE_API_KEY: z.string().optional(),
   SMTP_HOST: z.string().optional(),

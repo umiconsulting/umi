@@ -84,7 +84,7 @@ export class TenantsRepository {
     );
   }
 
-  /** Locations with the (tenant) timezone, Chapultepec-first then oldest. */
+  /** Locations with the (tenant) timezone, oldest first (tenant-neutral, deterministic). */
   async loadLocations(tenantId: string): Promise<LocationRow[]> {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<LocationRow>(
@@ -92,9 +92,7 @@ export class TenantsRepository {
          FROM core.locations AS l
          JOIN core.tenants AS t ON t.id = l.tenant_id
          WHERE l.tenant_id = $1::uuid
-         ORDER BY
-           CASE WHEN lower(l.name) = 'chapultepec' THEN 0 ELSE 1 END,
-           l.created_at ASC`,
+         ORDER BY l.created_at ASC, l.id ASC`,
         [tenantId],
       ),
     );
@@ -102,9 +100,11 @@ export class TenantsRepository {
   }
 
   /**
-   * Resolve the effective location id for a tenant (server.js
-   * `getLocationForTenant`): the requested active location, else the default
-   * active one (Chapultepec-first, then oldest). Null when the tenant has none.
+   * Resolve the effective location id for a tenant: the requested active
+   * location, else the default active one — the OLDEST active location
+   * (created_at, then id). Tenant-neutral and deterministic: no hardcoded branch
+   * name (branches can be renamed/deleted; the platform is multi-tenant). Null
+   * when the tenant has no active location.
    */
   async resolveLocationId(
     tenantId: string,
@@ -119,9 +119,7 @@ export class TenantsRepository {
         `SELECT id::text AS id
          FROM core.locations
          WHERE tenant_id = $1::uuid AND status = 'active'
-         ORDER BY
-           CASE WHEN lower(name) = 'chapultepec' THEN 0 ELSE 1 END,
-           created_at ASC
+         ORDER BY created_at ASC, id ASC
          LIMIT 1`,
         [tenantId],
       ),
@@ -144,6 +142,46 @@ export class TenantsRepository {
       ),
     );
     return rows[0] ?? null;
+  }
+
+  /**
+   * Worker-pool (BYPASSRLS) variant of resolveLocationId — for the unauthenticated
+   * WhatsApp path, which has no member user and so can't use withTenant. MUST use
+   * the SAME tenant-neutral resolution as the dashboard (oldest active location),
+   * so the bot reads hours at the SAME location_id the dashboard wrote.
+   */
+  async resolveLocationIdWorker(
+    tenantId: string,
+    requestedLocationId: string | null,
+  ): Promise<string | null> {
+    if (requestedLocationId) {
+      const { rows } = await this.pg.query<{ id: string }>(
+        `SELECT id::text AS id
+         FROM core.locations
+         WHERE tenant_id = $1::uuid AND id = $2::uuid AND status = 'active'
+         LIMIT 1`,
+        [tenantId, requestedLocationId],
+      );
+      return rows[0]?.id ?? null;
+    }
+    const { rows } = await this.pg.query<{ id: string }>(
+      `SELECT id::text AS id
+       FROM core.locations
+       WHERE tenant_id = $1::uuid AND status = 'active'
+       ORDER BY created_at ASC, id ASC
+       LIMIT 1`,
+      [tenantId],
+    );
+    return rows[0]?.id ?? null;
+  }
+
+  /** Worker-pool read of the tenant's canonical timezone (`core.tenants.timezone`). */
+  async getTenantTimezoneWorker(tenantId: string): Promise<string | null> {
+    const { rows } = await this.pg.query<{ timezone: string | null }>(
+      `SELECT timezone FROM core.tenants WHERE id = $1::uuid`,
+      [tenantId],
+    );
+    return rows[0]?.timezone ?? null;
   }
 
   async updateTenantSettings(

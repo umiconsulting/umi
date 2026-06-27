@@ -25,6 +25,20 @@ async function bootstrap(): Promise<void> {
   // and enables `reply.setCookie`/`clearCookie` used by AuthController.
   await app.register(fastifyCookie);
 
+  // Twilio webhook (§8.2) posts application/x-www-form-urlencoded and signs the
+  // RAW body — keep it as a raw string so the HMAC-SHA1 validation sees the exact
+  // bytes. (The only form-urlencoded route is the WhatsApp webhook; everything
+  // else is JSON.)
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .addContentTypeParser(
+      'application/x-www-form-urlencoded',
+      { parseAs: 'string' },
+      (_req: unknown, body: string, done: (err: Error | null, body?: unknown) => void) =>
+        done(null, body),
+    );
+
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true }),
   );

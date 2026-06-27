@@ -20,6 +20,11 @@ export class VoyageAdapter {
 
   constructor(private readonly config: ConfigService<AppConfig, true>) {}
 
+  /** The embedding model these vectors were produced with (persisted alongside). */
+  get embeddingModel(): string {
+    return EMBEDDING_MODEL;
+  }
+
   /** Embed many texts in one call. Returns vectors in input order, or null. */
   async generateEmbeddings(
     texts: string[],
