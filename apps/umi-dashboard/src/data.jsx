@@ -1,5 +1,5 @@
 import { useState as useStateD, useEffect as useEffectD } from 'react'
-import { LIVE as _LIVE, COOKIE_AUTH, apiUrl, withCreds } from './lib/config.js'
+import { LIVE as _LIVE, COOKIE_AUTH, apiUrl, withCreds, errMessage } from './lib/config.js'
 import { getAuthHeaders } from './lib/auth.jsx'
 import { useTenant } from './lib/tenant-context.jsx'
 import { isProductActive } from './lib/module-registry.js'
@@ -52,7 +52,7 @@ async function _apiFetch(path, opts) {
     }, opts.headers || {}),
   })))
   const payload = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(payload.error || `${res.status} ${path}`)
+  if (!res.ok) throw new Error(errMessage(payload, `${res.status} ${path}`))
   return payload
 }
 

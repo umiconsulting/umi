@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { CFG, COOKIE_AUTH, LOCAL_SESSION, apiUrl, withCreds } from './config.js'
+import { CFG, COOKIE_AUTH, LOCAL_SESSION, apiUrl, withCreds, errMessage } from './config.js'
 import { supabase } from './supabase.js'
 
 const AuthContext = createContext(null)
@@ -74,7 +74,7 @@ export async function signIn(email, password) {
       body: JSON.stringify({ username: email, password }),
     }))
     const payload = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(payload.error || 'Credenciales incorrectas')
+    if (!res.ok) throw new Error(errMessage(payload, 'Credenciales incorrectas'))
     window.localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(payload.session))
     window.location.assign('/')
     return payload.session

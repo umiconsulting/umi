@@ -32,3 +32,18 @@ export function apiUrl(path) {
 export function withCreds(init) {
   return COOKIE_AUTH ? Object.assign({ credentials: 'include' }, init) : (init || {});
 }
+
+/**
+ * Pull a human-readable message out of an API error body. umi-api wraps errors
+ * as `{ statusCode, error: { message, ... } }`, so `payload.error` is an OBJECT —
+ * passing it straight to `new Error()` renders "[object Object]". server.js and
+ * plain Nest responses use a string `error` or top-level `message`. Handle all.
+ */
+export function errMessage(payload, fallback = 'Error') {
+  if (!payload || typeof payload !== 'object') return fallback;
+  const e = payload.error;
+  if (e && typeof e === 'object' && typeof e.message === 'string') return e.message;
+  if (typeof e === 'string' && e) return e;
+  if (typeof payload.message === 'string' && payload.message) return payload.message;
+  return fallback;
+}
