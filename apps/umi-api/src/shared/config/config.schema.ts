@@ -107,6 +107,16 @@ export const configSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
   EMAIL_FROM: z.string().optional(),
+}).superRefine((cfg, ctx) => {
+  // The Twilio signature bypass is a local-dev escape hatch only. Reject it at
+  // boot in production so it can never silently disable webhook verification.
+  if (cfg.NODE_ENV === 'production' && cfg.ALLOW_INSECURE_TWILIO_WEBHOOK) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['ALLOW_INSECURE_TWILIO_WEBHOOK'],
+      message: 'must not be true when NODE_ENV=production (it disables Twilio signature validation)',
+    });
+  }
 });
 
 export type AppConfig = z.infer<typeof configSchema>;

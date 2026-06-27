@@ -7,9 +7,11 @@ import { QUEUES } from '../../jobs/queues';
  * Per-conversation single-flight for `turn.process` (preflight §5: Redis
  * `SET NX PX` mutex keyed on conversation_id + delayed re-enqueue). Prevents two
  * workers from running the LLM loop for the same conversation at once (wasted
- * work). Correctness is ALSO guaranteed by the conversation `state_version` CAS,
- * so this is best-effort: a Redis error fails OPEN (proceed) rather than stalling
- * turns.
+ * work). Correctness is ALSO guaranteed by the conversation `state_version` CAS.
+ * A Redis error fails CLOSED (returns null) so the caller re-enqueues with a
+ * short delay rather than letting every worker bypass the single-flight guard;
+ * for a transient blip the re-enqueue just retries, and on a full outage the
+ * queue is unusable anyway (it lives on the same Redis).
  *
  * Reuses BullMQ's existing Redis connection (no separate client).
  */
@@ -39,8 +41,8 @@ export class ConversationLockService {
 
   /**
    * Try to acquire the lock. Returns a per-acquire token on success (pass it to
-   * `release`), or null if another worker holds it. On a Redis error we fail OPEN
-   * by returning a token — `release` then no-ops since the key isn't ours.
+   * `release`), or null if another worker holds it. On a Redis error we fail
+   * CLOSED (null) so the caller re-enqueues instead of bypassing single-flight.
    */
   async acquire(conversationId: string, ttlMs: number): Promise<string | null> {
     const token = randomUUID();
@@ -49,11 +51,11 @@ export class ConversationLockService {
       return res === 'OK' ? token : null;
     } catch (err) {
       this.logger.warn(
-        `lock acquire failed (failing open) for ${conversationId}: ${
+        `lock acquire failed (will re-enqueue, not process) for ${conversationId}: ${
           err instanceof Error ? err.message : String(err)
         }`,
       );
-      return token;
+      return null;
     }
   }
 
