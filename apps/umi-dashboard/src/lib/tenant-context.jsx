@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { getAuthHeaders } from './auth.jsx'
-import { apiUrl, withCreds } from './config.js'
+import { apiUrl, withCreds, errMessage } from './config.js'
 import { buildModuleAvailability, canShowModule, getVisibleModules, isProductActive } from './module-registry.js'
 
 const TenantContext = createContext(null)
@@ -11,7 +11,7 @@ async function apiGet(path) {
   const headers = await getAuthHeaders()
   const res = await fetch(apiUrl(path), withCreds({ headers }))
   const payload = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(payload.error || `${res.status} ${path}`)
+  if (!res.ok) throw new Error(errMessage(payload, `${res.status} ${path}`))
   return payload
 }
 

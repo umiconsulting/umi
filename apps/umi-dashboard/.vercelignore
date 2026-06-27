@@ -1,0 +1,8 @@
+# Never upload local env files to Vercel builds.
+# Production config comes from the Vercel project's Environment Variables
+# (VITE_AUTH_MODE=cookie, VITE_API_BASE=https://api.umiconsulting.co, VITE_SUPABASE_*).
+# Shipping the local-dev .env (VITE_AUTH_MODE=local, no VITE_API_BASE) is what
+# previously broke the prod build into same-origin/supabase mode.
+.env
+.env.*
+!.env.example

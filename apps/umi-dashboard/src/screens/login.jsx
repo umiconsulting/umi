@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CFG, apiUrl, withCreds } from '../lib/config.js'
+import { CFG, apiUrl, withCreds, errMessage } from '../lib/config.js'
 import { signIn } from '../lib/auth.jsx'
 import '../styles.css'
 
@@ -39,7 +39,7 @@ export default function LoginScreen() {
       }))
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || 'Error al enviar el correo')
+        throw new Error(errMessage(data, 'Error al enviar el correo'))
       }
       setView('sent')
     } catch (err) {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../lib/auth.jsx'
-import { apiUrl, withCreds } from '../lib/config.js'
+import { apiUrl, withCreds, errMessage } from '../lib/config.js'
 import '../styles.css'
 
 export default function ResetPasswordScreen() {
@@ -46,7 +46,7 @@ export default function ResetPasswordScreen() {
           body: JSON.stringify({ token: localToken, password }),
         }))
         const data = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(data.error || 'Error al reestablecer la contraseña')
+        if (!res.ok) throw new Error(errMessage(data, 'Error al reestablecer la contraseña'))
         setDone(true)
       } else {
         const { error: err } = await supabase.auth.updateUser({ password })
