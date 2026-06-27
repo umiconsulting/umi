@@ -110,7 +110,9 @@ export class ConversationTurnsRepository {
     );
     const run: MessageRunItem[] = [];
     for (const message of rows) {
-      if (message.role === 'assistant') break;
+      // Only consecutive USER messages form the trailing run — stop at the first
+      // non-user row (assistant/system/tool) so they can't leak into the merged turn.
+      if (message.role !== 'user') break;
       run.push(message);
     }
     return run.reverse();

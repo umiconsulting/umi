@@ -565,6 +565,10 @@ export class ToolLoopService {
             toolCallCount++;
             toolResultBytes += jsonByteLength(forced.result);
             applyToolOutcome(params.toolOutcomes, forced.toolName, forced.result);
+            // Register the forced call in the dedup set with the SAME keying as
+            // normal calls, so a repeated model emission of the same mutating
+            // forced action (e.g. confirm_order) can't run twice.
+            seenToolCalls.add(stableToolCallKey(forced.toolName, forced.input));
           }
           toolChain.push({
             name: forced.toolName,

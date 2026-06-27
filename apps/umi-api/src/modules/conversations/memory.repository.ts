@@ -119,25 +119,21 @@ export class MemoryRepository {
   }
 
   /**
-   * Merge-write the customer facts blob. Constraint-agnostic upsert (UPDATE,
-   * then INSERT if no row) so it doesn't depend on the exact unique-key shape of
-   * canonical `comms.customer_preferences`. Used by extract-facts enrichment.
+   * Merge-write the customer facts blob via a single atomic upsert on the
+   * `customer_preferences_tenant_id_person_id_key` UNIQUE(tenant_id, person_id),
+   * so two concurrent extract-facts jobs can't race a read-then-insert into
+   * duplicate/conflicting rows. Used by extract-facts enrichment.
    */
   async upsertCustomerFacts(
     tenantId: string,
     personId: string,
     facts: Record<string, unknown>,
   ): Promise<void> {
-    const updated = await this.pg.query(
-      `UPDATE comms.customer_preferences
-          SET facts = $3::jsonb, updated_at = now()
-        WHERE person_id = $1 AND tenant_id = $2`,
-      [personId, tenantId, JSON.stringify(facts)],
-    );
-    if ((updated.rowCount ?? 0) > 0) return;
     await this.pg.query(
       `INSERT INTO comms.customer_preferences (tenant_id, person_id, facts)
-       VALUES ($1, $2, $3::jsonb)`,
+       VALUES ($1, $2, $3::jsonb)
+       ON CONFLICT (tenant_id, person_id)
+         DO UPDATE SET facts = EXCLUDED.facts, updated_at = now()`,
       [tenantId, personId, JSON.stringify(facts)],
     );
   }

@@ -13,6 +13,9 @@ export interface TurnIntegrityPayload {
   conversation_id: string;
   person_id: string;
   tenant_id: string;
+  /** Resolved business location (channel_account), threaded from ingress for
+   *  location-aware tools (hours, order persistence). Null when unresolved. */
+  location_id?: string | null;
   request_id?: string;
 }
 export interface TurnProcessPayload extends TurnIntegrityPayload {

@@ -152,12 +152,20 @@ export class LifecycleService {
   ): Promise<boolean> {
     const claimed = await this.repo.claimSend(tenant.id, cardId, journey, body);
     if (!claimed) return false; // already sent — silent skip (matches source)
-    await this.enqueue.enqueue(
-      QUEUES.outbound,
-      'whatsapp.lifecycle',
-      { to: phone, body, tenant_id: tenant.id, card_id: cardId, journey },
-      { priority: JobPriority.Background, jobId: `lc:${tenant.id}:${cardId}:${journey}` },
-    );
+    try {
+      await this.enqueue.enqueue(
+        QUEUES.outbound,
+        'whatsapp.lifecycle',
+        { to: phone, body, tenant_id: tenant.id, card_id: cardId, journey },
+        { priority: JobPriority.Background, jobId: `lc:${tenant.id}:${cardId}:${journey}` },
+      );
+    } catch (err) {
+      // The claim is the dedup gate; if enqueue fails the message would be lost
+      // forever (the claim blocks every future run). Roll the claim back so the
+      // next cron tick retries this card.
+      await this.repo.deleteSend(tenant.id, cardId, journey).catch(() => undefined);
+      throw err;
+    }
     return true;
   }
 }

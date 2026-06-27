@@ -40,6 +40,33 @@ export class TurnCommitRepository {
 
   async commitTurnReply(params: CommitTurnReplyParams): Promise<CommitTurnReplyResult> {
     return this.pg.workerTx(async (client) => {
+      // 1. Claim the reply via the outbox idempotency key FIRST. If it already
+      //    exists, this turn's reply was committed + relayed by a prior attempt:
+      //    return committed (so the caller doesn't supersede) WITHOUT re-CASing
+      //    state or inserting a duplicate assistant message. ON CONFLICT means a
+      //    committed row exists, and the relay drains every row, so the reply is
+      //    (or will be) delivered exactly once.
+      const ob = await client.query<{ id: string }>(
+        `INSERT INTO queue.outbox_events
+           (tenant_id, event_type, aggregate_id, idempotency_key, payload)
+         VALUES ($1, $2, $3, $4, $5::jsonb)
+         ON CONFLICT (idempotency_key) DO NOTHING
+         RETURNING id`,
+        [
+          params.tenantId,
+          params.eventType,
+          params.conversationId,
+          params.idempotencyKey,
+          JSON.stringify(params.payload ?? {}),
+        ],
+      );
+      if (!ob.rows.length) {
+        return { committed: true, assistantMessageId: null, outboxId: null };
+      }
+
+      // 2. CAS the conversation state. If a concurrent writer advanced it, the
+      //    whole tx (including the outbox claim above) rolls back and the caller
+      //    supersedes + requeues — never a half-commit.
       const cas = await client.query<{ id: string }>(
         `UPDATE comms.conversations
             SET current_state = $2,
@@ -57,6 +84,7 @@ export class TurnCommitRepository {
       );
       if (!cas.rows.length) return { committed: false };
 
+      // 3. Persist the assistant message. Only now is the turn truly committed.
       const msg = await client.query<{ id: string }>(
         `INSERT INTO comms.messages
            (tenant_id, conversation_id, role, content, message_index)
@@ -67,25 +95,10 @@ export class TurnCommitRepository {
         [params.tenantId, params.conversationId, params.replyBody],
       );
 
-      const ob = await client.query<{ id: string }>(
-        `INSERT INTO queue.outbox_events
-           (tenant_id, event_type, aggregate_id, idempotency_key, payload)
-         VALUES ($1, $2, $3, $4, $5::jsonb)
-         ON CONFLICT (idempotency_key) DO NOTHING
-         RETURNING id`,
-        [
-          params.tenantId,
-          params.eventType,
-          params.conversationId,
-          params.idempotencyKey,
-          JSON.stringify(params.payload ?? {}),
-        ],
-      );
-
       return {
         committed: true,
         assistantMessageId: msg.rows[0]?.id ?? null,
-        outboxId: ob.rows[0]?.id ?? null,
+        outboxId: ob.rows[0].id,
       };
     });
   }

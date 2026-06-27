@@ -233,6 +233,16 @@ export class LifecycleRepository {
     return (rowCount ?? 0) > 0;
   }
 
+  /** Compensating delete for a claim whose downstream enqueue failed (so the
+   *  next cron run can retry the send rather than skipping it forever). */
+  async deleteSend(tenantId: string, cardId: string, journey: string): Promise<void> {
+    await this.pg.query(
+      `DELETE FROM loyalty.lifecycle_sends
+        WHERE tenant_id = $1::uuid AND card_id = $2::uuid AND journey = $3`,
+      [tenantId, cardId, journey],
+    );
+  }
+
   private toCandidate = (r: {
     card_id: string;
     name: string | null;

@@ -69,19 +69,23 @@ export class EnrichmentProcessor extends BaseProcessor {
   private async messageEmbed(p: Record<string, unknown>): Promise<void> {
     const userId = p.user_message_id as string | undefined;
     const assistantId = p.assistant_message_id as string | undefined;
-    const embeddings = await this.voyage.generateEmbeddings([
-      String(p.user_text ?? ''),
-      String(p.assistant_text ?? ''),
-    ]);
+    const userText = String(p.user_text ?? '').trim();
+    const assistantText = String(p.assistant_text ?? '').trim();
+    // Only embed sides with BOTH an id and non-empty text. Never embed an empty
+    // string — it would persist a meaningless vector and hide the row from the
+    // backfill (which looks for name_embedding IS NULL).
+    const targets: Array<{ id: string; text: string }> = [];
+    if (userId && userText) targets.push({ id: userId, text: userText });
+    if (assistantId && assistantText) targets.push({ id: assistantId, text: assistantText });
+    if (!targets.length) return;
+    const embeddings = await this.voyage.generateEmbeddings(targets.map((t) => t.text));
     if (!embeddings) return; // adapter logged; non-fatal (backfill catches it later)
-    const [userEmb, assistantEmb] = embeddings;
     const model = this.voyage.embeddingModel;
-    await Promise.all([
-      userId && userEmb ? this.messages.updateEmbedding(userId, userEmb, model) : Promise.resolve(),
-      assistantId && assistantEmb
-        ? this.messages.updateEmbedding(assistantId, assistantEmb, model)
-        : Promise.resolve(),
-    ]);
+    await Promise.all(
+      targets.map((t, i) =>
+        embeddings[i] ? this.messages.updateEmbedding(t.id, embeddings[i], model) : Promise.resolve(),
+      ),
+    );
   }
 
   private async summarize(p: Record<string, unknown>): Promise<void> {

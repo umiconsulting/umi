@@ -95,8 +95,8 @@ export function validateOrderItems(items: OrderItemInput[]): {
       return { valid: false, reason: 'Nombre de producto inválido' };
     }
     if (
-      !item.quantity ||
       typeof item.quantity !== 'number' ||
+      !Number.isInteger(item.quantity) ||
       item.quantity < 1 ||
       item.quantity > 50
     ) {
@@ -153,6 +153,7 @@ export function validateCartItems(cart: unknown): {
     }
     if (
       typeof item.quantity !== 'number' ||
+      !Number.isInteger(item.quantity) ||
       item.quantity < 1 ||
       item.quantity > 50
     ) {

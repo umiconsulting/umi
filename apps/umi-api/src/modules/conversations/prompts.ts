@@ -46,6 +46,21 @@ function sanitizeCustomerFacts(facts: CustomerFacts): CustomerFacts {
   };
 }
 
+/**
+ * Neutralize prompt-injection in free-text memory (rolling summary, recalled
+ * past-conversation snippets) before it is interpolated into the system prompt.
+ * Strips role-prefixed lines and instruction-override tokens without discarding
+ * the whole snippet — the same untrusted-input philosophy as sanitizeCustomerFacts.
+ */
+function sanitizeMemorySnippet(text: string): string {
+  return text
+    .replace(/^\s*(system|assistant|user|cliente|asistente)\s*:/gim, '')
+    .replace(/\b(ignore|disregard|forget|override)\s+(all\s+)?(previous|prior|above)\b/gi, '[removed]')
+    .replace(/\[\/?INST\]/gi, '')
+    .replace(/<\|[^|]*\|>/g, '')
+    .trim();
+}
+
 function formatFacts(facts: CustomerFacts): string {
   const safe = sanitizeCustomerFacts(facts);
   const lines: string[] = [];
@@ -80,12 +95,12 @@ function buildWorkingMemorySections(ctx: PromptContext): string {
     : '';
 
   const summarySection = wm?.summary
-    ? `\n## RESUMEN DE CONVERSACIÓN ANTERIOR\n${wm.summary}\n`
+    ? `\n## RESUMEN DE CONVERSACIÓN ANTERIOR\n${sanitizeMemorySnippet(wm.summary)}\n`
     : '';
 
   const semanticSection = wm?.semanticContext?.length
     ? `\n## CONTEXTO RELEVANTE DE CONVERSACIONES PASADAS\n${wm.semanticContext
-        .map((m) => `[${m.role}]: ${m.content}`)
+        .map((m) => `[${m.role === 'assistant' ? 'assistant' : 'user'}]: ${sanitizeMemorySnippet(m.content)}`)
         .join('\n')}\n`
     : '';
 

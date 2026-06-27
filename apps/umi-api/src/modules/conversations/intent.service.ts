@@ -380,7 +380,16 @@ export class IntentService {
         parsedIntent.tool_hint = confirmationTool;
         parsedIntent.entities.confirmation = 'yes';
       } else if (isNegativeConfirmation(params.turnText)) {
+        // A bare "no" is a complete rejection of the pending confirmation — make
+        // it a full clarification_response (not just a target) and clear the stale
+        // confirmation tool_hint so the loop won't still try to confirm.
+        parsedIntent.intent_type = 'clarification_response';
+        parsedIntent.confidence = 'high';
+        parsedIntent.complete = true;
+        parsedIntent.ambiguous = false;
         parsedIntent.clarification_target = 'confirmation';
+        parsedIntent.tool_hint = null;
+        parsedIntent.entities.confirmation = 'no';
       }
     }
 

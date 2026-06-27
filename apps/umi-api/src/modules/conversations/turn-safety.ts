@@ -13,8 +13,14 @@ export function jsonByteLength(value: unknown): number {
 
 export function truncateBytes(value: unknown, maxBytes: number): unknown {
   const json = JSON.stringify(value ?? null);
-  if (jsonByteLength(value) <= maxBytes) return value;
-  return { truncated: true, max_bytes: maxBytes, excerpt: json.slice(0, maxBytes) };
+  const bytes = new TextEncoder().encode(json);
+  if (bytes.length <= maxBytes) return value;
+  // Truncate by BYTES (not chars) and drop any trailing replacement char left by
+  // a split multibyte sequence, so the excerpt never exceeds maxBytes.
+  const excerpt = new TextDecoder('utf-8', { fatal: false })
+    .decode(bytes.slice(0, maxBytes))
+    .replace(/�+$/, '');
+  return { truncated: true, max_bytes: maxBytes, excerpt };
 }
 
 export function blockUnverifiedOrderConfirmation(params: {

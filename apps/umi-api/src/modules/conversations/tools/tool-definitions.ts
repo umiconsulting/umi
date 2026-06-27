@@ -41,7 +41,7 @@ export const TOOL_DEFINITIONS: ToolDefinitions = [
       type: 'object',
       properties: {
         query: { type: 'string' },
-        quantity: { type: 'number' },
+        quantity: { type: 'integer', minimum: 1, description: 'Cantidad entera de unidades (por ejemplo, 2).' },
         size: { type: 'string' },
         temp: { type: 'string' },
         milk: { type: 'string' },

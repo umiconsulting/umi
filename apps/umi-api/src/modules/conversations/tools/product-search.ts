@@ -180,7 +180,10 @@ export function buildStrippedSearchQuery(
 ): string | null {
   if (!size && !temp && !milk) return null;
   const tokens = normalizeText(query).split(' ').filter(Boolean);
-  if (tokens.length <= 2) return null;
+  // Allow 2-token queries ("latte grande", "matcha coco") to strip-and-retry; the
+  // later "no removable token" / "stripped empty" checks still reject
+  // modifier-only inputs, so this no longer blocks legitimate product+modifier.
+  if (tokens.length < 2) return null;
 
   const toRemove = new Set<string>();
   const addSyn = (dict: Record<string, string>, canonical: string | null) => {
@@ -501,7 +504,10 @@ export function resolveVariant(product: ProductRecord, filters: VariantFilters):
 }
 
 export function formatMoney(value: number): string {
-  return `$${Math.round(value)}`;
+  // Snap to centavos and keep fractional pesos (Zettle prices like 28.50) instead
+  // of rounding them away; whole-peso amounts stay integer ($28, not $28.00).
+  const rounded = Math.round(value * 100) / 100;
+  return Number.isInteger(rounded) ? `$${rounded}` : `$${rounded.toFixed(2)}`;
 }
 
 export function formatCartSummary(cart: DraftCart): string {

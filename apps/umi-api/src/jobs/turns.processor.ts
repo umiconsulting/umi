@@ -41,8 +41,8 @@ export class TurnsProcessor extends BaseProcessor {
 
     if (job.name === 'turn.process') {
       const payload = job.data as TurnProcessPayload;
-      const acquired = await this.lock.acquire(payload.conversation_id, TURN_LOCK_TTL_MS);
-      if (!acquired) {
+      const lockToken = await this.lock.acquire(payload.conversation_id, TURN_LOCK_TTL_MS);
+      if (!lockToken) {
         // Another worker holds the conversation — re-enqueue (fresh job id) with
         // a short delay rather than running the LLM loop concurrently.
         await this.enqueue.enqueue(QUEUES.turns, 'turn.process', payload, {
@@ -54,7 +54,7 @@ export class TurnsProcessor extends BaseProcessor {
       try {
         await this.turn.process(payload);
       } finally {
-        await this.lock.release(payload.conversation_id);
+        await this.lock.release(payload.conversation_id, lockToken);
       }
       return;
     }

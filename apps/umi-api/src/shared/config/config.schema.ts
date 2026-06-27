@@ -90,6 +90,10 @@ export const configSchema = z.object({
   // The EXACT public URL Twilio signs (e.g. https://api.umiconsulting.co/conversations/whatsapp).
   // Used for HMAC-SHA1 signature validation — never inferred from req.url (Phase 3d, spec §8.2).
   TWILIO_WEBHOOK_URL: z.string().url().optional(),
+  // The webhook FAILS CLOSED when TWILIO_AUTH_TOKEN is unset (drops the request
+  // rather than processing unsigned input). Set this true ONLY for local dev to
+  // bypass signature validation; it must never be true in production.
+  ALLOW_INSECURE_TWILIO_WEBHOOK: booleanFromEnv.default(false),
   // Location-pin tool (geo). Optional; the tool degrades to text when unset.
   GOOGLE_MAPS_API_KEY: z.string().optional(),
   // Tenant-resolution fallback (Phase 3): when an inbound WhatsApp number has no

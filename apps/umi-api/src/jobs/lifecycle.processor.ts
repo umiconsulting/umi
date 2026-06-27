@@ -1,5 +1,7 @@
 import { Processor } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
+import { ConfigService } from '@nestjs/config';
+import type { AppConfig } from '../shared/config/config.schema';
 import { QUEUES } from './queues';
 import { workerOptions } from './job-options';
 import { BaseProcessor } from './base.processor';
@@ -17,11 +19,19 @@ export class LifecycleProcessor extends BaseProcessor {
   constructor(
     deadLetters: DeadLetterService,
     private readonly lifecycle: LifecycleService,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {
     super(deadLetters);
   }
 
   async process(job: Job): Promise<void> {
+    // Re-check the flag at run time: removing the scheduler stops FUTURE repeats
+    // but a job already queued before the flag flipped could still fire. Honor the
+    // current flag so disabling the crons is immediate and complete.
+    if (!this.config.get('LIFECYCLE_CRONS_ENABLED', { infer: true })) {
+      this.logger.log(`lifecycle job ${job.name} skipped (LIFECYCLE_CRONS_ENABLED=false)`);
+      return;
+    }
     switch (job.name) {
       case 'reward_expiring':
         await this.lifecycle.runRewardExpiring();

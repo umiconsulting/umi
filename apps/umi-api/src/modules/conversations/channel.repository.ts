@@ -38,9 +38,17 @@ export class ChannelRepository {
          AND ( $1 IN (ca.provider_account_id, ca.address)
             OR $2 IN (ca.provider_account_id, ca.address) )
        ORDER BY ca.updated_at DESC
-       LIMIT 1`,
+       LIMIT 2`,
       [bareNumber, prefixedNumber],
     );
+    // Fail CLOSED on ambiguity: two active accounts claiming the same number is a
+    // misconfiguration, and silently picking the newest could route a tenant's
+    // messages to another tenant. Throw so the webhook drops the message rather
+    // than guessing (a DB partial-unique on the active provider id is the durable
+    // guard — tracked as a follow-up migration).
+    if (rows.length > 1) {
+      throw new Error(`ambiguous WhatsApp channel account: ${rows.length} active rows match "${bareNumber}"`);
+    }
     return rows[0] ?? null;
   }
 }

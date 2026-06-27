@@ -96,6 +96,41 @@ SELECT s.tenant_id,
   FROM src s
  CROSS JOIN days d;
 
+-- 2b-bis. EXISTING tenants whose rows live at a location OTHER than the
+--     now-canonical OLDEST-active location. Resolution moved from the legacy
+--     Chapultepec-first pick to oldest-active, so such a tenant has rows — and so
+--     2b skips it — yet the bot now resolves a location with NO rows and would
+--     read "closed". Project the legacy rows onto the resolved location.
+--     ADDITIVE ONLY: inserts a (tenant, resolved-location, day) row only when that
+--     day isn't already present at the resolved location, so dashboard-set hours
+--     are never overwritten. DISTINCT ON guarantees one source row per day.
+WITH default_loc AS (
+  SELECT DISTINCT ON (tenant_id) tenant_id, id AS location_id
+    FROM core.locations
+   WHERE status = 'active'
+   ORDER BY tenant_id, created_at ASC, id ASC
+),
+source_rows AS (
+  SELECT DISTINCT ON (bh.tenant_id, bh.day_of_week)
+         bh.tenant_id,
+         dl.location_id AS target_location,
+         bh.day_of_week, bh.opens_at, bh.closes_at, bh.is_closed
+    FROM ops.business_hours bh
+    JOIN default_loc dl ON dl.tenant_id = bh.tenant_id
+   WHERE bh.location_id IS DISTINCT FROM dl.location_id
+   ORDER BY bh.tenant_id, bh.day_of_week, bh.location_id
+)
+INSERT INTO ops.business_hours
+  (tenant_id, location_id, day_of_week, opens_at, closes_at, is_closed)
+SELECT sr.tenant_id, sr.target_location, sr.day_of_week, sr.opens_at, sr.closes_at, sr.is_closed
+  FROM source_rows sr
+ WHERE NOT EXISTS (
+   SELECT 1 FROM ops.business_hours bh2
+    WHERE bh2.tenant_id = sr.tenant_id
+      AND bh2.location_id IS NOT DISTINCT FROM sr.target_location
+      AND bh2.day_of_week = sr.day_of_week
+ );
+
 -- 2c. VERIFY before COMMIT (run, eyeball against the conversaflow tenant):
 --   SELECT id, name, timezone FROM core.tenants WHERE id = '<conversaflow-tenant>';
 --   SELECT day_of_week, opens_at, closes_at, is_closed FROM ops.business_hours

@@ -34,12 +34,20 @@ export class OutboundProcessor extends BaseProcessor {
 
     switch (job.name) {
       case 'twilio.location_pin': {
+        const from = String(p.from ?? '');
+        const lat = Number(p.lat);
+        const lng = Number(p.lng);
+        // Fail fast on a malformed job rather than coercing to ''/NaN and
+        // handing Twilio a bad request (which it would reject anyway).
+        if (!to || !from || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+          throw new Error(`twilio.location_pin missing/invalid fields (to/from/lat/lng) #${job.id}`);
+        }
         const res = await this.twilio.sendLocationPin({
           to,
-          from: String(p.from ?? ''),
+          from,
           body: toWhatsAppMarkdown(String(p.body ?? '')),
-          lat: Number(p.lat),
-          lng: Number(p.lng),
+          lat,
+          lng,
           label: String(p.label ?? ''),
         });
         if (!res) throw new Error('twilio sendLocationPin returned null');
@@ -49,10 +57,11 @@ export class OutboundProcessor extends BaseProcessor {
       case 'twilio.status_notification':
       case 'twilio.cancel_notification':
       case 'whatsapp.lifecycle': {
-        const res = await this.twilio.sendWhatsAppMessage({
-          to,
-          body: toWhatsAppMarkdown(String(p.body ?? '')),
-        });
+        const body = toWhatsAppMarkdown(String(p.body ?? ''));
+        if (!to || !body.trim()) {
+          throw new Error(`${job.name} missing 'to' or empty body #${job.id}`);
+        }
+        const res = await this.twilio.sendWhatsAppMessage({ to, body });
         if (!res) throw new Error(`twilio sendWhatsAppMessage returned null (${job.name})`);
         if (job.name === 'twilio.reply' && typeof p.trace_id === 'string') {
           await this.trace.logPipelineTrace({

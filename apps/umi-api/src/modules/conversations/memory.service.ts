@@ -76,9 +76,11 @@ export class MemoryService {
   }): Promise<WorkingMemory> {
     const doSemanticSearch = params.totalMsgCount > 4;
 
-    // Kick off the query embedding in parallel with the DB fetches.
+    // Kick off the query embedding in parallel with the DB fetches. `.catch` keeps
+    // an embedding failure from rejecting the whole method — semantic context just
+    // falls back to null while recent messages + facts still load.
     const queryEmbeddingPromise = doSemanticSearch
-      ? this.voyage.generateEmbedding(params.currentMessage, 'query')
+      ? this.voyage.generateEmbedding(params.currentMessage, 'query').catch(() => null)
       : Promise.resolve(null);
 
     const [recent, rawFacts] = await Promise.all([
@@ -208,9 +210,12 @@ export class MemoryService {
     const convoText = recentMessages.map((m) => `${m.role}: ${m.content}`).join('\n');
     const existingJson = existingFacts ? JSON.stringify(existingFacts) : '{}';
 
-    const completion = await this.anthropic.createCompletion({
-      maxTokens: 256,
-      system: `Extract and merge customer preferences from this WhatsApp conversation with a café bot.
+    // Fully fail-safe: a thrown Anthropic call (network/rate-limit) or malformed
+    // output returns null so the caller keeps existingFacts unchanged.
+    try {
+      const completion = await this.anthropic.createCompletion({
+        maxTokens: 256,
+        system: `Extract and merge customer preferences from this WhatsApp conversation with a café bot.
 Return ONLY valid JSON with this exact shape:
 {
   "preferences": ["string array of things they like"],
@@ -221,13 +226,12 @@ Return ONLY valid JSON with this exact shape:
 }
 Merge with existing facts. If nothing new, return existing facts unchanged.
 Existing facts: ${existingJson}`,
-      userMessage: convoText,
-    });
+        userMessage: convoText,
+      });
 
-    if (!completion) return null;
-    const jsonMatch = completion.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    try {
+      if (!completion) return null;
+      const jsonMatch = completion.text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return null;
       return JSON.parse(jsonMatch[0]) as CustomerFacts;
     } catch {
       return null;

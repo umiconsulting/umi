@@ -60,8 +60,12 @@ export class MessagesRepository {
       );
       return rows[0]?.id ?? null;
     } catch (err) {
-      const code = (err as { code?: string }).code;
-      if (code === '23505' && params.twilioMessageSid) {
+      const e = err as { code?: string; constraint?: string };
+      // Only the twilio_message_sid partial-unique signals a duplicate webhook.
+      // (message_index has no unique index, so its MAX+1 allocation can't 23505 —
+      // a concurrent insert at worst shares an index and ordering falls back to
+      // created_at.) Narrowing here avoids masking an unrelated 23505 as a dup.
+      if (e.code === '23505' && e.constraint === 'comms_messages_twilio_sid_uidx') {
         this.logger.log(
           `message_already_processed twilio_sid=${params.twilioMessageSid}`,
         );

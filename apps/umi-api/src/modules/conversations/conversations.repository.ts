@@ -59,37 +59,48 @@ export class ConversationsRepository {
     tenantId: string,
     personId: string,
   ): Promise<{ conversation: ConversationRecord; messageCount: number }> {
-    const existing = await this.pg.query<ConversationRow>(
-      `SELECT ${SELECT_COLUMNS}
-         FROM comms.conversations
-        WHERE person_id = $1
-          AND tenant_id = $2
-          AND status IN ('open', 'active', 'pending')
-        ORDER BY last_message_at DESC NULLS LAST, created_at DESC
-        LIMIT 1`,
-      [personId, tenantId],
-    );
+    // There is no partial-unique on open conversations (a person legitimately has
+    // many closed ones + at most one open), so a plain SELECT-then-INSERT races:
+    // two simultaneous inbound messages could each create a new open conversation.
+    // A transaction-scoped advisory lock keyed on (tenant, person) makes the
+    // find-or-create atomic without a schema change.
+    return this.pg.workerTx(async (client) => {
+      await client.query(`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, [
+        `conv:${tenantId}:${personId}`,
+      ]);
 
-    if (existing.rows[0]) {
-      const conversation = mapRow(existing.rows[0]);
-      const count = await this.pg.query<{ n: string }>(
-        `SELECT count(*)::text AS n FROM comms.messages WHERE conversation_id = $1`,
-        [conversation.id],
+      const existing = await client.query<ConversationRow>(
+        `SELECT ${SELECT_COLUMNS}
+           FROM comms.conversations
+          WHERE person_id = $1
+            AND tenant_id = $2
+            AND status IN ('open', 'active', 'pending')
+          ORDER BY last_message_at DESC NULLS LAST, created_at DESC
+          LIMIT 1`,
+        [personId, tenantId],
       );
-      return { conversation, messageCount: Number(count.rows[0]?.n ?? 0) };
-    }
 
-    const created = await this.pg.query<ConversationRow>(
-      `INSERT INTO comms.conversations
-         (tenant_id, person_id, current_state, status, state_version, draft_cart_version, last_message_at)
-       VALUES ($1, $2, 'initial', 'open', 0, 0, now())
-       RETURNING ${SELECT_COLUMNS}`,
-      [tenantId, personId],
-    );
-    if (!created.rows[0]) {
-      throw new Error('Failed to create conversation');
-    }
-    return { conversation: mapRow(created.rows[0]), messageCount: 0 };
+      if (existing.rows[0]) {
+        const conversation = mapRow(existing.rows[0]);
+        const count = await client.query<{ n: string }>(
+          `SELECT count(*)::text AS n FROM comms.messages WHERE conversation_id = $1`,
+          [conversation.id],
+        );
+        return { conversation, messageCount: Number(count.rows[0]?.n ?? 0) };
+      }
+
+      const created = await client.query<ConversationRow>(
+        `INSERT INTO comms.conversations
+           (tenant_id, person_id, current_state, status, state_version, draft_cart_version, last_message_at)
+         VALUES ($1, $2, 'initial', 'open', 0, 0, now())
+         RETURNING ${SELECT_COLUMNS}`,
+        [tenantId, personId],
+      );
+      if (!created.rows[0]) {
+        throw new Error('Failed to create conversation');
+      }
+      return { conversation: mapRow(created.rows[0]), messageCount: 0 };
+    });
   }
 
   async loadById(conversationId: string): Promise<ConversationRecord | null> {

@@ -137,8 +137,14 @@ export class HoursService {
 
   /**
    * Dashboard PATCH: persist any combination of weekly hours, timezone, and
-   * ordering settings through their single canonical homes. Each block is
-   * independent so a hours-only save still works.
+   * ordering settings through their single canonical homes.
+   *
+   * CONTRACT: the three blocks are INDEPENDENT and each is idempotent. This is a
+   * settings form, not a money path — full cross-repo atomicity would require
+   * threading one transaction through HoursRepository (RLS pool),
+   * TenantsRepository, and OrderingSettingsRepository, which they don't share. If
+   * a later block fails the earlier ones stay saved; the caller surfaces the error
+   * and the user re-saves (a no-op for the already-persisted blocks).
    */
   async updateAll(
     tenantId: string,
@@ -167,18 +173,35 @@ export class HoursService {
     if (!hours || typeof hours !== 'object') {
       throw new BadRequestException('hours required');
     }
-    const days: DayInput[] = [];
-    for (const [id, raw] of Object.entries(hours as Record<string, DayHours>)) {
-      const num = DAY_ID_TO_NUM[id];
-      if (num === undefined) continue;
-      const h = raw ?? ({} as DayHours);
-      days.push({
-        dow: parseInt(num, 10),
-        opens: h.open ? h.from || '08:00' : '00:00',
-        closes: h.open ? h.to || '20:00' : '00:00',
-        isClosed: !h.open,
-      });
+    const submitted = hours as Record<string, DayHours>;
+
+    // repo.replace() rewrites the WHOLE week, so a partial payload (e.g. just
+    // {mon}) would wipe the untouched days. Merge the submitted days onto the
+    // existing schedule first; days neither submitted nor previously set stay
+    // absent (no invented default windows).
+    const merged: HoursMap = {};
+    for (const r of await this.repo.read(tenantId, locationId)) {
+      const id = DAY_NUM_TO_ID[String(r.day_of_week)];
+      if (!id) continue;
+      merged[id] = r.is_closed
+        ? { open: false, from: '00:00', to: '00:00' }
+        : {
+            open: true,
+            from: (r.opens_at || '08:00').slice(0, 5),
+            to: (r.closes_at || '20:00').slice(0, 5),
+          };
     }
+    for (const [id, raw] of Object.entries(submitted)) {
+      if (DAY_ID_TO_NUM[id] === undefined || !raw) continue;
+      merged[id] = raw;
+    }
+
+    const days: DayInput[] = Object.entries(merged).map(([id, h]) => ({
+      dow: parseInt(DAY_ID_TO_NUM[id], 10),
+      opens: h.open ? h.from || '08:00' : '00:00',
+      closes: h.open ? h.to || '20:00' : '00:00',
+      isClosed: !h.open,
+    }));
     await this.repo.replace(tenantId, locationId, days);
   }
 

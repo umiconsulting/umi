@@ -34,6 +34,7 @@ export class WhatsappController {
   private readonly logger = new Logger(WhatsappController.name);
   private readonly authToken?: string;
   private readonly webhookUrl?: string;
+  private readonly allowInsecure: boolean;
 
   constructor(
     config: ConfigService<AppConfig, true>,
@@ -48,6 +49,7 @@ export class WhatsappController {
   ) {
     this.authToken = config.get('TWILIO_AUTH_TOKEN', { infer: true });
     this.webhookUrl = config.get('TWILIO_WEBHOOK_URL', { infer: true });
+    this.allowInsecure = config.get('ALLOW_INSECURE_TWILIO_WEBHOOK', { infer: true });
   }
 
   @Post('whatsapp')
@@ -60,11 +62,18 @@ export class WhatsappController {
     const params = new URLSearchParams(typeof rawBody === 'string' ? rawBody : '');
 
     // ── SEC-01/FT-02: signature validation against the exact signed URL ──
-    if (this.authToken) {
-      if (!this.webhookUrl) {
-        this.logger.error('TWILIO_WEBHOOK_URL not set — cannot validate Twilio signature');
-        return twimlMessage('Lo siento, estoy teniendo problemas. Intenta de nuevo.');
+    // FAIL CLOSED: without an auth token we cannot verify the sender, so drop the
+    // request unless an explicit local-dev bypass is set (never in production).
+    if (!this.authToken || !this.webhookUrl) {
+      if (this.allowInsecure) {
+        this.logger.warn('twilio signature validation BYPASSED (ALLOW_INSECURE_TWILIO_WEBHOOK)');
+      } else {
+        this.logger.error(
+          `twilio webhook missing TWILIO_AUTH_TOKEN/URL — dropping unsigned request request_id=${requestId}`,
+        );
+        return emptyTwiml();
       }
+    } else {
       const valid = validateTwilioSignature(this.authToken, signature ?? '', this.webhookUrl, params);
       if (!valid) {
         this.logger.warn(`twilio_sig_invalid request_id=${requestId}`);
@@ -134,7 +143,14 @@ export class WhatsappController {
 
     const message = sanitizeInput(rawMessage);
 
-    // ── Idempotent ingress gate (queue.inbound_events UNIQUE(provider, event id)) ──
+    // ── Ingress observability gate (queue.inbound_events UNIQUE(provider, event id)) ──
+    // NOTE: this is NOT the authoritative dedup. It commits before the message
+    // insert + enqueue, so hard-dropping on its `duplicate` flag would strand a
+    // first attempt that crashed mid-flight (gate written, work not done). The
+    // durable, idempotent guards are below: comms.messages.twilio_message_sid
+    // (UNIQUE) → DUPLICATE_MESSAGE, and the enqueue jobId=messageSid (BullMQ drops
+    // a re-add). So we log a duplicate here and continue; the message-level dedup
+    // is what actually prevents a double turn.
     if (messageSid) {
       const gate = await this.queue.registerInboundEvent({
         tenantId,
@@ -144,8 +160,7 @@ export class WhatsappController {
         payload: { phone_hash: this.trace.hashPhone(phone), message_length: message.length },
       });
       if (gate.duplicate) {
-        this.logger.log(`duplicate_webhook_ignored message_sid=${messageSid}`);
-        return emptyTwiml();
+        this.logger.log(`inbound_event_seen message_sid=${messageSid} (continuing; message-level dedup is authoritative)`);
       }
     }
 

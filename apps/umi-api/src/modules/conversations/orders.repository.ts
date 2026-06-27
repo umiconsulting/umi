@@ -67,8 +67,11 @@ export class OrdersRepository {
    * existing order (no duplicate items).
    */
   async createOrder(params: CreateOrderParams): Promise<CreateOrderResult> {
-    const totalPesos = params.items.reduce((s, it) => s + it.quantity * it.unit_price, 0);
-    const totalCents = round(totalPesos * 100);
+    // Compute each line's cents ONCE, then sum for the header total — so
+    // ops.orders.total_cents always equals SUM(quantity * order_items.unit_price_cents)
+    // (deriving the header from rounded pesos could drift by a centavo).
+    const itemCents = params.items.map((it) => round(it.unit_price * 100));
+    const totalCents = params.items.reduce((s, it, i) => s + it.quantity * itemCents[i], 0);
     const details = {
       items: params.items, // PESOS snapshot
       ...(params.customerNote ? { customer_note: params.customerNote } : {}),
@@ -125,11 +128,11 @@ export class OrdersRepository {
             it.product_name,
             it.variant_name,
             it.quantity,
-            round(it.unit_price * 100),
+            itemCents[i],
           ],
         );
       }
-      return { orderId, total: totalPesos, created: true };
+      return { orderId, total: totalCents / 100, created: true };
     });
   }
 

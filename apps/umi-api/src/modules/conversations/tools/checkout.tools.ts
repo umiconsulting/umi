@@ -158,11 +158,17 @@ export class CheckoutTools {
       return terminalToolError('No encontré una orden previa reutilizable para repetir.');
     }
 
+    // Re-validate + re-price the historical items against the LIVE catalog (same
+    // path confirmOrder uses) so a reorder never recreates a discontinued variant
+    // or a stale price.
+    const revalidated = await this.validateItems(ctx.tenantId, last.items);
+    if (!revalidated.ok) return revalidated.error;
+
     const result = await this.orders.createOrder({
       tenantId: ctx.tenantId,
       personId: ctx.personId,
       locationId: ctx.locationId ?? null,
-      items: last.items,
+      items: revalidated.items,
       customerNote: input.customer_note ?? last.customerNote ?? null,
       pickupPerson: last.pickupPerson ?? null,
       personalMessage: last.pickupPerson ? last.personalMessage ?? null : null,

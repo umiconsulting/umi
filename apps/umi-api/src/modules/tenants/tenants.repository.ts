@@ -112,7 +112,10 @@ export class TenantsRepository {
   ): Promise<string | null> {
     if (requestedLocationId) {
       const loc = await this.findActiveLocation(tenantId, requestedLocationId);
-      return loc?.id ?? null;
+      if (loc) return loc.id;
+      // Stale/invalid requested id (renamed/deleted/wrong tenant) → fall through
+      // to the deterministic default rather than returning null (which would make
+      // hours resolve tenant-wide instead of at the canonical active location).
     }
     const { rows } = await this.pg.withTenant((c) =>
       c.query<{ id: string }>(
@@ -162,7 +165,10 @@ export class TenantsRepository {
          LIMIT 1`,
         [tenantId, requestedLocationId],
       );
-      return rows[0]?.id ?? null;
+      if (rows[0]) return rows[0].id;
+      // Stale/invalid requested id → fall through to the deterministic default
+      // (must mirror resolveLocationId so the bot reads at the same location the
+      // dashboard writes).
     }
     const { rows } = await this.pg.query<{ id: string }>(
       `SELECT id::text AS id

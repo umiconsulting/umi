@@ -157,6 +157,7 @@ export class TurnService {
         personId: payload.person_id,
         conversationId: payload.conversation_id,
         turnId: payload.turn_id,
+        locationId: payload.location_id ?? null,
         requestId: payload.request_id,
         customerPhone: person.phone,
       },

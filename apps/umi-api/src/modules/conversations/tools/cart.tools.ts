@@ -72,7 +72,11 @@ export class CartTools {
       customer_note?: string;
     },
   ): Promise<ToolResult> {
-    const quantity = Math.max(1, Math.min(Number(input.quantity) || 1, 20));
+    // Reject non-integer quantities rather than silently truncating 1.5 → 1.
+    if (input.quantity !== undefined && (!Number.isInteger(input.quantity) || input.quantity < 1)) {
+      return needsInputToolError('Indica la cantidad en números enteros (por ejemplo, 2).');
+    }
+    const quantity = Math.max(1, Math.min(input.quantity ?? 1, 20));
     const variantFilters = inferVariantFiltersFromText(input.query, {
       size: input.size,
       temp: input.temp,

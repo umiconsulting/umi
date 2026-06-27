@@ -39,18 +39,23 @@ export class TenantResolutionService {
    */
   async resolveInboundTenant(toAddress: string): Promise<ResolvedTenant | null> {
     const bare = normalizeAddress(toAddress);
-    const prefixed = bare ? `whatsapp:${bare}` : '';
+    // An empty/whitespace `To` is never a valid business number — drop it
+    // rather than letting it fall through to the DEFAULT_TENANT_ID catch-all
+    // (which would mis-route junk into the live tenant).
+    if (!bare) {
+      this.logger.error('inbound WhatsApp message with empty To — dropping');
+      return null;
+    }
+    const prefixed = `whatsapp:${bare}`;
 
-    if (bare) {
-      const account = await this.channels.findWhatsappAccount(bare, prefixed);
-      if (account) {
-        return {
-          tenantId: account.tenantId,
-          locationId: account.locationId,
-          channelAccountId: account.channelAccountId,
-          source: 'channel_account',
-        };
-      }
+    const account = await this.channels.findWhatsappAccount(bare, prefixed);
+    if (account) {
+      return {
+        tenantId: account.tenantId,
+        locationId: account.locationId,
+        channelAccountId: account.channelAccountId,
+        source: 'channel_account',
+      };
     }
 
     if (this.defaultTenantId) {

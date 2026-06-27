@@ -84,9 +84,10 @@ export class OrderingSettingsRepository {
 
   /**
    * Merge-write the ordering scalars into `ops.businesses.config` (shallow jsonb
-   * merge). Constraint-agnostic upsert (UPDATE then INSERT) so it doesn't depend
-   * on a UNIQUE(tenant_id) constraint. Clears legacy `order_cutoff_time` whenever
-   * the buffer is set.
+   * merge). Single atomic upsert on the `businesses_tenant_id_key` UNIQUE(tenant_id)
+   * — no UPDATE-then-INSERT race. If no business row exists yet, one is created
+   * with the tenant's real name (never a blank), not a synthetic empty string.
+   * Clears legacy `order_cutoff_time` whenever the buffer is set.
    */
   async updateOrdering(tenantId: string, patch: OrderingPatch): Promise<void> {
     const merge: Record<string, unknown> = {};
@@ -102,20 +103,17 @@ export class OrderingSettingsRepository {
     if (Object.keys(merge).length === 0) return;
 
     const mergeJson = JSON.stringify(merge);
-    await this.pg.withTenant(async (c) => {
-      const updated = await c.query(
-        `UPDATE ops.businesses
-            SET config = COALESCE(config, '{}'::jsonb) || $2::jsonb,
-                updated_at = now()
-          WHERE tenant_id = $1::uuid`,
-        [tenantId, mergeJson],
-      );
-      if ((updated.rowCount ?? 0) > 0) return;
-      await c.query(
+    await this.pg.withTenant((c) =>
+      c.query(
         `INSERT INTO ops.businesses (tenant_id, name, config)
-         VALUES ($1::uuid, '', $2::jsonb)`,
+         VALUES ($1::uuid,
+                 COALESCE((SELECT name FROM core.tenants WHERE id = $1::uuid), 'Negocio'),
+                 $2::jsonb)
+         ON CONFLICT (tenant_id) DO UPDATE
+           SET config = COALESCE(ops.businesses.config, '{}'::jsonb) || EXCLUDED.config,
+               updated_at = now()`,
         [tenantId, mergeJson],
-      );
-    });
+      ),
+    );
   }
 }

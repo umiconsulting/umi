@@ -32,7 +32,11 @@ export function applyToolOutcome(
   toolName: string,
   result: ToolResult,
 ): void {
-  if (result?.success === false) return;
+  // Only a genuine success advances turn state. A clarification or error payload
+  // (success===false, a needs_clarification prompt, or an error) must never flip
+  // orderConfirmed / cartUpdated / searchPerformed — otherwise a failed
+  // confirm_order would still move the conversation to a confirmed state.
+  if (result?.success === false || result?.needs_clarification || result?.error) return;
 
   if (ORDER_CONFIRMATION_TOOLS.has(toolName)) state.orderConfirmed = true;
   if (toolName === 'confirm_order_changes') state.orderChangesConfirmed = true;

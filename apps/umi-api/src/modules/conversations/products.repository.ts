@@ -74,8 +74,14 @@ export class ProductsRepository {
         LIMIT 250`,
       [tenantId, likePatterns],
     );
-    if (text.rows.length) {
-      return rankProducts(text.rows.map(mapRow), query).slice(0, limit);
+    // Exclude internal-only categories in BOTH branches, matching browse() /
+    // findNearestCandidates() / categorySuggestions() — otherwise a text or
+    // semantic hit could surface internal catalog items to the customer.
+    const textMatches = text.rows
+      .map(mapRow)
+      .filter((p) => !INTERNAL_ONLY_CATEGORIES.has(p.category ?? ''));
+    if (textMatches.length) {
+      return rankProducts(textMatches, query).slice(0, limit);
     }
 
     // Semantic fallback.
@@ -90,7 +96,10 @@ export class ProductsRepository {
         LIMIT $3`,
       [tenantId, JSON.stringify(embedding), limit],
     );
-    return rankProducts(sem.rows.map(mapRow), query).slice(0, limit);
+    return rankProducts(
+      sem.rows.map(mapRow).filter((p) => !INTERNAL_ONLY_CATEGORIES.has(p.category ?? '')),
+      query,
+    ).slice(0, limit);
   }
 
   /** Permissive cosine "nearest" candidates (threshold 0.30) for near-miss help. */

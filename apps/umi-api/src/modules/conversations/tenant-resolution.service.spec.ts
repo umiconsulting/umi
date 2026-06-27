@@ -77,10 +77,12 @@ describe('TenantResolutionService', () => {
     expect(await svc.resolveInboundTenant('whatsapp:+14155238886')).toBeNull();
   });
 
-  it('does not query the channel repo for an empty address (still allows default)', async () => {
+  it('drops an empty address WITHOUT querying the repo or falling back to default', async () => {
+    // An empty `To` is never a valid business number — it must not be mis-routed
+    // into the DEFAULT_TENANT_ID catch-all (CodeRabbit #16, fail-closed).
     const { svc, findWhatsappAccount } = make({ defaultTenantId: DEFAULT });
     const res = await svc.resolveInboundTenant('');
     expect(findWhatsappAccount).not.toHaveBeenCalled();
-    expect(res?.source).toBe('default');
+    expect(res).toBeNull();
   });
 });
