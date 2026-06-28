@@ -21,6 +21,7 @@ import { StaffModule } from './modules/staff/staff.module';
 import { HoursModule } from './modules/hours/hours.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { CashModule } from './modules/cash/cash.module';
+import { KdsModule } from './modules/kds/kds.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 
 /**
@@ -44,6 +45,7 @@ import { ConversationsModule } from './modules/conversations/conversations.modul
     HoursModule,
     CustomersModule,
     CashModule,
+    KdsModule,
     ConversationsModule,
   ],
   providers: [
