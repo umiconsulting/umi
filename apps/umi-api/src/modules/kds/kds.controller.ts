@@ -1,4 +1,4 @@
-import { Controller, Options, Post, Req, Res } from '@nestjs/common';
+import { Controller, Logger, Options, Post, Req, Res } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { KdsService } from './kds.service';
 import {
@@ -23,6 +23,8 @@ const DEVICE_ALLOW_HEADERS =
  */
 @Controller()
 export class KdsController {
+  private readonly logger = new Logger(KdsController.name);
+
   constructor(private readonly kds: KdsService) {}
 
   // ── pairing (no device auth) ───────────────────────────────────────────────
@@ -41,13 +43,16 @@ export class KdsController {
     const body = readJson(req);
     if (!body) return send(reply, 400, { error: 'invalid_json' });
     try {
-      const r = await this.kds.pairing(body);
+      const r = await this.kds.pairing(body, req.ip ?? null);
       return send(reply, r.status, r.body);
     } catch (err) {
-      return send(reply, 500, {
-        error: 'internal_error',
-        detail: errMessage(err),
-      });
+      // Public pairing is unauthenticated — keep the body generic (never leak
+      // DB/schema internals) and record the cause server-side.
+      this.logger.error(
+        `kds pairing error: ${errMessage(err)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
+      return send(reply, 500, { error: 'internal_error' });
     }
   }
 
@@ -72,6 +77,10 @@ export class KdsController {
       return send(reply, r.status, r.body);
     } catch (err) {
       if (err instanceof KdsHttpError) return send(reply, err.status, err.body);
+      this.logger.error(
+        `kds board error: ${errMessage(err)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
       return send(reply, 500, { error: 'internal_error' });
     }
   }
@@ -97,6 +106,10 @@ export class KdsController {
       return send(reply, r.status, r.body);
     } catch (err) {
       if (err instanceof KdsHttpError) return send(reply, err.status, err.body);
+      this.logger.error(
+        `kds command error: ${errMessage(err)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
       return send(reply, 500, { error: 'internal_error' });
     }
   }

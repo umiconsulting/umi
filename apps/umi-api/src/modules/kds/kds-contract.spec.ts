@@ -3,11 +3,15 @@ import {
   asSixDigitPin,
   asUuid,
   BOARD_ACTIVE_STATUSES,
+  DEVICE_LIVE_MS,
+  DEVICE_OFFLINE_MS,
   DEVICE_REVOKED_BODY,
   hashPin,
   KDS_DEVICE_TOKEN_HEADER,
   mapKitchenToOrderStatus,
   MAX_ATTEMPTS,
+  PAIRING_LIST_LIMIT,
+  PIN_SCAN_LIMIT,
   PIN_TTL_MINUTES,
   POLL_AFTER_SECONDS,
   randomHex,
@@ -39,6 +43,10 @@ describe('KDS frozen contract', () => {
     expect(PIN_TTL_MINUTES).toBe(10);
     expect(POLL_AFTER_SECONDS).toBe(5);
     expect(MAX_ATTEMPTS).toBe(5);
+    expect(PIN_SCAN_LIMIT).toBe(50);
+    expect(PAIRING_LIST_LIMIT).toBe(20);
+    expect(DEVICE_LIVE_MS).toBe(10_000);
+    expect(DEVICE_OFFLINE_MS).toBe(20_000);
   });
 
   it('keeps terminal statuses off the live board', () => {

@@ -3,13 +3,13 @@ import {
   deviceStatus,
   KdsService,
   ticketBelongsToDevice,
-  validateTransition,
 } from './kds.service';
 import {
   DEVICE_REVOKED_BODY,
   hashPin,
   KdsHttpError,
   type KdsDeviceSession,
+  validateTransition,
 } from './dto/kds-contract';
 
 function make(notifyEnabled = true) {
@@ -34,8 +34,11 @@ function make(notifyEnabled = true) {
     heartbeatTouch: vi.fn().mockResolvedValue(true),
   };
   const config = { get: vi.fn().mockReturnValue(notifyEnabled) };
-  const svc = new KdsService(repo as never, config as never);
-  return { svc, repo };
+  const rateLimit = {
+    hit: vi.fn().mockReturnValue({ allowed: true, remaining: 9, resetAt: 0 }),
+  };
+  const svc = new KdsService(repo as never, rateLimit as never, config as never);
+  return { svc, repo, rateLimit };
 }
 
 const SESSION: KdsDeviceSession = {
@@ -142,6 +145,20 @@ describe('KdsService.pairing — kds_start', () => {
     const r = await svc.pairing({ action: 'kds_start', pin: '123456' });
     expect(r).toEqual({ status: 404, body: { error: 'pairing_not_found' } });
     expect(repo.setPairingRequestedName).not.toHaveBeenCalled();
+  });
+
+  it('429s kds_start when the per-IP rate limit is exceeded', async () => {
+    const { svc, repo, rateLimit } = make();
+    rateLimit.hit.mockReturnValueOnce({ allowed: false, remaining: 0, resetAt: 0 });
+    const r = await svc.pairing({ action: 'kds_start', pin: '123456' }, '1.2.3.4');
+    expect(r).toEqual({ status: 429, body: { error: 'rate_limited' } });
+    expect(repo.findPendingPairingsForPin).not.toHaveBeenCalled();
+  });
+
+  it('skips the rate limit when no IP is provided', async () => {
+    const { svc, rateLimit } = make();
+    await svc.pairing({ action: 'kds_start', pin: '123456' });
+    expect(rateLimit.hit).not.toHaveBeenCalled();
   });
 });
 
@@ -341,7 +358,7 @@ describe('KdsService.command — partial_cancel_items', () => {
     const r = await svc.command(SESSION, {
       action: 'partial_cancel_items',
       ticket_id: 'o1',
-      item_ids: ['i1'],
+      item_ids: ['3f2504e0-4f89-41d3-9a0c-0305e82c3301'],
       reason_code: 'out_of_stock',
     });
     expect(r.status).toBe(200);
@@ -386,6 +403,7 @@ describe('pure helpers', () => {
   it('deviceStatus derives live/slow/offline from last_used_at', () => {
     expect(deviceStatus(null)).toBe('offline');
     expect(deviceStatus(new Date().toISOString())).toBe('live');
+    expect(deviceStatus(new Date(Date.now() - 15_000).toISOString())).toBe('slow');
     expect(deviceStatus(new Date(Date.now() - 60_000).toISOString())).toBe('offline');
   });
 });

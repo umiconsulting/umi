@@ -203,7 +203,9 @@ async function _loadDevices(ctx) {
   // is removed (the "remove the duplicate" deliverable).
   const devResult = await _apiFetch(_withLocation(ctx, _tenantPath(ctx, '/kds/devices')))
   return (devResult.devices || []).map(function(d) {
-    return Object.assign({ model: 'iPad', ip: '-' }, d, d.status ? {
+    // `d.ip` overrides the merged default, so re-apply the '-' fallback after
+    // the spread (the server sends null when no ip has been recorded yet).
+    return Object.assign({ model: 'iPad' }, d, { ip: d.ip || '-' }, d.status ? {
       _heartbeatStatus: d.status,    // 'live' | 'slow' | 'offline'
       _heartbeatSeenMs: d.last_used_at ? new Date(d.last_used_at).getTime() : null,
     } : {})

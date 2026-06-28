@@ -1,10 +1,12 @@
 import {
   BadRequestException,
+  HttpException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { AppConfig } from '../../shared/config/config.schema';
+import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 import { KdsRepository, type OrderScopeRow, type TicketRow, type EventRow, type DeviceListRow } from './kds.repository';
 import {
   partialCancelNotificationBody,
@@ -30,18 +32,14 @@ import {
   randomHex,
   randomPin,
   sha256Hex,
-  STATUS_TRANSITIONS,
+  validateTransition,
 } from './dto/kds-contract';
 
-const KITCHEN_STATUSES = new Set<KitchenStatus>([
-  'new',
-  'accepted',
-  'preparing',
-  'ready',
-  'completed',
-  'cancelled',
-  'partial_cancelled',
-]);
+// Per-IP brute-force guard on kds_start (the public PIN-guess vector). A legit
+// pairing is a single PIN entry; 10/min/IP is generous for staff yet caps an
+// attacker far below the 6-digit space within a pairing's 10-min TTL.
+const PAIR_RATE_MAX = 10;
+const PAIR_RATE_WINDOW_MS = 60_000;
 
 /**
  * KDS domain logic. Two faces over one canonical model:
@@ -58,6 +56,7 @@ export class KdsService {
 
   constructor(
     private readonly repo: KdsRepository,
+    private readonly rateLimit: RateLimitService,
     config: ConfigService<AppConfig, true>,
   ) {
     this.notifyEnabled = config.get('KDS_STATUS_NOTIFY_ENABLED', {
@@ -99,19 +98,36 @@ export class KdsService {
   // ═══════════════════════════ iPad: pairing ════════════════════════════════
 
   /** Device-side pairing (kds_start / kds_status). Admin actions are dashboard-only. */
-  async pairing(body: Record<string, unknown>): Promise<KdsResult> {
+  async pairing(
+    body: Record<string, unknown>,
+    ip: string | null = null,
+  ): Promise<KdsResult> {
     const action = asText(body.action);
     if (!action) return { status: 400, body: { error: 'missing_action' } };
 
-    if (action === 'kds_start') return this.kdsStart(body);
+    if (action === 'kds_start') return this.kdsStart(body, ip);
     if (action === 'kds_status') return this.kdsStatus(body);
     return { status: 400, body: { error: 'unknown_action' } };
   }
 
-  private async kdsStart(body: Record<string, unknown>): Promise<KdsResult> {
+  private async kdsStart(
+    body: Record<string, unknown>,
+    ip: string | null,
+  ): Promise<KdsResult> {
     const pin = asSixDigitPin(body.pin);
     const requestedName = asText(body.device_name) || 'Kitchen iPad';
     if (!pin) return { status: 400, body: { error: 'invalid_pin' } };
+
+    // Brute-force guard: cap PIN guesses per source IP. A pairing-row attempt
+    // counter is unenforceable in this flow (a global PIN match can't attribute
+    // a wrong guess to a specific pairing), so rate-limit the endpoint instead.
+    if (
+      ip &&
+      !this.rateLimit.hit(`kds:pair:${ip}`, PAIR_RATE_MAX, PAIR_RATE_WINDOW_MS)
+        .allowed
+    ) {
+      return { status: 429, body: { error: 'rate_limited' } };
+    }
 
     const candidates = await this.repo.findPendingPairingsForPin(PIN_SCAN_LIMIT);
     for (const p of candidates) {
@@ -229,7 +245,12 @@ export class KdsService {
       const limit = Number.isFinite(Number(body.limit))
         ? Math.min(Math.max(Number(body.limit), 1), 500)
         : 200;
-      const rows = await this.repo.ticketEvents(session.tenantId, after, limit);
+      const rows = await this.repo.ticketEvents(
+        session.tenantId,
+        session.stationId,
+        after,
+        limit,
+      );
       return { status: 200, body: { ok: true, data: rows.map(toEventRow) } };
     }
 
@@ -256,6 +277,7 @@ export class KdsService {
         return { status: 400, body: { error: 'missing_required_fields' } };
       }
       const order = await this.repo.loadOrderForScope(
+        session.tenantId,
         ticketId,
         asUuid(ticketId),
       );
@@ -285,14 +307,24 @@ export class KdsService {
 
     if (action === 'partial_cancel_items') {
       const ticketId = asText(body.ticket_id);
-      const itemIds = Array.isArray(body.item_ids)
-        ? (body.item_ids as unknown[]).map(String).filter(Boolean)
+      const rawIds = Array.isArray(body.item_ids)
+        ? (body.item_ids as unknown[])
         : [];
+      // Validate every id as a uuid BEFORE the `::uuid[]` cast (a bad value would
+      // otherwise surface as a raw 500 instead of a clean 400).
+      const mappedIds = rawIds.map((v) => asUuid(v));
       const reasonCode = asText(body.reason_code);
-      if (!ticketId || itemIds.length === 0 || !reasonCode) {
+      if (
+        !ticketId ||
+        mappedIds.length === 0 ||
+        mappedIds.some((x) => x === null) ||
+        !reasonCode
+      ) {
         return { status: 400, body: { error: 'missing_required_fields' } };
       }
+      const itemIds = [...new Set(mappedIds as string[])];
       const order = await this.repo.loadOrderForScope(
+        session.tenantId,
         ticketId,
         asUuid(ticketId),
       );
@@ -310,7 +342,7 @@ export class KdsService {
         buildNotifyBody: (cancelled, remaining) =>
           this.notifyEnabled
             ? partialCancelNotificationBody(cancelled, remaining)
-            : '',
+            : null,
       });
       return {
         status: 200,
@@ -400,6 +432,10 @@ export class KdsService {
     }
     const station = await this.repo.loadStation(tenantId, locationId, stationId);
     if (!station) throw new NotFoundException({ error: 'station_not_found' });
+    // When the dashboard didn't scope by location, anchor the pairing to the
+    // station's own location so kds_status re-resolves the same station
+    // (loadStation now treats a missing locationId as unscoped, not root-only).
+    const pairingLocationId = locationId ?? station.location_id;
 
     const pin = randomPin();
     const pinSalt = randomHex(16);
@@ -410,7 +446,7 @@ export class KdsService {
 
     const row = await this.repo.insertPairingRequest({
       tenantId,
-      locationId,
+      locationId: pairingLocationId,
       stationId,
       deviceName,
       pinHash,
@@ -463,10 +499,13 @@ export class KdsService {
   ): Promise<{ ok: true }> {
     const id = asUuid(deviceId);
     if (!id) throw new BadRequestException({ error: 'invalid_device_id' });
-    const ok = await this.repo.updateSession(tenantId, id, {
+    // Only touch station_id when the PATCH actually carries it, so a rename-only
+    // update doesn't wipe the device's station assignment.
+    const patch: { deviceName: string | null; stationId?: string | null } = {
       deviceName: optText(body.device_name),
-      stationId: asUuid(body.station_id),
-    });
+    };
+    if ('station_id' in body) patch.stationId = asUuid(body.station_id);
+    const ok = await this.repo.updateSession(tenantId, id, patch);
     if (!ok) throw new NotFoundException({ error: 'device_not_found' });
     return { ok: true };
   }
@@ -493,22 +532,39 @@ export class KdsService {
     if (!target) {
       throw new BadRequestException({ error: 'missing_required_fields' });
     }
-    const order = await this.repo.loadOrderForScope(ticketId, asUuid(ticketId));
-    if (!order || order.tenant_id !== tenantId) {
+    const order = await this.repo.loadOrderForScope(
+      tenantId,
+      ticketId,
+      asUuid(ticketId),
+    );
+    if (!order) {
       throw new NotFoundException({ error: 'ticket_not_found' });
     }
     const err = validateTransition(order.kitchen_status, target);
     if (err) throw new BadRequestException({ error: err });
 
-    const result = await this.repo.transitionTicket({
-      order,
-      targetStatus: target,
-      actorId: actorUserId,
-      actorChannel: 'dashboard',
-      cancellationReasonCode: optText(body.cancellation_reason_code),
-      cancellationReasonNote: optText(body.cancellation_reason_note),
-      notifyBody: this.notifyEnabled ? statusNotificationBody(target) : null,
-    });
+    let result: { sequence: number };
+    try {
+      result = await this.repo.transitionTicket({
+        order,
+        targetStatus: target,
+        actorId: actorUserId,
+        actorChannel: 'dashboard',
+        cancellationReasonCode: optText(body.cancellation_reason_code),
+        cancellationReasonNote: optText(body.cancellation_reason_note),
+        notifyBody: this.notifyEnabled ? statusNotificationBody(target) : null,
+      });
+    } catch (e) {
+      // The repo re-checks under a row lock; surface a lost-race conflict as a
+      // proper HTTP status (the iPad path catches KdsHttpError directly).
+      if (e instanceof KdsHttpError) {
+        throw new HttpException(
+          e.body as string | Record<string, unknown>,
+          e.status,
+        );
+      }
+      throw e;
+    }
     return {
       ok: true,
       data: { ticket_id: order.id, status: target, sequence: result.sequence },
@@ -536,19 +592,6 @@ export function ticketBelongsToDevice(
     order.station_id === session.stationId ||
     order.station_id == null;
   return tenantMatches && locationMatches && stationMatches;
-}
-
-/** Returns an error string for an invalid transition, or null if allowed. */
-export function validateTransition(
-  from: KitchenStatus | null,
-  to: KitchenStatus,
-): string | null {
-  if (!KITCHEN_STATUSES.has(to)) return `invalid_target_status: ${to}`;
-  const current = from ?? 'new';
-  if (!STATUS_TRANSITIONS[current].includes(to)) {
-    return `invalid_transition: ${current} -> ${to}`;
-  }
-  return null;
 }
 
 export function deviceStatus(lastUsedAt: string | null): string {

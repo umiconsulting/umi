@@ -105,6 +105,33 @@ export function mapKitchenToOrderStatus(k: KitchenStatus): string {
   }
 }
 
+const KITCHEN_STATUS_SET = new Set<KitchenStatus>([
+  'new',
+  'accepted',
+  'preparing',
+  'ready',
+  'completed',
+  'cancelled',
+  'partial_cancelled',
+]);
+
+/**
+ * Returns an error string for an invalid transition, or null if allowed. Lives
+ * in the contract module so both the service (pre-check) and the repository
+ * (authoritative re-check inside the locked transaction) share one matrix.
+ */
+export function validateTransition(
+  from: KitchenStatus | null,
+  to: KitchenStatus,
+): string | null {
+  if (!KITCHEN_STATUS_SET.has(to)) return `invalid_target_status: ${to}`;
+  const current = from ?? 'new';
+  if (!STATUS_TRANSITIONS[current].includes(to)) {
+    return `invalid_transition: ${current} -> ${to}`;
+  }
+  return null;
+}
+
 // ── Device session (normalized from device.sessions) ───────────────────────
 
 export interface KdsDeviceSession {

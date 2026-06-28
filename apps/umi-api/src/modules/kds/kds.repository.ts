@@ -3,10 +3,12 @@ import type { PoolClient } from 'pg';
 import { PgService } from '../../shared/database/pg.service';
 import {
   BOARD_ACTIVE_STATUSES,
+  KdsHttpError,
   type KitchenStatus,
   mapKitchenToOrderStatus,
   randomHex,
   sha256Hex,
+  validateTransition,
 } from './dto/kds-contract';
 
 /**
@@ -142,9 +144,10 @@ export class KdsRepository {
     locationId: string | null,
     stationId: string,
   ): Promise<StationRow | null> {
-    const locClause = locationId
-      ? 'AND location_id = $3'
-      : 'AND location_id IS NULL';
+    // A missing locationId means "unscoped" (match the station at any location) —
+    // NOT "root-location only". listStations() returns all-location stations, so
+    // forcing location_id IS NULL here would reject a valid dashboard selection.
+    const locClause = locationId ? 'AND location_id = $3' : '';
     const params = locationId
       ? [stationId, tenantId, locationId]
       : [stationId, tenantId];
@@ -486,23 +489,40 @@ export class KdsRepository {
     deviceId: string,
     patch: { deviceName?: string | null; stationId?: string | null },
   ): Promise<boolean> {
+    // stationId === undefined → the PATCH omitted station_id, so leave it
+    // untouched (a rename must not wipe the assignment). An explicit null clears.
+    const setStation = patch.stationId !== undefined;
     return this.pg.workerTx(async (client) => {
       const sess = await client.query(
         `UPDATE device.sessions
             SET device_name = COALESCE($3, device_name),
-                station_id  = $4
+                station_id  = CASE WHEN $5 THEN $4 ELSE station_id END
           WHERE id = $1 AND tenant_id = $2
         RETURNING device_id`,
-        [deviceId, tenantId, patch.deviceName ?? null, patch.stationId ?? null],
+        [
+          deviceId,
+          tenantId,
+          patch.deviceName ?? null,
+          patch.stationId ?? null,
+          setStation,
+        ],
       );
       if (sess.rowCount === 0) return false;
       const registryId = sess.rows[0]?.device_id;
       if (registryId) {
         await client.query(
           `UPDATE device.devices
-              SET name = COALESCE($3, name), station_id = $4, updated_at = now()
+              SET name = COALESCE($3, name),
+                  station_id = CASE WHEN $5 THEN $4 ELSE station_id END,
+                  updated_at = now()
             WHERE id = $1 AND tenant_id = $2`,
-          [registryId, tenantId, patch.deviceName ?? null, patch.stationId ?? null],
+          [
+            registryId,
+            tenantId,
+            patch.deviceName ?? null,
+            patch.stationId ?? null,
+            setStation,
+          ],
         );
       }
       return true;
@@ -559,9 +579,15 @@ export class KdsRepository {
     return rows;
   }
 
-  /** Event stream cursor (ops.order_events ordered by kitchen_sequence). */
+  /**
+   * Event stream cursor (ops.order_events ordered by kitchen_sequence), scoped
+   * to the device's station the same way the board snapshot is (NULL-station
+   * orders broadcast to every board) so a station-bound iPad can't read other
+   * stations' events through the cursor.
+   */
   async ticketEvents(
     tenantId: string,
+    stationId: string | null,
     afterSequence: number,
     limit: number,
   ): Promise<EventRow[]> {
@@ -580,10 +606,11 @@ export class KdsRepository {
            ON o.tenant_id = e.tenant_id AND o.id = e.order_id
         WHERE e.tenant_id = $1
           AND e.kitchen_sequence IS NOT NULL
-          AND e.kitchen_sequence > $2
+          AND e.kitchen_sequence > $3
+          AND ($2::text IS NULL OR o.station_id IS NULL OR o.station_id = $2)
         ORDER BY e.kitchen_sequence ASC
-        LIMIT LEAST(GREATEST($3, 1), 1000)`,
-      [tenantId, afterSequence, limit],
+        LIMIT LEAST(GREATEST($4, 1), 1000)`,
+      [tenantId, stationId, afterSequence, limit],
     );
     return rows;
   }
@@ -665,8 +692,9 @@ export class KdsRepository {
 
   // ── Command writes (transition / partial cancel) ───────────────────────────
 
-  /** Load an order for the device-scope check (by id or source_transaction_id). */
+  /** Load an order for the device-scope check (tenant-scoped; by id or source tx). */
   async loadOrderForScope(
+    tenantId: string,
     ticketId: string,
     ticketUuid: string | null,
   ): Promise<OrderScopeRow | null> {
@@ -674,10 +702,11 @@ export class KdsRepository {
       `SELECT id, tenant_id, location_id, station_id, kitchen_status,
               person_id, source_transaction_id
          FROM ops.orders
-        WHERE ($2::uuid IS NOT NULL AND id = $2::uuid)
-           OR source_transaction_id = $1
+        WHERE tenant_id = $3
+          AND (($2::uuid IS NOT NULL AND id = $2::uuid)
+               OR source_transaction_id = $1)
         LIMIT 1`,
-      [ticketId, ticketUuid],
+      [ticketId, ticketUuid, tenantId],
     );
     return rows[0] ?? null;
   }
@@ -687,6 +716,13 @@ export class KdsRepository {
     client: PoolClient,
     tenantId: string,
   ): Promise<number> {
+    // Serialize per-tenant sequence allocation: MAX+1 under default isolation can
+    // hand the same number to concurrent transitions (cursor consumers using
+    // `> after_sequence` would then miss one). The xact-scoped advisory lock is
+    // released automatically at COMMIT/ROLLBACK.
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, [
+      `kds:kitchen_sequence:${tenantId}`,
+    ]);
     const { rows } = await client.query<{ seq: string }>(
       `SELECT COALESCE(MAX(kitchen_sequence), 0) + 1 AS seq
          FROM ops.order_events WHERE tenant_id = $1`,
@@ -726,6 +762,23 @@ export class KdsRepository {
   }): Promise<{ sequence: number }> {
     const { order, targetStatus } = input;
     return this.pg.workerTx(async (client) => {
+      // Lock + re-read the order so a concurrent transition can't make this one
+      // overwrite stale state or emit a wrong old_status. The service pre-checks
+      // against a pre-transaction snapshot; this is the authoritative re-check.
+      const locked = await client.query<{
+        kitchen_status: KitchenStatus | null;
+      }>(
+        `SELECT kitchen_status FROM ops.orders
+          WHERE id = $1 AND tenant_id = $2 FOR UPDATE`,
+        [order.id, order.tenant_id],
+      );
+      if (locked.rowCount === 0) {
+        throw new KdsHttpError(404, { error: 'ticket_not_found' });
+      }
+      const currentStatus = locked.rows[0].kitchen_status;
+      const invalid = validateTransition(currentStatus, targetStatus);
+      if (invalid) throw new KdsHttpError(422, { error: invalid });
+
       const seq = await this.nextKitchenSequence(client, order.tenant_id);
       const orderStatus = mapKitchenToOrderStatus(targetStatus);
       const isCancel = targetStatus === 'cancelled';
@@ -768,7 +821,7 @@ export class KdsRepository {
         [
           order.tenant_id,
           order.id,
-          order.kitchen_status,
+          currentStatus,
           targetStatus,
           seq,
           `kds:transition:${order.id}:${seq}`,
@@ -830,10 +883,19 @@ export class KdsRepository {
     buildNotifyBody: (
       cancelled: Array<{ quantity: number; name: string }>,
       remaining: Array<{ quantity: number; name: string }>,
-    ) => string;
+    ) => string | null;
   }): Promise<{ sequence: number; newStatus: KitchenStatus }> {
     const { order } = input;
     return this.pg.workerTx(async (client) => {
+      // Lock the order so concurrent transitions/cancels serialize on this row.
+      const locked = await client.query(
+        `SELECT 1 FROM ops.orders WHERE id = $1 AND tenant_id = $2 FOR UPDATE`,
+        [order.id, order.tenant_id],
+      );
+      if (locked.rowCount === 0) {
+        throw new KdsHttpError(404, { error: 'ticket_not_found' });
+      }
+
       // Flag the targeted items as cancelled.
       const cancelled = await client.query<{ quantity: number; name: string }>(
         `UPDATE ops.order_items
@@ -843,6 +905,11 @@ export class KdsRepository {
         RETURNING quantity, name`,
         [order.id, order.tenant_id, input.itemIds],
       );
+      // Every requested id must have matched an active line on this order;
+      // otherwise roll back rather than mutate the order / notify the customer.
+      if ((cancelled.rowCount ?? 0) !== input.itemIds.length) {
+        throw new KdsHttpError(422, { error: 'partial_cancel_items_not_found' });
+      }
 
       // Remaining (non-cancelled) items → drives total + whole-order status.
       const remaining = await client.query<{ quantity: number; name: string }>(
@@ -908,8 +975,12 @@ export class KdsRepository {
         order.tenant_id,
         order.person_id,
       );
-      if (phone) {
-        const body = input.buildNotifyBody(cancelled.rows, remaining.rows);
+      // Only emit when notifications are enabled (buildNotifyBody returns null
+      // when KDS_STATUS_NOTIFY_ENABLED is off) AND a customer phone exists.
+      const body = phone
+        ? input.buildNotifyBody(cancelled.rows, remaining.rows)
+        : null;
+      if (phone && body) {
         await client.query(
           `INSERT INTO queue.outbox_events
              (tenant_id, event_type, aggregate_id, idempotency_key, payload)
