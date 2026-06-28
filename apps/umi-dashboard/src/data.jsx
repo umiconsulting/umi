@@ -196,17 +196,18 @@ async function _loadOverviewAndStations(ctx) {
 
 async function _loadDevices(ctx) {
   if (!_active(ctx, 'kds')) return EMPTY_DEVICES
-  const [devResult, heartbeats] = await Promise.all([
-    _apiFetch(_withLocation(ctx, _tenantPath(ctx, '/kds/devices'))),
-    fetch('/api/kds/heartbeats').then(r => r.json()).catch(() => []),
-  ])
-  const hbMap = Object.fromEntries((heartbeats || []).map(h => [h.deviceId, h]))
+  // Heartbeat is now folded into GET /kds/devices server-side: umi-api derives
+  // live/slow/offline from device.sessions.last_used_at, which the iPad's board
+  // poll touches every cycle (Phase 4). The old separate `/api/kds/heartbeats`
+  // call was a same-origin fetch that never reached umi-api in cookie mode — it
+  // is removed (the "remove the duplicate" deliverable).
+  const devResult = await _apiFetch(_withLocation(ctx, _tenantPath(ctx, '/kds/devices')))
   return (devResult.devices || []).map(function(d) {
-    const hb = hbMap[d.device_id]
-    return Object.assign({ model: 'iPad', ip: '-' }, d, hb ? {
-      _heartbeat: hb,
-      _heartbeatStatus: hb.status,    // 'live' | 'slow' | 'offline'
-      _heartbeatSeenMs: hb.lastSeen,
+    // `d.ip` overrides the merged default, so re-apply the '-' fallback after
+    // the spread (the server sends null when no ip has been recorded yet).
+    return Object.assign({ model: 'iPad' }, d, { ip: d.ip || '-' }, d.status ? {
+      _heartbeatStatus: d.status,    // 'live' | 'slow' | 'offline'
+      _heartbeatSeenMs: d.last_used_at ? new Date(d.last_used_at).getTime() : null,
     } : {})
   })
 }

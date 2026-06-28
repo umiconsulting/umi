@@ -58,6 +58,14 @@ export const configSchema = z.object({
   // dual-writer window, so enabling here before umi-cash stops would double-send.
   // Owner flips to true at the Phase 3 cutover (and disables the umi-cash crons).
   LIFECYCLE_CRONS_ENABLED: booleanFromEnv.default(false),
+  // KDS customer status notifications (Phase 4). When a KDS transition/partial-
+  // cancel runs, emit a `twilio.status_notification`/`twilio.cancel_notification`
+  // outbox row. OFF by default: while the iPad still hits the Supabase edge
+  // functions, the legacy `kds.transition_ticket` RPC already enqueues these —
+  // enabling here before the iPad is repointed would double-send. Transitions
+  // still execute when off; only the customer notify is gated. Owner flips it
+  // true at the iPad repoint + edge-function decommission.
+  KDS_STATUS_NOTIFY_ENABLED: booleanFromEnv.default(false),
 
   // CORS.
   CORS_ORIGINS: z.string().optional(), // comma-separated origins
