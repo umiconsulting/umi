@@ -8,6 +8,7 @@ import {
   mapKitchenToOrderStatus,
   randomHex,
   sha256Hex,
+  TERMINAL_STATUSES,
   validateTransition,
 } from './dto/kds-contract';
 
@@ -705,6 +706,9 @@ export class KdsRepository {
         WHERE tenant_id = $3
           AND (($2::uuid IS NOT NULL AND id = $2::uuid)
                OR source_transaction_id = $1)
+        ORDER BY CASE
+          WHEN $2::uuid IS NOT NULL AND id = $2::uuid THEN 0 ELSE 1
+        END
         LIMIT 1`,
       [ticketId, ticketUuid, tenantId],
     );
@@ -887,13 +891,24 @@ export class KdsRepository {
   }): Promise<{ sequence: number; newStatus: KitchenStatus }> {
     const { order } = input;
     return this.pg.workerTx(async (client) => {
-      // Lock the order so concurrent transitions/cancels serialize on this row.
-      const locked = await client.query(
-        `SELECT 1 FROM ops.orders WHERE id = $1 AND tenant_id = $2 FOR UPDATE`,
+      // Lock + re-read the order so a transition that committed just before this
+      // lock can't be overwritten and the event can't carry a stale old_status.
+      const locked = await client.query<{
+        kitchen_status: KitchenStatus | null;
+      }>(
+        `SELECT kitchen_status FROM ops.orders
+          WHERE id = $1 AND tenant_id = $2 FOR UPDATE`,
         [order.id, order.tenant_id],
       );
       if (locked.rowCount === 0) {
         throw new KdsHttpError(404, { error: 'ticket_not_found' });
+      }
+      const currentStatus = locked.rows[0].kitchen_status;
+      // A completed/cancelled order can't be partially cancelled.
+      if (currentStatus && TERMINAL_STATUSES.includes(currentStatus)) {
+        throw new KdsHttpError(422, {
+          error: `invalid_transition: ${currentStatus} -> partial_cancelled`,
+        });
       }
 
       // Flag the targeted items as cancelled.
@@ -956,7 +971,7 @@ export class KdsRepository {
         [
           order.tenant_id,
           order.id,
-          order.kitchen_status,
+          currentStatus,
           newStatus,
           seq,
           `kds:partial_cancel:${order.id}:${seq}`,
