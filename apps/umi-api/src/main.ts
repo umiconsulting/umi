@@ -39,7 +39,15 @@ async function bootstrap(): Promise<void> {
     .map((s) => s.trim())
     .filter(Boolean);
   if (corsOrigins?.length) {
-    app.enableCors({ origin: corsOrigins, credentials: true });
+    // Methods MUST be explicit: on the Fastify adapter the default
+    // Access-Control-Allow-Methods is only `GET,HEAD,POST`, which fails the CORS
+    // preflight for every cross-origin dashboard PATCH (settings, hours, voice,
+    // reward-config, locations). List the full verb set the dashboard uses.
+    app.enableCors({
+      origin: corsOrigins,
+      credentials: true,
+      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    });
   }
 
   // Initialize the app so the Fastify adapter registers its default JSON +
