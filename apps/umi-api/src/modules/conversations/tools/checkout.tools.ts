@@ -185,6 +185,28 @@ export class CheckoutTools {
   }
 
   async cancelOrder(ctx: ToolContext, reason: string): Promise<ToolResult> {
+    // A draft cart (an order still being ASSEMBLED, not yet placed in ops.orders)
+    // is what "cancel" means while the customer is still building their order.
+    // Clear it FIRST: cancel_order used to only touch confirmed ops.orders, so a
+    // cancel left the in-progress cart intact and it reappeared on the next add.
+    const conv = await this.conversations.loadById(ctx.conversationId);
+    const draftCart = (conv?.draftCart as DraftCart | null) ?? null;
+    if (draftCart && draftCart.items.length > 0) {
+      // Idempotent clear at the read version (a stale CAS just means another turn
+      // already moved the cart on).
+      await this.conversations.updateDraftCartCas(
+        ctx.conversationId,
+        conv?.draftCartVersion ?? 0,
+        null,
+      );
+      const trimmed = reason?.trim();
+      const replyBody = trimmed
+        ? `Listo, cancelé tu pedido.\nMotivo: ${trimmed}`
+        : 'Listo, cancelé tu pedido.';
+      return { success: true, cart_cleared: true, customer_reply: replyBody, message: replyBody };
+    }
+
+    // No draft cart → cancel the most recent confirmed order the kitchen hasn't started.
     const recent = await this.orders.recentOrders(ctx.tenantId, ctx.personId, 5);
     if (!recent.length) {
       return terminalToolError('No encontré ningún pedido activo para tu cuenta.');

@@ -102,3 +102,45 @@ describe('CheckoutTools.confirmOrder', () => {
     expect(orders.createOrder).not.toHaveBeenCalled();
   });
 });
+
+describe('CheckoutTools.cancelOrder', () => {
+  const draftCart = {
+    items: [{ product_id: 'p-latte', product_name: 'Latte', variant_name: 'GDE, CALIENTE', quantity: 1, unit_price: 60 }],
+    updated_at: new Date(0).toISOString(),
+    customer_note: null,
+  };
+
+  it('clears an in-progress draft cart (not a confirmed order)', async () => {
+    const orders = { recentOrders: vi.fn(), markCancelled: vi.fn() };
+    const conversations = {
+      loadById: vi.fn().mockResolvedValue({ draftCart, draftCartVersion: 7 }),
+      updateDraftCartCas: vi.fn().mockResolvedValue(8),
+    };
+    const checkout = new CheckoutTools(orders as never, {} as never, conversations as never, {} as never);
+
+    const r = await checkout.cancelOrder(CTX, 'ya no quiero');
+    expect(r.success).toBe(true);
+    // Draft cart emptied at the read version; ops.orders never consulted.
+    expect(conversations.updateDraftCartCas).toHaveBeenCalledWith('c1', 7, null);
+    expect(orders.recentOrders).not.toHaveBeenCalled();
+    expect(orders.markCancelled).not.toHaveBeenCalled();
+  });
+
+  it('falls back to cancelling a confirmed, not-yet-started order when no draft cart', async () => {
+    const orders = {
+      recentOrders: vi.fn().mockResolvedValue([{ id: 'o-9', status: 'pending', kitchenStatus: 'new', items: [{}] }]),
+      markCancelled: vi.fn().mockResolvedValue(undefined),
+    };
+    const conversations = {
+      loadById: vi.fn().mockResolvedValue({ draftCart: null, draftCartVersion: 0 }),
+      updateDraftCartCas: vi.fn(),
+    };
+    const checkout = new CheckoutTools(orders as never, {} as never, conversations as never, {} as never);
+
+    const r = await checkout.cancelOrder(CTX, 'me arrepentí');
+    expect(r.success).toBe(true);
+    expect(r.order_id).toBe('o-9');
+    expect(orders.markCancelled).toHaveBeenCalledWith('t1', 'o-9', 'me arrepentí');
+    expect(conversations.updateDraftCartCas).not.toHaveBeenCalled();
+  });
+});
