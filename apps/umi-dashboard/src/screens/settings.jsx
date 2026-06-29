@@ -274,7 +274,11 @@ const SettingsScreen = () => {
                 <button
                   key={p.key}
                   className={'day-pill focusable' + (voice.tonePreset === p.key ? ' on' : '')}
-                  onClick={() => setVoice(v => ({...v, tonePreset: p.key}))}
+                  // Picking a chip clears any freeform override so the preset
+                  // actually takes effect — the engine gives freeform `tone`
+                  // precedence over `tone_preset`, so a stale custom tone would
+                  // otherwise make the chip inert.
+                  onClick={() => setVoice(v => ({...v, tonePreset: p.key, customTone: ''}))}
                 >{p.label}</button>
               ))}
             </div>

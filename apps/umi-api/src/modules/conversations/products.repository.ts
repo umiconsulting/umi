@@ -70,7 +70,23 @@ export class ProductsRepository {
     const text = await this.pg.query<ProductRow>(
       `SELECT ${SELECT} ${FROM}
         WHERE p.tenant_id = $1::uuid AND p.is_available = true
-          AND (p.name ILIKE ANY($2) OR COALESCE(p.description,'') ILIKE ANY($2))
+          AND (
+            p.name ILIKE ANY($2)
+            OR COALESCE(p.description,'') ILIKE ANY($2)
+            -- Also match VARIANT names. A brand-as-product catalog (e.g. product
+            -- "La Mesa de Leonor" with variants "Brookies", "Linzer Cookies", …)
+            -- otherwise hides each item from a targeted search ("brookies") even
+            -- though browse shows it — the TS ranker already scores variant names,
+            -- it just never received variant-only matches. jsonb_typeof guards a
+            -- non-array variants value so jsonb_array_elements can't error.
+            OR (
+              jsonb_typeof(p.variants) = 'array'
+              AND EXISTS (
+                SELECT 1 FROM jsonb_array_elements(p.variants) AS v
+                 WHERE v->>'name' ILIKE ANY($2)
+              )
+            )
+          )
         LIMIT 250`,
       [tenantId, likePatterns],
     );
