@@ -19,6 +19,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { HoursModule } from './modules/hours/hours.module';
+import { VoiceModule } from './modules/voice/voice.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { CashModule } from './modules/cash/cash.module';
 import { KdsModule } from './modules/kds/kds.module';
@@ -43,6 +44,7 @@ import { ConversationsModule } from './modules/conversations/conversations.modul
     TenantsModule,
     StaffModule,
     HoursModule,
+    VoiceModule,
     CustomersModule,
     CashModule,
     KdsModule,

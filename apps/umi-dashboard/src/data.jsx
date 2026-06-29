@@ -18,6 +18,7 @@ const EMPTY_CUSTOMER_DETAIL = { customer: null, timeline: [], conversations: [],
 const EMPTY_CUSTOMER_INSIGHTS = { metrics: {}, insights: [], source: null }
 const EMPTY_STAFF = { staff: [] }
 const EMPTY_HOURS = { hours: {}, timezone: null }
+const EMPTY_VOICE = { voice: null, presets: [], businessName: '', defaults: null }
 const EMPTY_GIFT_CARDS = { giftCards: [], total: 0, page: 1, totalPages: 1 }
 const EMPTY_CONVERSATIONS = { conversations: [], total: 0, page: 1, totalPages: 1 }
 const DEVICE_LIVE_MS = 10_000
@@ -326,6 +327,11 @@ async function _loadBusinessHours(ctx) {
   return _apiFetch(_withLocation(ctx, _tenantPath(ctx, '/conversaflow/hours')))
 }
 
+async function _loadVoiceConfig(ctx) {
+  if (!_active(ctx, 'conversaflow')) return EMPTY_VOICE
+  return _apiFetch(_tenantPath(ctx, '/conversaflow/voice'))
+}
+
 async function saveTenantSettings(patch) {
   const headers = await getAuthHeaders()
   const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant')
@@ -354,6 +360,15 @@ async function saveBusinessHours(hours, timezone) {
   return _apiFetch(path, {
     method: 'PATCH',
     body: JSON.stringify({ hours, timezone }),
+  })
+}
+
+async function saveTenantVoice(patch) {
+  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant')
+  if (!tenantId) throw new Error('No active tenant selected')
+  return _apiFetch(`/api/tenants/${encodeURIComponent(tenantId)}/conversaflow/voice`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
   })
 }
 
@@ -494,6 +509,11 @@ function useBusinessHours() {
   return _useAsync(function() { return _loadBusinessHours(ctx) }, _deps(ctx), EMPTY_HOURS)
 }
 
+function useVoiceConfig() {
+  const ctx = useTenant()
+  return _useAsync(function() { return _loadVoiceConfig(ctx) }, _deps(ctx), EMPTY_VOICE)
+}
+
 function useMembersData(opts) {
   const ctx = useTenant()
   var page = opts && opts.page ? opts.page : 1
@@ -587,8 +607,8 @@ export {
   useOverviewData, useDevicesData, useTenantData, useOrdersData,
   useKdsStations, useDevicePairings,
   useMembersData, useCustomersData, useCustomerDetail, useCustomerInsights,
-  useStaffData, useBusinessHours, useGiftCardsData, useConversationsData,
-  saveTenantSettings, saveRewardConfig, saveBusinessHours,
+  useStaffData, useBusinessHours, useVoiceConfig, useGiftCardsData, useConversationsData,
+  saveTenantSettings, saveRewardConfig, saveBusinessHours, saveTenantVoice,
   createStaffMember, updateStaffMember, deleteStaffMember,
   provisionDevice, generateDevicePairingPin, approveDevicePairing, denyDevicePairing, updateDevice, revokeDevice, transitionOrder,
   useKdsConnection,
