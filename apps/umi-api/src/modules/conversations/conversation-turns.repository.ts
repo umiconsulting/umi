@@ -121,13 +121,22 @@ export class ConversationTurnsRepository {
   async hasNewerUserMessages(
     conversationId: string,
     afterTimestamp: string,
+    excludeMessageIds: string[] = [],
   ): Promise<boolean> {
+    // `afterTimestamp` is the turn's last_message_at, which round-trips through a
+    // JS Date and is truncated to MILLISECOND precision, while
+    // comms.messages.created_at keeps Postgres MICROSECOND precision. A strict
+    // `created_at > $2` then treats the turn's own newest message as "newer"
+    // (e.g. .62592 > .625), so the turn supersedes + re-queues forever. Excluding
+    // the turn's source message ids makes the check precision-immune: a genuinely
+    // newer message is one that is not already part of this turn.
     const { rows } = await this.pg.query(
       `SELECT 1
          FROM comms.messages
         WHERE conversation_id = $1 AND role = 'user' AND created_at > $2
+          AND id <> ALL ($3::uuid[])
         LIMIT 1`,
-      [conversationId, afterTimestamp],
+      [conversationId, afterTimestamp, excludeMessageIds],
     );
     return rows.length > 0;
   }

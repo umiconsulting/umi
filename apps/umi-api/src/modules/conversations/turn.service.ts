@@ -98,7 +98,13 @@ export class TurnService {
     }
     if (['superseded', 'completed', 'failed'].includes(turn.status)) return;
 
-    if (await this.turns.hasNewerUserMessages(payload.conversation_id, turn.lastMessageAt ?? '')) {
+    if (
+      await this.turns.hasNewerUserMessages(
+        payload.conversation_id,
+        turn.lastMessageAt ?? '',
+        turn.sourceMessageIds ?? [],
+      )
+    ) {
       await this.supersedeAndRequeue(payload, turn, 'newer_user_messages_arrived_before_processing', traceId);
       return;
     }
