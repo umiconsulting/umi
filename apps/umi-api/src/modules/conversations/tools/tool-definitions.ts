@@ -105,7 +105,7 @@ export const TOOL_DEFINITIONS: ToolDefinitions = [
   {
     name: 'cancel_order',
     description:
-      'Cancela el pedido más reciente del cliente si todavía está pendiente. Úsala solo cuando el cliente quiere cancelar y ya tienes el motivo. No la uses para rechazos de una aclaración o cambios menores de carrito.',
+      'Cancela el pedido del cliente: si todavía está armando su pedido (carrito en progreso, sin confirmar) lo vacía por completo; si ya lo había confirmado y la cocina no lo ha empezado, cancela esa orden. Úsala cuando el cliente quiere cancelar todo su pedido. No la uses para rechazos de una aclaración o para quitar un solo producto (eso es edit_cart).',
     input_schema: {
       type: 'object',
       properties: { reason: { type: 'string' } },
