@@ -27,9 +27,17 @@ export interface TurnProcessPayload extends TurnIntegrityPayload {
  *  DISTINCT across re-releases — so a dead-lettered, still-retained turn.process
  *  (removeOnFail retention, lazily evicted ≈ never at prod volume) can't dedupe
  *  and silently drop the re-released turn (bug #5). The ':' are sanitized to '_'
- *  by EnqueueService; the uuid+ISO form is never all-digit, so it stays BullMQ-safe. */
-export function turnProcessJobId(turnId: string, releasedAt: string): string {
-  return `turn_process:${turnId}:${releasedAt}`;
+ *  by EnqueueService; the uuid+ISO form is never all-digit, so it stays BullMQ-safe.
+ *  A missing release timestamp falls back to the stable per-turn id rather than a
+ *  collision-prone empty suffix (the enqueue is only reached on the released path,
+ *  so in practice `releasedAt` is always set). */
+export function turnProcessJobId(
+  turnId: string,
+  releasedAt: string | null | undefined,
+): string {
+  return releasedAt
+    ? `turn_process:${turnId}:${releasedAt}`
+    : `turn_process:${turnId}`;
 }
 
 /**
@@ -113,6 +121,10 @@ export class TurnIntegrityService {
     }
 
     const released = decision.decision === 'release' || decision.decision === 'replace';
+    // Generate the release timestamp ONCE and thread the same value into both the
+    // persisted turn and the per-release job id below, so the dedupe key can never
+    // diverge from (or collapse without) what was written.
+    const releasedAt = released ? new Date().toISOString() : null;
     // Canonical status: both buffering + released map to 'pending'; released_at
     // (set only when released) distinguishes them.
     const turn = await this.turns.upsertTurn({
@@ -129,7 +141,7 @@ export class TurnIntegrityService {
       firstMessageAt: decision.firstMessageAt,
       lastMessageAt: decision.lastMessageAt,
       holdUntil: released ? null : decision.holdUntil,
-      releasedAt: released ? new Date().toISOString() : null,
+      releasedAt,
     });
 
     if (!released && decision.holdUntil) {
@@ -150,7 +162,7 @@ export class TurnIntegrityService {
     const processPayload: TurnProcessPayload = { ...payload, turn_id: turn.id };
     await this.enqueue.enqueue(QUEUES.turns, 'turn.process', processPayload, {
       priority: JobPriority.Interactive,
-      jobId: turnProcessJobId(turn.id, turn.releasedAt ?? ''),
+      jobId: turnProcessJobId(turn.id, releasedAt),
     });
 
     await this.trace.logPipelineTrace({

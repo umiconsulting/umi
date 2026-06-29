@@ -127,7 +127,7 @@ const SettingsScreen = () => {
     if (!biz || !brand || !promo) return;
     setSaving(true);
     const promoDayNums = promo.days.map(id => DOW_NUM[id]).filter(Boolean).join(',');
-    const [settingsResult] = await Promise.allSettled([
+    const saveResults = await Promise.allSettled([
       saveTenantSettings({
         name:               biz.name,
         city:               biz.city,
@@ -156,10 +156,19 @@ const SettingsScreen = () => {
         style_notes:    voice.styleNotes.split('\n').map(s => s.trim()).filter(Boolean),
       }),
     ]);
+    const [settingsResult] = saveResults;
     if (settingsResult.status === 'fulfilled') {
       tenantState?.updateSelectedTenant?.({ name: biz.name });
     }
     setSaving(false);
+    // Don't flash "Cambios guardados" if any section's save rejected — the user
+    // would otherwise lose those edits silently. (Gated `false`/`null` array
+    // entries settle as fulfilled, so only real rejections are counted.)
+    const failed = saveResults.filter(r => r.status === 'rejected');
+    if (failed.length) {
+      console.error('settings save: one or more sections failed', failed.map(r => r.reason));
+      return;
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   }

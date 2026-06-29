@@ -32,14 +32,19 @@ export class VoiceService {
       voice: {
         assistant_name:
           typeof v.assistant_name === 'string' && v.assistant_name.trim()
-            ? v.assistant_name
+            ? v.assistant_name.trim()
             : null,
         locale:
-          typeof v.locale === 'string' && v.locale.trim() ? v.locale : DEFAULT_LOCALE,
+          typeof v.locale === 'string' && v.locale.trim()
+            ? v.locale.trim()
+            : DEFAULT_LOCALE,
         tone_preset: presetKey,
-        tone: typeof v.tone === 'string' && v.tone.trim() ? v.tone : null,
+        tone: typeof v.tone === 'string' && v.tone.trim() ? v.tone.trim() : null,
         style_notes: Array.isArray(v.style_notes)
-          ? v.style_notes.filter((s) => typeof s === 'string' && s.trim())
+          ? v.style_notes
+              .filter((s) => typeof s === 'string')
+              .map((s) => s.trim())
+              .filter(Boolean)
           : [],
       },
       businessName, // assistant_name placeholder in the UI

@@ -72,4 +72,18 @@ describe('resolveVoiceConfig', () => {
     const v = resolveVoiceConfig(config, 'Kalala', 'tenant-1');
     expect(v.style_notes).toBeUndefined();
   });
+
+  it('caps assistant_name (60) and locale (20) to the DTO bounds for round-trip safety', () => {
+    const config: BusinessConfig = {
+      voice: { assistant_name: 'N'.repeat(120), locale: 'x'.repeat(40) },
+    };
+    const v = resolveVoiceConfig(config, 'Kalala', 'tenant-1');
+    expect(v.assistant_name.length).toBe(60);
+    expect(v.locale.length).toBe(20);
+  });
+
+  it('caps a long business-name fallback to the assistant_name bound', () => {
+    const v = resolveVoiceConfig(null, 'B'.repeat(120), 'tenant-1');
+    expect(v.assistant_name.length).toBe(60);
+  });
 });

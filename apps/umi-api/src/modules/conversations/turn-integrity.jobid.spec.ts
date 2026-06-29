@@ -22,4 +22,11 @@ describe('turnProcessJobId', () => {
     expect(sanitized).not.toContain(':');
     expect(/^\d+$/.test(sanitized)).toBe(false);
   });
+
+  it('omits the release suffix (no collision-prone empty key) when releasedAt is missing', () => {
+    const stable = `turn_process:${turnId}`;
+    expect(turnProcessJobId(turnId, null)).toBe(stable);
+    expect(turnProcessJobId(turnId, undefined)).toBe(stable);
+    expect(turnProcessJobId(turnId, '')).toBe(stable);
+  });
 });

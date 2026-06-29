@@ -52,6 +52,8 @@ export const DEFAULT_ASSISTANT_NAME = 'Asistente';
  *  These bound length only (not content): voice is first-party config a tenant
  *  sets for their OWN assistant, so it is not a cross-tenant injection boundary
  *  (unlike sanitizeCustomerFacts, which also content-filters). */
+const MAX_ASSISTANT_NAME_CHARS = 60;
+const MAX_LOCALE_CHARS = 20;
 const MAX_TONE_CHARS = 280;
 const MAX_STYLE_NOTES = 8;
 const MAX_STYLE_NOTE_CHARS = 200;
@@ -111,13 +113,19 @@ export function resolveVoiceConfig(
     | (Partial<VoiceConfig> & { tone_preset?: unknown })
     | null;
 
-  const assistant_name =
+  // Cap to the same bounds as UpdateVoiceDto (assistant_name 60, locale 20) so a
+  // long business name or hand-seeded legacy row resolves to a value that still
+  // round-trips cleanly back through the dashboard PATCH validator.
+  const assistant_name = (
     (typeof voice?.assistant_name === 'string' && voice.assistant_name.trim()) ||
     (typeof businessName === 'string' && businessName.trim()) ||
-    DEFAULT_ASSISTANT_NAME;
+    DEFAULT_ASSISTANT_NAME
+  ).slice(0, MAX_ASSISTANT_NAME_CHARS);
 
-  const locale =
-    (typeof voice?.locale === 'string' && voice.locale.trim()) || DEFAULT_LOCALE;
+  const locale = (
+    (typeof voice?.locale === 'string' && voice.locale.trim()) ||
+    DEFAULT_LOCALE
+  ).slice(0, MAX_LOCALE_CHARS);
 
   const tone = resolveToneText(voice);
 
