@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildStrippedSearchQuery,
   chooseBestProductMatch,
+  chooseVariantByQuery,
   formatCartSummary,
   formatMoney,
   inferVariantFiltersFromText,
@@ -21,6 +22,20 @@ const latte: ProductRecord = {
 };
 const matcha: ProductRecord = { id: 'p-matcha', name: 'Matcha Latte', price: 65, variants: [] };
 
+// Brand-as-product / item-as-variant catalog (real shape: Kalala's "La Mesa de
+// Leonor", where each cookie is a variant, not its own product).
+const laMesaDeLeonor: ProductRecord = {
+  id: 'p-leonor',
+  name: 'La Mesa de Leonor',
+  price: 22,
+  variants: [
+    { name: 'GALLETA CHOCOLATECHIP', price: 70 },
+    { name: 'GALLETA SALT AND CHOCOLATE', price: 70 },
+    { name: 'BROOKIES', price: 22 },
+    { name: 'PISTACHE CHOCOLATE', price: 28 },
+  ],
+};
+
 describe('product ranking', () => {
   it('ranks an exact name match first', () => {
     const ranked = rankProducts([matcha, latte], 'latte');
@@ -31,6 +46,21 @@ describe('product ranking', () => {
     const chosen = chooseBestProductMatch([latte, matcha], 'latte');
     expect(chosen).toHaveLength(1);
     expect(chosen[0].id).toBe('p-latte');
+  });
+});
+
+describe('brand-as-product / item-as-variant discovery', () => {
+  // The DB now feeds variant-only matches into the ranker (products.repository
+  // searchByQuery EXISTS-on-variants); these assert the downstream that consumes
+  // them — a term living only in a variant ("brookies") still surfaces + resolves.
+  it('ranks a product when the query matches only a VARIANT name', () => {
+    const ranked = rankProducts([matcha, laMesaDeLeonor], 'brookies');
+    expect(ranked[0]?.id).toBe('p-leonor');
+  });
+
+  it('chooseVariantByQuery picks the specific variant from a brand-item term', () => {
+    const v = chooseVariantByQuery(laMesaDeLeonor.variants!, 'brookies', laMesaDeLeonor.name);
+    expect(v?.name).toBe('BROOKIES');
   });
 });
 
