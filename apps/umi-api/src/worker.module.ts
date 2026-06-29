@@ -3,6 +3,7 @@ import { AppConfigModule } from './shared/config/config.module';
 import { DatabaseModule } from './shared/database/database.module';
 import { AdaptersModule } from './shared/adapters/adapters.module';
 import { LoggingModule } from './shared/logging/logging.module';
+import { SharedAuthModule } from './shared/auth/auth.shared.module';
 import { QueueModule } from './jobs/queue.module';
 import { SystemProcessor } from './jobs/system.processor';
 import { TurnsProcessor } from './jobs/turns.processor';
@@ -28,6 +29,10 @@ import { LifecycleModule } from './modules/lifecycle/lifecycle.module';
     DatabaseModule,
     AdaptersModule,
     LoggingModule,
+    // The web AppModule pulls in the global SharedAuthModule; the worker is a
+    // separate Nest root, so it must import it too — ConversationsModule's turn
+    // engine transitively needs PasswordService from this layer.
+    SharedAuthModule,
     QueueModule,
     ConversationsModule,
     LifecycleModule,
