@@ -9,7 +9,8 @@ export interface EnqueueOptions {
   priority?: JobPriority;
   /**
    * Deterministic job id for idempotency (e.g. Twilio MessageSid for ingress,
-   * turn_id for a reply, `cardId:journey:date` for a lifecycle nudge). BullMQ
+   * turn_id for a reply, `cardId:journey:date` for a lifecycle nudge). Any ':' is
+   * sanitized to '_' before enqueue (BullMQ forbids it in custom ids). BullMQ
    * drops a duplicate enqueue while a job with this id still exists. For durable
    * cross-restart idempotency, pair this with the `queue.inbound_events` gate or
    * a `queue.outbox_events` UNIQUE(idempotency_key) row (see QueueRepository).
@@ -58,7 +59,12 @@ export class EnqueueService {
     const job = await this.queues[queue].add(name, data, {
       ...defaultJobOptions(queue),
       priority: toBullPriority(opts.priority),
-      jobId: opts.jobId,
+      // BullMQ uses ':' as its Redis key separator and rejects custom job ids
+      // containing it ("Custom Ids cannot contain :"). Callers build readable
+      // ids like `turn_process:<id>`, `twilio_reply_turn:<id>` or
+      // `cardId:journey:date`, so sanitize here. The mapping is deterministic,
+      // so BullMQ's dedup-by-id (and the outbox stale-lease re-ack) still holds.
+      jobId: opts.jobId?.replace(/:/g, '_'),
       delay: opts.delayMs,
     });
     // BullMQ always assigns an id for a queued job; a missing id signals an

@@ -45,6 +45,24 @@ describe('EnqueueService', () => {
     );
   });
 
+  it('sanitizes ":" out of the jobId (BullMQ rejects it in custom ids)', async () => {
+    const { svc, queues } = serviceWithQueues();
+    await svc.enqueue(
+      QUEUES.turns,
+      'turn.process',
+      { tenantId: 't1' },
+      { jobId: 'turn_process:11111111-2222-3333-4444-555555555555' },
+    );
+
+    expect(queues[QUEUES.turns].add).toHaveBeenCalledWith(
+      'turn.process',
+      { tenantId: 't1' },
+      expect.objectContaining({
+        jobId: 'turn_process_11111111-2222-3333-4444-555555555555',
+      }),
+    );
+  });
+
   it('routes to the requested queue and defaults priority', async () => {
     const { svc, queues } = serviceWithQueues();
     await svc.enqueue(QUEUES.outbound, 'twilio.reply', { tenantId: 't1' });
