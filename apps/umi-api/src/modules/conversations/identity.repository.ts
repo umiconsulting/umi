@@ -54,22 +54,46 @@ export class IdentityRepository {
   }
 
   /**
-   * Fetch a person's display name + canonical phone (for the prompt + the reply
-   * `to`). `normalized_phone` is the E.164 anchor on `core.people`.
+   * Fetch a person's display name + phones. `phone` is the canonical E.164 anchor
+   * (`core.people.normalized_phone`) used for identity/prompt. `replyAddress` is the
+   * WhatsApp channel address AS RECEIVED (`contact_methods.display_value`, kind
+   * 'whatsapp') — that, not the normalized anchor, is what Twilio must reply to.
+   * Mexican mobiles arrive as `+521…` (WhatsApp's extra `1`) but normalize to
+   * `+52…`; replying to the normalized form fails Twilio **63015** ("number hasn't
+   * joined the sandbox"). Falls back to `normalized_phone` when there is no
+   * WhatsApp contact method.
    */
   async getPerson(
     tenantId: string,
     personId: string,
-  ): Promise<{ displayName: string | null; phone: string | null } | null> {
+  ): Promise<{
+    displayName: string | null;
+    phone: string | null;
+    replyAddress: string | null;
+  } | null> {
     const { rows } = await this.pg.query<{
       display_name: string | null;
       normalized_phone: string | null;
+      reply_address: string | null;
     }>(
-      `SELECT display_name, normalized_phone
-         FROM core.people WHERE id = $1 AND tenant_id = $2`,
+      `SELECT p.display_name,
+              p.normalized_phone,
+              (SELECT cm.display_value
+                 FROM core.contact_methods cm
+                WHERE cm.person_id = p.id
+                  AND cm.tenant_id = p.tenant_id
+                  AND cm.kind = 'whatsapp'
+                ORDER BY cm.is_primary DESC NULLS LAST, cm.created_at DESC
+                LIMIT 1) AS reply_address
+         FROM core.people p
+        WHERE p.id = $1 AND p.tenant_id = $2`,
       [personId, tenantId],
     );
     if (!rows[0]) return null;
-    return { displayName: rows[0].display_name, phone: rows[0].normalized_phone };
+    return {
+      displayName: rows[0].display_name,
+      phone: rows[0].normalized_phone,
+      replyAddress: rows[0].reply_address ?? rows[0].normalized_phone,
+    };
   }
 }

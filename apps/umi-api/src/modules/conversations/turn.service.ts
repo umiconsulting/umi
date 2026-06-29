@@ -205,7 +205,9 @@ export class TurnService {
       eventType: 'twilio.reply',
       idempotencyKey: `twilio_reply_turn:${lastUserMessageId}`,
       payload: {
-        to: person.phone,
+        // Reply to the WhatsApp address AS RECEIVED (display_value), not the
+        // normalized identity anchor — else Mexican +521 numbers fail Twilio 63015.
+        to: person.replyAddress ?? person.phone,
         body: finalResponse,
         trace_id: payload.request_id ?? null,
         turn_id: payload.turn_id,
