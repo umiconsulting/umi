@@ -3,7 +3,7 @@ import { EnqueueService } from '../../jobs/enqueue.service';
 import { JobPriority } from '../../jobs/job-options';
 import { QUEUES } from '../../jobs/queues';
 import { TraceService } from '../../shared/logging/trace.service';
-import { BusinessConfigService, requireVoiceConfig } from './business-config.service';
+import { BusinessConfigService, resolveVoiceConfig } from './business-config.service';
 import { ConversationsRepository } from './conversations.repository';
 import { ConversationTurnsRepository, type TurnRecord } from './conversation-turns.repository';
 import { IdentityRepository } from './identity.repository';
@@ -139,7 +139,11 @@ export class TurnService {
     const partialCancelledOrder = null;
     const currentState = conversation.currentState ?? 'initial';
     const activePendingClarification = getActivePendingClarification(conversation.pendingClarification);
-    const voice = requireVoiceConfig(businessRow?.config ?? null, payload.tenant_id);
+    const voice = resolveVoiceConfig(
+      businessRow?.config ?? null,
+      businessRow?.name ?? null,
+      payload.tenant_id,
+    );
     const systemPrompt = buildHarnessSystemPrompt({
       customerName: person.displayName,
       currentState,

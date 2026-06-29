@@ -22,6 +22,16 @@ export interface TurnProcessPayload extends TurnIntegrityPayload {
   turn_id: string;
 }
 
+/** Per-RELEASE-unique job id for turn.process. Stable within a single release
+ *  (idempotent against duplicate integrity fires for the same released turn) but
+ *  DISTINCT across re-releases — so a dead-lettered, still-retained turn.process
+ *  (removeOnFail retention, lazily evicted ≈ never at prod volume) can't dedupe
+ *  and silently drop the re-released turn (bug #5). The ':' are sanitized to '_'
+ *  by EnqueueService; the uuid+ISO form is never all-digit, so it stays BullMQ-safe. */
+export function turnProcessJobId(turnId: string, releasedAt: string): string {
+  return `turn_process:${turnId}:${releasedAt}`;
+}
+
 /**
  * Turn integrity (multi-bubble debounce). Port of `processors/turn-integrity.ts`.
  * Rebound to canonical `comms.*` + BullMQ. The legacy inline `setTimeout` hold +
@@ -140,7 +150,7 @@ export class TurnIntegrityService {
     const processPayload: TurnProcessPayload = { ...payload, turn_id: turn.id };
     await this.enqueue.enqueue(QUEUES.turns, 'turn.process', processPayload, {
       priority: JobPriority.Interactive,
-      jobId: `turn_process:${turn.id}`,
+      jobId: turnProcessJobId(turn.id, turn.releasedAt ?? ''),
     });
 
     await this.trace.logPipelineTrace({

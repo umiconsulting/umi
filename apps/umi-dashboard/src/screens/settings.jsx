@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { I } from '../icons.jsx'
 import { XSep } from '../shell.jsx'
-import { useTenantData, saveTenantSettings, saveRewardConfig } from '../data.jsx'
+import { useTenantData, saveTenantSettings, saveRewardConfig, useVoiceConfig, saveTenantVoice } from '../data.jsx'
 import { useTenant } from '../lib/tenant-context.jsx'
 
 // Screen 5 — Settings (Branding + Loyalty + Promotions)
@@ -19,6 +19,13 @@ const DOW = [
 const DOW_NUM = { dom: '0', lun: '1', mar: '2', mie: '3', jue: '4', vie: '5', sab: '6' };
 
 const PRESET_COLORS = ['#B5605A', '#223979', '#7692CB', '#5B7A4C', '#B5812A', '#1F1410', '#A8463F', '#2D5F8F'];
+
+// Mirror of umi-api TONE_PRESETS labels — used only until the live GET resolves.
+const VOICE_PRESET_FALLBACK = [
+  { key: 'casual',   label: 'Casual' },
+  { key: 'friendly', label: 'Amigable' },
+  { key: 'formal',   label: 'Formal' },
+];
 const MIN_STAMP_TARGET = 1;
 const MAX_STAMP_TARGET = 10;
 const MAX_REWARD_NAME_LENGTH = 30;
@@ -30,8 +37,10 @@ const clampStampTarget = value => Math.max(
 
 const SettingsScreen = () => {
   const { data: tenant, loading } = useTenantData();
+  const { data: voiceData } = useVoiceConfig();
   const tenantState = useTenant();
   const cashActive = tenantState?.isProductActive?.('cash') === true;
+  const conversaflowActive = tenantState?.isProductActive?.('conversaflow') === true;
 
   // ── Local editing state ─────────────────────────────────────────────────────
   const [biz, setBiz] = useState(null);
@@ -41,6 +50,8 @@ const SettingsScreen = () => {
   const [birthday, setBirthday] = useState(null);
   const [promo, setPromo] = useState(null);
   const [selfReg, setSelfReg] = useState(true);
+  const [voice, setVoice] = useState(null);
+  const [bizName, setBizName] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [saved,  setSaved]  = useState(false);
@@ -89,6 +100,19 @@ const SettingsScreen = () => {
     });
   }, [tenant]);
 
+  // Seed the voice editor independently of the cash-gated tenant skeleton, so a
+  // conversaflow-only tenant (e.g. Kalala, cashActive=false) still gets its chips.
+  useEffect(() => {
+    if (!voiceData?.voice) return;
+    setVoice({
+      tonePreset:    voiceData.voice.tone_preset || 'friendly',
+      assistantName: voiceData.voice.assistant_name || '',
+      customTone:    voiceData.voice.tone || '',
+      styleNotes:    (voiceData.voice.style_notes || []).join('\n'),
+    });
+    setBizName(voiceData.businessName || voiceData.defaults?.assistant_name || '');
+  }, [voiceData]);
+
   const toggleDay = id => setPromo(p => ({
     ...p, days: p.days.includes(id) ? p.days.filter(d => d !== id) : [...p.days, id],
   }));
@@ -122,6 +146,14 @@ const SettingsScreen = () => {
         rewardName:          loyalty.rewardName.slice(0, MAX_REWARD_NAME_LENGTH),
         visitsRequired:      loyalty.visitsRequired,
         rewardCostCentavos:  Math.round((loyalty.rewardCost || 0) * 100),
+      }),
+      // Always send tone + assistant_name together: picking a chip with an empty
+      // custom-tone field clears any stale freeform override (preset wins again).
+      conversaflowActive && voice && saveTenantVoice({
+        tone_preset:    voice.tonePreset,
+        assistant_name: voice.assistantName,
+        tone:           voice.customTone,
+        style_notes:    voice.styleNotes.split('\n').map(s => s.trim()).filter(Boolean),
       }),
     ]);
     if (settingsResult.status === 'fulfilled') {
@@ -213,6 +245,67 @@ const SettingsScreen = () => {
           </div>
         </div>
       </div>
+
+      {/* Voice & tone — WhatsApp assistant (ConversaFlow) */}
+      {conversaflowActive && voice && (
+        <div className="card fade-up d2" style={{padding:'24px 26px'}}>
+          <div className="ed-head" style={{marginBottom:18}}>
+            <div className="titles">
+              <div className="sec-index"><span className="nn">V</span><span>/</span><span>VOZ <XSep/> CONVERSAFLOW</span></div>
+              <h2>Voz y tono del asistente</h2>
+              <div className="en">WhatsApp assistant voice &amp; tone</div>
+            </div>
+          </div>
+
+          {/* Tone chips — single select */}
+          <div className="field" style={{marginBottom:18}}>
+            <label>Tono · cómo le habla el asistente a tus clientes</label>
+            <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
+              {(voiceData?.presets?.length ? voiceData.presets : VOICE_PRESET_FALLBACK).map(p => (
+                <button
+                  key={p.key}
+                  className={'day-pill focusable' + (voice.tonePreset === p.key ? ' on' : '')}
+                  onClick={() => setVoice(v => ({...v, tonePreset: p.key}))}
+                >{p.label}</button>
+              ))}
+            </div>
+            {voice.customTone.trim() ? (
+              <div style={{fontSize:12.5, color:'var(--ink-3)', marginTop:8, fontStyle:'italic'}}>
+                Usando tono personalizado — anula el chip seleccionado.
+              </div>
+            ) : voiceData?.presets?.find(p => p.key === voice.tonePreset)?.description && (
+              <div style={{fontSize:12.5, color:'var(--ink-3)', marginTop:8}}>
+                {voiceData.presets.find(p => p.key === voice.tonePreset).description}
+              </div>
+            )}
+          </div>
+
+          {/* Advanced */}
+          <div className="grid grid-2" style={{gap:14}}>
+            <div className="field">
+              <label>Nombre del asistente · opcional</label>
+              <input className="input tall"
+                value={voice.assistantName}
+                placeholder={bizName || 'Asistente'}
+                onChange={e => setVoice(v => ({...v, assistantName: e.target.value.slice(0,60)}))}/>
+            </div>
+            <div className="field">
+              <label>Tono personalizado · opcional (anula el chip)</label>
+              <input className="input tall"
+                value={voice.customTone}
+                placeholder="Ej. relajado, con modismos del norte"
+                onChange={e => setVoice(v => ({...v, customTone: e.target.value.slice(0,280)}))}/>
+            </div>
+            <div className="field" style={{gridColumn:'1 / -1'}}>
+              <label>Notas de estilo · una por línea (máx. 8)</label>
+              <textarea className="input"
+                value={voice.styleNotes}
+                onChange={e => setVoice(v => ({...v, styleNotes: e.target.value}))}
+                style={{minHeight:80}}/>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!cashActive && (
         <div className="card fade-up d2" style={{padding:'24px 26px'}}>
