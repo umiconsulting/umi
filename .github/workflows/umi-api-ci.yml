@@ -1,10 +1,9 @@
 name: umi-api CI
 
+# PR gate only. Pushes to main are checked + built + deployed by
+# umi-api-deploy.yml (which re-runs these same checks before shipping),
+# so running on `push` here too would just double the work on every merge.
 on:
-  push:
-    paths:
-      - "apps/umi-api/**"
-      - ".github/workflows/umi-api-ci.yml"
   pull_request:
     paths:
       - "apps/umi-api/**"
