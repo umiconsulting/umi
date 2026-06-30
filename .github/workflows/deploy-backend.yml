@@ -91,9 +91,15 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # Stream deploy.sh to a temp file on the box, then run it with stdin
+          # detached (< /dev/null). Piping the script straight into `bash -s`
+          # breaks: deploy.sh's own `git fetch` spawns an ssh-to-GitHub that
+          # drains the very stdin the script is being read from, so bash hits
+          # EOF mid-script and dies silently. cat-to-file + /dev/null avoids it.
           ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -p "$SSH_PORT" \
             "$SSH_USER@$SSH_HOST" \
-            "APP_NAME='$APP_NAME' bash -s 'sha-${{ github.sha }}'" < "$DEPLOY_SCRIPT"
+            "cat > /tmp/$APP_NAME-deploy.sh && APP_NAME='$APP_NAME' bash /tmp/$APP_NAME-deploy.sh 'sha-${{ github.sha }}' < /dev/null" \
+            < "$DEPLOY_SCRIPT"
 
       - name: Health check
         if: ${{ inputs.health_url != '' }}
