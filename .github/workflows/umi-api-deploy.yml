@@ -15,6 +15,14 @@ concurrency:
   group: deploy-umi-api
   cancel-in-progress: false
 
+# The repo's default GITHUB_TOKEN is read-only, so grant this caller the
+# packages:write it needs to push to GHCR (plus contents:read for checkout).
+# Without this, the reusable workflow's packages:write request exceeds the
+# caller's permission ceiling and the run fails at startup.
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   deploy:
     uses: ./.github/workflows/deploy-backend.yml
