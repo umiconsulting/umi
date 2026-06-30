@@ -1,0 +1,107 @@
+# Reusable CD for a self-hosted umi backend service (umi-api today; umi-logs or
+# any future Docker service tomorrow). It:
+#   1. typecheck + build + test (gate)
+#   2. build the Docker image and push it to GHCR (off the VPS)
+#   3. SSH to the VPS and run the app's deploy/deploy.sh, which pulls the new
+#      image and rolls the containers — no build on the live box.
+#
+# Add another backend: copy .github/workflows/umi-api-deploy.yml, change the
+# inputs, and ship a apps/<app>/deploy/deploy.sh. Nothing here needs to change.
+name: Deploy backend (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      app_name:
+        description: "Service name, also the apps/<app_name> dir on the VPS (e.g. umi-api)"
+        type: string
+        required: true
+      app_dir:
+        description: "Path to the app in this repo (e.g. apps/umi-api)"
+        type: string
+        required: true
+      image:
+        description: "GHCR image name without tag (e.g. ghcr.io/umiconsulting/umi-api)"
+        type: string
+        required: true
+      node_version:
+        type: string
+        default: "22"
+      health_url:
+        description: "Optional URL to curl after deploy; empty disables the check"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.app_dir }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.app_dir }}/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run test
+
+  build-push-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Build & push image to GHCR
+        env:
+          IMAGE: ${{ inputs.image }}
+          DIR: ${{ inputs.app_dir }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker build \
+            -t "$IMAGE:sha-${{ github.sha }}" \
+            -t "$IMAGE:latest" \
+            -f "$DIR/Dockerfile" "$DIR"
+          docker push "$IMAGE:sha-${{ github.sha }}"
+          docker push "$IMAGE:latest"
+
+      - name: Deploy over SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          SSH_HOST: ${{ secrets.VPS_HOST }}
+          SSH_USER: ${{ secrets.VPS_USER }}
+          SSH_PORT: ${{ secrets.VPS_SSH_PORT || '22' }}
+          APP_NAME: ${{ inputs.app_name }}
+          DEPLOY_SCRIPT: ${{ inputs.app_dir }}/deploy/deploy.sh
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -p "$SSH_PORT" \
+            "$SSH_USER@$SSH_HOST" \
+            "APP_NAME='$APP_NAME' bash -s 'sha-${{ github.sha }}'" < "$DEPLOY_SCRIPT"
+
+      - name: Health check
+        if: ${{ inputs.health_url != '' }}
+        run: |
+          for i in $(seq 1 10); do
+            if curl -fsS --max-time 5 "${{ inputs.health_url }}" >/dev/null; then
+              echo "Health OK: ${{ inputs.health_url }}"; exit 0
+            fi
+            echo "Waiting for health ($i/10)..."; sleep 6
+          done
+          echo "Health check failed: ${{ inputs.health_url }}"; exit 1

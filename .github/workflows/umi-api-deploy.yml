@@ -1,0 +1,26 @@
+# Builds and ships umi-api to the VPS on every merge to main. Thin caller of the
+# reusable deploy-backend workflow — see .github/workflows/deploy-backend.yml.
+name: umi-api deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/umi-api/**"
+      - ".github/workflows/umi-api-deploy.yml"
+      - ".github/workflows/deploy-backend.yml"
+
+# Never run two umi-api deploys at once; let an in-flight one finish.
+concurrency:
+  group: deploy-umi-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-backend.yml
+    with:
+      app_name: umi-api
+      app_dir: apps/umi-api
+      image: ghcr.io/umiconsulting/umi-api
+      health_url: https://api.umiconsulting.co/health
+    secrets: inherit
