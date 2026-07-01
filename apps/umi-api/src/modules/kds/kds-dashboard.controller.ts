@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -62,6 +63,32 @@ export class KdsDashboardController {
     @Query('locationId') locationId?: string,
   ) {
     return this.kds.listStationsForDashboard(t.tenantId, locationId ?? null);
+  }
+
+  @Post('stations')
+  createStation(
+    @Tenant() t: TenantAccess,
+    @Body() body: Record<string, unknown>,
+    @Query('locationId') locationId?: string,
+  ) {
+    return this.kds.createStation(t.tenantId, locationId ?? null, body);
+  }
+
+  @Patch('stations/:stationId')
+  updateStation(
+    @Tenant() t: TenantAccess,
+    @Param('stationId') stationId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.kds.updateStation(t.tenantId, stationId, body);
+  }
+
+  @Delete('stations/:stationId')
+  archiveStation(
+    @Tenant() t: TenantAccess,
+    @Param('stationId') stationId: string,
+  ) {
+    return this.kds.archiveStation(t.tenantId, stationId);
   }
 
   @Get('devices/pairing')

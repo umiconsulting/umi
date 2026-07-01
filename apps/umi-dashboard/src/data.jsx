@@ -420,6 +420,36 @@ async function generateDevicePairingPin(device) {
   })
 }
 
+async function createKdsStation(station) {
+  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant')
+  const locationId = window.localStorage.getItem('umi-dashboard-selected-location')
+  if (!tenantId) throw new Error('No active tenant selected')
+  const path = `/api/tenants/${encodeURIComponent(tenantId)}/kds/stations${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`
+  return _apiFetch(path, {
+    method: 'POST',
+    body: JSON.stringify(station),
+  })
+}
+
+async function updateKdsStation(stationId, patch) {
+  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant')
+  const locationId = window.localStorage.getItem('umi-dashboard-selected-location')
+  if (!tenantId) throw new Error('No active tenant selected')
+  const path = `/api/tenants/${encodeURIComponent(tenantId)}/kds/stations/${encodeURIComponent(stationId)}${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`
+  return _apiFetch(path, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+}
+
+async function deleteKdsStation(stationId) {
+  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant')
+  const locationId = window.localStorage.getItem('umi-dashboard-selected-location')
+  if (!tenantId) throw new Error('No active tenant selected')
+  const path = `/api/tenants/${encodeURIComponent(tenantId)}/kds/stations/${encodeURIComponent(stationId)}${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`
+  return _apiFetch(path, { method: 'DELETE' })
+}
+
 async function approveDevicePairing(pairingId) {
   const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant')
   const locationId = window.localStorage.getItem('umi-dashboard-selected-location')
@@ -611,6 +641,7 @@ export {
   saveTenantSettings, saveRewardConfig, saveBusinessHours, saveTenantVoice,
   createStaffMember, updateStaffMember, deleteStaffMember,
   provisionDevice, generateDevicePairingPin, approveDevicePairing, denyDevicePairing, updateDevice, revokeDevice, transitionOrder,
+  createKdsStation, updateKdsStation, deleteKdsStation,
   useKdsConnection,
   _LIVE as DATA_IS_LIVE,
 }

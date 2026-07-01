@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   deviceStatus,
   KdsService,
+  stationKeyFromName,
   ticketBelongsToDevice,
 } from './kds.service';
 import {
@@ -390,6 +391,15 @@ describe('pure helpers', () => {
       ),
     ).toBe(false);
     expect(ticketBelongsToDevice(null, SESSION)).toBe(false);
+  });
+
+  it('stationKeyFromName slugifies (accent-folded, cap 40)', () => {
+    expect(stationKeyFromName('Cocina Caliente')).toBe('cocina_caliente');
+    expect(stationKeyFromName('Estación Fría')).toBe('estacion_fria');
+    expect(stationKeyFromName('  Bar / Pass  ')).toBe('bar_pass');
+    expect(stationKeyFromName('PASTELERÍA #2')).toBe('pasteleria_2');
+    expect(stationKeyFromName('!!!')).toBe(''); // no usable chars ⇒ caller rejects
+    expect(stationKeyFromName('x'.repeat(60)).length).toBe(40);
   });
 
   it('validateTransition enforces the matrix', () => {
