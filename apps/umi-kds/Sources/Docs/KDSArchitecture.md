@@ -60,8 +60,7 @@ explicit `device_revoked` response.
 
 ### Info.plist keys
 
-- `KDSBackendURL` — Supabase project URL
-- `KDSAnonKey` — anon key / publishable project key for endpoint transport
+- `KDSBackendURL` — backend base URL (production: `https://api.umiconsulting.co`)
 - `KDSLocalBaseURL` — optional local dashboard API base URL for development. For local device
   testing, point this at the Mac's LAN address on port `4011`, the dashboard API server connected to
   the local transition database. The dashboard browser UI runs on `4010`, but KDS runtime calls

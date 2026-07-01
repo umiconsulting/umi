@@ -117,8 +117,6 @@ struct KDSAPIClient {
         var request = URLRequest(url: configuration.commandURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(configuration.anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(configuration.anonKey)", forHTTPHeaderField: "Authorization")
         request.setValue(deviceToken, forHTTPHeaderField: "X-KDS-Device-Token")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -134,8 +132,6 @@ struct KDSAPIClient {
         var request = URLRequest(url: configuration.pairingURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(configuration.anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(configuration.anonKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         return try await responseData(for: request)
@@ -159,8 +155,6 @@ struct KDSAPIClient {
         var request = URLRequest(url: configuration.boardURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(configuration.anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(configuration.anonKey)", forHTTPHeaderField: "Authorization")
         request.setValue(deviceToken, forHTTPHeaderField: "X-KDS-Device-Token")
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
 
