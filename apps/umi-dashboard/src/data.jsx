@@ -55,7 +55,15 @@ async function _apiFetch(path, opts) {
     headers: Object.assign(headers, opts.headers || {}),
   })))
   const payload = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(errMessage(payload, `${res.status} ${path}`))
+  if (!res.ok) {
+    // Keep the human string on .message, but also surface the machine code and
+    // HTTP status so callers can map to friendly copy and log the raw detail.
+    const err = new Error(errMessage(payload, `${res.status} ${path}`))
+    err.status = res.status
+    err.code = payload && typeof payload.error === 'string' ? payload.error : null
+    err.path = path
+    throw err
+  }
   return payload
 }
 

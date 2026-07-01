@@ -220,6 +220,20 @@ const DevicesScreen = () => {
   );
 };
 
+const PAIRING_ERROR_MESSAGES = {
+  pairing_not_pending: 'Esta solicitud ya expiró o fue atendida. Actualiza la lista.',
+  invalid_pairing_id: 'Solicitud inválida.',
+};
+
+// Show operators friendly copy; the raw error (code, status, path) goes to the
+// console for debugging.
+function pairingErrorMessage(err) {
+  return (
+    PAIRING_ERROR_MESSAGES[err && err.code] ||
+    'No se pudo completar la acción. Intenta de nuevo.'
+  );
+}
+
 const PairingRequestsCard = ({ pairings, stations, onChanged }) => {
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
@@ -230,11 +244,12 @@ const PairingRequestsCard = ({ pairings, stations, onChanged }) => {
     setError(null);
     try {
       await approveDevicePairing(id);
-      onChanged && onChanged();
     } catch (err) {
-      setError(err.message);
+      console.error('[kds] approve pairing failed', err);
+      setError(pairingErrorMessage(err));
     } finally {
       setBusy(null);
+      onChanged && onChanged();
     }
   }
 
@@ -243,11 +258,12 @@ const PairingRequestsCard = ({ pairings, stations, onChanged }) => {
     setError(null);
     try {
       await denyDevicePairing(id);
-      onChanged && onChanged();
     } catch (err) {
-      setError(err.message);
+      console.error('[kds] deny pairing failed', err);
+      setError(pairingErrorMessage(err));
     } finally {
       setBusy(null);
+      onChanged && onChanged();
     }
   }
 
@@ -272,6 +288,7 @@ const PairingRequestsCard = ({ pairings, stations, onChanged }) => {
           const station = stationById[p.station_id];
           const requested = p.requested_name || 'Esperando iPad';
           const pendingApproval = p.status === 'pending' && p.requested_name;
+          const expired = p.status === 'pending' && p.expires_at && new Date(p.expires_at).getTime() < Date.now();
           return (
             <div key={p.id} className="list-card" style={{padding:14, alignItems:'center'}}>
               <div style={{paddingLeft:14, flex:1, minWidth:0}}>
@@ -283,10 +300,10 @@ const PairingRequestsCard = ({ pairings, stations, onChanged }) => {
                   <span className="chip" style={{
                     height:22,
                     fontSize:10.5,
-                    color: p.status === 'approved' ? 'var(--success)' : 'var(--warning)',
-                    background: p.status === 'approved' ? 'var(--success-soft)' : 'var(--warning-soft)',
+                    color: p.status === 'approved' ? 'var(--success)' : expired ? 'var(--danger)' : 'var(--warning)',
+                    background: p.status === 'approved' ? 'var(--success-soft)' : expired ? 'var(--danger-soft)' : 'var(--warning-soft)',
                   }}>
-                    {p.status === 'approved' ? 'Aprobado' : pendingApproval ? 'Confirmar' : 'Esperando'}
+                    {p.status === 'approved' ? 'Aprobado' : expired ? 'Expirada' : pendingApproval ? 'Confirmar' : 'Esperando'}
                   </span>
                 </div>
                 <div style={{fontSize:12.5, color:'var(--ink-3)'}}>
@@ -304,8 +321,8 @@ const PairingRequestsCard = ({ pairings, stations, onChanged }) => {
                   </button>
                   <button
                     className="btn btn-primary btn-sm"
-                    disabled={!p.requested_name || busy === p.id + ':approve'}
-                    style={{opacity: p.requested_name ? 1 : 0.5}}
+                    disabled={!p.requested_name || expired || busy === p.id + ':approve'}
+                    style={{opacity: (p.requested_name && !expired) ? 1 : 0.5}}
                     onClick={() => approve(p.id)}
                   >
                     <I.Check size={14}/> Aprobar
