@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   HttpException,
   Injectable,
   NotFoundException,
@@ -407,6 +408,81 @@ export class KdsService {
     return { stations };
   }
 
+  /**
+   * Create a station for the tenant (dashboard "Estaciones" panel + the
+   * add-device empty state). `station_key` is derived from the name (accent-
+   * folded slug) unless the caller passes one. Created at the active location
+   * scope so it shows in that location's dropdown; unscoped (tenant-wide) when
+   * no location is selected.
+   */
+  async createStation(
+    tenantId: string,
+    locationId: string | null,
+    body: Record<string, unknown>,
+  ): Promise<{ station: unknown }> {
+    const name = asText(body.name);
+    if (!name) throw new BadRequestException({ error: 'missing_station_name' });
+    const stationKey = stationKeyFromName(asText(body.station_key) || name);
+    if (!stationKey) {
+      throw new BadRequestException({ error: 'invalid_station_name' });
+    }
+    // Pre-check catches tenant-wide (location_id IS NULL) duplicates the DB's
+    // NULL-distinct unique index would let through; the 23505 catch below is the
+    // race backstop and covers location-scoped dupes.
+    const existing = await this.repo.findActiveStationByKey(
+      tenantId,
+      locationId,
+      stationKey,
+    );
+    if (existing) throw new ConflictException({ error: 'station_exists' });
+    try {
+      const station = await this.repo.createStation({
+        tenantId,
+        locationId,
+        name,
+        stationKey,
+      });
+      return { station };
+    } catch (err) {
+      // unique (tenant_id, location_id, station_key)
+      if ((err as { code?: string })?.code === '23505') {
+        throw new ConflictException({ error: 'station_exists' });
+      }
+      throw err;
+    }
+  }
+
+  /** Rename a station (keeps the stable `station_key`). */
+  async updateStation(
+    tenantId: string,
+    stationId: string,
+    body: Record<string, unknown>,
+  ): Promise<{ station: unknown }> {
+    const id = asUuid(stationId);
+    if (!id) throw new BadRequestException({ error: 'invalid_station_id' });
+    const name = asText(body.name);
+    if (!name) throw new BadRequestException({ error: 'missing_station_name' });
+    const station = await this.repo.updateStation({
+      tenantId,
+      stationId: id,
+      name,
+    });
+    if (!station) throw new NotFoundException({ error: 'station_not_found' });
+    return { station };
+  }
+
+  /** Archive a station (soft delete — hidden from the active list). */
+  async archiveStation(
+    tenantId: string,
+    stationId: string,
+  ): Promise<{ ok: true }> {
+    const id = asUuid(stationId);
+    if (!id) throw new BadRequestException({ error: 'invalid_station_id' });
+    const ok = await this.repo.archiveStation(tenantId, id);
+    if (!ok) throw new NotFoundException({ error: 'station_not_found' });
+    return { ok: true };
+  }
+
   async listPairingsForDashboard(
     tenantId: string,
     locationId: string | null,
@@ -577,6 +653,22 @@ export class KdsService {
 function optText(value: unknown): string | null {
   const t = asText(value);
   return t.length ? t : null;
+}
+
+/**
+ * Slugify a station name into a stable `station_key` (unique per tenant+location):
+ * lowercase, strip accents (estación → estacion), non-alphanumerics → `_`,
+ * trim leading/trailing separators, cap at 40 chars. Returns '' for names with
+ * no usable characters (caller rejects those).
+ */
+export function stationKeyFromName(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40);
 }
 
 export function ticketBelongsToDevice(

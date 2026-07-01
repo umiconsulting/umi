@@ -3,10 +3,13 @@ import { I } from '../icons.jsx'
 import { XSep } from '../shell.jsx'
 import {
   approveDevicePairing,
+  createKdsStation,
+  deleteKdsStation,
   denyDevicePairing,
   generateDevicePairingPin,
   revokeDevice,
   updateDevice,
+  updateKdsStation,
   useDevicePairings,
   useDevicesData,
   useKdsStations,
@@ -17,7 +20,6 @@ import {
 // Status derived from local heartbeat: <10s=live, <20s=slow, else=offline.
 
 
-const STATIONS = ['HOT LINE', 'COLD LINE', 'PASTRY', 'BAR', 'PASS', 'OVEN'];
 const DEVICE_LIVE_MS = 10_000;
 const DEVICE_OFFLINE_MS = 20_000;
 
@@ -197,7 +199,7 @@ const DevicesScreen = () => {
         </span>
       </div>
 
-      {stationOpen && <StationPanel onClose={() => setStationOpen(false)} devices={devices}/>}
+      {stationOpen && <StationPanel onClose={() => setStationOpen(false)} devices={devices} stations={stations || []} onChanged={() => setRefresh(r => r + 1)}/>}
       {addOpen && (
         <AddDevicePanel
           onClose={() => setAddOpen(false)}
@@ -476,8 +478,106 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
   );
 };
 
-const StationPanel = ({ onClose, devices }) => {
-  const [stations, setStations] = useState(STATIONS.map(function(s) { return { id: s, name: s }; }));
+// Shared create-station flow (name state + busy + guarded create/reset) used by
+// both the Estaciones panel and the add-device empty state. `onCreated` receives
+// the created station so callers can react (refresh, auto-select).
+function useCreateStation(onCreated) {
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function create(onError) {
+    const trimmed = name.trim();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    onError && onError(null);
+    try {
+      const res = await createKdsStation({ name: trimmed });
+      setName('');
+      onCreated && onCreated(res && res.station);
+    } catch (err) {
+      onError && onError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return { name, setName, busy, create };
+}
+
+const StationRow = ({ station, count, onChanged, onError }) => {
+  const [name, setName] = useState(station.name);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(function() { setName(station.name); }, [station.name]);
+
+  const trimmed = name.trim();
+  const dirty = trimmed && trimmed !== station.name;
+
+  async function rename() {
+    if (!dirty || busy) {
+      if (!trimmed) setName(station.name); // cleared field ⇒ revert, don't persist blank
+      return;
+    }
+    setBusy(true);
+    onError && onError(null);
+    try {
+      await updateKdsStation(station.id, { name: trimmed });
+      onChanged && onChanged();
+    } catch (err) {
+      setName(station.name);
+      onError && onError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    if (busy) return;
+    if (!window.confirm(`¿Archivar la estación "${station.name}"? Dejará de aparecer al asignar dispositivos.`)) return;
+    setBusy(true);
+    onError && onError(null);
+    try {
+      await deleteKdsStation(station.id);
+      onChanged && onChanged();
+    } catch (err) {
+      onError && onError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="list-card" style={{padding:14, alignItems:'center'}}>
+      <div style={{paddingLeft:14, flex:1, display:'flex', alignItems:'center', gap:12}}>
+        <div style={{width:34, height:34, borderRadius:10, background:'var(--canvas-2)', color:'var(--umi-navy)', display:'flex', alignItems:'center', justifyContent:'center'}}>
+          <I.Layout size={16}/>
+        </div>
+        <div style={{flex:1}}>
+          <input
+            className="input"
+            style={{height:36, border:'1px solid transparent', background:'transparent', padding:'0 8px', fontWeight:600, fontSize:14}}
+            value={name}
+            disabled={busy}
+            onChange={function(e) { setName(e.target.value); }}
+            onBlur={rename}
+            onKeyDown={function(e) { if (e.key === 'Enter') e.currentTarget.blur(); }}
+          />
+          <div style={{fontSize:11.5, color:'var(--ink-3)', paddingLeft:8, marginTop:-2}}>
+            {count} device{count !== 1 ? 's' : ''} assigned{dirty ? ' · sin guardar' : ''}
+          </div>
+        </div>
+        <button className="btn-icon" aria-label="Archivar estación" onClick={remove} disabled={busy}><I.Trash size={15}/></button>
+      </div>
+    </div>
+  );
+};
+
+const StationPanel = ({ onClose, devices, stations, onChanged }) => {
+  const [error, setError] = useState(null);
+  const list = stations || [];
+  const { name: newName, setName: setNewName, busy: saving, create } = useCreateStation(function() {
+    onChanged && onChanged();
+  });
+  function addStation() { return create(setError); }
+
   return (
     <>
       <div className="sheet-backdrop" onClick={onClose}/>
@@ -485,53 +585,54 @@ const StationPanel = ({ onClose, devices }) => {
         <div className="sheet-head">
           <div>
             <div className="eyebrow">Devices · KDS</div>
-            <h2 className="h-section" style={{marginTop:4}}>Stations</h2>
+            <h2 className="h-section" style={{marginTop:4}}>Estaciones</h2>
           </div>
           <button className="btn-icon" onClick={onClose} aria-label="Close"><I.X size={16}/></button>
         </div>
         <div className="sheet-body">
           <p style={{color:'var(--ink-2)', margin:0, fontSize:13.5}}>
-            Tickets are routed to stations based on the menu category. Each station can be assigned to one or more iPads.
+            Los tickets se enrutan a estaciones según la categoría del menú. Cada estación puede asignarse a uno o más iPads.
           </p>
+          {list.length === 0 && (
+            <div style={{fontSize:13, color:'var(--ink-3)'}}>Aún no hay estaciones. Crea la primera abajo.</div>
+          )}
           <div style={{display:'flex', flexDirection:'column', gap:8}}>
-            {stations.map(function(s, i) {
-              var count = devices.filter(function(d) { return d.station === s.id; }).length;
+            {list.map(function(s) {
+              var count = (devices || []).filter(function(d) { return d.stationId === s.id; }).length;
               return (
-                <div key={s.id} className="list-card" style={{padding:14, alignItems:'center'}}>
-                  <div style={{paddingLeft:14, flex:1, display:'flex', alignItems:'center', gap:12}}>
-                    <div style={{width:34, height:34, borderRadius:10, background:'var(--canvas-2)', color:'var(--umi-navy)', display:'flex', alignItems:'center', justifyContent:'center'}}>
-                      <I.Layout size={16}/>
-                    </div>
-                    <div style={{flex:1}}>
-                      <input
-                        className="input"
-                        style={{height:36, border:'1px solid transparent', background:'transparent', padding:'0 8px', fontWeight:600, fontSize:14}}
-                        value={s.name}
-                        onChange={function(e) {
-                          setStations(function(prev) {
-                            return prev.map(function(p, j) { return j === i ? Object.assign({}, p, { name: e.target.value }) : p; });
-                          });
-                        }}
-                      />
-                      <div style={{fontSize:11.5, color:'var(--ink-3)', paddingLeft:8, marginTop:-2}}>
-                        {count} device{count !== 1 ? 's' : ''} assigned
-                      </div>
-                    </div>
-                    <button className="btn-icon" aria-label="Delete station"><I.Trash size={15}/></button>
-                  </div>
-                </div>
+                <StationRow
+                  key={s.id}
+                  station={s}
+                  count={count}
+                  onChanged={onChanged}
+                  onError={setError}
+                />
               );
             })}
           </div>
-          <button className="btn btn-secondary focusable" onClick={function() {
-            setStations(function(prev) { return [...prev, { id: 'NEW-' + (prev.length+1), name: 'New station' }]; });
-          }}>
-            <I.Plus size={16}/> Add station
-          </button>
+          {error && (
+            <div style={{fontSize:12.5, color:'var(--danger)', background:'var(--danger-soft)', borderRadius:10, padding:'10px 12px'}}>
+              {error}
+            </div>
+          )}
+          <div className="field">
+            <label>Nueva estación</label>
+            <div style={{display:'flex', gap:8}}>
+              <input
+                className="input"
+                placeholder="e.g. Cocina Caliente"
+                value={newName}
+                onChange={function(e) { setNewName(e.target.value); }}
+                onKeyDown={function(e) { if (e.key === 'Enter') addStation(); }}
+              />
+              <button className="btn btn-primary focusable" onClick={addStation} disabled={saving || !newName.trim()} style={{whiteSpace:'nowrap'}}>
+                <I.Plus size={16}/> {saving ? 'Creando…' : 'Crear'}
+              </button>
+            </div>
+          </div>
         </div>
         <div className="sheet-foot">
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={onClose}>Save changes</button>
+          <button className="btn btn-ghost" onClick={onClose}>Cerrar</button>
         </div>
       </aside>
     </>
@@ -545,9 +646,18 @@ const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
+  const hasStations = (stations || []).length > 0;
+  const { name: newStationName, setName: setNewStationName, busy: creatingStation, create: createStationInline } =
+    useCreateStation(function(createdStation) {
+      if (createdStation && createdStation.id) setStation(createdStation.id);
+      onProvisioned && onProvisioned();
+    });
+
   React.useEffect(function() {
     if (!station && stations && stations[0]) setStation(stations[0].id);
   }, [stations, station]);
+
+  function addStation() { return createStationInline(setError); }
 
   async function createDevice() {
     setSaving(true);
@@ -584,9 +694,29 @@ const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
           </div>
           <div className="field">
             <label>Assign to station</label>
-            <select className="select" style={{height:52, borderRadius:14}} value={station} onChange={function(e) { setStation(e.target.value); }}>
-              {(stations || []).map(function(s) { return <option key={s.id} value={s.id}>{s.name}</option>; })}
-            </select>
+            {hasStations ? (
+              <select className="select" style={{height:52, borderRadius:14}} value={station} onChange={function(e) { setStation(e.target.value); }}>
+                {(stations || []).map(function(s) { return <option key={s.id} value={s.id}>{s.name}</option>; })}
+              </select>
+            ) : (
+              <>
+                <div style={{fontSize:12.5, color:'var(--ink-3)', marginBottom:8}}>
+                  No hay estaciones todavía. Crea una para asignar este dispositivo.
+                </div>
+                <div style={{display:'flex', gap:8}}>
+                  <input
+                    className="input"
+                    placeholder="Nombre de la estación"
+                    value={newStationName}
+                    onChange={function(e) { setNewStationName(e.target.value); }}
+                    onKeyDown={function(e) { if (e.key === 'Enter') addStation(); }}
+                  />
+                  <button className="btn btn-secondary focusable" onClick={addStation} disabled={creatingStation || !newStationName.trim()} style={{whiteSpace:'nowrap'}}>
+                    <I.Plus size={16}/> {creatingStation ? 'Creando…' : 'Crear estación'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
           {error && (
             <div style={{fontSize:12.5, color:'var(--danger)', background:'var(--danger-soft)', borderRadius:10, padding:'10px 12px'}}>

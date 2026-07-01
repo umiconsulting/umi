@@ -194,6 +194,109 @@ export class KdsRepository {
     }>;
   }
 
+  /**
+   * Active (non-archived) station with this key in the same location scope.
+   * `IS NOT DISTINCT FROM` makes the location match NULL-safe, so this closes
+   * the tenant-wide (`location_id IS NULL`) gap that the DB's
+   * `UNIQUE (tenant_id, location_id, station_key)` misses (NULLs compare
+   * distinct there, so it never fires 23505 for tenant-wide dupes).
+   */
+  async findActiveStationByKey(
+    tenantId: string,
+    locationId: string | null,
+    stationKey: string,
+  ): Promise<{ id: string } | null> {
+    const { rows } = await this.pg.query<{ id: string }>(
+      `SELECT id
+         FROM kitchen.stations
+        WHERE tenant_id = $1
+          AND station_key = $2
+          AND location_id IS NOT DISTINCT FROM $3
+          AND status <> 'archived'
+        LIMIT 1`,
+      [tenantId, stationKey, locationId],
+    );
+    return rows[0] ?? null;
+  }
+
+  /** Create an active station. `sort_order` defaults to 0 (DB default). */
+  async createStation(input: {
+    tenantId: string;
+    locationId: string | null;
+    name: string;
+    stationKey: string;
+  }): Promise<{
+    id: string;
+    station_key: string;
+    name: string;
+    status: string;
+    sort_order: number;
+    location_id: string | null;
+  }> {
+    const { rows } = await this.pg.query(
+      `INSERT INTO kitchen.stations (tenant_id, location_id, station_key, name)
+         VALUES ($1, $2, $3, $4)
+       RETURNING id, station_key, name, status, sort_order, location_id`,
+      [input.tenantId, input.locationId, input.stationKey, input.name],
+    );
+    return rows[0] as {
+      id: string;
+      station_key: string;
+      name: string;
+      status: string;
+      sort_order: number;
+      location_id: string | null;
+    };
+  }
+
+  /** Rename an active/disabled station. Returns null if not found. */
+  async updateStation(input: {
+    tenantId: string;
+    stationId: string;
+    name: string;
+  }): Promise<{
+    id: string;
+    station_key: string;
+    name: string;
+    status: string;
+    sort_order: number;
+    location_id: string | null;
+  } | null> {
+    const { rows } = await this.pg.query(
+      `UPDATE kitchen.stations
+          SET name = $3, updated_at = now()
+        WHERE id = $1 AND tenant_id = $2 AND status <> 'archived'
+      RETURNING id, station_key, name, status, sort_order, location_id`,
+      [input.stationId, input.tenantId, input.name],
+    );
+    return (
+      (rows[0] as {
+        id: string;
+        station_key: string;
+        name: string;
+        status: string;
+        sort_order: number;
+        location_id: string | null;
+      }) ?? null
+    );
+  }
+
+  /**
+   * Soft-delete a station (status → 'archived'). Never a hard DELETE: devices,
+   * pairings and orders reference `station_id`, so archiving keeps history intact
+   * while hiding it from the active list. Returns false if not found / already
+   * archived.
+   */
+  async archiveStation(tenantId: string, stationId: string): Promise<boolean> {
+    const { rowCount } = await this.pg.query(
+      `UPDATE kitchen.stations
+          SET status = 'archived', updated_at = now()
+        WHERE id = $1 AND tenant_id = $2 AND status <> 'archived'`,
+      [stationId, tenantId],
+    );
+    return (rowCount ?? 0) > 0;
+  }
+
   // ── Pairing (device.pairing_requests) ──────────────────────────────────────
 
   async insertPairingRequest(input: {

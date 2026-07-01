@@ -398,61 +398,65 @@ async function deleteStaffMember(id) {
   })
 }
 
-async function provisionDevice(device) {
+// Build a tenant-scoped API path with the active location as `?locationId`.
+// Centralizes the localStorage tenant/location lookup + missing-tenant guard
+// that every KDS mutation shares.
+function tenantScopedPath(basePath) {
   const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant')
   const locationId = window.localStorage.getItem('umi-dashboard-selected-location')
   if (!tenantId) throw new Error('No active tenant selected')
-  const path = `/api/tenants/${encodeURIComponent(tenantId)}/kds/devices/provision${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`
-  return _apiFetch(path, {
+  return `/api/tenants/${encodeURIComponent(tenantId)}${basePath}${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`
+}
+
+async function provisionDevice(device) {
+  return _apiFetch(tenantScopedPath('/kds/devices/provision'), {
     method: 'POST',
     body: JSON.stringify(device),
   })
 }
 
 async function generateDevicePairingPin(device) {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant')
-  const locationId = window.localStorage.getItem('umi-dashboard-selected-location')
-  if (!tenantId) throw new Error('No active tenant selected')
-  const path = `/api/tenants/${encodeURIComponent(tenantId)}/kds/devices/pairing-pin${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`
-  return _apiFetch(path, {
+  return _apiFetch(tenantScopedPath('/kds/devices/pairing-pin'), {
     method: 'POST',
     body: JSON.stringify(device),
   })
 }
 
+async function createKdsStation(station) {
+  return _apiFetch(tenantScopedPath('/kds/stations'), {
+    method: 'POST',
+    body: JSON.stringify(station),
+  })
+}
+
+async function updateKdsStation(stationId, patch) {
+  return _apiFetch(tenantScopedPath(`/kds/stations/${encodeURIComponent(stationId)}`), {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+}
+
+async function deleteKdsStation(stationId) {
+  return _apiFetch(tenantScopedPath(`/kds/stations/${encodeURIComponent(stationId)}`), { method: 'DELETE' })
+}
+
 async function approveDevicePairing(pairingId) {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant')
-  const locationId = window.localStorage.getItem('umi-dashboard-selected-location')
-  if (!tenantId) throw new Error('No active tenant selected')
-  const path = `/api/tenants/${encodeURIComponent(tenantId)}/kds/devices/pairing/${encodeURIComponent(pairingId)}/approve${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`
-  return _apiFetch(path, { method: 'POST' })
+  return _apiFetch(tenantScopedPath(`/kds/devices/pairing/${encodeURIComponent(pairingId)}/approve`), { method: 'POST' })
 }
 
 async function denyDevicePairing(pairingId) {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant')
-  const locationId = window.localStorage.getItem('umi-dashboard-selected-location')
-  if (!tenantId) throw new Error('No active tenant selected')
-  const path = `/api/tenants/${encodeURIComponent(tenantId)}/kds/devices/pairing/${encodeURIComponent(pairingId)}/deny${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`
-  return _apiFetch(path, { method: 'POST' })
+  return _apiFetch(tenantScopedPath(`/kds/devices/pairing/${encodeURIComponent(pairingId)}/deny`), { method: 'POST' })
 }
 
 async function updateDevice(deviceId, patch) {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant')
-  const locationId = window.localStorage.getItem('umi-dashboard-selected-location')
-  if (!tenantId) throw new Error('No active tenant selected')
-  const path = `/api/tenants/${encodeURIComponent(tenantId)}/kds/devices/${encodeURIComponent(deviceId)}${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`
-  return _apiFetch(path, {
+  return _apiFetch(tenantScopedPath(`/kds/devices/${encodeURIComponent(deviceId)}`), {
     method: 'PATCH',
     body: JSON.stringify(patch),
   })
 }
 
 async function revokeDevice(deviceId, reason) {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant')
-  const locationId = window.localStorage.getItem('umi-dashboard-selected-location')
-  if (!tenantId) throw new Error('No active tenant selected')
-  const path = `/api/tenants/${encodeURIComponent(tenantId)}/kds/devices/${encodeURIComponent(deviceId)}/revoke${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`
-  return _apiFetch(path, {
+  return _apiFetch(tenantScopedPath(`/kds/devices/${encodeURIComponent(deviceId)}/revoke`), {
     method: 'POST',
     body: JSON.stringify({ reason: reason || 'removed_from_dashboard' }),
   })
@@ -611,6 +615,7 @@ export {
   saveTenantSettings, saveRewardConfig, saveBusinessHours, saveTenantVoice,
   createStaffMember, updateStaffMember, deleteStaffMember,
   provisionDevice, generateDevicePairingPin, approveDevicePairing, denyDevicePairing, updateDevice, revokeDevice, transitionOrder,
+  createKdsStation, updateKdsStation, deleteKdsStation,
   useKdsConnection,
   _LIVE as DATA_IS_LIVE,
 }
