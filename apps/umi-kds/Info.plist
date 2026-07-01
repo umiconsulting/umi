@@ -21,11 +21,13 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>KDSBackendURL</key>
-	<string>https://xbudknbimkgjjgohnjgp.supabase.co</string>
-	<key>KDSLocalBaseURL</key>
-	<string>http://127.0.0.1:4011</string>
-	<key>KDSHeartbeatIntervalSeconds</key>
-	<real>5</real>
+	<string>https://api.umiconsulting.co</string>
+	<key>KDSPairingURL</key>
+	<string>https://api.umiconsulting.co/kds/pairing</string>
+	<key>KDSBoardURL</key>
+	<string>https://api.umiconsulting.co/kds/board</string>
+	<key>KDSCommandURL</key>
+	<string>https://api.umiconsulting.co/kds/command</string>
 	<key>KDSAnonKey</key>
 	<string>$(KDS_ANON_KEY)</string>
 	<key>KDSBusinessID</key>
