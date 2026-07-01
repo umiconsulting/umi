@@ -63,4 +63,5 @@ alter default privileges in schema core, ops, comms, loyalty, observability, que
 alter default privileges in schema core, ops, comms, loyalty, observability, queue
   grant usage, select on sequences to umi_app, umi_worker;
 
--- When the landing-page leads land (Phase 5), add `grow` to umi_worker's grants.
+-- The landing-page leads (Phase 5) grant `grow` to umi_worker — see the
+-- companion 003_grow_grants.sql (grow is service-role-only; worker pool only).
