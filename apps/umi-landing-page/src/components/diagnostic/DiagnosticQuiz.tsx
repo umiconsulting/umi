@@ -7,6 +7,7 @@ import QuestionStep, { Question } from "./QuestionStep";
 import SnapshotResult from "./SnapshotResult";
 import ContactForm, { ContactInfo } from "./ContactForm";
 import FullResult from "./FullResult";
+import { apiUrl } from "../../lib/api";
 
 // Define los tipos de datos necesarios
 const questions: Question[] = [
@@ -162,7 +163,7 @@ const DiagnosticQuiz = () => {
     };
 
     try {
-      const response = await fetch("/api/diagnostic", {
+      const response = await fetch(apiUrl("/api/diagnostic"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

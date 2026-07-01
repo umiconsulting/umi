@@ -2,6 +2,7 @@
 
 import { useState, ChangeEvent, FormEvent } from "react";
 import { motion } from "framer-motion";
+import { apiUrl } from "../../lib/api";
 
 type FormStatus = "idle" | "sending" | "success" | "error";
 
@@ -82,7 +83,7 @@ const ContactSection = () => {
     setFormState({ status: "sending", message: "" });
 
     try {
-      const response = await fetch("/api/contact", {
+      const response = await fetch(apiUrl("/api/contact"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

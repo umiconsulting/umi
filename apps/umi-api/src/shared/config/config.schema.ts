@@ -66,6 +66,13 @@ export const configSchema = z.object({
   // still execute when off; only the customer notify is gated. Owner flips it
   // true at the iPad repoint + edge-function decommission.
   KDS_STATUS_NOTIFY_ENABLED: booleanFromEnv.default(false),
+  // Landing-page lead email sequences (Phase 5). Gates the repeatable
+  // `email_sequence` job that drains due diagnostic-followup emails. OFF by
+  // default: while the landing page still runs its own SQLite/Vercel cron, a
+  // second sender here would double-mail prospects. Owner flips it true at the
+  // landing cutover (and disables the landing cron). Public contact/diagnostic
+  // routes stay live regardless — only the background sequence tick is gated.
+  LEADS_SEQUENCE_ENABLED: booleanFromEnv.default(false),
 
   // CORS.
   CORS_ORIGINS: z.string().optional(), // comma-separated origins
@@ -115,6 +122,14 @@ export const configSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
   EMAIL_FROM: z.string().optional(),
+  // Recipient for the landing-page contact-form internal notification (Phase 5).
+  // Falls back to EMAIL_FROM then hola@umiconsulting.co when unset.
+  CONTACT_TO_EMAIL: z.string().optional(),
+  // HMAC-SHA256 secret for the /api/leads/webhook/email-response signature
+  // (X-Webhook-Signature: sha256=…). When set, the webhook verifies it and fails
+  // closed on mismatch. When unset, the webhook is rejected in production and
+  // allowed only in non-production (local testing) — mirroring the ported stub.
+  LEADS_WEBHOOK_SECRET: z.string().optional(),
 }).superRefine((cfg, ctx) => {
   // The Twilio signature bypass is a local-dev escape hatch only. Reject it at
   // boot in production so it can never silently disable webhook verification.

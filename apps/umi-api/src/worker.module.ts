@@ -12,11 +12,13 @@ import { EnrichmentProcessor } from './jobs/enrichment.processor';
 import { IntegrationsProcessor } from './jobs/integrations.processor';
 import { LifecycleProcessor } from './jobs/lifecycle.processor';
 import { LifecycleScheduler } from './jobs/lifecycle.scheduler';
+import { LeadsScheduler } from './jobs/leads.scheduler';
 import { OutboxRoutesRegistrar } from './jobs/outbox-routes';
 import { DeadLetterService } from './jobs/dead-letter.service';
 import { OutboxRelayService } from './jobs/outbox-relay.service';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { LifecycleModule } from './modules/lifecycle/lifecycle.module';
+import { LeadsModule } from './modules/leads/leads.module';
 
 /**
  * Root module for the WORKER process. Same shared infrastructure as the web
@@ -36,6 +38,7 @@ import { LifecycleModule } from './modules/lifecycle/lifecycle.module';
     QueueModule,
     ConversationsModule,
     LifecycleModule,
+    LeadsModule,
   ],
   // Worker-only consumers: BullMQ processors, the dead-letter sink they route
   // terminal failures to, and the transactional-outbox relay (inert until
@@ -52,6 +55,7 @@ import { LifecycleModule } from './modules/lifecycle/lifecycle.module';
     IntegrationsProcessor,
     LifecycleProcessor,
     LifecycleScheduler,
+    LeadsScheduler,
   ],
 })
 export class WorkerModule {}
