@@ -426,6 +426,15 @@ export class KdsService {
     if (!stationKey) {
       throw new BadRequestException({ error: 'invalid_station_name' });
     }
+    // Pre-check catches tenant-wide (location_id IS NULL) duplicates the DB's
+    // NULL-distinct unique index would let through; the 23505 catch below is the
+    // race backstop and covers location-scoped dupes.
+    const existing = await this.repo.findActiveStationByKey(
+      tenantId,
+      locationId,
+      stationKey,
+    );
+    if (existing) throw new ConflictException({ error: 'station_exists' });
     try {
       const station = await this.repo.createStation({
         tenantId,

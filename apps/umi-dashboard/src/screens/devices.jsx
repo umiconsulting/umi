@@ -478,6 +478,30 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
   );
 };
 
+// Shared create-station flow (name state + busy + guarded create/reset) used by
+// both the Estaciones panel and the add-device empty state. `onCreated` receives
+// the created station so callers can react (refresh, auto-select).
+function useCreateStation(onCreated) {
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function create(onError) {
+    const trimmed = name.trim();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    onError && onError(null);
+    try {
+      const res = await createKdsStation({ name: trimmed });
+      setName('');
+      onCreated && onCreated(res && res.station);
+    } catch (err) {
+      onError && onError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return { name, setName, busy, create };
+}
+
 const StationRow = ({ station, count, onChanged, onError }) => {
   const [name, setName] = useState(station.name);
   const [busy, setBusy] = useState(false);
@@ -488,7 +512,10 @@ const StationRow = ({ station, count, onChanged, onError }) => {
   const dirty = trimmed && trimmed !== station.name;
 
   async function rename() {
-    if (!dirty || busy) return;
+    if (!dirty || busy) {
+      if (!trimmed) setName(station.name); // cleared field ⇒ revert, don't persist blank
+      return;
+    }
     setBusy(true);
     onError && onError(null);
     try {
@@ -544,26 +571,12 @@ const StationRow = ({ station, count, onChanged, onError }) => {
 };
 
 const StationPanel = ({ onClose, devices, stations, onChanged }) => {
-  const [newName, setNewName] = useState('');
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const list = stations || [];
-
-  async function addStation() {
-    const name = newName.trim();
-    if (!name) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await createKdsStation({ name });
-      setNewName('');
-      onChanged && onChanged();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
+  const { name: newName, setName: setNewName, busy: saving, create } = useCreateStation(function() {
+    onChanged && onChanged();
+  });
+  function addStation() { return create(setError); }
 
   return (
     <>
@@ -633,30 +646,18 @@ const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  const [newStationName, setNewStationName] = useState('');
-  const [creatingStation, setCreatingStation] = useState(false);
   const hasStations = (stations || []).length > 0;
+  const { name: newStationName, setName: setNewStationName, busy: creatingStation, create: createStationInline } =
+    useCreateStation(function(createdStation) {
+      if (createdStation && createdStation.id) setStation(createdStation.id);
+      onProvisioned && onProvisioned();
+    });
 
   React.useEffect(function() {
     if (!station && stations && stations[0]) setStation(stations[0].id);
   }, [stations, station]);
 
-  async function addStation() {
-    const sName = newStationName.trim();
-    if (!sName) return;
-    setCreatingStation(true);
-    setError(null);
-    try {
-      const res = await createKdsStation({ name: sName });
-      setNewStationName('');
-      if (res && res.station && res.station.id) setStation(res.station.id);
-      onProvisioned && onProvisioned();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setCreatingStation(false);
-    }
-  }
+  function addStation() { return createStationInline(setError); }
 
   async function createDevice() {
     setSaving(true);

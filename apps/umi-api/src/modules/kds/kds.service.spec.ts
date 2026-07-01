@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   deviceStatus,
@@ -22,6 +23,15 @@ function make(notifyEnabled = true) {
     getPairing: vi.fn(),
     expirePairing: vi.fn().mockResolvedValue(undefined),
     loadStation: vi.fn(),
+    findActiveStationByKey: vi.fn().mockResolvedValue(null),
+    createStation: vi.fn().mockResolvedValue({
+      id: 's1',
+      station_key: 'estacion_fria',
+      name: 'Estación Fría',
+      status: 'active',
+      sort_order: 0,
+      location_id: null,
+    }),
     createDeviceSession: vi.fn(),
     claimPairing: vi.fn(),
     deleteDevice: vi.fn().mockResolvedValue(undefined),
@@ -391,6 +401,32 @@ describe('pure helpers', () => {
       ),
     ).toBe(false);
     expect(ticketBelongsToDevice(null, SESSION)).toBe(false);
+  });
+
+  it('createStation blocks a duplicate active key before inserting (NULL-safe)', async () => {
+    const { svc, repo } = make();
+    repo.findActiveStationByKey.mockResolvedValue({ id: 'existing' });
+    await expect(
+      svc.createStation('t1', null, { name: 'Estación Fría' }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(repo.findActiveStationByKey).toHaveBeenCalledWith(
+      't1',
+      null,
+      'estacion_fria',
+    );
+    expect(repo.createStation).not.toHaveBeenCalled();
+  });
+
+  it('createStation inserts an accent-folded key when unique', async () => {
+    const { svc, repo } = make();
+    const out = await svc.createStation('t1', null, { name: 'Estación Fría' });
+    expect(repo.createStation).toHaveBeenCalledWith({
+      tenantId: 't1',
+      locationId: null,
+      name: 'Estación Fría',
+      stationKey: 'estacion_fria',
+    });
+    expect(out.station).toMatchObject({ id: 's1' });
   });
 
   it('stationKeyFromName slugifies (accent-folded, cap 40)', () => {
