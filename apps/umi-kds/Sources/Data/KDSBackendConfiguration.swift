@@ -2,7 +2,6 @@ import Foundation
 
 struct KDSBackendConfiguration: Sendable {
     let projectURL: URL
-    let anonKey: String
     let pollingInterval: Duration
     /// How often the device sends a heartbeat to the dashboard. Defaults to 5 s.
     let heartbeatInterval: Duration
@@ -15,7 +14,6 @@ struct KDSBackendConfiguration: Sendable {
 
     init(
         projectURL: URL,
-        anonKey: String,
         pollingInterval: Duration = .seconds(3),
         heartbeatInterval: Duration = .seconds(5),
         commandURLOverride: URL? = nil,
@@ -24,7 +22,6 @@ struct KDSBackendConfiguration: Sendable {
         heartbeatURL: URL? = nil
     ) {
         self.projectURL = projectURL
-        self.anonKey = anonKey
         self.pollingInterval = pollingInterval
         self.heartbeatInterval = heartbeatInterval
         self.commandURLOverride = commandURLOverride
@@ -52,9 +49,7 @@ struct KDSBackendConfiguration: Sendable {
     static func load(bundle: Bundle = .main) -> KDSBackendConfiguration? {
         guard
             let urlString = bundle.object(forInfoDictionaryKey: "KDSBackendURL") as? String,
-            let projectURL = URL(string: urlString),
-            let anonKey = bundle.object(forInfoDictionaryKey: "KDSAnonKey") as? String,
-            !anonKey.isEmpty
+            let projectURL = URL(string: urlString)
         else {
             return nil
         }
@@ -87,7 +82,6 @@ struct KDSBackendConfiguration: Sendable {
 
         return KDSBackendConfiguration(
             projectURL: projectURL,
-            anonKey: anonKey,
             pollingInterval: Duration.milliseconds(Int64(pollingSeconds * 1_000)),
             heartbeatInterval: Duration.milliseconds(Int64(heartbeatSeconds * 1_000)),
             commandURLOverride: commandURLOverride,
