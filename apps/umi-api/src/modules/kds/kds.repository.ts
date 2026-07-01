@@ -370,11 +370,16 @@ export class KdsRepository {
       action === 'approve'
         ? [pairingId, tenantId, adminUserId]
         : [pairingId, tenantId];
+    // Approve requires a still-valid window. Deny is a dismissal, so it also
+    // clears pending requests already past expires_at — those linger in the
+    // list (status is still 'pending' until dismissed) and would otherwise be
+    // impossible to remove.
+    const freshnessClause = action === 'approve' ? `AND expires_at > now()` : '';
     const { rows } = await this.pg.query<{ id: string; status: string }>(
       `UPDATE device.pairing_requests
           SET ${patch}
         WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
-          AND expires_at > now()
+          ${freshnessClause}
         RETURNING id, status`,
       params,
     );
