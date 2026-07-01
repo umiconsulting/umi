@@ -46,11 +46,13 @@ function _withLocation(ctx, path) {
 async function _apiFetch(path, opts) {
   opts = opts || {}
   const authHeaders = await getAuthHeaders()
+  // Only advertise a JSON body when we actually send one. Fastify rejects an
+  // empty body when Content-Type is application/json, so bodyless mutations
+  // (pairing approve/deny, deletes) must NOT carry the header.
+  const headers = Object.assign({}, authHeaders)
+  if (opts.body != null) headers['Content-Type'] = 'application/json'
   const res = await fetch(apiUrl(path), withCreds(Object.assign({}, opts, {
-    headers: Object.assign({
-      'Content-Type': 'application/json',
-      ...authHeaders,
-    }, opts.headers || {}),
+    headers: Object.assign(headers, opts.headers || {}),
   })))
   const payload = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(errMessage(payload, `${res.status} ${path}`))

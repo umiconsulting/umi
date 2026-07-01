@@ -96,6 +96,10 @@ struct PairingView: View {
             if case .waiting = phase {
                 ProgressView()
                     .tint(KDSTheme.Brand.blue)
+                Text("Esperando aprobacion. Aprueba este dispositivo en el panel (Dashboard \u{2192} KDS \u{2192} Dispositivos) para continuar.")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
 
             if let message {
