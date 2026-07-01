@@ -91,9 +91,18 @@ export class SequencesService {
         if (elapsed < step.day) continue;
         if (lead.emailsSent.includes(stepKey(step.day))) continue;
         touched = true;
-        const ok = await this.sendStepToLead(lead, step);
-        if (ok) sent++;
-        else failed++;
+        try {
+          const ok = await this.sendStepToLead(lead, step);
+          if (ok) sent++;
+          else failed++;
+        } catch (err) {
+          // A per-step failure (e.g. the reservation UPDATE erroring) must not
+          // abort the whole tick — count it and move on to the next lead/step.
+          failed++;
+          this.logger.error(
+            `sequence step failed (lead=${lead.id} day=${step.day}): ${String(err)}`,
+          );
+        }
       }
       if (touched) processed++;
     }
@@ -144,7 +153,6 @@ export class SequencesService {
     const subject = this.personalize(step.subject, data);
     const html = step.template(data);
 
-    const result = await this.email.send({ to: lead.email, subject, html });
     const meta = {
       leadId: lead.id,
       emailKey: key,
@@ -152,14 +160,37 @@ export class SequencesService {
       sequenceDay: step.day,
       subject,
     };
-    if (result) {
-      await this.repo.finalizeEmailSent(meta);
-      lead.emailsSent.push(key); // mirror the persisted reservation
-      return true;
+
+    let result: { messageId: string } | null;
+    try {
+      result = await this.email.send({ to: lead.email, subject, html });
+    } catch (err) {
+      // Provider threw → the mail did NOT go out. Release the reservation so a
+      // later tick retries (best-effort; a release failure just leaves it for
+      // the next reconcile).
+      await this.repo.releaseEmailStep(meta).catch(() => undefined);
+      this.logger.error(`email send threw (lead=${lead.id} step=${key}): ${String(err)}`);
+      return false;
     }
-    // Send failed → release the reservation so a later tick retries.
-    await this.repo.releaseEmailStep(meta);
-    return false;
+
+    if (!result) {
+      // Provider reported failure → release so a later tick retries.
+      await this.repo.releaseEmailStep(meta);
+      return false;
+    }
+
+    // The mail IS out. The reservation MUST stay — releasing here would resend.
+    // Mirror it locally and record the send; a finalize failure only loses the
+    // audit stamp, so log it and still count the step as sent (never release).
+    lead.emailsSent.push(key);
+    try {
+      await this.repo.finalizeEmailSent(meta);
+    } catch (err) {
+      this.logger.error(
+        `finalizeEmailSent failed after a successful send (lead=${lead.id} step=${key}); reservation kept to avoid a resend: ${String(err)}`,
+      );
+    }
+    return true;
   }
 
   private personalize(subject: string, data: LeadTemplateData): string {

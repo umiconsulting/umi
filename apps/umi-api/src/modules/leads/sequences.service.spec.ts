@@ -101,6 +101,42 @@ describe('SequencesService.sendDueEmails', () => {
     expect(h.repo.finalizeEmailSent).not.toHaveBeenCalled();
   });
 
+  it('releases and retries when the provider THROWS (mail never went out)', async () => {
+    h.email.send.mockRejectedValue(new Error('smtp down'));
+    h.repo.listActive.mockResolvedValue([lead()]); // today → day 0 due
+    const r = await h.svc.sendDueEmails();
+    expect(r.sent).toBe(0);
+    expect(r.failed).toBe(1);
+    expect(h.repo.releaseEmailStep).toHaveBeenCalledWith(
+      expect.objectContaining({ emailKey: 'diagnostic_followup_day_0' }),
+    );
+  });
+
+  it('keeps the reservation (no release, counts as sent) when finalize rejects AFTER a successful send', async () => {
+    // The mail is already out — releasing would resend it, so the reservation must stay.
+    h.repo.finalizeEmailSent.mockRejectedValue(new Error('db down'));
+    h.repo.listActive.mockResolvedValue([lead()]);
+    const r = await h.svc.sendDueEmails();
+    expect(r.sent).toBe(1);
+    expect(h.email.send).toHaveBeenCalledOnce();
+    expect(h.repo.releaseEmailStep).not.toHaveBeenCalled();
+  });
+
+  it('one lead failing does not abort the batch', async () => {
+    const today = new Date().toISOString();
+    h.repo.listActive.mockResolvedValue([
+      lead({ id: 'bad', diagnosticDate: today }),
+      lead({ id: 'good', diagnosticDate: today }),
+    ]);
+    // First reserve call (bad lead) throws; the rest resolve true.
+    h.repo.reserveEmailStep
+      .mockRejectedValueOnce(new Error('reserve failed'))
+      .mockResolvedValue(true);
+    const r = await h.svc.sendDueEmails();
+    expect(r.failed).toBe(1);
+    expect(r.sent).toBe(1); // the good lead still got its day-0 mail
+  });
+
   it('personalizes the subject with the company name', async () => {
     h.repo.listActive.mockResolvedValue([lead()]);
     await h.svc.sendDueEmails();
