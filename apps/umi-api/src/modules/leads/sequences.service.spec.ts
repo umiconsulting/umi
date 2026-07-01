@@ -25,7 +25,9 @@ function lead(overrides: Partial<LeadRecord> = {}): LeadRecord {
 function make(enabled = true) {
   const repo = {
     listActive: vi.fn().mockResolvedValue([]),
-    markEmailSent: vi.fn().mockResolvedValue(undefined),
+    reserveEmailStep: vi.fn().mockResolvedValue(true),
+    finalizeEmailSent: vi.fn().mockResolvedValue(undefined),
+    releaseEmailStep: vi.fn().mockResolvedValue(undefined),
     setPaused: vi.fn().mockResolvedValue(true),
   };
   const email = { send: vi.fn().mockResolvedValue({ messageId: 'm1' }) };
@@ -58,8 +60,9 @@ describe('SequencesService.sendDueEmails', () => {
     expect(r.sent).toBe(3);
     expect(r.processed).toBe(1);
     expect(h.email.send).toHaveBeenCalledTimes(3);
-    expect(h.repo.markEmailSent).toHaveBeenCalledTimes(3);
-    const keys = h.repo.markEmailSent.mock.calls.map((c) => c[0].emailKey);
+    expect(h.repo.reserveEmailStep).toHaveBeenCalledTimes(3);
+    expect(h.repo.finalizeEmailSent).toHaveBeenCalledTimes(3);
+    const keys = h.repo.finalizeEmailSent.mock.calls.map((c) => c[0].emailKey);
     expect(keys).toEqual([
       'diagnostic_followup_day_0',
       'diagnostic_followup_day_2',
@@ -77,15 +80,25 @@ describe('SequencesService.sendDueEmails', () => {
     expect(h.email.send).toHaveBeenCalledOnce();
   });
 
-  it('records a failed send without appending to emails_sent', async () => {
+  it('releases the reservation on a failed send so it retries later', async () => {
     h.email.send.mockResolvedValue(null); // provider failure
     h.repo.listActive.mockResolvedValue([lead()]); // today → only day 0 due
     const r = await h.svc.sendDueEmails();
     expect(r.sent).toBe(0);
     expect(r.failed).toBe(1);
-    expect(h.repo.markEmailSent).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'failed', emailKey: 'diagnostic_followup_day_0' }),
+    expect(h.repo.finalizeEmailSent).not.toHaveBeenCalled();
+    expect(h.repo.releaseEmailStep).toHaveBeenCalledWith(
+      expect.objectContaining({ emailKey: 'diagnostic_followup_day_0' }),
     );
+  });
+
+  it('does not send when the step is already reserved by a racing path', async () => {
+    h.repo.reserveEmailStep.mockResolvedValue(false); // lost the reservation race
+    h.repo.listActive.mockResolvedValue([lead()]);
+    const r = await h.svc.sendDueEmails();
+    expect(r.sent).toBe(0);
+    expect(h.email.send).not.toHaveBeenCalled();
+    expect(h.repo.finalizeEmailSent).not.toHaveBeenCalled();
   });
 
   it('personalizes the subject with the company name', async () => {
@@ -102,8 +115,9 @@ describe('SequencesService.sendWelcome', () => {
     const h = make(true);
     const ok = await h.svc.sendWelcome(lead());
     expect(ok).toBe(true);
-    expect(h.repo.markEmailSent).toHaveBeenCalledWith(
-      expect.objectContaining({ emailKey: 'diagnostic_followup_day_0', status: 'sent' }),
+    expect(h.repo.reserveEmailStep).toHaveBeenCalledWith('lead-1', 'diagnostic_followup_day_0');
+    expect(h.repo.finalizeEmailSent).toHaveBeenCalledWith(
+      expect.objectContaining({ emailKey: 'diagnostic_followup_day_0' }),
     );
   });
 

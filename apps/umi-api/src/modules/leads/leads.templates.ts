@@ -6,6 +6,21 @@
  * shared adapter, because the copy is landing-domain-specific.
  */
 
+/**
+ * HTML-entity escaper for user-controlled text interpolated into email markup.
+ * The contact/diagnostic forms are PUBLIC, so name/company/email/message/need are
+ * attacker-controlled — without this, a submitter could inject arbitrary HTML into
+ * the internal notification and the customer-facing emails.
+ */
+export function esc(v: unknown): string {
+  return String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /** The template view-model. `recommendations` drive the quick-win bullets. */
 export interface LeadTemplateData {
   name: string;
@@ -60,7 +75,7 @@ const brandBase = (content: string, title = ''): string => `
 const actionList = (data: LeadTemplateData): string =>
   data.diagnostic.recommendations.length
     ? data.diagnostic.recommendations
-        .map((r) => `<li><strong>${r}</strong></li>`)
+        .map((r) => `<li><strong>${esc(r)}</strong></li>`)
         .join('')
     : '<li>Definir el primer producto Umi a activar según tu operación actual.</li>';
 
@@ -69,11 +84,11 @@ const actionList = (data: LeadTemplateData): string =>
 export const day0UrgencyTemplate = (data: LeadTemplateData): string =>
   brandBase(
     `
-    <p>Hola <strong>${data.name}</strong>,</p>
-    <p>Acabas de completar tu diagnóstico operativo para <strong>${data.company}</strong>.</p>
+    <p>Hola <strong>${esc(data.name)}</strong>,</p>
+    <p>Acabas de completar tu diagnóstico operativo para <strong>${esc(data.company)}</strong>.</p>
     <div class="urgent-box">
       <h4 style="margin-top: 0; color: #92400e;">Ruta inicial Umi</h4>
-      <p>Tu nivel <strong>${data.diagnostic.level}</strong> sugiere que el primer paso debe resolver el flujo donde hoy se pierde más contexto: pedidos, cocina, cliente, dashboard u observabilidad.</p>
+      <p>Tu nivel <strong>${esc(data.diagnostic.level)}</strong> sugiere que el primer paso debe resolver el flujo donde hoy se pierde más contexto: pedidos, cocina, cliente, dashboard u observabilidad.</p>
     </div>
     <h4>Acciones sugeridas:</h4>
     <ul>${actionList(data)}</ul>
@@ -92,8 +107,8 @@ export const day0UrgencyTemplate = (data: LeadTemplateData): string =>
 export const day2PressureTemplate = (data: LeadTemplateData): string =>
   brandBase(
     `
-    <p>Hola ${data.name},</p>
-    <p>Hace 2 días completaste el diagnóstico de <strong>${data.company}</strong>.</p>
+    <p>Hola ${esc(data.name)},</p>
+    <p>Hace 2 días completaste el diagnóstico de <strong>${esc(data.company)}</strong>.</p>
     <div class="warning-box">
       <p><strong>Punto a cuidar:</strong> cuando pedidos, cocina y cliente viven en herramientas separadas, cada día se acumulan excepciones que luego nadie puede auditar.</p>
     </div>
@@ -106,7 +121,7 @@ export const day2PressureTemplate = (data: LeadTemplateData): string =>
 export const day5CaseStudyTemplate = (data: LeadTemplateData): string =>
   brandBase(
     `
-    <p>Hola ${data.name},</p>
+    <p>Hola ${esc(data.name)},</p>
     <p>Un patrón común en restaurantes es empezar automatizando el canal equivocado. Si el pedido no está bien normalizado, KDS, wallet y dashboard terminan leyendo ruido.</p>
     <div class="info-box">
       <h4 style="margin-top: 0;">Secuencia recomendada</h4>
@@ -117,7 +132,7 @@ export const day5CaseStudyTemplate = (data: LeadTemplateData): string =>
         <li>Medir y auditar con Dashboard y Logs.</li>
       </ol>
     </div>
-    <p>Para <strong>${data.company}</strong>, el diagnóstico marcó nivel ${data.diagnostic.level}. Esa lectura nos ayuda a decidir dónde no conviene saltarnos pasos.</p>
+    <p>Para <strong>${esc(data.company)}</strong>, el diagnóstico marcó nivel ${esc(data.diagnostic.level)}. Esa lectura nos ayuda a decidir dónde no conviene saltarnos pasos.</p>
     <p>Saludos,<br>Equipo Umi</p>
   `,
     'Cómo ordenar la activación',
@@ -126,8 +141,8 @@ export const day5CaseStudyTemplate = (data: LeadTemplateData): string =>
 export const day10FreeOfferTemplate = (data: LeadTemplateData): string =>
   brandBase(
     `
-    <p>Hola ${data.name},</p>
-    <p>Han pasado 10 días desde tu diagnóstico de ${data.company}.</p>
+    <p>Hola ${esc(data.name)},</p>
+    <p>Han pasado 10 días desde tu diagnóstico de ${esc(data.company)}.</p>
     <div class="urgent-box">
       <h4 style="color: #92400e; margin-top: 0;">Propuesta simple</h4>
       <p>Podemos revisar gratis el mapa actual de operación: cómo entra el pedido, quién lo toca, dónde se informa cocina, cómo vuelve el cliente y qué se puede auditar.</p>
@@ -142,8 +157,8 @@ export const day10FreeOfferTemplate = (data: LeadTemplateData): string =>
 export const day30ReactivationTemplate = (data: LeadTemplateData): string =>
   brandBase(
     `
-    <p>Hola ${data.name},</p>
-    <p>Ha pasado un mes desde tu diagnóstico. Si ${data.company} sigue moviendo pedidos por canales manuales, este puede ser buen momento para revisar el flujo.</p>
+    <p>Hola ${esc(data.name)},</p>
+    <p>Ha pasado un mes desde tu diagnóstico. Si ${esc(data.company)} sigue moviendo pedidos por canales manuales, este puede ser buen momento para revisar el flujo.</p>
     <div class="info-box">
       <h4 style="margin-top: 0;">Checklist rápido</h4>
       <ul style="margin: 10px 0;">
@@ -201,21 +216,21 @@ export const contactInternalTemplate = (data: ContactTemplateData): string => `
       <div class="section">
         <span class="label">Cliente Potencial:</span>
         <div class="value priority-high">
-          <strong>${data.name}</strong><br>
-          Email: ${data.email}<br>
-          Empresa: ${data.company || 'No especificada'}
+          <strong>${esc(data.name)}</strong><br>
+          Email: ${esc(data.email)}<br>
+          Empresa: ${esc(data.company || 'No especificada')}
         </div>
       </div>
       <div class="section">
         <span class="label">Producto o necesidad:</span>
-        <div class="value priority-medium">${(data.need && NEED_LABELS[data.need]) || data.need || 'No especificada'}</div>
+        <div class="value priority-medium">${esc((data.need && NEED_LABELS[data.need]) || data.need || 'No especificada')}</div>
       </div>
       <div class="section">
         <span class="label">Mensaje:</span>
-        <div class="value">${data.message || 'Sin mensaje adicional'}</div>
+        <div class="value">${esc(data.message || 'Sin mensaje adicional')}</div>
       </div>
       <div style="text-align: center;">
-        <a href="mailto:${data.email}" class="cta-button">Responder Directamente</a>
+        <a href="mailto:${esc(data.email)}" class="cta-button">Responder Directamente</a>
       </div>
     </div>
     <div class="footer">
@@ -243,7 +258,7 @@ export const contactAutoReplyTemplate = (data: ContactTemplateData): string => `
   <div class="container">
     <div class="header"><div class="logo">umi</div><p>Gracias por contactarnos</p></div>
     <div class="content">
-      <p>Hola <strong>${data.name}</strong>,</p>
+      <p>Hola <strong>${esc(data.name)}</strong>,</p>
       <p>Hemos recibido tu consulta y queremos agradecerte por considerar Umi para conectar tu operación.</p>
       <div class="highlight">
         <strong>¿Qué sigue ahora?</strong><br>

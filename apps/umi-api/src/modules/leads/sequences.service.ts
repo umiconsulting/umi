@@ -109,13 +109,26 @@ export class SequencesService {
     return this.sendStepToLead(lead, STEPS[0]);
   }
 
-  /** Send one sequence step to one lead; persist the outcome. Idempotent. */
+  /**
+   * Send one sequence step to one lead; persist the outcome. Idempotent and
+   * race-safe: the step is RESERVED atomically in the DB before the provider
+   * call (the in-memory `emailsSent` check is only a fast path), so concurrent
+   * web `sendWelcome` + worker `sendDueEmails` can't both send day 0. On a send
+   * failure the reservation is released so a later tick retries.
+   */
   private async sendStepToLead(
     lead: LeadRecord,
     step: SequenceStep,
   ): Promise<boolean> {
     const key = stepKey(step.day);
-    if (lead.emailsSent.includes(key)) return false;
+    if (lead.emailsSent.includes(key)) return false; // fast path (DB snapshot)
+
+    const reserved = await this.repo.reserveEmailStep(lead.id, key);
+    if (!reserved) {
+      // Another path already reserved/sent this step — mirror + don't send.
+      lead.emailsSent.push(key);
+      return false;
+    }
 
     const company = lead.company?.trim() || 'tu negocio';
     const data: LeadTemplateData = {
@@ -132,19 +145,21 @@ export class SequencesService {
     const html = step.template(data);
 
     const result = await this.email.send({ to: lead.email, subject, html });
-    const status: 'sent' | 'failed' = result ? 'sent' : 'failed';
-    await this.repo.markEmailSent({
+    const meta = {
       leadId: lead.id,
       emailKey: key,
       templateName: step.name,
       sequenceDay: step.day,
       subject,
-      status,
-    });
-    // Reflect the append locally so a caller looping over the same record in one
-    // pass won't try to resend this step.
-    if (status === 'sent') lead.emailsSent.push(key);
-    return status === 'sent';
+    };
+    if (result) {
+      await this.repo.finalizeEmailSent(meta);
+      lead.emailsSent.push(key); // mirror the persisted reservation
+      return true;
+    }
+    // Send failed → release the reservation so a later tick retries.
+    await this.repo.releaseEmailStep(meta);
+    return false;
   }
 
   private personalize(subject: string, data: LeadTemplateData): string {

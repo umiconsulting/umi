@@ -3,40 +3,36 @@ import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { AppConfig } from '../../shared/config/config.schema';
 import { EmailAdapter } from '../../shared/adapters/email.adapter';
-import { LeadsRepository, type LeadDiagnosticData } from './leads.repository';
 import { SequencesService } from './sequences.service';
 import {
   contactAutoReplyTemplate,
   contactInternalTemplate,
 } from './leads.templates';
 import type { ContactDto } from './dto/contact.dto';
-import type { CreateLeadDto, UpdateLeadDto } from './dto/lead.dto';
 import type { EmailResponseWebhookDto } from './dto/webhook.dto';
 
-const DEFAULT_INTERNAL_EMAIL = 'hola@umiconsulting.co';
-
 /**
- * Landing-page lead orchestration (Phase 5): the contact form send, the internal
- * lead-management surface (`/api/leads` POST/GET/PUT), and the email-response
- * webhook. Diagnostic scoring lives in DiagnosticService; the sequence engine in
- * SequencesService — this service wires the HTTP edges to them.
+ * Landing-page lead orchestration (Phase 5): the contact-form send and the
+ * email-response webhook. Diagnostic scoring lives in DiagnosticService; the
+ * sequence engine (and its pause/resume/responded actions) in SequencesService —
+ * this service wires the public HTTP edges to them.
  */
 @Injectable()
 export class LeadsService {
   private readonly logger = new Logger(LeadsService.name);
 
   constructor(
-    private readonly repo: LeadsRepository,
     private readonly sequences: SequencesService,
     private readonly email: EmailAdapter,
     private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
-  private internalEmail(): string {
+  /** Internal notification recipient — no hard-coded fallback (fail closed). */
+  private internalEmail(): string | null {
     return (
       this.config.get('CONTACT_TO_EMAIL', { infer: true }) ??
       this.config.get('EMAIL_FROM', { infer: true }) ??
-      DEFAULT_INTERNAL_EMAIL
+      null
     );
   }
 
@@ -47,6 +43,11 @@ export class LeadsService {
    */
   async sendContact(dto: ContactDto): Promise<{ sent: number; failed: number }> {
     const to = this.internalEmail();
+    if (!to) {
+      // Misconfiguration — never silently route prospect data to a default inbox.
+      this.logger.error('contact_internal_email_missing');
+      throw new Error('contact_internal_email_missing');
+    }
     const internal = await this.email.send({
       to,
       subject: `Nueva consulta Umi de ${dto.name} - ${dto.company || 'Cliente potencial'}`,
@@ -66,52 +67,6 @@ export class LeadsService {
     return { sent, failed };
   }
 
-  /** POST /api/leads — upsert a lead and optionally kick off the sequence. */
-  async createLead(dto: CreateLeadDto): Promise<{
-    leadId: string;
-    isNew: boolean;
-    sequenceStarted: boolean;
-  }> {
-    const diagnosticData = normalizeDiagnosticData(dto.diagnosticData);
-    const { lead, isNew } = await this.repo.upsertByEmail({
-      email: dto.email,
-      name: dto.name,
-      company: dto.company ?? null,
-      phone: dto.phone ?? null,
-      diagnosticData,
-      diagnosticDate: new Date().toISOString(),
-    });
-    let sequenceStarted = false;
-    if (dto.triggerSequence) {
-      sequenceStarted = await this.sequences.sendWelcome(lead);
-    }
-    return { leadId: lead.id, isNew, sequenceStarted };
-  }
-
-  /** GET /api/leads — funnel stats. */
-  async getStats(): Promise<{
-    totalLeads: number;
-    activeSequences: number;
-    pausedSequences: number;
-    emailsSentToday: number;
-  }> {
-    return this.repo.metrics();
-  }
-
-  /** PUT /api/leads — pause / resume / mark-responded. */
-  async updateLead(dto: UpdateLeadDto): Promise<boolean> {
-    switch (dto.action) {
-      case 'pause_sequence':
-        return this.sequences.pauseSequence(dto.leadId, dto.data?.reason || 'manual_pause');
-      case 'resume_sequence':
-        return this.sequences.resumeSequence(dto.leadId);
-      case 'mark_responded':
-        return this.sequences.markResponded(dto.leadId, dto.data?.responseType || 'email');
-      default:
-        return false;
-    }
-  }
-
   /** POST /api/leads/webhook/email-response — provider callback. */
   async handleEmailResponse(dto: EmailResponseWebhookDto): Promise<void> {
     switch (dto.type) {
@@ -129,7 +84,7 @@ export class LeadsService {
 
   /**
    * Verify the webhook signature. When `LEADS_WEBHOOK_SECRET` is set, require a
-   * matching `sha256=<hex>` HMAC over the raw JSON body. When unset, allow only
+   * matching `sha256=<hex>` HMAC over the JSON body. When unset, allow only
    * outside production (local testing) — production fails closed.
    */
   verifyWebhookSignature(signature: string | null, rawBody: string): boolean {
@@ -143,16 +98,4 @@ export class LeadsService {
     const b = Buffer.from(expected);
     return a.length === b.length && timingSafeEqual(a, b);
   }
-}
-
-/** Coerce the loose /api/leads diagnosticData payload into the canonical shape. */
-function normalizeDiagnosticData(raw: Record<string, unknown>): LeadDiagnosticData {
-  const score = typeof raw.score === 'number' ? raw.score : 0;
-  const level = typeof raw.level === 'string' ? raw.level : 'Inicial';
-  const recommendations = Array.isArray(raw.recommendations)
-    ? (raw.recommendations.filter((r) => typeof r === 'string') as string[])
-    : typeof raw.primaryChallenge === 'string'
-      ? [raw.primaryChallenge]
-      : [];
-  return { score, level, recommendations };
 }

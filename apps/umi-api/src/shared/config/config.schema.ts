@@ -140,6 +140,21 @@ export const configSchema = z.object({
       message: 'must not be true when NODE_ENV=production (it disables Twilio signature validation)',
     });
   }
+  // If the lead sequence runs in production, the email-response webhook MUST be
+  // verifiable — otherwise reply-driven mark_responded/unsubscribe fails closed
+  // (unset secret → rejected in prod) and we keep mailing people who replied or
+  // unsubscribed. Require the secret whenever the sequence is enabled in prod.
+  if (
+    cfg.NODE_ENV === 'production' &&
+    cfg.LEADS_SEQUENCE_ENABLED &&
+    !cfg.LEADS_WEBHOOK_SECRET
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['LEADS_WEBHOOK_SECRET'],
+      message: 'must be set when LEADS_SEQUENCE_ENABLED=true in production',
+    });
+  }
 });
 
 export type AppConfig = z.infer<typeof configSchema>;

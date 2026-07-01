@@ -48,13 +48,6 @@ export interface LeadRecord {
   updatedAt: string;
 }
 
-export interface LeadMetrics {
-  totalLeads: number;
-  activeSequences: number;
-  pausedSequences: number;
-  emailsSentToday: number;
-}
-
 // node-postgres parses timestamptz columns into JS Date objects, so the
 // timestamp fields arrive as Date (string only for a text-typed value).
 type Ts = Date | string;
@@ -147,42 +140,64 @@ export class LeadsRepository {
   ): Promise<{ lead: LeadRecord; isNew: boolean }> {
     const existing = await this.findActiveByEmail(input.email);
     if (existing) {
+      return { lead: await this.applyUpdate(existing.id, input), isNew: false };
+    }
+
+    try {
       const { rows } = await this.pg.query<LeadRow>(
-        `UPDATE grow.leads
-            SET name = $2,
-                company = COALESCE($3, company),
-                phone = COALESCE($4, phone),
-                diagnostic_data = $5::jsonb,
-                updated_at = now()
-          WHERE id = $1
-        RETURNING ${SELECT_COLS}`,
+        `INSERT INTO grow.leads
+           (email, name, company, phone, diagnostic_data, diagnostic_date, source_app, submitted_form)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6, COALESCE($7, 'umi-landing-page'), 'diagnostic')
+         RETURNING ${SELECT_COLS}`,
         [
-          existing.id,
+          input.email,
           input.name,
           input.company ?? null,
           input.phone ?? null,
           JSON.stringify(input.diagnosticData),
+          input.diagnosticDate,
+          input.sourceApp ?? null,
         ],
       );
-      return { lead: toRecord(rows[0]), isNew: false };
+      return { lead: toRecord(rows[0]), isNew: true };
+    } catch (err) {
+      // TOCTOU: a concurrent submission for the same email inserted the active
+      // lead between our findActiveByEmail() and this INSERT, tripping the partial
+      // unique index grow_leads_email_active_uidx (23505). Re-read and update so
+      // the flow stays idempotent instead of throwing.
+      if ((err as { code?: string }).code === '23505') {
+        const now = await this.findActiveByEmail(input.email);
+        if (now) {
+          return { lead: await this.applyUpdate(now.id, input), isNew: false };
+        }
+      }
+      throw err;
     }
+  }
 
+  /** Refresh a lead's mutable fields, keeping its original diagnostic_date. */
+  private async applyUpdate(
+    id: string,
+    input: UpsertLeadInput,
+  ): Promise<LeadRecord> {
     const { rows } = await this.pg.query<LeadRow>(
-      `INSERT INTO grow.leads
-         (email, name, company, phone, diagnostic_data, diagnostic_date, source_app, submitted_form)
-       VALUES ($1, $2, $3, $4, $5::jsonb, $6, COALESCE($7, 'umi-landing-page'), 'diagnostic')
-       RETURNING ${SELECT_COLS}`,
+      `UPDATE grow.leads
+          SET name = $2,
+              company = COALESCE($3, company),
+              phone = COALESCE($4, phone),
+              diagnostic_data = $5::jsonb,
+              updated_at = now()
+        WHERE id = $1
+      RETURNING ${SELECT_COLS}`,
       [
-        input.email,
+        id,
         input.name,
         input.company ?? null,
         input.phone ?? null,
         JSON.stringify(input.diagnosticData),
-        input.diagnosticDate,
-        input.sourceApp ?? null,
       ],
     );
-    return { lead: toRecord(rows[0]), isNew: true };
+    return toRecord(rows[0]);
   }
 
   /** Append a raw funnel event. */
@@ -199,42 +214,69 @@ export class LeadsRepository {
   }
 
   /**
-   * Record an email send outcome. On success, idempotently append `emailKey` to
-   * `emails_sent` and stamp `last_email_sent_at`; on failure, only log the event
-   * so the next tick retries. Writes the matching lead_event either way.
+   * ATOMICALLY reserve an email step before sending. Appends `emailKey` to
+   * `emails_sent` only if it's not already there, and returns whether THIS call
+   * won the reservation. This is the deduplication gate: two racers (e.g. the
+   * web `sendWelcome` and the worker `sendDueEmails`) can both see the step as
+   * unsent in memory, but only one UPDATE flips the array — the loser gets
+   * `false` and must not send. The provider call happens only on a `true`.
    */
-  async markEmailSent(params: {
+  async reserveEmailStep(leadId: string, emailKey: string): Promise<boolean> {
+    const { rowCount } = await this.pg.query(
+      `UPDATE grow.leads
+          SET emails_sent = array_append(emails_sent, $2), updated_at = now()
+        WHERE id = $1 AND NOT ($2 = ANY(emails_sent))`,
+      [leadId, emailKey],
+    );
+    return rowCount === 1;
+  }
+
+  /** Finalize a reserved step after a successful send: stamp + log the event. */
+  async finalizeEmailSent(params: {
     leadId: string;
     emailKey: string;
     templateName: string;
     sequenceDay: number;
     subject: string;
-    status: 'sent' | 'failed';
     sentAt?: string;
   }): Promise<void> {
-    await this.recordEvent(
-      params.leadId,
-      params.status === 'failed' ? 'email_failed' : 'email_sent',
-      {
-        template_name: params.templateName,
-        sequence_day: params.sequenceDay,
-        subject: params.subject,
-        status: params.status,
-        email_key: params.emailKey,
-      },
-    );
-    if (params.status !== 'sent') return;
     await this.pg.query(
       `UPDATE grow.leads
-          SET emails_sent = CASE
-                WHEN $2 = ANY(emails_sent) THEN emails_sent
-                ELSE array_append(emails_sent, $2)
-              END,
-              last_email_sent_at = COALESCE($3, now()),
-              updated_at = now()
+          SET last_email_sent_at = COALESCE($2, now()), updated_at = now()
         WHERE id = $1`,
-      [params.leadId, params.emailKey, params.sentAt ?? null],
+      [params.leadId, params.sentAt ?? null],
     );
+    await this.recordEvent(params.leadId, 'email_sent', {
+      template_name: params.templateName,
+      sequence_day: params.sequenceDay,
+      subject: params.subject,
+      email_key: params.emailKey,
+    });
+  }
+
+  /**
+   * Release a reserved step after a failed send: remove `emailKey` so a later
+   * tick retries it, and log the failure event.
+   */
+  async releaseEmailStep(params: {
+    leadId: string;
+    emailKey: string;
+    templateName: string;
+    sequenceDay: number;
+    subject: string;
+  }): Promise<void> {
+    await this.pg.query(
+      `UPDATE grow.leads
+          SET emails_sent = array_remove(emails_sent, $2), updated_at = now()
+        WHERE id = $1`,
+      [params.leadId, params.emailKey],
+    );
+    await this.recordEvent(params.leadId, 'email_failed', {
+      template_name: params.templateName,
+      sequence_day: params.sequenceDay,
+      subject: params.subject,
+      email_key: params.emailKey,
+    });
   }
 
   /** Active (non-paused) leads still inside a live lifecycle status. */
@@ -267,29 +309,5 @@ export class LeadsRepository {
     if (!rowCount) return false;
     await this.recordEvent(leadId, eventType, eventData);
     return true;
-  }
-
-  async metrics(): Promise<LeadMetrics> {
-    const { rows } = await this.pg.query<{
-      total: string;
-      active: string;
-      paused: string;
-      today: string;
-    }>(
-      `SELECT
-         (SELECT count(*) FROM grow.leads) AS total,
-         (SELECT count(*) FROM grow.leads WHERE sequence_paused = false) AS active,
-         (SELECT count(*) FROM grow.leads WHERE sequence_paused = true) AS paused,
-         (SELECT count(*) FROM grow.lead_events
-            WHERE event_type = 'email_sent'
-              AND created_at >= date_trunc('day', now())) AS today`,
-    );
-    const r = rows[0];
-    return {
-      totalLeads: Number(r?.total ?? 0),
-      activeSequences: Number(r?.active ?? 0),
-      pausedSequences: Number(r?.paused ?? 0),
-      emailsSentToday: Number(r?.today ?? 0),
-    };
   }
 }

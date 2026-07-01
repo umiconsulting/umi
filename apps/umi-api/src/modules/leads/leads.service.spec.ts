@@ -3,10 +3,6 @@ import { createHmac } from 'node:crypto';
 import { LeadsService } from './leads.service';
 
 function make(env: Record<string, unknown> = {}) {
-  const repo = {
-    upsertByEmail: vi.fn().mockResolvedValue({ lead: { id: 'l1', emailsSent: [] }, isNew: true }),
-    metrics: vi.fn().mockResolvedValue({ totalLeads: 3, activeSequences: 2, pausedSequences: 1, emailsSentToday: 0 }),
-  };
   const sequences = {
     sendWelcome: vi.fn().mockResolvedValue(true),
     pauseSequence: vi.fn().mockResolvedValue(true),
@@ -17,8 +13,8 @@ function make(env: Record<string, unknown> = {}) {
   const email = { send: vi.fn().mockResolvedValue({ messageId: 'm1' }) };
   const config = { get: vi.fn((k: string) => env[k]) };
   return {
-    svc: new LeadsService(repo as never, sequences as never, email as never, config as never),
-    repo, sequences, email, config,
+    svc: new LeadsService(sequences as never, email as never, config as never),
+    sequences, email, config,
   };
 }
 
@@ -38,6 +34,14 @@ describe('LeadsService.sendContact', () => {
     const h = make({ CONTACT_TO_EMAIL: 'hola@umiconsulting.co' });
     h.email.send.mockResolvedValue(null);
     await expect(h.svc.sendContact({ name: 'Ana', email: 'ana@cafe.mx' } as never)).rejects.toThrow();
+  });
+
+  it('fails closed (no send) when no internal recipient is configured', async () => {
+    const h = make({}); // neither CONTACT_TO_EMAIL nor EMAIL_FROM
+    await expect(h.svc.sendContact({ name: 'Ana', email: 'ana@cafe.mx' } as never)).rejects.toThrow(
+      'contact_internal_email_missing',
+    );
+    expect(h.email.send).not.toHaveBeenCalled();
   });
 });
 
@@ -62,16 +66,6 @@ describe('LeadsService.verifyWebhookSignature', () => {
   it('allows in non-production when no secret is set', () => {
     const h = make({ NODE_ENV: 'development' });
     expect(h.svc.verifyWebhookSignature(null, '{}')).toBe(true);
-  });
-});
-
-describe('LeadsService.updateLead', () => {
-  it('routes actions to the sequence engine', async () => {
-    const h = make();
-    await h.svc.updateLead({ leadId: 'l1', action: 'pause_sequence', data: { reason: 'x' } } as never);
-    expect(h.sequences.pauseSequence).toHaveBeenCalledWith('l1', 'x');
-    await h.svc.updateLead({ leadId: 'l1', action: 'mark_responded' } as never);
-    expect(h.sequences.markResponded).toHaveBeenCalledWith('l1', 'email');
   });
 });
 

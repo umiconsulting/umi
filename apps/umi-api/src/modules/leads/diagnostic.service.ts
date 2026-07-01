@@ -143,8 +143,9 @@ export class DiagnosticService {
       await this.sequences.sendWelcome(lead);
     }
 
+    // Log the lead id + state, never the prospect's email (PII stays out of logs).
     this.logger.log(
-      `diagnostic processed for ${input.email} (new=${isNew}, level=${diagnostic.level})`,
+      `diagnostic processed lead=${lead.id} (new=${isNew}, level=${diagnostic.level})`,
     );
     return { diagnostic, isNewLead: isNew, leadId: lead.id };
   }

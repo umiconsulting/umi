@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 /**
  * Landing-page contact form (POST /api/leads/contact, alias /api/contact).
@@ -7,6 +7,7 @@ import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
  */
 export class ContactDto {
   @IsString()
+  @IsNotEmpty()
   @MaxLength(200)
   name!: string;
 
