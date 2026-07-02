@@ -131,6 +131,6 @@ test('shared brand hues resolve from core in BOTH apps (single source, no drift)
 
 test('no unresolved DTCG references leak into any generated artifact', () => {
   for (const f of ['dashboard.css', 'landing.cjs', 'landing.mjs', 'tokens.json']) {
-    assert.doesNotMatch(distText(f), /\{[a-z]+\.[a-z]+\}/i, `unresolved {ref} in dist/${f}`);
+    assert.doesNotMatch(distText(f), /\{[a-z]+(\.[a-z]+)+\}/i, `unresolved {ref} in dist/${f}`);
   }
 });

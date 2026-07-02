@@ -10,6 +10,9 @@ on:
       - "packages/tokens/**"
       - ".github/workflows/tokens-ci.yml"
 
+permissions:
+  contents: read
+
 jobs:
   tokens:
     runs-on: ubuntu-latest
