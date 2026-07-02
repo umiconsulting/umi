@@ -31,3 +31,6 @@ export interface AuthedRequest {
 export const ACCESS_COOKIE = 'umi_access';
 export const REFRESH_COOKIE = 'umi_refresh';
 export const CSRF_COOKIE = 'umi_csrf';
+// "Remember me" marker. Lets /refresh preserve the session-vs-persistent choice
+// made at login — a cookie's own maxAge isn't readable server-side.
+export const REMEMBER_COOKIE = 'umi_remember';

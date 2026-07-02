@@ -7,7 +7,7 @@ export interface CookieOptions {
   sameSite: 'lax' | 'strict' | 'none';
   domain?: string;
   path: string;
-  maxAge: number; // seconds
+  maxAge?: number; // seconds; omitted ⇒ session cookie (cleared on browser close)
 }
 
 /** Parse a jose duration (`15m`, `1h`, `30d`, `3600s`) into seconds. */
@@ -37,6 +37,7 @@ export function parseDurationSeconds(input: string): number {
 export function buildCookieOptions(
   config: ConfigService<AppConfig, true>,
   kind: 'access' | 'refresh' | 'csrf',
+  remember = true,
 ): CookieOptions {
   const ttl =
     kind === 'access'
@@ -49,6 +50,8 @@ export function buildCookieOptions(
     sameSite: config.get('COOKIE_SAMESITE', { infer: true }),
     ...(domain ? { domain } : {}),
     path: '/',
-    maxAge: parseDurationSeconds(ttl),
+    // "Remember me": persist to the cookie's TTL. Otherwise omit maxAge so it is
+    // a session cookie. Either way the JWT's own `exp` still bounds validity.
+    ...(remember ? { maxAge: parseDurationSeconds(ttl) } : {}),
   };
 }

@@ -51,4 +51,15 @@ describe('buildCookieOptions', () => {
     const opts = buildCookieOptions(cfg({ ...base, COOKIE_DOMAIN: undefined }), 'access');
     expect(opts.domain).toBeUndefined();
   });
+
+  it('drops maxAge (session cookie) when remember is false', () => {
+    for (const kind of ['access', 'refresh', 'csrf'] as const) {
+      expect(buildCookieOptions(cfg(base), kind, false).maxAge).toBeUndefined();
+    }
+  });
+
+  it('keeps maxAge (persistent cookie) when remember is true or default', () => {
+    expect(buildCookieOptions(cfg(base), 'refresh', true).maxAge).toBe(2592000);
+    expect(buildCookieOptions(cfg(base), 'refresh').maxAge).toBe(2592000);
+  });
 });
