@@ -10,7 +10,12 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     resolve: {
-      alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
+        // Committed design tokens, resolved at build time (no workspace/npm
+        // dependency) so it works identically under Vercel's app-scoped npm build.
+        '@umi/tokens': fileURLToPath(new URL('../../packages/tokens/dist', import.meta.url)),
+      },
     },
     server: {
       port,

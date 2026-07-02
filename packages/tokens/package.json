@@ -1,0 +1,24 @@
+{
+  "name": "@umi/tokens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical Umi design tokens — a DTCG-subset source generated into CSS custom properties (umi-dashboard) and a Tailwind theme object (umi-landing-page).",
+  "type": "module",
+  "scripts": {
+    "build": "node build/build.mjs",
+    "test": "node --test"
+  },
+  "exports": {
+    "./dashboard.css": "./dist/dashboard.css",
+    "./landing": {
+      "require": "./dist/landing.cjs",
+      "import": "./dist/landing.mjs"
+    },
+    "./json": "./dist/tokens.json"
+  },
+  "files": [
+    "dist",
+    "tokens",
+    "build"
+  ]
+}
