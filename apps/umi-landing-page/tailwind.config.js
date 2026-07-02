@@ -1,4 +1,8 @@
 /** @type {import('tailwindcss').Config} */
+// Design tokens from packages/tokens (committed dist/, no workspace dependency —
+// Vercel's app-scoped npm build resolves it via this relative path).
+const tokens = require("../../packages/tokens/dist/landing.cjs");
+
 module.exports = {
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -7,37 +11,9 @@ module.exports = {
   ],
   theme: {
     extend: {
-      colors: {
-        "umi-blue": {
-          dark: "#223979",
-          light: "#7692CB",
-          deep: "#0A1430",
-          80: "rgba(34, 57, 121, 0.8)",
-          60: "rgba(34, 57, 121, 0.6)",
-          40: "rgba(34, 57, 121, 0.4)",
-        },
-        "umi-light-blue": {
-          DEFAULT: "#7692CB",
-          soft: "#BFD1F2",
-          80: "rgba(118, 146, 203, 0.8)",
-          60: "rgba(118, 146, 203, 0.6)",
-          40: "rgba(118, 146, 203, 0.4)",
-        },
-        "umi-paper": "#FBF7EF",
-        "umi-paper-warm": "#EDE7DA",
-        "umi-accent": "#E7A85B",
-        "umi-ink": "#F2F6FF",
-      },
-      fontFamily: {
-        domus: ["var(--font-nunito)", "sans-serif"],
-        sans: ["var(--font-nunito)", "sans-serif"],
-        serif: ["var(--font-fraunces)", "Georgia", "serif"],
-        mono: ["var(--font-source-code)", "monospace"],
-      },
-      letterSpacing: {
-        "wider-2": "0.2em",
-        "wider-3": "0.22em",
-      },
+      colors: tokens.colors,
+      fontFamily: tokens.fontFamily,
+      letterSpacing: tokens.letterSpacing,
     },
   },
   plugins: [],

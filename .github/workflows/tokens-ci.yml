@@ -1,0 +1,35 @@
+name: tokens CI
+
+# packages/tokens commits its generated dist/ (the frontends' Vercel builds run
+# app-scoped `npm install` and never execute the monorepo generator). This gate
+# proves the committed output still matches source and the parity tests pass, so a
+# stale or hand-edited dist/ can't silently drift.
+on:
+  pull_request:
+    paths:
+      - "packages/tokens/**"
+      - ".github/workflows/tokens-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  tokens:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      - name: Regenerate dist/ from source
+        run: node packages/tokens/build/build.mjs
+
+      - name: dist/ is committed and fresh
+        run: git diff --exit-code packages/tokens/dist
+
+      - name: Parity + anti-drift tests
+        run: node --test packages/tokens/test/tokens.test.mjs

@@ -1,0 +1,85 @@
+{
+  "$description": "umi-dashboard (Vite/React operator console) design tokens, captured verbatim from apps/umi-dashboard/src/styles.css :root. Token keys ARE the exact CSS custom-property names (minus the leading --), so the generator reproduces --umi-navy … --ease 1:1. Divergent-from-landing values live here on purpose; convergence is an explicit owner commit (see README drift register). Non-color $type values (shadow, cubicBezier) are stored as raw CSS strings rather than DTCG composites.",
+  "brand": {
+    "$description": "Brand",
+    "umi-navy": { "$type": "color", "$value": "{color.navy}" },
+    "umi-navy-deep": { "$type": "color", "$value": "#1a2c5e" },
+    "umi-navy-ink": { "$type": "color", "$value": "#131f44" },
+    "umi-blue": { "$type": "color", "$value": "{color.blue}" },
+    "umi-blue-soft": { "$type": "color", "$value": "#a8bbde" },
+    "umi-neutral": { "$type": "color", "$value": "#EEF1F8" },
+    "umi-white": { "$type": "color", "$value": "#ffffff" }
+  },
+  "surface": {
+    "$description": "Surfaces (light shell)",
+    "canvas": { "$type": "color", "$value": "#EEF1F8" },
+    "canvas-2": { "$type": "color", "$value": "#E4E9F3" },
+    "surface": { "$type": "color", "$value": "#ffffff" },
+    "surface-warm": { "$type": "color", "$value": "#FAF4EC" },
+    "surface-warm-border": { "$type": "color", "$value": "#EAE0D3" },
+    "sidebar-bg": { "$type": "color", "$value": "#1a2952" },
+    "sidebar-bg-deep": { "$type": "color", "$value": "#131f44" }
+  },
+  "ink": {
+    "$description": "Ink",
+    "ink-1": { "$type": "color", "$value": "#131f44" },
+    "ink-2": { "$type": "color", "$value": "#4a5680" },
+    "ink-3": { "$type": "color", "$value": "#8892b3" },
+    "ink-4": { "$type": "color", "$value": "#b9c0d3" },
+    "ink-warm": { "$type": "color", "$value": "#1F1410" },
+    "ink-warm-soft": { "$type": "color", "$value": "#6e5a4a" },
+    "ink-warm-mute": { "$type": "color", "$value": "#C4A882" }
+  },
+  "sidebar-text": {
+    "$description": "Sidebar text",
+    "side-text-1": { "$type": "color", "$value": "#f0f4ff" },
+    "side-text-2": { "$type": "color", "$value": "rgba(240, 244, 255, 0.62)" },
+    "side-text-3": { "$type": "color", "$value": "rgba(240, 244, 255, 0.34)" },
+    "side-line": { "$type": "color", "$value": "rgba(255, 255, 255, 0.08)" }
+  },
+  "line": {
+    "$description": "Lines",
+    "line": { "$type": "color", "$value": "#DDE3F0" },
+    "line-soft": { "$type": "color", "$value": "#E8ECF5" },
+    "line-strong": { "$type": "color", "$value": "#C8D1E5" }
+  },
+  "status": {
+    "$description": "Status",
+    "success": { "$type": "color", "$value": "#4F8A4F" },
+    "success-soft": { "$type": "color", "$value": "#E4F0E1" },
+    "danger": { "$type": "color", "$value": "#B33A35" },
+    "danger-soft": { "$type": "color", "$value": "#F4DEDB" },
+    "warning": { "$type": "color", "$value": "#B5812A" },
+    "warning-soft": { "$type": "color", "$value": "#F6E9D0" },
+    "info": { "$type": "color", "$value": "{color.blue}" },
+    "info-soft": { "$type": "color", "$value": "#DEE6F4" }
+  },
+  "tenant": {
+    "$description": "Tenant brand default (warm)",
+    "tenant-brand": { "$type": "color", "$value": "#B5605A" }
+  },
+  "radius": {
+    "$description": "Radii",
+    "r-pill": { "$type": "dimension", "$value": "9999px" },
+    "r-lg": { "$type": "dimension", "$value": "12px" },
+    "r-xl": { "$type": "dimension", "$value": "16px" },
+    "r-card": { "$type": "dimension", "$value": "20px" },
+    "r-shell": { "$type": "dimension", "$value": "28px" }
+  },
+  "shadow": {
+    "$description": "Shadows",
+    "shadow-card": { "$type": "shadow", "$value": "0 1px 0 rgba(19, 31, 68, 0.04), 0 8px 32px -16px rgba(19, 31, 68, 0.18)" },
+    "shadow-pop": { "$type": "shadow", "$value": "0 12px 40px -12px rgba(19, 31, 68, 0.25)" },
+    "shadow-inner": { "$type": "shadow", "$value": "inset 0 0 0 1px rgba(19, 31, 68, 0.05)" }
+  },
+  "typography": {
+    "$description": "Typography",
+    "font-display": { "$type": "fontFamily", "$value": "\"Source Sans 3\", \"Domus\", Georgia, serif" },
+    "font-body": { "$type": "fontFamily", "$value": "\"Source Sans 3\", \"Source Sans Pro\", system-ui, sans-serif" },
+    "font-mono": { "$type": "fontFamily", "$value": "\"JetBrains Mono\", ui-monospace, \"SF Mono\", monospace" }
+  },
+  "motion": {
+    "$description": "Motion",
+    "ease": { "$type": "cubicBezier", "$value": "cubic-bezier(.2,.7,.2,1)" }
+  }
+}

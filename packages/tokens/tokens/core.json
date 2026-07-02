@@ -1,0 +1,15 @@
+{
+  "$description": "Brand primitives shared byte-for-byte by BOTH the operator console (umi-dashboard) and the marketing site (umi-landing-page). These are the only genuinely cross-app values; every other token is app-scoped (see dashboard.json / landing.json). App tokens reference these with the DTCG alias syntax {color.navy}.",
+  "color": {
+    "navy": {
+      "$type": "color",
+      "$value": "#223979",
+      "$description": "Azul Marino UMI — primary brand navy. dashboard --umi-navy · landing umi-blue.dark"
+    },
+    "blue": {
+      "$type": "color",
+      "$value": "#7692CB",
+      "$description": "Azul UMI — brand blue. dashboard --umi-blue / --info · landing umi-light-blue.DEFAULT / umi-blue.light"
+    }
+  }
+}

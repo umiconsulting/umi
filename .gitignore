@@ -31,5 +31,14 @@ dist/
 build/
 .next/
 
+# Exception: packages/tokens ships its generator (build/) AND its generated output
+# (dist/) in git. The frontends deploy as separate Vercel projects that run an
+# app-scoped `npm install` + `npm run build` and never execute the monorepo token
+# generator, so the committed dist/ is what they consume. tokens-ci.yml keeps it fresh.
+!packages/tokens/build/
+!packages/tokens/build/**
+!packages/tokens/dist/
+!packages/tokens/dist/**
+
 # Turborepo cache
 .turbo/
