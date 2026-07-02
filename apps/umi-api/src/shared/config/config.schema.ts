@@ -82,7 +82,7 @@ export const configSchema = z.object({
   // without it); JwtService throws a clear error if it's actually used without
   // one. Set it in any environment that serves the dashboard API.
   JWT_SECRET: z.string().min(16).optional(),
-  JWT_ACCESS_TTL: z.string().default('15m'), // jose duration (e.g. 15m, 1h)
+  JWT_ACCESS_TTL: z.string().default('30m'), // jose duration (e.g. 15m, 1h); SPA refreshes silently before expiry
   JWT_REFRESH_TTL: z.string().default('30d'),
   COOKIE_SECURE: booleanFromEnv.default(true), // false for local http dev
   COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).default('lax'),
