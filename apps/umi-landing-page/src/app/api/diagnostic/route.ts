@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getDiagnosticTrigger,
   DiagnosticSubmission,
-} from "@/lib/integration/diagnosticTrigger";
+} from "@/lib/integration/diagnostic-trigger";
 
 interface DiagnosticRequest {
   email: string;

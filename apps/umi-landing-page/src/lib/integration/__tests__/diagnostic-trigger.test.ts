@@ -1,6 +1,6 @@
 // src/lib/integration/__tests__/diagnosticTrigger.test.ts - ARCHIVO COMPLETO CORREGIDO
 import { describe, test, expect, beforeEach, afterEach } from "@jest/globals";
-import { DiagnosticTrigger } from "../diagnosticTrigger";
+import { DiagnosticTrigger } from "../diagnostic-trigger";
 import { LeadDatabase, DiagnosticData } from "../../database/sqlite";
 import { existsSync, unlinkSync } from "fs";
 import path from "path";

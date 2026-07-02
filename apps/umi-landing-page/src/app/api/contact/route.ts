@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createEmailService, getInternalEmail } from "@/lib/email/emailService";
+import { createEmailService, getInternalEmail } from "@/lib/email/email-service";
 
 // Tipos para el formulario de contacto
 interface ContactFormData {

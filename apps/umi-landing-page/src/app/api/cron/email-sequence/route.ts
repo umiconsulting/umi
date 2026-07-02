@@ -1,6 +1,6 @@
 // src/app/api/cron/email-sequence/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { getDiagnosticTrigger } from "@/lib/integration/diagnosticTrigger";
+import { getDiagnosticTrigger } from "@/lib/integration/diagnostic-trigger";
 
 export async function POST(request: NextRequest) {
   try {

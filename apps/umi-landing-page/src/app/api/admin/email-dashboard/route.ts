@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSequenceManager } from "@/lib/email/sequenceManager";
-import { getEmailService } from "@/lib/email/emailService";
+import { getSequenceManager } from "@/lib/email/sequence-manager";
+import { getEmailService } from "@/lib/email/email-service";
 
 // Interfaces para type safety
 interface RecentActivity {

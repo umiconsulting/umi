@@ -1,8 +1,8 @@
 // src/app/api/health/route.ts - Health check del sistema
 import { NextResponse } from "next/server";
-import { getEmailService } from "@/lib/email/emailService";
-import { getSequenceManager } from "@/lib/email/sequenceManager";
-import { getCronManager } from "@/app/api/cron/emailCron";
+import { getEmailService } from "@/lib/email/email-service";
+import { getSequenceManager } from "@/lib/email/sequence-manager";
+import { getCronManager } from "@/app/api/cron/email-cron";
 
 // GET: Health check completo del sistema
 export async function GET() {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSequenceManager } from "@/lib/email/sequenceManager";
+import { getSequenceManager } from "@/lib/email/sequence-manager";
 
 // Interfaces para type safety
 interface LeadData {

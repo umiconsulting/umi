@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSequenceManager } from "@/lib/email/sequenceManager";
+import { getSequenceManager } from "@/lib/email/sequence-manager";
 
 // Definir tipos para mejor type safety
 interface WebhookData {

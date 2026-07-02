@@ -1,5 +1,5 @@
 // src/lib/integration/diagnosticTrigger.ts
-import { getSequenceManager } from "../email/sequenceManager";
+import { getSequenceManager } from "../email/sequence-manager";
 import {
   LeadDatabase,
   DiagnosticData,

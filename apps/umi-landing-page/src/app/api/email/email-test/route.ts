@@ -2,8 +2,8 @@
 // Mejorando el archivo existente con funcionalidad completa
 
 import { NextRequest, NextResponse } from "next/server";
-import { getEmailService } from "@/lib/email/emailService";
-import { getSequenceManager } from "@/lib/email/sequenceManager";
+import { getEmailService } from "@/lib/email/email-service";
+import { getSequenceManager } from "@/lib/email/sequence-manager";
 import { EmailTemplates } from "@/lib/email/templates";
 
 // Interfaces para type safety
