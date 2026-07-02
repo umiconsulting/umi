@@ -2,7 +2,9 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@umi/contract": ["../../packages/contract/src/index.ts"],
+      "@umi/contract/routes": ["../../packages/contract/src/routes.ts"]
     }
   },
   "exclude": ["node_modules", "dist"]

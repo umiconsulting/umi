@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { getAuthHeaders } from './auth.jsx'
 import { apiUrl, withCreds, errMessage } from './config.js'
 import { buildModuleAvailability, canShowModule, getVisibleModules, isProductActive } from './module-registry.js'
+import { routes } from '@umi/contract/routes'
 
 const TenantContext = createContext(null)
 const SELECTED_TENANT_KEY = 'umi-dashboard-selected-tenant'
@@ -27,7 +28,7 @@ export function TenantProvider({ children }) {
     let active = true
     setLoading(true)
     setError(null)
-    apiGet('/api/me/tenants')
+    apiGet(routes.me.tenants)
       .then((payload) => {
         if (!active) return
         const nextTenants = payload.tenants || []
