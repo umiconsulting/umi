@@ -1,4 +1,18 @@
-# Workspace members: JS apps only. Directories without a package.json
-# (umi-kds Swift app) are skipped by pnpm.
+# Workspace members: JS apps + shared packages. Directories without a
+# package.json (umi-kds Swift app) are skipped by pnpm.
+# umi-cash is FROZEN and intentionally excluded — it keeps its own npm
+# lockfile until the dashboard cutover (do not pull it into the workspace).
 packages:
   - "apps/*"
+  - "!apps/umi-cash"
+  - "packages/*"
+
+# pnpm 10 blocks dependency install-scripts by default. These native deps
+# legitimately need theirs (esbuild → vite binary, sharp → Next image opt,
+# better-sqlite3 → native binding). Approved explicitly instead of globally.
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - better-sqlite3
+  - msgpackr-extract
+  - unrs-resolver
