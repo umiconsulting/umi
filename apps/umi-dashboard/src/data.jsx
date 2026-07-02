@@ -1,8 +1,8 @@
 import { useState as useStateD, useEffect as useEffectD } from 'react'
-import { LIVE as _LIVE, COOKIE_AUTH, apiUrl, withCreds, errMessage } from './lib/config.js'
-import { getAuthHeaders, refreshSession, handleSessionExpired } from './lib/auth.jsx'
-import { useTenant } from './lib/tenant-context.jsx'
-import { isProductActive } from './lib/module-registry.js'
+import { LIVE as _LIVE, COOKIE_AUTH, apiUrl, withCreds, errMessage } from '@/lib/config.js'
+import { getAuthHeaders, refreshSession, handleSessionExpired } from '@/lib/auth.jsx'
+import { useTenant } from '@/lib/tenant-context.jsx'
+import { isProductActive } from '@/lib/module-registry.js'
 
 const EMPTY_OVERVIEW = {}
 const EMPTY_STATIONS = []

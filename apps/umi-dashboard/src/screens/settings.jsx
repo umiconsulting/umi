@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { I } from '../icons.jsx'
-import { XSep } from '../shell.jsx'
-import { useTenantData, saveTenantSettings, saveRewardConfig, useVoiceConfig, saveTenantVoice } from '../data.jsx'
-import { useTenant } from '../lib/tenant-context.jsx'
+import { I } from '@/icons.jsx'
+import { XSep } from '@/shell.jsx'
+import { useTenantData, saveTenantSettings, saveRewardConfig, useVoiceConfig, saveTenantVoice } from '@/data.jsx'
+import { useTenant } from '@/lib/tenant-context.jsx'
 
 // Screen 5 — Settings (Branding + Loyalty + Promotions)
 // Data: useTenantData() → umi-cash GET /api/[slug]/admin/settings + reward-config

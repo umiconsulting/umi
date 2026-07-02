@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
-import { I } from '../icons.jsx'
-import { XSep } from '../shell.jsx'
-import { useGiftCardsData } from '../data.jsx'
+import { I } from '@/icons.jsx'
+import { XSep } from '@/shell.jsx'
+import { useGiftCardsData } from '@/data.jsx'
 
 const GiftCardsScreen = () => {
   const [page, setPage] = useState(1)

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { I } from '../icons.jsx'
-import { XSep } from '../shell.jsx'
-import { useMembersData } from '../data.jsx'
+import { I } from '@/icons.jsx'
+import { XSep } from '@/shell.jsx'
+import { useMembersData } from '@/data.jsx'
 
 // Screen 7 — Miembros / Loyalty Members
 // Data: umi-cash GET /api/[slug]/admin/customers (role: CUSTOMER)

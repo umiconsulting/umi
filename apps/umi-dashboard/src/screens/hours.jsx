@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { I } from '../icons.jsx'
-import { XSep } from '../shell.jsx'
-import { useBusinessHours, saveBusinessHours } from '../data.jsx'
+import { I } from '@/icons.jsx'
+import { XSep } from '@/shell.jsx'
+import { useBusinessHours, saveBusinessHours } from '@/data.jsx'
 
 // Screen 4 — Business Hours & Availability
 

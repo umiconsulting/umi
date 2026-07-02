@@ -1,6 +1,6 @@
 import React from 'react'
-import { I } from '../icons.jsx'
-import { useTenant } from '../lib/tenant-context.jsx'
+import { I } from '@/icons.jsx'
+import { useTenant } from '@/lib/tenant-context.jsx'
 
 const PRODUCT_COPY = {
   dashboard: {

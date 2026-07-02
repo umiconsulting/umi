@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
-import { I } from '../icons.jsx'
-import { XSep } from '../shell.jsx'
-import { useConversationsData } from '../data.jsx'
+import { I } from '@/icons.jsx'
+import { XSep } from '@/shell.jsx'
+import { useConversationsData } from '@/data.jsx'
 
 const ConversationsScreen = () => {
   const [page, setPage] = useState(1)

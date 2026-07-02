@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { I } from '../icons.jsx'
-import { XSep } from '../shell.jsx'
+import { I } from '@/icons.jsx'
+import { XSep } from '@/shell.jsx'
 import {
   approveDevicePairing,
   createKdsStation,
@@ -13,7 +13,7 @@ import {
   useDevicePairings,
   useDevicesData,
   useKdsStations,
-} from '../data.jsx'
+} from '@/data.jsx'
 
 // Screen 3 — Devices (KDS)
 // Data: useDevicesData() → kds.device_sessions from Supabase

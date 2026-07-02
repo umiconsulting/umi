@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { I } from '../icons.jsx'
-import { XSep } from '../shell.jsx'
-import { useCustomerDetail, useCustomerInsights, useCustomersData } from '../data.jsx'
+import { I } from '@/icons.jsx'
+import { XSep } from '@/shell.jsx'
+import { useCustomerDetail, useCustomerInsights, useCustomersData } from '@/data.jsx'
 
 const FILTERS = [
   { id: '', label: 'All' },

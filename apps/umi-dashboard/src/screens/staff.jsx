@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
-import { I } from '../icons.jsx'
-import { XSep } from '../shell.jsx'
-import { createStaffMember, deleteStaffMember, useStaffData } from '../data.jsx'
+import { I } from '@/icons.jsx'
+import { XSep } from '@/shell.jsx'
+import { createStaffMember, deleteStaffMember, useStaffData } from '@/data.jsx'
 
 // Screen 4 — Staff & Access
 // Data: useStaffData() → conversaflow.staff_members scoped by business tenant

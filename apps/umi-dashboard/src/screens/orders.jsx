@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { I } from '../icons.jsx'
-import { XSep } from '../shell.jsx'
-import { transitionOrder, useOrdersData } from '../data.jsx'
+import { I } from '@/icons.jsx'
+import { XSep } from '@/shell.jsx'
+import { transitionOrder, useOrdersData } from '@/data.jsx'
 
 // Screen 6 — Pedidos / KDS Tickets
 // Data: kds.tickets from Supabase (conversaflow project)
