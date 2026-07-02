@@ -1,0 +1,42 @@
+name: contract CI
+
+# Gates the @umi/contract package: types compile, the dual build succeeds, and the
+# route literals stay byte-exact to the controllers. dist/ is git-ignored (umi-api
+# builds it in-workspace; the dashboard uses the source), so CI builds it here.
+on:
+  pull_request:
+    paths:
+      - "packages/contract/**"
+      - ".github/workflows/contract-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      - name: Enable pnpm (corepack)
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.29.3 --activate
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm --filter @umi/contract typecheck
+
+      - name: Build (tsup dual CJS+ESM+dts)
+        run: pnpm --filter @umi/contract build
+
+      - name: Route-literal tests
+        run: pnpm --filter @umi/contract test

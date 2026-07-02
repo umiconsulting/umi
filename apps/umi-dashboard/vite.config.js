@@ -15,6 +15,9 @@ export default defineConfig(({ mode }) => {
         // Committed design tokens, resolved at build time (no workspace/npm
         // dependency) so it works identically under Vercel's app-scoped npm build.
         '@umi/tokens': fileURLToPath(new URL('../../packages/tokens/dist', import.meta.url)),
+        // Shared HTTP contract, consumed FROM SOURCE (Vite transpiles the zero-dep
+        // routes entry) — same reason: no build artifact needed for the npm build.
+        '@umi/contract': fileURLToPath(new URL('../../packages/contract/src', import.meta.url)),
       },
     },
     server: {
