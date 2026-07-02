@@ -20,13 +20,13 @@ module.exports = {
     "src/**/*.{ts,tsx}",
     "!src/**/*.d.ts",
     "!src/**/__tests__/**",
-    "!src/setupTests.ts",
+    "!src/setup-tests.ts",
   ],
   // ✅ CORREGIDO: moduleNameMapping → moduleNameMapper
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
   },
-  setupFilesAfterEnv: ["<rootDir>/src/setupTests.ts"],
+  setupFilesAfterEnv: ["<rootDir>/src/setup-tests.ts"],
   testTimeout: 30000,
   verbose: true,
   clearMocks: true,

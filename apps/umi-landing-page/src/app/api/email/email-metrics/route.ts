@@ -2,8 +2,8 @@
 // Endpoint dedicado para métricas del sistema
 
 import { NextResponse } from "next/server";
-import { getEmailService } from "@/lib/email/emailService";
-import { getSequenceManager } from "@/lib/email/sequenceManager";
+import { getEmailService } from "@/lib/email/email-service";
+import { getSequenceManager } from "@/lib/email/sequence-manager";
 
 export async function GET() {
   try {

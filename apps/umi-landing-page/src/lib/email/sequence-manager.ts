@@ -1,7 +1,7 @@
 // Manager de Secuencias Modular
 // src/lib/email/sequenceManager.ts
 
-import { EmailService, getEmailService, getInternalEmail } from "./emailService";
+import { EmailService, getEmailService, getInternalEmail } from "./email-service";
 import { EmailTemplates, EmailTemplateData } from "./templates";
 import { LeadDatabasePostgres, getLeadDatabasePostgres } from "../database/postgres";
 import { LeadDatabase } from "../database/sqlite";

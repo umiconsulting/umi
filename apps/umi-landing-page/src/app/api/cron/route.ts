@@ -1,8 +1,8 @@
 // 📡 API ENDPOINT PARA CONTROL MANUAL
 // src/app/api/cron/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { getCronManager } from "@/app/api/cron/emailCron";
-import { getSequenceManager } from "@/lib/email/sequenceManager";
+import { getCronManager } from "@/app/api/cron/email-cron";
+import { getSequenceManager } from "@/lib/email/sequence-manager";
 
 export async function GET() {
   try {
