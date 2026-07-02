@@ -1,6 +1,6 @@
 import { useState as useStateD, useEffect as useEffectD } from 'react'
 import { LIVE as _LIVE, COOKIE_AUTH, apiUrl, withCreds, errMessage } from './lib/config.js'
-import { getAuthHeaders } from './lib/auth.jsx'
+import { getAuthHeaders, refreshSession, handleSessionExpired } from './lib/auth.jsx'
 import { useTenant } from './lib/tenant-context.jsx'
 import { isProductActive } from './lib/module-registry.js'
 
@@ -43,7 +43,7 @@ function _withLocation(ctx, path) {
   return `${path}${sep}locationId=${encodeURIComponent(locationId)}`
 }
 
-async function _apiFetch(path, opts) {
+async function _apiFetch(path, opts, _retried) {
   opts = opts || {}
   const authHeaders = await getAuthHeaders()
   // Only advertise a JSON body when we actually send one. Fastify rejects an
@@ -54,6 +54,21 @@ async function _apiFetch(path, opts) {
   const res = await fetch(apiUrl(path), withCreds(Object.assign({}, opts, {
     headers: Object.assign(headers, opts.headers || {}),
   })))
+
+  // Cookie-mode session recovery: a 401 means the short-lived access cookie
+  // expired. Refresh once (single-flight) and retry the request. If refresh
+  // fails, the session is truly dead → clear it and bounce to /login.
+  if (res.status === 401 && COOKIE_AUTH && !_retried && !path.includes('/api/auth/')) {
+    const ok = await refreshSession()
+    if (ok) return _apiFetch(path, opts, true)
+    handleSessionExpired()
+    const dead = new Error('Sesión expirada')
+    dead.status = 401
+    dead.code = 'session_expired'
+    dead.path = path
+    throw dead
+  }
+
   const payload = await res.json().catch(() => ({}))
   if (!res.ok) {
     // Keep the human string on .message, but also surface the machine code and
