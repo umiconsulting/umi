@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'node:crypto';
+import { decodeJwt } from 'jose';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { AppConfig } from '../../shared/config/config.schema';
 import { AuthService, type LoginResult } from './auth.service';
@@ -93,23 +94,49 @@ export class AuthController {
 
   /** Cookie-based session bootstrap for the SPA (authed). */
   @Get('me')
-  async me(@CurrentUser() user: AuthUser): Promise<{ session: SessionEnvelope }> {
+  async me(
+    @Req() req: FastifyRequest,
+    @CurrentUser() user: AuthUser,
+  ): Promise<{ session: SessionEnvelope }> {
     const session = await this.auth.session(user.id);
     return {
       session: {
         ...session,
         provider: 'local',
-        accessExpiresIn: this.accessExpiresIn(),
+        accessExpiresIn: this.remainingAccessSeconds(req),
       },
     };
   }
 
   /**
-   * Access-token lifetime in seconds, so the SPA can refresh proactively just
-   * before it expires (the token itself is httpOnly and unreadable client-side).
+   * Full access-token lifetime in seconds. Accurate right after login/refresh,
+   * which reissue the cookie; the SPA uses it to schedule a proactive refresh
+   * just before expiry (the token is httpOnly and unreadable client-side).
    */
   private accessExpiresIn(): number {
     return parseDurationSeconds(this.config.get('JWT_ACCESS_TTL', { infer: true }));
+  }
+
+  /**
+   * Remaining lifetime (seconds) of the caller's access cookie. /me does NOT
+   * reissue the cookie, so it must report the token's actual remaining `exp` —
+   * returning the full configured TTL here would let the SPA schedule its
+   * proactive refresh too late. Falls back to the configured TTL if the token
+   * can't be decoded.
+   */
+  private remainingAccessSeconds(req: FastifyRequest): number {
+    const token = req.cookies?.[ACCESS_COOKIE];
+    if (token) {
+      try {
+        const { exp } = decodeJwt(token);
+        if (typeof exp === 'number') {
+          return Math.max(0, exp - Math.floor(Date.now() / 1000));
+        }
+      } catch {
+        // malformed/unreadable — fall back to the configured TTL below
+      }
+    }
+    return this.accessExpiresIn();
   }
 
   private setAuthCookies(reply: FastifyReply, result: LoginResult): void {
