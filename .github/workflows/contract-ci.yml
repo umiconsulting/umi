@@ -9,6 +9,9 @@ on:
       - "packages/contract/**"
       - ".github/workflows/contract-ci.yml"
 
+permissions:
+  contents: read
+
 jobs:
   contract:
     runs-on: ubuntu-latest
