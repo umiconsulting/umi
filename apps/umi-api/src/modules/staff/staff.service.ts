@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { iso } from '../../shared/format/money';
 import { TenantsRepository } from '../tenants/tenants.repository';
 import { StaffRepository, type StaffRow } from './staff.repository';
 
@@ -15,11 +16,6 @@ const DEFAULT_PERMISSIONS: Record<string, Record<string, boolean>> = {
 
 function normalizeRole(role: unknown): 'ADMIN' | 'STAFF' {
   return role === 'ADMIN' ? 'ADMIN' : 'STAFF';
-}
-
-function iso(value: Date | string | null | undefined): string | null {
-  if (value == null) return null;
-  return value instanceof Date ? value.toISOString() : value;
 }
 
 export interface StaffDto {

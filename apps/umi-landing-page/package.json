@@ -15,8 +15,6 @@
     "visual:screenshots": "bash scripts/visual-snapshots.sh"
   },
   "dependencies": {
-    "@headlessui/react": "^2.2.1",
-    "@hookform/resolvers": "^5.0.1",
     "@supabase/supabase-js": "^2.108.1",
     "@types/better-sqlite3": "^7.6.13",
     "better-sqlite3": "^12.2.0",
@@ -28,9 +26,7 @@
     "nodemailer": "^7.0.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-hook-form": "^7.55.0",
-    "tailwind-merge": "^3.2.0",
-    "zod": "^3.24.2"
+    "tailwind-merge": "^3.2.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

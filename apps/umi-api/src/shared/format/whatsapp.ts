@@ -10,23 +10,16 @@ export function toWhatsAppMarkdown(text: string): string {
   return text.replace(/\*\*(.+?)\*\*/g, '*$1*');
 }
 
+const XML_ENTITIES: Record<string, string> = {
+  '<': '&lt;',
+  '>': '&gt;',
+  '&': '&amp;',
+  "'": '&apos;',
+  '"': '&quot;',
+};
+
 function escapeXml(unsafe: string): string {
-  return unsafe.replace(/[<>&'"]/g, (c) => {
-    switch (c) {
-      case '<':
-        return '&lt;';
-      case '>':
-        return '&gt;';
-      case '&':
-        return '&amp;';
-      case "'":
-        return '&apos;';
-      case '"':
-        return '&quot;';
-      default:
-        return c;
-    }
-  });
+  return unsafe.replace(/[<>&'"]/g, (c) => XML_ENTITIES[c]);
 }
 
 /** A TwiML `<Message>` reply (used for synchronous webhook errors/limits). */
