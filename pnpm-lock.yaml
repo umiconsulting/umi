@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      prettier:
+        specifier: ^3.4.2
+        version: 3.9.4
       turbo:
         specifier: ^2.8.8
         version: 2.10.2
