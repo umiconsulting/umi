@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { CFG, COOKIE_AUTH, LOCAL_SESSION, apiUrl, withCreds, errMessage } from './config.js'
 import { supabase } from './supabase.js'
+import { routes } from '@umi/contract/routes'
 
 const AuthContext = createContext(null)
 const LOCAL_SESSION_KEY = 'umi-dashboard-local-session'
@@ -86,7 +87,7 @@ export function refreshSession() {
   if (refreshInFlight) return refreshInFlight
   refreshInFlight = (async function () {
     try {
-      const res = await fetch(apiUrl('/api/auth/local/refresh'), withCreds({ method: 'POST' }))
+      const res = await fetch(apiUrl(routes.auth.refresh), withCreds({ method: 'POST' }))
       if (!res.ok) return false
       const payload = await res.json().catch(() => ({}))
       if (payload && payload.session) {
@@ -171,7 +172,7 @@ export async function signIn(email, password, remember = false) {
   // localStorage session id echoed as X-UMI-User-ID. Either way we cache session.* for the UI.
   // `remember` makes umi-api issue persistent cookies (vs session cookies).
   if (LOCAL_SESSION) {
-    const res = await fetch(apiUrl('/api/auth/local/login'), withCreds({
+    const res = await fetch(apiUrl(routes.auth.login), withCreds({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: email, password, remember }),
@@ -196,7 +197,7 @@ export async function signOut() {
       // so check both — a failed server logout can leave the httpOnly cookie
       // valid. We still clear local state + redirect, but never silently.
       try {
-        const res = await fetch(apiUrl('/api/auth/local/logout'), withCreds({ method: 'POST' }))
+        const res = await fetch(apiUrl(routes.auth.logout), withCreds({ method: 'POST' }))
         if (!res.ok) console.warn(`logout failed (${res.status}); auth cookie may persist server-side`)
       } catch (err) {
         console.warn('logout request failed; auth cookie may persist server-side', err)

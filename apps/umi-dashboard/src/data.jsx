@@ -3,6 +3,7 @@ import { LIVE as _LIVE, COOKIE_AUTH, apiUrl, withCreds, errMessage } from '@/lib
 import { getAuthHeaders, refreshSession, handleSessionExpired } from '@/lib/auth.jsx'
 import { useTenant } from '@/lib/tenant-context.jsx'
 import { isProductActive } from '@/lib/module-registry.js'
+import { routes } from '@umi/contract/routes'
 
 const EMPTY_OVERVIEW = {}
 const EMPTY_STATIONS = []
@@ -85,7 +86,7 @@ async function _apiFetch(path, opts, _retried) {
 function _tenantPath(ctx, suffix) {
   const tenantId = _tenantId(ctx)
   if (!tenantId) throw new Error('No active tenant selected')
-  return `/api/tenants/${encodeURIComponent(tenantId)}${suffix}`
+  return `${routes.tenants.base(tenantId)}${suffix}`
 }
 
 function _useAsync(asyncFn, deps, seed) {
