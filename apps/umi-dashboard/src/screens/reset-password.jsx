@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { supabase } from '../lib/supabase.js'
-import { useAuth } from '../lib/auth.jsx'
-import { apiUrl, withCreds, errMessage } from '../lib/config.js'
-import '../styles.css'
+import { supabase } from '@/lib/supabase.js'
+import { useAuth } from '@/lib/auth.jsx'
+import { apiUrl, withCreds, errMessage } from '@/lib/config.js'
+import '@/styles.css'
 
 export default function ResetPasswordScreen() {
   const navigate = useNavigate()

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { apiUrl, withCreds, errMessage } from '../lib/config.js'
-import { signIn } from '../lib/auth.jsx'
-import '../styles.css'
+import { apiUrl, withCreds, errMessage } from '@/lib/config.js'
+import { signIn } from '@/lib/auth.jsx'
+import '@/styles.css'
 
 const REMEMBER_KEY = 'umi.login.rememberedEmail'
 

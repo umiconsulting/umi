@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
-import { I, UmiX } from '../icons.jsx'
-import { XSep, Spark } from '../shell.jsx'
-import { useOverviewData } from '../data.jsx'
+import { I, UmiX } from '@/icons.jsx'
+import { XSep, Spark } from '@/shell.jsx'
+import { useOverviewData } from '@/data.jsx'
 
 // Screen 1 — Overview / Panorama
 // Data: useOverviewData() → { overview, stations }
