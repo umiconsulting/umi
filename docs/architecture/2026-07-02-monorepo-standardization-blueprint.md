@@ -77,6 +77,20 @@ first so a future extraction has a consistent surface to pull from.
 
 ### 2.1 Monorepo tooling → pnpm + Turborepo, single lockfile
 
+> **RATIFIED (engineering, not preference):** **pnpm workspaces + one root lockfile.** Reasoned
+> by dominance, not vote: per-app lockfiles are *architecturally disqualified* (no workspace ⇒ no
+> shared `packages/*` ⇒ the contract/token/config sharing this whole plan depends on is
+> impossible). npm-workspaces reaches the same capability but is *strictly worse* — pnpm's
+> content-addressable store is more disk/CI-efficient, its non-flat `node_modules` prevents
+> phantom dependencies (a correctness property npm hoisting lacks), and the root **already
+> declares** `pnpm@10` + turbo (choosing npm means tearing out the declared toolchain for a
+> weaker model). npm's only edge — Vercel defaults to `npm install` — is a one-time Install-
+> Command flip, not an engineering trade. Only an *external* constraint (a Vercel policy
+> forbidding the install-command change) could override this; none exists.
+> **Shipping is PR-per-phase** (small batch size ⇒ lower change-failure rate + faster recovery;
+> CodeRabbit skips >150-file PRs so a stacked mega-PR gets *zero* review; per-phase = independent
+> revert + bisect).
+
 - **One package manager: pnpm** (the root already commits to it). One **`pnpm-lock.yaml`
   at the root**; delete all five per-app `package-lock.json`. *(pnpm workspaces exist
   precisely to give a single lockfile; Turborepo reads the pnpm workspace graph.)*
@@ -89,7 +103,7 @@ first so a future extraction has a consistent surface to pull from.
 
 Every app roots its code at **`src/`**:
 
-```
+```text
 apps/<app>/
   src/
     app/            # Next apps: App Router (page.tsx, layout.tsx, route.ts — framework-fixed names)
@@ -193,9 +207,8 @@ Non-negotiable in **both** models (fixes today's real mess):
 4. **pnpm consolidation has a known Vercel scar.** The dashboard was moved to `npm install`
    specifically to dodge the pnpm workspace on Vercel. Re-committing to pnpm means fixing
    Install Command + Root Directory on 4 Vercel projects; get it wrong and deploys break.
-   → *Either do pnpm properly (root lockfile + Vercel install command set per project) or
-   stay npm-per-app honestly and delete the pnpm/turbo pretense. The current half-state is
-   the actual bug. This is an owner decision, not a default.*
+   → *Resolved (§2.1): pnpm, done properly — root lockfile + Vercel Install Command per
+   project. The half-state (declares pnpm, ships npm lockfiles) was the actual bug.*
 5. **hyper-strict tsconfig as the floor may surface latent type errors** in cash/logs/api
    that currently compile. → *Land the base config in "loose-compatible" mode, then ratchet
    each strict flag per app behind its own green `typecheck`.*
@@ -213,8 +226,9 @@ Non-negotiable in **both** models (fixes today's real mess):
   camelCase/underscore lib-file mess**, which is the actual inconsistency.
 - **umi-api stays relative + dotted-kebab** (idiomatic); it does not adopt `@/*`. It is
   already the most consistent app; it needs only lint/format/base-tsconfig wiring.
-- **Package manager is an explicit owner decision** (pnpm-single-lockfile vs honest
-  npm-per-app). The half-state gets fixed either way.
+- **Package manager: ratified pnpm + single root lockfile** (§2.1) — decided on engineering
+  merit, not left open. The half-state (root declares pnpm, apps ship npm lockfiles) is fixed
+  by consolidating on the toolchain the root already declares.
 - **Sequencing is strictly risk-ascending, each phase independently shippable + CI-green:**
 
 | Phase | Content | Risk | Moves product code? |
@@ -224,7 +238,7 @@ Non-negotiable in **both** models (fixes today's real mess):
 | **2 — Shared config** | `packages/tsconfig` + `packages/eslint-config` + root Prettier + `.editorconfig`; apps extend; format-all commit w/ blame-ignore | low | no (whitespace only) |
 | **3 — Topology + alias** | logs → `src/`; `@/* → ./src/*` everywhere (except Nest); enforce kebab folders | med (imports) | moves files |
 | **4 — File naming** | Apply Model A or B; fix camelCase/underscore; per-app, one at a time | **high** | renames + import rewrites |
-| **5 — (deferred)** | dashboard JS→TS; `packages/ui`+`packages/api-client` extraction; cash Prisma removal | high | yes |
+| **5 — (deferred)** | `packages/ui`+`packages/api-client` extraction; cash Prisma removal _(dashboard JS→TS is elevated to P3 — §8.2/§9.8, not parked here)_ | high | yes |
 
 Each phase = its own PR, its own green build/test, never bundled.
 
@@ -265,9 +279,9 @@ whether "the same everywhere" should be literal-global or framework-idiomatic.
 
 **Umi-specific conclusion (inference, labeled):**
 - Adopt Model B (idiomatic) unless the owner explicitly values literal uniformity.
-- Consolidate on pnpm + one lockfile (the root already declares it) *provided* the 4 Vercel
-  projects get Install Command = `pnpm install`; otherwise drop the pnpm/turbo pretense and
-  standardize honestly on npm-per-app. The current half-state is the real defect.
+- Consolidate on pnpm + one lockfile (the root already declares it) — ratified in §2.1. The
+  Vercel projects must set Install Command = `pnpm install`; the prior half-state (declares
+  pnpm, ships npm lockfiles) was the real defect.
 - umi-api is exempt from `@/*` and stays framework-idiomatic.
 
 **What would invalidate this later:**
@@ -285,7 +299,7 @@ whether "the same everywhere" should be literal-global or framework-idiomatic.
 - **Framework-version drift** — Next 14 (cash) / 15 (landing) / 16 (logs); React 18 vs 19.
   Real, but a dependency-upgrade program, not naming standardization.
 - **Cross-app code extraction** — `packages/ui`, `packages/api-client`, `packages/supabase`.
-- **dashboard JS→TS** migration.
+- **dashboard JS→TS** migration — *elevated to P3 (§8.2/§9.8) by the product direction; kept here only as a pointer*.
 
 ---
 
@@ -348,10 +362,10 @@ Directory, the Dockerfile build context, and the CI trigger `apps/umi-api/**` in
 contract package has already made the coupling real; not now.
 
 **Consequence:** because the dashboard is becoming *the* product front-end (and will host a
-loyalty/payments POS), its JS-only, untyped state is no longer acceptable. The deferred
-**dashboard JS→TS** migration (§2.4/§7) should be **re-prioritized** so it can consume
-`packages/contract`. This is the one place the earlier "defer JS→TS" call is reversed by the
-new product direction.
+loyalty/payments POS), its JS-only, untyped state is no longer acceptable. The **dashboard
+JS→TS** migration is therefore **elevated to P3** (§9.8), tied to `packages/contract` — it is
+**no longer a §5 'Phase 5' item**. This is the one place the earlier "defer JS→TS" call
+(§4/§7) is reversed by the new product direction.
 
 ### 8.3 The dashboard's new form — absorbing cash's *operator* half
 
@@ -393,7 +407,7 @@ this whole decision is §8.7.
 
 ### 8.5 Revised topology summary
 
-```
+```text
 packages/
   contract/          # api DTOs + route types — owned by api, consumed by dashboard  (NEW, priority)
   tsconfig/          # shared base configs                                            (§2.4)
@@ -411,7 +425,7 @@ apps/
 
 One backend, two front-ends for two audiences:
 
-```
+```text
 api.umiconsulting.co        # single backend (umi-api) for BOTH front-ends below
 <console>                   # operator console (Vite SPA). TODAY: dashboard.umiconsulting.co
                             #   TARGET (optional): app.umiconsulting.co, dashboard.* 301→app.*
@@ -603,7 +617,7 @@ is **every frontend reaching past the api into data and secrets it shouldn't tou
 **One rule fixes most of it:** *only umi-api owns data and secrets; every frontend is a **typed
 client of the api** and a **consumer of shared tokens**.* Target packages:
 
-```
+```text
 packages/
   contract/        # api DTOs + route types (also → Swift client for KDS)
   tokens/          # DTCG design tokens → CSS vars (+ optional Tailwind preset)
