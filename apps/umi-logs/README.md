@@ -1,36 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# umi-logs — RESERVED SLOT (app deleted 2026-07-02)
 
-## Getting Started
+The previous `umi-logs` implementation was **deleted**, not refactored. It was an internal
+observability viewer that had drifted into three liabilities:
 
-First, run the development server:
+1. It queried Supabase **directly from the shipped app** using `SUPABASE_SERVICE_ROLE_KEY`
+   (RLS bypass) and a `SUPABASE_MANAGEMENT_TOKEN` (project-admin) — both strictly server-only
+   secrets.
+2. It read the **dead `conversaflow` schema** and legacy tables (`inbound_events`, `jobs`,
+   `outbox`, `dashboard_users`) that were superseded by the canonical schema and removed when
+   the conversaflow backend was deleted (PR #17).
+3. It bypassed `umi-api` entirely, violating the "only umi-api owns data and secrets" boundary.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Deleting the app was the cleanest security remediation (it removes the credential surface
+outright). This directory is kept as a **reserved slot** so a future rebuild has a home and a spec.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+> **Ops follow-up (not code):** if the deleted app's `service_role` key or Management token were
+> ever real values in a live deployment, **deprovision that deployment and rotate both tokens.**
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Ideal future observability tool (build to this, not the old one)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Audience:** internal Umi staff only — traces, invocations, token accounting, queue/outbox
+  health. Never a tenant surface. Access-gated (super-admin / SSO), on its own subdomain.
+- **Data access:** **no direct DB from the browser, ever.** Read *only* through **umi-api
+  observability endpoints** (a `modules/observability` surface / `TraceService` rebind) against
+  the **canonical schema** (`observability.*`, `queue.*`, `comms.*`). No `service_role`, no
+  Management token in the app — it is a typed client of umi-api like every other frontend.
+- **Structure:** the shared monorepo blueprint — `src/{app,components,lib}`, `@/* → ./src/*`,
+  consumes `packages/{contract,tokens,eslint-config,tsconfig}`, Model-B file naming.
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Full rationale + the whole-monorepo boundary audit:
+[`docs/architecture/2026-07-02-monorepo-standardization-blueprint.md`](../../docs/architecture/2026-07-02-monorepo-standardization-blueprint.md) (§9.3).
