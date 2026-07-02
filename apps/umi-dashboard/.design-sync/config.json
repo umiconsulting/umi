@@ -1,0 +1,5 @@
+{
+  "projectId": "019e1d2c-3f87-73f9-889e-bcd13b510fc0",
+  "shape": "offscript",
+  "note": "umi-dashboard is an app, not a component-library repo (no Storybook, no compiled component bundle). Design system = styles.css token layer + inline-styled screens. Synced off-script: real styles.css + README conventions + component preview cards (login baseline + two redesign directions + tokens foundation). Re-sync by re-authoring ds-bundle/ and DesignSync finalize_plan->write_files, or build a real component library first to use the full converter."
+}
