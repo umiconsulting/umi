@@ -10,7 +10,9 @@ services:
   umi-api:
     # `image` is what the VPS pulls from GHCR; `build` is the local-dev fallback.
     image: ghcr.io/umiconsulting/umi-api:${UMI_API_TAG:-latest}
-    build: .
+    build:
+      context: ../..
+      dockerfile: apps/umi-api/Dockerfile
     command: node dist/main.js
     env_file: .env
     environment:
@@ -25,7 +27,9 @@ services:
   umi-worker:
     # Same image as umi-api — one build, two commands.
     image: ghcr.io/umiconsulting/umi-api:${UMI_API_TAG:-latest}
-    build: .
+    build:
+      context: ../..
+      dockerfile: apps/umi-api/Dockerfile
     command: node dist/worker.js
     env_file: .env
     environment:

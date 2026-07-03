@@ -1,0 +1,30 @@
+# Build context for apps/umi-api/Dockerfile is the REPO ROOT. Drop everything
+# heavy, secret, or unrelated to the umi-api image so the daemon context stays
+# small and no .env / other-app payload is ever sent. The Dockerfile COPYs only
+# the manifests + apps/umi-api source it needs.
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/coverage
+**/*.tsbuildinfo
+**/*.log
+
+# Never ship secrets.
+**/.env
+**/.env.*
+!**/.env.example
+
+# VCS / CI / docs / local tooling — not build inputs.
+.git
+.github
+.hermes
+docs
+backups
+artifacts
+
+# Other apps are not needed to build umi-api (umi-cash is workspace-excluded;
+# umi-kds is a native app). Their package.json isn't a workspace member, so
+# dropping them entirely keeps the context lean.
+apps/umi-cash
+apps/umi-kds

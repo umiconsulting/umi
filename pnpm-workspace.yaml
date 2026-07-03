@@ -1,16 +1,15 @@
-# Workspace members: the FRONTENDS that will consume shared packages/* (umi-dashboard,
-# umi-landing-page) + shared packages/*. Directories without a package.json (umi-kds
-# Swift app) are skipped by pnpm.
+# Workspace members: umi-dashboard, umi-landing-page, umi-api, and shared packages/*.
+# Directories without a package.json (umi-kds Swift app) are skipped by pnpm.
 #
-# Excluded on purpose (each keeps its own npm lockfile — do NOT pull into the workspace):
+# umi-api joined the workspace with its Docker→pnpm migration so it can consume
+# packages/contract. Its image is now built from the repo root with pnpm (multi-stage
+# `pnpm deploy`); the VPS still only pulls the prebuilt image (never builds).
+#
+# Excluded on purpose (keeps its own npm lockfile — do NOT pull into the workspace):
 #   - umi-cash: FROZEN until the dashboard cutover.
-#   - umi-api:  ships via its own Docker image + VPS deploy pipeline (npm ci). Migrating that
-#               prod-critical chain to pnpm is a separate, deliberately-tested PR; it joins the
-#               workspace when packages/contract lands (P2/P3), not as a side effect of this one.
 packages:
   - "apps/*"
   - "!apps/umi-cash"
-  - "!apps/umi-api"
   - "packages/*"
 
 # pnpm 10 blocks dependency install-scripts by default. These native deps
