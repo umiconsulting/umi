@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { HoursModule } from '../hours/hours.module';
+import { TenantsModule } from '../tenants/tenants.module';
 import { WhatsappController } from './whatsapp.controller';
 import { ChannelRepository } from './channel.repository';
 import { TenantResolutionService } from './tenant-resolution.service';
@@ -40,7 +41,7 @@ import { CustomerTools } from './tools/customer.tools';
  * provides the real tool implementations.
  */
 @Module({
-  imports: [HoursModule],
+  imports: [HoursModule, TenantsModule],
   // The Twilio webhook ingress (web process only; the worker imports this module
   // for the services and never instantiates controllers).
   controllers: [WhatsappController],

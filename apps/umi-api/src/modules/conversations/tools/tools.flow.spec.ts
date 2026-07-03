@@ -55,6 +55,7 @@ describe('CheckoutTools.confirmOrder', () => {
   let products: { getByIds: ReturnType<typeof vi.fn> };
   let conversations: { loadById: ReturnType<typeof vi.fn>; updateDraftCartCas: ReturnType<typeof vi.fn> };
   let hours: { checkOrderingEnabled: ReturnType<typeof vi.fn>; isWithinOrderHours: ReturnType<typeof vi.fn>; getOrdersClosedMessage: ReturnType<typeof vi.fn> };
+  let tenants: { countActiveLocationsWorker: ReturnType<typeof vi.fn>; resolveLocationIdWorker: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     orders = { createOrder: vi.fn().mockResolvedValue({ orderId: 'o-1', total: 60, created: true }) };
@@ -75,6 +76,11 @@ describe('CheckoutTools.confirmOrder', () => {
       isWithinOrderHours: vi.fn().mockResolvedValue(true),
       getOrdersClosedMessage: vi.fn().mockResolvedValue('cerrado'),
     };
+    // Default: single-branch tenant resolving to its sole/oldest-active location.
+    tenants = {
+      countActiveLocationsWorker: vi.fn().mockResolvedValue(1),
+      resolveLocationIdWorker: vi.fn().mockResolvedValue('loc-sole'),
+    };
   });
 
   it('creates an order with a deterministic per-turn idempotency key and clears the cart', async () => {
@@ -83,6 +89,7 @@ describe('CheckoutTools.confirmOrder', () => {
       products as never,
       conversations as never,
       hours as never,
+      tenants as never,
     );
     const r = await checkout.confirmOrder(CTX, {});
     expect(r.success).toBe(true);
@@ -94,9 +101,26 @@ describe('CheckoutTools.confirmOrder', () => {
     expect(conversations.updateDraftCartCas).toHaveBeenCalledWith('c1', 3, null);
   });
 
+  it('stamps the sole location for a single-branch tenant instead of NULL', async () => {
+    // CTX.locationId is null; a single-branch tenant must still route to its one branch.
+    const checkout = new CheckoutTools(orders as never, products as never, conversations as never, hours as never, tenants as never);
+    await checkout.confirmOrder(CTX, {});
+    expect(tenants.resolveLocationIdWorker).toHaveBeenCalledWith('t1', null);
+    expect(orders.createOrder.mock.calls[0][0].locationId).toBe('loc-sole');
+  });
+
+  it('leaves the location as-is for a multi-branch tenant with no resolved branch (never auto-routes to branch #1)', async () => {
+    tenants.countActiveLocationsWorker.mockResolvedValue(2);
+    const checkout = new CheckoutTools(orders as never, products as never, conversations as never, hours as never, tenants as never);
+    await checkout.confirmOrder(CTX, {});
+    // Multi-branch: keep the ingress location (null here); do NOT stamp oldest-active.
+    expect(tenants.resolveLocationIdWorker).not.toHaveBeenCalled();
+    expect(orders.createOrder.mock.calls[0][0].locationId).toBeNull();
+  });
+
   it('blocks confirmation when ordering is paused', async () => {
     hours.checkOrderingEnabled.mockResolvedValue({ enabled: false, disabledMessage: 'pausado' });
-    const checkout = new CheckoutTools(orders as never, products as never, conversations as never, hours as never);
+    const checkout = new CheckoutTools(orders as never, products as never, conversations as never, hours as never, tenants as never);
     const r = await checkout.confirmOrder(CTX, {});
     expect(r.success).toBe(false);
     expect(orders.createOrder).not.toHaveBeenCalled();
@@ -116,7 +140,7 @@ describe('CheckoutTools.cancelOrder', () => {
       loadById: vi.fn().mockResolvedValue({ draftCart, draftCartVersion: 7 }),
       updateDraftCartCas: vi.fn().mockResolvedValue(8),
     };
-    const checkout = new CheckoutTools(orders as never, {} as never, conversations as never, {} as never);
+    const checkout = new CheckoutTools(orders as never, {} as never, conversations as never, {} as never, {} as never);
 
     const r = await checkout.cancelOrder(CTX, 'ya no quiero');
     expect(r.success).toBe(true);
@@ -135,7 +159,7 @@ describe('CheckoutTools.cancelOrder', () => {
       loadById: vi.fn().mockResolvedValue({ draftCart: null, draftCartVersion: 0 }),
       updateDraftCartCas: vi.fn(),
     };
-    const checkout = new CheckoutTools(orders as never, {} as never, conversations as never, {} as never);
+    const checkout = new CheckoutTools(orders as never, {} as never, conversations as never, {} as never, {} as never);
 
     const r = await checkout.cancelOrder(CTX, 'me arrepentí');
     expect(r.success).toBe(true);

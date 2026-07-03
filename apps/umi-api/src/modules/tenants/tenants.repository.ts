@@ -181,6 +181,22 @@ export class TenantsRepository {
     return rows[0]?.id ?? null;
   }
 
+  /**
+   * Worker-pool count of the tenant's ACTIVE locations. Lets the unauthenticated
+   * WhatsApp order write tell a single-branch tenant (safe to stamp the sole
+   * location) apart from a multi-branch one (must NOT auto-route to the oldest
+   * branch — that is Phase 1 branch resolution).
+   */
+  async countActiveLocationsWorker(tenantId: string): Promise<number> {
+    const { rows } = await this.pg.query<{ n: number }>(
+      `SELECT count(*)::int AS n
+       FROM core.locations
+       WHERE tenant_id = $1::uuid AND status = 'active'`,
+      [tenantId],
+    );
+    return Number(rows[0]?.n ?? 0);
+  }
+
   /** Worker-pool read of the tenant's canonical timezone (`core.tenants.timezone`). */
   async getTenantTimezoneWorker(tenantId: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ timezone: string | null }>(

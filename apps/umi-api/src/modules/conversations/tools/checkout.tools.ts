@@ -3,6 +3,7 @@ import { OrdersRepository, type OrderItemSnapshot } from '../orders.repository';
 import { ProductsRepository } from '../products.repository';
 import { ConversationsRepository } from '../conversations.repository';
 import { BusinessHoursService } from '../business-hours.service';
+import { TenantsRepository } from '../../tenants/tenants.repository';
 import type { DraftCart } from '../conversation.types';
 import type { ToolContext, ToolResult } from '../turn.types';
 import {
@@ -28,10 +29,30 @@ export class CheckoutTools {
     private readonly products: ProductsRepository,
     private readonly conversations: ConversationsRepository,
     private readonly hours: BusinessHoursService,
+    private readonly tenants: TenantsRepository,
   ) {}
 
   private idempotencyKey(ctx: ToolContext): string {
     return `conversaflow:turn:${ctx.turnId ?? ctx.conversationId}`;
+  }
+
+  /**
+   * Phase 0 of branch resolution — the location a WhatsApp order is written to.
+   * A single-branch tenant (<=1 active location) gets the sole/oldest-active
+   * location instead of NULL, closing the gap where hours already resolved to the
+   * oldest-active location but the order still wrote location_id = NULL. A
+   * multi-branch tenant keeps the ingress-derived location (which may be null)
+   * UNCHANGED: auto-stamping the oldest branch would silently route every
+   * unresolved order to branch #1 — real multi-branch routing is Phase 1
+   * (resolve_branch). Deterministic per turn, so it stays safe under createOrder's
+   * `conversaflow:turn:<id>` idempotency (a retry writes the identical location).
+   */
+  private async resolveOrderLocation(ctx: ToolContext): Promise<string | null> {
+    const activeLocations = await this.tenants.countActiveLocationsWorker(ctx.tenantId);
+    if (activeLocations <= 1) {
+      return this.tenants.resolveLocationIdWorker(ctx.tenantId, ctx.locationId ?? null);
+    }
+    return ctx.locationId ?? null;
   }
 
   /** Re-validate + re-price cart items against the live catalog (pesos). */
@@ -123,7 +144,7 @@ export class CheckoutTools {
     const result = await this.orders.createOrder({
       tenantId: ctx.tenantId,
       personId: ctx.personId,
-      locationId: ctx.locationId ?? null,
+      locationId: await this.resolveOrderLocation(ctx),
       items: validation.items,
       customerNote: input.customer_note ?? cart.customer_note ?? null,
       pickupPerson: input.pickup_person ?? null,
@@ -167,7 +188,7 @@ export class CheckoutTools {
     const result = await this.orders.createOrder({
       tenantId: ctx.tenantId,
       personId: ctx.personId,
-      locationId: ctx.locationId ?? null,
+      locationId: await this.resolveOrderLocation(ctx),
       items: revalidated.items,
       customerNote: input.customer_note ?? last.customerNote ?? null,
       pickupPerson: last.pickupPerson ?? null,
