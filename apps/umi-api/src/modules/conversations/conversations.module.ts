@@ -27,6 +27,7 @@ import { CatalogTools } from './tools/catalog.tools';
 import { CartTools } from './tools/cart.tools';
 import { CheckoutTools } from './tools/checkout.tools';
 import { CustomerTools } from './tools/customer.tools';
+import { BranchTools } from './tools/branch.tools';
 
 /**
  * The conversational engine (ConversaFlow port, spec §3 Phase 3):
@@ -74,6 +75,7 @@ import { CustomerTools } from './tools/customer.tools';
     CartTools,
     CheckoutTools,
     CustomerTools,
+    BranchTools,
     { provide: ToolsService, useClass: RealToolsService },
   ],
   exports: [

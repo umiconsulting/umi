@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type { AppConfig } from '../../../shared/config/config.schema';
 import { OrdersRepository, type OrderItemSnapshot } from '../orders.repository';
 import { ProductsRepository } from '../products.repository';
 import { ConversationsRepository } from '../conversations.repository';
@@ -30,6 +32,7 @@ export class CheckoutTools {
     private readonly conversations: ConversationsRepository,
     private readonly hours: BusinessHoursService,
     private readonly tenants: TenantsRepository,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
   private idempotencyKey(ctx: ToolContext): string {
@@ -37,22 +40,54 @@ export class CheckoutTools {
   }
 
   /**
-   * Phase 0 of branch resolution — the location a WhatsApp order is written to.
-   * A single-branch tenant (<=1 active location) gets the sole/oldest-active
-   * location instead of NULL, closing the gap where hours already resolved to the
-   * oldest-active location but the order still wrote location_id = NULL. A
-   * multi-branch tenant keeps the ingress-derived location (which may be null)
-   * UNCHANGED: auto-stamping the oldest branch would silently route every
-   * unresolved order to branch #1 — real multi-branch routing is Phase 1
-   * (resolve_branch). Deterministic per turn, so it stays safe under createOrder's
-   * `conversaflow:turn:<id>` idempotency (a retry writes the identical location).
+   * The location a WhatsApp order is written to, plus the branch gate.
+   *
+   * - Single-branch tenant (<=1 active location) → stamp the sole/oldest-active
+   *   location instead of NULL (Phase 0). Deterministic per turn, so it stays safe
+   *   under createOrder's `conversaflow:turn:<id>` idempotency.
+   * - Multi-branch tenant, feature OFF → unchanged: keep the ingress location
+   *   (which may be NULL). Never auto-routes to a branch.
+   * - Multi-branch tenant, feature ON → require a branch the customer chose. If a
+   *   valid `selected_location_id` exists, write there. Otherwise DON'T write:
+   *   return `{ ok: false, ask }` so the bot asks "¿de qué sucursal?" (in the
+   *   business voice) and the in-flight order is preserved for after they answer.
    */
-  private async resolveOrderLocation(ctx: ToolContext): Promise<string | null> {
+  private async resolveOrderLocation(
+    ctx: ToolContext,
+  ): Promise<
+    { ok: true; locationId: string | null } | { ok: false; ask: ToolResult }
+  > {
     const activeLocations = await this.tenants.countActiveLocationsWorker(ctx.tenantId);
     if (activeLocations <= 1) {
-      return this.tenants.resolveLocationIdWorker(ctx.tenantId, ctx.locationId ?? null);
+      return {
+        ok: true,
+        locationId: await this.tenants.resolveLocationIdWorker(
+          ctx.tenantId,
+          ctx.locationId ?? null,
+        ),
+      };
     }
-    return ctx.locationId ?? null;
+
+    if (!this.config.get('BRANCH_RESOLUTION_ENABLED', { infer: true })) {
+      return { ok: true, locationId: ctx.locationId ?? null };
+    }
+
+    const selected = await this.conversations.getSelectedLocationWorker(
+      ctx.conversationId,
+    );
+    const locations = await this.tenants.listActiveLocationsWorker(ctx.tenantId);
+    if (selected && locations.some((l) => l.id === selected)) {
+      return { ok: true, locationId: selected };
+    }
+    // No valid branch chosen (or a stale/archived pick) → force the question.
+    const names = locations.map((l) => l.name).join(', ');
+    return {
+      ok: false,
+      ask: needsInputToolError(
+        'Falta elegir la sucursal para este pedido.',
+        `Pregúntale al cliente de qué sucursal quiere ordenar (opciones: ${names}) y usa set_branch. No pierdas su pedido.`,
+      ),
+    };
   }
 
   /** Re-validate + re-price cart items against the live catalog (pesos). */
@@ -141,10 +176,17 @@ export class CheckoutTools {
     const validation = await this.validateItems(ctx.tenantId, cart.items);
     if (!validation.ok) return validation.error;
 
+    // Branch gate: for a multi-branch tenant with the feature on, this returns
+    // an "ask the customer which branch" result unless a branch is already
+    // chosen. Returning before createOrder leaves the draft cart intact (it is
+    // cleared only after a successful write), so the order is not forgotten.
+    const location = await this.resolveOrderLocation(ctx);
+    if (!location.ok) return location.ask;
+
     const result = await this.orders.createOrder({
       tenantId: ctx.tenantId,
       personId: ctx.personId,
-      locationId: await this.resolveOrderLocation(ctx),
+      locationId: location.locationId,
       items: validation.items,
       customerNote: input.customer_note ?? cart.customer_note ?? null,
       pickupPerson: input.pickup_person ?? null,
@@ -185,10 +227,13 @@ export class CheckoutTools {
     const revalidated = await this.validateItems(ctx.tenantId, last.items);
     if (!revalidated.ok) return revalidated.error;
 
+    const location = await this.resolveOrderLocation(ctx);
+    if (!location.ok) return location.ask;
+
     const result = await this.orders.createOrder({
       tenantId: ctx.tenantId,
       personId: ctx.personId,
-      locationId: await this.resolveOrderLocation(ctx),
+      locationId: location.locationId,
       items: revalidated.items,
       customerNote: input.customer_note ?? last.customerNote ?? null,
       pickupPerson: last.pickupPerson ?? null,

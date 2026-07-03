@@ -197,6 +197,24 @@ export class TenantsRepository {
     return Number(rows[0]?.n ?? 0);
   }
 
+  /**
+   * Worker-pool list of the tenant's ACTIVE locations (id + name), oldest-first.
+   * Feeds branch resolution: the `# SUCURSALES` prompt block, `set_branch`
+   * validation, and the checkout branch gate.
+   */
+  async listActiveLocationsWorker(
+    tenantId: string,
+  ): Promise<Array<{ id: string; name: string }>> {
+    const { rows } = await this.pg.query<{ id: string; name: string }>(
+      `SELECT id::text AS id, name
+       FROM core.locations
+       WHERE tenant_id = $1::uuid AND status = 'active'
+       ORDER BY created_at ASC, id ASC`,
+      [tenantId],
+    );
+    return rows;
+  }
+
   /** Worker-pool read of the tenant's canonical timezone (`core.tenants.timezone`). */
   async getTenantTimezoneWorker(tenantId: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ timezone: string | null }>(

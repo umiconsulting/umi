@@ -1,4 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type { AppConfig } from '../../shared/config/config.schema';
+import { TenantsRepository } from '../tenants/tenants.repository';
 import { EnqueueService } from '../../jobs/enqueue.service';
 import { JobPriority } from '../../jobs/job-options';
 import { QUEUES } from '../../jobs/queues';
@@ -14,7 +17,11 @@ import { TurnCommitRepository } from './turn-commit.repository';
 import { createToolOutcomeState, type ToolOutcomeState } from './tool-outcomes';
 import { getActivePendingClarification } from './pending-clarification';
 import { shapeTurnMemory } from './turn-memory';
-import { buildHarnessSystemPrompt, PROMPT_VERSION } from './prompts';
+import {
+  buildHarnessSystemPrompt,
+  PROMPT_VERSION,
+  type BranchPromptContext,
+} from './prompts';
 import { sanitizeOutput } from './security.service';
 import {
   blockUnverifiedOrderConfirmation,
@@ -69,7 +76,29 @@ export class TurnService {
     private readonly commit: TurnCommitRepository,
     private readonly enqueue: EnqueueService,
     private readonly trace: TraceService,
+    private readonly tenants: TenantsRepository,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {}
+
+  /**
+   * Multi-branch prompt context: the tenant's active-branch names + the branch
+   * already chosen for this conversation (if any). Null (no prompt block) unless
+   * BRANCH_RESOLUTION_ENABLED is on AND the tenant has >1 active location — so
+   * single-branch tenants and flag-off deploys keep the exact prior prompt.
+   */
+  private async resolveBranchContext(
+    tenantId: string,
+    conversationId: string,
+  ): Promise<BranchPromptContext | null> {
+    if (!this.config.get('BRANCH_RESOLUTION_ENABLED', { infer: true })) return null;
+    const locations = await this.tenants.listActiveLocationsWorker(tenantId);
+    if (locations.length < 2) return null;
+    const selectedId = await this.conversations.getSelectedLocationWorker(conversationId);
+    const selectedBranch = selectedId
+      ? locations.find((l) => l.id === selectedId)?.name ?? null
+      : null;
+    return { branches: locations.map((l) => l.name), selectedBranch };
+  }
 
   async process(payload: TurnProcessPayload): Promise<void> {
     const start = Date.now();
@@ -144,12 +173,17 @@ export class TurnService {
       businessRow?.name ?? null,
       payload.tenant_id,
     );
+    const branchContext = await this.resolveBranchContext(
+      payload.tenant_id,
+      payload.conversation_id,
+    );
     const systemPrompt = buildHarnessSystemPrompt({
       customerName: person.displayName,
       currentState,
       workingMemory,
       partialCancelledOrder,
       voice,
+      branchContext,
     });
 
     const toolOutcomes = createToolOutcomeState();
