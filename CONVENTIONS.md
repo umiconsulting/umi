@@ -10,6 +10,9 @@ Keep these consistent so tooling stays predictable and the repo stays legible.
 - **Always filter by the package name, never the directory:**
   `pnpm --filter @umi/dashboard build` (not `--filter umi-dashboard`).
 - Exceptions, documented on purpose:
+  - `apps/umi-landing-page` is `@umi/landing`, **not** `@umi/landing-page` — the
+    `-page` is dropped. The package name is the concept (`landing`); the directory
+    keeps `-page` because the prefix is load-bearing (see below).
   - `apps/umi-cash` keeps the unscoped `umi-cash` — it's **frozen** and excluded
     from the workspace; it gets renamed at its cutover, not before.
   - `apps/umi-kds` is a native Swift app with no `package.json`.
@@ -35,10 +38,10 @@ not arbitrary):
    checkout.
 2. **The output type decides source-vs-prebuilt:**
 
-   | Package | Output | Dashboard/landing consume | API consumes |
+   | Package | Output | Frontend consumers | API consumes |
    | --- | --- | --- | --- |
-   | `@umi/contract` | TypeScript | **source** — Vite alias `@umi/contract` → `packages/contract/src` (the bundler transpiles it); `dist/` is git-ignored | the **built** `dist` (Node can't `require` `.ts`); built in-workspace during the Docker/CI build |
-   | `@umi/tokens` | CSS + a Tailwind JS object | the **committed** `dist/` (a bundler can't generate CSS from token JSON, and Vercel won't run the generator) via a Vite alias / relative `require` | n/a |
+   | `@umi/contract` | TypeScript | **dashboard** only — the **source**, via Vite alias `@umi/contract` → `packages/contract/src` (the bundler transpiles it); `dist/` is git-ignored | the **built** `dist` (Node can't `require` `.ts`); built in-workspace during the Docker/CI build |
+   | `@umi/tokens` | CSS + a Tailwind JS object | **dashboard + landing** — the **committed** `dist/` (a bundler can't generate CSS from token JSON, and Vercel won't run the generator) via a Vite alias / relative `require` | n/a |
 
    So: **bundler-transpilable source → consume the source; outputs a consumer can't
    generate itself → commit the built `dist/` and gate its freshness in CI**
