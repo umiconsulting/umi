@@ -23,11 +23,18 @@ function normalize(s: string): string {
  * `set_branch` — records which branch a customer wants for the in-flight order.
  * The prompt only advertises it to multi-branch tenants that still need a choice
  * (see OrderLocationResolver / the `# SUCURSALES` block). The LLM does the fuzzy
- * read ("chapu" -> "Chapultepec") and passes a branch name; this tool VALIDATES
- * that name against the tenant's real active locations and persists the pick to
- * `comms.conversations.selected_location_id`. It never invents a branch: an
- * ambiguous or unmatched name returns `needs_input` so the bot re-asks in the
- * business voice (no hardcoded customer-facing string).
+ * read and passes a branch name; this tool VALIDATES it against the tenant's real
+ * active branches and persists the pick to
+ * `comms.conversations.selected_location_id`. It never invents a branch.
+ *
+ * Matching (Phase 2) combines two votes over `name + owner-curated aliases`:
+ *   - a deterministic literal match (exact > prefix > substring). A UNIQUE literal
+ *     match is confident enough to auto-select ("chapu" -> "Chapultepec").
+ *   - a pg_trgm `word_similarity` fuzzy score (the DB "second vote"), used only
+ *     when there is no literal hit: a strong, clearly-separated score asks the
+ *     customer to CONFIRM (never auto — this is where typos/near-misses live);
+ *     anything ambiguous or weak re-asks with the options. Disambiguation is
+ *     always voiced by the LLM (needs_input), never a hardcoded customer string.
  */
 @Injectable()
 export class BranchTools {
@@ -40,54 +47,76 @@ export class BranchTools {
     ctx: ToolContext,
     input: { branch?: string },
   ): Promise<ToolResult> {
-    const locations = await this.tenants.listActiveLocationsWorker(ctx.tenantId);
-    if (locations.length <= 1) {
+    const raw = (input.branch ?? '').trim();
+    const candidates = await this.tenants.matchBranchCandidates(ctx.tenantId, raw);
+    if (candidates.length <= 1) {
       // Single-branch: nothing to choose (defensive — prompt won't offer this).
       return { success: true, message: 'El negocio tiene una sola sucursal.' };
     }
-
-    const names = locations.map((l) => l.name);
-    const query = normalize(input.branch ?? '');
-    if (!query) {
+    const names = candidates.map((c) => c.name);
+    if (!raw) {
       return needsInputToolError(
         'No se indicó la sucursal.',
         `Pregúntale al cliente de qué sucursal quiere ordenar. Opciones: ${names.join(', ')}.`,
       );
     }
 
-    // Rank: exact normalized name (3) > prefix either way (2) > substring (1).
-    const scored = locations
-      .map((l) => {
-        const n = normalize(l.name);
-        let score = 0;
-        if (n === query) score = 3;
-        else if (n.startsWith(query) || query.startsWith(n)) score = 2;
-        else if (n.includes(query) || query.includes(n)) score = 1;
-        return { l, score };
-      })
-      .filter((s) => s.score > 0)
-      .sort((a, b) => b.score - a.score);
+    const q = normalize(raw);
+    const detLevel = (c: { name: string; aliases: string[] }): number => {
+      const targets = [c.name, ...c.aliases].map(normalize).filter(Boolean);
+      if (targets.some((t) => t === q)) return 3; // exact name/alias
+      if (targets.some((t) => t.startsWith(q) || q.startsWith(t))) return 2; // prefix
+      if (targets.some((t) => t.includes(q) || q.includes(t))) return 1; // substring
+      return 0;
+    };
+    const scored = candidates.map((c) => ({ c, det: detLevel(c), sim: c.sim }));
 
-    const top = scored[0];
-    if (!top) {
-      return needsInputToolError(
-        `No reconocí "${input.branch}" como una sucursal.`,
-        `Pídele al cliente que elija una de estas sucursales: ${names.join(', ')}.`,
-      );
-    }
-    const tied = scored.filter((s) => s.score === top.score);
-    if (tied.length > 1) {
-      return needsInputToolError(
-        `"${input.branch}" coincide con más de una sucursal.`,
-        `Pídele al cliente que aclare entre: ${tied.map((s) => s.l.name).join(', ')}.`,
-      );
+    // 1. Deterministic name/alias match — a UNIQUE best wins outright.
+    const maxDet = Math.max(...scored.map((s) => s.det));
+    if (maxDet > 0) {
+      const top = scored.filter((s) => s.det === maxDet);
+      if (top.length === 1) return this.persist(ctx, top[0].c);
+      return this.ask(top.map((s) => s.c.name)); // equally-good literals → ask
     }
 
-    await this.conversations.setSelectedLocationWorker(ctx.conversationId, top.l.id);
+    // 2. No literal hit → pg_trgm fuzzy second vote.
+    const bySim = [...scored].sort((a, b) => b.sim - a.sim);
+    const s1 = bySim[0];
+    const margin = s1.sim - (bySim[1]?.sim ?? 0);
+    if (s1.sim >= 0.72 && margin >= 0.25) {
+      // Strong, clearly-separated fuzzy match → CONFIRM, never auto (typo territory).
+      return needsInputToolError(
+        `¿Te refieres a la sucursal ${s1.c.name}?`,
+        `Confírmale al cliente si se refiere a la sucursal ${s1.c.name}. Si dice que sí, vuelve a llamar set_branch con "${s1.c.name}". Si no, muéstrale: ${names.join(', ')}.`,
+      );
+    }
+    if (s1.sim >= 0.4) {
+      const near = bySim.filter((s) => s.sim >= 0.4).map((s) => s.c.name);
+      return this.ask(near.length > 1 ? near : names);
+    }
+    // 3. Nothing plausible.
+    return needsInputToolError(
+      `No reconocí "${raw}" como una sucursal.`,
+      `Pídele al cliente que elija una de estas sucursales: ${names.join(', ')}.`,
+    );
+  }
+
+  private async persist(
+    ctx: ToolContext,
+    loc: { id: string; name: string },
+  ): Promise<ToolResult> {
+    await this.conversations.setSelectedLocationWorker(ctx.conversationId, loc.id);
     return {
       success: true,
-      branch: top.l.name,
-      message: `Sucursal seleccionada: ${top.l.name}. Continúa con el pedido del cliente en esta sucursal.`,
+      branch: loc.name,
+      message: `Sucursal seleccionada: ${loc.name}. Continúa con el pedido del cliente en esta sucursal.`,
     };
+  }
+
+  private ask(branchNames: string[]): ToolResult {
+    return needsInputToolError(
+      'Hay que aclarar la sucursal.',
+      `Pídele al cliente que elija entre: ${branchNames.join(', ')}.`,
+    );
   }
 }

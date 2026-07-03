@@ -199,6 +199,41 @@ export class TenantsRepository {
     return rows;
   }
 
+  /**
+   * Rank a tenant's ACTIVE branches against free customer text for branch
+   * resolution (Phase 2). Returns every active branch with its owner-curated
+   * `aliases` and a pg_trgm `word_similarity` score of the (accent-stripped,
+   * lowercased) query against `search_text` (= name + aliases). Worker pool
+   * (unauthenticated WhatsApp path). `set_branch` combines this fuzzy score with
+   * a deterministic name/alias match to decide auto-select vs. ask.
+   */
+  async matchBranchCandidates(
+    tenantId: string,
+    query: string,
+  ): Promise<Array<{ id: string; name: string; aliases: string[]; sim: number }>> {
+    const { rows } = await this.pg.query<{
+      id: string;
+      name: string;
+      aliases: string[] | null;
+      sim: string | number;
+    }>(
+      `SELECT id::text AS id,
+              name,
+              aliases,
+              word_similarity(core.f_unaccent(lower($2)), search_text) AS sim
+         FROM core.locations
+        WHERE tenant_id = $1::uuid AND status = 'active'
+        ORDER BY sim DESC, created_at ASC`,
+      [tenantId, query],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      aliases: r.aliases ?? [],
+      sim: Number(r.sim) || 0,
+    }));
+  }
+
   /** Worker-pool read of the tenant's canonical timezone (`core.tenants.timezone`). */
   async getTenantTimezoneWorker(tenantId: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ timezone: string | null }>(
