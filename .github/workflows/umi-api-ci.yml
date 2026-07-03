@@ -11,6 +11,7 @@ on:
   pull_request:
     paths:
       - "apps/umi-api/**"
+      - "packages/contract/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "package.json"

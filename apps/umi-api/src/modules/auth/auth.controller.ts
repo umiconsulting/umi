@@ -25,6 +25,7 @@ import {
   REMEMBER_COOKIE,
   type AuthUser,
 } from './auth.types';
+import type { SessionEnvelope, SessionResponse } from '@umi/contract';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
@@ -47,7 +48,7 @@ export class AuthController {
   async login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) reply: FastifyReply,
-  ): Promise<{ session: SessionEnvelope }> {
+  ): Promise<SessionResponse> {
     const result = await this.auth.login(dto.username, dto.password);
     this.setAuthCookies(reply, result, dto.remember ?? false);
     return { session: toSession(result, this.accessExpiresIn()) };
@@ -58,7 +59,7 @@ export class AuthController {
   async refresh(
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
-  ): Promise<{ session: SessionEnvelope }> {
+  ): Promise<SessionResponse> {
     const token = req.cookies?.[REFRESH_COOKIE];
     if (!token) throw new UnauthorizedException('authentication_required');
     const result = await this.auth.refresh(token);
@@ -100,7 +101,7 @@ export class AuthController {
   async me(
     @Req() req: FastifyRequest,
     @CurrentUser() user: AuthUser,
-  ): Promise<{ session: SessionEnvelope }> {
+  ): Promise<SessionResponse> {
     const session = await this.auth.session(user.id);
     return {
       session: {
@@ -171,13 +172,6 @@ export class AuthController {
       buildCookieOptions(this.config, 'refresh', remember),
     );
   }
-}
-
-interface SessionEnvelope {
-  user: { id: string; email: string; displayName: string | null };
-  tenants: LoginResult['tenants'];
-  provider: 'local';
-  accessExpiresIn: number; // seconds until the access cookie expires
 }
 
 function toSession(

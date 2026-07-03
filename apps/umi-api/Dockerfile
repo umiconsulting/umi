@@ -22,9 +22,14 @@ COPY packages/contract/package.json ./packages/contract/
 COPY packages/tokens/package.json ./packages/tokens/
 RUN pnpm install --frozen-lockfile --filter @umi/api...
 
-# Source, build (nest → dist/main.js + dist/worker.js), then a pruned prod bundle.
+# Source (umi-api + its workspace dep @umi/contract), build the contract then
+# umi-api (nest → dist/main.js + dist/worker.js), then a pruned prod bundle.
+# `pnpm deploy --legacy` injects the built @umi/contract into /out/node_modules as
+# a real copy (no workspace symlink survives in the runtime image).
+COPY packages/contract ./packages/contract
 COPY apps/umi-api ./apps/umi-api
-RUN pnpm --filter @umi/api build \
+RUN pnpm --filter @umi/contract build \
+ && pnpm --filter @umi/api build \
  && pnpm --filter=@umi/api deploy --prod --legacy /out
 
 # ── runtime stage ──────────────────────────────────────────────────────────
