@@ -24,6 +24,9 @@ create or replace function core.f_unaccent(text)
   immutable
   strict
   parallel safe
+  -- Pin search_path so a generated column / index expression can never be
+  -- hijacked via a shadowing object; the body is already schema-qualified.
+  set search_path = pg_catalog, extensions
 as $$
   select extensions.unaccent('extensions.unaccent'::regdictionary, $1)
 $$;
@@ -36,5 +39,8 @@ alter table core.locations
     lower(core.f_unaccent(name || ' ' || coalesce(array_to_string(aliases, ' '), '')))
   ) stored;
 
-create index if not exists locations_search_text_trgm
+-- CONCURRENTLY avoids a write-blocking ACCESS EXCLUSIVE lock on core.locations
+-- (read on the per-turn hot path). It must run OUTSIDE a transaction block, so
+-- apply this file via psql/direct connection in autocommit, not a wrapped txn.
+create index concurrently if not exists locations_search_text_trgm
   on core.locations using gin (search_text extensions.gin_trgm_ops);

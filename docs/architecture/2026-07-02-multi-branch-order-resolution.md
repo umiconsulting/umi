@@ -99,7 +99,7 @@ This keeps the model as the flexible front door and the database as the source o
 
 Bands: **auto** (persist silently, still echo back) · **single** (sole branch) · **confirm** (one candidate, ask yes/no) · **ask** (ranked candidates, ask which) · **none** (offer all branches).
 
-```
+```text
 GATE  (worker pool, first, always):
       count active core.locations WHERE tenant_id=$1 AND status='active'.
       <= 1  -> SINGLE short-circuit: no prompt block, no question,
@@ -298,7 +298,7 @@ Honors the no-hardcoded-user-messages rule exactly like the existing safety gate
 
 ## 12. Files to touch (Phase 1 unless noted)
 
-```
+```text
 apps/umi-api/src/modules/conversations/tools/tool-definitions.ts     # + resolve_branch schema
 apps/umi-api/src/modules/conversations/tools.service.ts              # + case 'resolve_branch'
 apps/umi-api/src/modules/conversations/conversations.module.ts       # + BranchTools provider

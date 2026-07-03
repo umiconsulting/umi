@@ -158,10 +158,10 @@ export class CheckoutTools {
     const validation = await this.validateItems(ctx.tenantId, cart.items);
     if (!validation.ok) return validation.error;
 
-    // Branch gate: for a multi-branch tenant with the feature on, this returns
-    // an "ask the customer which branch" result unless a branch is already
-    // chosen. Returning before createOrder leaves the draft cart intact (it is
-    // cleared only after a successful write), so the order is not forgotten.
+    // Branch gate: for a multi-branch tenant with no chosen branch yet, this
+    // returns an "ask the customer which branch" result. Returning before
+    // createOrder leaves the draft cart intact (it is cleared only after a
+    // successful write), so the order is not forgotten.
     const location = await this.resolveOrderLocation(ctx);
     if (!location.ok) return location.ask;
 

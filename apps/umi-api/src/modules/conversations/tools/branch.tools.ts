@@ -20,6 +20,18 @@ function normalize(s: string): string {
 }
 
 /**
+ * pg_trgm `word_similarity` tuning knobs for the fuzzy second vote (used only
+ * when there is no literal name/alias hit). Confirm vs. re-ask boundaries:
+ *   - CONFIRM: a strong, clearly-separated top score -> ask the customer to
+ *     confirm (never auto; this is typo territory).
+ *   - ASK: anything above the floor but not confidently separated -> re-ask with
+ *     the near candidates; below it, nothing is plausible.
+ */
+const FUZZY_CONFIRM_MIN_SIM = 0.72;
+const FUZZY_CONFIRM_MIN_MARGIN = 0.25;
+const FUZZY_ASK_MIN_SIM = 0.4;
+
+/**
  * `set_branch` — records which branch a customer wants for the in-flight order.
  * The prompt only advertises it to multi-branch tenants that still need a choice
  * (see OrderLocationResolver / the `# SUCURSALES` block). The LLM does the fuzzy
@@ -83,15 +95,15 @@ export class BranchTools {
     const bySim = [...scored].sort((a, b) => b.sim - a.sim);
     const s1 = bySim[0];
     const margin = s1.sim - (bySim[1]?.sim ?? 0);
-    if (s1.sim >= 0.72 && margin >= 0.25) {
+    if (s1.sim >= FUZZY_CONFIRM_MIN_SIM && margin >= FUZZY_CONFIRM_MIN_MARGIN) {
       // Strong, clearly-separated fuzzy match → CONFIRM, never auto (typo territory).
       return needsInputToolError(
         `¿Te refieres a la sucursal ${s1.c.name}?`,
         `Confírmale al cliente si se refiere a la sucursal ${s1.c.name}. Si dice que sí, vuelve a llamar set_branch con "${s1.c.name}". Si no, muéstrale: ${names.join(', ')}.`,
       );
     }
-    if (s1.sim >= 0.4) {
-      const near = bySim.filter((s) => s.sim >= 0.4).map((s) => s.c.name);
+    if (s1.sim >= FUZZY_ASK_MIN_SIM) {
+      const near = bySim.filter((s) => s.sim >= FUZZY_ASK_MIN_SIM).map((s) => s.c.name);
       return this.ask(near.length > 1 ? near : names);
     }
     // 3. Nothing plausible.

@@ -118,12 +118,19 @@ export class TurnService {
       detail: { processor_version: PROCESSOR_VERSION },
     });
 
-    const [turn, conversation, person, businessRow, messageCount] = await Promise.all([
+    // resolveBranchContext depends only on `payload`, so it rides along in this
+    // batch instead of adding its own round trip to the turn's critical path.
+    const [turn, conversation, person, businessRow, messageCount, branchContext] = await Promise.all([
       this.turns.loadTurn(payload.turn_id),
       this.conversations.loadById(payload.conversation_id),
       this.identity.getPerson(payload.tenant_id, payload.person_id),
       this.businessConfig.fetchConfigRow(payload.tenant_id),
       this.messages.countMessages(payload.conversation_id),
+      this.resolveBranchContext(
+        payload.tenant_id,
+        payload.conversation_id,
+        payload.location_id ?? null,
+      ),
     ]);
 
     if (!turn || !conversation || !person?.phone) {
@@ -176,11 +183,6 @@ export class TurnService {
       businessRow?.config ?? null,
       businessRow?.name ?? null,
       payload.tenant_id,
-    );
-    const branchContext = await this.resolveBranchContext(
-      payload.tenant_id,
-      payload.conversation_id,
-      payload.location_id ?? null,
     );
     const systemPrompt = buildHarnessSystemPrompt({
       customerName: person.displayName,

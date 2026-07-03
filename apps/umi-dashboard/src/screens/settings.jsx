@@ -207,8 +207,8 @@ const SettingsScreen = () => {
         </button>
       </div>
 
-      {/* Sucursales — branch aliases/descriptor (multi-branch only) */}
-      <BranchProfilesCard/>
+      {/* Sucursales — branch aliases/descriptor (multi-branch, ConversaFlow only) */}
+      {conversaflowActive && <BranchProfilesCard/>}
 
       {/* Business info */}
       <div className="card fade-up d1" style={{padding:'24px 26px'}}>
@@ -682,6 +682,7 @@ function BranchProfileRow({ profile }) {
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState(null);
 
   const dirty = JSON.stringify(aliases) !== JSON.stringify(profile.aliases || [])
     || descriptor !== (profile.descriptor || '');
@@ -695,12 +696,13 @@ function BranchProfileRow({ profile }) {
   function removeAlias(i) { setAliases(aliases.filter((_, idx) => idx !== i)); }
 
   async function save() {
-    setSaving(true); setSaved(false);
+    setSaving(true); setSaved(false); setError(null);
     try {
       await saveBranchProfile(profile.id, { aliases, descriptor: descriptor.trim() });
       setSaved(true); setTimeout(() => setSaved(false), 2000);
     } catch (e) {
       console.error('branch profile save failed', e);
+      setError('No se pudo guardar. Reintenta.');
     } finally {
       setSaving(false);
     }
@@ -710,9 +712,12 @@ function BranchProfileRow({ profile }) {
     <div style={{border:'1px solid var(--line)', borderRadius:12, padding:16, display:'flex', flexDirection:'column', gap:12}}>
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:12}}>
         <div style={{fontWeight:600, fontSize:14}}>{profile.name}</div>
-        <button className="btn btn-secondary btn-sm" onClick={save} disabled={!dirty || saving}>
-          {saving ? 'Guardando…' : saved ? '✓ Guardado' : 'Guardar'}
-        </button>
+        <div style={{display:'flex', alignItems:'center', gap:10}}>
+          {error && <span role="alert" style={{color:'#c0392b', fontSize:12}}>{error}</span>}
+          <button className="btn btn-secondary btn-sm" onClick={save} disabled={!dirty || saving}>
+            {saving ? 'Guardando…' : saved ? '✓ Guardado' : error ? 'Reintentar' : 'Guardar'}
+          </button>
+        </div>
       </div>
       <div className="field" style={{margin:0}}>
         <label>Apodos (cómo la llaman los clientes)</label>
@@ -729,6 +734,7 @@ function BranchProfileRow({ profile }) {
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addAlias(draft); } }}
             onBlur={() => addAlias(draft)}
             placeholder="+ apodo"
+            maxLength={40}
             style={{width:150, height:32, fontSize:12.5}}/>
         </div>
       </div>
