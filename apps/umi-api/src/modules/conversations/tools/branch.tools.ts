@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import type { AppConfig } from '../../../shared/config/config.schema';
 import { TenantsRepository } from '../../tenants/tenants.repository';
 import { ConversationsRepository } from '../conversations.repository';
 import type { ToolContext, ToolResult } from '../turn.types';
-import { needsInputToolError, terminalToolError } from './tool-errors';
+import { needsInputToolError } from './tool-errors';
 
 /**
  * Lenient branch-name normalization: lowercase, strip accents/punctuation,
@@ -23,10 +21,10 @@ function normalize(s: string): string {
 
 /**
  * `set_branch` — records which branch a customer wants for the in-flight order.
- * Only meaningful for multi-branch tenants with BRANCH_RESOLUTION_ENABLED on (the
- * prompt only advertises it then). The LLM does the fuzzy read ("chapu" ->
- * "Chapultepec") and passes a branch name; this tool VALIDATES that name against
- * the tenant's real active locations and persists the pick to
+ * The prompt only advertises it to multi-branch tenants that still need a choice
+ * (see OrderLocationResolver / the `# SUCURSALES` block). The LLM does the fuzzy
+ * read ("chapu" -> "Chapultepec") and passes a branch name; this tool VALIDATES
+ * that name against the tenant's real active locations and persists the pick to
  * `comms.conversations.selected_location_id`. It never invents a branch: an
  * ambiguous or unmatched name returns `needs_input` so the bot re-asks in the
  * business voice (no hardcoded customer-facing string).
@@ -36,18 +34,12 @@ export class BranchTools {
   constructor(
     private readonly tenants: TenantsRepository,
     private readonly conversations: ConversationsRepository,
-    private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
   async setBranch(
     ctx: ToolContext,
     input: { branch?: string },
   ): Promise<ToolResult> {
-    if (!this.config.get('BRANCH_RESOLUTION_ENABLED', { infer: true })) {
-      // Feature dormant (or migration not applied) — never touch the column.
-      return terminalToolError('La selección de sucursal no está disponible.');
-    }
-
     const locations = await this.tenants.listActiveLocationsWorker(ctx.tenantId);
     if (locations.length <= 1) {
       // Single-branch: nothing to choose (defensive — prompt won't offer this).

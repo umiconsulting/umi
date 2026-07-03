@@ -205,13 +205,14 @@ export interface BranchPromptContext {
 }
 
 function buildBranchSection(branch: BranchPromptContext | null | undefined): string {
-  if (!branch || branch.branches.length < 2) return '';
+  if (!branch) return '';
   if (branch.selectedBranch) {
     return `
 # SUCURSAL
 El cliente ya eligió la sucursal: ${branch.selectedBranch}. No vuelvas a preguntar por la sucursal; continúa con su pedido normalmente.
 `;
   }
+  if (branch.branches.length < 2) return '';
   const list = branch.branches.map((b) => `- ${b}`).join('\n');
   return `
 # SUCURSALES

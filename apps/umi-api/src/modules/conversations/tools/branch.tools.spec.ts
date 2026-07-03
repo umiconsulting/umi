@@ -19,23 +19,14 @@ const TWO_BRANCHES = [
 describe('BranchTools.setBranch', () => {
   let tenants: { listActiveLocationsWorker: ReturnType<typeof vi.fn> };
   let conversations: { setSelectedLocationWorker: ReturnType<typeof vi.fn> };
-  let config: { get: ReturnType<typeof vi.fn> };
 
   function build() {
-    return new BranchTools(tenants as never, conversations as never, config as never);
+    return new BranchTools(tenants as never, conversations as never);
   }
 
   beforeEach(() => {
     tenants = { listActiveLocationsWorker: vi.fn().mockResolvedValue(TWO_BRANCHES) };
     conversations = { setSelectedLocationWorker: vi.fn().mockResolvedValue(undefined) };
-    config = { get: vi.fn().mockReturnValue(true) };
-  });
-
-  it('is a no-op error when the feature is off (never touches the column)', async () => {
-    config.get.mockReturnValue(false);
-    const r = await build().setBranch(CTX, { branch: 'Chapultepec' });
-    expect(r.success).toBe(false);
-    expect(conversations.setSelectedLocationWorker).not.toHaveBeenCalled();
   });
 
   it('resolves an exact (accent/case-insensitive) branch name and persists it', async () => {

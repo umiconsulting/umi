@@ -28,6 +28,7 @@ import { CartTools } from './tools/cart.tools';
 import { CheckoutTools } from './tools/checkout.tools';
 import { CustomerTools } from './tools/customer.tools';
 import { BranchTools } from './tools/branch.tools';
+import { OrderLocationResolver } from './order-location.resolver';
 
 /**
  * The conversational engine (ConversaFlow port, spec §3 Phase 3):
@@ -71,6 +72,7 @@ import { BranchTools } from './tools/branch.tools';
     // agent tools (3c) — RealToolsService replaces the stub
     ProductsRepository,
     OrdersRepository,
+    OrderLocationResolver,
     CatalogTools,
     CartTools,
     CheckoutTools,

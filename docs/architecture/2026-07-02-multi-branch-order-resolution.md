@@ -14,7 +14,29 @@ Evidence base:
 - **Not** `docs/migration/audit-output/supabase-prod-schema.sql` — that is a stale pre-migration dump with no `core.*` tables; do not use it for schema facts.
 - design derived via a bounded multi-agent design pass (ground → 3 diverse designs → adversarial critique → synthesis), 2026-07-02
 
-Status: **DESIGN — no code applied.** Companion to the shipped display-side fix (`kds.repository.ts` `listOrders` NULL-escape, see §1).
+Status: **IMPLEMENTED** on branch `feat/multibranch-order-resolution` (PR #29). Companion to the shipped display-side fix (`kds.repository.ts` `listOrders` NULL-escape, see §1).
+
+---
+
+## Architecture revision (as built — supersedes the flag-based draft below)
+
+The exploratory design below gated the feature behind a global `BRANCH_RESOLUTION_ENABLED` env flag. **That was dropped.** A global boolean can't express a per-tenant fact (is *this* business multi-branch?), and it conflated rollout-safety with business capability. The as-built architecture instead makes branch selection a **domain policy whose behavior is derived purely from data**:
+
+**`OrderLocationResolver`** (`src/modules/conversations/order-location.resolver.ts`) — one service, one precedence, consumed by the write path (checkout), the prompt path (turn.service), and the `set_branch` tool:
+
+1. **ByChannel** — the inbound number is bound to a branch (`channel_accounts.location_id`). *Defined but dormant* today (tenants use one number); works with no code change when a tenant adopts per-branch numbers.
+2. **BySole** — the tenant has exactly one active branch → resolved, no question.
+3. **BySelection** — multi-branch, the customer already chose (durable `comms.conversations.selected_location_id`).
+4. **NeedsSelection** — multi-branch, no valid choice yet → the bot asks *once*, in the business voice, via the `# SUCURSALES` prompt block; `set_branch` records the answer.
+5. **None** — no active branch → order still written (NULL location), never blocked over a config gap.
+
+Consequences vs. the draft: **no feature flag**; the scattered active-location `count` checks collapse into the resolver; a single-branch café can never reach the selection path (it resolves `BySole`); rollout is "apply the additive migration, deploy, done — all multi-branch tenants at once." The migration adds only `selected_location_id` (not `aliases[]`/`descriptor`, which are Phase 2). `pg_trgm`/embeddings remain Phase 2/3 refinements on top of this policy.
+
+Everywhere the draft below says "gated behind `BRANCH_RESOLUTION_ENABLED`" or "count ≤ 1 check", read: "decided by `OrderLocationResolver`."
+
+---
+
+### Original exploratory design follows
 
 ---
 

@@ -1,13 +1,14 @@
--- Branch resolution (Phase 1) — durable per-conversation branch selection.
+-- Branch resolution — durable per-conversation branch selection.
 --
--- ADDITIVE + DORMANT: the application only reads/writes this column when
--- BRANCH_RESOLUTION_ENABLED = true AND the tenant has more than one active
--- location. It is kept out of the conversation hot-path SELECT, so this is safe
--- to apply to prod (xbudknbimkgjjgohnjgp) ahead of the deploy + flag flip.
+-- ADDITIVE + DORMANT: `selected_location_id` is only read/written for a tenant
+-- that actually has more than one active branch (see OrderLocationResolver — the
+-- fulfillment-location policy). Single-branch tenants never touch it. There is NO
+-- feature flag: behavior is derived from the data (active-location count), so
+-- once this column exists and the code is deployed, every multi-branch tenant
+-- gets branch resolution at once.
 --
--- DEPLOY ORDERING (owner-gated): apply THIS migration BEFORE flipping
--- BRANCH_RESOLUTION_ENABLED for any tenant. Single-branch tenants and flag-off
--- deploys never touch the column.
+-- DEPLOY ORDERING (owner-gated): apply THIS migration BEFORE deploying the code
+-- that reads the column. It is additive and safe to apply well ahead of deploy.
 --
 -- selected_location_id: the branch the customer chose for the in-flight order,
 -- persisted so the choice survives across turns. The bot re-derives its working

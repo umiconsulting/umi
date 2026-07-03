@@ -1,11 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import type { AppConfig } from '../../../shared/config/config.schema';
 import { OrdersRepository, type OrderItemSnapshot } from '../orders.repository';
 import { ProductsRepository } from '../products.repository';
 import { ConversationsRepository } from '../conversations.repository';
 import { BusinessHoursService } from '../business-hours.service';
-import { TenantsRepository } from '../../tenants/tenants.repository';
+import { OrderLocationResolver } from '../order-location.resolver';
 import type { DraftCart } from '../conversation.types';
 import type { ToolContext, ToolResult } from '../turn.types';
 import {
@@ -31,8 +29,7 @@ export class CheckoutTools {
     private readonly products: ProductsRepository,
     private readonly conversations: ConversationsRepository,
     private readonly hours: BusinessHoursService,
-    private readonly tenants: TenantsRepository,
-    private readonly config: ConfigService<AppConfig, true>,
+    private readonly locations: OrderLocationResolver,
   ) {}
 
   private idempotencyKey(ctx: ToolContext): string {
@@ -40,47 +37,32 @@ export class CheckoutTools {
   }
 
   /**
-   * The location a WhatsApp order is written to, plus the branch gate.
-   *
-   * - Single-branch tenant (<=1 active location) → stamp the sole/oldest-active
-   *   location instead of NULL (Phase 0). Deterministic per turn, so it stays safe
-   *   under createOrder's `conversaflow:turn:<id>` idempotency.
-   * - Multi-branch tenant, feature OFF → unchanged: keep the ingress location
-   *   (which may be NULL). Never auto-routes to a branch.
-   * - Multi-branch tenant, feature ON → require a branch the customer chose. If a
-   *   valid `selected_location_id` exists, write there. Otherwise DON'T write:
-   *   return `{ ok: false, ask }` so the bot asks "¿de qué sucursal?" (in the
-   *   business voice) and the in-flight order is preserved for after they answer.
+   * The branch a WhatsApp order is written to — the write side of the
+   * fulfillment-location policy (see OrderLocationResolver). Resolved by data:
+   * a bound number / sole branch / prior customer choice writes directly; a
+   * multi-branch tenant with no choice returns `{ ok: false, ask }` so the bot
+   * asks "¿de qué sucursal?" before any write, leaving the in-flight order
+   * intact. A tenant with no active branch degrades to a NULL location rather
+   * than blocking the order.
    */
   private async resolveOrderLocation(
     ctx: ToolContext,
   ): Promise<
     { ok: true; locationId: string | null } | { ok: false; ask: ToolResult }
   > {
-    const activeLocations = await this.tenants.countActiveLocationsWorker(ctx.tenantId);
-    if (activeLocations <= 1) {
-      return {
-        ok: true,
-        locationId: await this.tenants.resolveLocationIdWorker(
-          ctx.tenantId,
-          ctx.locationId ?? null,
-        ),
-      };
+    const resolution = await this.locations.resolve({
+      tenantId: ctx.tenantId,
+      conversationId: ctx.conversationId,
+      channelLocationId: ctx.locationId ?? null,
+    });
+    if (resolution.kind === 'resolved') {
+      return { ok: true, locationId: resolution.locationId };
     }
-
-    if (!this.config.get('BRANCH_RESOLUTION_ENABLED', { infer: true })) {
-      return { ok: true, locationId: ctx.locationId ?? null };
+    if (resolution.kind === 'none') {
+      // Misconfigured tenant (no active branch) — never block ordering over it.
+      return { ok: true, locationId: null };
     }
-
-    const selected = await this.conversations.getSelectedLocationWorker(
-      ctx.conversationId,
-    );
-    const locations = await this.tenants.listActiveLocationsWorker(ctx.tenantId);
-    if (selected && locations.some((l) => l.id === selected)) {
-      return { ok: true, locationId: selected };
-    }
-    // No valid branch chosen (or a stale/archived pick) → force the question.
-    const names = locations.map((l) => l.name).join(', ');
+    const names = resolution.branches.map((b) => b.name).join(', ');
     return {
       ok: false,
       ask: needsInputToolError(

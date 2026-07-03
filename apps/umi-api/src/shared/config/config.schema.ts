@@ -74,14 +74,6 @@ export const configSchema = z.object({
   // routes stay live regardless — only the background sequence tick is gated.
   LEADS_SEQUENCE_ENABLED: booleanFromEnv.default(false),
 
-  // Multi-branch WhatsApp order routing (branch resolution). When a tenant has
-  // more than one active location, gates the bot asking "¿de qué sucursal?"
-  // before taking an order, the `set_branch` tool, and the durable
-  // `comms.conversations.selected_location_id`. OFF by default and a no-op for
-  // single-branch tenants. Flip true only AFTER applying
-  // docs/migration/2026-07-02-branch-resolution.sql to the tenant's DB.
-  BRANCH_RESOLUTION_ENABLED: booleanFromEnv.default(false),
-
   // CORS.
   CORS_ORIGINS: z.string().optional(), // comma-separated origins
 

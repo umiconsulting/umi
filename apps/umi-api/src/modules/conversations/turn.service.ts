@@ -1,7 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import type { AppConfig } from '../../shared/config/config.schema';
-import { TenantsRepository } from '../tenants/tenants.repository';
+import { OrderLocationResolver } from './order-location.resolver';
 import { EnqueueService } from '../../jobs/enqueue.service';
 import { JobPriority } from '../../jobs/job-options';
 import { QUEUES } from '../../jobs/queues';
@@ -76,28 +74,34 @@ export class TurnService {
     private readonly commit: TurnCommitRepository,
     private readonly enqueue: EnqueueService,
     private readonly trace: TraceService,
-    private readonly tenants: TenantsRepository,
-    private readonly config: ConfigService<AppConfig, true>,
+    private readonly orderLocation: OrderLocationResolver,
   ) {}
 
   /**
-   * Multi-branch prompt context: the tenant's active-branch names + the branch
-   * already chosen for this conversation (if any). Null (no prompt block) unless
-   * BRANCH_RESOLUTION_ENABLED is on AND the tenant has >1 active location — so
-   * single-branch tenants and flag-off deploys keep the exact prior prompt.
+   * Multi-branch prompt context, derived from the fulfillment-location policy
+   * (OrderLocationResolver): when the tenant still needs the customer to choose a
+   * branch, expose the branch names so the LLM can ask; when one is already
+   * chosen, note it so the LLM stops asking. Null (no prompt block) whenever the
+   * branch is already determined by a bound number or a sole location — so
+   * single-branch tenants are untouched.
    */
   private async resolveBranchContext(
     tenantId: string,
     conversationId: string,
+    channelLocationId: string | null,
   ): Promise<BranchPromptContext | null> {
-    if (!this.config.get('BRANCH_RESOLUTION_ENABLED', { infer: true })) return null;
-    const locations = await this.tenants.listActiveLocationsWorker(tenantId);
-    if (locations.length < 2) return null;
-    const selectedId = await this.conversations.getSelectedLocationWorker(conversationId);
-    const selectedBranch = selectedId
-      ? locations.find((l) => l.id === selectedId)?.name ?? null
-      : null;
-    return { branches: locations.map((l) => l.name), selectedBranch };
+    const resolution = await this.orderLocation.resolve({
+      tenantId,
+      conversationId,
+      channelLocationId,
+    });
+    if (resolution.kind === 'needs_selection') {
+      return { branches: resolution.branches.map((b) => b.name), selectedBranch: null };
+    }
+    if (resolution.kind === 'resolved' && resolution.source === 'selection') {
+      return { branches: [], selectedBranch: resolution.name };
+    }
+    return null;
   }
 
   async process(payload: TurnProcessPayload): Promise<void> {
@@ -176,6 +180,7 @@ export class TurnService {
     const branchContext = await this.resolveBranchContext(
       payload.tenant_id,
       payload.conversation_id,
+      payload.location_id ?? null,
     );
     const systemPrompt = buildHarnessSystemPrompt({
       customerName: person.displayName,

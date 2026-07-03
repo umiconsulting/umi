@@ -182,22 +182,6 @@ export class TenantsRepository {
   }
 
   /**
-   * Worker-pool count of the tenant's ACTIVE locations. Lets the unauthenticated
-   * WhatsApp order write tell a single-branch tenant (safe to stamp the sole
-   * location) apart from a multi-branch one (must NOT auto-route to the oldest
-   * branch — that is Phase 1 branch resolution).
-   */
-  async countActiveLocationsWorker(tenantId: string): Promise<number> {
-    const { rows } = await this.pg.query<{ n: number }>(
-      `SELECT count(*)::int AS n
-       FROM core.locations
-       WHERE tenant_id = $1::uuid AND status = 'active'`,
-      [tenantId],
-    );
-    return Number(rows[0]?.n ?? 0);
-  }
-
-  /**
    * Worker-pool list of the tenant's ACTIVE locations (id + name), oldest-first.
    * Feeds branch resolution: the `# SUCURSALES` prompt block, `set_branch`
    * validation, and the checkout branch gate.
