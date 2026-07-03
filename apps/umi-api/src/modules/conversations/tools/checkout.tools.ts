@@ -3,6 +3,7 @@ import { OrdersRepository, type OrderItemSnapshot } from '../orders.repository';
 import { ProductsRepository } from '../products.repository';
 import { ConversationsRepository } from '../conversations.repository';
 import { BusinessHoursService } from '../business-hours.service';
+import { OrderLocationResolver } from '../order-location.resolver';
 import type { DraftCart } from '../conversation.types';
 import type { ToolContext, ToolResult } from '../turn.types';
 import {
@@ -28,10 +29,47 @@ export class CheckoutTools {
     private readonly products: ProductsRepository,
     private readonly conversations: ConversationsRepository,
     private readonly hours: BusinessHoursService,
+    private readonly locations: OrderLocationResolver,
   ) {}
 
   private idempotencyKey(ctx: ToolContext): string {
     return `conversaflow:turn:${ctx.turnId ?? ctx.conversationId}`;
+  }
+
+  /**
+   * The branch a WhatsApp order is written to — the write side of the
+   * fulfillment-location policy (see OrderLocationResolver). Resolved by data:
+   * a bound number / sole branch / prior customer choice writes directly; a
+   * multi-branch tenant with no choice returns `{ ok: false, ask }` so the bot
+   * asks "¿de qué sucursal?" before any write, leaving the in-flight order
+   * intact. A tenant with no active branch degrades to a NULL location rather
+   * than blocking the order.
+   */
+  private async resolveOrderLocation(
+    ctx: ToolContext,
+  ): Promise<
+    { ok: true; locationId: string | null } | { ok: false; ask: ToolResult }
+  > {
+    const resolution = await this.locations.resolve({
+      tenantId: ctx.tenantId,
+      conversationId: ctx.conversationId,
+      channelLocationId: ctx.locationId ?? null,
+    });
+    if (resolution.kind === 'resolved') {
+      return { ok: true, locationId: resolution.locationId };
+    }
+    if (resolution.kind === 'none') {
+      // Misconfigured tenant (no active branch) — never block ordering over it.
+      return { ok: true, locationId: null };
+    }
+    const names = resolution.branches.map((b) => b.name).join(', ');
+    return {
+      ok: false,
+      ask: needsInputToolError(
+        'Falta elegir la sucursal para este pedido.',
+        `Pregúntale al cliente de qué sucursal quiere ordenar (opciones: ${names}) y usa set_branch. No pierdas su pedido.`,
+      ),
+    };
   }
 
   /** Re-validate + re-price cart items against the live catalog (pesos). */
@@ -120,10 +158,17 @@ export class CheckoutTools {
     const validation = await this.validateItems(ctx.tenantId, cart.items);
     if (!validation.ok) return validation.error;
 
+    // Branch gate: for a multi-branch tenant with no chosen branch yet, this
+    // returns an "ask the customer which branch" result. Returning before
+    // createOrder leaves the draft cart intact (it is cleared only after a
+    // successful write), so the order is not forgotten.
+    const location = await this.resolveOrderLocation(ctx);
+    if (!location.ok) return location.ask;
+
     const result = await this.orders.createOrder({
       tenantId: ctx.tenantId,
       personId: ctx.personId,
-      locationId: ctx.locationId ?? null,
+      locationId: location.locationId,
       items: validation.items,
       customerNote: input.customer_note ?? cart.customer_note ?? null,
       pickupPerson: input.pickup_person ?? null,
@@ -164,10 +209,13 @@ export class CheckoutTools {
     const revalidated = await this.validateItems(ctx.tenantId, last.items);
     if (!revalidated.ok) return revalidated.error;
 
+    const location = await this.resolveOrderLocation(ctx);
+    if (!location.ok) return location.ask;
+
     const result = await this.orders.createOrder({
       tenantId: ctx.tenantId,
       personId: ctx.personId,
-      locationId: ctx.locationId ?? null,
+      locationId: location.locationId,
       items: revalidated.items,
       customerNote: input.customer_note ?? last.customerNote ?? null,
       pickupPerson: last.pickupPerson ?? null,

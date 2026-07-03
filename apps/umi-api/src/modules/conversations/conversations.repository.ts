@@ -112,6 +112,38 @@ export class ConversationsRepository {
   }
 
   /**
+   * Read the durable branch selection for a conversation (worker pool — the
+   * WhatsApp path is unauthenticated). Deliberately kept OUT of the hot-path
+   * SELECT_COLUMNS so a flag-off / pre-migration deploy never references the
+   * `selected_location_id` column: only called when BRANCH_RESOLUTION_ENABLED is
+   * on and the tenant is multi-branch (Phase 1 branch resolution).
+   */
+  async getSelectedLocationWorker(
+    conversationId: string,
+  ): Promise<string | null> {
+    const { rows } = await this.pg.query<{ selected_location_id: string | null }>(
+      `SELECT selected_location_id::text AS selected_location_id
+         FROM comms.conversations WHERE id = $1`,
+      [conversationId],
+    );
+    return rows[0]?.selected_location_id ?? null;
+  }
+
+  /** Persist the customer's chosen branch for the in-flight order (worker pool). */
+  async setSelectedLocationWorker(
+    conversationId: string,
+    locationId: string | null,
+  ): Promise<void> {
+    await this.pg.query(
+      `UPDATE comms.conversations
+          SET selected_location_id = $2::uuid,
+              last_message_at = now()
+        WHERE id = $1`,
+      [conversationId, locationId],
+    );
+  }
+
+  /**
    * Optimistic-lock state update (CAS on `state_version`). Patches any of
    * current_state / summary / pending_clarification / status / order_id, bumps
    * the version, and touches `last_message_at`. Returns the new version, or null

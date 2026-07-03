@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { HoursModule } from '../hours/hours.module';
+import { TenantsModule } from '../tenants/tenants.module';
 import { WhatsappController } from './whatsapp.controller';
 import { ChannelRepository } from './channel.repository';
 import { TenantResolutionService } from './tenant-resolution.service';
@@ -26,6 +27,8 @@ import { CatalogTools } from './tools/catalog.tools';
 import { CartTools } from './tools/cart.tools';
 import { CheckoutTools } from './tools/checkout.tools';
 import { CustomerTools } from './tools/customer.tools';
+import { BranchTools } from './tools/branch.tools';
+import { OrderLocationResolver } from './order-location.resolver';
 
 /**
  * The conversational engine (ConversaFlow port, spec §3 Phase 3):
@@ -40,7 +43,7 @@ import { CustomerTools } from './tools/customer.tools';
  * provides the real tool implementations.
  */
 @Module({
-  imports: [HoursModule],
+  imports: [HoursModule, TenantsModule],
   // The Twilio webhook ingress (web process only; the worker imports this module
   // for the services and never instantiates controllers).
   controllers: [WhatsappController],
@@ -69,10 +72,12 @@ import { CustomerTools } from './tools/customer.tools';
     // agent tools (3c) — RealToolsService replaces the stub
     ProductsRepository,
     OrdersRepository,
+    OrderLocationResolver,
     CatalogTools,
     CartTools,
     CheckoutTools,
     CustomerTools,
+    BranchTools,
     { provide: ToolsService, useClass: RealToolsService },
   ],
   exports: [

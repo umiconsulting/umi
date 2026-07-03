@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { OrderLocationResolver } from './order-location.resolver';
 import { EnqueueService } from '../../jobs/enqueue.service';
 import { JobPriority } from '../../jobs/job-options';
 import { QUEUES } from '../../jobs/queues';
@@ -14,7 +15,11 @@ import { TurnCommitRepository } from './turn-commit.repository';
 import { createToolOutcomeState, type ToolOutcomeState } from './tool-outcomes';
 import { getActivePendingClarification } from './pending-clarification';
 import { shapeTurnMemory } from './turn-memory';
-import { buildHarnessSystemPrompt, PROMPT_VERSION } from './prompts';
+import {
+  buildHarnessSystemPrompt,
+  PROMPT_VERSION,
+  type BranchPromptContext,
+} from './prompts';
 import { sanitizeOutput } from './security.service';
 import {
   blockUnverifiedOrderConfirmation,
@@ -69,7 +74,35 @@ export class TurnService {
     private readonly commit: TurnCommitRepository,
     private readonly enqueue: EnqueueService,
     private readonly trace: TraceService,
+    private readonly orderLocation: OrderLocationResolver,
   ) {}
+
+  /**
+   * Multi-branch prompt context, derived from the fulfillment-location policy
+   * (OrderLocationResolver): when the tenant still needs the customer to choose a
+   * branch, expose the branch names so the LLM can ask; when one is already
+   * chosen, note it so the LLM stops asking. Null (no prompt block) whenever the
+   * branch is already determined by a bound number or a sole location — so
+   * single-branch tenants are untouched.
+   */
+  private async resolveBranchContext(
+    tenantId: string,
+    conversationId: string,
+    channelLocationId: string | null,
+  ): Promise<BranchPromptContext | null> {
+    const resolution = await this.orderLocation.resolve({
+      tenantId,
+      conversationId,
+      channelLocationId,
+    });
+    if (resolution.kind === 'needs_selection') {
+      return { branches: resolution.branches.map((b) => b.name), selectedBranch: null };
+    }
+    if (resolution.kind === 'resolved' && resolution.source === 'selection') {
+      return { branches: [], selectedBranch: resolution.name };
+    }
+    return null;
+  }
 
   async process(payload: TurnProcessPayload): Promise<void> {
     const start = Date.now();
@@ -85,12 +118,19 @@ export class TurnService {
       detail: { processor_version: PROCESSOR_VERSION },
     });
 
-    const [turn, conversation, person, businessRow, messageCount] = await Promise.all([
+    // resolveBranchContext depends only on `payload`, so it rides along in this
+    // batch instead of adding its own round trip to the turn's critical path.
+    const [turn, conversation, person, businessRow, messageCount, branchContext] = await Promise.all([
       this.turns.loadTurn(payload.turn_id),
       this.conversations.loadById(payload.conversation_id),
       this.identity.getPerson(payload.tenant_id, payload.person_id),
       this.businessConfig.fetchConfigRow(payload.tenant_id),
       this.messages.countMessages(payload.conversation_id),
+      this.resolveBranchContext(
+        payload.tenant_id,
+        payload.conversation_id,
+        payload.location_id ?? null,
+      ),
     ]);
 
     if (!turn || !conversation || !person?.phone) {
@@ -150,6 +190,7 @@ export class TurnService {
       workingMemory,
       partialCancelledOrder,
       voice,
+      branchContext,
     });
 
     const toolOutcomes = createToolOutcomeState();

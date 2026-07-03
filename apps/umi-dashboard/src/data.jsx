@@ -633,12 +633,30 @@ function useKdsConnection() {
   return { status, latency, retry: function() { setSeq(function(s) { return s + 1 }) } }
 }
 
+async function getBranchProfiles() {
+  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant')
+  if (!tenantId) throw new Error('No active tenant selected')
+  const res = await _apiFetch(`/api/tenants/${encodeURIComponent(tenantId)}/locations/profiles`)
+  return res?.locations || []
+}
+
+async function saveBranchProfile(locationId, patch) {
+  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant')
+  if (!tenantId) throw new Error('No active tenant selected')
+  const res = await _apiFetch(`/api/tenants/${encodeURIComponent(tenantId)}/locations/${encodeURIComponent(locationId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+  return res?.location || null
+}
+
 export {
   useOverviewData, useDevicesData, useTenantData, useOrdersData,
   useKdsStations, useDevicePairings,
   useMembersData, useCustomersData, useCustomerDetail, useCustomerInsights,
   useStaffData, useBusinessHours, useVoiceConfig, useGiftCardsData, useConversationsData,
   saveTenantSettings, saveRewardConfig, saveBusinessHours, saveTenantVoice,
+  getBranchProfiles, saveBranchProfile,
   createStaffMember, updateStaffMember, deleteStaffMember,
   provisionDevice, generateDevicePairingPin, approveDevicePairing, denyDevicePairing, updateDevice, revokeDevice, transitionOrder,
   createKdsStation, updateKdsStation, deleteKdsStation,

@@ -193,18 +193,49 @@ Si \`match_type = "browse"\`, usa los ejemplos de \`data_summary.categories\` pa
 `.trim();
 }
 
+/**
+ * Multi-branch instruction block. Present ONLY when the tenant has >1 active
+ * location and branch resolution is enabled. When no branch is chosen yet it
+ * makes the bot ask once (in the business voice) before taking/confirming an
+ * order and call `set_branch`; once chosen it tells the bot to stop asking.
+ */
+export interface BranchPromptContext {
+  branches: string[];
+  selectedBranch: string | null;
+}
+
+function buildBranchSection(branch: BranchPromptContext | null | undefined): string {
+  if (!branch) return '';
+  if (branch.selectedBranch) {
+    return `
+# SUCURSAL
+El cliente ya eligió la sucursal: ${branch.selectedBranch}. No vuelvas a preguntar por la sucursal; continúa con su pedido normalmente.
+`;
+  }
+  if (branch.branches.length < 2) return '';
+  const list = branch.branches.map((b) => `- ${b}`).join('\n');
+  return `
+# SUCURSALES
+Este negocio tiene varias sucursales:
+${list}
+Antes de agregar productos o confirmar un pedido, DEBES preguntar de qué sucursal quiere ordenar el cliente. Haz UNA sola pregunta, en la voz del negocio. Cuando el cliente indique la sucursal —aunque use un apodo o abreviación como "chapu" por "Chapultepec"— llama a la herramienta \`set_branch\` con el nombre. Si no queda claro a cuál se refiere, vuelve a preguntar mostrando las opciones. No olvides lo que el cliente ya pidió: después de fijar la sucursal, continúa con ese pedido.
+`;
+}
+
 export function buildHarnessSystemPrompt(params: {
   customerName: string | null;
   currentState: string;
   workingMemory?: WorkingMemory;
   partialCancelledOrder?: PartialCancelledOrderContext | null;
   voice: VoiceConfig;
+  branchContext?: BranchPromptContext | null;
 }): string {
   const basePrompt = buildVoiceSystemPrompt(params);
+  const branchSection = buildBranchSection(params.branchContext);
 
   return `
 ${basePrompt}
-
+${branchSection}
 # HERRAMIENTAS
 Usa herramientas cuando necesites verificar información operativa o afectar el pedido.
 - \`search_menu\`: para productos, categorías, disponibilidad aproximada y búsquedas vagas como "comida", "algo dulce" o "otra bebida".

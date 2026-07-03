@@ -7,6 +7,21 @@ import type { ToolDefinitions } from '../turn.types';
  */
 export const TOOL_DEFINITIONS: ToolDefinitions = [
   {
+    name: 'set_branch',
+    description:
+      'Registra a qué sucursal quiere ordenar el cliente, cuando el negocio tiene más de una sucursal activa. Úsala cuando el cliente indique la sucursal, zona o colonia —aunque use un apodo o abreviación como "chapu" por "Chapultepec"—. No inventes la sucursal: si no queda clara, vuelve a preguntar. No la uses si el negocio tiene una sola sucursal.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        branch: {
+          type: 'string',
+          description: 'Nombre de la sucursal que indicó el cliente (tal como la nombró).',
+        },
+      },
+      required: ['branch'],
+    },
+  },
+  {
     name: 'get_business_info',
     description:
       'Obtiene dirección, métodos de pago y datos operativos del negocio. Úsala para ubicación, pagos o información general del café. No la uses para horarios ni para responder preguntas de menú.',

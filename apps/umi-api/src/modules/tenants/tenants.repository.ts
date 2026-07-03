@@ -23,6 +23,12 @@ export interface LocationRow {
   status: string;
 }
 
+/** LocationRow + the branch-resolution profile fields (Phase 2). */
+export interface LocationProfileRow extends LocationRow {
+  aliases: string[];
+  descriptor: string | null;
+}
+
 /**
  * Tenant/location/product reads + admin writes. Tenant-scoped queries run on the
  * request path after TenantAccessGuard set the RLS context, so they go through
@@ -181,6 +187,59 @@ export class TenantsRepository {
     return rows[0]?.id ?? null;
   }
 
+  /**
+   * Worker-pool list of the tenant's ACTIVE locations (id + name), oldest-first.
+   * Feeds branch resolution: the `# SUCURSALES` prompt block, `set_branch`
+   * validation, and the checkout branch gate.
+   */
+  async listActiveLocationsWorker(
+    tenantId: string,
+  ): Promise<Array<{ id: string; name: string }>> {
+    const { rows } = await this.pg.query<{ id: string; name: string }>(
+      `SELECT id::text AS id, name
+       FROM core.locations
+       WHERE tenant_id = $1::uuid AND status = 'active'
+       ORDER BY created_at ASC, id ASC`,
+      [tenantId],
+    );
+    return rows;
+  }
+
+  /**
+   * Rank a tenant's ACTIVE branches against free customer text for branch
+   * resolution (Phase 2). Returns every active branch with its owner-curated
+   * `aliases` and a pg_trgm `word_similarity` score of the (accent-stripped,
+   * lowercased) query against `search_text` (= name + aliases). Worker pool
+   * (unauthenticated WhatsApp path). `set_branch` combines this fuzzy score with
+   * a deterministic name/alias match to decide auto-select vs. ask.
+   */
+  async matchBranchCandidates(
+    tenantId: string,
+    query: string,
+  ): Promise<Array<{ id: string; name: string; aliases: string[]; sim: number }>> {
+    const { rows } = await this.pg.query<{
+      id: string;
+      name: string;
+      aliases: string[] | null;
+      sim: string | number;
+    }>(
+      `SELECT id::text AS id,
+              name,
+              aliases,
+              word_similarity(core.f_unaccent(lower($2)), search_text) AS sim
+         FROM core.locations
+        WHERE tenant_id = $1::uuid AND status = 'active'
+        ORDER BY sim DESC, created_at ASC`,
+      [tenantId, query],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      aliases: r.aliases ?? [],
+      sim: Number(r.sim) || 0,
+    }));
+  }
+
   /** Worker-pool read of the tenant's canonical timezone (`core.tenants.timezone`). */
   async getTenantTimezoneWorker(tenantId: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ timezone: string | null }>(
@@ -209,26 +268,60 @@ export class TenantsRepository {
   async updateLocation(
     tenantId: string,
     locationId: string,
-    patch: { name?: string; timezone?: string; status?: string },
-  ): Promise<LocationRow | null> {
+    patch: {
+      name?: string;
+      timezone?: string;
+      status?: string;
+      aliases?: string[];
+      descriptor?: string;
+    },
+  ): Promise<LocationProfileRow | null> {
+    // descriptor uses a presence flag so an explicit empty value can CLEAR it
+    // (COALESCE alone could never null it out); aliases pass through COALESCE so
+    // an omitted field is untouched while an explicit [] clears the list.
+    const setDescriptor = Object.prototype.hasOwnProperty.call(patch, 'descriptor');
     const { rows } = await this.pg.withTenant((c) =>
-      c.query<LocationRow>(
+      c.query<LocationProfileRow>(
         `UPDATE core.locations
          SET name = COALESCE($3, name),
              timezone = COALESCE($4, timezone),
              status = COALESCE($5, status),
+             aliases = COALESCE($6::text[], aliases),
+             descriptor = CASE WHEN $7::boolean THEN $8 ELSE descriptor END,
              updated_at = now()
          WHERE id = $2::uuid AND tenant_id = $1::uuid
-         RETURNING id::text, slug, name, timezone, status`,
+         RETURNING id::text, slug, name, timezone, status, aliases, descriptor`,
         [
           tenantId,
           locationId,
           patch.name ?? null,
           patch.timezone ?? null,
           patch.status ?? null,
+          patch.aliases ?? null,
+          setDescriptor,
+          patch.descriptor ?? null,
         ],
       ),
     );
     return rows[0] ?? null;
+  }
+
+  /**
+   * Per-branch profiles for the dashboard branch editor: name + owner-curated
+   * aliases + descriptor. Reads the Phase 2 columns, so it is a dedicated read
+   * (NOT folded into loadLocations / buildCapabilities) — a pre-migration deploy
+   * only breaks the branch-settings section, never the whole dashboard.
+   */
+  async listLocationProfiles(tenantId: string): Promise<LocationProfileRow[]> {
+    const { rows } = await this.pg.withTenant((c) =>
+      c.query<LocationProfileRow>(
+        `SELECT id::text, slug, name, NULL::text AS timezone, status, aliases, descriptor
+         FROM core.locations
+         WHERE tenant_id = $1::uuid AND status <> 'archived'
+         ORDER BY created_at ASC, id ASC`,
+        [tenantId],
+      ),
+    );
+    return rows;
   }
 }
