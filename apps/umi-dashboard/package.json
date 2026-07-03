@@ -1,5 +1,5 @@
 {
-  "name": "umi-dashboard",
+  "name": "@umi/dashboard",
   "version": "0.2.0",
   "private": true,
   "type": "module",
