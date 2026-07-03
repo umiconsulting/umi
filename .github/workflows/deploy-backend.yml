@@ -62,8 +62,10 @@ jobs:
           corepack prepare pnpm@10.29.3 --activate
       - name: Install
         run: pnpm install --frozen-lockfile --filter "$PACKAGE_NAME..."
+      # Build workspace deps before the app, topologically, so their generated
+      # types/dist exist for the typecheck.
+      - run: pnpm --filter "$PACKAGE_NAME..." build
       - run: pnpm --filter "$PACKAGE_NAME" typecheck
-      - run: pnpm --filter "$PACKAGE_NAME" build
       - run: pnpm --filter "$PACKAGE_NAME" test
 
   build-push-deploy:
