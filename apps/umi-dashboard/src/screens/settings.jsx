@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { I } from '@/icons.jsx'
 import { XSep } from '@/shell.jsx'
-import { useTenantData, saveTenantSettings, saveRewardConfig, useVoiceConfig, saveTenantVoice } from '@/data.jsx'
+import { useTenantData, saveTenantSettings, saveRewardConfig, useVoiceConfig, saveTenantVoice, getBranchProfiles, saveBranchProfile } from '@/data.jsx'
 import { useTenant } from '@/lib/tenant-context.jsx'
 
 // Screen 5 — Settings (Branding + Loyalty + Promotions)
@@ -206,6 +206,9 @@ const SettingsScreen = () => {
           {saving ? 'Guardando…' : saved ? <><I.Check size={15}/> Guardado</> : 'Guardar cambios'}
         </button>
       </div>
+
+      {/* Sucursales — branch aliases/descriptor (multi-branch only) */}
+      <BranchProfilesCard/>
 
       {/* Business info */}
       <div className="card fade-up d1" style={{padding:'24px 26px'}}>
@@ -646,4 +649,98 @@ function hideBrokenImage(e) {
   e.currentTarget.style.display = 'none';
 }
 
+function BranchProfilesCard() {
+  const [profiles, setProfiles] = useState(null);
+  useEffect(() => {
+    let active = true;
+    getBranchProfiles()
+      .then((rows) => { if (active) setProfiles(rows); })
+      .catch(() => { if (active) setProfiles([]); });
+    return () => { active = false; };
+  }, []);
+  // Aliases only matter when there is more than one branch to disambiguate.
+  if (!profiles || profiles.length <= 1) return null;
+  return (
+    <div className="card fade-up d2" style={{padding:'24px 26px'}}>
+      <div className="ed-head" style={{marginBottom:18}}>
+        <div className="titles">
+          <div className="sec-index"><span className="nn">S</span><span>/</span><span>SUCURSALES</span></div>
+          <h2>Sucursales y apodos</h2>
+          <div className="en">Cómo el bot reconoce a qué sucursal se refiere el cliente por WhatsApp</div>
+        </div>
+      </div>
+      <div style={{display:'flex', flexDirection:'column', gap:14}}>
+        {profiles.map((p) => <BranchProfileRow key={p.id} profile={p}/>)}
+      </div>
+    </div>
+  );
+}
+
+function BranchProfileRow({ profile }) {
+  const [aliases, setAliases] = useState(profile.aliases || []);
+  const [descriptor, setDescriptor] = useState(profile.descriptor || '');
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const dirty = JSON.stringify(aliases) !== JSON.stringify(profile.aliases || [])
+    || descriptor !== (profile.descriptor || '');
+
+  function addAlias(v) {
+    const t = (v || '').trim();
+    setDraft('');
+    if (!t || aliases.some((a) => a.toLowerCase() === t.toLowerCase())) return;
+    setAliases(aliases.concat(t).slice(0, 24));
+  }
+  function removeAlias(i) { setAliases(aliases.filter((_, idx) => idx !== i)); }
+
+  async function save() {
+    setSaving(true); setSaved(false);
+    try {
+      await saveBranchProfile(profile.id, { aliases, descriptor: descriptor.trim() });
+      setSaved(true); setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      console.error('branch profile save failed', e);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{border:'1px solid var(--line)', borderRadius:12, padding:16, display:'flex', flexDirection:'column', gap:12}}>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:12}}>
+        <div style={{fontWeight:600, fontSize:14}}>{profile.name}</div>
+        <button className="btn btn-secondary btn-sm" onClick={save} disabled={!dirty || saving}>
+          {saving ? 'Guardando…' : saved ? '✓ Guardado' : 'Guardar'}
+        </button>
+      </div>
+      <div className="field" style={{margin:0}}>
+        <label>Apodos (cómo la llaman los clientes)</label>
+        <div style={{display:'flex', flexWrap:'wrap', gap:6, alignItems:'center'}}>
+          {aliases.map((a, i) => (
+            <span key={i} className="chip" style={{display:'inline-flex', alignItems:'center', gap:6}}>
+              {a}
+              <button onClick={() => removeAlias(i)} aria-label={'Quitar ' + a}
+                style={{border:'none', background:'none', cursor:'pointer', color:'var(--ink-3)', fontSize:15, lineHeight:1, padding:0}}>×</button>
+            </span>
+          ))}
+          <input className="input" value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addAlias(draft); } }}
+            onBlur={() => addAlias(draft)}
+            placeholder="+ apodo"
+            style={{width:150, height:32, fontSize:12.5}}/>
+        </div>
+      </div>
+      <div className="field" style={{margin:0}}>
+        <label>Descripción (zona / referencia)</label>
+        <input className="input tall" value={descriptor}
+          onChange={(e) => setDescriptor(e.target.value.slice(0, 160))}
+          placeholder="p. ej. la del centro, junto al parque"/>
+      </div>
+    </div>
+  );
+}
+
 export default SettingsScreen
+

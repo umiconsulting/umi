@@ -74,6 +74,13 @@ export class TenantsController {
     return { locations: caps.locations };
   }
 
+  @Get('tenants/:tenantId/locations/profiles')
+  @UseGuards(TenantAccessGuard, EntitlementGuard)
+  @RequireProduct('dashboard')
+  async getLocationProfiles(@Tenant() tenant: TenantAccess) {
+    return { locations: await this.tenants.listLocationProfiles(tenant.tenantId) };
+  }
+
   @Patch('tenants/:tenantId/locations/:locationId')
   @UseGuards(TenantAccessGuard, EntitlementGuard)
   @RequireProduct('dashboard')

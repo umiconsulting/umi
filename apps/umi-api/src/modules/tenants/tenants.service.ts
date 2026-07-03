@@ -3,6 +3,7 @@ import type { TenantAccess } from '../auth/auth.types';
 import {
   TenantsRepository,
   type LocationRow,
+  type LocationProfileRow,
   type ProductInstance,
   type TenantSummary,
 } from './tenants.repository';
@@ -100,13 +101,24 @@ export class TenantsService {
   async updateLocation(
     tenantId: string,
     locationId: string,
-    patch: { name?: string; timezone?: string; status?: string },
-  ): Promise<LocationRow> {
+    patch: {
+      name?: string;
+      timezone?: string;
+      status?: string;
+      aliases?: string[];
+      descriptor?: string;
+    },
+  ): Promise<LocationProfileRow> {
     // Don't pre-filter on status: updateLocation already scopes by tenant+id and
     // returns null when absent, and gating on `active` would 404 any patch to an
     // inactive location — including reactivating it with status:'active'.
     const updated = await this.repo.updateLocation(tenantId, locationId, patch);
     if (!updated) throw new NotFoundException({ error: 'location_not_found' });
     return updated;
+  }
+
+  /** Per-branch profiles (aliases + descriptor) for the dashboard branch editor. */
+  async listLocationProfiles(tenantId: string): Promise<LocationProfileRow[]> {
+    return this.repo.listLocationProfiles(tenantId);
   }
 }
