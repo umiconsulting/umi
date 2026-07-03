@@ -13,6 +13,7 @@ import { EntitlementGuard } from '../auth/entitlement.guard';
 import { RequireProduct } from '../auth/require-product.decorator';
 import { CurrentUser, Tenant } from '../auth/current-user.decorator';
 import type { AuthUser, TenantAccess } from '../auth/auth.types';
+import type { MeTenantsResponse } from '@umi/contract';
 import { TenantsService } from './tenants.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
@@ -28,7 +29,7 @@ export class TenantsController {
   constructor(private readonly tenants: TenantsService) {}
 
   @Get('me/tenants')
-  async myTenants(@CurrentUser() user: AuthUser) {
+  async myTenants(@CurrentUser() user: AuthUser): Promise<MeTenantsResponse> {
     return { tenants: await this.tenants.listUserTenants(user.id) };
   }
 

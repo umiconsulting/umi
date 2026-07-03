@@ -11,6 +11,7 @@ on:
   pull_request:
     paths:
       - "apps/umi-api/**"
+      - "packages/contract/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "package.json"
@@ -40,11 +41,13 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile --filter @umi/api...
 
+      # Build workspace deps (e.g. @umi/contract) before umi-api, in topological
+      # order, so its generated types/dist exist for the typecheck below.
+      - name: Build
+        run: pnpm --filter @umi/api... build
+
       - name: Typecheck
         run: pnpm --filter @umi/api typecheck
-
-      - name: Build
-        run: pnpm --filter @umi/api build
 
       - name: Test
         run: pnpm --filter @umi/api test
