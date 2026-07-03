@@ -5,8 +5,10 @@
 #   3. SSH to the VPS and run the app's deploy/deploy.sh, which pulls the new
 #      image and rolls the containers — no build on the live box.
 #
-# Add another backend: copy .github/workflows/umi-api-deploy.yml, change the
-# inputs, and ship a apps/<app>/deploy/deploy.sh. Nothing here needs to change.
+# Add another backend: it must be a pnpm workspace member with a root-context
+# Dockerfile (`docker build -f apps/<app>/Dockerfile .`). Copy
+# .github/workflows/umi-api-deploy.yml, change the inputs (incl. package_name),
+# and ship a apps/<app>/deploy/deploy.sh. Nothing here needs to change.
 name: Deploy backend (reusable)
 
 on:
@@ -18,6 +20,10 @@ on:
         required: true
       app_dir:
         description: "Path to the app in this repo (e.g. apps/umi-api)"
+        type: string
+        required: true
+      package_name:
+        description: "pnpm workspace package name for --filter (e.g. @umi/api)"
         type: string
         required: true
       image:
@@ -39,9 +45,6 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ${{ inputs.app_dir }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -49,12 +52,15 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ inputs.node_version }}
-          cache: npm
-          cache-dependency-path: ${{ inputs.app_dir }}/package-lock.json
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run build
-      - run: npm run test
+      - name: Enable pnpm (corepack)
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.29.3 --activate
+      - name: Install
+        run: pnpm install --frozen-lockfile --filter ${{ inputs.package_name }}...
+      - run: pnpm --filter ${{ inputs.package_name }} typecheck
+      - run: pnpm --filter ${{ inputs.package_name }} build
+      - run: pnpm --filter ${{ inputs.package_name }} test
 
   build-push-deploy:
     needs: test
@@ -74,7 +80,7 @@ jobs:
           docker build \
             -t "$IMAGE:sha-${{ github.sha }}" \
             -t "$IMAGE:latest" \
-            -f "$DIR/Dockerfile" "$DIR"
+            -f "$DIR/Dockerfile" .
           docker push "$IMAGE:sha-${{ github.sha }}"
           docker push "$IMAGE:latest"
 

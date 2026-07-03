@@ -7,6 +7,10 @@ on:
     branches: [main]
     paths:
       - "apps/umi-api/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "package.json"
+      - "turbo.json"
       - ".github/workflows/umi-api-deploy.yml"
       - ".github/workflows/deploy-backend.yml"
 
@@ -29,6 +33,7 @@ jobs:
     with:
       app_name: umi-api
       app_dir: apps/umi-api
+      package_name: "@umi/api"
       image: ghcr.io/umiconsulting/umi-api
       health_url: https://api.umiconsulting.co/health
     secrets: inherit

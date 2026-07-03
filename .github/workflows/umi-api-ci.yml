@@ -3,15 +3,22 @@ name: umi-api CI
 # PR gate only. Pushes to main are checked + built + deployed by
 # umi-api-deploy.yml (which re-runs these same checks before shipping),
 # so running on `push` here too would just double the work on every merge.
+#
+# umi-api is a pnpm workspace member: install/build/test run from the repo root
+# with pnpm --filter. Workspace-level files are watched too, since they affect
+# the umi-api build.
 on:
   pull_request:
     paths:
       - "apps/umi-api/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "package.json"
+      - "turbo.json"
       - ".github/workflows/umi-api-ci.yml"
 
-defaults:
-  run:
-    working-directory: apps/umi-api
+permissions:
+  contents: read
 
 jobs:
   build-and-test:
@@ -24,17 +31,20 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
-          cache: npm
-          cache-dependency-path: apps/umi-api/package-lock.json
+
+      - name: Enable pnpm (corepack)
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.29.3 --activate
 
       - name: Install
-        run: npm ci
+        run: pnpm install --frozen-lockfile --filter @umi/api...
 
       - name: Typecheck
-        run: npm run typecheck
+        run: pnpm --filter @umi/api typecheck
 
       - name: Build
-        run: npm run build
+        run: pnpm --filter @umi/api build
 
       - name: Test
-        run: npm run test
+        run: pnpm --filter @umi/api test
