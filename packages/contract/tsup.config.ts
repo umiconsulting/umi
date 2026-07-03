@@ -12,4 +12,7 @@ export default defineConfig({
   target: 'node22',
   clean: true,
   sourcemap: false,
+  // No code-splitting: two tiny entries → keep flat index.*/routes.* outputs,
+  // no chunk-*.js files cluttering dist/.
+  splitting: false,
 });

@@ -2,14 +2,15 @@
 .DS_Store
 
 # apps/ are tracked in this monorepo (fresh-snapshot migration 2026-06-20).
-# Per-app .gitignore files still apply within each app subtree; nested .git
-# histories were archived to backups/nested-git/ and to each origin repo.
+# Per-app .gitignore files still apply within each app subtree.
 
-# Database dumps and handoff material — never version data payloads at root
+# Local, non-repo working files — never version data payloads or scratch dirs
 backups/
 prod-db-handoff-2026-05-13/
 *.dump
 *.sql.gz
+artifacts/
+.hermes/
 *.tar.gz.enc
 
 # Screenshots / visual artifacts
