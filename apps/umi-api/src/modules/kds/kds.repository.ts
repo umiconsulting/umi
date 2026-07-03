@@ -766,7 +766,14 @@ export class KdsRepository {
     let locClause = '';
     if (locationId) {
       params.push(locationId);
-      locClause = `AND o.location_id = $${params.length}`;
+      // NULL-escape the branch filter: WhatsApp orders arrive with
+      // location_id = NULL (the channel account isn't branch-bound), and the
+      // dashboard always sends a selected branch (it defaults to the
+      // oldest-active location). A plain `location_id = $N` therefore hides every
+      // WhatsApp ticket. Unrouted (NULL) orders are tenant-wide and must surface
+      // on any branch — same reason the iPad boardSnapshot query carries no
+      // location filter at all.
+      locClause = `AND (o.location_id = $${params.length} OR o.location_id IS NULL)`;
     }
     const { rows } = await this.pg.query<TicketRow>(
       `SELECT t.ticket_id,
