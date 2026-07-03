@@ -45,6 +45,10 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Pass the caller's package name through the environment rather than
+    # interpolating ${{ }} straight into run: scripts (avoids shell injection).
+    env:
+      PACKAGE_NAME: ${{ inputs.package_name }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -57,10 +61,10 @@ jobs:
           corepack enable
           corepack prepare pnpm@10.29.3 --activate
       - name: Install
-        run: pnpm install --frozen-lockfile --filter ${{ inputs.package_name }}...
-      - run: pnpm --filter ${{ inputs.package_name }} typecheck
-      - run: pnpm --filter ${{ inputs.package_name }} build
-      - run: pnpm --filter ${{ inputs.package_name }} test
+        run: pnpm install --frozen-lockfile --filter "$PACKAGE_NAME..."
+      - run: pnpm --filter "$PACKAGE_NAME" typecheck
+      - run: pnpm --filter "$PACKAGE_NAME" build
+      - run: pnpm --filter "$PACKAGE_NAME" test
 
   build-push-deploy:
     needs: test
