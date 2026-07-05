@@ -17,12 +17,17 @@
       "types": "./dist/routes.d.ts",
       "import": "./dist/routes.js",
       "require": "./dist/routes.cjs"
+    },
+    "./entitlements": {
+      "types": "./dist/entitlements.d.ts",
+      "import": "./dist/entitlements.js",
+      "require": "./dist/entitlements.cjs"
     }
   },
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/routes.test.mjs"
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "zod": "^3.24.1"
