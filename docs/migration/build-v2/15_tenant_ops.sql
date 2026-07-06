@@ -109,7 +109,7 @@ create table if not exists tenant.station (
   updated_at   timestamptz not null default now(),
   primary key (tenant_id, id),
   foreign key (tenant_id, branch_id)
-    references tenant.branch (tenant_id, id) on delete set null
+    references tenant.branch (tenant_id, id) on delete set null (branch_id)
 );
 
 -- source UNIQUE(tenant_id, location_id, station_key), NULL-safe split:
@@ -149,7 +149,7 @@ create table if not exists tenant.device (
   updated_at      timestamptz not null default now(),
   primary key (tenant_id, id),
   foreign key (tenant_id, branch_id)
-    references tenant.branch (tenant_id, id) on delete set null
+    references tenant.branch (tenant_id, id) on delete set null (branch_id)
 );
 
 create index if not exists tenant_device_status_idx
@@ -184,7 +184,7 @@ create table if not exists tenant.whatsapp_number (
   primary key (tenant_id, id),
   unique (provider, provider_account_id),
   foreign key (tenant_id, branch_id)
-    references tenant.branch (tenant_id, id) on delete set null
+    references tenant.branch (tenant_id, id) on delete set null (branch_id)
 );
 
 create index if not exists tenant_whatsapp_number_tenant_idx
