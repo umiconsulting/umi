@@ -51,7 +51,7 @@ create table if not exists tenant.conversation (
   metadata        jsonb not null default '{}'::jsonb,
   primary key (tenant_id, id),
   foreign key (tenant_id, customer_id)
-    references tenant.customer (tenant_id, id) on delete set null
+    references tenant.customer (tenant_id, id) on delete set null (customer_id)
 );
 
 create index if not exists tenant_conversation_customer_status_idx
@@ -71,7 +71,8 @@ create table if not exists tenant.message (
   id                 uuid not null default gen_random_uuid(),
   tenant_id          uuid not null references tenant.tenant(id) on delete cascade,
   conversation_id    uuid not null,
-  sender             text not null,                       -- was comms.messages.role
+  sender             text not null                         -- was comms.messages.role
+    check (sender in ('user', 'assistant', 'system', 'tool')),
   body               text,                                -- was content (GDPR nullable)
   intent             text,
   entities           jsonb not null default '{}'::jsonb,
@@ -119,7 +120,7 @@ create table if not exists tenant.knowledge_document (
   updated_at timestamptz not null default now(),
   primary key (tenant_id, id),
   foreign key (tenant_id, branch_id)
-    references tenant.branch (tenant_id, id) on delete set null
+    references tenant.branch (tenant_id, id) on delete set null (branch_id)
 );
 
 create index if not exists tenant_knowledge_document_type_idx

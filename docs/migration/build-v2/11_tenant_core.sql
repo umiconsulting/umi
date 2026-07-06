@@ -133,7 +133,7 @@ create table if not exists tenant.branch (
   primary key (tenant_id, id),
   unique (tenant_id, id),
   foreign key (tenant_id, business_id)
-    references tenant.business (tenant_id, id) on delete set null
+    references tenant.business (tenant_id, id) on delete set null (business_id)
 );
 
 create unique index if not exists tenant_branch_tenant_slug_uidx
@@ -160,7 +160,7 @@ create table if not exists tenant.contact (
   primary key (tenant_id, id),
   unique (tenant_id, id),
   foreign key (tenant_id, merged_into)
-    references tenant.contact (tenant_id, id) on delete set null
+    references tenant.contact (tenant_id, id) on delete set null (merged_into)
 );
 
 create index if not exists tenant_contact_tenant_state_idx
@@ -194,6 +194,11 @@ create table if not exists tenant.contact_identity (
   primary key (tenant_id, id),
   unique (tenant_id, id),
   unique (tenant_id, channel_id, normalized_value),       -- dedup spine (G4)
+  -- Every identity must carry at least one reachability key. The dedup spine
+  -- escapes via NULLs and the external_id partial-unique only covers non-NULL
+  -- external_id, so a row with BOTH normalized_value and external_id NULL would
+  -- have zero uniqueness — the resolver could mint unbounded duplicates. (CR #37)
+  check (normalized_value is not null or external_id is not null),
   foreign key (tenant_id, contact_id)
     references tenant.contact (tenant_id, id) on delete cascade
 );
@@ -348,7 +353,7 @@ create table if not exists tenant.staff (
   primary key (tenant_id, id),
   unique (tenant_id, id),
   foreign key (tenant_id, branch_id)
-    references tenant.branch (tenant_id, id) on delete set null
+    references tenant.branch (tenant_id, id) on delete set null (branch_id)
 );
 
 create index if not exists tenant_staff_tenant_status_idx

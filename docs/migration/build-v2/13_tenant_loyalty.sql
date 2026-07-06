@@ -123,7 +123,7 @@ create table if not exists tenant.card_ledger (
   foreign key (tenant_id, card_id)
     references tenant.card (tenant_id, id) on delete cascade,
   foreign key (tenant_id, staff_id)
-    references tenant.staff (tenant_id, id) on delete set null
+    references tenant.staff (tenant_id, id) on delete set null (staff_id)
 );
 
 create index if not exists tenant_card_ledger_card_idx
@@ -151,7 +151,7 @@ create table if not exists tenant.visit (
   foreign key (tenant_id, card_id)
     references tenant.card (tenant_id, id) on delete cascade,
   foreign key (tenant_id, staff_id)
-    references tenant.staff (tenant_id, id) on delete set null
+    references tenant.staff (tenant_id, id) on delete set null (staff_id)
 );
 
 create index if not exists tenant_visit_card_idx
@@ -198,7 +198,7 @@ create table if not exists tenant.reward_redemption (
   foreign key (tenant_id, reward_rule_id)
     references tenant.reward_rule (tenant_id, id) on delete cascade,
   foreign key (tenant_id, staff_id)
-    references tenant.staff (tenant_id, id) on delete set null
+    references tenant.staff (tenant_id, id) on delete set null (staff_id)
 );
 
 create index if not exists tenant_reward_redemption_card_idx
@@ -260,9 +260,9 @@ create table if not exists tenant.gift_card (
   primary key (tenant_id, id),
   unique (code),
   foreign key (tenant_id, created_by_staff_id)
-    references tenant.staff (tenant_id, id) on delete set null,
+    references tenant.staff (tenant_id, id) on delete set null (created_by_staff_id),
   foreign key (tenant_id, redeemed_card_id)
-    references tenant.card (tenant_id, id) on delete set null
+    references tenant.card (tenant_id, id) on delete set null (redeemed_card_id)
 );
 
 create index if not exists tenant_gift_card_redeemed_idx

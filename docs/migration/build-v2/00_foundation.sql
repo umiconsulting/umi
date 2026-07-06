@@ -186,6 +186,18 @@ revoke all on function tenant.can_access_tenant(uuid) from public;
 create or replace function tenant.block_append_only_mutation()
 returns trigger language plpgsql as $$
 begin
+  -- Controlled bypass for maintenance / erasure / tenant-teardown — and for the
+  -- FK delete actions (ON DELETE CASCADE from card/gift_card, ON DELETE SET NULL
+  -- of staff_id) that would otherwise be blocked, making staff/card/tenant
+  -- deletes fail once ledger rows exist. A caller that legitimately needs to
+  -- remove or rewrite ledger rows opts in inside its transaction with:
+  --     set local app.ledger_maintenance = 'on';
+  -- Normal application writes never set it, so the ledgers stay insert-only
+  -- (the RLS/verify smoke test injects a mutation without the flag and still
+  -- gets blocked). missing_ok = true so an unset GUC reads as NULL, not error.
+  if current_setting('app.ledger_maintenance', true) = 'on' then
+    return case tg_op when 'DELETE' then old else new end;
+  end if;
   raise exception
     'append-only violation: % on %.% is forbidden (financial ledger is insert-only)',
     tg_op, tg_table_schema, tg_table_name
