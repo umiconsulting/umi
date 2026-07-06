@@ -312,7 +312,11 @@ create table if not exists tenant.tenant_access (
   tenant_id   uuid not null references tenant.tenant(id) on delete cascade,
   login_id    uuid not null references tenant.login(id) on delete cascade,
   role        text not null default 'staff'
-    check (role in ('owner', 'admin', 'staff', 'viewer')),
+    -- super_admin = Umi's cross-tenant operator (hola@umiconsulting.co): wildcard
+    -- permissions + can_access_tenant bypass (see 00_foundation, 18_umi). One
+    -- active super_admin edge anywhere flags a GLOBAL super_admin. 'developer' /
+    -- 'tech_assist' are deliberately PARKED (not admitted until wired end-to-end).
+    check (role in ('owner', 'admin', 'staff', 'viewer', 'super_admin')),
   status      text not null default 'active'
     check (status in ('active', 'invited', 'disabled', 'archived')),
   created_at  timestamptz not null default now(),

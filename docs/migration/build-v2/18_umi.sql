@@ -197,6 +197,63 @@ create index if not exists umi_invoice_period_idx
   on umi.invoice (period_start, period_end);
 
 -- ===========================================================================
+-- umi.permission + umi.role_permission  <- core.permissions + core.role_permissions
+--   The RBAC POLICY layer, hoisted out of the old per-tenant `core` schema into
+--   the SEALED `umi` schema because it is Umi PLATFORM policy: the permission
+--   vocabulary and the role -> permission mapping are byte-identical for every
+--   tenant and must be UNFORGEABLE by a tenant request. The per-tenant EDGE
+--   (which login holds which role in which tenant) stays in tenant.tenant_access
+--   (RLS-gated); only the system-wide role -> permission LOOKUP lives here.
+--   Read at login on the worker pool (umi_app has no USAGE on `umi`).
+--   role mirrors tenant.tenant_access.role; parked roles are NOT admitted.
+-- ===========================================================================
+create table if not exists umi.permission (
+  key         text primary key,
+  description text,
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists umi.role_permission (
+  role           text not null
+    check (role in ('owner', 'admin', 'staff', 'viewer', 'super_admin')),
+  permission_key text not null references umi.permission(key) on delete cascade,
+  created_at     timestamptz not null default now(),
+  primary key (role, permission_key)
+);
+
+create index if not exists umi_role_permission_role_idx
+  on umi.role_permission (role);
+
+-- Seed the catalog (idempotent). '*' = wildcard (all permissions).
+insert into umi.permission (key, description) values
+  ('*',               'Wildcard — all permissions (super_admin)'),
+  ('tenant.manage',   'Manage tenant settings'),
+  ('loyalty.operate', 'Scan/award/redeem loyalty'),
+  ('orders.operate',  'Operate orders / kitchen'),
+  ('insights.read',   'Read dashboards & insights')
+on conflict (key) do nothing;
+
+-- Seed role -> permission grants (idempotent).
+--   super_admin -> '*' (explicit auditable row; code also short-circuits).
+--   owner/admin -> full tenant administration.
+--   staff       -> operational only (loyalty + orders); no settings/insights.
+--   viewer      -> read-only insights.
+insert into umi.role_permission (role, permission_key) values
+  ('super_admin', '*'),
+  ('owner',  'tenant.manage'),
+  ('owner',  'loyalty.operate'),
+  ('owner',  'orders.operate'),
+  ('owner',  'insights.read'),
+  ('admin',  'tenant.manage'),
+  ('admin',  'loyalty.operate'),
+  ('admin',  'orders.operate'),
+  ('admin',  'insights.read'),
+  ('staff',  'loyalty.operate'),
+  ('staff',  'orders.operate'),
+  ('viewer', 'insights.read')
+on conflict (role, permission_key) do nothing;
+
+-- ===========================================================================
 -- GRANTS — SEALED SCHEMA: umi_worker ONLY (never umi_app). 00_foundation already
 --   withheld umi_app USAGE on `umi`; we do not re-grant it. umi_worker owns the
 --   read+write path; umi_readonly may SELECT for internal analytics. Then a hard
