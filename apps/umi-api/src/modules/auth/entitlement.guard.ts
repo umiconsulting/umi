@@ -5,12 +5,10 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { isProductStatusActive } from '@umi/contract';
 import { AuthRepository } from './auth.repository';
 import { REQUIRE_PRODUCT } from './require-product.decorator';
 import type { AuthedRequest } from './auth.types';
-
-/** Ported from server.js `PRODUCT_ACTIVE_STATUSES`. */
-export const PRODUCT_ACTIVE_STATUSES = new Set(['active', 'trialing']);
 
 /**
  * Enforces `@RequireProduct('<key>')`. Reads the tenant resolved by
@@ -43,7 +41,7 @@ export class EntitlementGuard implements CanActivate {
     }
 
     const status = await this.repo.productStatus(tenantId, productKey);
-    if (!status || !PRODUCT_ACTIVE_STATUSES.has(status)) {
+    if (!isProductStatusActive(status)) {
       throw new ForbiddenException({
         error: 'product_not_active',
         product: productKey,

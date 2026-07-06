@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { formatMxn, iso } from '../../shared/format/money';
-import { PRODUCT_ACTIVE_STATUSES } from '../auth/entitlement.guard';
+import { isProductStatusActive } from '@umi/contract';
 import { TenantsRepository } from '../tenants/tenants.repository';
 import {
   CustomersRepository,
@@ -18,7 +18,7 @@ function isUuid(v: string): boolean {
 
 function productActive(products: Products, key: string): boolean {
   const status = products[key]?.status;
-  return !!status && PRODUCT_ACTIVE_STATUSES.has(status);
+  return isProductStatusActive(status);
 }
 
 function normalizeCustomerPhone(phone: string | null): string | null {
