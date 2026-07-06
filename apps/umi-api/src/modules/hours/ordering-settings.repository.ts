@@ -3,7 +3,7 @@ import { PgService } from '../../shared/database/pg.service';
 
 /**
  * The single accessor for the tenant ORDERING-WINDOW scalars that live in
- * `ops.businesses.config` jsonb (one business per tenant). These are the
+ * `tenant.business.config` jsonb (one business per tenant). These are the
  * settings the WhatsApp bot needs beyond the weekly grid:
  *   - accepts_whatsapp_orders (pause/resume)
  *   - order_cutoff_minutes    (minutes-before-close buffer; the dashboard slider)
@@ -57,7 +57,7 @@ export class OrderingSettingsRepository {
   /** Worker-pool read (bot path). */
   async readWorker(tenantId: string): Promise<OrderingSettings> {
     const { rows } = await this.pg.query<{ config: RawConfig | null }>(
-      `SELECT config FROM ops.businesses
+      `SELECT config FROM tenant.business
         WHERE tenant_id = $1::uuid
         ORDER BY created_at ASC
         LIMIT 1`,
@@ -71,7 +71,7 @@ export class OrderingSettingsRepository {
     const rows = await this.pg.withTenant((c) =>
       c
         .query<{ config: RawConfig | null }>(
-          `SELECT config FROM ops.businesses
+          `SELECT config FROM tenant.business
             WHERE tenant_id = $1::uuid
             ORDER BY created_at ASC
             LIMIT 1`,
@@ -83,7 +83,7 @@ export class OrderingSettingsRepository {
   }
 
   /**
-   * Merge-write the ordering scalars into `ops.businesses.config` (shallow jsonb
+   * Merge-write the ordering scalars into `tenant.business.config` (shallow jsonb
    * merge). Single atomic upsert on the `businesses_tenant_id_key` UNIQUE(tenant_id)
    * — no UPDATE-then-INSERT race. If no business row exists yet, one is created
    * with the tenant's real name (never a blank), not a synthetic empty string.
@@ -105,12 +105,12 @@ export class OrderingSettingsRepository {
     const mergeJson = JSON.stringify(merge);
     await this.pg.withTenant((c) =>
       c.query(
-        `INSERT INTO ops.businesses (tenant_id, name, config)
+        `INSERT INTO tenant.business (tenant_id, name, config)
          VALUES ($1::uuid,
-                 COALESCE((SELECT name FROM core.tenants WHERE id = $1::uuid), 'Negocio'),
+                 COALESCE((SELECT name FROM tenant.tenant WHERE id = $1::uuid), 'Negocio'),
                  $2::jsonb)
          ON CONFLICT (tenant_id) DO UPDATE
-           SET config = COALESCE(ops.businesses.config, '{}'::jsonb) || EXCLUDED.config,
+           SET config = COALESCE(tenant.business.config, '{}'::jsonb) || EXCLUDED.config,
                updated_at = now()`,
         [tenantId, mergeJson],
       ),

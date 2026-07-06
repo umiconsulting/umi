@@ -16,9 +16,9 @@ function extractTenantId(data: unknown): string | null {
 }
 
 /**
- * Routes terminally-failed BullMQ jobs to the canonical `queue.dead_letters`
+ * Routes terminally-failed BullMQ jobs to the canonical `runtime.dead_letters`
  * sink (spec §10.5). Tenant-scoped jobs are persisted; infra/system jobs that
- * carry no tenant are log-only, because `queue.dead_letters.tenant_id` is NOT
+ * carry no tenant are log-only, because `runtime.dead_letters.tenant_id` is NOT
  * NULL and FKs `core.tenants` (confirmed 2026-06-24 preflight). Best-effort: a
  * dead-letter write must never throw back into the worker.
  */

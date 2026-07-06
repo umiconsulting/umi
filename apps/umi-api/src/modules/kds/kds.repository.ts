@@ -19,7 +19,7 @@ import {
  *   1. the iPad path has no authenticated member user, so RLS would hide rows;
  *   2. `device.*` carries auth secrets (`token_hash`/`pin_hash`/`pin_salt`)
  *      REVOKEd from `umi_app`;
- *   3. transitions write `queue.outbox_events` (service-role-only schema).
+ *   3. transitions write `runtime.outbox_events` (service-role-only schema).
  * Cross-tenant isolation is enforced by the explicit predicate + the guard stack
  * on the dashboard routes / the device-session scope on the iPad routes — the
  * same model the public cash routes use.
@@ -961,7 +961,7 @@ export class KdsRepository {
         );
         if (phone) {
           await client.query(
-            `INSERT INTO queue.outbox_events
+            `INSERT INTO runtime.outbox_events
                (tenant_id, event_type, aggregate_id, idempotency_key, payload)
              VALUES ($1, 'twilio.status_notification', $2, $3, $4::jsonb)
              ON CONFLICT (idempotency_key) DO NOTHING`,
@@ -1112,7 +1112,7 @@ export class KdsRepository {
         : null;
       if (phone && body) {
         await client.query(
-          `INSERT INTO queue.outbox_events
+          `INSERT INTO runtime.outbox_events
              (tenant_id, event_type, aggregate_id, idempotency_key, payload)
            VALUES ($1, 'twilio.cancel_notification', $2, $3, $4::jsonb)
            ON CONFLICT (idempotency_key) DO NOTHING`,

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
 
-/** The voice sub-object as stored in `ops.businesses.config.voice` (jsonb). */
+/** The voice sub-object as stored in `tenant.business.config.voice` (jsonb). */
 export interface StoredVoice {
   assistant_name?: string;
   locale?: string;
@@ -12,7 +12,7 @@ export interface StoredVoice {
 
 /**
  * The single accessor for the tenant VOICE config that lives under
- * `ops.businesses.config.voice` (one business per tenant). Sibling of
+ * `tenant.business.config.voice` (one business per tenant). Sibling of
  * OrderingSettingsRepository — same nested-jsonb-merge upsert, but it writes
  * UNDER `config.voice` so the hours/ordering keys in `config` are untouched.
  *
@@ -34,9 +34,9 @@ export class VoiceSettingsRepository {
         .query<{ business_name: string | null; voice: StoredVoice | null }>(
           `SELECT COALESCE(b.name, t.name) AS business_name,
                   b.config -> 'voice'      AS voice
-             FROM core.tenants t
+             FROM tenant.tenant t
              LEFT JOIN LATERAL (
-               SELECT name, config FROM ops.businesses
+               SELECT name, config FROM tenant.business
                 WHERE tenant_id = t.id ORDER BY created_at ASC LIMIT 1
              ) b ON true
             WHERE t.id = $1::uuid`,
@@ -51,7 +51,7 @@ export class VoiceSettingsRepository {
   }
 
   /**
-   * Nested merge-write into `ops.businesses.config.voice`. Single atomic upsert on
+   * Nested merge-write into `tenant.business.config.voice`. Single atomic upsert on
    * the `businesses_tenant_id_key` UNIQUE(tenant_id) (same as
    * OrderingSettingsRepository) — no UPDATE-then-INSERT race. Creates the business
    * row with the tenant's real name when absent. The `||` jsonb operator shallow-
@@ -65,15 +65,15 @@ export class VoiceSettingsRepository {
     const json = JSON.stringify(voicePatch);
     await this.pg.withTenant((c) =>
       c.query(
-        `INSERT INTO ops.businesses (tenant_id, name, config)
+        `INSERT INTO tenant.business (tenant_id, name, config)
          VALUES ($1::uuid,
-                 COALESCE((SELECT name FROM core.tenants WHERE id = $1::uuid), 'Negocio'),
+                 COALESCE((SELECT name FROM tenant.tenant WHERE id = $1::uuid), 'Negocio'),
                  jsonb_build_object('voice', $2::jsonb))
          ON CONFLICT (tenant_id) DO UPDATE
            SET config = jsonb_set(
-                 COALESCE(ops.businesses.config, '{}'::jsonb),
+                 COALESCE(tenant.business.config, '{}'::jsonb),
                  '{voice}',
-                 COALESCE(ops.businesses.config -> 'voice', '{}'::jsonb) || (EXCLUDED.config -> 'voice')
+                 COALESCE(tenant.business.config -> 'voice', '{}'::jsonb) || (EXCLUDED.config -> 'voice')
                ),
                updated_at = now()`,
         [tenantId, json],

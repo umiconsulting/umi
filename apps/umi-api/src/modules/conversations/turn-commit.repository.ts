@@ -6,7 +6,7 @@ import { PgService } from '../../shared/database/pg.service';
  * worker-pool transaction it:
  *   1. CAS-updates the conversation state (guards against a concurrent writer),
  *   2. inserts the assistant message,
- *   3. inserts the `queue.outbox_events` reply row (the OutboxRelay drains it to
+ *   3. inserts the `runtime.outbox_events` reply row (the OutboxRelay drains it to
  *      the outbound queue → Twilio send in Phase 3d).
  * If the CAS loses (another writer advanced state_version), the whole tx rolls
  * back and `committed=false` is returned — the caller supersedes + requeues. So a
@@ -47,7 +47,7 @@ export class TurnCommitRepository {
       //    committed row exists, and the relay drains every row, so the reply is
       //    (or will be) delivered exactly once.
       const ob = await client.query<{ id: string }>(
-        `INSERT INTO queue.outbox_events
+        `INSERT INTO runtime.outbox_events
            (tenant_id, event_type, aggregate_id, idempotency_key, payload)
          VALUES ($1, $2, $3, $4, $5::jsonb)
          ON CONFLICT (idempotency_key) DO NOTHING

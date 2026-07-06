@@ -7,7 +7,7 @@ import { JobPriority } from './job-options';
  * Registers the `event_type → queue` routes the transactional-outbox relay
  * drains into (Phase 3d). Worker-only. Until these exist the relay defers every
  * row (no-route). With them registered + `OUTBOX_RELAY_ENABLED=true`, the relay
- * pushes each `queue.outbox_events` row into the outbound queue for delivery.
+ * pushes each `runtime.outbox_events` row into the outbound queue for delivery.
  *
  * All current cross-product side effects are WhatsApp sends → the `outbound`
  * queue / OutboundProcessor.
