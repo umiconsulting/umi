@@ -27,6 +27,7 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
+    "pretest": "npm run build",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {

@@ -85,7 +85,7 @@ export const CASH_SCAN_ACTIONS = ['VISIT', 'REDEEM', 'BIRTHDAY_REDEEM'] as const
 
 /** POST /api/:slug/admin/scan — mirrors ScanDto. */
 export const ScanRequest = z.object({
-  qrPayload: z.string().min(1),
+  qrPayload: z.string(),
   action: z.enum(CASH_SCAN_ACTIONS).optional(),
   actions: z.array(z.enum(CASH_SCAN_ACTIONS)).min(1).max(3).optional(),
 });
@@ -93,7 +93,7 @@ export type ScanRequest = z.infer<typeof ScanRequest>;
 
 /** POST /api/:slug/admin/topup — mirrors TopupDto (min $1.00). */
 export const TopupRequest = z.object({
-  cardId: z.string().min(1),
+  cardId: z.string(),
   amountCentavos: z.number().int().min(100),
   note: z.string().max(200).optional(),
   idempotencyKey: z.string().max(80).optional(),
@@ -102,27 +102,53 @@ export type TopupRequest = z.infer<typeof TopupRequest>;
 
 /** POST /api/:slug/admin/purchase — mirrors PurchaseDto (min $0.01). */
 export const PurchaseRequest = z.object({
-  cardId: z.string().min(1),
+  cardId: z.string(),
   amountCentavos: z.number().int().min(1),
   note: z.string().max(200).optional(),
   idempotencyKey: z.string().max(80).optional(),
 });
 export type PurchaseRequest = z.infer<typeof PurchaseRequest>;
 
-/** POST /api/:slug/admin/gift-cards — mirrors GiftCardCreateDto. Requires at least
- *  one recipient channel (email or phone), matching the two `@ValidateIf` rules. */
+/** POST /api/:slug/admin/gift-cards — mirrors GiftCardCreateDto. The two
+ *  `@ValidateIf` rules mean each recipient field is validated *only when it is the
+ *  sole channel*: email must be a valid email when no phone is given, phone must be
+ *  ≤20 chars when no email is given, and at least one is required. When both are
+ *  present the DTO validates neither — reproduced here so the contract accepts
+ *  exactly what the server accepts. */
 export const GiftCardCreateRequest = z
   .object({
     amountCentavos: z.number().int().min(100),
     senderName: z.string().max(100).optional(),
     message: z.string().max(300).optional(),
-    recipientEmail: z.string().email().optional(),
-    recipientPhone: z.string().max(20).optional(),
+    recipientEmail: z.string().optional(),
+    recipientPhone: z.string().optional(),
     recipientName: z.string().max(100).optional(),
   })
-  .refine((v) => Boolean(v.recipientEmail || v.recipientPhone), {
-    message: 'Se requiere email o teléfono del destinatario',
-    path: ['recipientEmail'],
+  .superRefine((v, ctx) => {
+    if (!v.recipientEmail && !v.recipientPhone) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['recipientEmail'],
+        message: 'Se requiere email o teléfono del destinatario',
+      });
+      return;
+    }
+    // @ValidateIf(o => !o.recipientPhone) @IsEmail
+    if (!v.recipientPhone && v.recipientEmail && !z.string().email().safeParse(v.recipientEmail).success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['recipientEmail'],
+        message: 'Se requiere email o teléfono del destinatario',
+      });
+    }
+    // @ValidateIf(o => !o.recipientEmail) @MaxLength(20)
+    if (!v.recipientEmail && v.recipientPhone && v.recipientPhone.length > 20) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['recipientPhone'],
+        message: 'recipientPhone must be at most 20 characters',
+      });
+    }
   });
 export type GiftCardCreateRequest = z.infer<typeof GiftCardCreateRequest>;
 

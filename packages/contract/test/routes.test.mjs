@@ -46,8 +46,17 @@ test('cash slug-scoped routes (umi-cash surface) — byte-exact to controllers',
   assert.equal(routes.cash.slug.settings('cafe'), '/api/cafe/admin/settings');
   assert.equal(routes.cash.slug.rewardConfig('cafe'), '/api/cafe/admin/reward-config');
   assert.equal(routes.cash.slug.stats('cafe'), '/api/cafe/admin/stats');
-  assert.equal(routes.cash.slug.members('cafe'), '/api/cafe/customers');
+  assert.equal(routes.cash.slug.analytics('cafe'), '/api/cafe/admin/analytics');
+  assert.equal(routes.cash.slug.registerMember('cafe'), '/api/cafe/customers');
   assert.equal(routes.cash.slug.gift('cafe', 'GIFT-1'), '/api/cafe/gift/GIFT-1');
+});
+
+test('routes entry is zod-free (dashboard bundle constraint)', () => {
+  // /routes is advertised as importing nothing — the dashboard consumes it to
+  // keep zod out of the browser bundle. Guard against a future zod import.
+  const fs = require('node:fs');
+  const src = fs.readFileSync(require.resolve('../dist/routes.cjs'), 'utf8');
+  assert.equal(/require\(['"]zod['"]\)/.test(src), false);
 });
 
 test('slug + gift code are URL-encoded', () => {

@@ -13,6 +13,9 @@ const {
   GiftCardCreateRequest,
   RegisterMemberRequest,
   GiftRedeemRequest,
+  LoginRequest,
+  SessionResponse,
+  OkResponse,
 } = require('../dist/index.cjs');
 
 test('ScanRequest', () => {
@@ -20,7 +23,8 @@ test('ScanRequest', () => {
   assert.ok(ScanRequest.safeParse({ qrPayload: 'q', action: 'VISIT' }).success);
   assert.ok(ScanRequest.safeParse({ qrPayload: 'q', actions: ['VISIT', 'REDEEM'] }).success);
   assert.equal(ScanRequest.safeParse({ qrPayload: 'q', action: 'NOPE' }).success, false);
-  assert.equal(ScanRequest.safeParse({ qrPayload: '' }).success, false);
+  assert.ok(ScanRequest.safeParse({ qrPayload: '' }).success); // bare @IsString accepts empty
+  assert.equal(ScanRequest.safeParse({}).success, false); // qrPayload required
   assert.equal(
     ScanRequest.safeParse({ qrPayload: 'q', actions: ['VISIT', 'REDEEM', 'BIRTHDAY_REDEEM', 'VISIT'] }).success,
     false,
@@ -40,11 +44,17 @@ test('PurchaseRequest — $0.01 floor', () => {
   assert.equal(PurchaseRequest.safeParse({ cardId: 'c', amountCentavos: 0 }).success, false);
 });
 
-test('GiftCardCreateRequest — requires a recipient channel', () => {
+test('GiftCardCreateRequest — mirrors the DTO @ValidateIf conditionals', () => {
+  // sole channel is validated
   assert.ok(GiftCardCreateRequest.safeParse({ amountCentavos: 100, recipientEmail: 'a@b.co' }).success);
   assert.ok(GiftCardCreateRequest.safeParse({ amountCentavos: 100, recipientPhone: '5550001' }).success);
+  // at least one required
   assert.equal(GiftCardCreateRequest.safeParse({ amountCentavos: 100 }).success, false);
+  // email-only must be valid; phone-only must be ≤20
   assert.equal(GiftCardCreateRequest.safeParse({ amountCentavos: 100, recipientEmail: 'not-an-email' }).success, false);
+  assert.equal(GiftCardCreateRequest.safeParse({ amountCentavos: 100, recipientPhone: '0'.repeat(21) }).success, false);
+  // both present → the DTO validates NEITHER, so a garbage email alongside a phone is accepted
+  assert.ok(GiftCardCreateRequest.safeParse({ amountCentavos: 100, recipientEmail: 'garbage', recipientPhone: '5550001' }).success);
 });
 
 test('RegisterMemberRequest — real calendar birthDate', () => {
@@ -58,4 +68,21 @@ test('RegisterMemberRequest — real calendar birthDate', () => {
 test('GiftRedeemRequest — both channels optional', () => {
   assert.ok(GiftRedeemRequest.safeParse({}).success);
   assert.ok(GiftRedeemRequest.safeParse({ phone: '5550001' }).success);
+});
+
+test('session schemas (auth surface) — representative parse', () => {
+  assert.ok(LoginRequest.safeParse({ username: 'u', password: 'p' }).success);
+  assert.equal(LoginRequest.safeParse({ username: 'u' }).success, false);
+  assert.ok(OkResponse.safeParse({ ok: true }).success);
+  assert.equal(OkResponse.safeParse({ ok: false }).success, false);
+  assert.ok(
+    SessionResponse.safeParse({
+      session: {
+        user: { id: '1', email: 'a@b.co', displayName: null },
+        tenants: [{ id: 't', slug: 's', name: 'n', roles: ['owner'] }],
+        provider: 'local',
+        accessExpiresIn: 1800,
+      },
+    }).success,
+  );
 });
