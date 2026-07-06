@@ -25,13 +25,13 @@ mkdir -p "${LOG_DIR}"
 FILES=(
   00_foundation
   11_tenant_core
-  10_umi
   12_tenant_commerce
   13_tenant_loyalty
   14_tenant_comms
   15_tenant_ops
   16_runtime
   17_observability
+  18_umi
   90_rls
 )
 

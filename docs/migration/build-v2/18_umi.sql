@@ -1,5 +1,5 @@
 -- =============================================================================
--- 10_umi.sql  (canonical rebuild v2 — schema `umi`, SEALED from umi_app)
+-- 18_umi.sql  (canonical rebuild v2 — schema `umi`, SEALED from umi_app)
 --
 -- Umi's OWN business / control-plane: the prospect funnel that sits OUTSIDE any
 -- customer tenant, the per-tenant billing subscription + its line items, and
@@ -181,7 +181,7 @@ create table if not exists umi.invoice (
   period_end      date,
   status          text not null default 'draft'
     check (status in ('draft', 'open', 'paid', 'void', 'uncollectible')),
-  idempotency_key text,
+  idempotency_key text not null,
   metadata        jsonb not null default '{}'::jsonb,
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),

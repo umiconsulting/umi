@@ -50,6 +50,26 @@ set search_path = tenant, public, extensions;
 --   visits_this_cycle, pending_rewards (visits = COUNT(tenant.visit)).
 --   account_id -> customer_id (loyalty.accounts folds into tenant.customer).
 -- ===========================================================================
+-- tenant.loyalty_settings <- loyalty.programs (the tenant's single loyalty-program
+--   config; one row per tenant). card_prefix drives card-number generation and
+--   birthday_reward_enabled gates the birthday cron — live facts, not dead config.
+create table if not exists tenant.loyalty_settings (
+  id                      uuid not null default gen_random_uuid(),
+  tenant_id               uuid not null references tenant.tenant(id) on delete cascade,
+  card_prefix             text,
+  topup_enabled           boolean not null default true,
+  self_registration       boolean not null default true,
+  birthday_reward_enabled boolean not null default false,
+  birthday_reward_name    text,
+  pass_style              jsonb not null default '{}'::jsonb,
+  branding                jsonb not null default '{}'::jsonb,
+  metadata                jsonb not null default '{}'::jsonb,
+  created_at              timestamptz not null default now(),
+  updated_at              timestamptz not null default now(),
+  primary key (tenant_id, id),
+  unique (tenant_id)                                       -- one program per tenant
+);
+
 create table if not exists tenant.card (
   id           uuid not null default gen_random_uuid(),
   tenant_id    uuid not null references tenant.tenant(id) on delete cascade,
@@ -109,9 +129,9 @@ create table if not exists tenant.card_ledger (
 create index if not exists tenant_card_ledger_card_idx
   on tenant.card_ledger (tenant_id, card_id, created_at desc);
 create index if not exists tenant_card_ledger_reason_idx
-  on tenant.card_ledger (reason);
+  on tenant.card_ledger (tenant_id, reason);
 create index if not exists tenant_card_ledger_source_idx
-  on tenant.card_ledger (source_type, source_id)
+  on tenant.card_ledger (tenant_id, source_type, source_id)
   where source_type is not null;
 
 -- ===========================================================================

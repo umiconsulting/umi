@@ -110,7 +110,10 @@ begin
     for p in select polname from pg_policy where polrelid='tenant.channel'::regclass loop
       execute format('drop policy if exists %I on tenant.channel', p.polname);
     end loop;
-    create policy global_catalog_read on tenant.channel for all using (true) with check (false);
+    -- read-only for the request path. `for all using(true)` would let umi_app DELETE
+    -- the whole global catalog (DELETE is USING-gated, not WITH CHECK). SELECT-only +
+    -- an explicit write REVOKE in §5 closes that. Worker (BYPASSRLS) seeds it.
+    create policy global_catalog_read on tenant.channel for select using (true);
   end if;
 end $$;
 
@@ -170,10 +173,15 @@ grant usage on schema tenant to umi_app;
 grant select, insert, update, delete on all tables in schema tenant to umi_app;
 alter default privileges in schema tenant grant select, insert, update, delete on tables to umi_app;
 
+-- channel is a GLOBAL read-only catalog for the request path — strip the write
+-- grants the blanket grant just handed umi_app (the SELECT-only policy blocks
+-- INSERT/UPDATE, but DELETE is USING-gated). Worker seeds/maintains it.
+revoke insert, update, delete on tenant.channel from umi_app, public;
+
 -- 5a. login password columns — never readable/writable by umi_app.
 revoke all on tenant.login from umi_app, public;
 revoke all (password_salt, password_hash, password_algorithm) on tenant.login from umi_app, public;
-grant select (id, auth_subject, email, phone, display_name, status, created_at, updated_at)
+grant select (id, auth_subject, email, phone, display_name, contact_id, status, created_at, updated_at)
   on tenant.login to umi_app;
 grant update (email, phone, display_name, status, updated_at) on tenant.login to umi_app;
 

@@ -220,6 +220,7 @@ create table if not exists tenant.order_item (
     check (unit_price_cents >= 0),
   notes             text,
   is_cancelled      boolean not null default false,
+  kitchen_status    text,                                  -- per-line KDS lifecycle (restored: KDS tracks per-item progress)
   metadata          jsonb not null default '{}'::jsonb,
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now(),
@@ -249,7 +250,9 @@ create table if not exists tenant.order_event (
   id               uuid not null default gen_random_uuid(),
   tenant_id        uuid not null references tenant.tenant(id) on delete cascade,
   order_id         uuid not null,
-  event_kind       text,                                  -- 'status_change'|'cancellation'|kitchen kind
+  event_kind       text                                   -- full/partial cancel distinction rides here
+    check (event_kind is null or event_kind in
+      ('status_change','kitchen','cancellation','partial_cancellation','note')),
   old_status       text,
   new_status       text,                                  -- the state transitioned into
   kitchen_status   text,                                  -- absorbed from ops.orders.kitchen_status

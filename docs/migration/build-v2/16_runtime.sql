@@ -401,6 +401,20 @@ create index if not exists runtime_pass_device_pass_idx
 --                 `runtime`; this REVOKE is belt-and-suspenders. NO RLS is
 --                 authored here or in 90_rls.sql — runtime is out of the loop.
 -- ===========================================================================
+-- runtime.device_event <- device.events (device lifecycle audit: paired/unpaired/
+--   offline/online/firmware). Operational audit, not a business fact — worker-only.
+create table if not exists runtime.device_event (
+  id           uuid not null default gen_random_uuid() primary key,
+  tenant_id    uuid,                                       -- soft (device is tenant-scoped)
+  device_id    uuid,                                       -- soft ref (no cross-schema FK)
+  session_id   uuid,
+  event_type   text not null,
+  payload      jsonb not null default '{}'::jsonb,
+  occurred_at  timestamptz not null default now()
+);
+create index if not exists runtime_device_event_device_idx
+  on runtime.device_event (device_id, occurred_at desc);
+
 grant select on all tables in schema runtime to umi_worker, umi_readonly;
 grant insert, update, delete on all tables in schema runtime to umi_worker;
 

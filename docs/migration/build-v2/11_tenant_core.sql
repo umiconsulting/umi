@@ -202,6 +202,13 @@ create index if not exists tenant_contact_identity_contact_idx
   on tenant.contact_identity (tenant_id, contact_id);
 create index if not exists tenant_contact_identity_lookup_idx
   on tenant.contact_identity (tenant_id, channel_id, normalized_value);
+-- external_id (issuer subject) dedup. The (tenant,channel,normalized_value) unique
+-- escapes via NULLs (NULLS DISTINCT), so identities carried only by external_id
+-- (a Meta PSID, an unparseable phone) would otherwise get zero uniqueness and the
+-- resolver could mint unlimited duplicate contact/customer rows.
+create unique index if not exists tenant_contact_identity_external_uidx
+  on tenant.contact_identity (tenant_id, channel_id, external_id)
+  where external_id is not null;
 -- one primary identity per (contact, channel).
 create unique index if not exists tenant_contact_identity_primary_uidx
   on tenant.contact_identity (tenant_id, contact_id, channel_id)
