@@ -44,6 +44,22 @@ begin;
 
 set search_path = tenant, public, extensions;
 
+-- ---------------------------------------------------------------------------
+-- tenant.f_branch_search_text(name, aliases) — the branch-name trigram target
+--   as ONE immutable boundary. IMMUTABILITY NOTE (from 2026-07-03 apply):
+--   array_to_string(anyarray, text) is only STABLE, so inlining it into a
+--   generated-column expression fails 42P17. A LANGUAGE plpgsql function is
+--   never inlined, so its DECLARED immutability is trusted. Body stays fully
+--   qualified; do NOT add SET search_path (would defeat immutability). f_unaccent
+--   is intentionally DROPPED per the PR2 decision (lowercase + pg_trgm only).
+-- ---------------------------------------------------------------------------
+create or replace function tenant.f_branch_search_text(p_name text, p_aliases text[])
+  returns text language plpgsql immutable parallel safe as $$
+begin
+  return lower(coalesce(p_name, '') || ' ' || coalesce(array_to_string(p_aliases, ' '), ''));
+end;
+$$;
+
 -- ===========================================================================
 -- tenant.tenant  <- core.tenants
 --   The RLS ROOT. It IS the tenant, so it keys on `id` (NO tenant_id column);
@@ -122,6 +138,13 @@ create table if not exists tenant.branch (
   business_id uuid,
   slug        text,
   name        text not null,
+  -- Branch-resolution profile (was core.locations.aliases/descriptor/search_text).
+  -- search_text is the trigram match target; f_unaccent is DROPPED per the PR2
+  -- decision (rely on lower() + pg_trgm word_similarity).
+  aliases     text[] not null default '{}',
+  descriptor  text,
+  search_text text generated always as
+    (tenant.f_branch_search_text(name, aliases)) stored,
   address     text,
   lat         double precision,
   lng         double precision,
@@ -142,6 +165,9 @@ create index if not exists tenant_branch_tenant_idx
   on tenant.branch (tenant_id, status);
 create index if not exists tenant_branch_business_idx
   on tenant.branch (tenant_id, business_id) where business_id is not null;
+-- trigram target for branch-name/alias fuzzy matching (set_branch resolution).
+create index if not exists tenant_branch_search_trgm_idx
+  on tenant.branch using gin (search_text extensions.gin_trgm_ops);
 
 -- ===========================================================================
 -- tenant.contact  (NEW — thin identity ANCHOR)

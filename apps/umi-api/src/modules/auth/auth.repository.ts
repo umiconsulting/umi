@@ -23,7 +23,10 @@ export interface TenantMembershipSummary {
 }
 
 export interface MembershipAccess {
-  membershipId: string;
+  // null for a SYNTHESIZED global-super_admin access (no explicit tenant_access
+  // edge in the requested tenant). Only ever surfaced to the client as an
+  // informational membership id — never a DB write key.
+  membershipId: string | null;
   tenantId: string;
   slug: string;
   name: string;
@@ -42,8 +45,17 @@ export interface ResetTokenRecord {
 /**
  * Auth/membership/entitlement reads. These run BEFORE any tenant RLS context
  * exists (login resolves which tenants a user has), so they use the worker pool
- * (`query`) with explicit parameterized predicates — never `withTenant`. SQL is
- * ported verbatim from `apps/umi-dashboard/server.js`.
+ * (`query`) with explicit parameterized predicates — never `withTenant`. The
+ * worker pool is also MANDATORY here because the entitlement + RBAC-policy tables
+ * (`umi.subscription_item`, `umi.role_permission`) live in the SEALED `umi`
+ * schema that `umi_app` has no USAGE on.
+ *
+ * 4-schema model (canonical rebuild v2): the old 5-table RBAC graph
+ * (core.tenant_memberships + membership_roles + roles + role_permissions +
+ * permissions) collapses to `tenant.tenant_access` (the per-tenant login↔role
+ * edge, single role) joined against `umi.role_permission` (system-wide
+ * role→permission grants). `super_admin` is Umi's cross-tenant operator: a login
+ * holding ANY active `super_admin` edge can select/access EVERY active tenant.
  */
 @Injectable()
 export class AuthRepository {
@@ -58,7 +70,7 @@ export class AuthRepository {
          u.display_name      AS "displayName",
          u.password_salt     AS "passwordSalt",
          u.password_hash     AS "passwordHash"
-       FROM core.users AS u
+       FROM tenant.login AS u
        WHERE lower(u.email) = $1
          AND u.password_hash IS NOT NULL
        LIMIT 1`,
@@ -71,7 +83,7 @@ export class AuthRepository {
   async findUserById(userId: string): Promise<UserSummary | null> {
     const { rows } = await this.pg.query<UserSummary>(
       `SELECT u.id::text AS "userId", u.email, u.display_name AS "displayName"
-       FROM core.users AS u
+       FROM tenant.login AS u
        WHERE u.id = $1::uuid AND u.password_hash IS NOT NULL
        LIMIT 1`,
       [userId],
@@ -79,26 +91,34 @@ export class AuthRepository {
     return rows[0] ?? null;
   }
 
-  /** Active tenant memberships + role keys for the login response body. */
+  /**
+   * Active tenant memberships + role for the login response body / tenant picker.
+   * Single role per (login, tenant) now. A global super_admin (any active
+   * super_admin edge) sees EVERY active tenant, tagged with its explicit role
+   * where one exists, else 'super_admin'.
+   */
   async findTenantsForUser(
     userId: string,
   ): Promise<TenantMembershipSummary[]> {
     const { rows } = await this.pg.query<TenantMembershipSummary>(
-      `SELECT
+      `WITH sa AS (
+         SELECT EXISTS (
+           SELECT 1 FROM tenant.tenant_access
+           WHERE login_id = $1::uuid AND role = 'super_admin' AND status = 'active'
+         ) AS is_sa
+       )
+       SELECT
          t.id::text AS "id",
          t.slug     AS "slug",
          t.name     AS "name",
-         COALESCE(
-           array_agg(r.key ORDER BY r.key) FILTER (WHERE r.key IS NOT NULL),
-           '{}'
-         ) AS "roles"
-       FROM core.tenant_memberships AS tm
-       JOIN core.tenants AS t ON t.id = tm.tenant_id
-       LEFT JOIN core.membership_roles AS mr ON mr.membership_id = tm.id
-       LEFT JOIN core.roles AS r ON r.id = mr.role_id
-       WHERE tm.user_id = $1::uuid
-         AND tm.status = 'active'
-       GROUP BY t.id, t.slug, t.name
+         ARRAY[COALESCE(ta.role, 'super_admin')] AS "roles"
+       FROM tenant.tenant AS t
+       LEFT JOIN tenant.tenant_access AS ta
+         ON ta.tenant_id = t.id
+        AND ta.login_id  = $1::uuid
+        AND ta.status    = 'active'
+       WHERE t.status = 'active'
+         AND (ta.id IS NOT NULL OR (SELECT is_sa FROM sa))
        ORDER BY t.slug`,
       [userId],
     );
@@ -106,33 +126,50 @@ export class AuthRepository {
   }
 
   /**
-   * Membership + roles + permissions for one (user, tenant). Drives
-   * TenantAccessGuard. Null ⇒ no active membership (404 tenant_not_found).
+   * Membership + role + permissions for one (user, tenant). Drives
+   * TenantAccessGuard. Null ⇒ no active access (404 tenant_not_found).
+   * Permissions come from the sealed `umi.role_permission` catalog. A global
+   * super_admin with no explicit edge here is SYNTHESIZED as
+   * {membershipId:null, role:'super_admin', permissions:['*']} so the guard
+   * grants it (never 404s Umi's own operator).
    */
   async findMembershipAccess(
     userId: string,
     tenantId: string,
   ): Promise<MembershipAccess | null> {
     const { rows } = await this.pg.query<MembershipAccess>(
-      `SELECT
-         tm.id::text AS "membershipId",
+      `WITH sa AS (
+         SELECT EXISTS (
+           SELECT 1 FROM tenant.tenant_access
+           WHERE login_id = $1::uuid AND role = 'super_admin' AND status = 'active'
+         ) AS is_sa
+       ),
+       edge AS (
+         SELECT ta.id, ta.role
+         FROM tenant.tenant_access AS ta
+         WHERE ta.login_id = $1::uuid
+           AND ta.tenant_id = $2::uuid
+           AND ta.status = 'active'
+         LIMIT 1
+       )
+       SELECT
+         e.id::text  AS "membershipId",
          t.id::text  AS "tenantId",
          t.slug      AS "slug",
          t.name      AS "name",
          t.timezone  AS "timezone",
-         array_remove(array_agg(DISTINCT r.key), NULL) AS "roles",
-         array_remove(array_agg(DISTINCT p.key), NULL) AS "permissions"
-       FROM core.tenant_memberships AS tm
-       JOIN core.tenants AS t ON t.id = tm.tenant_id
-       LEFT JOIN core.membership_roles AS mr ON mr.membership_id = tm.id
-       LEFT JOIN core.roles AS r ON r.id = mr.role_id
-       LEFT JOIN core.role_permissions AS rp ON rp.role_id = r.id
-       LEFT JOIN core.permissions AS p ON p.id = rp.permission_id
-       WHERE tm.user_id = $1::uuid
-         AND tm.tenant_id = $2::uuid
-         AND tm.status = 'active'
+         ARRAY[COALESCE(e.role, 'super_admin')] AS "roles",
+         COALESCE(
+           (SELECT array_agg(rp.permission_key)
+              FROM umi.role_permission AS rp
+             WHERE rp.role = COALESCE(e.role, 'super_admin')),
+           '{}'
+         ) AS "permissions"
+       FROM tenant.tenant AS t
+       LEFT JOIN edge AS e ON true
+       WHERE t.id = $2::uuid
          AND t.status = 'active'
-       GROUP BY tm.id, t.id
+         AND (e.id IS NOT NULL OR (SELECT is_sa FROM sa))
        LIMIT 1`,
       [userId, tenantId],
     );
@@ -142,7 +179,7 @@ export class AuthRepository {
   /** Resolve a tenant id from its slug (for the legacy `/:slug/...` routes). */
   async tenantIdForSlug(slug: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ id: string }>(
-      `SELECT id::text AS id FROM core.tenants WHERE slug = $1 LIMIT 1`,
+      `SELECT id::text AS id FROM tenant.tenant WHERE slug = $1 LIMIT 1`,
       [slug],
     );
     return rows[0]?.id ?? null;
@@ -153,37 +190,40 @@ export class AuthRepository {
     slug: string,
   ): Promise<{ id: string; name: string; slug: string } | null> {
     const { rows } = await this.pg.query<{ id: string; name: string; slug: string }>(
-      `SELECT id::text AS id, name, slug FROM core.tenants WHERE slug = $1 LIMIT 1`,
+      `SELECT id::text AS id, name, slug FROM tenant.tenant WHERE slug = $1 LIMIT 1`,
       [slug],
     );
     return rows[0] ?? null;
   }
 
-  /** Tenant-level product entitlement status (location_id IS NULL row). */
+  /**
+   * Tenant-level product entitlement status. Entitlements live in the sealed
+   * `umi.subscription_item` (tenant granularity — no location_id), read on the
+   * worker pool.
+   */
   async productStatus(
     tenantId: string,
     productKey: string,
   ): Promise<string | null> {
     const { rows } = await this.pg.query<{ status: string }>(
       `SELECT status
-       FROM core.product_instances
+       FROM umi.subscription_item
        WHERE tenant_id = $1::uuid
          AND product_key = $2
-         AND location_id IS NULL
        LIMIT 1`,
       [tenantId, productKey],
     );
     return rows[0]?.status ?? null;
   }
 
-  // ── password reset ──
+  // ── password reset (tenant.password_reset_token, login-keyed) ──
   async insertResetToken(
     userId: string,
     tokenHash: string,
     expiresAt: Date,
   ): Promise<void> {
     await this.pg.query(
-      `INSERT INTO core.password_reset_tokens (user_id, token_hash, expires_at)
+      `INSERT INTO tenant.password_reset_token (login_id, token_hash, expires_at)
        VALUES ($1::uuid, $2, $3)`,
       [userId, tokenHash, expiresAt],
     );
@@ -191,9 +231,9 @@ export class AuthRepository {
 
   async findResetToken(tokenHash: string): Promise<ResetTokenRecord | null> {
     const { rows } = await this.pg.query<ResetTokenRecord>(
-      `SELECT id::text, user_id::text AS "userId",
+      `SELECT id::text, login_id::text AS "userId",
               expires_at AS "expiresAt", used_at AS "usedAt"
-       FROM core.password_reset_tokens
+       FROM tenant.password_reset_token
        WHERE token_hash = $1
        LIMIT 1`,
       [tokenHash],
@@ -207,7 +247,7 @@ export class AuthRepository {
     hash: string,
   ): Promise<void> {
     await this.pg.query(
-      `UPDATE core.users
+      `UPDATE tenant.login
        SET password_salt = $2, password_hash = $3, updated_at = now()
        WHERE id = $1::uuid`,
       [userId, salt, hash],
@@ -216,7 +256,7 @@ export class AuthRepository {
 
   async markResetTokenUsed(tokenId: string): Promise<void> {
     await this.pg.query(
-      `UPDATE core.password_reset_tokens SET used_at = now() WHERE id = $1::uuid`,
+      `UPDATE tenant.password_reset_token SET used_at = now() WHERE id = $1::uuid`,
       [tokenId],
     );
   }

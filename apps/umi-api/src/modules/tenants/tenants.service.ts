@@ -17,7 +17,8 @@ export interface Capabilities {
   selectedLocation: LocationRow | null;
   locations: LocationRow[];
   membership: {
-    id: string;
+    // null for a synthesized global-super_admin access (no explicit edge here).
+    id: string | null;
     role: string | null;
     roles: string[];
     permissions: string[];

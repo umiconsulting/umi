@@ -30,73 +30,87 @@ export interface LocationProfileRow extends LocationRow {
 }
 
 /**
- * Tenant/location/product reads + admin writes. Tenant-scoped queries run on the
+ * Tenant/branch/product reads + admin writes. Tenant-scoped queries run on the
  * request path after TenantAccessGuard set the RLS context, so they go through
  * `withTenant` (umi_app, RLS) while still carrying explicit `tenant_id`
- * predicates (defense in depth). The cross-tenant `/me/tenants` list has no
- * single tenant context, so it uses the worker pool. SQL ported from server.js.
+ * predicates (defense in depth). The cross-tenant `/me/tenants` list and product
+ * ENTITLEMENTS use the worker pool — the latter is MANDATORY because entitlements
+ * moved to the SEALED `umi.subscription_item` (no umi_app USAGE on `umi`).
+ *
+ * 4-schema model (canonical rebuild v2): core.tenants -> tenant.tenant,
+ * core.locations -> tenant.branch, core.product_instances -> umi.subscription_item
+ * (tenant granularity — no location_id), RBAC -> tenant.tenant_access single role.
  */
 @Injectable()
 export class TenantsRepository {
   constructor(private readonly pg: PgService) {}
 
-  /** Active memberships for the authed user (the `/me/tenants` list). */
+  /**
+   * Active memberships for the authed user (the `/me/tenants` list). Single role
+   * per (login, tenant). A global super_admin (any active super_admin edge) sees
+   * EVERY active tenant, tagged with its explicit role where one exists.
+   */
   async tenantsForUser(userId: string): Promise<TenantSummary[]> {
     const { rows } = await this.pg.query<TenantSummary>(
-      `SELECT
+      `WITH sa AS (
+         SELECT EXISTS (
+           SELECT 1 FROM tenant.tenant_access
+           WHERE login_id = $1::uuid AND role = 'super_admin' AND status = 'active'
+         ) AS is_sa
+       )
+       SELECT
          t.id::text AS "id",
          t.slug     AS "slug",
          t.name     AS "name",
          t.timezone AS "timezone",
-         array_remove(array_agg(DISTINCT r.key), NULL) AS "roles"
-       FROM core.tenant_memberships AS tm
-       JOIN core.tenants AS t ON t.id = tm.tenant_id
-       LEFT JOIN core.membership_roles AS mr ON mr.membership_id = tm.id
-       LEFT JOIN core.roles AS r ON r.id = mr.role_id
-       WHERE tm.user_id = $1::uuid
-         AND tm.status = 'active'
-         AND t.status = 'active'
-       GROUP BY t.id
+         ARRAY[COALESCE(ta.role, 'super_admin')] AS "roles"
+       FROM tenant.tenant AS t
+       LEFT JOIN tenant.tenant_access AS ta
+         ON ta.tenant_id = t.id
+        AND ta.login_id  = $1::uuid
+        AND ta.status    = 'active'
+       WHERE t.status = 'active'
+         AND (ta.id IS NOT NULL OR (SELECT is_sa FROM sa))
        ORDER BY t.slug`,
       [userId],
     );
     return rows;
   }
 
-  /** Tenant-level product entitlements (location_id IS NULL rows). */
+  /**
+   * Tenant-level product entitlements. Reads the SEALED umi.subscription_item on
+   * the WORKER pool (umi_app has no USAGE on `umi`). Entitlements are tenant-
+   * grained now — locationId is always null (kept for result-shape stability).
+   */
   async loadProducts(
     tenantId: string,
   ): Promise<Record<string, ProductInstance>> {
-    const { rows } = await this.pg.withTenant((c) =>
-      c.query<{
-        productKey: string;
-        status: string;
-        locationId: string | null;
-        config: Record<string, unknown> | null;
-      }>(
-        `SELECT product_key AS "productKey", status,
-                location_id::text AS "locationId", config
-         FROM core.product_instances
-         WHERE tenant_id = $1::uuid AND location_id IS NULL
-         ORDER BY product_key`,
-        [tenantId],
-      ),
+    const { rows } = await this.pg.query<{
+      productKey: string;
+      status: string;
+      config: Record<string, unknown> | null;
+    }>(
+      `SELECT product_key AS "productKey", status, config
+         FROM umi.subscription_item
+        WHERE tenant_id = $1::uuid
+        ORDER BY product_key`,
+      [tenantId],
     );
     return Object.fromEntries(
       rows.map((r) => [
         r.productKey,
-        { status: r.status, locationId: r.locationId, config: r.config ?? {} },
+        { status: r.status, locationId: null, config: r.config ?? {} },
       ]),
     );
   }
 
-  /** Locations with the (tenant) timezone, oldest first (tenant-neutral, deterministic). */
+  /** Branches with the (tenant) timezone, oldest first (tenant-neutral, deterministic). */
   async loadLocations(tenantId: string): Promise<LocationRow[]> {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<LocationRow>(
         `SELECT l.id::text, l.slug, l.name, t.timezone, l.status
-         FROM core.locations AS l
-         JOIN core.tenants AS t ON t.id = l.tenant_id
+         FROM tenant.branch AS l
+         JOIN tenant.tenant AS t ON t.id = l.tenant_id
          WHERE l.tenant_id = $1::uuid
          ORDER BY l.created_at ASC, l.id ASC`,
         [tenantId],
@@ -126,7 +140,7 @@ export class TenantsRepository {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<{ id: string }>(
         `SELECT id::text AS id
-         FROM core.locations
+         FROM tenant.branch
          WHERE tenant_id = $1::uuid AND status = 'active'
          ORDER BY created_at ASC, id ASC
          LIMIT 1`,
@@ -144,7 +158,7 @@ export class TenantsRepository {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<LocationRow>(
         `SELECT id::text, slug, name, NULL::text AS timezone, status
-         FROM core.locations
+         FROM tenant.branch
          WHERE tenant_id = $1::uuid AND id = $2::uuid AND status = 'active'
          LIMIT 1`,
         [tenantId, locationId],
@@ -166,7 +180,7 @@ export class TenantsRepository {
     if (requestedLocationId) {
       const { rows } = await this.pg.query<{ id: string }>(
         `SELECT id::text AS id
-         FROM core.locations
+         FROM tenant.branch
          WHERE tenant_id = $1::uuid AND id = $2::uuid AND status = 'active'
          LIMIT 1`,
         [tenantId, requestedLocationId],
@@ -178,7 +192,7 @@ export class TenantsRepository {
     }
     const { rows } = await this.pg.query<{ id: string }>(
       `SELECT id::text AS id
-       FROM core.locations
+       FROM tenant.branch
        WHERE tenant_id = $1::uuid AND status = 'active'
        ORDER BY created_at ASC, id ASC
        LIMIT 1`,
@@ -197,7 +211,7 @@ export class TenantsRepository {
   ): Promise<Array<{ id: string; name: string }>> {
     const { rows } = await this.pg.query<{ id: string; name: string }>(
       `SELECT id::text AS id, name
-       FROM core.locations
+       FROM tenant.branch
        WHERE tenant_id = $1::uuid AND status = 'active'
        ORDER BY created_at ASC, id ASC`,
       [tenantId],
@@ -226,8 +240,8 @@ export class TenantsRepository {
       `SELECT id::text AS id,
               name,
               aliases,
-              word_similarity(core.f_unaccent(lower($2)), search_text) AS sim
-         FROM core.locations
+              word_similarity(lower($2), search_text) AS sim
+         FROM tenant.branch
         WHERE tenant_id = $1::uuid AND status = 'active'
         ORDER BY sim DESC, created_at ASC`,
       [tenantId, query],
@@ -240,10 +254,10 @@ export class TenantsRepository {
     }));
   }
 
-  /** Worker-pool read of the tenant's canonical timezone (`core.tenants.timezone`). */
+  /** Worker-pool read of the tenant's canonical timezone (`tenant.tenant.timezone`). */
   async getTenantTimezoneWorker(tenantId: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ timezone: string | null }>(
-      `SELECT timezone FROM core.tenants WHERE id = $1::uuid`,
+      `SELECT timezone FROM tenant.tenant WHERE id = $1::uuid`,
       [tenantId],
     );
     return rows[0]?.timezone ?? null;
@@ -255,7 +269,7 @@ export class TenantsRepository {
   ): Promise<void> {
     await this.pg.withTenant((c) =>
       c.query(
-        `UPDATE core.tenants
+        `UPDATE tenant.tenant
          SET name = COALESCE($2, name),
              timezone = COALESCE($3, timezone),
              updated_at = now()
@@ -282,7 +296,7 @@ export class TenantsRepository {
     const setDescriptor = Object.prototype.hasOwnProperty.call(patch, 'descriptor');
     const { rows } = await this.pg.withTenant((c) =>
       c.query<LocationProfileRow>(
-        `UPDATE core.locations
+        `UPDATE tenant.branch
          SET name = COALESCE($3, name),
              timezone = COALESCE($4, timezone),
              status = COALESCE($5, status),
@@ -316,7 +330,7 @@ export class TenantsRepository {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<LocationProfileRow>(
         `SELECT id::text, slug, name, NULL::text AS timezone, status, aliases, descriptor
-         FROM core.locations
+         FROM tenant.branch
          WHERE tenant_id = $1::uuid AND status <> 'archived'
          ORDER BY created_at ASC, id ASC`,
         [tenantId],
