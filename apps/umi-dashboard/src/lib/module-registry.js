@@ -1,4 +1,8 @@
-export const PRODUCT_ACTIVE_STATUSES = new Set(['active', 'trialing'])
+// Single source of the entitlement vocabulary — @umi/contract/entitlements
+// (zero-dep, so no zod enters this browser bundle; resolved via the Vite source
+// alias). Re-exported to keep this module's public surface unchanged.
+import { PRODUCT_ACTIVE_STATUSES } from '@umi/contract/entitlements'
+export { PRODUCT_ACTIVE_STATUSES }
 
 export const MODULES = {
   overview: {

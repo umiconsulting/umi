@@ -4,7 +4,7 @@
  * `modules` map in the capabilities response to decide what to render, so the
  * keys/sections/reasons must match exactly.
  */
-import { PRODUCT_ACTIVE_STATUSES } from '../auth/entitlement.guard';
+import { isProductStatusActive } from '@umi/contract';
 
 export interface ModuleConfig {
   id: string;
@@ -53,7 +53,7 @@ export type ModuleAvailability =
 
 function isProductActive(productKey: string, cap: CapabilitiesShape): boolean {
   const status = cap.products?.[productKey]?.status;
-  return !!status && PRODUCT_ACTIVE_STATUSES.has(status);
+  return isProductStatusActive(status);
 }
 
 function hasRequiredRole(moduleConfig: ModuleConfig, cap: CapabilitiesShape): boolean {

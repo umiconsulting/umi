@@ -1,4 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
+import type { ProductKey } from '@umi/contract';
 
 export const REQUIRE_PRODUCT = 'umi:requireProduct';
 
@@ -7,5 +8,5 @@ export const REQUIRE_PRODUCT = 'umi:requireProduct';
  * EntitlementGuard returns 403 `product_not_active` when the tenant's
  * `core.product_instances.status` is not active/trialing.
  */
-export const RequireProduct = (productKey: string) =>
+export const RequireProduct = (productKey: ProductKey) =>
   SetMetadata(REQUIRE_PRODUCT, productKey);

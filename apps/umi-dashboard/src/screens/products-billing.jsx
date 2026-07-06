@@ -1,4 +1,5 @@
 import React from 'react'
+import { isProductStatusActive } from '@umi/contract/entitlements'
 import { I } from '@/icons.jsx'
 import { useTenant } from '@/lib/tenant-context.jsx'
 
@@ -33,7 +34,7 @@ const PRODUCT_COPY = {
 function ProductCard({ productKey, product }) {
   const copy = PRODUCT_COPY[productKey] || { title: productKey, body: '', icon: 'Settings' }
   const Icon = I[copy.icon] || I.Settings
-  const active = ['active', 'trialing'].includes(product?.status)
+  const active = isProductStatusActive(product?.status)
   return (
     <div className="card fade-up" style={{padding:'22px 24px', display:'flex', gap:18, alignItems:'flex-start'}}>
       <div style={{width:46, height:46, borderRadius:12, background: active ? 'var(--tenant-brand)' : 'var(--canvas-2)', color: active ? '#fff' : 'var(--ink-3)', display:'flex', alignItems:'center', justifyContent:'center'}}>
