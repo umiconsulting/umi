@@ -30,7 +30,29 @@ export const routes = {
     locations: (tenantId: string): string => `${tenantBase(tenantId)}/locations`,
   },
   cash: {
+    // Tenant-scoped surface (dashboard, cookie auth) — /api/tenants/:tenantId/cash/*.
     stats: (tenantId: string): string => `${tenantBase(tenantId)}/cash/stats`,
+    analytics: (tenantId: string): string => `${tenantBase(tenantId)}/cash/analytics`,
+    customers: (tenantId: string): string => `${tenantBase(tenantId)}/cash/customers`,
+    members: (tenantId: string): string => `${tenantBase(tenantId)}/cash/members`,
+    giftCards: (tenantId: string): string => `${tenantBase(tenantId)}/cash/gift-cards`,
+    rewardConfig: (tenantId: string): string => `${tenantBase(tenantId)}/cash/reward-config`,
+    // Slug-scoped surface (umi-cash frontend) — /api/:slug/... . The write + primary
+    // read paths both surfaces call; each byte-exact to the cash-scan / cash-write /
+    // cash-customer / cash controllers (not an exhaustive mirror of every GET).
+    slug: {
+      scan: (slug: string): string => `/api/${enc(slug)}/admin/scan`,
+      topup: (slug: string): string => `/api/${enc(slug)}/admin/topup`,
+      purchase: (slug: string): string => `/api/${enc(slug)}/admin/purchase`,
+      giftCards: (slug: string): string => `/api/${enc(slug)}/admin/gift-cards`,
+      settings: (slug: string): string => `/api/${enc(slug)}/admin/settings`,
+      rewardConfig: (slug: string): string => `/api/${enc(slug)}/admin/reward-config`,
+      stats: (slug: string): string => `/api/${enc(slug)}/admin/stats`,
+      analytics: (slug: string): string => `/api/${enc(slug)}/admin/analytics`,
+      // POST /api/:slug/customers — member registration (name↔path: registers a member).
+      registerMember: (slug: string): string => `/api/${enc(slug)}/customers`,
+      gift: (slug: string, code: string): string => `/api/${enc(slug)}/gift/${enc(code)}`,
+    },
   },
 } as const;
 
