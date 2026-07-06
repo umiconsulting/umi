@@ -98,6 +98,24 @@ create table if not exists tenant.channel (
   created_at             timestamptz not null default now()
 );
 
+-- Seed the GLOBAL channel catalog (idempotent). REQUIRED: normalize_identity +
+-- every contact_identity dedup are unusable without it, and build-v2 shipped no
+-- seed. normalization_rule mirrors tenant.normalize_identity's dispatch; only the
+-- value-keyed channels (phone/whatsapp/sms/email) are deterministically matchable
+-- — Meta PSIDs (instagram/messenger) + pos/web/manual match by external_id, not
+-- value. The app's identity resolver may re-upsert this same set at bootstrap.
+insert into tenant.channel (key, namespace, normalization_rule, deterministic_matchable, default_trust) values
+  ('phone',     null,   'e164',  true,  0.90),
+  ('whatsapp',  'meta', 'e164',  true,  0.85),
+  ('sms',       null,   'e164',  true,  0.85),
+  ('email',     null,   'lower', true,  0.80),
+  ('instagram', 'meta', 'none',  false, 0.60),
+  ('messenger', 'meta', 'none',  false, 0.60),
+  ('pos',       null,   'none',  false, 0.50),
+  ('web',       null,   'none',  false, 0.50),
+  ('manual',    null,   'none',  false, 0.50)
+on conflict (key) do nothing;
+
 -- ===========================================================================
 -- tenant.business  <- ops.businesses
 --   Org node + the tenant's own authored config (brand/config/voice/hours
