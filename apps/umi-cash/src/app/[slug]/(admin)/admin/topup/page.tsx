@@ -51,6 +51,12 @@ export default function TopUpPage() {
     success: boolean; message: string; newBalanceMXN?: string; customer?: string;
   } | null>(null);
 
+  // Stable per-top-up idempotency token: reused if the operator re-taps after a lost
+  // response (so the server dedups instead of double-crediting), and reset on success
+  // or whenever the inputs change (a different intended top-up gets a fresh key).
+  const opKeyRef = useRef<string>('');
+  useEffect(() => { opKeyRef.current = ''; }, [cardId, amount, note]);
+
   // Camera state
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -200,14 +206,16 @@ export default function TopUpPage() {
 
       if (amountCentavos < 100) { setResult({ success: false, message: 'El monto mínimo es $1.00 MXN' }); return; }
 
+      if (!opKeyRef.current) opKeyRef.current = crypto.randomUUID();
       const res = await authedFetch(slug, `/api/${slug}/admin/topup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId: cardId.trim(), amountCentavos, note }),
+        body: JSON.stringify({ cardId: cardId.trim(), amountCentavos, note, idempotencyKey: opKeyRef.current }),
       });
 
       const data = await res.json();
       if (res.ok) {
+        opKeyRef.current = '';
         setResult({ success: true, message: `Recarga exitosa: ${data.amountMXN}`, newBalanceMXN: data.newBalanceMXN, customer: data.customer });
         setCardId(''); setAmount(''); setNote(''); setSelectedCustomer(null);
       } else {

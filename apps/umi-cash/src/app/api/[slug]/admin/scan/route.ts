@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAuth, verifyQRPayload, generateRandomToken } from '@/lib/auth';
+import { requireAuth, generateRandomToken } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getStaffMemberId } from '@/lib/identity';
-import { getActiveRewardConfig, rewardConfigDefaults, findCardByIdentifier } from '@/lib/prisma-helpers';
-import { formatMXN } from '@/lib/currency';
+import { getActiveRewardConfig, rewardConfigDefaults } from '@/lib/prisma-helpers';
+import { resolveScanTarget } from '@/lib/scan-resolve';
+import { lockCard } from '@/lib/wallet';
 import { DEFAULT_CUSTOMER_NAME, SCAN_ACTIONS } from '@/lib/constants';
-import { sendApplePushUpdate } from '@/lib/push-apple';
-import { updateGoogleWalletObject } from '@/lib/pass-google';
+import { triggerWalletUpdates, buildCardSummary, readLifecycleMessage } from '@/lib/scan-helpers';
 import { getTenant, requireActiveSubscription } from '@/lib/tenant';
 import { tenantHour, tenantWeekday, tenantStartOfDay } from '@/lib/timezone';
 import { sendRewardEarnedEmail } from '@/lib/email';
@@ -25,10 +25,12 @@ const ScanSchema = z.object({
 // Fixed processing order — redemptions consume current state before VISIT may add a new reward.
 const ACTION_ORDER = [SCAN_ACTIONS.BIRTHDAY_REDEEM, SCAN_ACTIONS.REDEEM, SCAN_ACTIONS.VISIT] as const;
 
-/** Read the cached lifecycle nudge message off the card's metadata jsonb. */
-function readLifecycleMessage(metadata: unknown): string | null {
-  const m = (metadata ?? {}) as Record<string, unknown>;
-  return (m.lifecycle_message as string) ?? null;
+/** Guard failure raised INSIDE the scan transaction; mapped to an HTTP response. */
+class ScanError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+    this.name = 'ScanError';
+  }
 }
 
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
@@ -52,42 +54,17 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     // Sort into canonical order so callers can't accidentally reorder semantics.
     const actionList = ACTION_ORDER.filter((a) => requested.has(a));
 
-    const qrData = await verifyQRPayload(parsed.qrPayload);
-    if (!qrData) {
-      return NextResponse.json({ error: 'Código QR inválido o expirado' }, { status: 400 });
+    // Resolve QR payload / card number / PHONE → hydrated card (shared with the
+    // preview endpoint via resolveScanTarget, so a phone that previews also commits).
+    const resolved = await resolveScanTarget(tenant.id, parsed.qrPayload);
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.error }, { status: resolved.status });
     }
-
-    // findCardByIdentifier matches by card_number OR id, scoped to the tenant, and
-    // hydrates the customer via account → person.
-    const card = await findCardByIdentifier(qrData.cardId, tenant.id, { person: true });
-
-    if (!card) return NextResponse.json({ error: 'Tarjeta no encontrada' }, { status: 404 });
-
-    if (!qrData.isWalletScan && card.qr_token !== qrData.qrToken) {
-      return NextResponse.json({
-        error: 'Código QR ya fue usado. Pídele al cliente que actualice su código.',
-      }, { status: 400 });
-    }
+    const card = resolved.card;
 
     const includesVisit = actionList.includes(SCAN_ACTIONS.VISIT);
     const includesRedeem = actionList.includes(SCAN_ACTIONS.REDEEM);
     const includesBirthday = actionList.includes(SCAN_ACTIONS.BIRTHDAY_REDEEM);
-
-    // Wallet scan replay protection: block if a visit was recorded in the last 60 seconds
-    if (qrData.isWalletScan && includesVisit) {
-      const recentVisit = await prisma.visit_events.findFirst({
-        where: {
-          tenant_id: tenant.id,
-          loyalty_card_id: card.id,
-          occurred_at: { gte: new Date(Date.now() - 60 * 1000) },
-        },
-      });
-      if (recentVisit) {
-        return NextResponse.json({
-          error: 'Visita ya registrada recientemente. Espera un momento.',
-        }, { status: 429 });
-      }
-    }
 
     // Staff cannot scan a card linked to their own person identity.
     const staffMemberId = await getStaffMemberId(tenant.id, staff.sub);
@@ -115,44 +92,28 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       console.warn(`[Scan] After-hours scan by staff ${staff.sub} for card ${card.id} at hour ${localHour} day ${localDay} (hours: ${dayHours ? dayHours.join('-') : 'closed'})`);
     }
 
-    // 1 visit per card per calendar day in tenant timezone
-    if (includesVisit) {
-      const recentVisit = await prisma.visit_events.findFirst({
-        where: { tenant_id: tenant.id, loyalty_card_id: card.id, occurred_at: { gte: tenantStartOfDay(tz) } },
-      });
-      if (recentVisit) {
-        return NextResponse.json({
-          error: 'Ya se registró una visita hoy',
-        }, { status: 429 });
-      }
-    }
-
     const rewardConfig = await getActiveRewardConfig(tenant.id);
     const { visitsRequired, rewardName } = rewardConfigDefaults(rewardConfig);
 
+    // A NULL expires_at means "never expires" — treat it as active (NULL >= now() is
+    // NULL in Postgres, so the old `expires_at >= now` filter silently hid it).
     const activeBirthdayReward = await prisma.birthday_rewards.findFirst({
-      where: { tenant_id: tenant.id, loyalty_card_id: card.id, status: 'active', expires_at: { gte: new Date() } },
+      where: {
+        tenant_id: tenant.id,
+        loyalty_card_id: card.id,
+        status: 'active',
+        OR: [{ expires_at: null }, { expires_at: { gte: new Date() } }],
+      },
     });
 
+    // Fast pre-transaction validations (the authoritative idempotency re-checks run
+    // inside the locked transaction below).
     if (includesBirthday && !activeBirthdayReward) {
       return NextResponse.json({ error: 'No hay regalo de cumpleaños activo' }, { status: 400 });
     }
-
-    if (includesRedeem) {
-      if (card.pending_rewards <= 0) {
-        return NextResponse.json({ error: 'No hay recompensas pendientes para canjear' }, { status: 400 });
-      }
+    if (includesRedeem && !rewardConfig) {
       // A reward config is required to record a redemption (FK to reward_configs).
-      if (!rewardConfig) {
-        return NextResponse.json({ error: 'No hay configuración de recompensa activa' }, { status: 400 });
-      }
-      // Idempotency: reject duplicate REDEEM within 30 seconds
-      const recentRedemption = await prisma.reward_redemptions.findFirst({
-        where: { tenant_id: tenant.id, loyalty_card_id: card.id, redeemed_at: { gte: new Date(Date.now() - 30 * 1000) } },
-      });
-      if (recentRedemption) {
-        return NextResponse.json({ error: 'Recompensa ya canjeada. Espera un momento si deseas canjear otra.' }, { status: 429 });
-      }
+      return NextResponse.json({ error: 'No hay configuración de recompensa activa' }, { status: 400 });
     }
 
     const customerName = card.person?.display_name ?? null;
@@ -164,15 +125,45 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     let rewardEarnedThisCall = false;
 
     const updatedCard = await prisma.$transaction(async (tx) => {
-      if (includesBirthday && activeBirthdayReward) {
-        await tx.birthday_rewards.update({
-          where: { id: activeBirthdayReward.id },
+      // Serialize concurrent duplicate scans on this card and re-check every
+      // idempotency guard UNDER the lock against fresh state, so a double-tap /
+      // retry / two-device race cannot double-count a visit or mint two rewards.
+      await lockCard(tx, card.id);
+      const fresh = await tx.cards.findUniqueOrThrow({ where: { id: card.id } });
+
+      if (includesBirthday) {
+        // Atomic claim of the SINGLE previewed reward: only that active row flips; a
+        // concurrent scan that already claimed it leaves count 0. Constraining to
+        // activeBirthdayReward.id (rather than every active row) caps consumption at
+        // one — otherwise a card holding two active birthday rewards would have BOTH
+        // silently redeemed while only one redemption is recorded/messaged (made more
+        // likely by the null-expiry rows the OR filter above now treats as active).
+        // includesBirthday guarantees activeBirthdayReward is non-null (pre-tx guard).
+        const claimed = await tx.birthday_rewards.updateMany({
+          where: {
+            id: activeBirthdayReward!.id,
+            tenant_id: tenant.id,
+            loyalty_card_id: card.id,
+            status: 'active',
+            OR: [{ expires_at: null }, { expires_at: { gte: new Date() } }],
+          },
           data: { status: 'redeemed', redeemed_at: new Date() },
         });
+        if (claimed.count === 0) throw new ScanError(400, 'No hay regalo de cumpleaños activo');
         performed.push(SCAN_ACTIONS.BIRTHDAY_REDEEM);
       }
 
       if (includesRedeem && rewardConfig) {
+        if (fresh.pending_rewards <= 0) {
+          throw new ScanError(400, 'No hay recompensas pendientes para canjear');
+        }
+        // Idempotency: reject a duplicate REDEEM within 30 seconds (under the lock).
+        const recentRedemption = await tx.reward_redemptions.findFirst({
+          where: { tenant_id: tenant.id, loyalty_card_id: card.id, redeemed_at: { gte: new Date(Date.now() - 30 * 1000) } },
+        });
+        if (recentRedemption) {
+          throw new ScanError(429, 'Recompensa ya canjeada. Espera un momento si deseas canjear otra.');
+        }
         await tx.reward_redemptions.create({
           data: {
             tenant_id: tenant.id,
@@ -190,11 +181,18 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
       let momentMessage: string | null = null;
       if (includesVisit) {
+        // 1 visit per card per calendar day (tenant tz) — re-checked under the lock,
+        // so a concurrent duplicate scan sees the just-committed visit and is rejected.
+        const recentVisit = await tx.visit_events.findFirst({
+          where: { tenant_id: tenant.id, loyalty_card_id: card.id, occurred_at: { gte: tenantStartOfDay(tz) } },
+        });
+        if (recentVisit) throw new ScanError(429, 'Ya se registró una visita hoy');
+
         await tx.visit_events.create({
           data: { tenant_id: tenant.id, loyalty_card_id: card.id, staff_member_id: staffMemberId },
         });
-        const newVisitsThisCycle = card.visits_this_cycle + 1;
-        const newTotalVisits = card.total_visits + 1;
+        const newVisitsThisCycle = fresh.visits_this_cycle + 1;
+        const newTotalVisits = fresh.total_visits + 1;
         const earnedReward = newVisitsThisCycle >= visitsRequired;
         rewardEarnedThisCall = earnedReward;
 
@@ -220,7 +218,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
           });
         }
 
-        const existingMeta = (card.metadata ?? {}) as Record<string, unknown>;
+        const existingMeta = (fresh.metadata ?? {}) as Record<string, unknown>;
         await tx.cards.update({
           where: { id: card.id },
           data: {
@@ -299,56 +297,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     });
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 });
+    if (err instanceof ScanError) return NextResponse.json({ error: err.message }, { status: err.status });
     console.error('[Scan]', err instanceof Error ? err.message : String(err));
     return NextResponse.json({ error: 'Error al procesar escaneo' }, { status: 500 });
   }
 }
 
-function buildCardSummary(
-  card: { visits_this_cycle: number; pending_rewards: number; balance_cents: number },
-  visitsRequired: number
-) {
-  return { visitsThisCycle: card.visits_this_cycle, visitsRequired, pendingRewards: card.pending_rewards, balanceMXN: formatMXN(card.balance_cents) };
-}
-
-async function triggerWalletUpdates(
-  cardId: string,
-  cardNumber: string,
-  card: { visits_this_cycle: number; pending_rewards: number; balance_cents: number; total_visits: number },
-  customerName: string | null,
-  visitsRequired: number,
-  rewardName: string,
-  createdAt: Date,
-  tenantName: string,
-  tenantSlug: string,
-  primaryColor: string,
-  birthdayRewardName: string | null,
-  lifecycleMessage: string | null,
-) {
-  // Run both wallet pushes to completion INDEPENDENTLY. Promise.all is fail-fast: if the
-  // Google push rejects (e.g. a bad service-account key), the await returns at once and
-  // Vercel suspends the function before the in-flight Apple http2 push can finish → the
-  // pass silently never updates (works locally only because the process stays alive).
-  // allSettled awaits BOTH, so the Apple push always completes regardless of Google.
-  const _wallet = await Promise.allSettled([
-    sendApplePushUpdate(cardId),
-    updateGoogleWalletObject({
-      cardId, cardNumber,
-      customerName: customerName || DEFAULT_CUSTOMER_NAME,
-      balanceCentavos: card.balance_cents,
-      visitsThisCycle: card.visits_this_cycle,
-      visitsRequired,
-      pendingRewards: card.pending_rewards,
-      rewardName,
-      totalVisits: card.total_visits,
-      memberSince: createdAt.toISOString(),
-      tenantName,
-      tenantSlug,
-      primaryColor,
-      birthdayRewardName,
-      lifecycleMessage,
-    }),
-  ]);
-  if (_wallet[0].status === 'rejected') console.warn('[Wallet Update] Apple push failed:', _wallet[0].reason);
-  if (_wallet[1].status === 'rejected') console.warn('[Wallet Update] Google push failed:', _wallet[1].reason);
-}
