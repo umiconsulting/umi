@@ -66,6 +66,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     if (!card) return NextResponse.json({ error: 'Tarjeta no encontrada' }, { status: 404 });
 
     const staffMemberId = await getStaffMemberId(tenant.id, staff.sub);
+    // Fail closed: a manual bulk seal credit is value-bearing and abuse-prone, so it
+    // must be attributed to a real staff member — never write a visit_event without
+    // attribution (same stance as the top-up path).
+    if (!staffMemberId) {
+      return NextResponse.json({ error: 'Tu usuario no está registrado como personal' }, { status: 403 });
+    }
     const rewardConfig = await getActiveRewardConfig(tenant.id);
     const { visitsRequired, rewardName } = rewardConfigDefaults(rewardConfig);
     const required = Math.max(1, visitsRequired); // guard divide-by-zero on a mis-set config
