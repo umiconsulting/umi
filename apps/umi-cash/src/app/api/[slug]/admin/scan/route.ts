@@ -140,10 +140,16 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       const fresh = await tx.cards.findUniqueOrThrow({ where: { id: card.id } });
 
       if (includesBirthday) {
-        // Atomic claim: only an active reward flips; a concurrent scan that already
-        // claimed it leaves count 0.
+        // Atomic claim of the SINGLE previewed reward: only that active row flips; a
+        // concurrent scan that already claimed it leaves count 0. Constraining to
+        // activeBirthdayReward.id (rather than every active row) caps consumption at
+        // one — otherwise a card holding two active birthday rewards would have BOTH
+        // silently redeemed while only one redemption is recorded/messaged (made more
+        // likely by the null-expiry rows the OR filter above now treats as active).
+        // includesBirthday guarantees activeBirthdayReward is non-null (pre-tx guard).
         const claimed = await tx.birthday_rewards.updateMany({
           where: {
+            id: activeBirthdayReward!.id,
             tenant_id: tenant.id,
             loyalty_card_id: card.id,
             status: 'active',
