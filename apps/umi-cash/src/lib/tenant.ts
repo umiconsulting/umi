@@ -82,8 +82,11 @@ export async function getTenantConfig(slug: string) {
     promoStartsAt: toDate(brand.promo_starts_at),
     promoEndsAt: toDate(brand.promo_ends_at),
     businessHours: hasHours ? openTimes : null,
-    // subscription (legacy enum so existing checks keep working)
-    subscriptionStatus: SUB_STATUS_TO_LEGACY[sub?.status ?? 'active'] ?? 'ACTIVE',
+    // subscription (legacy enum so existing checks keep working). FAIL CLOSED: a
+    // MISSING subscription row → SUSPENDED (the intended `missing: 'SUSPENDED'` was
+    // dead because `?? 'active'` substituted before the map lookup). NOTE: verify all
+    // active tenants have a grow.subscriptions row before deploying this.
+    subscriptionStatus: sub ? (SUB_STATUS_TO_LEGACY[sub.status] ?? 'SUSPENDED') : 'SUSPENDED',
     trialEndsAt: sub?.trial_ends_at ?? null,
     suspendedAt: sub?.suspended_at ?? null,
     // canonical ids for write fan-out
@@ -120,28 +123,32 @@ export async function requireActiveSubscription(tenant: {
       { status: 402 },
     );
   }
-  if (
-    tenant.subscriptionStatus === 'TRIAL' &&
-    tenant.trialEndsAt &&
-    tenant.trialEndsAt < new Date()
-  ) {
-    if (tenant.subscriptionId) {
-      try {
-        await prisma.subscriptions.update({
-          where: { id: tenant.subscriptionId },
-          data: { status: 'disabled', suspended_at: new Date() },
-        });
-      } catch (err) {
-        console.error(
-          '[Tenant] Failed to auto-suspend expired trial:',
-          err instanceof Error ? err.message : String(err),
-        );
+  if (tenant.subscriptionStatus === 'TRIAL') {
+    // Fail closed: a trial with NO end date is a misconfiguration, not an unlimited
+    // free pass — treat it as expired and block.
+    const trialExpired = !tenant.trialEndsAt || tenant.trialEndsAt < new Date();
+    if (trialExpired) {
+      // Auto-suspend only when there is a concrete past end date; for a null (mis-set)
+      // end date we block WITHOUT permanently flipping the row, so fixing the date
+      // restores access.
+      if (tenant.subscriptionId && tenant.trialEndsAt) {
+        try {
+          await prisma.subscriptions.update({
+            where: { id: tenant.subscriptionId },
+            data: { status: 'disabled', suspended_at: new Date() },
+          });
+        } catch (err) {
+          console.error(
+            '[Tenant] Failed to auto-suspend expired trial:',
+            err instanceof Error ? err.message : String(err),
+          );
+        }
       }
+      return NextResponse.json(
+        { error: 'Tu período de prueba ha terminado. Contacta a Umi Cash para activar tu cuenta.' },
+        { status: 402 },
+      );
     }
-    return NextResponse.json(
-      { error: 'Tu período de prueba ha terminado. Contacta a Umi Cash para activar tu cuenta.' },
-      { status: 402 },
-    );
   }
   return null;
 }

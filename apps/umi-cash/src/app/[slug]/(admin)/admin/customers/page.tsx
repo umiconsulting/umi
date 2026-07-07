@@ -31,17 +31,26 @@ export default function CustomersPage() {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('recent');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   async function loadCustomers(p = 1, q = search, s = sort) {
     setLoading(true);
-    const params = new URLSearchParams({ page: String(p), limit: '20', search: q, sort: s });
-    const res = await authedFetch(slug, `/api/${slug}/admin/customers?${params}`);
-    const data = await res.json();
-    setCustomers(data.customers || []);
-    setTotal(data.total || 0);
-    setTotalPages(data.totalPages || 1);
-    setPage(p);
-    setLoading(false);
+    setLoadError(false);
+    try {
+      const params = new URLSearchParams({ page: String(p), limit: '20', search: q, sort: s });
+      const res = await authedFetch(slug, `/api/${slug}/admin/customers?${params}`);
+      const data = await res.json();
+      setCustomers(data.customers || []);
+      setTotal(data.total || 0);
+      setTotalPages(data.totalPages || 1);
+      setPage(p);
+    } catch {
+      // Network/parse failure — show an error+retry instead of an infinite skeleton.
+      setLoadError(true);
+      setCustomers([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { loadCustomers(); }, [slug]);
@@ -109,12 +118,17 @@ export default function CustomersPage() {
         <div className="space-y-3">
           {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-20 rounded-2xl animate-pulse" style={{ background: 'var(--color-surface-dark)' }} />)}
         </div>
+      ) : loadError ? (
+        <div className="text-center py-12 space-y-3" style={{ color: 'var(--color-ink-light)' }}>
+          <p>No se pudieron cargar los clientes.</p>
+          <button onClick={() => loadCustomers(page)} className="u-btn u-btn-secondary">Reintentar</button>
+        </div>
       ) : customers.length === 0 ? (
         <div className="text-center py-12" style={{ color: 'var(--color-ink-light)' }}><p>No se encontraron clientes</p></div>
       ) : (
         <div className="space-y-2 u-fade-up d3">
           {customers.map((c) => (
-            <Link key={c.id} href={`/${slug}/admin/customers/${c.id}`}
+            <Link key={c.cardId} href={`/${slug}/admin/customers/${c.id}`}
               className="u-surface p-4 flex items-center justify-between hover:shadow-md transition-shadow">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">

@@ -64,6 +64,14 @@ export default function ScanPage() {
   const [topupNote, setTopupNote] = useState('');
   const [showTopup, setShowTopup] = useState(false);
 
+  // Stable per-operation idempotency tokens: reused if the operator re-taps after a
+  // lost response (server dedups instead of double-charging/crediting), reset on
+  // success or whenever the target card / amount / note changes.
+  const chargeKeyRef = useRef<string>('');
+  const topupKeyRef = useRef<string>('');
+  useEffect(() => { chargeKeyRef.current = ''; }, [preview, chargeAmount, chargeNote]);
+  useEffect(() => { topupKeyRef.current = ''; }, [preview, topupAmount, topupNote]);
+
   // ── Camera ──────────────────────────────────────────────────────────────
 
   async function startCamera() {
@@ -220,13 +228,15 @@ export default function ScanPage() {
     }
 
     try {
+      if (!chargeKeyRef.current) chargeKeyRef.current = crypto.randomUUID();
       const res = await authedFetch(slug, `/api/${slug}/admin/purchase`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId: preview.cardId, amountCentavos, note: chargeNote }),
+        body: JSON.stringify({ cardId: preview.cardId, amountCentavos, note: chargeNote, idempotencyKey: chargeKeyRef.current }),
       });
       const data = await res.json();
       if (res.ok) {
+        chargeKeyRef.current = '';
         setResult({ success: true, message: `Cobrado: ${data.amountMXN}`, detail: `Nuevo saldo: ${data.newBalanceMXN}` });
         setPreview(null);
         setShowCharge(false);
@@ -256,13 +266,15 @@ export default function ScanPage() {
     }
 
     try {
+      if (!topupKeyRef.current) topupKeyRef.current = crypto.randomUUID();
       const res = await authedFetch(slug, `/api/${slug}/admin/topup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId: preview.cardId, amountCentavos, note: topupNote }),
+        body: JSON.stringify({ cardId: preview.cardId, amountCentavos, note: topupNote, idempotencyKey: topupKeyRef.current }),
       });
       const data = await res.json();
       if (res.ok) {
+        topupKeyRef.current = '';
         setResult({ success: true, message: `Recarga exitosa: ${data.amountMXN}`, detail: `Nuevo saldo: ${data.newBalanceMXN}` });
         setPreview(null);
         setShowTopup(false);

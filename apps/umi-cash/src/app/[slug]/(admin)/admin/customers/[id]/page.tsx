@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { formatMXN, COMMON_TOPUP_AMOUNTS, centavosFromPesos } from '@/lib/currency';
 import { useTenant } from '@/context/TenantContext';
@@ -33,6 +33,11 @@ export default function CustomerDetailPage() {
   const [topupAmount, setTopupAmount] = useState('');
   const [topupLoading, setTopupLoading] = useState(false);
   const [redeemLoading, setRedeemLoading] = useState(false);
+
+  // Stable per-top-up idempotency token: reused on a re-tap after a lost response
+  // (server dedups), reset on success or when the amount changes.
+  const topupKeyRef = useRef<string>('');
+  useEffect(() => { topupKeyRef.current = ''; }, [topupAmount]);
   const [message, setMessage] = useState('');
   const [messageIsSuccess, setMessageIsSuccess] = useState(false);
   const [confirmRedeem, setConfirmRedeem] = useState(false);
@@ -53,13 +58,15 @@ export default function CustomerDetailPage() {
 
     try {
       const centavos = centavosFromPesos(topupAmount);
+      if (!topupKeyRef.current) topupKeyRef.current = crypto.randomUUID();
       const res = await authedFetch(slug, `/api/${slug}/admin/topup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId: customer.cardId, amountCentavos: centavos }),
+        body: JSON.stringify({ cardId: customer.cardId, amountCentavos: centavos, idempotencyKey: topupKeyRef.current }),
       });
       const data = await res.json();
       if (res.ok) {
+        topupKeyRef.current = '';
         setMessage(`Recarga de ${data.amountMXN}. Nuevo saldo: ${data.newBalanceMXN}`);
         setMessageIsSuccess(true);
         setTopupAmount('');
@@ -76,15 +83,21 @@ export default function CustomerDetailPage() {
     setRedeemLoading(true);
     setMessage('');
 
-    const res = await authedFetch(slug, `/api/${slug}/admin/scan`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ qrPayload: customer.cardNumber, action: 'REDEEM' }),
-    });
-    const data = await res.json();
-    if (res.ok) { setMessage(data.message); setMessageIsSuccess(true); loadCustomer(); }
-    else { setMessage(data.error || data.message); setMessageIsSuccess(false); }
-    setRedeemLoading(false);
+    try {
+      const res = await authedFetch(slug, `/api/${slug}/admin/scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qrPayload: customer.cardNumber, action: 'REDEEM' }),
+      });
+      const data = await res.json();
+      if (res.ok) { setMessage(data.message); setMessageIsSuccess(true); loadCustomer(); }
+      else { setMessage(data.error || data.message); setMessageIsSuccess(false); }
+    } catch {
+      setMessage('Error de conexión'); setMessageIsSuccess(false);
+    } finally {
+      // Always clear the loading flag so the button can never get stuck disabled.
+      setRedeemLoading(false);
+    }
   }
 
   if (loading) {

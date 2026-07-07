@@ -1,9 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth, generateRandomToken } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getStaffMemberId } from '@/lib/identity';
-import { applyWalletDelta } from '@/lib/wallet';
+import { applyWalletDelta, lockCard } from '@/lib/wallet';
 import { findCardByIdentifier, getActiveRewardConfig, rewardConfigDefaults } from '@/lib/prisma-helpers';
 import { formatMXN } from '@/lib/currency';
 import { DEFAULT_CUSTOMER_NAME } from '@/lib/constants';
@@ -22,6 +23,8 @@ const PurchaseSchema = z.object({
   cardId: z.string().min(1),
   amountCentavos: z.number().int().min(1, 'El monto mínimo es $0.01'),
   note: z.string().max(200).optional(),
+  // Stable per-attempt token so a retry/lost-response resubmit cannot double-charge.
+  idempotencyKey: z.string().min(8).max(100).optional(),
 });
 
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
@@ -39,26 +42,48 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (suspended) return suspended;
 
   try {
-    const { cardId, amountCentavos, note } = PurchaseSchema.parse(await req.json());
+    const { cardId, amountCentavos, note, idempotencyKey } = PurchaseSchema.parse(await req.json());
+    const opKey = idempotencyKey ?? `purchase_${randomUUID()}`;
 
     const card = await findCardByIdentifier(cardId, tenant.id, { person: true });
     if (!card) return NextResponse.json({ error: 'Tarjeta no encontrada' }, { status: 404 });
 
     const staffMemberId = await getStaffMemberId(tenant.id, staff.sub);
 
-    // Balance check + debit + QR rotate inside a single transaction to prevent race conditions.
-    // Money moves ONLY through applyWalletDelta (ledger + history + balance cache).
+    // Balance check + debit + QR rotate inside a single transaction, under a per-card
+    // advisory lock, so concurrent charges serialize (prevents overdraw) and a
+    // retried request (same key) is a no-op instead of a second debit.
     const result = await prisma.$transaction(async (tx) => {
-      const freshCard = await tx.cards.findUniqueOrThrow({ where: { id: card.id } });
-      if (freshCard.balance_cents < amountCentavos) {
-        throw new InsufficientBalanceError(freshCard.balance_cents);
+      await lockCard(tx, card.id);
+      // Idempotent replay: this op already committed — return its balance without
+      // re-debiting or re-rotating the QR.
+      const prior = await tx.points_ledger.findUnique({
+        where: { idempotency_key: opKey },
+        select: { id: true },
+      });
+      if (prior) {
+        const agg = await tx.points_ledger.aggregate({
+          _sum: { delta: true },
+          where: { tenant_id: tenant.id, loyalty_card_id: card.id },
+        });
+        return { balanceCents: agg._sum.delta ?? 0 };
+      }
+      // Balance = SUM(ledger) read UNDER the lock (source of truth, not the cache),
+      // so a concurrent purchase cannot pass the check against stale state.
+      const bal = await tx.points_ledger.aggregate({
+        _sum: { delta: true },
+        where: { tenant_id: tenant.id, loyalty_card_id: card.id },
+      });
+      const available = bal._sum.delta ?? 0;
+      if (available < amountCentavos) {
+        throw new InsufficientBalanceError(available);
       }
       const { balanceCents } = await applyWalletDelta(tx, {
         tenantId: tenant.id,
         cardId: card.id,
         deltaCents: -amountCentavos,
         type: 'purchase',
-        idempotencyKey: `purchase_${card.id}_${Date.now()}`,
+        idempotencyKey: opKey,
         staffMemberId,
         description: note || 'Pago con saldo',
       });
