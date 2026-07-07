@@ -71,6 +71,10 @@ export async function getTenantConfig(slug: string) {
     passStyle: program?.pass_style ?? (brand.pass_style as string) ?? 'default',
     birthdayRewardEnabled: program?.birthday_reward_enabled ?? false,
     birthdayRewardName: program?.birthday_reward_name ?? null,
+    // Kalala-only (for now): let staff credit more than one seal in a single scan,
+    // to catch up stamps customers earned on their previous wallet provider (which
+    // we can't import). Enabled per-tenant via programs.branding.multi_seal_enabled.
+    multiSealEnabled: (programBrand.multi_seal_enabled as boolean) ?? false,
     lifecycleCopy: (programBrand.lifecycle_copy as Record<string, string>) ?? {},
     // brand / wallet styling
     primaryColor: (brand.primary_color as string) ?? '#B5605A',

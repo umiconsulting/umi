@@ -10,6 +10,7 @@ export type TenantContextValue = {
   secondaryColor: string | null;
   cardPrefix: string;
   topupEnabled: boolean;
+  multiSealEnabled: boolean;
 };
 
 const TenantContext = createContext<TenantContextValue | null>(null);
