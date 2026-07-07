@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import type { AdminCustomer } from '@/types/api';
@@ -32,8 +32,12 @@ export default function CustomersPage() {
   const [sort, setSort] = useState('recent');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  // Track the page we actually asked for. `page` state only advances on success,
+  // so on a failed load "Reintentar" must retry this, not the last good page.
+  const lastRequestedPage = useRef(1);
 
   async function loadCustomers(p = 1, q = search, s = sort) {
+    lastRequestedPage.current = p;
     setLoading(true);
     setLoadError(false);
     try {
@@ -121,7 +125,7 @@ export default function CustomersPage() {
       ) : loadError ? (
         <div className="text-center py-12 space-y-3" style={{ color: 'var(--color-ink-light)' }}>
           <p>No se pudieron cargar los clientes.</p>
-          <button onClick={() => loadCustomers(page)} className="u-btn u-btn-secondary">Reintentar</button>
+          <button onClick={() => loadCustomers(lastRequestedPage.current)} className="u-btn u-btn-secondary">Reintentar</button>
         </div>
       ) : customers.length === 0 ? (
         <div className="text-center py-12" style={{ color: 'var(--color-ink-light)' }}><p>No se encontraron clientes</p></div>
