@@ -72,17 +72,31 @@ function getLoyaltyObject(data: GooglePassData) {
     });
   }
 
-  // Reward status
+  // Reward status — copy escalates as the customer nears the reward so the line
+  // pulls its weight on the card face (surfaced there by the class cardTemplateOverride)
+  // and in the details view. The `pending_rewards` / `next_reward` ids are referenced
+  // by that override — keep them stable.
   if (data.pendingRewards > 0) {
+    const plural = data.pendingRewards > 1;
     textModules.push({
-      header: 'RECOMPENSAS DISPONIBLES',
-      body: `${data.pendingRewards} recompensa${data.pendingRewards > 1 ? 's' : ''} — ¡canjéala en tienda!`,
+      header: plural ? 'RECOMPENSAS DISPONIBLES' : 'RECOMPENSA LISTA',
+      body: plural
+        ? `🎉 Tienes ${data.pendingRewards} ${data.rewardName} — ¡canjéalas en tienda!`
+        : `🎉 Tu ${data.rewardName} te espera — ¡canjéala en tienda!`,
       id: 'pending_rewards',
     });
   } else {
+    let body: string;
+    if (remaining === 1) {
+      body = `¡Última visita! Tu próxima compra desbloquea ${data.rewardName} 🎁`;
+    } else if (remaining === 2) {
+      body = `¡Ya casi! Solo 2 visitas para ${data.rewardName}`;
+    } else {
+      body = `${remaining} visitas para ${data.rewardName}`;
+    }
     textModules.push({
       header: 'PRÓXIMA RECOMPENSA',
-      body: `${remaining} visita${remaining !== 1 ? 's' : ''} para ${data.rewardName}`,
+      body,
       id: 'next_reward',
     });
   }
