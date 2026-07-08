@@ -11,10 +11,15 @@ export interface AnalyticsWindows {
 }
 
 /**
- * Cash read surface + admin-config writes (loyalty.reward_configs, branding).
- * Customer-facing wallet/ledger writes live in cash-write.repository. All
- * tenant-scoped → withTenant. SQL ported from server.js; `wallet_transactions.type`
- * is lowercase (`topup`/`purchase`) to match the live data (umi-cash convention).
+ * Cash read surface + admin-config writes (build-v2). All tenant-scoped →
+ * withTenant. DERIVE MODEL: there are no `balance_cents` / `total_visits` /
+ * `visits_this_cycle` / `pending_rewards` caches — balance = SUM(card_ledger.delta),
+ * visits = COUNT(visit), cycle = visits % visits_required, pending = visits /
+ * visits_required − redemptions. The old `loyalty.wallet_transactions` (topup /
+ * purchase) is gone: topups = card_ledger reason='topup', revenue = |delta| where
+ * reason='purchase'. Loyalty is program-less (config in `tenant.loyalty_settings`,
+ * one reward threshold in `tenant.reward_rule`). Identity phone/email come from
+ * `tenant.contact_identity`.
  */
 @Injectable()
 export class CashRepository {
@@ -42,9 +47,9 @@ export class CashRepository {
            p.branding->>'promo_starts_at' AS "promoStartsAt",
            p.branding->>'promo_ends_at'   AS "promoEndsAt",
            p.branding->>'promo_days'      AS "promoDays"
-         FROM core.tenants AS t
-         LEFT JOIN loyalty.programs AS p  ON p.tenant_id = t.id
-         LEFT JOIN ops.businesses   AS ob ON ob.tenant_id = t.id
+         FROM tenant.tenant AS t
+         LEFT JOIN tenant.loyalty_settings AS p  ON p.tenant_id = t.id
+         LEFT JOIN tenant.business          AS ob ON ob.tenant_id = t.id
          WHERE t.id = $1::uuid
          LIMIT 1`,
         [tenantId],
@@ -56,7 +61,7 @@ export class CashRepository {
   async updateTenantName(tenantId: string, name: string): Promise<void> {
     await this.pg.withTenant((c) =>
       c.query(
-        `UPDATE core.tenants SET name = $2, updated_at = now() WHERE id = $1::uuid`,
+        `UPDATE tenant.tenant SET name = $2, updated_at = now() WHERE id = $1::uuid`,
         [tenantId, name],
       ),
     );
@@ -68,7 +73,7 @@ export class CashRepository {
   ): Promise<void> {
     await this.pg.withTenant((c) =>
       c.query(
-        `UPDATE loyalty.programs
+        `UPDATE tenant.loyalty_settings
          SET card_prefix = COALESCE($2, card_prefix),
              pass_style  = COALESCE($3, pass_style),
              branding    = COALESCE(branding, '{}'::jsonb) || $4::jsonb,
@@ -88,19 +93,33 @@ export class CashRepository {
     return this.pg.withTenant(async (c) => {
       const [visits, topups, pending] = await Promise.all([
         c.query<Row>(
-          `SELECT count(*)::int AS n FROM loyalty.visit_events
+          `SELECT count(*)::int AS n FROM tenant.visit
            WHERE tenant_id = $1::uuid AND occurred_at >= $2`,
           [tenantId, dayStart],
         ),
         c.query<Row>(
-          `SELECT count(*)::int AS n, COALESCE(sum(amount_cents), 0)::bigint AS sum
-           FROM loyalty.wallet_transactions
-           WHERE tenant_id = $1::uuid AND type = 'topup' AND created_at >= $2`,
+          `SELECT count(*)::int AS n, COALESCE(sum(delta), 0)::bigint AS sum
+           FROM tenant.card_ledger
+           WHERE tenant_id = $1::uuid AND reason = 'topup' AND created_at >= $2`,
           [tenantId, dayStart],
         ),
+        // pending rewards across all active cards = Σ max(visits/n − redemptions, 0)
         c.query<Row>(
-          `SELECT COALESCE(sum(pending_rewards), 0)::int AS sum FROM loyalty.cards
-           WHERE tenant_id = $1::uuid AND pending_rewards > 0`,
+          `WITH vr AS (
+             SELECT COALESCE((SELECT visits_required FROM tenant.reward_rule
+               WHERE tenant_id = $1::uuid AND is_active
+               ORDER BY activated_at DESC NULLS LAST LIMIT 1), 10) AS n
+           )
+           SELECT COALESCE(sum(pend), 0)::int AS sum FROM (
+             SELECT (
+               (SELECT count(*) FROM tenant.visit v
+                 WHERE v.tenant_id = c.tenant_id AND v.card_id = c.id) / (SELECT n FROM vr)
+               - (SELECT count(*) FROM tenant.reward_redemption r
+                   WHERE r.tenant_id = c.tenant_id AND r.card_id = c.id)
+             ) AS pend
+             FROM tenant.card c
+             WHERE c.tenant_id = $1::uuid AND c.status = 'active'
+           ) s WHERE pend > 0`,
           [tenantId],
         ),
       ]);
@@ -119,58 +138,65 @@ export class CashRepository {
         topupsRow, rewardsRow, activeRow, totalsRow, activeRewardConfigRow,
       ] = await Promise.all([
         c.query<Row>(
-          `SELECT occurred_at AS "scannedAt" FROM loyalty.visit_events
+          `SELECT occurred_at AS "scannedAt" FROM tenant.visit
            WHERE tenant_id = $1::uuid AND occurred_at >= $2`,
           [tenantId, w.thirtyDaysAgo],
         ),
         c.query<Row>(
-          `SELECT a.person_id::text AS "userId", pe.display_name AS name,
-                  ca.card_number AS "cardNumber", ca.total_visits AS "totalVisits",
-                  ca.balance_cents AS "balanceCentavos"
-           FROM loyalty.cards AS ca
-           JOIN loyalty.accounts AS a ON a.id = ca.account_id
-           LEFT JOIN core.people AS pe ON pe.id = a.person_id
+          `SELECT ca.customer_id::text AS "userId", cu.name AS name,
+                  ca.card_number AS "cardNumber",
+                  agg.total_visits::int   AS "totalVisits",
+                  agg.balance_cents::int  AS "balanceCentavos"
+           FROM tenant.card AS ca
+           LEFT JOIN tenant.customer AS cu ON cu.tenant_id = ca.tenant_id AND cu.id = ca.customer_id
+           CROSS JOIN LATERAL (
+             SELECT
+               (SELECT count(*) FROM tenant.visit v
+                 WHERE v.tenant_id = ca.tenant_id AND v.card_id = ca.id) AS total_visits,
+               COALESCE((SELECT sum(l.delta) FROM tenant.card_ledger l
+                 WHERE l.tenant_id = ca.tenant_id AND l.card_id = ca.id), 0) AS balance_cents
+           ) AS agg
            WHERE ca.tenant_id = $1::uuid
-           ORDER BY ca.total_visits DESC NULLS LAST LIMIT 10`,
+           ORDER BY agg.total_visits DESC NULLS LAST LIMIT 10`,
           [tenantId],
         ),
         c.query<Row>(
-          `SELECT created_at AS "createdAt" FROM core.people
+          `SELECT created_at AS "createdAt" FROM tenant.customer
            WHERE tenant_id = $1::uuid AND created_at >= $2`,
           [tenantId, w.eightWeeksAgo],
         ),
         c.query<Row>(
-          `SELECT COALESCE(sum(balance_cents), 0)::bigint AS sum FROM loyalty.cards
+          `SELECT COALESCE(sum(delta), 0)::bigint AS sum FROM tenant.card_ledger
            WHERE tenant_id = $1::uuid`,
           [tenantId],
         ),
         c.query<Row>(
-          `SELECT COALESCE(sum(amount_cents), 0)::bigint AS sum FROM loyalty.wallet_transactions
-           WHERE tenant_id = $1::uuid AND type = 'topup' AND created_at >= $2`,
+          `SELECT COALESCE(sum(delta), 0)::bigint AS sum FROM tenant.card_ledger
+           WHERE tenant_id = $1::uuid AND reason = 'topup' AND created_at >= $2`,
           [tenantId, w.monthStart],
         ),
         c.query<Row>(
-          `SELECT count(*)::int AS n FROM loyalty.reward_redemptions
+          `SELECT count(*)::int AS n FROM tenant.reward_redemption
            WHERE tenant_id = $1::uuid AND redeemed_at >= $2`,
           [tenantId, w.monthStart],
         ),
         c.query<Row>(
-          `SELECT count(DISTINCT loyalty_card_id)::int AS n FROM loyalty.visit_events
+          `SELECT count(DISTINCT card_id)::int AS n FROM tenant.visit
            WHERE tenant_id = $1::uuid AND occurred_at >= $2`,
           [tenantId, w.thirtyDaysAgo],
         ),
         c.query<Row>(
           `SELECT
-             (SELECT count(*)::int FROM core.people WHERE tenant_id = $1::uuid) AS "totalCustomers",
-             (SELECT COALESCE(sum(abs(amount_cents)), 0)::bigint FROM loyalty.wallet_transactions
-                WHERE tenant_id = $1::uuid AND type = 'purchase') AS "totalRevenueCentavos",
-             (SELECT COALESCE(sum(total_visits), 0)::bigint FROM loyalty.cards
+             (SELECT count(*)::int FROM tenant.customer WHERE tenant_id = $1::uuid) AS "totalCustomers",
+             (SELECT COALESCE(sum(abs(delta)), 0)::bigint FROM tenant.card_ledger
+                WHERE tenant_id = $1::uuid AND reason = 'purchase') AS "totalRevenueCentavos",
+             (SELECT count(*)::bigint FROM tenant.visit
                 WHERE tenant_id = $1::uuid) AS "totalAllTimeVisits"`,
           [tenantId],
         ),
         c.query<Row>(
           `SELECT visits_required AS "visitsRequired", reward_cost_cents AS "rewardCostCentavos"
-           FROM loyalty.reward_configs
+           FROM tenant.reward_rule
            WHERE tenant_id = $1::uuid AND is_active = true
            ORDER BY activated_at DESC NULLS LAST LIMIT 1`,
           [tenantId],
@@ -196,38 +222,61 @@ export class CashRepository {
   ): Promise<{ rows: Row[]; total: number }> {
     const like = `%${opts.search}%`;
     const order =
-      opts.sort === 'visits' ? 'c.total_visits DESC NULLS LAST'
-      : opts.sort === 'balance' ? 'c.balance_cents DESC NULLS LAST'
-      : opts.sort === 'inactive' ? 'lv.last_visit ASC NULLS FIRST'
-      : opts.sort === 'ltv' ? 'ltv.ltv_centavos DESC NULLS LAST'
-      : 'pe.created_at DESC';
+      opts.sort === 'visits' ? 'total_visits DESC NULLS LAST'
+      : opts.sort === 'balance' ? 'balance_cents DESC NULLS LAST'
+      : opts.sort === 'inactive' ? 'last_visit ASC NULLS FIRST'
+      : opts.sort === 'ltv' ? 'ltv_centavos DESC NULLS LAST'
+      : 'created_at DESC';
+    // The per-customer derived projection (balance/visits/cycle/pending/ltv from the
+    // ledgers; phone/email from the identity spine). One active card per customer.
+    const CUST_CTE = `
+      vr AS (
+        SELECT COALESCE((SELECT visits_required FROM tenant.reward_rule
+          WHERE tenant_id = $1::uuid AND is_active
+          ORDER BY activated_at DESC NULLS LAST LIMIT 1), 10) AS n
+      ),
+      cust AS (
+        SELECT
+          cu.id, cu.name, cu.created_at, cu.contact_id,
+          c.id AS card_id, c.card_number,
+          COALESCE((SELECT sum(l.delta) FROM tenant.card_ledger l
+            WHERE l.tenant_id = cu.tenant_id AND l.card_id = c.id), 0)::bigint          AS balance_cents,
+          (SELECT count(*) FROM tenant.visit v
+            WHERE v.tenant_id = cu.tenant_id AND v.card_id = c.id)::int                 AS total_visits,
+          (SELECT count(*) FROM tenant.reward_redemption r
+            WHERE r.tenant_id = cu.tenant_id AND r.card_id = c.id)::int                 AS redemptions,
+          (SELECT max(v.occurred_at) FROM tenant.visit v
+            WHERE v.tenant_id = cu.tenant_id AND v.card_id = c.id)                       AS last_visit,
+          COALESCE((SELECT sum(abs(l.delta)) FROM tenant.card_ledger l
+            WHERE l.tenant_id = cu.tenant_id AND l.card_id = c.id AND l.reason = 'purchase'), 0)::bigint AS ltv_centavos,
+          (SELECT ci.normalized_value FROM tenant.contact_identity ci
+             JOIN tenant.channel ch ON ch.id = ci.channel_id
+            WHERE ci.tenant_id = cu.tenant_id AND ci.contact_id = cu.contact_id
+              AND ch.normalization_rule = 'e164'
+            ORDER BY ci.is_primary DESC, ci.last_seen_at DESC LIMIT 1)                   AS phone,
+          (SELECT ci.normalized_value FROM tenant.contact_identity ci
+             JOIN tenant.channel ch ON ch.id = ci.channel_id
+            WHERE ci.tenant_id = cu.tenant_id AND ci.contact_id = cu.contact_id
+              AND ch.key = 'email'
+            ORDER BY ci.is_primary DESC, ci.last_seen_at DESC LIMIT 1)                   AS email
+        FROM tenant.customer cu
+        LEFT JOIN tenant.card c
+          ON c.tenant_id = cu.tenant_id AND c.customer_id = cu.id AND c.status = 'active'
+        WHERE cu.tenant_id = $1::uuid
+      )`;
+    const filter = `($2 = '' OR name ILIKE $3 OR phone ILIKE $3 OR email ILIKE $3 OR card_number ILIKE $3)`;
     return this.pg.withTenant(async (c) => {
       const rows = (
         await c.query<Row>(
-          `SELECT
-             pe.id::text AS id, pe.display_name AS name,
-             pe.normalized_phone AS phone, pe.normalized_email AS email,
-             pe.created_at AS "createdAt",
-             c.id::text AS "cardId", c.card_number AS "cardNumber",
-             c.balance_cents AS "balanceCentavos", c.total_visits AS "totalVisits",
-             c.visits_this_cycle AS "visitsThisCycle", c.pending_rewards AS "pendingRewards",
-             lv.last_visit AS "lastVisit",
-             COALESCE(ltv.ltv_centavos, 0)::bigint AS "ltvCentavos"
-           FROM core.people AS pe
-           LEFT JOIN loyalty.accounts AS a ON a.person_id = pe.id AND a.tenant_id = pe.tenant_id
-           LEFT JOIN loyalty.cards    AS c ON c.account_id = a.id
-           LEFT JOIN LATERAL (
-             SELECT max(occurred_at) AS last_visit
-             FROM loyalty.visit_events ve WHERE ve.loyalty_card_id = c.id
-           ) AS lv ON true
-           LEFT JOIN LATERAL (
-             SELECT COALESCE(sum(abs(amount_cents)), 0) AS ltv_centavos
-             FROM loyalty.wallet_transactions wt WHERE wt.loyalty_card_id = c.id AND wt.type = 'purchase'
-           ) AS ltv ON true
-           WHERE pe.tenant_id = $1::uuid AND (
-             $2 = '' OR pe.display_name ILIKE $3 OR pe.normalized_phone ILIKE $3
-             OR pe.normalized_email ILIKE $3 OR c.card_number ILIKE $3
-           )
+          `WITH ${CUST_CTE}, vr_n AS (SELECT n FROM vr)
+           SELECT id::text AS id, name, phone, email, created_at AS "createdAt",
+                  card_id::text AS "cardId", card_number AS "cardNumber",
+                  balance_cents AS "balanceCentavos", total_visits AS "totalVisits",
+                  (total_visits % (SELECT n FROM vr_n))::int                       AS "visitsThisCycle",
+                  (total_visits / (SELECT n FROM vr_n) - redemptions)::int         AS "pendingRewards",
+                  last_visit AS "lastVisit", ltv_centavos AS "ltvCentavos"
+           FROM cust
+           WHERE ${filter}
            ORDER BY ${order}
            LIMIT $4 OFFSET $5`,
           [tenantId, opts.search, like, opts.limit, opts.skip],
@@ -235,14 +284,8 @@ export class CashRepository {
       ).rows;
       const total = (
         await c.query<Row>(
-          `SELECT count(DISTINCT pe.id)::int AS n
-           FROM core.people AS pe
-           LEFT JOIN loyalty.accounts AS a ON a.person_id = pe.id AND a.tenant_id = pe.tenant_id
-           LEFT JOIN loyalty.cards    AS c ON c.account_id = a.id
-           WHERE pe.tenant_id = $1::uuid AND (
-             $2 = '' OR pe.display_name ILIKE $3 OR pe.normalized_phone ILIKE $3
-             OR pe.normalized_email ILIKE $3 OR c.card_number ILIKE $3
-           )`,
+          `WITH ${CUST_CTE}
+           SELECT count(*)::int AS n FROM cust WHERE ${filter}`,
           [tenantId, opts.search, like],
         )
       ).rows[0]?.n;
@@ -252,20 +295,20 @@ export class CashRepository {
 
   async rewardConfig(tenantId: string): Promise<{ active: Row[]; history: Row[] }> {
     const select = `
-      id::text, tenant_id::text AS "tenantId", program_id::text AS "programId",
+      id::text, tenant_id::text AS "tenantId", NULL::text AS "programId",
       visits_required AS "visitsRequired", reward_name AS "rewardName",
       reward_description AS "rewardDescription", reward_cost_cents AS "rewardCostCentavos",
       is_active AS "isActive", activated_at AS "activatedAt", created_at AS "createdAt"`;
     return this.pg.withTenant(async (c) => {
       const [active, history] = await Promise.all([
         c.query<Row>(
-          `SELECT ${select} FROM loyalty.reward_configs
+          `SELECT ${select} FROM tenant.reward_rule
            WHERE tenant_id = $1::uuid AND is_active = true
            ORDER BY activated_at DESC NULLS LAST LIMIT 1`,
           [tenantId],
         ),
         c.query<Row>(
-          `SELECT ${select} FROM loyalty.reward_configs
+          `SELECT ${select} FROM tenant.reward_rule
            WHERE tenant_id = $1::uuid AND is_active = false
            ORDER BY activated_at DESC NULLS LAST LIMIT 10`,
           [tenantId],
@@ -278,29 +321,29 @@ export class CashRepository {
   /** Admin-config write (not the inert customer-facing path) — see preflight §4. */
   async upsertRewardConfig(
     tenantId: string,
-    programId: string,
+    _programId: string,
     data: { visitsRequired: number; rewardName: string; rewardDescription: string | null; rewardCostCentavos: number },
   ): Promise<Row> {
     return this.pg.withTenant(async (c) => {
-      // Serialize concurrent reward-config saves per tenant so the
+      // Serialize concurrent reward-rule saves per tenant so the
       // deactivate-then-insert can't interleave into two is_active=true rows.
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
         `reward_config:${tenantId}`,
       ]);
       await c.query(
-        `UPDATE loyalty.reward_configs SET is_active = false
+        `UPDATE tenant.reward_rule SET is_active = false
          WHERE tenant_id = $1::uuid AND is_active = true`,
         [tenantId],
       );
       const { rows } = await c.query<Row>(
-        `INSERT INTO loyalty.reward_configs
-           (tenant_id, program_id, visits_required, reward_name, reward_description, reward_cost_cents, is_active, activated_at)
-         VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, true, now())
-         RETURNING id::text, tenant_id::text AS "tenantId", program_id::text AS "programId",
+        `INSERT INTO tenant.reward_rule
+           (tenant_id, visits_required, reward_name, reward_description, reward_cost_cents, is_active, activated_at)
+         VALUES ($1::uuid, $2, $3, $4, $5, true, now())
+         RETURNING id::text, tenant_id::text AS "tenantId", NULL::text AS "programId",
                    visits_required AS "visitsRequired", reward_name AS "rewardName",
                    reward_description AS "rewardDescription", reward_cost_cents AS "rewardCostCentavos",
                    is_active AS "isActive", activated_at AS "activatedAt"`,
-        [tenantId, programId, data.visitsRequired, data.rewardName, data.rewardDescription, data.rewardCostCentavos],
+        [tenantId, data.visitsRequired, data.rewardName, data.rewardDescription, data.rewardCostCentavos],
       );
       return rows[0];
     });
@@ -319,7 +362,7 @@ export class CashRepository {
                   recipient_phone AS "recipientPhone", message,
                   (redeemed_at IS NOT NULL) AS "isRedeemed",
                   redeemed_at AS "redeemedAt", expires_at AS "expiresAt", created_at AS "createdAt"
-           FROM loyalty.gift_cards
+           FROM tenant.gift_card
            WHERE tenant_id = $1::uuid
            ORDER BY created_at DESC
            LIMIT $2 OFFSET $3`,
@@ -328,7 +371,7 @@ export class CashRepository {
       ).rows;
       const total = (
         await c.query<Row>(
-          `SELECT count(*)::int AS n FROM loyalty.gift_cards WHERE tenant_id = $1::uuid`,
+          `SELECT count(*)::int AS n FROM tenant.gift_card WHERE tenant_id = $1::uuid`,
           [tenantId],
         )
       ).rows[0]?.n;

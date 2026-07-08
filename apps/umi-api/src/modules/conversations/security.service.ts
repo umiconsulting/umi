@@ -205,8 +205,8 @@ export class SecurityService {
 
   /**
    * Rate-limit a sender by counting their user messages in the last minute/hour
-   * on their most recent active conversation. Rebound from the legacy
-   * customers→conversations→messages chain to canonical `comms.*`.
+   * on their most recent active conversation. Reads `tenant.conversation` +
+   * `tenant.message` (build-v2).
    */
   async checkRateLimit(
     tenantId: string,
@@ -214,8 +214,8 @@ export class SecurityService {
   ): Promise<{ allowed: boolean; count: number }> {
     const conv = await this.pg.query<{ id: string }>(
       `SELECT id
-         FROM comms.conversations
-        WHERE person_id = $1
+         FROM tenant.conversation
+        WHERE customer_id = $1
           AND tenant_id = $2
           AND status IN ('open', 'active', 'pending')
           AND last_message_at >= now() - interval '1 hour'
@@ -229,8 +229,8 @@ export class SecurityService {
       `SELECT
          count(*) FILTER (WHERE created_at >= now() - interval '1 minute') AS minute,
          count(*) FILTER (WHERE created_at >= now() - interval '1 hour')   AS hour
-       FROM comms.messages
-       WHERE conversation_id = $1 AND role = 'user'`,
+       FROM tenant.message
+       WHERE conversation_id = $1 AND sender = 'user'`,
       [conv.rows[0].id],
     );
 

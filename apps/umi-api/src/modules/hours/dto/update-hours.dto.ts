@@ -12,12 +12,12 @@ export class UpdateHoursDto {
   @IsObject()
   hours?: Record<string, { open: boolean; from: string; to: string }>;
 
-  // IANA timezone → core.tenants.timezone.
+  // IANA timezone → tenant.tenant.timezone.
   @IsOptional()
   @IsString()
   timezone?: string;
 
-  // Ordering-window settings → ops.businesses.config (accepts/cutoff/notice/bypass).
+  // Ordering-window settings → tenant.business.config (accepts/cutoff/notice/bypass).
   @IsOptional()
   @IsObject()
   ordering?: OrderingPatch;

@@ -14,7 +14,7 @@ import {
 /**
  * Catalog tools: search_menu (browse / exact / near-miss) + get_business_info /
  * get_business_hours. Ported from `tools.ts`; product reads rebound to
- * ProductsRepository (ops.products), hours/info to BusinessHoursService.
+ * ProductsRepository (tenant.product), hours/info to BusinessHoursService.
  */
 @Injectable()
 export class CatalogTools {

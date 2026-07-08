@@ -289,49 +289,59 @@ export class CashWriteRepository {
   }
 
   /**
-   * Resolve a person + their card by phone (normalized) or email.
-   * PR4 (identity graph): this is deterministic identity resolution and moves to
-   * the TS resolver over tenant.contact_identity/contact/customer. Left on the
-   * legacy relations until PR4 wires the resolver (dead against build-v2 until then).
+   * Resolve a customer + their card by phone (normalized) or email over the
+   * identity graph (build-v2): `tenant.contact_identity` → `tenant.customer` →
+   * `tenant.card` by `customer_id`. Phone matches across the e164 family (a
+   * WhatsApp-only contact resolves the same customer); email matches the `email`
+   * channel. `personId` is the `tenant.customer.id`.
    */
   async findPersonCard(
     tenantId: string,
     by: { phone?: string; email?: string },
   ): Promise<{ personId: string; displayName: string | null; cardId: string } | null> {
     return this.pg.workerTx(async (c) => {
-      let personRow: Row | undefined;
+      let customer: Row | undefined;
       if (by.phone) {
         const norm = (
           await c.query<Row>(`SELECT tenant.normalize_phone($1) AS n`, [by.phone])
         ).rows[0]?.n;
         if (!norm) return null;
-        personRow = (
+        customer = (
           await c.query<Row>(
-            `SELECT id::text, display_name FROM core.people
-             WHERE tenant_id=$1::uuid AND normalized_phone=$2 LIMIT 1`,
+            `SELECT cu.id::text AS id, cu.name AS display_name
+               FROM tenant.contact_identity ci
+               JOIN tenant.channel ch  ON ch.id = ci.channel_id
+               JOIN tenant.customer cu ON cu.tenant_id = ci.tenant_id AND cu.contact_id = ci.contact_id
+              WHERE ci.tenant_id = $1::uuid AND ci.normalized_value = $2
+                AND ch.normalization_rule = 'e164'
+              ORDER BY ci.is_primary DESC, ci.last_seen_at DESC LIMIT 1`,
             [tenantId, norm],
           )
         ).rows[0];
       } else if (by.email) {
-        personRow = (
+        customer = (
           await c.query<Row>(
-            `SELECT id::text, display_name FROM core.people
-             WHERE tenant_id=$1::uuid AND normalized_email=$2 LIMIT 1`,
+            `SELECT cu.id::text AS id, cu.name AS display_name
+               FROM tenant.contact_identity ci
+               JOIN tenant.channel ch  ON ch.id = ci.channel_id
+               JOIN tenant.customer cu ON cu.tenant_id = ci.tenant_id AND cu.contact_id = ci.contact_id
+              WHERE ci.tenant_id = $1::uuid AND ci.normalized_value = $2 AND ch.key = 'email'
+              ORDER BY ci.is_primary DESC, ci.last_seen_at DESC LIMIT 1`,
             [tenantId, by.email.trim().toLowerCase()],
           )
         ).rows[0];
       }
-      if (!personRow) return null;
+      if (!customer) return null;
       const card = (
         await c.query<Row>(
-          `SELECT c.id::text FROM loyalty.cards c
-           JOIN loyalty.accounts a ON a.id=c.account_id
-           WHERE c.tenant_id=$1::uuid AND a.person_id=$2::uuid LIMIT 1`,
-          [tenantId, personRow.id],
+          `SELECT id::text FROM tenant.card
+            WHERE tenant_id=$1::uuid AND customer_id=$2::uuid AND status='active'
+            ORDER BY created_at LIMIT 1`,
+          [tenantId, customer.id],
         )
       ).rows[0];
       if (!card) return null;
-      return { personId: personRow.id, displayName: personRow.display_name, cardId: card.id };
+      return { personId: customer.id, displayName: customer.display_name, cardId: card.id };
     });
   }
 

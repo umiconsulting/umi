@@ -12,7 +12,7 @@ import { OrderingSettingsRepository } from './ordering-settings.repository';
  * by the dashboard and the WhatsApp bot. Imports AuthModule (guards) and
  * TenantsModule (effective-location resolution + timezone). Exports HoursService
  * (and the repos) so ConversationsModule can reuse them for the bot (DRY) instead
- * of re-querying ops.business_hours / ops.businesses.config.
+ * of re-querying tenant.open_hours / tenant.business.config.
  */
 @Module({
   imports: [AuthModule, TenantsModule],

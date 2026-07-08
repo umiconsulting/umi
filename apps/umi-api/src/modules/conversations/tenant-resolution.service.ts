@@ -15,7 +15,7 @@ export interface ResolvedTenant {
  * Resolves the tenant for an inbound WhatsApp message from the Twilio `To` field
  * (the business's own WhatsApp number). This replaces ConversaFlow's module-load
  * `BUSINESS_ID` global (single-tenant) with per-request resolution (owner decision,
- * 2026-06-25): `ops.channel_accounts.provider_account_id` → tenant.
+ * 2026-06-25): `tenant.whatsapp_number.provider_account_id` → tenant.
  *
  * Fallback: when no channel account matches and `DEFAULT_TENANT_ID` is configured,
  * resolve to it (keeps the single live tenant working before its number is seeded

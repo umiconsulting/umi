@@ -129,7 +129,7 @@ export class CustomersService {
       total,
       page,
       totalPages: Math.max(1, Math.ceil(total / limit)),
-      source: 'core.people',
+      source: 'tenant.customer',
     };
   }
 

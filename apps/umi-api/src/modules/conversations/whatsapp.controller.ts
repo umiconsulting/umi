@@ -101,7 +101,7 @@ export class WhatsappController {
     }
     const { tenantId, locationId } = resolved;
 
-    // ── Identity (creates core.people + contact_methods idempotently) ──
+    // ── Identity: resolve-or-create tenant.customer (federated graph) ──
     const personId = await this.identity.resolveContact({
       tenantId,
       kind: 'whatsapp',
@@ -147,7 +147,7 @@ export class WhatsappController {
     // NOTE: this is NOT the authoritative dedup. It commits before the message
     // insert + enqueue, so hard-dropping on its `duplicate` flag would strand a
     // first attempt that crashed mid-flight (gate written, work not done). The
-    // durable, idempotent guards are below: comms.messages.twilio_message_sid
+    // durable, idempotent guards are below: tenant.message.twilio_message_sid
     // (UNIQUE) → DUPLICATE_MESSAGE, and the enqueue jobId=messageSid (BullMQ drops
     // a re-add). So we log a duplicate here and continue; the message-level dedup
     // is what actually prevents a double turn.

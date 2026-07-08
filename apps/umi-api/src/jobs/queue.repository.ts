@@ -6,7 +6,7 @@ import { PgService } from '../shared/database/pg.service';
  * against the live platform DB on 2026-06-24
  * (`docs/migration/2026-06-24-phase1c-queue-schema-preflight.md`). All access is
  * via the worker pool — `queue` is a service-role-only schema (§9.1) and every
- * table carries a NOT NULL `tenant_id` FK to `core.tenants`.
+ * table carries a NOT NULL `tenant_id` FK to `tenant.tenant`.
  *
  * BullMQ owns *execution* state (queue.jobs/job_attempts are superseded, §10.5).
  * This repository owns the durable boundaries BullMQ does not: the inbound

@@ -37,7 +37,7 @@ const FUZZY_ASK_MIN_SIM = 0.4;
  * (see OrderLocationResolver / the `# SUCURSALES` block). The LLM does the fuzzy
  * read and passes a branch name; this tool VALIDATES it against the tenant's real
  * active branches and persists the pick to
- * `comms.conversations.selected_location_id`. It never invents a branch.
+ * `runtime.conversation_state.selected_location_id`. It never invents a branch.
  *
  * Matching (Phase 2) combines two votes over `name + owner-curated aliases`:
  *   - a deterministic literal match (exact > prefix > substring). A UNIQUE literal

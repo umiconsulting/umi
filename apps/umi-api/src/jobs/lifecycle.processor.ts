@@ -14,7 +14,7 @@ import { SequencesService } from '../modules/leads/sequences.service';
  * families of scheduled work on the one `lifecycle` queue (spec §10.1):
  *   - cash WhatsApp journeys (LifecycleScheduler) — gated by LIFECYCLE_CRONS_ENABLED
  *   - landing email sequences (LeadsScheduler)     — gated by LEADS_SEQUENCE_ENABLED
- * Each cash journey is idempotent at the row level (`loyalty.lifecycle_sends`
+ * Each cash journey is idempotent at the row level (`runtime.nudge_sent`
  * claim); the email sequence is idempotent via `umi.prospect.emails_sent`. The two
  * flags are checked per-job so neither family can gate the other. Worker-only.
  */

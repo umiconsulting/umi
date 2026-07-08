@@ -6,7 +6,7 @@ import { VoiceSettingsRepository } from './voice-settings.repository';
 
 /**
  * Voice & tone settings — the dashboard-facing read/write over
- * `ops.businesses.config.voice` (the same jsonb the WhatsApp bot resolves via
+ * `tenant.business.config.voice` (the same jsonb the WhatsApp bot resolves via
  * BusinessConfigService/resolveVoiceConfig). Imports AuthModule (guards); no
  * TenantsModule needed (voice is tenant-level — no location resolution). PgService
  * is @Global, so VoiceSettingsRepository injects it with no extra import.

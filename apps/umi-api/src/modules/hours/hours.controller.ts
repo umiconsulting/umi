@@ -15,7 +15,7 @@ import { HoursService } from './hours.service';
 import { UpdateHoursDto } from './dto/update-hours.dto';
 
 /**
- * Business hours over `ops.business_hours` (one row per day_of_week). Slug-routed
+ * Business hours over `tenant.open_hours` (one row per day_of_week). Slug-routed
  * + membership-checked. Hours are stored per tenant/location; the effective
  * location is resolved from `?locationId` or the tenant default.
  */
