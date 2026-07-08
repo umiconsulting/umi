@@ -45,24 +45,34 @@ const H = { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' }
 let patched = 0, skipped = 0;
 for (const slug of SLUGS) {
   const classId = `${ISSUER}.${slug}_${PREFIX}`;
+  // Collect the whole class first — we need the full set to tell a topup class
+  // (some cards carry a money balance) from a loyalty-only class (none do).
+  const objs = [];
   let pageToken = '';
   do {
     const url = `https://walletobjects.googleapis.com/walletobjects/v1/loyaltyObject?classId=${encodeURIComponent(classId)}&maxResults=200${pageToken ? `&token=${pageToken}` : ''}`;
     const res = await fetch(url, { headers: H });
     if (res.status !== 200) { console.log(`SKIP class ${classId} (list ${res.status})`); break; }
     const body = await res.json();
-    for (const obj of body.resources || []) {
-      const micros = obj.secondaryLoyaltyPoints?.balance?.money?.micros;
-      if (micros == null) { skipped++; continue; } // no topup → no Saldo line
-      const saldoBody = formatMXN(Number(micros) / 10_000);
-      // Replace any existing saldo module, keep the rest, in a stable order.
-      const modules = (obj.textModulesData || []).filter((m) => m.id !== 'saldo');
-      modules.push({ header: 'SALDO', body: saldoBody, id: 'saldo' });
-      if (!APPLY) { patched++; if (patched <= 3) console.log(`[dry] ${obj.id} -> Saldo ${saldoBody}`); continue; }
-      const p = await fetch(`https://walletobjects.googleapis.com/walletobjects/v1/loyaltyObject/${encodeURIComponent(obj.id)}`, { method: 'PATCH', headers: H, body: JSON.stringify({ textModulesData: modules }) });
-      if (p.status === 200) patched++; else { skipped++; console.log(`FAIL ${obj.id}: ${p.status} ${await p.text()}`); }
-    }
+    for (const o of body.resources || []) objs.push(o);
     pageToken = body.pagination?.nextPageToken || '';
   } while (pageToken);
+
+  // Loyalty-only class → skip entirely (never stamp a misleading "$0.00").
+  const isTopup = objs.some((o) => o.secondaryLoyaltyPoints?.balance?.money?.micros != null);
+  if (!isTopup) { skipped += objs.length; console.log(`${slug}: loyalty-only (${objs.length} objs) → skip`); continue; }
+
+  // Topup class → every card gets a Saldo string: its balance, or "$0.00" when it
+  // has none yet (stale object predating topup). Avoids a blank Saldo slot on the face.
+  for (const obj of objs) {
+    const micros = obj.secondaryLoyaltyPoints?.balance?.money?.micros;
+    const saldoBody = formatMXN(micros != null ? Number(micros) / 10_000 : 0);
+    const modules = (obj.textModulesData || []).filter((m) => m.id !== 'saldo');
+    modules.push({ header: 'SALDO', body: saldoBody, id: 'saldo' });
+    if (!APPLY) { patched++; if (patched <= 3) console.log(`[dry] ${obj.id} -> Saldo ${saldoBody}`); continue; }
+    const p = await fetch(`https://walletobjects.googleapis.com/walletobjects/v1/loyaltyObject/${encodeURIComponent(obj.id)}`, { method: 'PATCH', headers: H, body: JSON.stringify({ textModulesData: modules }) });
+    if (p.status === 200) patched++; else { skipped++; console.log(`FAIL ${obj.id}: ${p.status} ${await p.text()}`); }
+  }
+  console.log(`${slug}: topup class → ${objs.length} objects`);
 }
-console.log(`\n${APPLY ? 'PATCHED' : 'WOULD PATCH'}: ${patched}   skipped (no topup): ${skipped}`);
+console.log(`\n${APPLY ? 'PATCHED' : 'WOULD PATCH'}: ${patched}   skipped (loyalty-only): ${skipped}`);
