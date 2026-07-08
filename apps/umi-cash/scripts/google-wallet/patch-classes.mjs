@@ -38,13 +38,16 @@ const ISSUER = env.GOOGLE_WALLET_ISSUER_ID;
 const PREFIX = (env.GOOGLE_WALLET_CLASS_ID || 'loyalty_v2').trim();
 const SLUGS = ['northwestcafe', 'kalalacafe', 'elgranribera'];
 
-// Explicit fallback template: two native rows. Row 1 = Visitas | Saldo, Row 2 = reward status.
+// Explicit template: two rows. Row 1 = Visitas | Saldo, Row 2 = reward status.
+// NOTE: Saldo references the STRING text module `saldo`, NOT secondaryLoyaltyPoints.balance —
+// money-type balances render BLANK inside a card row (that's the PR#40 missing-Saldo bug).
+// getLoyaltyObject emits the `saldo` text module (formatMXN) whenever topup is enabled.
 const EXPLICIT_TEMPLATE = {
   cardTemplateOverride: {
     cardRowTemplateInfos: [
       { twoItems: {
           startItem: { firstValue: { fields: [{ fieldPath: 'object.loyaltyPoints.balance' }] } },
-          endItem:   { firstValue: { fields: [{ fieldPath: 'object.secondaryLoyaltyPoints.balance' }] } },
+          endItem:   { firstValue: { fields: [{ fieldPath: "object.textModulesData['saldo']" }] } },
       } },
       { oneItem: {
           item: { firstValue: { fields: [

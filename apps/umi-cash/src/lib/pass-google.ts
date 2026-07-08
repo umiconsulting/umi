@@ -7,6 +7,7 @@
 
 import { SignJWT } from 'jose';
 import { signWalletBarcode } from './auth';
+import { formatMXN } from './currency';
 
 const ISSUER_ID = (process.env.GOOGLE_WALLET_ISSUER_ID || '').trim();
 const CLASS_ID_PREFIX = (process.env.GOOGLE_WALLET_CLASS_ID || 'loyalty_v2').trim();
@@ -98,6 +99,18 @@ function getLoyaltyObject(data: GooglePassData) {
       header: 'PRÓXIMA RECOMPENSA',
       body,
       id: 'next_reward',
+    });
+  }
+
+  // Saldo as a STRING text module. `secondaryLoyaltyPoints` (money) is the native
+  // balance display, but money does NOT render inside a cardTemplateOverride row —
+  // so when the card-face override is active, its row references this string instead.
+  // Kept in sync with the balance on every object update.
+  if (data.topupEnabled !== false) {
+    textModules.push({
+      header: 'SALDO',
+      body: formatMXN(data.balanceCentavos),
+      id: 'saldo',
     });
   }
 
