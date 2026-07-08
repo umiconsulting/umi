@@ -93,20 +93,6 @@ function getLoyaltyObject(data: GooglePassData) {
     state: 'active',
     accountId: data.cardNumber,
     accountName: data.customerName || 'Cliente',
-    // Visual stamp card (Google's analog of the Apple strip). Content-addressed by
-    // state so a stamp advance points at a new URL and Google re-fetches it; a fixed
-    // URL would be served from Google's image cache and never update.
-    heroImage: {
-      sourceUri: {
-        uri: `${APP_URL}/api/${data.tenantSlug || ''}/stamp-strip/${data.visitsThisCycle}-${data.visitsRequired}.png`,
-      },
-      contentDescription: {
-        defaultValue: {
-          language: 'es-MX',
-          value: `Progreso: ${data.visitsThisCycle} de ${data.visitsRequired} visitas`,
-        },
-      },
-    },
     loyaltyPoints: {
       balance: {
         string: `${data.visitsThisCycle} / ${data.visitsRequired}`,
@@ -151,6 +137,24 @@ function getLoyaltyObject(data: GooglePassData) {
       ],
     },
   };
+
+  // Visual stamp card (Google's analog of the Apple strip). Content-addressed by state
+  // so a stamp advance points at a new URL and Google re-fetches it; a fixed URL would be
+  // served from Google's image cache and never update. Skipped when tenantSlug is absent —
+  // the URL (and the whole pass, whose classId is slug-derived) would be malformed anyway.
+  if (data.tenantSlug) {
+    object.heroImage = {
+      sourceUri: {
+        uri: `${APP_URL}/api/${data.tenantSlug}/stamp-strip/${data.visitsThisCycle}-${data.visitsRequired}.png`,
+      },
+      contentDescription: {
+        defaultValue: {
+          language: 'es-MX',
+          value: `Progreso: ${data.visitsThisCycle} de ${data.visitsRequired} visitas`,
+        },
+      },
+    };
+  }
 
   // Balance — only when topup/monedero is enabled (matches Apple pass)
   if (data.topupEnabled !== false) {

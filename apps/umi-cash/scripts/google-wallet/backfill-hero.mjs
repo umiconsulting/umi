@@ -25,6 +25,11 @@ const raw = fs.readFileSync(path.join(HERE, '../../.env.vercel.production'), 'ut
 const env = {};
 for (const l of raw.split('\n')) { const m = l.match(/^([A-Z0-9_]+)=(.*)$/); if (!m) continue; let v = m[2].trim(); if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1); env[m[1]] = v; }
 
+if (!env.GOOGLE_WALLET_ISSUER_ID || !env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
+  console.error('Missing GOOGLE_WALLET_ISSUER_ID / GOOGLE_SERVICE_ACCOUNT_EMAIL / GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY in .env.vercel.production');
+  process.exit(1);
+}
+
 const ISSUER = env.GOOGLE_WALLET_ISSUER_ID;
 const PREFIX = (env.GOOGLE_WALLET_CLASS_ID || 'loyalty_v2').trim();
 const HERO_BASE = (process.env.HERO_BASE || env.NEXT_PUBLIC_APP_URL || 'https://cash.umiconsulting.co').replace(/\/$/, '');
