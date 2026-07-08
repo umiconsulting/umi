@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
+import { SUPER_ADMIN_SA_CTE } from '../auth/rbac.sql';
 
 export interface TenantSummary {
   id: string;
@@ -52,12 +53,7 @@ export class TenantsRepository {
    */
   async tenantsForUser(userId: string): Promise<TenantSummary[]> {
     const { rows } = await this.pg.query<TenantSummary>(
-      `WITH sa AS (
-         SELECT EXISTS (
-           SELECT 1 FROM tenant.tenant_access
-           WHERE login_id = $1::uuid AND role = 'super_admin' AND status = 'active'
-         ) AS is_sa
-       )
+      `WITH ${SUPER_ADMIN_SA_CTE}
        SELECT
          t.id::text AS "id",
          t.slug     AS "slug",

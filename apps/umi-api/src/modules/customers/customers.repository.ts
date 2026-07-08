@@ -108,6 +108,12 @@ export class CustomersRepository {
                COALESCE((SELECT sum(l.delta) FROM tenant.card_ledger l
                  WHERE l.tenant_id = c.tenant_id
                    AND l.card_id IN (SELECT id FROM tenant.card WHERE tenant_id = c.tenant_id AND customer_id = c.id)), 0) AS wallet_balance_cents,
+               -- Intentionally 0: tenant.gift_card has no customer FK (it links to a
+               -- person only via recipient email/phone PII, or via redeemed_card_id
+               -- once redeemed), so a per-customer active-gift-card count can't be
+               -- derived off this card-keyed lateral without fuzzy PII matching —
+               -- out of scope for the rename sweep. giftCards.active is card-balance
+               -- driven; gift-card attribution is a follow-up (PR4 writers).
                0 AS gift_card_count,
                max(lc.updated_at) AS last_cash_at
              FROM tenant.card AS lc

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
+import { SUPER_ADMIN_SA_CTE } from './rbac.sql';
 
 export interface UserCredential {
   userId: string;
@@ -101,12 +102,7 @@ export class AuthRepository {
     userId: string,
   ): Promise<TenantMembershipSummary[]> {
     const { rows } = await this.pg.query<TenantMembershipSummary>(
-      `WITH sa AS (
-         SELECT EXISTS (
-           SELECT 1 FROM tenant.tenant_access
-           WHERE login_id = $1::uuid AND role = 'super_admin' AND status = 'active'
-         ) AS is_sa
-       )
+      `WITH ${SUPER_ADMIN_SA_CTE}
        SELECT
          t.id::text AS "id",
          t.slug     AS "slug",
@@ -138,12 +134,7 @@ export class AuthRepository {
     tenantId: string,
   ): Promise<MembershipAccess | null> {
     const { rows } = await this.pg.query<MembershipAccess>(
-      `WITH sa AS (
-         SELECT EXISTS (
-           SELECT 1 FROM tenant.tenant_access
-           WHERE login_id = $1::uuid AND role = 'super_admin' AND status = 'active'
-         ) AS is_sa
-       ),
+      `WITH ${SUPER_ADMIN_SA_CTE},
        edge AS (
          SELECT ta.id, ta.role
          FROM tenant.tenant_access AS ta

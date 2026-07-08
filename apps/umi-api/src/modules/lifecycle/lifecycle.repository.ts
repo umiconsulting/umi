@@ -104,7 +104,7 @@ export class LifecycleRepository {
            SELECT visits_required, reward_name
              FROM tenant.reward_rule
             WHERE tenant_id = t.id AND is_active = true
-            ORDER BY activated_at DESC LIMIT 1
+            ORDER BY activated_at DESC NULLS LAST LIMIT 1
          ) rc ON true
         WHERE t.id = $1::uuid
         LIMIT 1`,

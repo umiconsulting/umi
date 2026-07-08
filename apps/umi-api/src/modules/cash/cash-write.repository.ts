@@ -199,6 +199,26 @@ export class CashWriteRepository {
         [d.tenantId, d.cardId],
       );
       if (!locked.rows[0]) throw new CardNotFoundError();
+
+      // Idempotent replay: if this idempotencyKey already produced a ledger row the
+      // debit already committed. Return the current balance WITHOUT re-checking funds
+      // (a later spend could drop the balance below amountCents and throw a false
+      // InsufficientBalanceError on a retry) or re-rotating qr_token (which would
+      // invalidate the QR the original call already issued).
+      const replay = await c.query<Row>(
+        `SELECT 1 AS balance FROM tenant.card_ledger
+         WHERE tenant_id=$1::uuid AND idempotency_key=$2 LIMIT 1`,
+        [d.tenantId, d.idempotencyKey],
+      );
+      if (replay.rows[0]) {
+        const { rows } = await c.query<Row>(
+          `SELECT COALESCE(sum(delta),0)::int AS balance
+           FROM tenant.card_ledger WHERE tenant_id=$1::uuid AND card_id=$2::uuid`,
+          [d.tenantId, d.cardId],
+        );
+        return Number(rows[0].balance);
+      }
+
       const available = Number(
         (
           await c.query<Row>(
