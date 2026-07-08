@@ -22,7 +22,7 @@ const MAX_REQUIRED = 20;
  * state shares one CDN-cached image.
  */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { slug: string; state: string } },
 ) {
   const match = params.state.replace(/\.png$/i, '').match(/^(\d+)-(\d+)$/);
@@ -34,8 +34,20 @@ export async function GET(
   }
   const filled = Math.max(0, Math.min(parseInt(match[1], 10), required));
 
-  const tenant = await getTenant(params.slug);
-  if (!tenant) return new NextResponse('Tenant not found', { status: 404 });
+  // Background color, in priority order: explicit ?bg= override → the tenant's secondary
+  // color (best-effort; skipped when there's no DB, e.g. a Vercel preview) → transparent,
+  // which inherits the card's background. This route is a pure image and must not depend
+  // on the database being reachable.
+  const bgParam = req.nextUrl.searchParams.get('bg');
+  let bgColor: string | null = bgParam ? (bgParam.startsWith('#') ? bgParam : `#${bgParam}`) : null;
+  if (!bgColor) {
+    try {
+      const tenant = await getTenant(params.slug);
+      bgColor = tenant?.secondaryColor ?? null;
+    } catch {
+      // No DB available (preview/offline) — fall through to transparent.
+    }
+  }
 
   // Tenant stamp art lives at /public/logos/{slug}-stamp-{filled,empty,welcome}.png —
   // same convention the Apple strip uses (see pass-apple.ts).
@@ -49,7 +61,7 @@ export async function GET(
       required,
       filledUrl,
       emptyUrl,
-      tenant.secondaryColor,
+      bgColor,
       welcomeUrl,
     );
     return new NextResponse(png as unknown as BodyInit, {
