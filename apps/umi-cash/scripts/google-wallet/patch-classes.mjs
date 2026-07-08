@@ -68,7 +68,12 @@ for (const slug of SLUGS) {
   fs.writeFileSync(path.join(HERE, `backup-${slug}.json`), JSON.stringify(cls.classTemplateInfo || {}, null, 2));
 
   // MODE=default clears the override (null); MODE=explicit installs the native template.
-  const body = MODE === 'explicit' ? { classTemplateInfo: EXPLICIT_TEMPLATE } : { classTemplateInfo: null };
+  // Editing an already-approved class requires resubmitting it (reviewStatus UNDER_REVIEW);
+  // existing saved passes keep working through re-review.
+  const body = {
+    reviewStatus: 'UNDER_REVIEW',
+    classTemplateInfo: MODE === 'explicit' ? EXPLICIT_TEMPLATE : null,
+  };
   console.log(`=== ${id} ===`);
   console.log(MODE === 'explicit' ? 'set explicit native template' : 'clear override -> Google default template');
   if (!APPLY) { console.log('(dry-run)\n'); continue; }
