@@ -6,7 +6,6 @@
  */
 
 import { SignJWT } from 'jose';
-import { formatMXN } from './currency';
 import { signWalletBarcode } from './auth';
 
 const ISSUER_ID = (process.env.GOOGLE_WALLET_ISSUER_ID || '').trim();
@@ -50,24 +49,10 @@ function getLoyaltyObject(data: GooglePassData) {
   const remaining = data.visitsRequired - data.visitsThisCycle;
   const objectId = `${ISSUER_ID}.card_${data.cardId}`;
 
-  // Stamp progress: ● for filled, ○ for empty
-  const filled = '●'.repeat(data.visitsThisCycle);
-  const empty = '○'.repeat(remaining);
-  const stampProgress = `${filled}${empty} (${data.visitsThisCycle}/${data.visitsRequired})`;
-
-  // Build text modules to match Apple pass fields
-  const textModules: { header: string; body: string; id: string }[] = [
-    {
-      header: 'MIEMBRO',
-      body: data.customerName || 'Cliente',
-      id: 'member_name',
-    },
-    {
-      header: data.rewardName.toUpperCase(),
-      body: stampProgress,
-      id: 'stamp_progress',
-    },
-  ];
+  // Visual stamp progress lives in the heroImage (a rendered stamp strip); the
+  // customer name lives in accountName. So the only text modules left are the
+  // genuinely free-form ones: lifecycle message, birthday, and reward status.
+  const textModules: { header: string; body: string; id: string }[] = [];
 
   // Lifecycle message (welcome/winback/expiring) — surfaces first so it's prominent
   if (data.lifecycleMessage) {
@@ -108,11 +93,25 @@ function getLoyaltyObject(data: GooglePassData) {
     state: 'active',
     accountId: data.cardNumber,
     accountName: data.customerName || 'Cliente',
+    // Visual stamp card (Google's analog of the Apple strip). Content-addressed by
+    // state so a stamp advance points at a new URL and Google re-fetches it; a fixed
+    // URL would be served from Google's image cache and never update.
+    heroImage: {
+      sourceUri: {
+        uri: `${APP_URL}/api/${data.tenantSlug || ''}/stamp-strip/${data.visitsThisCycle}-${data.visitsRequired}.png`,
+      },
+      contentDescription: {
+        defaultValue: {
+          language: 'es-MX',
+          value: `Progreso: ${data.visitsThisCycle} de ${data.visitsRequired} visitas`,
+        },
+      },
+    },
     loyaltyPoints: {
       balance: {
-        string: String(data.visitsThisCycle),
+        string: `${data.visitsThisCycle} / ${data.visitsRequired}`,
       },
-      label: `Visitas (meta: ${data.visitsRequired})`,
+      label: 'Visitas',
     },
     barcode: {
       type: 'qrCode',
