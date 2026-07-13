@@ -16,7 +16,8 @@
     "dev": "nest start --watch",
     "dev:worker": "nest start --watch --entryFile worker",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",

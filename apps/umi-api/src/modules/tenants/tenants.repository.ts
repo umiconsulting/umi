@@ -38,7 +38,7 @@ export interface LocationProfileRow extends LocationRow {
  * ENTITLEMENTS use the worker pool — the latter is MANDATORY because entitlements
  * moved to the SEALED `umi.subscription_item` (no umi_app USAGE on `umi`).
  *
- * 4-schema model (canonical rebuild v2): core.tenants -> tenant.tenant,
+ * 4-schema model (canonical rebuild v2): core.tenants -> tenant.business,
  * core.locations -> tenant.branch, core.product_instances -> umi.subscription_item
  * (tenant granularity — no location_id), RBAC -> tenant.tenant_access single role.
  */
@@ -60,7 +60,7 @@ export class TenantsRepository {
          t.name     AS "name",
          t.timezone AS "timezone",
          ARRAY[COALESCE(ta.role, 'super_admin')] AS "roles"
-       FROM tenant.tenant AS t
+       FROM tenant.business AS t
        LEFT JOIN tenant.tenant_access AS ta
          ON ta.tenant_id = t.id
         AND ta.login_id  = $1::uuid
@@ -106,7 +106,7 @@ export class TenantsRepository {
       c.query<LocationRow>(
         `SELECT l.id::text, l.slug, l.name, t.timezone, l.status
          FROM tenant.branch AS l
-         JOIN tenant.tenant AS t ON t.id = l.tenant_id
+         JOIN tenant.business AS t ON t.id = l.tenant_id
          WHERE l.tenant_id = $1::uuid
          ORDER BY l.created_at ASC, l.id ASC`,
         [tenantId],
@@ -250,10 +250,10 @@ export class TenantsRepository {
     }));
   }
 
-  /** Worker-pool read of the tenant's canonical timezone (`tenant.tenant.timezone`). */
+  /** Worker-pool read of the tenant's canonical timezone (`tenant.business.timezone`). */
   async getTenantTimezoneWorker(tenantId: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ timezone: string | null }>(
-      `SELECT timezone FROM tenant.tenant WHERE id = $1::uuid`,
+      `SELECT timezone FROM tenant.business WHERE id = $1::uuid`,
       [tenantId],
     );
     return rows[0]?.timezone ?? null;
@@ -265,7 +265,7 @@ export class TenantsRepository {
   ): Promise<void> {
     await this.pg.withTenant((c) =>
       c.query(
-        `UPDATE tenant.tenant
+        `UPDATE tenant.business
          SET name = COALESCE($2, name),
              timezone = COALESCE($3, timezone),
              updated_at = now()

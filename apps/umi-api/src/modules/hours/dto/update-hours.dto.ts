@@ -12,7 +12,7 @@ export class UpdateHoursDto {
   @IsObject()
   hours?: Record<string, { open: boolean; from: string; to: string }>;
 
-  // IANA timezone → tenant.tenant.timezone.
+  // IANA timezone → tenant.business.timezone.
   @IsOptional()
   @IsString()
   timezone?: string;

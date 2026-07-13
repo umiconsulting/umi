@@ -107,7 +107,7 @@ export class OrderingSettingsRepository {
       c.query(
         `INSERT INTO tenant.business (tenant_id, name, config)
          VALUES ($1::uuid,
-                 COALESCE((SELECT name FROM tenant.tenant WHERE id = $1::uuid), 'Negocio'),
+                 COALESCE((SELECT name FROM tenant.business WHERE id = $1::uuid), 'Negocio'),
                  $2::jsonb)
          ON CONFLICT (tenant_id) DO UPDATE
            SET config = COALESCE(tenant.business.config, '{}'::jsonb) || EXCLUDED.config,

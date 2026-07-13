@@ -45,15 +45,15 @@ export interface ScannedCard {
  * STATE only (visits/rewards/birthday) — never money, so it must NOT write the
  * card_ledger.
  *
- * DERIVED-STATE MODEL (canonical rebuild v2): `tenant.card` is identity-only —
+ * DERIVED-STATE MODEL (canonical rebuild v2): `tenant.loyalty_card` is identity-only —
  * the old total_visits / visits_this_cycle / pending_rewards / balance_cents
  * caches are GONE. They are computed from the event tables on read:
- *   total_visits       = COUNT(tenant.visit)
+ *   total_visits       = COUNT(tenant.loyalty_visit)
  *   visits_this_cycle  = total_visits % visits_required
  *   pending_rewards    = floor(total_visits / visits_required)
- *                          − COUNT(tenant.reward_redemption)
- *   balance_cents      = COALESCE(SUM(tenant.card_ledger.delta), 0)
- * where visits_required is the tenant's active tenant.reward_rule (default 10).
+ *                          − COUNT(tenant.loyalty_redemption)
+ *   balance_cents      = COALESCE(SUM(tenant.loyalty_stored_value_ledger.delta), 0)
+ * where visits_required is the tenant's active tenant.loyalty_reward (default 10).
  * The scan mutation therefore only appends the visit / reward_redemption rows
  * (which it already did) and rotates the QR token — no cache to update.
  */
@@ -65,7 +65,7 @@ export class CashScanRepository {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<RewardConfig>(
         `SELECT id::text, visits_required, reward_name
-         FROM tenant.reward_rule
+         FROM tenant.loyalty_reward
          WHERE tenant_id = $1::uuid AND is_active = true
          ORDER BY activated_at DESC NULLS LAST LIMIT 1`,
         [tenantId],
@@ -80,8 +80,8 @@ export class CashScanRepository {
         `SELECT t.name, t.timezone,
                 s.branding->'lifecycle_copy' AS lifecycle_copy,
                 s.birthday_reward_name AS birthday_reward_name
-         FROM tenant.tenant AS t
-         LEFT JOIN tenant.loyalty_settings AS s ON s.tenant_id = t.id
+         FROM tenant.business AS t
+         LEFT JOIN tenant.loyalty_program AS s ON s.tenant_id = t.id
          WHERE t.id = $1::uuid LIMIT 1`,
         [tenantId],
       ),
@@ -104,7 +104,7 @@ export class CashScanRepository {
   ): Promise<boolean> {
     const { rows } = await this.pg.withTenant((c) =>
       c.query(
-        `SELECT 1 FROM tenant.visit
+        `SELECT 1 FROM tenant.loyalty_visit
          WHERE tenant_id=$1::uuid AND card_id=$2::uuid
            AND occurred_at >= now() - ($3 || ' seconds')::interval
          LIMIT 1`,
@@ -122,7 +122,7 @@ export class CashScanRepository {
   ): Promise<boolean> {
     const { rows } = await this.pg.withTenant((c) =>
       c.query(
-        `SELECT 1 FROM tenant.visit
+        `SELECT 1 FROM tenant.loyalty_visit
          WHERE tenant_id=$1::uuid AND card_id=$2::uuid
            AND occurred_at >= (date_trunc('day', now() AT TIME ZONE $3) AT TIME ZONE $3)
          LIMIT 1`,
@@ -139,7 +139,7 @@ export class CashScanRepository {
   ): Promise<boolean> {
     const { rows } = await this.pg.withTenant((c) =>
       c.query(
-        `SELECT 1 FROM tenant.reward_redemption
+        `SELECT 1 FROM tenant.loyalty_redemption
          WHERE tenant_id=$1::uuid AND card_id=$2::uuid
            AND redeemed_at >= now() - ($3 || ' seconds')::interval
          LIMIT 1`,
@@ -198,7 +198,7 @@ export class CashScanRepository {
   /**
    * Apply the selected actions in one transaction (BIRTHDAY → REDEEM → VISIT),
    * rotate the QR token, then RE-DERIVE the card summary from the event tables
-   * (no caches on tenant.card). The visit / reward_redemption inserts are the
+   * (no caches on tenant.loyalty_card). The visit / reward_redemption inserts are the
    * source of truth the derive reads back.
    */
   async performScan(input: PerformScanInput): Promise<ScannedCard> {
@@ -212,7 +212,7 @@ export class CashScanRepository {
       }
       if (input.doRedeem && input.rewardConfigId) {
         await c.query(
-          `INSERT INTO tenant.reward_redemption
+          `INSERT INTO tenant.loyalty_redemption
              (tenant_id, card_id, reward_rule_id, staff_id)
            VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid)`,
           [input.tenantId, input.cardId, input.rewardConfigId, input.staffMemberId],
@@ -220,7 +220,7 @@ export class CashScanRepository {
       }
       if (input.doVisit) {
         await c.query(
-          `INSERT INTO tenant.visit (tenant_id, card_id, staff_id)
+          `INSERT INTO tenant.loyalty_visit (tenant_id, card_id, staff_id)
            VALUES ($1::uuid, $2::uuid, $3::uuid)`,
           [input.tenantId, input.cardId, input.staffMemberId],
         );
@@ -228,7 +228,7 @@ export class CashScanRepository {
       // Rotate the QR token; stamp the lifecycle moment message on a visit. No
       // cache columns to touch — visit/reward counts + balance are derived below.
       const upd = await c.query<{ card_number: string }>(
-        `UPDATE tenant.card SET
+        `UPDATE tenant.loyalty_card SET
            metadata = CASE WHEN $3
              THEN COALESCE(metadata,'{}'::jsonb) || jsonb_build_object(
                'lifecycle_message', $4::text,
@@ -256,15 +256,15 @@ export class CashScanRepository {
       const { rows } = await c.query<ScannedCard>(
         `WITH vr AS (
            SELECT COALESCE((
-             SELECT visits_required FROM tenant.reward_rule
+             SELECT visits_required FROM tenant.loyalty_reward
              WHERE tenant_id=$1::uuid AND is_active
              ORDER BY activated_at DESC NULLS LAST LIMIT 1), 10) AS n
          ),
-         tv  AS (SELECT COUNT(*)::int AS n FROM tenant.visit
+         tv  AS (SELECT COUNT(*)::int AS n FROM tenant.loyalty_visit
                   WHERE tenant_id=$1::uuid AND card_id=$2::uuid),
-         rr  AS (SELECT COUNT(*)::int AS n FROM tenant.reward_redemption
+         rr  AS (SELECT COUNT(*)::int AS n FROM tenant.loyalty_redemption
                   WHERE tenant_id=$1::uuid AND card_id=$2::uuid),
-         bal AS (SELECT COALESCE(SUM(delta),0)::int AS n FROM tenant.card_ledger
+         bal AS (SELECT COALESCE(SUM(delta),0)::int AS n FROM tenant.loyalty_stored_value_ledger
                   WHERE tenant_id=$1::uuid AND card_id=$2::uuid)
          SELECT $3::text            AS card_number,
                 tv.n                AS total_visits,

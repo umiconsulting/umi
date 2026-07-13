@@ -5,20 +5,20 @@ import { PgService } from '../../shared/database/pg.service';
  * Canonical reads for the scheduled lifecycle WhatsApp journeys (3d-lifecycle),
  * on build-v2:
  *
- *   loyalty.cards          → tenant.card           (customer_id — no account layer)
+ *   loyalty.cards          → tenant.loyalty_card           (customer_id — no account layer)
  *   core.people            → tenant.customer       (name; phone via contact_identity)
- *   loyalty.visit_events   → tenant.visit          (card_id, occurred_at)
+ *   loyalty.visit_events   → tenant.loyalty_visit          (card_id, occurred_at)
  *   loyalty.birthday_rewards → tenant.birthday_reward (card_id, status 'active')
- *   core.tenants           → tenant.tenant         (status 'active')
- *   loyalty.programs       → tenant.loyalty_settings (branding.lifecycle_copy)
- *   loyalty.reward_configs → tenant.reward_rule    (is_active, latest activated_at)
- *   loyalty.lifecycle_sends→ runtime.nudge_sent    UNIQUE(tenant_id, card_id, journey)
+ *   core.tenants           → tenant.business         (status 'active')
+ *   loyalty.programs       → tenant.loyalty_program (branding.lifecycle_copy)
+ *   loyalty.reward_configs → tenant.loyalty_reward    (is_active, latest activated_at)
+ *   loyalty.lifecycle_sends→ runtime.reminder_sent    UNIQUE(tenant_id, card_id, journey)
  *
  * DERIVED (no cache columns): visits_this_cycle = COUNT(visit) % visits_required;
  * the phone is the WhatsApp as-received reply address (contact_identity.display_value,
  * avoids Twilio 63015) else the phone E.164. The Apple/Google wallet-push journeys
  * stay in umi-cash. Worker pool (BYPASSRLS): cross-tenant batch, no auth user, and
- * runtime.nudge_sent is sealed from umi_app.
+ * runtime.reminder_sent is sealed from umi_app.
  */
 
 export interface LifecycleTenant {
@@ -66,8 +66,8 @@ const CARD_PERSON_JOIN = `
 const HAS_PHONE = `ph.phone IS NOT NULL`;
 // visits_this_cycle = COUNT(visit) % active visits_required (default 10).
 const VISITS_THIS_CYCLE = `(
-  (SELECT count(*) FROM tenant.visit v WHERE v.tenant_id = c.tenant_id AND v.card_id = c.id)
-  % COALESCE((SELECT visits_required FROM tenant.reward_rule
+  (SELECT count(*) FROM tenant.loyalty_visit v WHERE v.tenant_id = c.tenant_id AND v.card_id = c.id)
+  % COALESCE((SELECT visits_required FROM tenant.loyalty_reward
        WHERE tenant_id = c.tenant_id AND is_active
        ORDER BY activated_at DESC NULLS LAST LIMIT 1), ${DEFAULT_VISITS_REQUIRED})
 )::int`;
@@ -80,7 +80,7 @@ export class LifecycleRepository {
   async activeTenants(): Promise<LifecycleTenant[]> {
     const { rows } = await this.pg.query<LifecycleTenant>(
       `SELECT id::text, name, slug, timezone
-         FROM tenant.tenant WHERE status = 'active'`,
+         FROM tenant.business WHERE status = 'active'`,
     );
     return rows;
   }
@@ -98,11 +98,11 @@ export class LifecycleRepository {
           p.birthday_reward_name       AS birthday_reward_name,
           rc.visits_required           AS visits_required,
           rc.reward_name               AS reward_name
-         FROM tenant.tenant t
-         LEFT JOIN tenant.loyalty_settings p ON p.tenant_id = t.id
+         FROM tenant.business t
+         LEFT JOIN tenant.loyalty_program p ON p.tenant_id = t.id
          LEFT JOIN LATERAL (
            SELECT visits_required, reward_name
-             FROM tenant.reward_rule
+             FROM tenant.loyalty_reward
             WHERE tenant_id = t.id AND is_active = true
             ORDER BY activated_at DESC NULLS LAST LIMIT 1
          ) rc ON true
@@ -132,7 +132,7 @@ export class LifecycleRepository {
       `SELECT c.id::text AS card_id, pe.name AS name, ph.phone AS phone,
               ${VISITS_THIS_CYCLE} AS visits_this_cycle, br.year, br.expires_at
          FROM tenant.birthday_reward br
-         JOIN tenant.card c ON c.tenant_id = br.tenant_id AND c.id = br.card_id ${CARD_PERSON_JOIN}
+         JOIN tenant.loyalty_card c ON c.tenant_id = br.tenant_id AND c.id = br.card_id ${CARD_PERSON_JOIN}
         WHERE br.tenant_id = $1::uuid
           AND br.status = 'active'
           AND br.redeemed_at IS NULL
@@ -165,11 +165,11 @@ export class LifecycleRepository {
     }>(
       `SELECT c.id::text AS card_id, pe.name AS name, ph.phone AS phone,
               ${VISITS_THIS_CYCLE} AS visits_this_cycle
-         FROM tenant.card c ${CARD_PERSON_JOIN}
+         FROM tenant.loyalty_card c ${CARD_PERSON_JOIN}
         WHERE c.tenant_id = $1::uuid AND c.status = 'active' AND ${HAS_PHONE}
           AND $2::int = (
             SELECT count(DISTINCT date_trunc('week', ve.occurred_at))
-              FROM tenant.visit ve
+              FROM tenant.loyalty_visit ve
              WHERE ve.tenant_id = c.tenant_id AND ve.card_id = c.id
                AND ve.occurred_at >= date_trunc('week', now()) - (($2::int - 1) || ' weeks')::interval
           )`,
@@ -188,10 +188,10 @@ export class LifecycleRepository {
     }>(
       `SELECT c.id::text AS card_id, pe.name AS name, ph.phone AS phone,
               ${VISITS_THIS_CYCLE} AS visits_this_cycle
-         FROM tenant.card c ${CARD_PERSON_JOIN}
+         FROM tenant.loyalty_card c ${CARD_PERSON_JOIN}
         WHERE c.tenant_id = $1::uuid AND c.status = 'active' AND ${HAS_PHONE}
           AND NOT EXISTS (
-            SELECT 1 FROM tenant.visit v WHERE v.tenant_id = c.tenant_id AND v.card_id = c.id
+            SELECT 1 FROM tenant.loyalty_visit v WHERE v.tenant_id = c.tenant_id AND v.card_id = c.id
           )
           AND c.created_at >= now() - interval '8 days'
           AND c.created_at <  now() - interval '7 days'`,
@@ -213,16 +213,16 @@ export class LifecycleRepository {
     }>(
       `SELECT c.id::text AS card_id, pe.name AS name, ph.phone AS phone,
               ${VISITS_THIS_CYCLE} AS visits_this_cycle
-         FROM tenant.card c ${CARD_PERSON_JOIN}
+         FROM tenant.loyalty_card c ${CARD_PERSON_JOIN}
         WHERE c.tenant_id = $1::uuid AND c.status = 'active' AND ${HAS_PHONE}
           AND EXISTS (
-            SELECT 1 FROM tenant.visit ve
+            SELECT 1 FROM tenant.loyalty_visit ve
              WHERE ve.tenant_id = c.tenant_id AND ve.card_id = c.id
                AND ve.occurred_at >= now() - (($2::int + 1) || ' days')::interval
                AND ve.occurred_at <  now() - ($2::int || ' days')::interval
           )
           AND NOT EXISTS (
-            SELECT 1 FROM tenant.visit ve2
+            SELECT 1 FROM tenant.loyalty_visit ve2
              WHERE ve2.tenant_id = c.tenant_id AND ve2.card_id = c.id
                AND ve2.occurred_at >= now() - ($2::int || ' days')::interval
           )`,
@@ -234,7 +234,7 @@ export class LifecycleRepository {
   /**
    * Atomically claim a (tenant, card, journey) send. Returns true on the first
    * claim (caller should enqueue the message), false if already sent — the
-   * canonical dedup (runtime.nudge_sent) that replaces the legacy outbox
+   * canonical dedup (runtime.reminder_sent) that replaces the legacy outbox
    * idempotency + LifecycleEvent.
    */
   async claimSend(
@@ -244,7 +244,7 @@ export class LifecycleRepository {
     body: string,
   ): Promise<boolean> {
     const { rowCount } = await this.pg.query(
-      `INSERT INTO runtime.nudge_sent (tenant_id, card_id, journey, sent_at, body, metadata)
+      `INSERT INTO runtime.reminder_sent (tenant_id, card_id, journey, sent_at, body, metadata)
        VALUES ($1::uuid, $2::uuid, $3, now(), $4, '{}'::jsonb)
        ON CONFLICT (tenant_id, card_id, journey) DO NOTHING`,
       [tenantId, cardId, journey, body],
@@ -256,7 +256,7 @@ export class LifecycleRepository {
    *  next cron run can retry the send rather than skipping it forever). */
   async deleteSend(tenantId: string, cardId: string, journey: string): Promise<void> {
     await this.pg.query(
-      `DELETE FROM runtime.nudge_sent
+      `DELETE FROM runtime.reminder_sent
         WHERE tenant_id = $1::uuid AND card_id = $2::uuid AND journey = $3`,
       [tenantId, cardId, journey],
     );

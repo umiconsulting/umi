@@ -5,7 +5,7 @@ import { HoursService, type BotDayWindow } from '../hours/hours.service';
 /**
  * Business hours + ordering-window logic for the WhatsApp bot. This is now a
  * THIN consumer of the canonical source (HoursService): weekly hours from
- * `tenant.open_hours`, timezone from `tenant.tenant.timezone`, and ordering
+ * `tenant.open_hours`, timezone from `tenant.business.timezone`, and ordering
  * scalars (accepts/cutoff/notice/bypass) from `tenant.business.config` — the SAME
  * data the dashboard Hours screen writes. There are no hardcoded café defaults:
  * a day with no row / is_closed / null times is CLOSED (fail-closed), and the

@@ -19,7 +19,7 @@ export interface RegisterTenantConfig {
  * customer graph, replacing `core.resolve_contact`). Loyalty is PROGRAM-LESS:
  * `loyalty.accounts`/`loyalty.programs` are gone — a card keys directly on
  * `tenant.customer.id`, and per-tenant loyalty config lives in
- * `tenant.loyalty_settings`. The returned `personId` is the `tenant.customer.id`
+ * `tenant.loyalty_program`. The returned `personId` is the `tenant.customer.id`
  * (also the customer session principal). Ported from umi-cash customers/route.ts.
  */
 @Injectable()
@@ -36,8 +36,8 @@ export class CashRegisterRepository {
                 ls.card_prefix       AS card_prefix,
                 ls.self_registration AS self_registration,
                 (ls.id IS NOT NULL)  AS loyalty_configured
-         FROM tenant.tenant AS t
-         LEFT JOIN tenant.loyalty_settings AS ls ON ls.tenant_id = t.id
+         FROM tenant.business AS t
+         LEFT JOIN tenant.loyalty_program AS ls ON ls.tenant_id = t.id
          WHERE t.id = $1::uuid LIMIT 1`,
         [tenantId],
       ),
@@ -73,7 +73,7 @@ export class CashRegisterRepository {
       `SELECT cu.id::text  AS person_id,
               cu.name      AS display_name,
               EXISTS (
-                SELECT 1 FROM tenant.card ca
+                SELECT 1 FROM tenant.loyalty_card ca
                  WHERE ca.tenant_id = cu.tenant_id
                    AND ca.customer_id = cu.id
                    AND ca.status = 'active'
@@ -143,7 +143,7 @@ export class CashRegisterRepository {
       ]);
       const existing = (
         await c.query<{ id: string; card_number: string }>(
-          `SELECT id::text, card_number FROM tenant.card
+          `SELECT id::text, card_number FROM tenant.loyalty_card
            WHERE tenant_id=$1::uuid AND customer_id=$2::uuid AND status='active'
            ORDER BY created_at LIMIT 1`,
           [input.tenantId, input.personId],
@@ -154,7 +154,7 @@ export class CashRegisterRepository {
       }
       const card = (
         await c.query<{ id: string; card_number: string }>(
-          `INSERT INTO tenant.card
+          `INSERT INTO tenant.loyalty_card
              (tenant_id, customer_id, card_number, qr_token, qr_issued_at, status)
            VALUES ($1::uuid, $2::uuid, $3, $4, now(), 'active')
            RETURNING id::text, card_number`,

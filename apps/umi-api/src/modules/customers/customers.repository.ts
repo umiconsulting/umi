@@ -102,13 +102,13 @@ export class CustomersRepository {
            LEFT JOIN LATERAL (
              SELECT
                count(lc.id) AS loyalty_count,
-               COALESCE((SELECT count(*) FROM tenant.visit v
+               COALESCE((SELECT count(*) FROM tenant.loyalty_visit v
                  WHERE v.tenant_id = c.tenant_id
-                   AND v.card_id IN (SELECT id FROM tenant.card WHERE tenant_id = c.tenant_id AND customer_id = c.id)), 0) AS total_visits,
-               COALESCE((SELECT sum(l.delta) FROM tenant.card_ledger l
+                   AND v.card_id IN (SELECT id FROM tenant.loyalty_card WHERE tenant_id = c.tenant_id AND customer_id = c.id)), 0) AS total_visits,
+               COALESCE((SELECT sum(l.delta) FROM tenant.loyalty_stored_value_ledger l
                  WHERE l.tenant_id = c.tenant_id
-                   AND l.card_id IN (SELECT id FROM tenant.card WHERE tenant_id = c.tenant_id AND customer_id = c.id)), 0) AS wallet_balance_cents,
-               -- Intentionally 0: tenant.gift_card has no customer FK (it links to a
+                   AND l.card_id IN (SELECT id FROM tenant.loyalty_card WHERE tenant_id = c.tenant_id AND customer_id = c.id)), 0) AS wallet_balance_cents,
+               -- Intentionally 0: tenant.loyalty_gift_card has no customer FK (it links to a
                -- person only via recipient email/phone PII, or via redeemed_card_id
                -- once redeemed), so a per-customer active-gift-card count can't be
                -- derived off this card-keyed lateral without fuzzy PII matching —
@@ -116,7 +116,7 @@ export class CustomersRepository {
                -- driven; gift-card attribution is a follow-up (PR4 writers).
                0 AS gift_card_count,
                max(lc.updated_at) AS last_cash_at
-             FROM tenant.card AS lc
+             FROM tenant.loyalty_card AS lc
              WHERE lc.tenant_id = c.tenant_id AND lc.customer_id = c.id
            ) AS cash_summary ON true
            LEFT JOIN LATERAL (
@@ -204,7 +204,7 @@ export class CustomersRepository {
              AND (
                $4 = ''
                OR ($4 = 'whatsapp' AND EXISTS (SELECT 1 FROM tenant.conversation AS cv WHERE cv.tenant_id = c.tenant_id AND cv.customer_id = c.id))
-               OR ($4 = 'cash' AND EXISTS (SELECT 1 FROM tenant.card AS ca WHERE ca.tenant_id = c.tenant_id AND ca.customer_id = c.id))
+               OR ($4 = 'cash' AND EXISTS (SELECT 1 FROM tenant.loyalty_card AS ca WHERE ca.tenant_id = c.tenant_id AND ca.customer_id = c.id))
                OR ($4 = 'memory' AND EXISTS (SELECT 1 FROM tenant.customer_note AS cn WHERE cn.tenant_id = c.tenant_id AND cn.customer_id = c.id))
                OR ($4 = 'review' AND EXISTS (SELECT 1 FROM tenant.contact_identity AS mc WHERE mc.tenant_id = c.tenant_id AND mc.contact_id = c.contact_id AND mc.match_type = 'probabilistic'))
              )
@@ -301,7 +301,7 @@ export class CustomersRepository {
         // Loyalty state DERIVED (no account layer): the customer's active card +
         // balance=SUM(card_ledger), visits=COUNT(visit), cycle/pending vs the rule.
         `WITH vr AS (
-           SELECT COALESCE((SELECT visits_required FROM tenant.reward_rule
+           SELECT COALESCE((SELECT visits_required FROM tenant.loyalty_reward
              WHERE tenant_id = $2::uuid AND is_active
              ORDER BY activated_at DESC NULLS LAST LIMIT 1), 10) AS n
          )
@@ -316,14 +316,14 @@ export class CustomersRepository {
            (agg.total_visits / vr.n - agg.redemptions)::int AS pending_rewards,
            lc.created_at,
            lc.updated_at
-         FROM tenant.card AS lc
+         FROM tenant.loyalty_card AS lc
          JOIN tenant.customer AS cu ON cu.tenant_id = lc.tenant_id AND cu.id = lc.customer_id
          CROSS JOIN vr
          CROSS JOIN LATERAL (
            SELECT
-             (SELECT count(*) FROM tenant.visit v WHERE v.tenant_id = lc.tenant_id AND v.card_id = lc.id) AS total_visits,
-             (SELECT count(*) FROM tenant.reward_redemption r WHERE r.tenant_id = lc.tenant_id AND r.card_id = lc.id) AS redemptions,
-             COALESCE((SELECT sum(l.delta) FROM tenant.card_ledger l WHERE l.tenant_id = lc.tenant_id AND l.card_id = lc.id), 0) AS balance_cents
+             (SELECT count(*) FROM tenant.loyalty_visit v WHERE v.tenant_id = lc.tenant_id AND v.card_id = lc.id) AS total_visits,
+             (SELECT count(*) FROM tenant.loyalty_redemption r WHERE r.tenant_id = lc.tenant_id AND r.card_id = lc.id) AS redemptions,
+             COALESCE((SELECT sum(l.delta) FROM tenant.loyalty_stored_value_ledger l WHERE l.tenant_id = lc.tenant_id AND l.card_id = lc.id), 0) AS balance_cents
          ) AS agg
          WHERE lc.customer_id = $1::uuid AND lc.tenant_id = $2::uuid
          ORDER BY lc.created_at DESC

@@ -34,7 +34,7 @@ export class VoiceSettingsRepository {
         .query<{ business_name: string | null; voice: StoredVoice | null }>(
           `SELECT COALESCE(b.name, t.name) AS business_name,
                   b.config -> 'voice'      AS voice
-             FROM tenant.tenant t
+             FROM tenant.business t
              LEFT JOIN LATERAL (
                SELECT name, config FROM tenant.business
                 WHERE tenant_id = t.id ORDER BY created_at ASC LIMIT 1
@@ -67,7 +67,7 @@ export class VoiceSettingsRepository {
       c.query(
         `INSERT INTO tenant.business (tenant_id, name, config)
          VALUES ($1::uuid,
-                 COALESCE((SELECT name FROM tenant.tenant WHERE id = $1::uuid), 'Negocio'),
+                 COALESCE((SELECT name FROM tenant.business WHERE id = $1::uuid), 'Negocio'),
                  jsonb_build_object('voice', $2::jsonb))
          ON CONFLICT (tenant_id) DO UPDATE
            SET config = jsonb_set(

@@ -108,7 +108,7 @@ export class AuthRepository {
          t.slug     AS "slug",
          t.name     AS "name",
          ARRAY[COALESCE(ta.role, 'super_admin')] AS "roles"
-       FROM tenant.tenant AS t
+       FROM tenant.business AS t
        LEFT JOIN tenant.tenant_access AS ta
          ON ta.tenant_id = t.id
         AND ta.login_id  = $1::uuid
@@ -156,7 +156,7 @@ export class AuthRepository {
              WHERE rp.role = COALESCE(e.role, 'super_admin')),
            '{}'
          ) AS "permissions"
-       FROM tenant.tenant AS t
+       FROM tenant.business AS t
        LEFT JOIN edge AS e ON true
        WHERE t.id = $2::uuid
          AND t.status = 'active'
@@ -170,7 +170,7 @@ export class AuthRepository {
   /** Resolve a tenant id from its slug (for the legacy `/:slug/...` routes). */
   async tenantIdForSlug(slug: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ id: string }>(
-      `SELECT id::text AS id FROM tenant.tenant WHERE slug = $1 LIMIT 1`,
+      `SELECT id::text AS id FROM tenant.business WHERE slug = $1 LIMIT 1`,
       [slug],
     );
     return rows[0]?.id ?? null;
@@ -181,7 +181,7 @@ export class AuthRepository {
     slug: string,
   ): Promise<{ id: string; name: string; slug: string } | null> {
     const { rows } = await this.pg.query<{ id: string; name: string; slug: string }>(
-      `SELECT id::text AS id, name, slug FROM tenant.tenant WHERE slug = $1 LIMIT 1`,
+      `SELECT id::text AS id, name, slug FROM tenant.business WHERE slug = $1 LIMIT 1`,
       [slug],
     );
     return rows[0] ?? null;
