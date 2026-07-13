@@ -403,6 +403,31 @@ describe('pure helpers', () => {
     expect(ticketBelongsToDevice(null, SESSION)).toBe(false);
   });
 
+  it('ticketBelongsToDevice lets a location-bound device act on a broadcast (null-location) order', () => {
+    // Conversaflow/WhatsApp orders land with location_id=null and broadcast to
+    // every board (like null-station). A location-bound device must still be able
+    // to transition them — regression for the silent cancel 404 on order
+    // 09695aa6-… (order.location_id null vs session.locationId 7cb0a615-…).
+    const boundSession: KdsDeviceSession = {
+      ...SESSION,
+      locationId: 'loc-1',
+      stationId: 'st-1',
+    };
+    expect(
+      ticketBelongsToDevice(
+        { id: 'o', tenant_id: 't1', location_id: null, station_id: null, kitchen_status: 'new', person_id: null, source_transaction_id: null },
+        boundSession,
+      ),
+    ).toBe(true);
+    // A different, explicit location on the order is still rejected (tenant-scoped, not global).
+    expect(
+      ticketBelongsToDevice(
+        { id: 'o', tenant_id: 't1', location_id: 'loc-2', station_id: null, kitchen_status: 'new', person_id: null, source_transaction_id: null },
+        boundSession,
+      ),
+    ).toBe(false);
+  });
+
   it('createStation blocks a duplicate active key before inserting (NULL-safe)', async () => {
     const { svc, repo } = make();
     repo.findActiveStationByKey.mockResolvedValue({ id: 'existing' });

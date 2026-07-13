@@ -678,7 +678,9 @@ export function ticketBelongsToDevice(
   if (!order) return false;
   const tenantMatches = order.tenant_id === session.tenantId;
   const locationMatches =
-    !session.locationId || order.location_id === session.locationId;
+    !session.locationId ||
+    order.location_id === session.locationId ||
+    order.location_id == null;
   const stationMatches =
     !session.stationId ||
     order.station_id === session.stationId ||

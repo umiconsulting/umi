@@ -22,6 +22,7 @@ import {
   ACCESS_COOKIE,
   CSRF_COOKIE,
   REFRESH_COOKIE,
+  REMEMBER_COOKIE,
   type AuthUser,
 } from './auth.types';
 import { LoginDto } from './dto/login.dto';
@@ -48,7 +49,7 @@ export class AuthController {
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<{ session: SessionEnvelope }> {
     const result = await this.auth.login(dto.username, dto.password);
-    this.setAuthCookies(reply, result);
+    this.setAuthCookies(reply, result, dto.remember ?? false);
     return { session: toSession(result, this.accessExpiresIn()) };
   }
 
@@ -61,14 +62,16 @@ export class AuthController {
     const token = req.cookies?.[REFRESH_COOKIE];
     if (!token) throw new UnauthorizedException('authentication_required');
     const result = await this.auth.refresh(token);
-    this.setAuthCookies(reply, result);
+    // Preserve the persistent-vs-session choice from login across rotations.
+    const remember = req.cookies?.[REMEMBER_COOKIE] === '1';
+    this.setAuthCookies(reply, result, remember);
     return { session: toSession(result, this.accessExpiresIn()) };
   }
 
   @Public()
   @Post('local/logout')
   logout(@Res({ passthrough: true }) reply: FastifyReply): { ok: true } {
-    for (const name of [ACCESS_COOKIE, REFRESH_COOKIE, CSRF_COOKIE]) {
+    for (const name of [ACCESS_COOKIE, REFRESH_COOKIE, CSRF_COOKIE, REMEMBER_COOKIE]) {
       reply.clearCookie(name, { path: '/' });
     }
     return { ok: true };
@@ -139,23 +142,33 @@ export class AuthController {
     return this.accessExpiresIn();
   }
 
-  private setAuthCookies(reply: FastifyReply, result: LoginResult): void {
+  private setAuthCookies(
+    reply: FastifyReply,
+    result: LoginResult,
+    remember: boolean,
+  ): void {
     reply.setCookie(
       ACCESS_COOKIE,
       result.accessToken,
-      buildCookieOptions(this.config, 'access'),
+      buildCookieOptions(this.config, 'access', remember),
     );
     reply.setCookie(
       REFRESH_COOKIE,
       result.refreshToken,
-      buildCookieOptions(this.config, 'refresh'),
+      buildCookieOptions(this.config, 'refresh', remember),
     );
     // Double-submit CSRF token: readable cookie, echoed by the SPA in a header
     // on mutations (CsrfGuard wiring is a follow-up; the token is issued now).
     reply.setCookie(
       CSRF_COOKIE,
       randomBytes(18).toString('hex'),
-      buildCookieOptions(this.config, 'csrf'),
+      buildCookieOptions(this.config, 'csrf', remember),
+    );
+    // Persist the choice so /refresh reissues with the same lifetime.
+    reply.setCookie(
+      REMEMBER_COOKIE,
+      remember ? '1' : '0',
+      buildCookieOptions(this.config, 'refresh', remember),
     );
   }
 }

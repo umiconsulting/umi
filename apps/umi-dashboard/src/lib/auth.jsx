@@ -165,15 +165,16 @@ export function useAuth() {
   return useContext(AuthContext)
 }
 
-export async function signIn(email, password) {
+export async function signIn(email, password, remember = false) {
   // 'local' (server.js) and 'cookie' (umi-api) both POST the same login route; the difference
   // is umi-api sets an httpOnly cookie (withCreds sends/stores it) while server.js relies on the
   // localStorage session id echoed as X-UMI-User-ID. Either way we cache session.* for the UI.
+  // `remember` makes umi-api issue persistent cookies (vs session cookies).
   if (LOCAL_SESSION) {
     const res = await fetch(apiUrl('/api/auth/local/login'), withCreds({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: email, password }),
+      body: JSON.stringify({ username: email, password, remember }),
     }))
     const payload = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(errMessage(payload, 'Credenciales incorrectas'))

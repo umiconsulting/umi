@@ -61,10 +61,17 @@
   - placement hints: run from the workspace root using `docs/migration/local-postgres/**`, `docs/migration/validation/**`, and `docs/migration/audit-output/**`.
   - confidence: high
   - provenance: promoted at the Phase 3 checkpoint (2026-06-10) from traces in S1.2 local validation and S3.1 standalone staging replay.
+- `repository-cartographer`
+  - scope: build a factual architectural metadata graph of a codebase (business modules, DDD roles, data ownership, dependency cycles, coupling/centrality, transaction boundaries, bounded-context map) and report it as architectural knowledge — deterministic-first and zero-install.
+  - trigger patterns: "map/analyze/understand/reverse-engineer this repo", onboarding onto an unfamiliar codebase, architecture or DDD review, dependency cycles, coupling hotspots, layering violations, aggregate roots, data ownership, transaction boundaries, bounded contexts / context map, dead code.
+  - placement hints: run from the workspace root (whole repo) so the ownership layer sees schema DDL under `docs/migration/**`; scripts are zero-install (Node + the repo's own TypeScript). Embeddings/LLM only narrate the already-factual `catalog.json`.
+  - confidence: high
+  - provenance: authored 2026-07-02; every structural claim primary-source-backed (references/research-basis.md); engine validated against ground truth + adversarially reviewed against the live monorepo (18 findings fixed).
 
 ## Selection rules
 - Workspace-level docs and planning: root `docs/` plus root `CLAUDE.md`.
 - Source-sensitive technical decisions: `scientific-research-check` before locking the recommendation.
+- Codebase architecture mapping, dependency cycles, data ownership, DDD/aggregate analysis, or bounded-context/context-map questions: `repository-cartographer` (run from the repo root).
 - Database staging, promotion, and cutover validation: `staging-validation-runner`.
 - Customer identity, phone normalization, and cross-product Customer 360 matching: `customer-identity-resolution`.
 - Logs-to-Dashboard owner insight migration: `owner-insights-migration`.
