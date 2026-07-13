@@ -17,7 +17,11 @@ const EMPTY_CUSTOMERS = { customers: [], total: 0, page: 1, totalPages: 1, sourc
 const EMPTY_CUSTOMER_DETAIL = { customer: null, timeline: [], conversations: [], orders: [], cash: null, identity: null }
 const EMPTY_CUSTOMER_INSIGHTS = { metrics: {}, insights: [], source: null }
 const EMPTY_STAFF = { staff: [] }
-const EMPTY_HOURS = { hours: {}, timezone: null }
+const EMPTY_HOURS = {
+  hours: {},
+  timezone: null,
+  ordering: { acceptsOrders: true, orderCutoffMinutes: 30, specialNotice: null, bypassPhones: [] },
+}
 const EMPTY_GIFT_CARDS = { giftCards: [], total: 0, page: 1, totalPages: 1 }
 const EMPTY_CONVERSATIONS = { conversations: [], total: 0, page: 1, totalPages: 1 }
 const DEVICE_LIVE_MS = 10_000
@@ -346,14 +350,22 @@ async function saveRewardConfig(patch) {
   })
 }
 
-async function saveBusinessHours(hours, timezone) {
+// Persist any combination of weekly hours, timezone, and ordering-window
+// settings ({ acceptsOrders, orderCutoffMinutes, specialNotice, bypassPhones }).
+// Each block is optional and only included when provided, so a partial save
+// (e.g. just the pause toggle) doesn't clobber the others server-side.
+async function saveBusinessHours(hours, timezone, ordering) {
   const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant')
   const locationId = window.localStorage.getItem('umi-dashboard-selected-location')
   if (!tenantId) throw new Error('No active tenant selected')
   const path = `/api/tenants/${encodeURIComponent(tenantId)}/conversaflow/hours${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`
+  const body = {}
+  if (hours !== undefined && hours !== null) body.hours = hours
+  if (timezone !== undefined && timezone !== null) body.timezone = timezone
+  if (ordering !== undefined && ordering !== null) body.ordering = ordering
   return _apiFetch(path, {
     method: 'PATCH',
-    body: JSON.stringify({ hours, timezone }),
+    body: JSON.stringify(body),
   })
 }
 

@@ -1,9 +1,10 @@
 # umi-api — VPS setup + deploy runbook
 
-> **Current state (2026-06-25): Phase 2 is LIVE in production** at
-> `https://api.umiconsulting.co`, and the umi-dashboard SPA is cut over to it
-> (httpOnly-cookie auth). For day-to-day deploys and the realized role/env model,
-> jump to **[Phase 2 — live deployment](#phase-2--live-deployment-current-state)**.
+> **Current state: Phase 2 is LIVE in production** at `https://api.umiconsulting.co`
+> (dashboard SPA cut over, httpOnly-cookie auth). **Phase 3 (ConversaFlow engine)
+> is merged to `main` but dormant** — see [Phase 3 — conversational engine](#phase-3--conversational-engine-merged-to-main-pre-cutover).
+> For day-to-day deploys and the realized role/env model, jump to
+> **[Phase 2 — live deployment](#phase-2--live-deployment-current-state)**.
 > The Steps below are the original Phase 0 bring-up, kept for history.
 
 Goal: get `umi-api` running on the VPS and `GET /health` returning green.
@@ -185,6 +186,60 @@ VITE_API_BASE=https://api.umiconsulting.co
 
 **Rollback:** delete those two vars → redeploy → the SPA is back on `server.js`
 (same-origin, `X-UMI-User-ID` header) with zero backend change.
+
+## Phase 3 — conversational engine (merged to `main`, pre-cutover)
+
+Phase 3 (the ConversaFlow WhatsApp engine: ingress → turn → tools → reply, plus
+enrichment, zettle catalog sync, and lifecycle WhatsApp nudges) is **merged to
+`main` but dormant**. A normal `git pull` + rebuild deploys the code; it changes
+nothing until the env below is set, the Twilio webhook is repointed, and
+`LIFECYCLE_CRONS_ENABLED` is flipped.
+
+### Phase 3 `.env` (additions over Phase 2)
+
+```ini
+ANTHROPIC_API_KEY=<Anthropic Console — inference key sk-ant-… (NOT an admin key)>
+VOYAGE_API_KEY=<embeddings>
+TWILIO_ACCOUNT_SID=<Twilio>
+TWILIO_AUTH_TOKEN=<Twilio — webhook FAILS CLOSED without this>
+TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
+TWILIO_WEBHOOK_URL=https://api.umiconsulting.co/conversations/whatsapp   # EXACT signed URL
+DEFAULT_TENANT_ID=<core.tenants UUID for the live WhatsApp tenant (e.g. Kalala)>
+GOOGLE_MAPS_API_KEY=<optional — location-pin tool; degrades to text if unset>
+ZETTLE_CLIENT_ID=<catalog sync>
+ZETTLE_API_KEY=<catalog sync — adapter wants a bearer token; prod has CLIENT_ID+SECRET (OAuth)>
+LIFECYCLE_CRONS_ENABLED=false    # keep false until umi-cash lifecycle crons are turned off
+# ALLOW_INSECURE_TWILIO_WEBHOOK is a LOCAL-DEV bypass only; it is rejected at boot when NODE_ENV=production.
+```
+
+The Twilio webhook **fails closed** (drops the request) if `TWILIO_AUTH_TOKEN` is
+unset — there is no unsigned-ingress path in production.
+
+### Gated DB backfill — APPLIED (2026-06-27)
+
+The hours-unification backfill (`docs/migration/2026-06-26-hours-unification.sql`)
+is **already applied to prod**: integrity index `ops_business_hours_tenant_loc_dow_uniq`
+created + Kalala Café hours seeded into `ops.business_hours` (2a/2b-bis were no-ops).
+The order-write idempotency index (`ops_orders_source_transaction_uidx`) already
+exists on prod. No further DB work is required before the Phase 3 cutover.
+
+Run ad-hoc prod SQL via the **Supabase CLI** (linked to `xbudknbimkgjjgohnjgp`;
+token in `apps/umi-conversaflow/.env`):
+
+```bash
+supabase db query --linked "SELECT …"                 # Management API, no DB password
+supabase db query --db-url "$DIRECT_DATABASE_URL" …   # direct conn (DDL / CREATE INDEX CONCURRENTLY)
+# NB: db query is one-command-per-call (extended protocol) — multi-statement files error 42601.
+```
+
+### Phase 3 cutover sequence
+
+1. `cd ~/umi && git pull origin main && cd apps/umi-api && docker compose up -d --build`.
+2. Add the Phase 3 `.env` block above; `docker compose up -d` to reload.
+3. **Sequence Phase 4 (KDS) before/with this** so confirmed WhatsApp orders surface on the kitchen display.
+4. Disable the umi-cash lifecycle crons, then set `LIFECYCLE_CRONS_ENABLED=true`.
+5. Repoint the Twilio number's webhook to `https://api.umiconsulting.co/conversations/whatsapp`; soak + compare to the edge function.
+6. **Rollback:** repoint the Twilio webhook back to the edge function.
 
 ### Not yet done
 

@@ -20,20 +20,20 @@ begin
   end if;
 end $$;
 
-create server if not exists umi_cash_production_local_20260515_srv
+create server if not exists umi_cash_production_local_20260618_srv
   foreign data wrapper postgres_fdw
-  options (host 'localhost', port '5432', dbname 'umi_cash_production_local_20260515');
+  options (host 'localhost', port '5233', dbname 'umi_cash_production_local_20260618');
 
-create server if not exists umi_platform_production_local_20260515_srv
+create server if not exists umi_platform_production_local_20260617_srv
   foreign data wrapper postgres_fdw
-  options (host 'localhost', port '5432', dbname 'umi_platform_production_local_20260515');
+  options (host 'localhost', port '5233', dbname 'umi_platform_production_local_20260617');
 
 create user mapping if not exists for current_user
-  server umi_cash_production_local_20260515_srv
+  server umi_cash_production_local_20260618_srv
   options (user 'juanlopez1');
 
 create user mapping if not exists for current_user
-  server umi_platform_production_local_20260515_srv
+  server umi_platform_production_local_20260617_srv
   options (user 'juanlopez1');
 
 import foreign schema public
@@ -53,7 +53,7 @@ import foreign schema public
     "BirthdayReward",
     "_prisma_migrations"
   )
-  from server umi_cash_production_local_20260515_srv
+  from server umi_cash_production_local_20260618_srv
   into src_cash_public;
 
 import foreign schema conversaflow
@@ -73,7 +73,7 @@ import foreign schema conversaflow
     outbox,
     pipeline_traces
   )
-  from server umi_platform_production_local_20260515_srv
+  from server umi_platform_production_local_20260617_srv
   into src_platform_conversaflow;
 
 import foreign schema kds
@@ -83,7 +83,7 @@ import foreign schema kds
     ticket_events,
     device_sessions
   )
-  from server umi_platform_production_local_20260515_srv
+  from server umi_platform_production_local_20260617_srv
   into src_platform_kds;
 
 import foreign schema public
@@ -97,5 +97,5 @@ import foreign schema public
     job_attempts,
     outbox
   )
-  from server umi_platform_production_local_20260515_srv
+  from server umi_platform_production_local_20260617_srv
   into src_platform_public;

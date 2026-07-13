@@ -21,6 +21,21 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-06-24 - Database access layer assessment
+- task type: cross-workspace architecture assessment
+- request summary: analyze the full Umi codebase and recommend the technically best long-term database access layer without preserving existing technology choices or considering migration cost
+- filesystem slice inspected: root contracts and maps; all app `AGENTS.md` / `REPO_CONTEXT.md`; `apps/umi-conversaflow/supabase/functions`, migrations, and SQL; Cash/Dashboard Prisma schemas and data routes; Logs queries; Landing database adapters; KDS data client/repository
+- chosen owner: root workspace assessment with backend ownership evidence centered in `apps/umi-conversaflow`
+- chosen path: direct assessment; no implementation or subagent
+- skill or subagent used: `task-router`, `workspace-boundary-check`, `scientific-research-check`, `supabase`, `supabase-postgres-best-practices`, `adapter-sync-check`
+- files touched:
+  - `.agents/skills/task-router/routing-ledger.md`
+  - generated `.claude/skills` mirror
+- tools used: repo search, structured Python scanners, targeted file reads, official-doc web research, `rsync -ac --delete`, recursive diff
+- outcome: evidence showed a SQL-heavy multi-schema Postgres system with database-side RPCs, queue locking, JSONB/vector/search features, Dashboard raw SQL, Cash transactional Prisma usage, Logs reporting reads, Landing lead CRUD, and KDS thin HTTP/RPC consumption; recommendation delivered in chat
+- reusable pattern observed: access-layer assessments in Umi need separate counts for active app migrations versus historical/root migration SQL, otherwise entity and SQL-feature totals are inflated by replay/audit snapshots
+- promotion follow-up: none
+
 ### 2026-06-10 - Phase 5 monorepo migration: S5.1 executed, S5.2 rehearsed, stoppers registered
 - task type: cross-workspace program execution (monorepo track) under an active sequencing gate
 - request summary: continue with Phase 5 of the integration plan; document all stoppers

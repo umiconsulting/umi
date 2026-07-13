@@ -1,8 +1,15 @@
 -- =============================================================================
 -- Hours unification — DB layer (Phase 3, ConversaFlow bot)
 -- Date: 2026-06-26
--- Status: GATED. Owner/Hermes-applied against the LIVE platform DB
---         (Supabase xbudknbimkgjjgohnjgp). Claude does NOT execute this.
+-- Status: APPLIED to the LIVE platform DB (Supabase xbudknbimkgjjgohnjgp) on
+--         2026-06-27 via the Supabase CLI (owner-authorized), after a read-only
+--         preflight. Result: Part 1 index created; 2a no-op (no differing tz —
+--         Kalala already America/Mazatlan); 2b seeded Kalala Café (7 rows at the
+--         oldest-active location "Congreso"); 2b-bis no-op (table was empty).
+--         NOTE: db query uses the extended protocol (one command per call), so
+--         2b was run as the single INSERT statement; the BEGIN..COMMIT wrapper is
+--         for psql/SQL-editor use. Re-running is safe (index IF NOT EXISTS; 2b
+--         only seeds zero-row tenants).
 -- -----------------------------------------------------------------------------
 -- This is the DB third of a DB + app + api refactor that makes business hours
 -- (and the ordering-window settings the WhatsApp bot needs) tenant-configurable
