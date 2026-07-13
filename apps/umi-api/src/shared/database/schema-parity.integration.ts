@@ -23,8 +23,11 @@ const WORKER_DSN =
   'postgresql://worker_login:harness_worker@127.0.0.1:5233/umi_backfill_v3';
 
 // `from|join|into|update [only] <schema>.<name>` — the places a table name appears.
+// The optional `"` group is load-bearing: build-v2 used `tenant."order"` (a reserved
+// word), and a bare [a-z_] charclass silently CANNOT match it — that blind spot hid a
+// 9th identifier across 24 call sites. Never narrow this back.
 const TABLE_REF =
-  /\b(?:from|join|into|update)\s+(?:only\s+)?(umi|tenant|runtime)\.([a-z_][a-z0-9_]*)/gi;
+  /\b(?:from|join|into|update)\s+(?:only\s+)?(umi|tenant|runtime)\.("?)([a-z_][a-z0-9_]*)\2/gi;
 
 function sourceFiles(root: string): string[] {
   const out: string[] = [];
@@ -63,7 +66,7 @@ function extractRefs(srcRoot: string): Ref[] {
     lines.forEach((lineText, i) => {
       for (const m of lineText.matchAll(TABLE_REF)) {
         refs.push({
-          ident: `${m[1]}.${m[2]}`.toLowerCase(),
+          ident: `${m[1]}.${m[3]}`.toLowerCase(),
           file: file.slice(srcRoot.length + 1),
           line: i + 1,
         });
