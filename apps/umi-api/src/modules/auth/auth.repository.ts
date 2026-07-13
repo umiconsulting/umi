@@ -51,12 +51,17 @@ export interface ResetTokenRecord {
  * (`umi.subscription_item`, `umi.role_permission`) live in the SEALED `umi`
  * schema that `umi_app` has no USAGE on.
  *
- * 4-schema model (canonical rebuild v2): the old 5-table RBAC graph
- * (core.tenant_memberships + membership_roles + roles + role_permissions +
- * permissions) collapses to `tenant.tenant_access` (the per-tenant login↔role
- * edge, single role) joined against `umi.role_permission` (system-wide
- * role→permission grants). `super_admin` is Umi's cross-tenant operator: a login
- * holding ANY active `super_admin` edge can select/access EVERY active tenant.
+ * build-v3 model: staff credentials + identity live on `umi.user` (email + hash +
+ * `full_name`); grants are `umi.user_role` (user×role×business, FK role_id) read
+ * against the sealed `umi.role_permission` (role_id×permission_id) catalog.
+ * `super_admin` is Umi's cross-tenant operator: a user holding ANY `umi.user_role`
+ * with role `super_admin` can select/access EVERY active business.
+ *
+ * PENDING (Phase 3a coordinated change — owner decision 2026-07-12 "route by id"):
+ * `findTenantsForUser` / `findMembershipAccess` / `tenantIdForSlug` / `tenantBySlug`
+ * still read `tenant.tenant_access` + the dropped `slug` column. That rewrite
+ * (tenant_access→umi.user_role FK joins + drop slug, route by business id) changes
+ * the /me/tenants + tenant-access API contract, so it lands with the dashboard.
  */
 @Injectable()
 export class AuthRepository {
@@ -68,10 +73,10 @@ export class AuthRepository {
       `SELECT
          u.id::text          AS "userId",
          u.email             AS "email",
-         u.display_name      AS "displayName",
+         u.full_name         AS "displayName",
          u.password_salt     AS "passwordSalt",
          u.password_hash     AS "passwordHash"
-       FROM tenant.login AS u
+       FROM umi.user AS u
        WHERE lower(u.email) = $1
          AND u.password_hash IS NOT NULL
        LIMIT 1`,
@@ -83,8 +88,8 @@ export class AuthRepository {
   /** Refresh — re-load the user so a rotated access token carries fresh email. */
   async findUserById(userId: string): Promise<UserSummary | null> {
     const { rows } = await this.pg.query<UserSummary>(
-      `SELECT u.id::text AS "userId", u.email, u.display_name AS "displayName"
-       FROM tenant.login AS u
+      `SELECT u.id::text AS "userId", u.email, u.full_name AS "displayName"
+       FROM umi.user AS u
        WHERE u.id = $1::uuid AND u.password_hash IS NOT NULL
        LIMIT 1`,
       [userId],
@@ -207,14 +212,14 @@ export class AuthRepository {
     return rows[0]?.status ?? null;
   }
 
-  // ── password reset (tenant.password_reset_token, login-keyed) ──
+  // ── password reset (runtime.password_reset_token, user-keyed) ──
   async insertResetToken(
     userId: string,
     tokenHash: string,
     expiresAt: Date,
   ): Promise<void> {
     await this.pg.query(
-      `INSERT INTO tenant.password_reset_token (login_id, token_hash, expires_at)
+      `INSERT INTO runtime.password_reset_token (user_id, token_hash, expires_at)
        VALUES ($1::uuid, $2, $3)`,
       [userId, tokenHash, expiresAt],
     );
@@ -222,9 +227,9 @@ export class AuthRepository {
 
   async findResetToken(tokenHash: string): Promise<ResetTokenRecord | null> {
     const { rows } = await this.pg.query<ResetTokenRecord>(
-      `SELECT id::text, login_id::text AS "userId",
+      `SELECT id::text, user_id::text AS "userId",
               expires_at AS "expiresAt", used_at AS "usedAt"
-       FROM tenant.password_reset_token
+       FROM runtime.password_reset_token
        WHERE token_hash = $1
        LIMIT 1`,
       [tokenHash],
@@ -238,7 +243,7 @@ export class AuthRepository {
     hash: string,
   ): Promise<void> {
     await this.pg.query(
-      `UPDATE tenant.login
+      `UPDATE umi.user
        SET password_salt = $2, password_hash = $3, updated_at = now()
        WHERE id = $1::uuid`,
       [userId, salt, hash],
@@ -247,7 +252,7 @@ export class AuthRepository {
 
   async markResetTokenUsed(tokenId: string): Promise<void> {
     await this.pg.query(
-      `UPDATE tenant.password_reset_token SET used_at = now() WHERE id = $1::uuid`,
+      `UPDATE runtime.password_reset_token SET used_at = now() WHERE id = $1::uuid`,
       [tokenId],
     );
   }

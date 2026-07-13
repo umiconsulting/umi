@@ -64,13 +64,17 @@ export class CashWriteRepository {
   }
 
   /**
-   * The contact linked to the authed login (self-card guard). login.contact_id
-   * is the soft link into the tenant.contact identity graph; findCard exposes the
-   * card owner's contact as `person_id`, so the two are comparable.
+   * The contact linked to the authed customer principal (self-card guard). In
+   * build-v3 the umi-cash session `sub` IS the `tenant.customer.id`
+   * (customer-session.service: principal_type='person'), and `tenant.customer`
+   * carries `contact_id` directly — so we resolve the person here exactly as
+   * `findCard` exposes the card owner's contact as `person_id`. A staff userId
+   * (a `umi.user.id`) matches no customer row → null → not-self (staff path),
+   * matching the old behavior where staff logins had no contact_id.
    */
   async getUserPersonId(userId: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ contact_id: string | null }>(
-      `SELECT contact_id::text AS contact_id FROM tenant.login WHERE id = $1::uuid LIMIT 1`,
+      `SELECT contact_id::text AS contact_id FROM tenant.customer WHERE id = $1::uuid LIMIT 1`,
       [userId],
     );
     return rows[0]?.contact_id ?? null;
