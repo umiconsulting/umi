@@ -29,6 +29,10 @@ export const configSchema = z.object({
   DATABASE_URL_APP: z.string().url(), // umi_app (RLS request role)
   DATABASE_URL_WORKER: z.string().url(), // umi_worker (BYPASSRLS)
   DATABASE_URL_READONLY: z.string().url().optional(), // umi_readonly (analytics)
+  // TLS: path to (or inline PEM of) the Postgres server's root CA. When set, both
+  // pools use verify-full (CA + hostname + rejectUnauthorized). Unset = plaintext
+  // (local dev against localhost). Do NOT put sslmode in the URLs — this governs TLS.
+  PGSSLROOTCERT: z.string().optional(),
 
   // Redis / BullMQ.
   REDIS_URL: z.string().url(),

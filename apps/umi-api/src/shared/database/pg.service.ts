@@ -5,15 +5,17 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { readFileSync } from 'node:fs';
 import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 import type { AppConfig } from '../config/config.schema';
 import { getRequestContext } from './request-context';
 
 /**
  * The single data-access primitive. No ORM (D8) — raw parameterized SQL.
- * Two pools, one per Postgres role (§11.2):
- *   - `app`    → umi_app    (RLS-enforced; web request path)
- *   - `worker` → umi_worker (BYPASSRLS; background + queue/observability/grow)
+ * Two pools, one per Postgres role — the role is embedded in each connection
+ * string (env), so cutover is an env change, not a code change:
+ *   - `app`    → RLS-enforced request path   (current: umi_app;   build-v3: api)
+ *   - `worker` → BYPASSRLS background/queue   (current: umi_worker; build-v3: worker)
  *
  * Repositories own their SQL; they call `query()` for service work, or
  * `withTenant()` for RLS-scoped reads/writes on the request path.
@@ -21,15 +23,31 @@ import { getRequestContext } from './request-context';
 @Injectable()
 export class PgService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PgService.name);
+  private readonly tlsEnforced: boolean;
   readonly app: Pool;
   readonly worker: Pool;
 
   constructor(config: ConfigService<AppConfig, true>) {
+    // verify-full TLS when a CA is provisioned (prod/Supabase); plaintext otherwise
+    // (local dev against localhost). rejectUnauthorized:true is the real enforcement —
+    // a wrong CA or hostname makes the handshake FAIL at connect. Accept a file path
+    // or an inline PEM. Do not set sslmode in the URL; this option governs TLS.
+    const caValue = config.get('PGSSLROOTCERT', { infer: true });
+    const ssl = caValue
+      ? {
+          ca: caValue.includes('BEGIN CERTIFICATE') ? caValue : readFileSync(caValue),
+          rejectUnauthorized: true,
+        }
+      : undefined;
+    this.tlsEnforced = ssl !== undefined;
+
     this.app = new Pool({
       connectionString: config.get('DATABASE_URL_APP', { infer: true }),
+      ssl,
     });
     this.worker = new Pool({
       connectionString: config.get('DATABASE_URL_WORKER', { infer: true }),
+      ssl,
     });
     // pg.Pool emits 'error' for idle clients (DB restart, network drop). Without
     // a listener, that unhandled event would crash the process — log and let the
@@ -49,7 +67,31 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
       this.app.query('SELECT 1'),
       this.worker.query('SELECT 1'),
     ]);
-    this.logger.log('Postgres pools ready (umi_app, umi_worker)');
+
+    if (!this.tlsEnforced) {
+      this.logger.log('Postgres pools ready (app + worker roles, no TLS — local/dev)');
+      return;
+    }
+    // TLS is enforced at connect by rejectUnauthorized (a wrong CA/hostname already
+    // threw above). Confirm the server also reports SSL on each pool so a silent
+    // misconfig surfaces at boot. Through a transaction pooler, pg_stat_ssl can
+    // reflect the pooler→db leg, so a false report is a WARNING, not a boot failure —
+    // the client→endpoint leg is already verified by the handshake.
+    for (const [name, pool] of [
+      ['app', this.app],
+      ['worker', this.worker],
+    ] as const) {
+      const { rows } = await pool.query<{ ssl: boolean }>(
+        'SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()',
+      );
+      if (!rows[0]?.ssl) {
+        this.logger.warn(
+          `${name} pool: server reports no SSL on this backend (pooler leg?); ` +
+            'client→endpoint TLS is still verified by rejectUnauthorized.',
+        );
+      }
+    }
+    this.logger.log('Postgres pools ready (app + worker roles, TLS verify-full)');
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -88,10 +130,16 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
     const client = await this.app.connect();
     try {
       await client.query('BEGIN');
-      await client.query('SELECT set_config($1, $2, true)', [
-        'app.tenant_id',
-        tenantId,
-      ]);
+      // RLS tenant scope. We set BOTH GUC names through the build-v3 transition
+      // (expand-contract): `app.tenant_id` is read by the CURRENT prod schema
+      // (core.rls_tenant_check), `app.current_business` by build-v3's RLS policies.
+      // Setting both keeps the request path correct against either schema; drop
+      // app.tenant_id after the build-v3 cutover. Both are transaction-scoped
+      // (set_config(..., true) == SET LOCAL), so nothing leaks across pooled reuse.
+      await client.query(
+        "SELECT set_config('app.tenant_id', $1, true), set_config('app.current_business', $1, true)",
+        [tenantId],
+      );
       await client.query('SELECT set_config($1, $2, true)', [
         'app.user_id',
         userId ?? '',
