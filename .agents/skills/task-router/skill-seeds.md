@@ -50,6 +50,14 @@ Observation ledger for **potential** skills. A seed is a pattern observed too fe
 - 2026-06-10 update: S1.2 trace recorded — validation SQL + per-schema row-count export ran cleanly against the local transition DB (`audit-output/2026-06-10-phase-4f-execution.md`); one wrinkle worth keeping: FDW server ports had drifted (5432→5233) and needed `ALTER SERVER` before the gate could run. Awaiting the S3.1 staging trace.
 - 2026-06-10 update: S3.1 trace recorded — standalone staging replay caught the `010`/`030` Kalala slug conflict and missing local-owner Kalala membership; both were fixed in replay scripts before validation. Row-count diff now records an intentional synthetic-family cleanup delta against the older local transition target.
 
+### repository-cartographer
+- status: **promoted** (2026-07-02 → `.agents/skills/repository-cartographer/`) — authored directly on user request, not seed-derived; recorded here for provenance.
+- observed: 2026-07-02 — request to build a "Repository Cartographer" that maps a codebase as a factual metadata graph (pg-catalog analogy) across 7 layers. Built deterministic zero-install engine (Node + repo's own TypeScript Compiler API + SQL/Prisma/Swift parsers), validated against ground truth (21 NestJS modules, 0 forwardRef, 111/32 cascade/set-null, loyalty.cards aggregate, 3 append-only ledgers) and a synthetic Tarjan/Johnson check; adversarially reviewed (18 findings, all fixed).
+- trigger pattern: map/analyze/understand a codebase's real structure; architecture or DDD review; dependency cycles, coupling, ownership, transaction boundaries, bounded contexts, dead code.
+- procedure sketch: walk → build import graph (TS Compiler API) + SQL FK ownership + Prisma/Swift/Deno parsers → Tarjan/Johnson/coupling/centrality → DDD + context-map classification → 9-section report + catalog.json; LLM only narrates the catalog.
+- promotion gate: n/a — promoted on authorship; every structural claim primary-source-backed (references/research-basis.md).
+- expected maturation: exercise on future onboarding/architecture-review tasks; extend adapters per references/language-adapters.md.
+
 ### cutover-soak-comparison
 - status: seed
 - observed: written as mitigation in the 05-23 checklist Phase 6; the plan deliberately rehearses it on the dashboard cutover (S4.1) before Cash (S4.3).

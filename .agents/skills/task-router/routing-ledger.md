@@ -21,6 +21,19 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-07-02 - repository-cartographer skill authored (deterministic architecture mapper)
+- task type: root workspace skill authoring (new reusable procedure + bundled engine)
+- request summary: build a "Repository Cartographer" that maps a codebase as a factual metadata graph (PostgreSQL system-catalog analogy) across 7 layers, deterministic-first with embeddings only to narrate; back every claim with research; review/critique/fix each phase (ultracode)
+- filesystem slice inspected: whole repo for grounding (`apps/*`, `apps/umi-api/src/**`, `docs/migration/build/*.sql`, both `schema.prisma`, `apps/umi-kds` Swift, `apps/umi-conversaflow/supabase/functions`); existing skill conventions (`.agents/skills/*`, `AGENTS.md`, `adapter-sync-check`)
+- chosen owner: root `.agents/skills/repository-cartographer/` (canonical); `.claude/skills/` generated mirror
+- chosen path: direct authorship + right-sized subagent fan-out (ultracode) for research and adversarial review
+- skill or subagent used: `scientific-research-check` (4-agent primary-source research + skeptic audit), `skill-creator` (installed this session), `task-router`, `adapter-sync-check`; 3-agent engine review + 1 doc reviewer
+- files touched: `.agents/skills/repository-cartographer/**` (SKILL.md, scripts/{cartograph.mjs, lib/*.mjs, adapters/nestjs.mjs}, references/*.md, agents/openai.yaml); `.agents/skills/task-router/{registry,skill-seeds,routing-ledger}.md`; generated `.claude` mirror
+- tools used: Node + TypeScript Compiler API (zero-install), Workflow (2 research/review workflows), Agent (Explore + reviewers), Bash (engine runs against the live repo + synthetic graphs)
+- outcome: zero-install engine validated against ground truth (21 NestJS modules, 0 forwardRef, 111/32 cascade/set-null, loyalty.cards aggregate root owning its ledger, 3 append-only ledgers) + synthetic Tarjan/Johnson check; Phase-1 research audited (2 clusters), Phase-2 engine adversarially reviewed (18 findings, all fixed), Phase-3 docs reviewed (8 drift items, all fixed); full report renders 9 sections in ~0.8s
+- reusable pattern observed: deterministic-first repo cartography (AST+SQL+FK ownership+Tarjan/Johnson+DDD context-map) is a general, reusable capability; edge-kind classification (type/test/dynamic) must precede any cycle verdict, and dumps/migration-history SQL must be segregated from authoritative DDL to avoid conflating schema generations
+- promotion follow-up: promoted on authorship (see skill-seeds.md); exercise on future onboarding/architecture-review tasks; extend language adapters per references/language-adapters.md
+
 ### 2026-06-10 - Phase 5 monorepo migration: S5.1 executed, S5.2 rehearsed, stoppers registered
 - task type: cross-workspace program execution (monorepo track) under an active sequencing gate
 - request summary: continue with Phase 5 of the integration plan; document all stoppers
