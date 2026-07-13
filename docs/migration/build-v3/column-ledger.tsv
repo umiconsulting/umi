@@ -1,0 +1,738 @@
+schema	table	column	type	table_referenced_in	column_mentioned	RULING
+comms	conversation_turns	id	uuid	backfill_comms.sql	yes	
+comms	conversation_turns	tenant_id	uuid	backfill_comms.sql	yes	
+comms	conversation_turns	conversation_id	uuid	backfill_comms.sql	yes	
+comms	conversation_turns	person_id	uuid	backfill_comms.sql	yes	
+comms	conversation_turns	status	text	backfill_comms.sql	yes	
+comms	conversation_turns	source_message_ids	ARRAY	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	conversation_turns	assistant_message_id	uuid	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	conversation_turns	merged_user_text	text	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	conversation_turns	integrity_decision	text	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	conversation_turns	integrity_reason	text	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	conversation_turns	base_state_version	bigint	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	conversation_turns	extracted_intent	jsonb	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	conversation_turns	reconciled_action	jsonb	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	conversation_turns	first_message_at	timestamp with time zone	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	conversation_turns	last_message_at	timestamp with time zone	backfill_comms.sql	yes	
+comms	conversation_turns	hold_until	timestamp with time zone	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	conversation_turns	released_at	timestamp with time zone	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	conversation_turns	processed_at	timestamp with time zone	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	conversation_turns	superseded_at	timestamp with time zone	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	conversation_turns	created_at	timestamp with time zone	backfill_comms.sql	yes	
+comms	conversation_turns	metadata	jsonb	backfill_comms.sql	yes	
+comms	conversations	id	uuid	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	conversations	tenant_id	uuid	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	conversations	person_id	uuid	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	conversations	order_id	uuid	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	conversations	status	text	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	conversations	current_state	text	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	conversations	conversation_history	jsonb	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	conversations	state_data	jsonb	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	conversations	draft_cart	jsonb	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	conversations	pending_clarification	jsonb	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	conversations	summary	text	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	conversations	history_migrated	boolean	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	conversations	state_version	bigint	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	conversations	draft_cart_version	bigint	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	conversations	last_message_at	timestamp with time zone	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	conversations	created_at	timestamp with time zone	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	conversations	metadata	jsonb	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	conversations	selected_location_id	uuid	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	customer_preferences	id	uuid	backfill_comms.sql	yes	
+comms	customer_preferences	tenant_id	uuid	backfill_comms.sql	yes	
+comms	customer_preferences	person_id	uuid	backfill_comms.sql	yes	
+comms	customer_preferences	favorite_service_ids	ARRAY	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	customer_preferences	usual_modifications	jsonb	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	customer_preferences	total_transactions	integer	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	customer_preferences	avg_transaction_value_cents	integer	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	customer_preferences	last_transaction_at	timestamp with time zone	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	customer_preferences	facts	jsonb	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	customer_preferences	created_at	timestamp with time zone	backfill_comms.sql	yes	
+comms	customer_preferences	updated_at	timestamp with time zone	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	daily_summaries	id	uuid	backfill_comms.sql	yes	
+comms	daily_summaries	tenant_id	uuid	backfill_comms.sql	yes	
+comms	daily_summaries	summary_date	date	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	daily_summaries	slack_channel	text	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	daily_summaries	slack_message_ts	text	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	daily_summaries	pinned	boolean	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	daily_summaries	body	jsonb	backfill_comms.sql	yes	
+comms	daily_summaries	created_at	timestamp with time zone	backfill_comms.sql	yes	
+comms	daily_summaries	last_updated_at	timestamp with time zone	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	knowledge_chunks	id	uuid	backfill_comms.sql	yes	
+comms	knowledge_chunks	tenant_id	uuid	backfill_comms.sql	yes	
+comms	knowledge_chunks	document_id	uuid	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	knowledge_chunks	chunk_index	integer	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	knowledge_chunks	content	text	backfill_comms.sql	yes	
+comms	knowledge_chunks	embedding	USER-DEFINED	backfill_comms.sql	yes	
+comms	knowledge_chunks	embedding_model	text	backfill_comms.sql	yes	
+comms	knowledge_chunks	metadata	jsonb	backfill_comms.sql	yes	
+comms	knowledge_chunks	created_at	timestamp with time zone	backfill_comms.sql	yes	
+comms	knowledge_documents	id	uuid	backfill_comms.sql	yes	
+comms	knowledge_documents	tenant_id	uuid	backfill_comms.sql	yes	
+comms	knowledge_documents	location_id	uuid	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	knowledge_documents	title	text	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	knowledge_documents	doc_type	text	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	knowledge_documents	source_uri	text	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	knowledge_documents	body	text	backfill_comms.sql	yes	
+comms	knowledge_documents	status	text	backfill_comms.sql	yes	
+comms	knowledge_documents	metadata	jsonb	backfill_comms.sql	yes	
+comms	knowledge_documents	created_at	timestamp with time zone	backfill_comms.sql	yes	
+comms	knowledge_documents	updated_at	timestamp with time zone	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	memory_items	id	uuid	backfill_comms.sql	yes	
+comms	memory_items	tenant_id	uuid	backfill_comms.sql	yes	
+comms	memory_items	person_id	uuid	backfill_comms.sql	yes	
+comms	memory_items	conversation_id	uuid	backfill_comms.sql	yes	
+comms	memory_items	memory_type	text	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	memory_items	content	text	backfill_comms.sql	yes	
+comms	memory_items	attributes	jsonb	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	memory_items	embedding	USER-DEFINED	backfill_comms.sql	yes	
+comms	memory_items	embedding_model	text	backfill_comms.sql	yes	
+comms	memory_items	created_at	timestamp with time zone	backfill_comms.sql	yes	
+comms	memory_items	updated_at	timestamp with time zone	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	memory_items	metadata	jsonb	backfill_comms.sql	yes	
+comms	messages	id	uuid	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	messages	tenant_id	uuid	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	messages	conversation_id	uuid	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	messages	role	text	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	messages	content	text	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	messages	intent	text	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	messages	entities	jsonb	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	messages	message_index	integer	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	messages	twilio_message_sid	text	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	messages	embedding	USER-DEFINED	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	messages	embedding_model	text	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	messages	created_at	timestamp with time zone	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	messages	metadata	jsonb	backfill_comms.sql,reconcile_v3.sql	yes	
+comms	tool_calls	id	uuid	backfill_comms.sql	yes	
+comms	tool_calls	tenant_id	uuid	backfill_comms.sql	yes	
+comms	tool_calls	conversation_id	uuid	backfill_comms.sql	yes	
+comms	tool_calls	turn_id	uuid	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	tool_calls	tool_name	text	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	tool_calls	input	jsonb	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	tool_calls	output	jsonb	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	tool_calls	status	text	backfill_comms.sql	yes	
+comms	tool_calls	error	text	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	tool_calls	started_at	timestamp with time zone	backfill_comms.sql	yes	
+comms	tool_calls	completed_at	timestamp with time zone	backfill_comms.sql	NO	TODO(column-unmentioned)
+comms	tool_calls	metadata	jsonb	backfill_comms.sql	yes	
+core	contact_merge_candidates	id	uuid	-	NO	TODO(table-never-referenced)
+core	contact_merge_candidates	tenant_id	uuid	-	NO	TODO(table-never-referenced)
+core	contact_merge_candidates	left_person_id	uuid	-	NO	TODO(table-never-referenced)
+core	contact_merge_candidates	right_person_id	uuid	-	NO	TODO(table-never-referenced)
+core	contact_merge_candidates	person_id_least	uuid	-	NO	TODO(table-never-referenced)
+core	contact_merge_candidates	person_id_greatest	uuid	-	NO	TODO(table-never-referenced)
+core	contact_merge_candidates	match_type	text	-	NO	TODO(table-never-referenced)
+core	contact_merge_candidates	confidence	text	-	NO	TODO(table-never-referenced)
+core	contact_merge_candidates	detail	jsonb	-	NO	TODO(table-never-referenced)
+core	contact_merge_candidates	created_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+core	contact_merge_candidates	resolved_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+core	contact_methods	id	uuid	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	contact_methods	tenant_id	uuid	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	contact_methods	person_id	uuid	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	contact_methods	kind	text	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	contact_methods	normalized_value	text	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	contact_methods	display_value	text	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	contact_methods	is_primary	boolean	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	contact_methods	verified_at	timestamp with time zone	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	contact_methods	metadata	jsonb	backfill_loyalty_v3.sql,reconcile_v3.sql	NO	TODO(column-unmentioned)
+core	contact_methods	created_at	timestamp with time zone	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	external_refs	id	uuid	-	NO	TODO(table-never-referenced)
+core	external_refs	tenant_id	uuid	-	NO	TODO(table-never-referenced)
+core	external_refs	location_id	uuid	-	NO	TODO(table-never-referenced)
+core	external_refs	product_key	text	-	NO	TODO(table-never-referenced)
+core	external_refs	external_schema	text	-	NO	TODO(table-never-referenced)
+core	external_refs	external_table	text	-	NO	TODO(table-never-referenced)
+core	external_refs	external_id	text	-	NO	TODO(table-never-referenced)
+core	external_refs	external_slug	text	-	NO	TODO(table-never-referenced)
+core	external_refs	metadata	jsonb	-	NO	TODO(table-never-referenced)
+core	external_refs	created_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+core	integration_tokens	id	uuid	-	NO	TODO(table-never-referenced)
+core	integration_tokens	tenant_id	uuid	-	NO	TODO(table-never-referenced)
+core	integration_tokens	provider	text	-	NO	TODO(table-never-referenced)
+core	integration_tokens	access_token	text	-	NO	TODO(table-never-referenced)
+core	integration_tokens	refresh_token	text	-	NO	TODO(table-never-referenced)
+core	integration_tokens	token_type	text	-	NO	TODO(table-never-referenced)
+core	integration_tokens	expires_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+core	integration_tokens	metadata	jsonb	-	NO	TODO(table-never-referenced)
+core	integration_tokens	created_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+core	integration_tokens	updated_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+core	locations	id	uuid	backfill_device.sql,backfill_identity.sql	yes	
+core	locations	tenant_id	uuid	backfill_device.sql,backfill_identity.sql	yes	
+core	locations	slug	text	backfill_device.sql,backfill_identity.sql	yes	
+core	locations	name	text	backfill_device.sql,backfill_identity.sql	yes	
+core	locations	address	text	backfill_device.sql,backfill_identity.sql	yes	
+core	locations	lat	double precision	backfill_device.sql,backfill_identity.sql	yes	
+core	locations	lng	double precision	backfill_device.sql,backfill_identity.sql	yes	
+core	locations	status	text	backfill_device.sql,backfill_identity.sql	yes	
+core	locations	metadata	jsonb	backfill_device.sql,backfill_identity.sql	yes	
+core	locations	created_at	timestamp with time zone	backfill_device.sql,backfill_identity.sql	yes	
+core	locations	updated_at	timestamp with time zone	backfill_device.sql,backfill_identity.sql	yes	
+core	locations	aliases	ARRAY	backfill_device.sql,backfill_identity.sql	yes	
+core	locations	descriptor	text	backfill_device.sql,backfill_identity.sql	yes	
+core	locations	search_text	text	backfill_device.sql,backfill_identity.sql	yes	
+core	membership_roles	membership_id	uuid	backfill_identity.sql	yes	
+core	membership_roles	role_id	uuid	backfill_identity.sql	yes	
+core	membership_roles	created_at	timestamp with time zone	backfill_identity.sql	yes	
+core	password_reset_tokens	id	uuid	-	NO	TODO(table-never-referenced)
+core	password_reset_tokens	user_id	uuid	-	NO	TODO(table-never-referenced)
+core	password_reset_tokens	token_hash	text	-	NO	TODO(table-never-referenced)
+core	password_reset_tokens	expires_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+core	password_reset_tokens	used_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+core	password_reset_tokens	created_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+core	people	id	uuid	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	people	tenant_id	uuid	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	people	display_name	text	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	people	birth_date	date	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	people	normalized_phone	text	backfill_loyalty_v3.sql,reconcile_v3.sql	NO	TODO(column-unmentioned)
+core	people	normalized_email	text	backfill_loyalty_v3.sql,reconcile_v3.sql	NO	TODO(column-unmentioned)
+core	people	metadata	jsonb	backfill_loyalty_v3.sql,reconcile_v3.sql	NO	TODO(column-unmentioned)
+core	people	created_at	timestamp with time zone	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	people	updated_at	timestamp with time zone	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	permissions	id	uuid	backfill_identity.sql	yes	
+core	permissions	key	text	backfill_identity.sql	yes	
+core	permissions	description	text	backfill_identity.sql	yes	
+core	permissions	created_at	timestamp with time zone	backfill_identity.sql	yes	
+core	product_instances	id	uuid	backfill_growth.sql,reconcile_v3.sql	yes	
+core	product_instances	tenant_id	uuid	backfill_growth.sql,reconcile_v3.sql	yes	
+core	product_instances	location_id	uuid	backfill_growth.sql,reconcile_v3.sql	NO	TODO(column-unmentioned)
+core	product_instances	product_key	text	backfill_growth.sql,reconcile_v3.sql	yes	
+core	product_instances	status	text	backfill_growth.sql,reconcile_v3.sql	yes	
+core	product_instances	config	jsonb	backfill_growth.sql,reconcile_v3.sql	yes	
+core	product_instances	enabled_at	timestamp with time zone	backfill_growth.sql,reconcile_v3.sql	NO	TODO(column-unmentioned)
+core	product_instances	disabled_at	timestamp with time zone	backfill_growth.sql,reconcile_v3.sql	NO	TODO(column-unmentioned)
+core	product_instances	created_at	timestamp with time zone	backfill_growth.sql,reconcile_v3.sql	yes	
+core	product_instances	updated_at	timestamp with time zone	backfill_growth.sql,reconcile_v3.sql	yes	
+core	role_permissions	role_id	uuid	backfill_identity.sql	yes	
+core	role_permissions	permission_id	uuid	backfill_identity.sql	NO	TODO(column-unmentioned)
+core	role_permissions	created_at	timestamp with time zone	backfill_identity.sql	yes	
+core	roles	id	uuid	backfill_identity.sql	yes	
+core	roles	tenant_id	uuid	backfill_identity.sql	yes	
+core	roles	key	text	backfill_identity.sql	yes	
+core	roles	name	text	backfill_identity.sql	yes	
+core	roles	description	text	backfill_identity.sql	yes	
+core	roles	created_at	timestamp with time zone	backfill_identity.sql	yes	
+core	sessions	id	uuid	-	NO	TODO(table-never-referenced)
+core	sessions	person_id	uuid	-	NO	TODO(table-never-referenced)
+core	sessions	user_id	uuid	-	NO	TODO(table-never-referenced)
+core	sessions	tenant_id	uuid	-	NO	TODO(table-never-referenced)
+core	sessions	token	text	-	NO	TODO(table-never-referenced)
+core	sessions	expires_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+core	sessions	created_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+core	staff_members	id	uuid	backfill_identity.sql	yes	
+core	staff_members	tenant_id	uuid	backfill_identity.sql	yes	
+core	staff_members	location_id	uuid	backfill_identity.sql	yes	
+core	staff_members	user_id	uuid	backfill_identity.sql	yes	
+core	staff_members	name	text	backfill_identity.sql	yes	
+core	staff_members	email	text	backfill_identity.sql	yes	
+core	staff_members	phone	text	backfill_identity.sql	yes	
+core	staff_members	status	text	backfill_identity.sql	yes	
+core	staff_members	metadata	jsonb	backfill_identity.sql	yes	
+core	staff_members	created_at	timestamp with time zone	backfill_identity.sql	yes	
+core	staff_members	updated_at	timestamp with time zone	backfill_identity.sql	yes	
+core	tenant_memberships	id	uuid	backfill_identity.sql	yes	
+core	tenant_memberships	tenant_id	uuid	backfill_identity.sql	yes	
+core	tenant_memberships	user_id	uuid	backfill_identity.sql	yes	
+core	tenant_memberships	status	text	backfill_identity.sql	yes	
+core	tenant_memberships	created_at	timestamp with time zone	backfill_identity.sql	yes	
+core	tenant_memberships	updated_at	timestamp with time zone	backfill_identity.sql	yes	
+core	tenants	id	uuid	backfill_commerce.sql,backfill_device.sql,backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	tenants	slug	text	backfill_commerce.sql,backfill_device.sql,backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	tenants	name	text	backfill_commerce.sql,backfill_device.sql,backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	tenants	status	text	backfill_commerce.sql,backfill_device.sql,backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	tenants	timezone	text	backfill_commerce.sql,backfill_device.sql,backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	tenants	metadata	jsonb	backfill_commerce.sql,backfill_device.sql,backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	tenants	created_at	timestamp with time zone	backfill_commerce.sql,backfill_device.sql,backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	tenants	updated_at	timestamp with time zone	backfill_commerce.sql,backfill_device.sql,backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+core	users	id	uuid	backfill_identity.sql	yes	
+core	users	auth_subject	text	backfill_identity.sql	yes	
+core	users	email	text	backfill_identity.sql	yes	
+core	users	phone	text	backfill_identity.sql	yes	
+core	users	display_name	text	backfill_identity.sql	yes	
+core	users	person_id	uuid	backfill_identity.sql	yes	
+core	users	password_salt	text	backfill_identity.sql	yes	
+core	users	password_hash	text	backfill_identity.sql	yes	
+core	users	password_algorithm	text	backfill_identity.sql	yes	
+core	users	status	text	backfill_identity.sql	yes	
+core	users	created_at	timestamp with time zone	backfill_identity.sql	yes	
+core	users	updated_at	timestamp with time zone	backfill_identity.sql	yes	
+device	devices	id	uuid	backfill_device.sql	yes	
+device	devices	tenant_id	uuid	backfill_device.sql	yes	
+device	devices	location_id	uuid	backfill_device.sql	yes	
+device	devices	station_id	uuid	backfill_device.sql	yes	
+device	devices	name	text	backfill_device.sql	yes	
+device	devices	device_type	text	backfill_device.sql	yes	
+device	devices	device_subtype	text	backfill_device.sql	yes	
+device	devices	manufacturer	text	backfill_device.sql	yes	
+device	devices	model	text	backfill_device.sql	yes	
+device	devices	connection_type	text	backfill_device.sql	yes	
+device	devices	status	text	backfill_device.sql	yes	
+device	devices	metadata	jsonb	backfill_device.sql	yes	
+device	devices	created_at	timestamp with time zone	backfill_device.sql	yes	
+device	devices	updated_at	timestamp with time zone	backfill_device.sql	NO	TODO(column-unmentioned)
+device	events	id	uuid	backfill_device.sql	yes	
+device	events	tenant_id	uuid	backfill_device.sql	yes	
+device	events	session_id	uuid	backfill_device.sql	NO	TODO(column-unmentioned)
+device	events	station_id	uuid	backfill_device.sql	yes	
+device	events	event_type	text	backfill_device.sql	yes	
+device	events	payload	jsonb	backfill_device.sql	yes	
+device	events	occurred_at	timestamp with time zone	backfill_device.sql	NO	TODO(column-unmentioned)
+device	pairing_requests	id	uuid	backfill_device.sql	yes	
+device	pairing_requests	tenant_id	uuid	backfill_device.sql	yes	
+device	pairing_requests	location_id	uuid	backfill_device.sql	yes	
+device	pairing_requests	station_id	uuid	backfill_device.sql	yes	
+device	pairing_requests	device_name	text	backfill_device.sql	yes	
+device	pairing_requests	requested_name	text	backfill_device.sql	NO	TODO(column-unmentioned)
+device	pairing_requests	pin_hash	text	backfill_device.sql	NO	TODO(column-unmentioned)
+device	pairing_requests	pin_salt	text	backfill_device.sql	NO	TODO(column-unmentioned)
+device	pairing_requests	status	text	backfill_device.sql	yes	
+device	pairing_requests	attempt_count	integer	backfill_device.sql	NO	TODO(column-unmentioned)
+device	pairing_requests	max_attempts	integer	backfill_device.sql	yes	
+device	pairing_requests	expires_at	timestamp with time zone	backfill_device.sql	yes	
+device	pairing_requests	approved_by	uuid	backfill_device.sql	NO	TODO(column-unmentioned)
+device	pairing_requests	approved_at	timestamp with time zone	backfill_device.sql	NO	TODO(column-unmentioned)
+device	pairing_requests	used_at	timestamp with time zone	backfill_device.sql	NO	TODO(column-unmentioned)
+device	pairing_requests	denied_at	timestamp with time zone	backfill_device.sql	NO	TODO(column-unmentioned)
+device	pairing_requests	created_at	timestamp with time zone	backfill_device.sql	yes	
+device	pairing_requests	updated_at	timestamp with time zone	backfill_device.sql	NO	TODO(column-unmentioned)
+device	sessions	id	uuid	backfill_device.sql	yes	
+device	sessions	tenant_id	uuid	backfill_device.sql	yes	
+device	sessions	device_id	uuid	backfill_device.sql	yes	
+device	sessions	station_id	uuid	backfill_device.sql	yes	
+device	sessions	device_name	text	backfill_device.sql	yes	
+device	sessions	token_hash	text	backfill_device.sql	yes	
+device	sessions	is_active	boolean	backfill_device.sql	yes	
+device	sessions	last_used_at	timestamp with time zone	backfill_device.sql	yes	
+device	sessions	metadata	jsonb	backfill_device.sql	yes	
+device	sessions	created_at	timestamp with time zone	backfill_device.sql	yes	
+grow	feature_flags	id	uuid	backfill_growth.sql	yes	
+grow	feature_flags	tenant_id	uuid	backfill_growth.sql	yes	
+grow	feature_flags	key	text	backfill_growth.sql	yes	
+grow	feature_flags	enabled	boolean	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	feature_flags	description	text	backfill_growth.sql	yes	
+grow	feature_flags	rollout	jsonb	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	feature_flags	created_at	timestamp with time zone	backfill_growth.sql	yes	
+grow	feature_flags	updated_at	timestamp with time zone	backfill_growth.sql	yes	
+grow	lead_events	id	uuid	backfill_growth.sql	yes	
+grow	lead_events	lead_id	uuid	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	lead_events	event_type	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	lead_events	event_data	jsonb	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	lead_events	created_at	timestamp with time zone	backfill_growth.sql	yes	
+grow	leads	id	uuid	backfill_growth.sql	yes	
+grow	leads	email	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	name	text	backfill_growth.sql	yes	
+grow	leads	phone	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	company	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	role_title	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	consent_state	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	lifecycle_status	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	diagnostic_data	jsonb	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	diagnostic_date	timestamp with time zone	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	first_contact_channel	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	first_contact_campaign	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	utm_source	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	utm_medium	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	utm_campaign	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	utm_content	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	utm_term	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	referrer	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	landing_path	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	submitted_form	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	source_app	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	first_contact_at	timestamp with time zone	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	sequence_paused	boolean	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	pause_reason	text	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	emails_sent	ARRAY	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	last_email_sent_at	timestamp with time zone	backfill_growth.sql	NO	TODO(column-unmentioned)
+grow	leads	created_at	timestamp with time zone	backfill_growth.sql	yes	
+grow	leads	updated_at	timestamp with time zone	backfill_growth.sql	yes	
+grow	subscriptions	id	uuid	backfill_growth.sql,reconcile_v3.sql	yes	
+grow	subscriptions	tenant_id	uuid	backfill_growth.sql,reconcile_v3.sql	yes	
+grow	subscriptions	plan	text	backfill_growth.sql,reconcile_v3.sql	yes	
+grow	subscriptions	status	text	backfill_growth.sql,reconcile_v3.sql	yes	
+grow	subscriptions	trial_ends_at	timestamp with time zone	backfill_growth.sql,reconcile_v3.sql	NO	TODO(column-unmentioned)
+grow	subscriptions	suspended_at	timestamp with time zone	backfill_growth.sql,reconcile_v3.sql	yes	
+grow	subscriptions	metadata	jsonb	backfill_growth.sql,reconcile_v3.sql	yes	
+grow	subscriptions	created_at	timestamp with time zone	backfill_growth.sql,reconcile_v3.sql	yes	
+grow	subscriptions	updated_at	timestamp with time zone	backfill_growth.sql,reconcile_v3.sql	yes	
+kitchen	station_assignments	id	uuid	backfill_device.sql	yes	
+kitchen	station_assignments	tenant_id	uuid	backfill_device.sql	yes	
+kitchen	station_assignments	station_id	uuid	backfill_device.sql	yes	
+kitchen	station_assignments	group_id	uuid	backfill_device.sql	NO	TODO(column-unmentioned)
+kitchen	station_assignments	product_ref	uuid	backfill_device.sql	NO	TODO(column-unmentioned)
+kitchen	station_assignments	product_key	text	backfill_device.sql	NO	TODO(column-unmentioned)
+kitchen	station_assignments	sort_order	integer	backfill_device.sql	yes	
+kitchen	station_assignments	metadata	jsonb	backfill_device.sql	yes	
+kitchen	station_assignments	created_at	timestamp with time zone	backfill_device.sql	yes	
+kitchen	station_assignments	updated_at	timestamp with time zone	backfill_device.sql	NO	TODO(column-unmentioned)
+kitchen	station_groups	id	uuid	backfill_device.sql	yes	
+kitchen	station_groups	tenant_id	uuid	backfill_device.sql	yes	
+kitchen	station_groups	location_id	uuid	backfill_device.sql	yes	
+kitchen	station_groups	group_key	text	backfill_device.sql	NO	TODO(column-unmentioned)
+kitchen	station_groups	name	text	backfill_device.sql	yes	
+kitchen	station_groups	sort_order	integer	backfill_device.sql	yes	
+kitchen	station_groups	metadata	jsonb	backfill_device.sql	yes	
+kitchen	station_groups	created_at	timestamp with time zone	backfill_device.sql	yes	
+kitchen	station_groups	updated_at	timestamp with time zone	backfill_device.sql	NO	TODO(column-unmentioned)
+kitchen	stations	id	uuid	backfill_device.sql	yes	
+kitchen	stations	tenant_id	uuid	backfill_device.sql	yes	
+kitchen	stations	location_id	uuid	backfill_device.sql	yes	
+kitchen	stations	station_key	text	backfill_device.sql	yes	
+kitchen	stations	name	text	backfill_device.sql	yes	
+kitchen	stations	status	text	backfill_device.sql	yes	
+kitchen	stations	sort_order	integer	backfill_device.sql	yes	
+kitchen	stations	metadata	jsonb	backfill_device.sql	yes	
+kitchen	stations	created_at	timestamp with time zone	backfill_device.sql	yes	
+kitchen	stations	updated_at	timestamp with time zone	backfill_device.sql	NO	TODO(column-unmentioned)
+loyalty	accounts	id	uuid	backfill_loyalty_v3.sql	yes	
+loyalty	accounts	tenant_id	uuid	backfill_loyalty_v3.sql	yes	
+loyalty	accounts	person_id	uuid	backfill_loyalty_v3.sql	yes	
+loyalty	accounts	program_id	uuid	backfill_loyalty_v3.sql	NO	TODO(column-unmentioned)
+loyalty	accounts	status	text	backfill_loyalty_v3.sql	yes	
+loyalty	accounts	metadata	jsonb	backfill_loyalty_v3.sql	NO	TODO(column-unmentioned)
+loyalty	accounts	created_at	timestamp with time zone	backfill_loyalty_v3.sql	yes	
+loyalty	accounts	updated_at	timestamp with time zone	backfill_loyalty_v3.sql	yes	
+loyalty	automation_rules	id	uuid	-	NO	TODO(table-never-referenced)
+loyalty	automation_rules	tenant_id	uuid	-	NO	TODO(table-never-referenced)
+loyalty	automation_rules	program_id	uuid	-	NO	TODO(table-never-referenced)
+loyalty	automation_rules	trigger_type	text	-	NO	TODO(table-never-referenced)
+loyalty	automation_rules	name	text	-	NO	TODO(table-never-referenced)
+loyalty	automation_rules	config	jsonb	-	NO	TODO(table-never-referenced)
+loyalty	automation_rules	is_active	boolean	-	NO	TODO(table-never-referenced)
+loyalty	automation_rules	created_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+loyalty	automation_rules	updated_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+loyalty	balances	tenant_id	uuid	-	NO	TODO(table-never-referenced)
+loyalty	balances	loyalty_card_id	uuid	-	NO	TODO(table-never-referenced)
+loyalty	balances	balance	integer	-	NO	TODO(table-never-referenced)
+loyalty	balances	updated_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+loyalty	birthday_rewards	id	uuid	-	NO	TODO(table-never-referenced)
+loyalty	birthday_rewards	tenant_id	uuid	-	NO	TODO(table-never-referenced)
+loyalty	birthday_rewards	loyalty_card_id	uuid	-	NO	TODO(table-never-referenced)
+loyalty	birthday_rewards	year	integer	-	NO	TODO(table-never-referenced)
+loyalty	birthday_rewards	issued_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+loyalty	birthday_rewards	expires_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+loyalty	birthday_rewards	redeemed_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+loyalty	birthday_rewards	status	text	-	NO	TODO(table-never-referenced)
+loyalty	birthday_rewards	created_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+loyalty	cards	id	uuid	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+loyalty	cards	tenant_id	uuid	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+loyalty	cards	account_id	uuid	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+loyalty	cards	card_number	text	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+loyalty	cards	balance_cents	integer	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+loyalty	cards	total_visits	integer	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+loyalty	cards	visits_this_cycle	integer	backfill_loyalty_v3.sql,reconcile_v3.sql	NO	TODO(column-unmentioned)
+loyalty	cards	pending_rewards	integer	backfill_loyalty_v3.sql,reconcile_v3.sql	NO	TODO(column-unmentioned)
+loyalty	cards	qr_token	text	backfill_loyalty_v3.sql,reconcile_v3.sql	NO	TODO(column-unmentioned)
+loyalty	cards	qr_issued_at	timestamp with time zone	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+loyalty	cards	status	text	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+loyalty	cards	metadata	jsonb	backfill_loyalty_v3.sql,reconcile_v3.sql	NO	TODO(column-unmentioned)
+loyalty	cards	created_at	timestamp with time zone	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+loyalty	cards	updated_at	timestamp with time zone	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+loyalty	gift_card_ledger	id	uuid	backfill_loyalty.sql	yes	
+loyalty	gift_card_ledger	tenant_id	uuid	backfill_loyalty.sql	yes	
+loyalty	gift_card_ledger	gift_card_id	uuid	backfill_loyalty.sql	yes	
+loyalty	gift_card_ledger	delta	integer	backfill_loyalty.sql	yes	
+loyalty	gift_card_ledger	reason	text	backfill_loyalty.sql	yes	
+loyalty	gift_card_ledger	source_type	text	backfill_loyalty.sql	yes	
+loyalty	gift_card_ledger	source_id	text	backfill_loyalty.sql	yes	
+loyalty	gift_card_ledger	idempotency_key	text	backfill_loyalty.sql	yes	
+loyalty	gift_card_ledger	metadata	jsonb	backfill_loyalty.sql	yes	
+loyalty	gift_card_ledger	created_at	timestamp with time zone	backfill_loyalty.sql	yes	
+loyalty	gift_cards	id	uuid	backfill_loyalty.sql,reconcile_v3.sql	yes	
+loyalty	gift_cards	tenant_id	uuid	backfill_loyalty.sql,reconcile_v3.sql	yes	
+loyalty	gift_cards	code	text	backfill_loyalty.sql,reconcile_v3.sql	yes	
+loyalty	gift_cards	amount_cents	integer	backfill_loyalty.sql,reconcile_v3.sql	yes	
+loyalty	gift_cards	balance_cents	integer	backfill_loyalty.sql,reconcile_v3.sql	yes	
+loyalty	gift_cards	created_by_staff_member_id	uuid	backfill_loyalty.sql,reconcile_v3.sql	NO	TODO(column-unmentioned)
+loyalty	gift_cards	sender_name	text	backfill_loyalty.sql,reconcile_v3.sql	yes	
+loyalty	gift_cards	message	text	backfill_loyalty.sql,reconcile_v3.sql	yes	
+loyalty	gift_cards	recipient_name	text	backfill_loyalty.sql,reconcile_v3.sql	NO	TODO(column-unmentioned)
+loyalty	gift_cards	recipient_email	text	backfill_loyalty.sql,reconcile_v3.sql	NO	TODO(column-unmentioned)
+loyalty	gift_cards	recipient_phone	text	backfill_loyalty.sql,reconcile_v3.sql	NO	TODO(column-unmentioned)
+loyalty	gift_cards	redeemed_at	timestamp with time zone	backfill_loyalty.sql,reconcile_v3.sql	yes	
+loyalty	gift_cards	redeemed_loyalty_card_id	uuid	backfill_loyalty.sql,reconcile_v3.sql	yes	
+loyalty	gift_cards	expires_at	timestamp with time zone	backfill_loyalty.sql,reconcile_v3.sql	yes	
+loyalty	gift_cards	created_at	timestamp with time zone	backfill_loyalty.sql,reconcile_v3.sql	yes	
+loyalty	lifecycle_sends	id	uuid	backfill_loyalty.sql	yes	
+loyalty	lifecycle_sends	tenant_id	uuid	backfill_loyalty.sql	yes	
+loyalty	lifecycle_sends	card_id	uuid	backfill_loyalty.sql	yes	
+loyalty	lifecycle_sends	journey	text	backfill_loyalty.sql	yes	
+loyalty	lifecycle_sends	sent_at	timestamp with time zone	backfill_loyalty.sql	yes	
+loyalty	lifecycle_sends	body	text	backfill_loyalty.sql	yes	
+loyalty	lifecycle_sends	metadata	jsonb	backfill_loyalty.sql	yes	
+loyalty	otp_verifications	id	uuid	-	NO	TODO(table-never-referenced)
+loyalty	otp_verifications	tenant_id	uuid	-	NO	TODO(table-never-referenced)
+loyalty	otp_verifications	person_id	uuid	-	NO	TODO(table-never-referenced)
+loyalty	otp_verifications	identity_type	text	-	NO	TODO(table-never-referenced)
+loyalty	otp_verifications	identity_value	text	-	NO	TODO(table-never-referenced)
+loyalty	otp_verifications	code_hash	text	-	NO	TODO(table-never-referenced)
+loyalty	otp_verifications	expires_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+loyalty	otp_verifications	attempts	integer	-	NO	TODO(table-never-referenced)
+loyalty	otp_verifications	verified_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+loyalty	otp_verifications	created_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+loyalty	pass_devices	id	uuid	backfill_loyalty.sql	yes	
+loyalty	pass_devices	tenant_id	uuid	backfill_loyalty.sql	yes	
+loyalty	pass_devices	pass_id	uuid	backfill_loyalty.sql	yes	
+loyalty	pass_devices	device_token	text	backfill_loyalty.sql	yes	
+loyalty	pass_devices	push_token	text	backfill_loyalty.sql	yes	
+loyalty	pass_devices	created_at	timestamp with time zone	backfill_loyalty.sql	yes	
+loyalty	passes	id	uuid	backfill_loyalty.sql	yes	
+loyalty	passes	tenant_id	uuid	backfill_loyalty.sql	yes	
+loyalty	passes	loyalty_card_id	uuid	backfill_loyalty.sql	yes	
+loyalty	passes	provider	text	backfill_loyalty.sql	yes	
+loyalty	passes	provider_object_id	text	backfill_loyalty.sql	yes	
+loyalty	passes	serial_number	text	backfill_loyalty.sql	yes	
+loyalty	passes	auth_token	text	backfill_loyalty.sql	yes	
+loyalty	passes	status	text	backfill_loyalty.sql	yes	
+loyalty	passes	metadata	jsonb	backfill_loyalty.sql	yes	
+loyalty	passes	created_at	timestamp with time zone	backfill_loyalty.sql	yes	
+loyalty	passes	updated_at	timestamp with time zone	backfill_loyalty.sql	yes	
+loyalty	points_ledger	id	uuid	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+loyalty	points_ledger	tenant_id	uuid	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+loyalty	points_ledger	loyalty_card_id	uuid	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+loyalty	points_ledger	delta	integer	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+loyalty	points_ledger	reason	text	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+loyalty	points_ledger	source_type	text	backfill_loyalty_v3.sql,reconcile_v3.sql	NO	TODO(column-unmentioned)
+loyalty	points_ledger	source_id	text	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+loyalty	points_ledger	idempotency_key	text	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+loyalty	points_ledger	metadata	jsonb	backfill_loyalty_v3.sql,reconcile_v3.sql	NO	TODO(column-unmentioned)
+loyalty	points_ledger	created_at	timestamp with time zone	backfill_loyalty_v3.sql,reconcile_v3.sql	yes	
+loyalty	programs	id	uuid	backfill_loyalty.sql	yes	
+loyalty	programs	tenant_id	uuid	backfill_loyalty.sql	yes	
+loyalty	programs	name	text	backfill_loyalty.sql	yes	
+loyalty	programs	card_prefix	text	backfill_loyalty.sql	yes	
+loyalty	programs	topup_enabled	boolean	backfill_loyalty.sql	yes	
+loyalty	programs	self_registration	boolean	backfill_loyalty.sql	yes	
+loyalty	programs	pass_style	text	backfill_loyalty.sql	yes	
+loyalty	programs	birthday_reward_enabled	boolean	backfill_loyalty.sql	yes	
+loyalty	programs	birthday_reward_name	text	backfill_loyalty.sql	yes	
+loyalty	programs	branding	jsonb	backfill_loyalty.sql	yes	
+loyalty	programs	status	text	backfill_loyalty.sql	yes	
+loyalty	programs	created_at	timestamp with time zone	backfill_loyalty.sql	yes	
+loyalty	programs	updated_at	timestamp with time zone	backfill_loyalty.sql	yes	
+loyalty	reward_configs	id	uuid	backfill_loyalty.sql	yes	
+loyalty	reward_configs	tenant_id	uuid	backfill_loyalty.sql	yes	
+loyalty	reward_configs	program_id	uuid	backfill_loyalty.sql	yes	
+loyalty	reward_configs	visits_required	integer	backfill_loyalty.sql	yes	
+loyalty	reward_configs	reward_name	text	backfill_loyalty.sql	yes	
+loyalty	reward_configs	reward_description	text	backfill_loyalty.sql	yes	
+loyalty	reward_configs	reward_cost_cents	integer	backfill_loyalty.sql	yes	
+loyalty	reward_configs	is_active	boolean	backfill_loyalty.sql	yes	
+loyalty	reward_configs	activated_at	timestamp with time zone	backfill_loyalty.sql	NO	TODO(column-unmentioned)
+loyalty	reward_configs	created_at	timestamp with time zone	backfill_loyalty.sql	yes	
+loyalty	reward_redemptions	id	uuid	backfill_loyalty.sql	yes	
+loyalty	reward_redemptions	tenant_id	uuid	backfill_loyalty.sql	yes	
+loyalty	reward_redemptions	loyalty_card_id	uuid	backfill_loyalty.sql	yes	
+loyalty	reward_redemptions	reward_config_id	uuid	backfill_loyalty.sql	yes	
+loyalty	reward_redemptions	staff_member_id	uuid	backfill_loyalty.sql	yes	
+loyalty	reward_redemptions	note	text	backfill_loyalty.sql	yes	
+loyalty	reward_redemptions	redeemed_at	timestamp with time zone	backfill_loyalty.sql	yes	
+loyalty	visit_events	id	uuid	backfill_loyalty_v3.sql	yes	
+loyalty	visit_events	tenant_id	uuid	backfill_loyalty_v3.sql	yes	
+loyalty	visit_events	loyalty_card_id	uuid	backfill_loyalty_v3.sql	yes	
+loyalty	visit_events	staff_member_id	uuid	backfill_loyalty_v3.sql	NO	TODO(column-unmentioned)
+loyalty	visit_events	note	text	backfill_loyalty_v3.sql	NO	TODO(column-unmentioned)
+loyalty	visit_events	metadata	jsonb	backfill_loyalty_v3.sql	NO	TODO(column-unmentioned)
+loyalty	visit_events	occurred_at	timestamp with time zone	backfill_loyalty_v3.sql	yes	
+loyalty	wallet_transactions	id	uuid	-	NO	TODO(table-never-referenced)
+loyalty	wallet_transactions	tenant_id	uuid	-	NO	TODO(table-never-referenced)
+loyalty	wallet_transactions	loyalty_card_id	uuid	-	NO	TODO(table-never-referenced)
+loyalty	wallet_transactions	staff_member_id	uuid	-	NO	TODO(table-never-referenced)
+loyalty	wallet_transactions	type	text	-	NO	TODO(table-never-referenced)
+loyalty	wallet_transactions	amount_cents	integer	-	NO	TODO(table-never-referenced)
+loyalty	wallet_transactions	description	text	-	NO	TODO(table-never-referenced)
+loyalty	wallet_transactions	metadata	jsonb	-	NO	TODO(table-never-referenced)
+loyalty	wallet_transactions	created_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	business_hours	id	uuid	backfill_commerce.sql	yes	
+ops	business_hours	tenant_id	uuid	backfill_commerce.sql	yes	
+ops	business_hours	location_id	uuid	backfill_commerce.sql	yes	
+ops	business_hours	day_of_week	smallint	backfill_commerce.sql	yes	
+ops	business_hours	opens_at	time without time zone	backfill_commerce.sql	yes	
+ops	business_hours	closes_at	time without time zone	backfill_commerce.sql	yes	
+ops	business_hours	is_closed	boolean	backfill_commerce.sql	yes	
+ops	business_hours	metadata	jsonb	backfill_commerce.sql	yes	
+ops	business_hours	created_at	timestamp with time zone	backfill_commerce.sql	yes	
+ops	business_hours	updated_at	timestamp with time zone	backfill_commerce.sql	yes	
+ops	businesses	id	uuid	backfill_commerce.sql	yes	
+ops	businesses	tenant_id	uuid	backfill_commerce.sql	yes	
+ops	businesses	name	text	backfill_commerce.sql	yes	
+ops	businesses	business_type	text	backfill_commerce.sql	yes	
+ops	businesses	city	text	backfill_commerce.sql	yes	
+ops	businesses	config	jsonb	backfill_commerce.sql	yes	
+ops	businesses	open_times	jsonb	backfill_commerce.sql	yes	
+ops	businesses	branding	jsonb	backfill_commerce.sql	yes	
+ops	businesses	metadata	jsonb	backfill_commerce.sql	yes	
+ops	businesses	created_at	timestamp with time zone	backfill_commerce.sql	yes	
+ops	businesses	updated_at	timestamp with time zone	backfill_commerce.sql	yes	
+ops	channel_accounts	id	uuid	-	NO	TODO(table-never-referenced)
+ops	channel_accounts	tenant_id	uuid	-	NO	TODO(table-never-referenced)
+ops	channel_accounts	location_id	uuid	-	NO	TODO(table-never-referenced)
+ops	channel_accounts	channel_id	uuid	-	NO	TODO(table-never-referenced)
+ops	channel_accounts	provider	text	-	NO	TODO(table-never-referenced)
+ops	channel_accounts	provider_account_id	text	-	NO	TODO(table-never-referenced)
+ops	channel_accounts	address	text	-	NO	TODO(table-never-referenced)
+ops	channel_accounts	config	jsonb	-	NO	TODO(table-never-referenced)
+ops	channel_accounts	status	text	-	NO	TODO(table-never-referenced)
+ops	channel_accounts	metadata	jsonb	-	NO	TODO(table-never-referenced)
+ops	channel_accounts	created_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	channel_accounts	updated_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	channels	id	uuid	-	NO	TODO(table-never-referenced)
+ops	channels	tenant_id	uuid	-	NO	TODO(table-never-referenced)
+ops	channels	key	text	-	NO	TODO(table-never-referenced)
+ops	channels	name	text	-	NO	TODO(table-never-referenced)
+ops	channels	status	text	-	NO	TODO(table-never-referenced)
+ops	channels	metadata	jsonb	-	NO	TODO(table-never-referenced)
+ops	channels	created_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	order_events	id	uuid	backfill_commerce.sql	yes	
+ops	order_events	tenant_id	uuid	backfill_commerce.sql	yes	
+ops	order_events	order_id	uuid	backfill_commerce.sql	yes	
+ops	order_events	event_kind	text	backfill_commerce.sql	yes	
+ops	order_events	old_status	text	backfill_commerce.sql	NO	TODO(column-unmentioned)
+ops	order_events	new_status	text	backfill_commerce.sql	yes	
+ops	order_events	kitchen_sequence	bigint	backfill_commerce.sql	NO	TODO(column-unmentioned)
+ops	order_events	source	text	backfill_commerce.sql	yes	
+ops	order_events	idempotency_key	text	backfill_commerce.sql	NO	TODO(column-unmentioned)
+ops	order_events	payload	jsonb	backfill_commerce.sql	yes	
+ops	order_events	metadata	jsonb	backfill_commerce.sql	yes	
+ops	order_events	occurred_at	timestamp with time zone	backfill_commerce.sql	yes	
+ops	order_events	created_at	timestamp with time zone	backfill_commerce.sql	yes	
+ops	order_items	id	uuid	backfill_commerce.sql	yes	
+ops	order_items	tenant_id	uuid	backfill_commerce.sql	yes	
+ops	order_items	order_id	uuid	backfill_commerce.sql	yes	
+ops	order_items	product_id	uuid	backfill_commerce.sql	yes	
+ops	order_items	display_order	integer	backfill_commerce.sql	yes	
+ops	order_items	name	text	backfill_commerce.sql	yes	
+ops	order_items	variant_name	text	backfill_commerce.sql	yes	
+ops	order_items	quantity	integer	backfill_commerce.sql	yes	
+ops	order_items	unit_price_cents	integer	backfill_commerce.sql	yes	
+ops	order_items	notes	text	backfill_commerce.sql	yes	
+ops	order_items	kitchen_status	text	backfill_commerce.sql	yes	
+ops	order_items	is_cancelled	boolean	backfill_commerce.sql	yes	
+ops	order_items	metadata	jsonb	backfill_commerce.sql	yes	
+ops	order_items	created_at	timestamp with time zone	backfill_commerce.sql	yes	
+ops	order_items	updated_at	timestamp with time zone	backfill_commerce.sql	yes	
+ops	orders	id	uuid	backfill_commerce.sql	yes	
+ops	orders	tenant_id	uuid	backfill_commerce.sql	yes	
+ops	orders	location_id	uuid	backfill_commerce.sql	yes	
+ops	orders	person_id	uuid	backfill_commerce.sql	yes	
+ops	orders	channel_id	uuid	backfill_commerce.sql	NO	TODO(column-unmentioned)
+ops	orders	source	text	backfill_commerce.sql	yes	
+ops	orders	channel	text	backfill_commerce.sql	yes	
+ops	orders	order_type	text	backfill_commerce.sql	yes	
+ops	orders	status	text	backfill_commerce.sql	yes	
+ops	orders	total_cents	integer	backfill_commerce.sql	yes	
+ops	orders	notes	text	backfill_commerce.sql	yes	
+ops	orders	details	jsonb	backfill_commerce.sql	yes	
+ops	orders	kitchen_status	text	backfill_commerce.sql	yes	
+ops	orders	pickup_person	text	backfill_commerce.sql	yes	
+ops	orders	station_id	text	backfill_commerce.sql	yes	
+ops	orders	station_name	text	backfill_commerce.sql	NO	TODO(column-unmentioned)
+ops	orders	cancellation_reason	text	backfill_commerce.sql	yes	
+ops	orders	cancellation_reason_code	text	backfill_commerce.sql	NO	TODO(column-unmentioned)
+ops	orders	cancellation_reason_note	text	backfill_commerce.sql	NO	TODO(column-unmentioned)
+ops	orders	partial_cancellation_reason	text	backfill_commerce.sql	NO	TODO(column-unmentioned)
+ops	orders	partial_cancellation_reason_code	text	backfill_commerce.sql	NO	TODO(column-unmentioned)
+ops	orders	partial_cancellation_reason_note	text	backfill_commerce.sql	NO	TODO(column-unmentioned)
+ops	orders	source_transaction_id	text	backfill_commerce.sql	yes	
+ops	orders	slack_message_ts	text	backfill_commerce.sql	NO	TODO(column-unmentioned)
+ops	orders	metadata	jsonb	backfill_commerce.sql	yes	
+ops	orders	placed_at	timestamp with time zone	backfill_commerce.sql	yes	
+ops	orders	created_at	timestamp with time zone	backfill_commerce.sql	yes	
+ops	orders	updated_at	timestamp with time zone	backfill_commerce.sql	yes	
+ops	payments	id	uuid	-	NO	TODO(table-never-referenced)
+ops	payments	tenant_id	uuid	-	NO	TODO(table-never-referenced)
+ops	payments	order_id	uuid	-	NO	TODO(table-never-referenced)
+ops	payments	provider	text	-	NO	TODO(table-never-referenced)
+ops	payments	provider_ref	text	-	NO	TODO(table-never-referenced)
+ops	payments	method	text	-	NO	TODO(table-never-referenced)
+ops	payments	status	text	-	NO	TODO(table-never-referenced)
+ops	payments	amount_cents	integer	-	NO	TODO(table-never-referenced)
+ops	payments	currency	text	-	NO	TODO(table-never-referenced)
+ops	payments	captured_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	payments	metadata	jsonb	-	NO	TODO(table-never-referenced)
+ops	payments	created_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	payments	updated_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	product_categories	id	uuid	backfill_commerce.sql	yes	
+ops	product_categories	tenant_id	uuid	backfill_commerce.sql	yes	
+ops	product_categories	key	text	backfill_commerce.sql	yes	
+ops	product_categories	name	text	backfill_commerce.sql	yes	
+ops	product_categories	sort_order	integer	backfill_commerce.sql	yes	
+ops	product_categories	metadata	jsonb	backfill_commerce.sql	yes	
+ops	product_categories	created_at	timestamp with time zone	backfill_commerce.sql	yes	
+ops	product_categories	updated_at	timestamp with time zone	backfill_commerce.sql	yes	
+ops	product_modifier_groups	id	uuid	-	NO	TODO(table-never-referenced)
+ops	product_modifier_groups	tenant_id	uuid	-	NO	TODO(table-never-referenced)
+ops	product_modifier_groups	product_id	uuid	-	NO	TODO(table-never-referenced)
+ops	product_modifier_groups	key	text	-	NO	TODO(table-never-referenced)
+ops	product_modifier_groups	name	text	-	NO	TODO(table-never-referenced)
+ops	product_modifier_groups	min_select	integer	-	NO	TODO(table-never-referenced)
+ops	product_modifier_groups	max_select	integer	-	NO	TODO(table-never-referenced)
+ops	product_modifier_groups	is_required	boolean	-	NO	TODO(table-never-referenced)
+ops	product_modifier_groups	sort_order	integer	-	NO	TODO(table-never-referenced)
+ops	product_modifier_groups	metadata	jsonb	-	NO	TODO(table-never-referenced)
+ops	product_modifier_groups	created_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	product_modifier_groups	updated_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	product_modifiers	id	uuid	-	NO	TODO(table-never-referenced)
+ops	product_modifiers	tenant_id	uuid	-	NO	TODO(table-never-referenced)
+ops	product_modifiers	modifier_group_id	uuid	-	NO	TODO(table-never-referenced)
+ops	product_modifiers	key	text	-	NO	TODO(table-never-referenced)
+ops	product_modifiers	name	text	-	NO	TODO(table-never-referenced)
+ops	product_modifiers	price_delta_cents	integer	-	NO	TODO(table-never-referenced)
+ops	product_modifiers	is_available	boolean	-	NO	TODO(table-never-referenced)
+ops	product_modifiers	sort_order	integer	-	NO	TODO(table-never-referenced)
+ops	product_modifiers	metadata	jsonb	-	NO	TODO(table-never-referenced)
+ops	product_modifiers	created_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	product_modifiers	updated_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	products	id	uuid	backfill_commerce.sql	yes	
+ops	products	tenant_id	uuid	backfill_commerce.sql	yes	
+ops	products	category_id	uuid	backfill_commerce.sql	yes	
+ops	products	name	text	backfill_commerce.sql	yes	
+ops	products	description	text	backfill_commerce.sql	yes	
+ops	products	price_cents	integer	backfill_commerce.sql	yes	
+ops	products	is_available	boolean	backfill_commerce.sql	yes	
+ops	products	variants	jsonb	backfill_commerce.sql	yes	
+ops	products	name_embedding	USER-DEFINED	backfill_commerce.sql	yes	
+ops	products	embedding_model	text	backfill_commerce.sql	yes	
+ops	products	synced_at	timestamp with time zone	backfill_commerce.sql	yes	
+ops	products	metadata	jsonb	backfill_commerce.sql	yes	
+ops	products	created_at	timestamp with time zone	backfill_commerce.sql	yes	
+ops	products	updated_at	timestamp with time zone	backfill_commerce.sql	yes	
+ops	refunds	id	uuid	-	NO	TODO(table-never-referenced)
+ops	refunds	tenant_id	uuid	-	NO	TODO(table-never-referenced)
+ops	refunds	payment_id	uuid	-	NO	TODO(table-never-referenced)
+ops	refunds	order_id	uuid	-	NO	TODO(table-never-referenced)
+ops	refunds	provider_ref	text	-	NO	TODO(table-never-referenced)
+ops	refunds	reason	text	-	NO	TODO(table-never-referenced)
+ops	refunds	status	text	-	NO	TODO(table-never-referenced)
+ops	refunds	amount_cents	integer	-	NO	TODO(table-never-referenced)
+ops	refunds	processed_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	refunds	metadata	jsonb	-	NO	TODO(table-never-referenced)
+ops	refunds	created_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	refunds	updated_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	service_windows	id	uuid	-	NO	TODO(table-never-referenced)
+ops	service_windows	tenant_id	uuid	-	NO	TODO(table-never-referenced)
+ops	service_windows	location_id	uuid	-	NO	TODO(table-never-referenced)
+ops	service_windows	label	text	-	NO	TODO(table-never-referenced)
+ops	service_windows	starts_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	service_windows	ends_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	service_windows	is_closed	boolean	-	NO	TODO(table-never-referenced)
+ops	service_windows	opens_at	time without time zone	-	NO	TODO(table-never-referenced)
+ops	service_windows	closes_at	time without time zone	-	NO	TODO(table-never-referenced)
+ops	service_windows	metadata	jsonb	-	NO	TODO(table-never-referenced)
+ops	service_windows	created_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	service_windows	updated_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	v_kds_tickets	ticket_id	uuid	-	NO	TODO(table-never-referenced)
+ops	v_kds_tickets	tenant_id	uuid	-	NO	TODO(table-never-referenced)
+ops	v_kds_tickets	source_transaction_id	text	-	NO	TODO(table-never-referenced)
+ops	v_kds_tickets	source_channel	text	-	NO	TODO(table-never-referenced)
+ops	v_kds_tickets	customer_person_id	uuid	-	NO	TODO(table-never-referenced)
+ops	v_kds_tickets	status	text	-	NO	TODO(table-never-referenced)
+ops	v_kds_tickets	station_id	text	-	NO	TODO(table-never-referenced)
+ops	v_kds_tickets	station_name	text	-	NO	TODO(table-never-referenced)
+ops	v_kds_tickets	pickup_person	text	-	NO	TODO(table-never-referenced)
+ops	v_kds_tickets	customer_note	text	-	NO	TODO(table-never-referenced)
+ops	v_kds_tickets	cancellation_reason	text	-	NO	TODO(table-never-referenced)
+ops	v_kds_tickets	partial_cancellation_reason	text	-	NO	TODO(table-never-referenced)
+ops	v_kds_tickets	total_cents	integer	-	NO	TODO(table-never-referenced)
+ops	v_kds_tickets	created_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	v_kds_tickets	updated_at	timestamp with time zone	-	NO	TODO(table-never-referenced)
+ops	v_kds_tickets	items	jsonb	-	NO	TODO(table-never-referenced)

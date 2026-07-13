@@ -1,0 +1,309 @@
+<title>build-v3 · Schema Map (v1 · swimlanes)</title>
+<style>
+  :root{
+    --umi:#2a6fdb; --umi-soft:#eaf1fd; --umi-ink:#1b4fa8;
+    --tenant:#12996b; --tenant-soft:#e6f6ef; --tenant-ink:#0c6f4d;
+    --runtime:#c9871e; --runtime-soft:#fbf1de; --runtime-ink:#8f5f10;
+    --bg:#f6f7f9; --panel:#ffffff; --panel-2:#fbfcfd;
+    --ink:#161a20; --ink-2:#41505f; --ink-3:#6b7a89;
+    --line:#dbe0e6; --line-2:#e9edf1;
+    --chip:#ffffff; --chip-line:#d4dae1;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --shadow:0 1px 2px rgba(16,24,40,.05),0 4px 14px rgba(16,24,40,.04);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --umi:#5f9bff; --umi-soft:#12233f; --umi-ink:#9cc0ff;
+      --tenant:#3ec392; --tenant-soft:#0e2b21; --tenant-ink:#7fe0bb;
+      --runtime:#e6ac4e; --runtime-soft:#2e2410; --runtime-ink:#f0c785;
+      --bg:#0d1013; --panel:#161b21; --panel-2:#12161b;
+      --ink:#e7ecf1; --ink-2:#aeb9c5; --ink-3:#7f8c9a;
+      --line:#28313b; --line-2:#20272f;
+      --chip:#1b222a; --chip-line:#333e49;
+      --shadow:0 1px 2px rgba(0,0,0,.35),0 6px 18px rgba(0,0,0,.28);
+    }
+  }
+  :root[data-theme="dark"]{
+    --umi:#5f9bff; --umi-soft:#12233f; --umi-ink:#9cc0ff;
+    --tenant:#3ec392; --tenant-soft:#0e2b21; --tenant-ink:#7fe0bb;
+    --runtime:#e6ac4e; --runtime-soft:#2e2410; --runtime-ink:#f0c785;
+    --bg:#0d1013; --panel:#161b21; --panel-2:#12161b;
+    --ink:#e7ecf1; --ink-2:#aeb9c5; --ink-3:#7f8c9a;
+    --line:#28313b; --line-2:#20272f;
+    --chip:#1b222a; --chip-line:#333e49;
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 6px 18px rgba(0,0,0,.28);
+  }
+  :root[data-theme="light"]{
+    --umi:#2a6fdb; --umi-soft:#eaf1fd; --umi-ink:#1b4fa8;
+    --tenant:#12996b; --tenant-soft:#e6f6ef; --tenant-ink:#0c6f4d;
+    --runtime:#c9871e; --runtime-soft:#fbf1de; --runtime-ink:#8f5f10;
+    --bg:#f6f7f9; --panel:#ffffff; --panel-2:#fbfcfd;
+    --ink:#161a20; --ink-2:#41505f; --ink-3:#6b7a89;
+    --line:#dbe0e6; --line-2:#e9edf1;
+    --chip:#ffffff; --chip-line:#d4dae1;
+    --shadow:0 1px 2px rgba(16,24,40,.05),0 4px 14px rgba(16,24,40,.04);
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+       -webkit-font-smoothing:antialiased;line-height:1.4}
+
+  /* ---- toolbar ---- */
+  .bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;
+       flex-wrap:wrap;padding:10px 20px;background:color-mix(in srgb,var(--panel) 88%,transparent);
+       backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  .bar h1{font-size:14px;font-weight:650;margin:0;letter-spacing:.2px}
+  .bar h1 span{color:var(--ink-3);font-weight:500}
+  .spacer{flex:1}
+  .leg{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:11.5px;color:var(--ink-2)}
+  .leg .k{display:inline-flex;align-items:center;gap:5px}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .zoom{display:flex;align-items:center;gap:2px;background:var(--panel-2);
+        border:1px solid var(--line);border-radius:9px;padding:2px}
+  .zoom button{width:26px;height:26px;border:0;background:transparent;color:var(--ink-2);
+        font-size:15px;cursor:pointer;border-radius:7px;line-height:1}
+  .zoom button:hover{background:var(--line-2);color:var(--ink)}
+  .zoom .lvl{min-width:44px;text-align:center;font:600 12px var(--mono);color:var(--ink-2)}
+  .tgl{border:1px solid var(--line);background:var(--panel-2);color:var(--ink-2);
+       border-radius:9px;height:30px;padding:0 11px;font-size:12px;cursor:pointer}
+  .tgl:hover{color:var(--ink)}
+
+  /* ---- stage ---- */
+  .wrap{padding:22px 22px 80px;overflow-x:auto}
+  .stage{max-width:1240px;margin:0 auto;transform-origin:top center}
+  .intro{margin:2px 4px 20px}
+  .intro .ey{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+  .intro p{margin:7px 0 0;color:var(--ink-2);font-size:13.5px;max-width:82ch}
+  .intro b{color:var(--ink);font-weight:600}
+  .intro code{font-family:var(--mono);font-size:12.5px}
+
+  /* ---- lane ---- */
+  .lane{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+        box-shadow:var(--shadow);overflow:hidden}
+  .lane.umi{--c:var(--umi);--c-soft:var(--umi-soft);--c-ink:var(--umi-ink)}
+  .lane.tenant{--c:var(--tenant);--c-soft:var(--tenant-soft);--c-ink:var(--tenant-ink)}
+  .lane.runtime{--c:var(--runtime);--c-soft:var(--runtime-soft);--c-ink:var(--runtime-ink)}
+  .lane-hd{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
+           padding:13px 18px;border-left:5px solid var(--c);background:var(--c-soft)}
+  .lane-hd .nm{font:650 17px/1 var(--mono);color:var(--c-ink)}
+  .lane-hd .badge{font:700 10px var(--sans);letter-spacing:.1em;color:#fff;background:var(--c);
+                  padding:3px 8px;border-radius:999px}
+  .lane-hd .th{color:var(--ink-2);font-size:12.5px}
+  .lane-hd .ct{margin-left:auto;font:600 11px var(--mono);color:var(--ink-3)}
+  .lane-bd{padding:16px;display:grid;gap:14px;
+           grid-template-columns:repeat(auto-fill,minmax(232px,1fr))}
+
+  /* ---- cluster ---- */
+  .cl{border:1px solid var(--line-2);border-radius:12px;background:var(--panel-2);padding:11px 11px 12px}
+  .cl.span2{grid-column:span 2}
+  .cl-hd{font:600 10.5px var(--mono);letter-spacing:.11em;text-transform:uppercase;
+         color:var(--c-ink);margin:1px 2px 9px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .cl-hd small{font-family:var(--sans);letter-spacing:normal;text-transform:none;
+               font-weight:500;color:var(--ink-3);font-size:11px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--chip);
+        border:1px solid var(--chip-line);border-radius:8px;padding:5px 8px;
+        font:500 12.5px var(--mono);color:var(--ink);white-space:nowrap}
+  .chip .m{font:600 8.5px var(--sans);letter-spacing:.04em;text-transform:uppercase;
+           padding:2px 5px;border-radius:5px;line-height:1}
+  .m.root{background:var(--c);color:#fff}
+  .m.ao{background:#7c3aed1a;color:#7c3aed;border:1px solid #7c3aed44}
+  .m.money{background:#0f9d581a;color:#0c7a45;border:1px solid #0f9d5844}
+  .m.vec{background:#c9871e1a;color:#8f5f10;border:1px solid #c9871e55}
+  .chip.view{border-style:dashed;font-style:italic;color:var(--ink-2)}
+  .chip.view .m{background:var(--ink-3);color:var(--panel)}
+  :root[data-theme="dark"] .m.ao{color:#b794f6;background:#7c3aed26}
+  :root[data-theme="dark"] .m.money{color:#5fd3a0;background:#0f9d5826}
+  :root[data-theme="dark"] .m.vec{color:#e6ac4e;background:#c9871e26}
+  @media (prefers-color-scheme:dark){
+    .m.money{color:#5fd3a0;background:#0f9d5826}
+    .m.vec{color:#e6ac4e;background:#c9871e26}
+  }
+
+  /* ---- seam ---- */
+  .seam{margin:0 auto;max-width:960px;padding:14px 8px}
+  .seam-inner{border:1px dashed var(--line);border-radius:12px;background:var(--panel-2);
+              padding:11px 15px;display:grid;gap:9px}
+  .seam-ttl{font:600 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);
+            display:flex;align-items:center;gap:8px}
+  .seam-row{display:flex;gap:9px;align-items:flex-start;font-size:12px;color:var(--ink-2)}
+  .seam-row .dir{font:700 11px var(--mono);white-space:nowrap;padding:2px 7px;border-radius:6px;
+                 background:var(--line-2);color:var(--ink);flex:none;min-width:66px;text-align:center}
+  .seam-row code{font:500 11.5px var(--mono);color:var(--ink);
+                 background:color-mix(in srgb,var(--line-2) 60%,transparent);
+                 padding:1px 5px;border-radius:5px}
+  .seam-note{font-size:11.5px;color:var(--ink-3);font-style:italic}
+
+  .foot{max-width:1240px;margin:26px auto 0;color:var(--ink-3);font-size:12px;padding:0 4px;line-height:1.6}
+  .foot b{color:var(--ink-2)}
+</style>
+
+<div class="bar">
+  <h1>build-v3 <span>· schema map · </span><b>v1 swimlanes</b></h1>
+  <div class="leg">
+    <span class="k"><i class="dot" style="background:var(--umi)"></i>umi · sealed</span>
+    <span class="k"><i class="dot" style="background:var(--tenant)"></i>tenant · RLS</span>
+    <span class="k"><i class="dot" style="background:var(--runtime)"></i>runtime</span>
+    <span class="k"><span class="m ao" style="font-size:8.5px;padding:2px 5px;border-radius:5px">append-only</span></span>
+    <span class="k"><span class="m money" style="font-size:8.5px;padding:2px 5px;border-radius:5px">money</span></span>
+    <span class="k"><span class="m vec" style="font-size:8.5px;padding:2px 5px;border-radius:5px">pgvector</span></span>
+    <span class="k" style="font-style:italic">view = derived</span>
+  </div>
+  <span class="spacer"></span>
+  <div class="zoom">
+    <button id="zo" title="Zoom out">&minus;</button>
+    <span class="lvl" id="lvl">100%</span>
+    <button id="zi" title="Zoom in">+</button>
+    <button id="zr" title="Reset zoom" style="width:auto;padding:0 8px;font-size:11px">reset</button>
+  </div>
+  <button class="tgl" id="theme">&#9681; theme</button>
+</div>
+
+<div class="wrap">
+  <div class="stage" id="stage">
+    <div class="intro">
+      <div class="ey">read this first · the design thesis is the layout</div>
+      <p>Three schemas become three lanes. <b>umi</b> is sealed authority (Umi owns every fact; no café writes here),
+      <b>tenant</b> is the café's durable business facts under row-level security, and <b>runtime</b> is sealed working
+      memory the running code <b>reads back</b> to act next. The bands between lanes are the <b>only</b> cross-schema
+      foreign keys: identity flows <b>up</b> into one <code>umi.user</code>; ownership flows <b>down</b> via
+      <code>business_id</code>. Money &amp; stamps live in tenant append-only ledgers (balance = SUM, never cached);
+      embeddings &amp; FSM state live in runtime, never in tenant.</p>
+    </div>
+    <div id="lanes"></div>
+  </div>
+</div>
+
+<div class="foot" id="foot"></div>
+
+<script>
+const DATA = [
+  { key:'umi', badge:'SEALED', thesis:'Umi owns every fact · no café ever writes here', clusters:[
+    { hd:'Identity spine', tables:[
+      {n:'user'}, {n:'user_role'}, {n:'role'}, {n:'role_permission'}, {n:'permission'}, {n:'channel_type'} ] },
+    { hd:'Entitlement', sub:'what a plan is allowed to do', tables:[
+      {n:'feature'}, {n:'plan'}, {n:'plan_feature'}, {n:'subscription'}, {n:'entitlement_override'},
+      {n:'effective_entitlement', view:true} ] },
+    { hd:'Billing', sub:'what a café is charged', tables:[
+      {n:'subscription_item', m:'money'}, {n:'invoice', m:'money'} ] },
+    { hd:'Sales', tables:[ {n:'prospect'}, {n:'prospect_event'} ] },
+    { hd:'Audit', sub:'Umi-internal actions', tables:[ {n:'audit_log', m:'ao'} ] },
+  ]},
+  { key:'tenant', badge:'RLS · PER BUSINESS', thesis:'the café’s business = the durable facts', clusters:[
+    { hd:'Root & org', span2:true, tables:[
+      {n:'business', m:'root'}, {n:'branch'}, {n:'station'}, {n:'integration'}, {n:'device'} ] },
+    { hd:'People', sub:'staff log in; customers don’t', tables:[
+      {n:'staff'}, {n:'customer'}, {n:'contact'}, {n:'customer_note'} ] },
+    { hd:'Loyalty', sub:'identity + append-only ledgers', span2:true, tables:[
+      {n:'loyalty_program'}, {n:'loyalty_card'},
+      {n:'loyalty_stored_value_ledger', m:'ao', m2:'money'}, {n:'loyalty_visit'},
+      {n:'loyalty_reward'}, {n:'loyalty_redemption'},
+      {n:'loyalty_gift_card', m:'money'}, {n:'loyalty_gift_card_ledger', m:'ao', m2:'money'},
+      {n:'loyalty_wallet_pass'} ] },
+    { hd:'Commerce', sub:'generic — no “menu”', tables:[
+      {n:'product_category'}, {n:'product'}, {n:'product_option_group'},
+      {n:'product_modifier'}, {n:'product_branch_availability'} ] },
+    { hd:'Knowledge', tables:[ {n:'knowledge_document'}, {n:'knowledge_chunk'} ] },
+    { hd:'Messaging', tables:[
+      {n:'conversation'}, {n:'message'}, {n:'conversation_analytics', view:true} ] },
+    { hd:'Orders', tables:[
+      {n:'customer_order'}, {n:'order_item'}, {n:'order_event'},
+      {n:'payment', m:'money'}, {n:'refund', m:'money'} ] },
+    { hd:'Audit', sub:'café-facing config changes', tables:[ {n:'audit_log', m:'ao'} ] },
+  ]},
+  { key:'runtime', badge:'SEALED · WORKING MEMORY', thesis:'every table is read back to act next', clusters:[
+    { hd:'Auth / session', tables:[ {n:'session'}, {n:'otp'}, {n:'password_reset_token'} ] },
+    { hd:'Device conn.', tables:[ {n:'device_session'}, {n:'pairing'} ] },
+    { hd:'Work queue & delivery', tables:[
+      {n:'outbox_event'}, {n:'inbound_event'}, {n:'idempotency_key'}, {n:'dead_letter'} ] },
+    { hd:'Live conversation', tables:[ {n:'conversation_state'}, {n:'reminder_sent'} ] },
+    { hd:'Integration', tables:[ {n:'integration_sync'} ] },
+    { hd:'Wallet push', tables:[ {n:'pass_device'} ] },
+    { hd:'Semantic index', sub:'pgvector 1024 · derived', span2:true, tables:[
+      {n:'product_embedding', m:'vec'}, {n:'message_embedding', m:'vec'}, {n:'knowledge_embedding', m:'vec'} ] },
+  ]},
+];
+
+const SEAMS = {
+  0:{ title:'seam · umi ⇄ tenant  (cross-schema FKs)',
+    rows:[
+      {dir:'↑ identity', t:'<code>staff.user_id</code>, <code>integration.connected_by</code>, <code>user_role.granted_by</code> → <code>umi.user</code>'},
+      {dir:'↑ vocab', t:'<code>contact.channel_id</code>, <code>conversation.channel_id</code> → <code>umi.channel_type</code>'},
+      {dir:'↓ scope', t:'<code>user_role.business_id / branch_id</code> → <code>tenant.business / branch</code> <i>(deferred xfk)</i>'},
+      {dir:'↓ billing', t:'<code>subscription.business_id</code>, <code>invoice.business_id</code> → <code>tenant.business</code>'},
+    ]},
+  1:{ title:'seam · runtime → tenant / umi  (runtime reads facts back, owns none)',
+    rows:[
+      {dir:'reads', t:'<code>device_session→device</code>, <code>conversation_state→conversation</code>, <code>reminder_sent→loyalty_card</code>, <code>integration_sync→integration</code>, <code>pass_device→loyalty_wallet_pass</code>'},
+      {dir:'reads', t:'<code>product_embedding→product</code>, <code>message_embedding→message</code>, <code>knowledge_embedding→knowledge_chunk</code>'},
+      {dir:'↑ actor', t:'<code>session.user_id</code>, <code>otp</code>, <code>password_reset_token</code> → <code>umi.user</code>'},
+    ],
+    note:'“Sealed” = no café / RLS access — but the api &amp; worker roles DO write here. Sealed from tenants, not from Umi.' },
+};
+
+function chipEl(t){
+  const c=document.createElement('span');
+  c.className='chip'+(t.view?' view':'');
+  const label=document.createElement('span'); label.textContent=t.n; c.appendChild(label);
+  if(t.view){ const m=document.createElement('span'); m.className='m'; m.textContent='view'; c.appendChild(m); }
+  [t.m,t.m2].filter(Boolean).forEach(k=>{
+    const m=document.createElement('span'); m.className='m '+k;
+    m.textContent={root:'root',ao:'A-O',money:'money',vec:'vec'}[k]; c.appendChild(m);
+  });
+  return c;
+}
+
+const lanes=document.getElementById('lanes');
+DATA.forEach((lane,i)=>{
+  const total=lane.clusters.reduce((a,c)=>a+c.tables.length,0);
+  const el=document.createElement('div'); el.className='lane '+lane.key;
+  const hd=document.createElement('div'); hd.className='lane-hd';
+  hd.innerHTML=`<span class="nm">${lane.key}</span><span class="badge">${lane.badge}</span>`+
+               `<span class="th">${lane.thesis}</span><span class="ct">${total} tables</span>`;
+  el.appendChild(hd);
+  const bd=document.createElement('div'); bd.className='lane-bd';
+  lane.clusters.forEach(cl=>{
+    const box=document.createElement('div'); box.className='cl'+(cl.span2?' span2':'');
+    const h=document.createElement('div'); h.className='cl-hd';
+    h.innerHTML=`<span>${cl.hd}</span>`+(cl.sub?`<small>${cl.sub}</small>`:'');
+    box.appendChild(h);
+    const chips=document.createElement('div'); chips.className='chips';
+    cl.tables.forEach(t=>chips.appendChild(chipEl(t)));
+    box.appendChild(chips); bd.appendChild(box);
+  });
+  el.appendChild(bd); lanes.appendChild(el);
+
+  const seam=SEAMS[i];
+  if(seam){
+    const s=document.createElement('div'); s.className='seam';
+    let rows=seam.rows.map(r=>`<div class="seam-row"><span class="dir">${r.dir}</span><span>${r.t}</span></div>`).join('');
+    if(seam.note) rows+=`<div class="seam-note">${seam.note}</div>`;
+    s.innerHTML=`<div class="seam-inner"><div class="seam-ttl">${seam.title}</div>${rows}</div>`;
+    lanes.appendChild(s);
+  }
+});
+
+document.getElementById('foot').innerHTML=
+  `<b>65 tables</b> · umi 16 · tenant 33 · runtime 16 &nbsp;+&nbsp; 2 views &nbsp;·&nbsp; `+
+  `faithful to <b>docs/migration/build-v3/*.sql</b>. Vertical seams are the complete set of cross-schema FKs. `+
+  `<b>NOT in runtime:</b> device_event, traces, spans, costs — write-once telemetry lives in OTel, not the DB.`;
+
+/* ---- zoom (CSS zoom = real reflow + native scrollbars, crisp text) ---- */
+const stage=document.getElementById('stage'), lvl=document.getElementById('lvl');
+let z=1;
+const apply=()=>{ stage.style.zoom=z; lvl.textContent=Math.round(z*100)+'%'; };
+document.getElementById('zi').onclick=()=>{ z=Math.min(2.5,+(z+0.1).toFixed(2)); apply(); };
+document.getElementById('zo').onclick=()=>{ z=Math.max(0.5,+(z-0.1).toFixed(2)); apply(); };
+document.getElementById('zr').onclick=()=>{ z=1; apply(); };
+addEventListener('wheel',e=>{ if(e.ctrlKey||e.metaKey){ e.preventDefault();
+  z=Math.min(2.5,Math.max(0.5,+(z-Math.sign(e.deltaY)*0.1).toFixed(2))); apply(); }},{passive:false});
+
+/* ---- theme toggle ---- */
+document.getElementById('theme').onclick=()=>{
+  const cur=document.documentElement.getAttribute('data-theme');
+  const next = cur==='dark'?'light' : cur==='light'?'dark'
+    : (matchMedia('(prefers-color-scheme:dark)').matches?'light':'dark');
+  document.documentElement.setAttribute('data-theme',next);
+};
+</script>
