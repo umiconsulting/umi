@@ -305,6 +305,8 @@ whether "the same everywhere" should be literal-global or framework-idiomatic.
 
 ## 8. Product topology — api ⇄ dashboard coupling, and where cash goes
 
+> **⛳ SUPERSEDED in part (2026-07-05, owner):** the "**umi-cash is PERMANENT**" call below is reversed. **umi-cash is not permanent — the repo retires and everything folds into the dashboard.** The operator half → RBAC- + product-gated dashboard modules (§8.3, still valid); the customer half shrinks to **register-for-wallet + download the pass**, folded into the dashboard as a **public** surface. **The QR-code constraint (§8.6) is NOT superseded — it carries forward:** printed codes point at `cash.umiconsulting.co/{slug}/customer`, so that URL keeps working — **for now it just redirects to the new route (keep the original URL if possible).** Interim: umi-cash + dashboard both call umi-api endpoints (env on the VPS). See the 2026-07-05 platform-restructure implementation plan.
+
 > **Decisions (2026-07-02):**
 > - **RESOLVED (owner):** cash's **customer-facing surface is PERMANENTLY `umi-cash`** at
 >   `cash.umiconsulting.co/{slug}` (tenant login / customer wallet creation), with the physical
