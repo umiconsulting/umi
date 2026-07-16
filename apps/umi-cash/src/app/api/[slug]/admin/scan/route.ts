@@ -12,6 +12,11 @@ import { afterResponse } from '@/lib/after-response';
 import { getTenant, requireActiveSubscription } from '@/lib/tenant';
 import { tenantHour, tenantWeekday, tenantStartOfDay } from '@/lib/timezone';
 import { sendRewardEarnedEmail } from '@/lib/email';
+
+// waitUntil work shares this budget — if the invocation ends, the backgrounded wallet
+// push is cancelled with it. The default 15s leaves the push racing the request it was
+// just moved off of; the provider hops are bounded well inside 30s.
+export const maxDuration = 30;
 import { resolveJourneyTemplate, renderTemplate, type LifecycleJourneyKey } from '@/lib/lifecycle-copy';
 
 const ActionEnum = z.enum([SCAN_ACTIONS.VISIT, SCAN_ACTIONS.REDEEM, SCAN_ACTIONS.BIRTHDAY_REDEEM]);

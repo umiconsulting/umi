@@ -10,6 +10,10 @@ import { getTenant, requireActiveSubscription } from '@/lib/tenant';
 import { triggerWalletUpdates, buildCardSummary, readLifecycleMessage } from '@/lib/scan-helpers';
 import { afterResponse } from '@/lib/after-response';
 
+// waitUntil work shares this budget — see the scan route; the backgrounded wallet push
+// is cancelled if the invocation ends first.
+export const maxDuration = 30;
+
 // Safety cap on a single manual credit — a migrating customer might carry a couple
 // of full cards' worth of stamps, but this bounds a fat-fingered entry.
 const MAX_BULK_SEALS = 50;
