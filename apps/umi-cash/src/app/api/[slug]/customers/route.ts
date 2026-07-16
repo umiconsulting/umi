@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { findOrCreateActiveCard } from '@/lib/cards';
+import { buildCustomerProfileData } from '@/lib/customer';
 import { createSession } from '@/lib/auth';
 import { getTenant, requireActiveSubscription } from '@/lib/tenant';
 import { resolveContact, normalizePhone, findPersonByPhone } from '@/lib/identity';
@@ -89,14 +90,18 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       displayName: data.name,
     });
 
-    // Persist birth_date + device/os metadata on the person.
+    // Persist profile fields on the person, incl. normalized_phone (denormalized
+    // from the contact so admin phone-search + the register fast-path work —
+    // resolve_contact only writes contact_methods, leaving people.normalized_phone NULL).
     await prisma.people.update({
       where: { id: personId },
-      data: {
-        display_name: data.name,
-        birth_date: new Date(data.birthDate + 'T00:00:00'),
-        metadata: { device, os },
-      },
+      data: buildCustomerProfileData({
+        name: data.name,
+        birthDate: data.birthDate,
+        device,
+        os,
+        normalizedPhone,
+      }),
     });
 
     const result = await prisma.$transaction(async (tx) => {
