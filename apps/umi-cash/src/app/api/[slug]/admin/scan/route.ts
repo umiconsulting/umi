@@ -8,6 +8,7 @@ import { resolveScanTarget } from '@/lib/scan-resolve';
 import { lockCard } from '@/lib/wallet';
 import { DEFAULT_CUSTOMER_NAME, SCAN_ACTIONS } from '@/lib/constants';
 import { triggerWalletUpdates, buildCardSummary, readLifecycleMessage } from '@/lib/scan-helpers';
+import { afterResponse } from '@/lib/after-response';
 import { getTenant, requireActiveSubscription } from '@/lib/tenant';
 import { tenantHour, tenantWeekday, tenantStartOfDay } from '@/lib/timezone';
 import { sendRewardEarnedEmail } from '@/lib/email';
@@ -247,17 +248,21 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
     const updatedLifecycleMessage = readLifecycleMessage(updatedCard.metadata);
 
-    // Send reward-earned email (only when VISIT pushed them over)
+    // Send reward-earned email (only when VISIT pushed them over). Fire-and-forget
+    // would be dropped when the response returns and the invocation is suspended.
     if (rewardEarnedThisCall && customerEmail) {
-      sendRewardEarnedEmail({
-        to: customerEmail,
-        customerName: customerName ?? 'Cliente',
-        tenantName: tenant.name,
-        rewardName,
-        slug: params.slug,
-        appUrl: process.env.NEXT_PUBLIC_APP_URL ?? 'https://cash.umiconsulting.co',
-        brandColor: tenant.primaryColor,
-      }).catch(() => {});
+      await afterResponse(
+        'mail:reward-earned',
+        sendRewardEarnedEmail({
+          to: customerEmail,
+          customerName: customerName ?? 'Cliente',
+          tenantName: tenant.name,
+          rewardName,
+          slug: params.slug,
+          appUrl: process.env.NEXT_PUBLIC_APP_URL ?? 'https://cash.umiconsulting.co',
+          brandColor: tenant.primaryColor,
+        }),
+      );
     }
 
     // Compose human message from what was performed
@@ -281,7 +286,13 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     // Birthday reward should be hidden from the pass if we just redeemed it
     const remainingBirthday = includesBirthday ? null : (activeBirthdayReward ? tenant.birthdayRewardName : null);
 
-    await triggerWalletUpdates(card.id, card.card_number, updatedCard, customerName, visitsRequired, rewardName, card.created_at, tenant.name, params.slug, tenant.primaryColor, remainingBirthday, updatedLifecycleMessage);
+    // The visit is already committed — never make the staff wait on Apple/Google to
+    // hear about it. A slow wallet hop used to delay this response past the client's
+    // patience, surfacing as "Error de conexión" for a scan that had in fact landed.
+    await afterResponse(
+      'wallet:scan',
+      triggerWalletUpdates(card.id, card.card_number, updatedCard, customerName, visitsRequired, rewardName, card.created_at, tenant.name, params.slug, tenant.primaryColor, remainingBirthday, updatedLifecycleMessage),
+    );
 
     return NextResponse.json({
       success: true,

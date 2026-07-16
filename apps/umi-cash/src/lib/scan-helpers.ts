@@ -26,11 +26,17 @@ export function buildCardSummary(
  * bulk-seal endpoints so a seal credit refreshes the customer's pass exactly like
  * a normal visit does.
  *
+ * Callers hand this to `afterResponse` rather than awaiting it on the response path —
+ * the write is already committed, and a slow provider must not turn a successful scan
+ * into "Error de conexión" on the staff's screen.
+ *
  * Run both wallet pushes to completion INDEPENDENTLY. Promise.all is fail-fast: if the
- * Google push rejects (e.g. a bad service-account key), the await returns at once and
- * Vercel suspends the function before the in-flight Apple http2 push can finish → the
- * pass silently never updates (works locally only because the process stays alive).
- * allSettled awaits BOTH, so the Apple push always completes regardless of Google.
+ * Google push rejects (e.g. a bad service-account key), the returned promise settles at
+ * once and the invocation can be suspended before the in-flight Apple http2 push
+ * finishes → the pass silently never updates (works locally only because the process
+ * stays alive). allSettled awaits BOTH, so the Apple push always completes regardless
+ * of Google. That still holds under waitUntil: the platform only keeps the function
+ * alive as long as the promise we hand it is pending.
  */
 export async function triggerWalletUpdates(
   cardId: string,
