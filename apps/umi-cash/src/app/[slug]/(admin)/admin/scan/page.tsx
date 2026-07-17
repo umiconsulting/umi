@@ -6,6 +6,7 @@ import jsQR from 'jsqr';
 import { centavosFromPesos, formatMXN, COMMON_TOPUP_AMOUNTS } from '@/lib/currency';
 import { useTenant } from '@/context/TenantContext';
 import { authedFetch } from '@/lib/authed-fetch';
+import { describeReadFailure, handleWriteFailure } from '@/lib/request-failure';
 
 interface CardPreview {
   cardId: string;
@@ -177,8 +178,9 @@ export default function ScanPage() {
       } else {
         setResult({ success: false, message: data.error ?? 'Error al leer la tarjeta' });
       }
-    } catch {
-      setResult({ success: false, message: 'Error de conexión' });
+    } catch (err) {
+      // Preview only reads — nothing to have half-happened, so this one can say so.
+      setResult({ success: false, ...describeReadFailure(err) });
     } finally {
       setProcessing(false);
     }
@@ -207,8 +209,15 @@ export default function ScanPage() {
       const data = await res.json();
       setResult({ success: res.ok, message: data.message ?? data.error });
       if (res.ok) setPreview(null);
-    } catch {
-      setResult({ success: false, message: 'Error de conexión' });
+    } catch (err) {
+      setResult({
+        success: false,
+        ...handleWriteFailure(err, {
+          slug,
+          action: 'scan:actions',
+          verifyHint: 'Vuelve a escanear la tarjeta para ver si ya se aplicó.',
+        }),
+      });
     } finally {
       setProcessing(false);
     }
@@ -253,8 +262,15 @@ export default function ScanPage() {
       } else {
         setResult({ success: false, message: data.error ?? 'Error al cobrar' });
       }
-    } catch {
-      setResult({ success: false, message: 'Error de conexión' });
+    } catch (err) {
+      setResult({
+        success: false,
+        ...handleWriteFailure(err, {
+          slug,
+          action: 'scan:charge',
+          verifyHint: 'Verifica el saldo del cliente antes de volver a cobrar.',
+        }),
+      });
     } finally {
       setProcessing(false);
     }
@@ -291,8 +307,15 @@ export default function ScanPage() {
       } else {
         setResult({ success: false, message: data.error ?? 'Error al recargar' });
       }
-    } catch {
-      setResult({ success: false, message: 'Error de conexión' });
+    } catch (err) {
+      setResult({
+        success: false,
+        ...handleWriteFailure(err, {
+          slug,
+          action: 'scan:topup',
+          verifyHint: 'Verifica el saldo del cliente antes de volver a recargar.',
+        }),
+      });
     } finally {
       setProcessing(false);
     }
@@ -340,8 +363,15 @@ export default function ScanPage() {
       } else {
         setResult({ success: false, message: data.error ?? 'Error al agregar sellos' });
       }
-    } catch {
-      setResult({ success: false, message: 'Error de conexión' });
+    } catch (err) {
+      setResult({
+        success: false,
+        ...handleWriteFailure(err, {
+          slug,
+          action: 'scan:seals',
+          verifyHint: 'Vuelve a escanear la tarjeta para ver los sellos antes de reintentar.',
+        }),
+      });
     } finally {
       setProcessing(false);
     }

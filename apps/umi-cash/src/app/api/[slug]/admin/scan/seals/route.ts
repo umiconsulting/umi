@@ -8,6 +8,11 @@ import { getActiveRewardConfig, rewardConfigDefaults, findCardByIdentifier } fro
 import { lockCard } from '@/lib/wallet';
 import { getTenant, requireActiveSubscription } from '@/lib/tenant';
 import { triggerWalletUpdates, buildCardSummary, readLifecycleMessage } from '@/lib/scan-helpers';
+import { afterResponse } from '@/lib/after-response';
+
+// waitUntil work shares this budget — see the scan route; the backgrounded wallet push
+// is cancelled if the invocation ends first.
+export const maxDuration = 30;
 
 // Safety cap on a single manual credit — a migrating customer might carry a couple
 // of full cards' worth of stamps, but this bounds a fat-fingered entry.
@@ -133,19 +138,25 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     });
 
     const customerName = card.person?.display_name ?? null;
-    await triggerWalletUpdates(
-      cardId,
-      card.card_number,
-      result.card,
-      customerName,
-      visitsRequired,
-      rewardName,
-      card.created_at,
-      tenant.name,
-      params.slug,
-      tenant.primaryColor,
-      birthdayRewardName,
-      readLifecycleMessage(result.card.metadata),
+    // Credit is committed — the wallet refresh must not delay the response (see
+    // afterResponse: a slow Apple/Google hop surfaced as "Error de conexión" on a
+    // seal that had already landed).
+    await afterResponse(
+      'wallet:seals',
+      triggerWalletUpdates(
+        cardId,
+        card.card_number,
+        result.card,
+        customerName,
+        visitsRequired,
+        rewardName,
+        card.created_at,
+        tenant.name,
+        params.slug,
+        tenant.primaryColor,
+        birthdayRewardName,
+        readLifecycleMessage(result.card.metadata),
+      ),
     );
 
     const sealWord = seals === 1 ? 'sello' : 'sellos';
