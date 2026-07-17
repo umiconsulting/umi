@@ -18,12 +18,26 @@ almost every table; without `001_roles.sql` first, each of those ~270 grants fai
 psql "$PREVIEW_DATABASE_URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 psql "$PREVIEW_DATABASE_URL" -f db/preview/001_roles.sql
 psql "$PREVIEW_DATABASE_URL" -f db/preview/002_schema.sql
-cd apps/umi-cash && DATABASE_URL="$PREVIEW_DATABASE_URL" npm run db:seed
+cd apps/umi-cash && DATABASE_URL="$PREVIEW_DATABASE_URL" \
+  EGR_ADMIN_PASSWORD='ElGranRibera2024!' \
+  KLC_ADMIN_PASSWORD='KalalaCafe2024!' \
+  npm run db:seed
 ```
 
 The seed (`apps/umi-cash/prisma/seed.ts`) creates three tenants — `kalalacafe`,
 `elgranribera`, `nectarcafe` — each with an admin, a staff login and a demo card. Real
 slugs so preview routes match production; invented people so nothing here is a customer.
+
+**Pass those two passwords explicitly.** The seed takes admin passwords from
+`{EGR,KLC}_ADMIN_PASSWORD` — an escape hatch for bootstrapping a real tenant — and Prisma
+loads `.env` before running it. On a developer machine that holds a live admin password,
+an unqualified `npm run db:seed` puts a hash of the real credential into this database,
+which is exactly what "synthetic data only" is supposed to rule out. The literals above
+are the seed's own defaults and are safe to write down.
+
+Re-running the seed will not repair an account seeded that way: the user upserts are
+`update: {}`, so existing rows keep the password they were created with. Overwrite
+`core.users.password_{salt,hash}` directly, or drop the row and re-seed.
 
 ## Why a dump and not `docs/migration/local-postgres/*.sql`
 
