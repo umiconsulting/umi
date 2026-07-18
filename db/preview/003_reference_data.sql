@@ -21,4 +21,7 @@ INSERT INTO "core"."roles" ("id", "tenant_id", "key", "name", "description", "cr
 	('8587445d-48de-2391-6b92-224bce07d6e4', NULL, 'admin', 'Admin', 'Tenant administration', '2026-06-20 06:37:10.95025+00'),
 	('ce305b6d-66ea-88e2-d77c-7512e65e7105', NULL, 'staff', 'Staff', 'Operational staff', '2026-06-20 06:37:10.95025+00'),
 	('41e36fd4-43e3-261a-f211-52de848e339c', NULL, 'viewer', 'Viewer', 'Read-only dashboard access', '2026-06-20 06:37:10.95025+00')
-ON CONFLICT ("id") DO NOTHING;
+-- Conflict on the global-key index, not the id: these are global roles (tenant_id
+-- NULL), and a project that already holds them by any means — not just this exact
+-- id — should no-op. Matches core_roles_global_key_uidx (key) WHERE tenant_id IS NULL.
+ON CONFLICT ("key") WHERE "tenant_id" IS NULL DO NOTHING;

@@ -14,15 +14,28 @@ touched data could be tested on one. It now serves that purpose deliberately.
 Order matters. `002_schema.sql` grants to `umi_app` / `umi_worker` / `umi_readonly` on
 almost every table; without `001_roles.sql` first, each of those ~270 grants fails.
 
+The reset must drop **every** schema the dump populates, not just `public` — `002_schema.sql`
+creates tables in 11 non-public schemas, and its constraints, indexes and policies have no
+`IF NOT EXISTS`, so replaying onto a database that still holds them errors. Dropping them all
+gives the clean target the snapshot assumes:
+
 ```bash
-psql "$PREVIEW_DATABASE_URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+psql "$PREVIEW_DATABASE_URL" -c "
+  DROP SCHEMA IF EXISTS _migration, comms, core, device, grow, kitchen, legacy,
+    loyalty, observability, ops, queue CASCADE;
+  DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 psql "$PREVIEW_DATABASE_URL" -f db/preview/001_roles.sql
 psql "$PREVIEW_DATABASE_URL" -f db/preview/002_schema.sql
+psql "$PREVIEW_DATABASE_URL" -f db/preview/003_reference_data.sql
 cd apps/umi-cash && DATABASE_URL="$PREVIEW_DATABASE_URL" \
   EGR_ADMIN_PASSWORD='ElGranRibera2024!' \
   KLC_ADMIN_PASSWORD='KalalaCafe2024!' \
   npm run db:seed
 ```
+
+`001_roles.sql` recreates the three roles; if you are replaying onto a project that already
+has them (rather than a fresh one), drop them first or expect a "role already exists" error —
+harmless, the roles are unchanged.
 
 The seed (`apps/umi-cash/prisma/seed.ts`) creates three tenants — `kalalacafe`,
 `elgranribera`, `nectarcafe` — each with an admin, a staff login and a demo card. Real

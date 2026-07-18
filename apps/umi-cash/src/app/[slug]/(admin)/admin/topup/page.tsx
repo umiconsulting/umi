@@ -162,9 +162,11 @@ export default function TopUpPage() {
 
   // ── Customer search ───────────────────────────────────────────────────────
 
-  async function handleSearch(e?: React.FormEvent) {
-    e?.preventDefault();
-    if (!search.trim()) return;
+  async function handleSearch() {
+    // Guard here, not just on the button's disabled state: the Enter key path
+    // (onKeyDown) doesn't consult it, so without this, holding Enter fires
+    // concurrent searches.
+    if (searchLoading || !search.trim()) return;
     setSearchLoading(true);
     setSearchResults([]);
     try {
