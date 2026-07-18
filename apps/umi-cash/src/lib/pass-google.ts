@@ -234,6 +234,20 @@ export async function generateGoogleWalletURL(data: GooglePassData): Promise<str
   return `https://pay.google.com/gp/v/save/${jwt}`;
 }
 
+// Every hop to Google is bounded: an unbounded one keeps the invocation alive until
+// the platform kills it, which loses the wallet update AND (before afterResponse) held
+// the scan response hostage. Google's own p99 here is well under a second.
+const GOOGLE_TIMEOUT_MS = 8_000;
+
+/** Bound a promise that carries no cancellation of its own (googleapis' token fetch). */
+function withTimeout<T>(work: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const expiry = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([work, expiry]).finally(() => clearTimeout(timer));
+}
+
 // Singleton — GoogleAuth and its OAuth client are expensive to re-create on every wallet update
 let googleAuthClient: any = null;
 async function getGoogleAuthToken(): Promise<string> {
@@ -258,9 +272,9 @@ export async function updateGoogleWalletObject(data: GooglePassData): Promise<vo
   try {
     const objectId = `${ISSUER_ID}.card_${data.cardId}`;
     const object = getLoyaltyObject(data);
-    const token = await getGoogleAuthToken();
+    const token = await withTimeout(getGoogleAuthToken(), GOOGLE_TIMEOUT_MS, 'google auth token');
 
-    await fetch(
+    const patched = await fetch(
       `https://walletobjects.googleapis.com/walletobjects/v1/loyaltyObject/${encodeURIComponent(objectId)}`,
       {
         method: 'PATCH',
@@ -269,8 +283,13 @@ export async function updateGoogleWalletObject(data: GooglePassData): Promise<vo
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(object),
+        signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
       }
     );
+    // A rejected PATCH means the customer's pass silently keeps stale state — say so.
+    if (!patched.ok) {
+      console.warn('[Google Wallet] PATCH failed:', patched.status, await patched.text().catch(() => ''));
+    }
 
     // Push a real device notification for the lifecycle message. PATCHing textModules
     // alone updates the card UI but does NOT generate a notification — Google requires
@@ -292,6 +311,7 @@ export async function updateGoogleWalletObject(data: GooglePassData): Promise<vo
               messageType: 'TEXT_AND_NOTIFY',
             },
           }),
+          signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
         }
       );
       if (!res.ok) {
