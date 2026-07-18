@@ -162,9 +162,11 @@ export default function TopUpPage() {
 
   // ── Customer search ───────────────────────────────────────────────────────
 
-  async function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (!search.trim()) return;
+  async function handleSearch() {
+    // Guard here, not just on the button's disabled state: the Enter key path
+    // (onKeyDown) doesn't consult it, so without this, holding Enter fires
+    // concurrent searches.
+    if (searchLoading || !search.trim()) return;
     setSearchLoading(true);
     setSearchResults([]);
     try {
@@ -309,20 +311,24 @@ export default function TopUpPage() {
                 </button>
               )}
 
-              {/* Text search */}
-              <form onSubmit={handleSearch} className="flex gap-2 mb-2">
+              {/* Text search — a div, not a form: this lives inside the top-up form
+                  and a nested <form> is invalid HTML (breaks hydration). Enter is
+                  wired manually and must preventDefault so it doesn't submit the
+                  outer top-up form instead. */}
+              <div className="flex gap-2 mb-2">
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearch(); } }}
                   placeholder="Buscar por nombre, teléfono o tarjeta..."
                   className="u-input flex-1"
                   autoFocus={!showCamera}
                 />
-                <button type="submit" disabled={!search.trim() || searchLoading} className="u-btn u-btn-secondary px-4 flex-shrink-0">
+                <button type="button" onClick={() => handleSearch()} disabled={!search.trim() || searchLoading} className="u-btn u-btn-secondary px-4 flex-shrink-0">
                   {searchLoading ? '...' : 'Buscar'}
                 </button>
-              </form>
+              </div>
 
               {searchResults.length > 0 && (
                 <div className="rounded-xl overflow-hidden divide-y" style={{ border: '1px solid var(--color-surface-dark)', borderColor: 'var(--color-surface-dark)' }}>
