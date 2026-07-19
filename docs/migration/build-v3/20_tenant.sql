@@ -404,26 +404,73 @@ create table tenant.customer_order (
   fulfillment_type text check (fulfillment_type in ('pickup','dine_in','delivery')),
   status           text not null default 'placed'
                      check (status in ('placed','preparing','ready','completed','canceled')),
-  total            bigint not null default 0,   -- centavos
+  cancel_reason    text,                          -- codes/notes for a void; contaminated free-text history NOT carried
   external_ref     text,                          -- Zettle order id when synced
   placed_at        timestamptz not null default now(),
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
+  -- NOTE: no stored `total`. The order's working/owed total is DERIVED (Σ live
+  -- lines) via tenant.order_total below — it cannot drift and self-heals on a
+  -- void. Money-truth for a settled order lives on tenant.payment, not here.
 );
 
 create table tenant.order_item (
-  id          uuid primary key default gen_random_uuid(),
-  order_id    uuid not null references tenant.customer_order(id) on delete cascade,
-  product_id  uuid references tenant.product(id),
-  station_id  uuid references tenant.station(id),   -- KDS routing target
-  name        text not null,                          -- snapshot at order time
-  quantity    integer not null default 1,
-  unit_price  bigint not null default 0,   -- centavos, snapshot
-  notes       text,
-  created_at  timestamptz not null default now()
+  id           uuid primary key default gen_random_uuid(),
+  order_id     uuid not null references tenant.customer_order(id) on delete cascade,
+  product_id   uuid references tenant.product(id),
+  name         text not null,               -- snapshot at order time
+  quantity     integer not null default 1 check (quantity > 0),
+  unit_price   bigint not null default 0 check (unit_price >= 0),   -- centavos, snapshot (final, incl. chosen modifiers)
+  voided_at    timestamptz,                 -- void tombstone; a live line = voided_at IS NULL
+  void_reason  text,                        -- why: mistake · duplicate · customer_changed · comp (service recovery) · test
+  notes        text,
+  created_at   timestamptz not null default now(),
+  -- a reason is meaningless without a void (the reverse is allowed: a historical/
+  -- unattributed void may have no reason — the backfill carries exactly that).
+  constraint order_item_reason_needs_void check (void_reason is null or voided_at is not null)
 );
+create index tenant_order_item_order_idx on tenant.order_item (order_id);
 comment on column tenant.order_item.name is
   'Snapshot at order time — a line must not change if the product is later renamed.';
+comment on column tenant.order_item.voided_at is
+  'A line is a void (Toast/Square term), not an order cancel. Amendments never edit a line: '
+  'void the old (set this), add a new line. NULL = live. Voided lines survive as waste/history '
+  'and fall out of the derived order total. A void of an ALREADY-FIRED line (see order_event) '
+  'carried a cost — that is the comp case (product made, not charged); void_reason records it.';
+-- NOTE: per-line station routing (order_item.station_id) is DEFERRED — a build-v3
+-- invention read by nothing (the KDS ticket derives its station from the device
+-- login), null on 100% of source lines. Re-add as a plain nullable FK when a
+-- second station + real routing exist. See ORDER_MODEL.md §5.
+
+-- A priced line is an immutable snapshot; the ONLY change allowed is voiding it ONCE
+-- (voided_at NULL -> set, with a reason). Amendments are void-then-add, never an
+-- in-place edit, and a line is never DELETED — voiding preserves the waste/history the
+-- owner must see (same append-only stance tenant.tg_append_only enforces on the money
+-- ledgers, which likewise block delete despite an on-delete-cascade parent).
+create or replace function tenant.tg_order_item_void_only() returns trigger
+  language plpgsql
+  set search_path = pg_catalog as $$   -- pinned: no writable schema on the path
+begin
+  if tg_op = 'DELETE' then
+    raise exception 'order_item % cannot be deleted; a line is voided (voided_at), never removed', old.id;
+  end if;
+  if old.voided_at is not null then
+    raise exception 'order_item % is voided and frozen; amend by adding a new line, not editing', old.id;
+  end if;
+  if new.id         is distinct from old.id
+  or new.order_id   is distinct from old.order_id
+  or new.product_id is distinct from old.product_id
+  or new.name       is distinct from old.name
+  or new.quantity   is distinct from old.quantity
+  or new.unit_price is distinct from old.unit_price
+  or new.created_at is distinct from old.created_at then
+    raise exception 'order_item % is an immutable snapshot; change an order by voiding the line and adding a new one', old.id;
+  end if;
+  return new;   -- permitted: set voided_at / void_reason (the void), or edit notes
+end $$;
+create trigger order_item_void_only
+  before update or delete on tenant.order_item
+  for each row execute function tenant.tg_order_item_void_only();
 
 create table tenant.order_event (
   id          uuid primary key default gen_random_uuid(),
@@ -455,6 +502,60 @@ create table tenant.refund (
   refunded_at timestamptz not null default now(),
   created_at  timestamptz not null default now()
 );
+
+-- ----------------------------------------------------------------------------
+-- DERIVED: order projections (see ORDER_MODEL.md §1, §4)
+-- The order carries no stored total and the "ticket" is not a KDS-private query:
+-- both are VIEWS so there is one definition and it cannot drift. security_invoker
+-- so the caller's RLS is enforced on the base tables (an owner-rights view would
+-- leak every café's orders to any api session — the audit's cross-tenant leak).
+-- ----------------------------------------------------------------------------
+
+-- Working / owed total: Σ live lines (voided_at IS NULL), per order, ANY status.
+-- CONTRACT: this is the *value of an order's live lines*, and its meaning depends on
+-- the status you read it with — for an OPEN order it is what is OWED (self-heals as
+-- lines are voided); for a completed order it is what was transacted; for a canceled
+-- order it is notional value that did NOT convert (no cash moved). It is deliberately
+-- NOT zeroed for canceled orders (the source keeps that value; the backfill reconciles
+-- against it). It is NOT revenue — never sum it across statuses; revenue aggregates
+-- tenant.payment. Consumers wanting "owed right now" filter to open orders (as
+-- order_ticket does).
+create view tenant.order_total with (security_invoker = true) as
+  select o.id          as order_id,
+         o.business_id,
+         coalesce(sum(i.unit_price * i.quantity)
+                    filter (where i.voided_at is null), 0)::bigint as total
+    from tenant.customer_order o
+    left join tenant.order_item i on i.order_id = o.id
+   group by o.id, o.business_id;
+
+-- The ticket: the LIVE projection every in-flight consumer shares (KDS, customer
+-- status "listo", pickup board, dashboard orders-in-flight). One line per row for
+-- each in-flight order, carrying the order's current status; group by order_id to
+-- render one ticket. Voided lines are INCLUDED (voided_at set) so the KDS renders
+-- them as VOID — a fired-then-voided line must be seen, not vanish, so the barista
+-- stops pouring (ORDER_MODEL §3). Money consumers filter live lines via
+-- tenant.order_total, not here. Station is NOT here — the KDS scopes by the
+-- device's paired station at query time.
+create view tenant.order_ticket with (security_invoker = true) as
+  select o.id           as order_id,
+         o.business_id,
+         o.branch_id,
+         o.customer_id,
+         o.source,
+         o.fulfillment_type,
+         o.status       as order_status,
+         o.placed_at,
+         i.id           as item_id,
+         i.name         as item_name,
+         i.quantity,
+         i.unit_price,
+         i.voided_at,
+         i.void_reason,
+         i.notes
+    from tenant.customer_order o
+    join tenant.order_item i on i.order_id = o.id
+   where o.status in ('placed','preparing','ready');
 
 -- ----------------------------------------------------------------------------
 -- DEVICES (the physical KDS iPad; sessions/pairing are runtime machinery)

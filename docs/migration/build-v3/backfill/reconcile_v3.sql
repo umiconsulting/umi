@@ -9,6 +9,9 @@ union all select 'subscription', (select count(*) from grow.subscriptions), (sel
 union all select 'conversation', (select count(*) from comms.conversations),(select count(*) from tenant.conversation)
 union all select 'message',   (select count(*) from comms.messages),        (select count(*) from tenant.message)
 union all select 'audit_log(tenant)', (select count(*) from observability.audit_log), (select count(*) from tenant.audit_log)
+union all select 'customer_order', (select count(*) from ops.orders),        (select count(*) from tenant.customer_order)
+union all select 'order_item', (select count(*) from ops.order_items),       (select count(*) from tenant.order_item)
+union all select 'order_event', (select count(*) from ops.order_events where event_kind='status_changed'), (select count(*) from tenant.order_event)
 order by 1;
 
 \echo ''
@@ -19,7 +22,37 @@ select 'stored_value Σdelta' k,
 union all
 select 'gift_card balance',
        (select coalesce(sum(balance_cents),0) from loyalty.gift_cards),
-       (select coalesce(sum(delta),0) from tenant.loyalty_gift_card_ledger);
+       (select coalesce(sum(delta),0) from tenant.loyalty_gift_card_ledger)
+union all
+-- every line carried, voided included (all-lines sum): proves no line was dropped
+select 'order lines Σ(all)',
+       (select coalesce(sum(unit_price_cents*quantity),0) from ops.order_items),
+       (select coalesce(sum(unit_price*quantity),0) from tenant.order_item)
+union all
+-- DERIVED order total (Σ live lines) reproduces the stored source total: proves
+-- dropping the stored column + carrying is_cancelled->cancelled_at is lossless
+select 'order total Σ(derived live)',
+       (select coalesce(sum(total_cents),0) from ops.orders),
+       (select coalesce(sum(total),0) from tenant.order_total);
+
+\echo ''
+\echo '-- order voids carried as tombstones (expect src is_cancelled = dst voided_at = 3):'
+select (select count(*) from ops.order_items where is_cancelled) src,
+       (select count(*) from tenant.order_item where voided_at is not null) dst;
+\echo '-- PER-ORDER: derived total = source total for EVERY order (aggregate can hide'
+\echo '   a compensating +X/-X; this cannot) — expect 0:'
+select count(*) as orders_total_mismatch
+from ops.orders o
+join tenant.order_total t on t.order_id = o.id
+where o.total_cents is distinct from t.total;
+\echo '-- PER-ITEM: is_cancelled <-> voided_at agree for EVERY line (by id, NULL-safe) — expect 0:'
+select count(*) as items_void_flag_mismatch
+from ops.order_items s
+join tenant.order_item d on d.id = s.id
+where s.is_cancelled is distinct from (d.voided_at is not null);
+\echo '-- no NULL status leaked (expect 0, 0):'
+select (select count(*) from tenant.customer_order where status is null) customer_order_null_status,
+       (select count(*) from tenant.order_event where status is null)    order_event_null_status;
 
 \echo ''
 \echo '========== C. GAP CARRIES (new) =========='
