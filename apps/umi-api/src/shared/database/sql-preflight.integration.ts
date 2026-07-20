@@ -32,6 +32,13 @@ import { PgService } from './pg.service';
 const WORKER_DSN =
   process.env.DATABASE_URL_WORKER ??
   'postgresql://worker_login:harness_worker@127.0.0.1:5233/umi_backfill_v3';
+// The D1 boot guard (SECURITY_GATE.md §4) refuses to boot if the app pool is
+// BYPASSRLS, so the app pool must connect as an INHERIT member of `api`
+// (`api_login`), exactly as prod provisions it — not as the worker role.
+// Statements are still PREPAREd on the worker pool (schema validity, not RLS).
+const APP_DSN =
+  process.env.DATABASE_URL_APP ??
+  'postgresql://api_login:harness_api@127.0.0.1:5233/umi_backfill_v3';
 
 /** Errors that mean "the schema does not have what this SQL asks for". */
 const SCHEMA_ERRORS = new Set(['42P01', '42703', '42883', '42P10', '42P02']);
@@ -96,7 +103,7 @@ function extractStatements(root: string): { stmts: Stmt[]; interpolated: Stmt[] 
 
 function makeConfig(): ConfigService<AppConfig, true> {
   const env: Record<string, string | undefined> = {
-    DATABASE_URL_APP: WORKER_DSN,
+    DATABASE_URL_APP: APP_DSN,
     DATABASE_URL_WORKER: WORKER_DSN,
     PGSSLROOTCERT: undefined,
   };
