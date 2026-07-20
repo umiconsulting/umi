@@ -29,7 +29,7 @@ export class HoursRepository {
         `SELECT day_of_week, opens_at::text AS opens_at,
                 closes_at::text AS closes_at, is_closed
          FROM tenant.open_hours
-         WHERE tenant_id = $1::uuid
+         WHERE business_id = $1::uuid
            AND branch_id IS NOT DISTINCT FROM $2::uuid`,
         [tenantId, locationId],
       ),
@@ -40,7 +40,7 @@ export class HoursRepository {
   /**
    * Worker-pool (BYPASSRLS) variant of read() — same query, for the
    * unauthenticated WhatsApp bot path (no member user → can't use withTenant).
-   * Isolation is the explicit tenant_id predicate.
+   * Isolation is the explicit business_id predicate.
    */
   async readWorker(
     tenantId: string,
@@ -50,7 +50,7 @@ export class HoursRepository {
       `SELECT day_of_week, opens_at::text AS opens_at,
               closes_at::text AS closes_at, is_closed
        FROM tenant.open_hours
-       WHERE tenant_id = $1::uuid
+       WHERE business_id = $1::uuid
          AND branch_id IS NOT DISTINCT FROM $2::uuid`,
       [tenantId, locationId],
     );
@@ -66,14 +66,14 @@ export class HoursRepository {
     await this.pg.withTenant(async (c) => {
       await c.query(
         `DELETE FROM tenant.open_hours
-         WHERE tenant_id = $1::uuid
+         WHERE business_id = $1::uuid
            AND branch_id IS NOT DISTINCT FROM $2::uuid`,
         [tenantId, locationId],
       );
       for (const d of days) {
         await c.query(
           `INSERT INTO tenant.open_hours
-             (tenant_id, branch_id, day_of_week, opens_at, closes_at, is_closed)
+             (business_id, branch_id, day_of_week, opens_at, closes_at, is_closed)
            VALUES ($1::uuid, $2::uuid, $3, $4::time, $5::time, $6)`,
           [tenantId, locationId, d.dow, d.opens, d.closes, d.isClosed],
         );

@@ -69,7 +69,7 @@ export class CustomersRepository {
              SELECT ci.normalized_value
              FROM tenant.contact_identity AS ci
              JOIN tenant.channel AS ch ON ch.id = ci.channel_id
-             WHERE ci.tenant_id = c.tenant_id AND ci.contact_id = c.contact_id
+             WHERE ci.business_id = c.business_id AND ci.contact_id = c.contact_id
                AND ch.key IN ('phone', 'whatsapp')
                AND ci.normalized_value IS NOT NULL
              ORDER BY CASE WHEN ch.key = 'phone' THEN 0 ELSE 1 END, ci.first_seen_at ASC
@@ -79,7 +79,7 @@ export class CustomersRepository {
              SELECT ci.normalized_value
              FROM tenant.contact_identity AS ci
              JOIN tenant.channel AS ch ON ch.id = ci.channel_id
-             WHERE ci.tenant_id = c.tenant_id AND ci.contact_id = c.contact_id
+             WHERE ci.business_id = c.business_id AND ci.contact_id = c.contact_id
                AND ch.key = 'email' AND ci.normalized_value IS NOT NULL
              ORDER BY ci.first_seen_at ASC
              LIMIT 1
@@ -97,17 +97,17 @@ export class CustomersRepository {
              ) AS items
              FROM tenant.contact_identity AS ci
              JOIN tenant.channel AS ch ON ch.id = ci.channel_id
-             WHERE ci.tenant_id = c.tenant_id AND ci.contact_id = c.contact_id
+             WHERE ci.business_id = c.business_id AND ci.contact_id = c.contact_id
            ) AS identities ON true
            LEFT JOIN LATERAL (
              SELECT
                count(lc.id) AS loyalty_count,
                COALESCE((SELECT count(*) FROM tenant.loyalty_visit v
-                 WHERE v.tenant_id = c.tenant_id
-                   AND v.card_id IN (SELECT id FROM tenant.loyalty_card WHERE tenant_id = c.tenant_id AND customer_id = c.id)), 0) AS total_visits,
+                 WHERE v.business_id = c.business_id
+                   AND v.card_id IN (SELECT id FROM tenant.loyalty_card WHERE business_id = c.business_id AND customer_id = c.id)), 0) AS total_visits,
                COALESCE((SELECT sum(l.delta) FROM tenant.loyalty_stored_value_ledger l
-                 WHERE l.tenant_id = c.tenant_id
-                   AND l.card_id IN (SELECT id FROM tenant.loyalty_card WHERE tenant_id = c.tenant_id AND customer_id = c.id)), 0) AS wallet_balance_cents,
+                 WHERE l.business_id = c.business_id
+                   AND l.card_id IN (SELECT id FROM tenant.loyalty_card WHERE business_id = c.business_id AND customer_id = c.id)), 0) AS wallet_balance_cents,
                -- Intentionally 0: tenant.loyalty_gift_card has no customer FK (it links to a
                -- person only via recipient email/phone PII, or via redeemed_card_id
                -- once redeemed), so a per-customer active-gift-card count can't be
@@ -117,7 +117,7 @@ export class CustomersRepository {
                0 AS gift_card_count,
                max(lc.updated_at) AS last_cash_at
              FROM tenant.loyalty_card AS lc
-             WHERE lc.tenant_id = c.tenant_id AND lc.customer_id = c.id
+             WHERE lc.business_id = c.business_id AND lc.customer_id = c.id
            ) AS cash_summary ON true
            LEFT JOIN LATERAL (
              SELECT
@@ -125,7 +125,7 @@ export class CustomersRepository {
                count(cv.id) FILTER (WHERE cv.status IN ('open', 'pending', 'active')) AS active_conversations,
                max(cv.last_message_at) AS last_conversation_at
              FROM tenant.conversation AS cv
-             WHERE cv.tenant_id = c.tenant_id AND cv.customer_id = c.id
+             WHERE cv.business_id = c.business_id AND cv.customer_id = c.id
            ) AS conversation_summary ON true
            LEFT JOIN LATERAL (
              SELECT
@@ -133,17 +133,17 @@ export class CustomersRepository {
                COALESCE(sum(o.total_cents), 0) AS total_spend_cents,
                max(COALESCE(o.placed_at, o.created_at)) AS last_order_at
              FROM tenant."order" AS o
-             WHERE o.tenant_id = c.tenant_id AND o.customer_id = c.id
+             WHERE o.business_id = c.business_id AND o.customer_id = c.id
            ) AS order_summary ON true
            LEFT JOIN LATERAL (
              SELECT count(cn.id) AS memory_count, max(cn.updated_at) AS last_memory_at
              FROM tenant.customer_note AS cn
-             WHERE cn.tenant_id = c.tenant_id AND cn.customer_id = c.id
+             WHERE cn.business_id = c.business_id AND cn.customer_id = c.id
            ) AS memory_summary ON true
            LEFT JOIN LATERAL (
              SELECT count(mc.id) AS merge_candidate_count, max(mc.first_seen_at) AS last_merge_at
              FROM tenant.contact_identity AS mc
-             WHERE mc.tenant_id = c.tenant_id AND mc.contact_id = c.contact_id
+             WHERE mc.business_id = c.business_id AND mc.contact_id = c.contact_id
                AND mc.match_type = 'probabilistic'
            ) AS merge_summary ON true
            LEFT JOIN LATERAL (
@@ -157,7 +157,7 @@ export class CustomersRepository {
                (merge_summary.last_merge_at)
              ) AS touch(ts)
            ) AS last_touch ON true
-           WHERE c.tenant_id = $1::uuid
+           WHERE c.business_id = $1::uuid
              AND ($2 = '' OR c.id = $3::uuid)
              AND (
                $4 = ''
@@ -186,7 +186,7 @@ export class CustomersRepository {
              SELECT ci.normalized_value
              FROM tenant.contact_identity AS ci
              JOIN tenant.channel AS ch ON ch.id = ci.channel_id
-             WHERE ci.tenant_id = c.tenant_id AND ci.contact_id = c.contact_id
+             WHERE ci.business_id = c.business_id AND ci.contact_id = c.contact_id
                AND ch.key IN ('phone', 'whatsapp')
                AND ci.normalized_value IS NOT NULL
              LIMIT 1
@@ -195,18 +195,18 @@ export class CustomersRepository {
              SELECT ci.normalized_value
              FROM tenant.contact_identity AS ci
              JOIN tenant.channel AS ch ON ch.id = ci.channel_id
-             WHERE ci.tenant_id = c.tenant_id AND ci.contact_id = c.contact_id
+             WHERE ci.business_id = c.business_id AND ci.contact_id = c.contact_id
                AND ch.key = 'email' AND ci.normalized_value IS NOT NULL
              LIMIT 1
            ) AS email_identity ON true
-           WHERE c.tenant_id = $1::uuid
+           WHERE c.business_id = $1::uuid
              AND ($2 = '' OR c.id = $3::uuid)
              AND (
                $4 = ''
-               OR ($4 = 'whatsapp' AND EXISTS (SELECT 1 FROM tenant.conversation AS cv WHERE cv.tenant_id = c.tenant_id AND cv.customer_id = c.id))
-               OR ($4 = 'cash' AND EXISTS (SELECT 1 FROM tenant.loyalty_card AS ca WHERE ca.tenant_id = c.tenant_id AND ca.customer_id = c.id))
-               OR ($4 = 'memory' AND EXISTS (SELECT 1 FROM tenant.customer_note AS cn WHERE cn.tenant_id = c.tenant_id AND cn.customer_id = c.id))
-               OR ($4 = 'review' AND EXISTS (SELECT 1 FROM tenant.contact_identity AS mc WHERE mc.tenant_id = c.tenant_id AND mc.contact_id = c.contact_id AND mc.match_type = 'probabilistic'))
+               OR ($4 = 'whatsapp' AND EXISTS (SELECT 1 FROM tenant.conversation AS cv WHERE cv.business_id = c.business_id AND cv.customer_id = c.id))
+               OR ($4 = 'cash' AND EXISTS (SELECT 1 FROM tenant.loyalty_card AS ca WHERE ca.business_id = c.business_id AND ca.customer_id = c.id))
+               OR ($4 = 'memory' AND EXISTS (SELECT 1 FROM tenant.customer_note AS cn WHERE cn.business_id = c.business_id AND cn.customer_id = c.id))
+               OR ($4 = 'review' AND EXISTS (SELECT 1 FROM tenant.contact_identity AS mc WHERE mc.business_id = c.business_id AND mc.contact_id = c.contact_id AND mc.match_type = 'probabilistic'))
              )
              AND (
                $5 = ''
@@ -229,15 +229,15 @@ export class CustomersRepository {
            SELECT 'whatsapp_message' AS type, m.id::text AS id, m.created_at AS occurred_at, m.sender AS label, COALESCE(m.body, '') AS detail, 'conversaflow' AS product
            FROM tenant.message AS m
            JOIN tenant.conversation AS cv ON cv.id = m.conversation_id
-           WHERE cv.customer_id = $1::uuid AND m.tenant_id = $2::uuid
+           WHERE cv.customer_id = $1::uuid AND m.business_id = $2::uuid
            UNION ALL
            SELECT 'order' AS type, o.id::text AS id, COALESCE(o.placed_at, o.created_at) AS occurred_at, o.status AS label, COALESCE(o.source_transaction_id, o.id::text) AS detail, 'orders' AS product
            FROM tenant."order" AS o
-           WHERE o.customer_id = $1::uuid AND o.tenant_id = $2::uuid
+           WHERE o.customer_id = $1::uuid AND o.business_id = $2::uuid
            UNION ALL
            SELECT 'memory' AS type, cn.id::text AS id, cn.updated_at AS occurred_at, COALESCE(cn.source, 'note') AS label, COALESCE(cn.fact, '') AS detail, 'conversaflow' AS product
            FROM tenant.customer_note AS cn
-           WHERE cn.customer_id = $1::uuid AND cn.tenant_id = $2::uuid
+           WHERE cn.customer_id = $1::uuid AND cn.business_id = $2::uuid
          ) AS timeline
          ORDER BY occurred_at DESC
          LIMIT 80`,
@@ -261,8 +261,8 @@ export class CustomersRepository {
            max(m.created_at) AS "lastMessageAt"
          FROM tenant.conversation AS cv
          LEFT JOIN tenant.message AS m ON m.conversation_id = cv.id
-         WHERE cv.customer_id = $1::uuid AND cv.tenant_id = $2::uuid
-         GROUP BY cv.tenant_id, cv.id
+         WHERE cv.customer_id = $1::uuid AND cv.business_id = $2::uuid
+         GROUP BY cv.business_id, cv.id
          ORDER BY cv.last_message_at DESC NULLS LAST
          LIMIT 40`,
         [contactId, tenantId],
@@ -286,7 +286,7 @@ export class CustomersRepository {
            o.updated_at
          FROM tenant."order" AS o
          LEFT JOIN tenant.channel AS ch ON ch.id = o.channel_id
-         WHERE o.customer_id = $1::uuid AND o.tenant_id = $2::uuid
+         WHERE o.customer_id = $1::uuid AND o.business_id = $2::uuid
          ORDER BY COALESCE(o.placed_at, o.created_at) DESC
          LIMIT 40`,
         [contactId, tenantId],
@@ -302,7 +302,7 @@ export class CustomersRepository {
         // balance=SUM(card_ledger), visits=COUNT(visit), cycle/pending vs the rule.
         `WITH vr AS (
            SELECT COALESCE((SELECT visits_required FROM tenant.loyalty_reward
-             WHERE tenant_id = $2::uuid AND is_active
+             WHERE business_id = $2::uuid AND is_active
              ORDER BY activated_at DESC NULLS LAST LIMIT 1), 10) AS n
          )
          SELECT
@@ -317,15 +317,15 @@ export class CustomersRepository {
            lc.created_at,
            lc.updated_at
          FROM tenant.loyalty_card AS lc
-         JOIN tenant.customer AS cu ON cu.tenant_id = lc.tenant_id AND cu.id = lc.customer_id
+         JOIN tenant.customer AS cu ON cu.business_id = lc.business_id AND cu.id = lc.customer_id
          CROSS JOIN vr
          CROSS JOIN LATERAL (
            SELECT
-             (SELECT count(*) FROM tenant.loyalty_visit v WHERE v.tenant_id = lc.tenant_id AND v.card_id = lc.id) AS total_visits,
-             (SELECT count(*) FROM tenant.loyalty_redemption r WHERE r.tenant_id = lc.tenant_id AND r.card_id = lc.id) AS redemptions,
-             COALESCE((SELECT sum(l.delta) FROM tenant.loyalty_stored_value_ledger l WHERE l.tenant_id = lc.tenant_id AND l.card_id = lc.id), 0) AS balance_cents
+             (SELECT count(*) FROM tenant.loyalty_visit v WHERE v.business_id = lc.business_id AND v.card_id = lc.id) AS total_visits,
+             (SELECT count(*) FROM tenant.loyalty_redemption r WHERE r.business_id = lc.business_id AND r.card_id = lc.id) AS redemptions,
+             COALESCE((SELECT sum(l.delta) FROM tenant.loyalty_stored_value_ledger l WHERE l.business_id = lc.business_id AND l.card_id = lc.id), 0) AS balance_cents
          ) AS agg
-         WHERE lc.customer_id = $1::uuid AND lc.tenant_id = $2::uuid
+         WHERE lc.customer_id = $1::uuid AND lc.business_id = $2::uuid
          ORDER BY lc.created_at DESC
          LIMIT 1`,
         [contactId, tenantId],
@@ -358,18 +358,18 @@ export class CustomersRepository {
              count(m.id)::int AS "messageCount",
              max(m.created_at) AS "lastMessageAt"
            FROM tenant.conversation AS c
-           LEFT JOIN tenant.customer AS co ON co.tenant_id = c.tenant_id AND co.id = c.customer_id
+           LEFT JOIN tenant.customer AS co ON co.business_id = c.business_id AND co.id = c.customer_id
            LEFT JOIN LATERAL (
              SELECT ci.normalized_value
              FROM tenant.contact_identity AS ci
              JOIN tenant.channel AS ch ON ch.id = ci.channel_id
-             WHERE ci.tenant_id = co.tenant_id AND ci.contact_id = co.contact_id
+             WHERE ci.business_id = co.business_id AND ci.contact_id = co.contact_id
                AND ch.normalization_rule = 'e164' AND ci.normalized_value IS NOT NULL
              ORDER BY ci.is_primary DESC, ci.last_seen_at DESC LIMIT 1
            ) AS ph ON true
            LEFT JOIN tenant.message AS m ON m.conversation_id = c.id
-           WHERE c.tenant_id = $1::uuid
-           GROUP BY c.tenant_id, c.id, co.tenant_id, co.id, ph.normalized_value
+           WHERE c.business_id = $1::uuid
+           GROUP BY c.business_id, c.id, co.business_id, co.id, ph.normalized_value
            ORDER BY COALESCE(max(m.created_at), c.created_at) DESC
            OFFSET $2 LIMIT $3`,
           [tenantId, skip, limit],
@@ -377,7 +377,7 @@ export class CustomersRepository {
       ).rows;
       const total = (
         await c.query<Row>(
-          `SELECT count(*)::int AS total FROM tenant.conversation WHERE tenant_id = $1::uuid`,
+          `SELECT count(*)::int AS total FROM tenant.conversation WHERE business_id = $1::uuid`,
           [tenantId],
         )
       ).rows[0]?.total;
@@ -400,8 +400,8 @@ export class CustomersRepository {
                   ci.metadata, ci.first_seen_at AS created_at
            FROM tenant.contact_identity AS ci
            JOIN tenant.channel AS ch ON ch.id = ci.channel_id
-           JOIN tenant.customer AS cu ON cu.tenant_id = ci.tenant_id AND cu.contact_id = ci.contact_id
-           WHERE cu.id = $1::uuid AND ci.tenant_id = $2::uuid
+           JOIN tenant.customer AS cu ON cu.business_id = ci.business_id AND cu.contact_id = ci.contact_id
+           WHERE cu.id = $1::uuid AND ci.business_id = $2::uuid
            ORDER BY ch.key, ci.first_seen_at`,
           [contactId, tenantId],
         ),
@@ -413,8 +413,8 @@ export class CustomersRepository {
                   ci.match_type, ci.confidence, ci.metadata AS detail,
                   ci.first_seen_at AS created_at, NULL::timestamptz AS resolved_at
            FROM tenant.contact_identity AS ci
-           JOIN tenant.customer AS cu ON cu.tenant_id = ci.tenant_id AND cu.contact_id = ci.contact_id
-           WHERE cu.id = $1::uuid AND ci.tenant_id = $2::uuid
+           JOIN tenant.customer AS cu ON cu.business_id = ci.business_id AND cu.contact_id = ci.contact_id
+           WHERE cu.id = $1::uuid AND ci.business_id = $2::uuid
              AND ci.match_type = 'probabilistic'
            ORDER BY ci.first_seen_at DESC
            LIMIT 20`,

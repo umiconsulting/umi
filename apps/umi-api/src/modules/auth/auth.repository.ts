@@ -115,7 +115,7 @@ export class AuthRepository {
          ARRAY[COALESCE(ta.role, 'super_admin')] AS "roles"
        FROM tenant.business AS t
        LEFT JOIN tenant.tenant_access AS ta
-         ON ta.tenant_id = t.id
+         ON ta.business_id = t.id
         AND ta.login_id  = $1::uuid
         AND ta.status    = 'active'
        WHERE t.status = 'active'
@@ -144,7 +144,7 @@ export class AuthRepository {
          SELECT ta.id, ta.role
          FROM tenant.tenant_access AS ta
          WHERE ta.login_id = $1::uuid
-           AND ta.tenant_id = $2::uuid
+           AND ta.business_id = $2::uuid
            AND ta.status = 'active'
          LIMIT 1
        )
@@ -204,7 +204,7 @@ export class AuthRepository {
     const { rows } = await this.pg.query<{ status: string }>(
       `SELECT status
        FROM umi.subscription_item
-       WHERE tenant_id = $1::uuid
+       WHERE business_id = $1::uuid
          AND product_key = $2
        LIMIT 1`,
       [tenantId, productKey],

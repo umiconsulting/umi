@@ -66,7 +66,7 @@ export class CashScanRepository {
       c.query<RewardConfig>(
         `SELECT id::text, visits_required, reward_name
          FROM tenant.loyalty_reward
-         WHERE tenant_id = $1::uuid AND is_active = true
+         WHERE business_id = $1::uuid AND is_active = true
          ORDER BY activated_at DESC NULLS LAST LIMIT 1`,
         [tenantId],
       ),
@@ -81,7 +81,7 @@ export class CashScanRepository {
                 s.branding->'lifecycle_copy' AS lifecycle_copy,
                 s.birthday_reward_name AS birthday_reward_name
          FROM tenant.business AS t
-         LEFT JOIN tenant.loyalty_program AS s ON s.tenant_id = t.id
+         LEFT JOIN tenant.loyalty_program AS s ON s.business_id = t.id
          WHERE t.id = $1::uuid LIMIT 1`,
         [tenantId],
       ),
@@ -105,7 +105,7 @@ export class CashScanRepository {
     const { rows } = await this.pg.withTenant((c) =>
       c.query(
         `SELECT 1 FROM tenant.loyalty_visit
-         WHERE tenant_id=$1::uuid AND card_id=$2::uuid
+         WHERE business_id=$1::uuid AND card_id=$2::uuid
            AND occurred_at >= now() - ($3 || ' seconds')::interval
          LIMIT 1`,
         [tenantId, cardId, String(seconds)],
@@ -123,7 +123,7 @@ export class CashScanRepository {
     const { rows } = await this.pg.withTenant((c) =>
       c.query(
         `SELECT 1 FROM tenant.loyalty_visit
-         WHERE tenant_id=$1::uuid AND card_id=$2::uuid
+         WHERE business_id=$1::uuid AND card_id=$2::uuid
            AND occurred_at >= (date_trunc('day', now() AT TIME ZONE $3) AT TIME ZONE $3)
          LIMIT 1`,
         [tenantId, cardId, tz],
@@ -140,7 +140,7 @@ export class CashScanRepository {
     const { rows } = await this.pg.withTenant((c) =>
       c.query(
         `SELECT 1 FROM tenant.loyalty_redemption
-         WHERE tenant_id=$1::uuid AND card_id=$2::uuid
+         WHERE business_id=$1::uuid AND card_id=$2::uuid
            AND redeemed_at >= now() - ($3 || ' seconds')::interval
          LIMIT 1`,
         [tenantId, cardId, String(seconds)],
@@ -156,7 +156,7 @@ export class CashScanRepository {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<{ id: string }>(
         `SELECT id::text FROM tenant.birthday_reward
-         WHERE tenant_id=$1::uuid AND card_id=$2::uuid
+         WHERE business_id=$1::uuid AND card_id=$2::uuid
            AND status='active' AND expires_at >= now()
          ORDER BY issued_at DESC LIMIT 1`,
         [tenantId, cardId],
@@ -180,7 +180,7 @@ export class CashScanRepository {
                   (SELECT lt::time FROM n) AS now_time,
                   oh.opens_at, oh.closes_at
            FROM tenant.open_hours oh, n
-           WHERE oh.tenant_id=$1::uuid
+           WHERE oh.business_id=$1::uuid
              AND oh.day_of_week = extract(dow FROM (SELECT lt FROM n))::int
            LIMIT 1`,
           [tenantId, tz],
@@ -206,21 +206,21 @@ export class CashScanRepository {
       if (input.doBirthday && input.birthdayRewardId) {
         await c.query(
           `UPDATE tenant.birthday_reward SET status='redeemed', redeemed_at=now()
-           WHERE tenant_id=$1::uuid AND id=$2::uuid`,
+           WHERE business_id=$1::uuid AND id=$2::uuid`,
           [input.tenantId, input.birthdayRewardId],
         );
       }
       if (input.doRedeem && input.rewardConfigId) {
         await c.query(
           `INSERT INTO tenant.loyalty_redemption
-             (tenant_id, card_id, reward_rule_id, staff_id)
+             (business_id, card_id, reward_rule_id, staff_id)
            VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid)`,
           [input.tenantId, input.cardId, input.rewardConfigId, input.staffMemberId],
         );
       }
       if (input.doVisit) {
         await c.query(
-          `INSERT INTO tenant.loyalty_visit (tenant_id, card_id, staff_id)
+          `INSERT INTO tenant.loyalty_visit (business_id, card_id, staff_id)
            VALUES ($1::uuid, $2::uuid, $3::uuid)`,
           [input.tenantId, input.cardId, input.staffMemberId],
         );
@@ -235,7 +235,7 @@ export class CashScanRepository {
                'lifecycle_message_updated_at', $5::text)
              ELSE metadata END,
            qr_token = $6, qr_issued_at = now(), updated_at = now()
-         WHERE tenant_id=$1::uuid AND id=$2::uuid
+         WHERE business_id=$1::uuid AND id=$2::uuid
          RETURNING card_number`,
         [
           input.tenantId,
@@ -257,15 +257,15 @@ export class CashScanRepository {
         `WITH vr AS (
            SELECT COALESCE((
              SELECT visits_required FROM tenant.loyalty_reward
-             WHERE tenant_id=$1::uuid AND is_active
+             WHERE business_id=$1::uuid AND is_active
              ORDER BY activated_at DESC NULLS LAST LIMIT 1), 10) AS n
          ),
          tv  AS (SELECT COUNT(*)::int AS n FROM tenant.loyalty_visit
-                  WHERE tenant_id=$1::uuid AND card_id=$2::uuid),
+                  WHERE business_id=$1::uuid AND card_id=$2::uuid),
          rr  AS (SELECT COUNT(*)::int AS n FROM tenant.loyalty_redemption
-                  WHERE tenant_id=$1::uuid AND card_id=$2::uuid),
+                  WHERE business_id=$1::uuid AND card_id=$2::uuid),
          bal AS (SELECT COALESCE(SUM(delta),0)::int AS n FROM tenant.loyalty_stored_value_ledger
-                  WHERE tenant_id=$1::uuid AND card_id=$2::uuid)
+                  WHERE business_id=$1::uuid AND card_id=$2::uuid)
          SELECT $3::text            AS card_number,
                 tv.n                AS total_visits,
                 (tv.n % vr.n)       AS visits_this_cycle,

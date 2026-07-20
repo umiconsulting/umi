@@ -6,7 +6,7 @@ import { PgService } from '../shared/database/pg.service';
  * against the live platform DB on 2026-06-24
  * (`docs/migration/2026-06-24-phase1c-queue-schema-preflight.md`). All access is
  * via the worker pool — `queue` is a service-role-only schema (§9.1) and every
- * table carries a NOT NULL `tenant_id` FK to `tenant.business`.
+ * table carries a NOT NULL `business_id` FK to `tenant.business`.
  *
  * BullMQ owns *execution* state (queue.jobs/job_attempts are superseded, §10.5).
  * This repository owns the durable boundaries BullMQ does not: the inbound
@@ -45,7 +45,7 @@ export class QueueRepository {
   async recordDeadLetter(dl: DeadLetterInput): Promise<void> {
     await this.pg.query(
       `INSERT INTO runtime.dead_letter
-         (tenant_id, source_schema, source_table, source_id, event_type, payload, error, attempts)
+         (business_id, source_schema, source_table, source_id, event_type, payload, error, attempts)
        VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8)`,
       [
         dl.tenantId,
@@ -77,7 +77,7 @@ export class QueueRepository {
   }): Promise<{ id: string; duplicate: boolean }> {
     const inserted = await this.pg.query<{ id: string }>(
       `INSERT INTO runtime.inbound_event
-         (tenant_id, provider, provider_event_id, event_type, payload_hash, payload)
+         (business_id, provider, provider_event_id, event_type, payload_hash, payload)
        VALUES ($1,$2,$3,$4,$5,$6::jsonb)
        ON CONFLICT (provider, provider_event_id) DO NOTHING
        RETURNING id`,
@@ -104,7 +104,7 @@ export class QueueRepository {
 
   /**
    * Claim an idempotency key. Returns true if this caller claimed it (first
-   * time), false if it already existed. UNIQUE(tenant_id, scope, key).
+   * time), false if it already existed. UNIQUE(business_id, scope, key).
    */
   async claimIdempotencyKey(
     tenantId: string,
@@ -113,9 +113,9 @@ export class QueueRepository {
     expiresAt?: Date | null,
   ): Promise<boolean> {
     const res = await this.pg.query(
-      `INSERT INTO runtime.idempotency_key (tenant_id, scope, key, expires_at)
+      `INSERT INTO runtime.idempotency_key (business_id, scope, key, expires_at)
        VALUES ($1,$2,$3,$4)
-       ON CONFLICT (tenant_id, scope, key) DO NOTHING`,
+       ON CONFLICT (business_id, scope, key) DO NOTHING`,
       [tenantId, scope, key, expiresAt ?? null],
     );
     return (res.rowCount ?? 0) > 0;
@@ -137,7 +137,7 @@ export class QueueRepository {
   ): Promise<OutboxEventRow[]> {
     const res = await this.pg.query<{
       id: string;
-      tenant_id: string;
+      business_id: string;
       event_type: string;
       aggregate_id: string | null;
       idempotency_key: string;
@@ -157,13 +157,13 @@ export class QueueRepository {
            LIMIT $1
         ) c
        WHERE o.id = c.id
-       RETURNING o.id, o.tenant_id, o.event_type, o.aggregate_id,
+       RETURNING o.id, o.business_id, o.event_type, o.aggregate_id,
                  o.idempotency_key, o.payload, o.attempts, o.max_attempts`,
       [limit, leaseSeconds],
     );
     return res.rows.map((r) => ({
       id: r.id,
-      tenantId: r.tenant_id,
+      tenantId: r.business_id,
       eventType: r.event_type,
       aggregateId: r.aggregate_id,
       idempotencyKey: r.idempotency_key,

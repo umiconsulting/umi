@@ -81,7 +81,7 @@ describe('KdsService.verifyDevice', () => {
     const { svc, repo } = make();
     repo.findSessionByToken.mockResolvedValue({
       id: 's1',
-      tenant_id: 't1',
+      business_id: 't1',
       is_active: false,
       metadata: {},
     });
@@ -92,7 +92,7 @@ describe('KdsService.verifyDevice', () => {
     const { svc, repo } = make();
     repo.findSessionByToken.mockResolvedValue({
       id: 's1',
-      tenant_id: 't1',
+      business_id: 't1',
       station_id: 'st1',
       device_name: 'Expo',
       is_active: true,
@@ -176,7 +176,7 @@ describe('KdsService.pairing — kds_start', () => {
 describe('KdsService.pairing — kds_status', () => {
   const approved = {
     id: 'p1',
-    tenant_id: 't1',
+    business_id: 't1',
     location_id: null,
     station_id: 'st1',
     device_name: 'iPad',
@@ -189,10 +189,10 @@ describe('KdsService.pairing — kds_status', () => {
   it('issues a device session + token on an approved+claimed pairing', async () => {
     const { svc, repo } = make();
     repo.getPairing.mockResolvedValue(approved);
-    repo.loadStation.mockResolvedValue({ id: 'st1', name: 'Expo', tenant_id: 't1' });
+    repo.loadStation.mockResolvedValue({ id: 'st1', name: 'Expo', business_id: 't1' });
     repo.createDeviceSession.mockResolvedValue({
       id: 'sess-1',
-      tenant_id: 't1',
+      business_id: 't1',
       station_id: 'st1',
       device_name: 'Cocina 1',
       token: 'plaintext-token',
@@ -217,8 +217,8 @@ describe('KdsService.pairing — kds_status', () => {
   it('drops the session and returns used on a lost claim race', async () => {
     const { svc, repo } = make();
     repo.getPairing.mockResolvedValue(approved);
-    repo.loadStation.mockResolvedValue({ id: 'st1', name: 'Expo', tenant_id: 't1' });
-    repo.createDeviceSession.mockResolvedValue({ id: 'sess-1', tenant_id: 't1', station_id: 'st1', device_name: 'x', token: 't', device_registry_id: 'reg-1' });
+    repo.loadStation.mockResolvedValue({ id: 'st1', name: 'Expo', business_id: 't1' });
+    repo.createDeviceSession.mockResolvedValue({ id: 'sess-1', business_id: 't1', station_id: 'st1', device_name: 'x', token: 't', device_registry_id: 'reg-1' });
     repo.claimPairing.mockResolvedValue(false);
 
     const r = await svc.pairing({ action: 'kds_status', pairing_id: '3f2504e0-4f89-41d3-9a0c-0305e82c3301' });
@@ -281,7 +281,7 @@ describe('KdsService.board', () => {
 describe('KdsService.command — transition_ticket', () => {
   const order = {
     id: 'o1',
-    tenant_id: 't1',
+    business_id: 't1',
     location_id: null,
     station_id: null,
     kitchen_status: 'new',
@@ -297,7 +297,7 @@ describe('KdsService.command — transition_ticket', () => {
 
   it('404s when the ticket is not in the device scope', async () => {
     const { svc, repo } = make();
-    repo.loadOrderForScope.mockResolvedValue({ ...order, tenant_id: 'OTHER' });
+    repo.loadOrderForScope.mockResolvedValue({ ...order, business_id: 'OTHER' });
     const r = await svc.command(SESSION, {
       action: 'transition_ticket',
       ticket_id: 'o1',
@@ -359,7 +359,7 @@ describe('KdsService.command — partial_cancel_items', () => {
     const { svc, repo } = make();
     repo.loadOrderForScope.mockResolvedValue({
       id: 'o1',
-      tenant_id: 't1',
+      business_id: 't1',
       location_id: null,
       station_id: null,
       kitchen_status: 'preparing',
@@ -390,13 +390,13 @@ describe('pure helpers', () => {
   it('ticketBelongsToDevice honors tenant/location/station scope', () => {
     expect(
       ticketBelongsToDevice(
-        { id: 'o', tenant_id: 't1', location_id: null, station_id: null, kitchen_status: 'new', person_id: null, source_transaction_id: null },
+        { id: 'o', business_id: 't1', location_id: null, station_id: null, kitchen_status: 'new', person_id: null, source_transaction_id: null },
         SESSION,
       ),
     ).toBe(true);
     expect(
       ticketBelongsToDevice(
-        { id: 'o', tenant_id: 'other', location_id: null, station_id: null, kitchen_status: 'new', person_id: null, source_transaction_id: null },
+        { id: 'o', business_id: 'other', location_id: null, station_id: null, kitchen_status: 'new', person_id: null, source_transaction_id: null },
         SESSION,
       ),
     ).toBe(false);
@@ -415,14 +415,14 @@ describe('pure helpers', () => {
     };
     expect(
       ticketBelongsToDevice(
-        { id: 'o', tenant_id: 't1', location_id: null, station_id: null, kitchen_status: 'new', person_id: null, source_transaction_id: null },
+        { id: 'o', business_id: 't1', location_id: null, station_id: null, kitchen_status: 'new', person_id: null, source_transaction_id: null },
         boundSession,
       ),
     ).toBe(true);
     // A different, explicit location on the order is still rejected (tenant-scoped, not global).
     expect(
       ticketBelongsToDevice(
-        { id: 'o', tenant_id: 't1', location_id: 'loc-2', station_id: null, kitchen_status: 'new', person_id: null, source_transaction_id: null },
+        { id: 'o', business_id: 't1', location_id: 'loc-2', station_id: null, kitchen_status: 'new', person_id: null, source_transaction_id: null },
         boundSession,
       ),
     ).toBe(false);

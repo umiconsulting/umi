@@ -9,7 +9,7 @@ const UUID_RE =
 function extractTenantId(data: unknown): string | null {
   if (data && typeof data === 'object') {
     const d = data as Record<string, unknown>;
-    const id = d.tenantId ?? d.tenant_id;
+    const id = d.tenantId ?? d.business_id;
     if (typeof id === 'string' && id.length > 0) return id;
   }
   return null;
@@ -18,7 +18,7 @@ function extractTenantId(data: unknown): string | null {
 /**
  * Routes terminally-failed BullMQ jobs to the canonical `runtime.dead_letter`
  * sink (spec §10.5). Tenant-scoped jobs are persisted; infra/system jobs that
- * carry no tenant are log-only, because `runtime.dead_letter.tenant_id` is NOT
+ * carry no tenant are log-only, because `runtime.dead_letter.business_id` is NOT
  * NULL and FKs `tenant.business` (build-v2). Best-effort: a
  * dead-letter write must never throw back into the worker.
  */

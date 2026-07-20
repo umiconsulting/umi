@@ -12,7 +12,7 @@ import { PgService } from '../../shared/database/pg.service';
  *   core.tenants           → tenant.business         (status 'active')
  *   loyalty.programs       → tenant.loyalty_program (branding.lifecycle_copy)
  *   loyalty.reward_configs → tenant.loyalty_reward    (is_active, latest activated_at)
- *   loyalty.lifecycle_sends→ runtime.reminder_sent    UNIQUE(tenant_id, card_id, journey)
+ *   loyalty.lifecycle_sends→ runtime.reminder_sent    UNIQUE(business_id, card_id, journey)
  *
  * DERIVED (no cache columns): visits_this_cycle = COUNT(visit) % visits_required;
  * the phone is the WhatsApp as-received reply address (contact_identity.display_value,
@@ -53,12 +53,12 @@ const DEFAULT_REWARD_NAME = 'Recompensa de temporada';
 // Card → customer join + the reply-phone lateral, shared by every journey (a phone
 // is required to message). `pe` = tenant.customer; `ph.phone` = best reply address.
 const CARD_PERSON_JOIN = `
-  JOIN tenant.customer pe ON pe.tenant_id = c.tenant_id AND pe.id = c.customer_id
+  JOIN tenant.customer pe ON pe.business_id = c.business_id AND pe.id = c.customer_id
   LEFT JOIN LATERAL (
     SELECT COALESCE(ci.display_value, ci.normalized_value) AS phone
       FROM tenant.contact_identity ci
       JOIN tenant.channel ch ON ch.id = ci.channel_id
-     WHERE ci.tenant_id = c.tenant_id AND ci.contact_id = pe.contact_id
+     WHERE ci.business_id = c.business_id AND ci.contact_id = pe.contact_id
        AND ch.key IN ('whatsapp', 'phone') AND ci.normalized_value IS NOT NULL
      ORDER BY (ch.key = 'whatsapp') DESC, ci.is_primary DESC, ci.last_seen_at DESC
      LIMIT 1
@@ -66,9 +66,9 @@ const CARD_PERSON_JOIN = `
 const HAS_PHONE = `ph.phone IS NOT NULL`;
 // visits_this_cycle = COUNT(visit) % active visits_required (default 10).
 const VISITS_THIS_CYCLE = `(
-  (SELECT count(*) FROM tenant.loyalty_visit v WHERE v.tenant_id = c.tenant_id AND v.card_id = c.id)
+  (SELECT count(*) FROM tenant.loyalty_visit v WHERE v.business_id = c.business_id AND v.card_id = c.id)
   % COALESCE((SELECT visits_required FROM tenant.loyalty_reward
-       WHERE tenant_id = c.tenant_id AND is_active
+       WHERE business_id = c.business_id AND is_active
        ORDER BY activated_at DESC NULLS LAST LIMIT 1), ${DEFAULT_VISITS_REQUIRED})
 )::int`;
 
@@ -99,11 +99,11 @@ export class LifecycleRepository {
           rc.visits_required           AS visits_required,
           rc.reward_name               AS reward_name
          FROM tenant.business t
-         LEFT JOIN tenant.loyalty_program p ON p.tenant_id = t.id
+         LEFT JOIN tenant.loyalty_program p ON p.business_id = t.id
          LEFT JOIN LATERAL (
            SELECT visits_required, reward_name
              FROM tenant.loyalty_reward
-            WHERE tenant_id = t.id AND is_active = true
+            WHERE business_id = t.id AND is_active = true
             ORDER BY activated_at DESC NULLS LAST LIMIT 1
          ) rc ON true
         WHERE t.id = $1::uuid
@@ -132,8 +132,8 @@ export class LifecycleRepository {
       `SELECT c.id::text AS card_id, pe.name AS name, ph.phone AS phone,
               ${VISITS_THIS_CYCLE} AS visits_this_cycle, br.year, br.expires_at
          FROM tenant.birthday_reward br
-         JOIN tenant.loyalty_card c ON c.tenant_id = br.tenant_id AND c.id = br.card_id ${CARD_PERSON_JOIN}
-        WHERE br.tenant_id = $1::uuid
+         JOIN tenant.loyalty_card c ON c.business_id = br.business_id AND c.id = br.card_id ${CARD_PERSON_JOIN}
+        WHERE br.business_id = $1::uuid
           AND br.status = 'active'
           AND br.redeemed_at IS NULL
           AND br.expires_at >= now()
@@ -166,11 +166,11 @@ export class LifecycleRepository {
       `SELECT c.id::text AS card_id, pe.name AS name, ph.phone AS phone,
               ${VISITS_THIS_CYCLE} AS visits_this_cycle
          FROM tenant.loyalty_card c ${CARD_PERSON_JOIN}
-        WHERE c.tenant_id = $1::uuid AND c.status = 'active' AND ${HAS_PHONE}
+        WHERE c.business_id = $1::uuid AND c.status = 'active' AND ${HAS_PHONE}
           AND $2::int = (
             SELECT count(DISTINCT date_trunc('week', ve.occurred_at))
               FROM tenant.loyalty_visit ve
-             WHERE ve.tenant_id = c.tenant_id AND ve.card_id = c.id
+             WHERE ve.business_id = c.business_id AND ve.card_id = c.id
                AND ve.occurred_at >= date_trunc('week', now()) - (($2::int - 1) || ' weeks')::interval
           )`,
       [tenantId, weeks],
@@ -189,9 +189,9 @@ export class LifecycleRepository {
       `SELECT c.id::text AS card_id, pe.name AS name, ph.phone AS phone,
               ${VISITS_THIS_CYCLE} AS visits_this_cycle
          FROM tenant.loyalty_card c ${CARD_PERSON_JOIN}
-        WHERE c.tenant_id = $1::uuid AND c.status = 'active' AND ${HAS_PHONE}
+        WHERE c.business_id = $1::uuid AND c.status = 'active' AND ${HAS_PHONE}
           AND NOT EXISTS (
-            SELECT 1 FROM tenant.loyalty_visit v WHERE v.tenant_id = c.tenant_id AND v.card_id = c.id
+            SELECT 1 FROM tenant.loyalty_visit v WHERE v.business_id = c.business_id AND v.card_id = c.id
           )
           AND c.created_at >= now() - interval '8 days'
           AND c.created_at <  now() - interval '7 days'`,
@@ -214,16 +214,16 @@ export class LifecycleRepository {
       `SELECT c.id::text AS card_id, pe.name AS name, ph.phone AS phone,
               ${VISITS_THIS_CYCLE} AS visits_this_cycle
          FROM tenant.loyalty_card c ${CARD_PERSON_JOIN}
-        WHERE c.tenant_id = $1::uuid AND c.status = 'active' AND ${HAS_PHONE}
+        WHERE c.business_id = $1::uuid AND c.status = 'active' AND ${HAS_PHONE}
           AND EXISTS (
             SELECT 1 FROM tenant.loyalty_visit ve
-             WHERE ve.tenant_id = c.tenant_id AND ve.card_id = c.id
+             WHERE ve.business_id = c.business_id AND ve.card_id = c.id
                AND ve.occurred_at >= now() - (($2::int + 1) || ' days')::interval
                AND ve.occurred_at <  now() - ($2::int || ' days')::interval
           )
           AND NOT EXISTS (
             SELECT 1 FROM tenant.loyalty_visit ve2
-             WHERE ve2.tenant_id = c.tenant_id AND ve2.card_id = c.id
+             WHERE ve2.business_id = c.business_id AND ve2.card_id = c.id
                AND ve2.occurred_at >= now() - ($2::int || ' days')::interval
           )`,
       [tenantId, days],
@@ -244,9 +244,9 @@ export class LifecycleRepository {
     body: string,
   ): Promise<boolean> {
     const { rowCount } = await this.pg.query(
-      `INSERT INTO runtime.reminder_sent (tenant_id, card_id, journey, sent_at, body, metadata)
+      `INSERT INTO runtime.reminder_sent (business_id, card_id, journey, sent_at, body, metadata)
        VALUES ($1::uuid, $2::uuid, $3, now(), $4, '{}'::jsonb)
-       ON CONFLICT (tenant_id, card_id, journey) DO NOTHING`,
+       ON CONFLICT (business_id, card_id, journey) DO NOTHING`,
       [tenantId, cardId, journey, body],
     );
     return (rowCount ?? 0) > 0;
@@ -257,7 +257,7 @@ export class LifecycleRepository {
   async deleteSend(tenantId: string, cardId: string, journey: string): Promise<void> {
     await this.pg.query(
       `DELETE FROM runtime.reminder_sent
-        WHERE tenant_id = $1::uuid AND card_id = $2::uuid AND journey = $3`,
+        WHERE business_id = $1::uuid AND card_id = $2::uuid AND journey = $3`,
       [tenantId, cardId, journey],
     );
   }

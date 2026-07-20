@@ -187,7 +187,7 @@ export class ConversationTurnsRepository {
     if (params.existingTurnId) {
       const { rows } = await this.pg.query<TurnRow>(
         `UPDATE runtime.conversation_turn SET
-            tenant_id = $1::uuid, conversation_id = $2::uuid, person_id = $3::uuid,
+            business_id = $1::uuid, conversation_id = $2::uuid, person_id = $3::uuid,
             status = $4, source_message_ids = $5::uuid[], merged_user_text = $6,
             integrity_decision = $7, integrity_reason = $8, base_state_version = $9,
             first_message_at = $10, last_message_at = $11, hold_until = $12,
@@ -204,7 +204,7 @@ export class ConversationTurnsRepository {
 
     const { rows } = await this.pg.query<TurnRow>(
       `INSERT INTO runtime.conversation_turn
-         (tenant_id, conversation_id, person_id, status, source_message_ids,
+         (business_id, conversation_id, person_id, status, source_message_ids,
           merged_user_text, integrity_decision, integrity_reason, base_state_version,
           first_message_at, last_message_at, hold_until, released_at, extracted_intent,
           reconciled_action, assistant_message_id, processed_at, superseded_at)

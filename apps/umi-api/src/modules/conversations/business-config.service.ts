@@ -6,7 +6,7 @@ import { PgService } from '../../shared/database/pg.service';
  * and rebound to the `tenant.business` row (`config` jsonb) — legacy
  * `businesses.config.voice` is the same shape. Read on the
  * worker pool: the WhatsApp path is unauthenticated (no member user → no RLS
- * tenant context), and every query carries an explicit `tenant_id` predicate.
+ * tenant context), and every query carries an explicit `business_id` predicate.
  *
  * `resolveVoiceConfig` NEVER throws: it fills sane defaults (assistant name from
  * the business name, locale `es-MX`, tone from the tenant's preset or a friendly
@@ -160,7 +160,7 @@ export class BusinessConfigService {
     }>(
       `SELECT id::text, name, config
          FROM tenant.business
-        WHERE tenant_id = $1
+        WHERE business_id = $1
         ORDER BY created_at ASC
         LIMIT 1`,
       [tenantId],

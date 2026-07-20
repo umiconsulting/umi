@@ -29,7 +29,7 @@ export class ChannelRepository {
     prefixedNumber: string,
   ): Promise<ResolvedChannelAccount | null> {
     const { rows } = await this.pg.query<ResolvedChannelAccount>(
-      `SELECT wn.tenant_id::text        AS "tenantId",
+      `SELECT wn.business_id::text        AS "tenantId",
               wn.branch_id::text       AS "locationId",
               wn.id::text              AS "channelAccountId"
        FROM tenant.whatsapp_number AS wn

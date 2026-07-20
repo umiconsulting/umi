@@ -33,8 +33,8 @@ export class IntegrationsProcessor extends BaseProcessor {
       this.logger.warn(`unknown integrations job: ${job.name} #${job.id}`);
       return;
     }
-    const tenantId = String((job.data as Record<string, unknown>)?.tenant_id ?? '');
-    if (!tenantId) throw new Error('zettle.sync requires tenant_id');
+    const tenantId = String((job.data as Record<string, unknown>)?.business_id ?? '');
+    if (!tenantId) throw new Error('zettle.sync requires business_id');
 
     const catalog = await this.zettle.fetchProducts();
     if (catalog === null) return; // not configured — deliberate skip (adapter logged)
@@ -74,7 +74,7 @@ export class IntegrationsProcessor extends BaseProcessor {
     await this.enqueue.enqueue(
       QUEUES.enrichment,
       'product.embed',
-      { tenant_id: tenantId },
+      { business_id: tenantId },
       { priority: JobPriority.Background },
     );
 

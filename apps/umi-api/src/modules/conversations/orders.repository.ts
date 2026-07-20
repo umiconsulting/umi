@@ -90,13 +90,13 @@ export class OrdersRepository {
     return this.pg.workerTx(async (client) => {
       const ins = await client.query<{ id: string }>(
         `INSERT INTO tenant."order"
-           (tenant_id, customer_id, branch_id, channel_id, order_type, status,
+           (business_id, customer_id, branch_id, channel_id, order_type, status,
             total_cents, details, pickup_person, notes, source_transaction_id, placed_at)
          VALUES ($1::uuid, $2::uuid, $3::uuid,
                  (SELECT id FROM tenant.channel WHERE key = 'whatsapp'),
                  'whatsapp', 'pending',
                  $4, $5::jsonb, $6, $7, $8, now())
-         ON CONFLICT (tenant_id, source_transaction_id) WHERE source_transaction_id IS NOT NULL
+         ON CONFLICT (business_id, source_transaction_id) WHERE source_transaction_id IS NOT NULL
            DO NOTHING
          RETURNING id::text`,
         [
@@ -115,7 +115,7 @@ export class OrdersRepository {
         // Idempotent hit: the order already exists for this turn.
         const existing = await client.query<{ id: string; total_cents: number }>(
           `SELECT id::text, total_cents FROM tenant."order"
-            WHERE tenant_id = $1::uuid AND source_transaction_id = $2`,
+            WHERE business_id = $1::uuid AND source_transaction_id = $2`,
           [params.tenantId, params.sourceTransactionId],
         );
         const row = existing.rows[0];
@@ -127,7 +127,7 @@ export class OrdersRepository {
         const it = params.items[i];
         await client.query(
           `INSERT INTO tenant.order_item
-             (tenant_id, order_id, product_id, display_order, name, variant_name,
+             (business_id, order_id, product_id, display_order, name, variant_name,
               quantity, unit_price_cents, kitchen_status)
            VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, 'new')`,
           [
@@ -147,9 +147,9 @@ export class OrdersRepository {
       // = 'new'). idempotency_key makes a partial-commit replay a no-op.
       await client.query(
         `INSERT INTO tenant.order_event
-           (tenant_id, order_id, event_kind, new_status, kitchen_status, source, idempotency_key)
+           (business_id, order_id, event_kind, new_status, kitchen_status, source, idempotency_key)
          VALUES ($1::uuid, $2::uuid, 'kitchen', 'pending', 'new', 'conversaflow', $3)
-         ON CONFLICT (tenant_id, idempotency_key) WHERE idempotency_key IS NOT NULL
+         ON CONFLICT (business_id, idempotency_key) WHERE idempotency_key IS NOT NULL
            DO NOTHING`,
         [params.tenantId, orderId, `${params.sourceTransactionId}:new`],
       );
@@ -172,12 +172,12 @@ export class OrdersRepository {
       `SELECT o.id::text, o.status, o.total_cents, o.details, o.created_at,
               (SELECT oe.kitchen_status
                  FROM tenant.order_event oe
-                WHERE oe.tenant_id = o.tenant_id AND oe.order_id = o.id
+                WHERE oe.business_id = o.business_id AND oe.order_id = o.id
                   AND oe.kitchen_status IS NOT NULL
                 ORDER BY oe.occurred_at DESC
                 LIMIT 1) AS kitchen_status
          FROM tenant."order" o
-        WHERE o.tenant_id = $1::uuid AND o.customer_id = $2::uuid
+        WHERE o.business_id = $1::uuid AND o.customer_id = $2::uuid
         ORDER BY COALESCE(o.placed_at, o.created_at) DESC
         LIMIT $3`,
       [tenantId, personId, safeLimit],
@@ -221,14 +221,14 @@ export class OrdersRepository {
       const res = await client.query(
         `UPDATE tenant."order"
             SET status = 'cancelled', updated_at = now()
-          WHERE tenant_id = $1::uuid AND id = $2::uuid`,
+          WHERE business_id = $1::uuid AND id = $2::uuid`,
         [tenantId, orderId],
       );
       if ((res.rowCount ?? 0) === 0) return false;
 
       await client.query(
         `INSERT INTO tenant.order_event
-           (tenant_id, order_id, event_kind, new_status, kitchen_status, reason, source)
+           (business_id, order_id, event_kind, new_status, kitchen_status, reason, source)
          VALUES ($1::uuid, $2::uuid, 'cancellation', 'cancelled', 'cancelled', $3, 'conversaflow')`,
         [tenantId, orderId, reason],
       );

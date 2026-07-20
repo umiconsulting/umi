@@ -12,7 +12,7 @@ import { getActivePendingClarification } from './pending-clarification';
 export interface TurnIntegrityPayload {
   conversation_id: string;
   person_id: string;
-  tenant_id: string;
+  business_id: string;
   /** Resolved business location (channel_account), threaded from ingress for
    *  location-aware tools (hours, order persistence). Null when unresolved. */
   location_id?: string | null;
@@ -65,7 +65,7 @@ export class TurnIntegrityService {
       await this.trace.logPipelineTrace({
         trace_id: traceId,
         conversation_id: payload.conversation_id,
-        business_id: payload.tenant_id,
+        business_id: payload.business_id,
         stage: 'integrity',
         event: 'failed',
         error: 'conversation_missing',
@@ -78,7 +78,7 @@ export class TurnIntegrityService {
       await this.trace.logPipelineTrace({
         trace_id: traceId,
         conversation_id: payload.conversation_id,
-        business_id: payload.tenant_id,
+        business_id: payload.business_id,
         stage: 'integrity',
         event: 'failed',
         error: 'no_trailing_user_messages',
@@ -112,7 +112,7 @@ export class TurnIntegrityService {
       await this.trace.logPipelineTrace({
         trace_id: traceId,
         conversation_id: payload.conversation_id,
-        business_id: payload.tenant_id,
+        business_id: payload.business_id,
         stage: 'integrity',
         event: 'skipped',
         detail: { reason: 'turn_already_in_progress', existing_turn_id: existingTurn.id },
@@ -129,7 +129,7 @@ export class TurnIntegrityService {
     // (set only when released) distinguishes them.
     const turn = await this.turns.upsertTurn({
       existingTurnId: existingTurn?.id ?? null,
-      tenantId: payload.tenant_id,
+      tenantId: payload.business_id,
       conversationId: payload.conversation_id,
       personId: payload.person_id,
       status: 'pending',
@@ -169,7 +169,7 @@ export class TurnIntegrityService {
       trace_id: traceId,
       conversation_id: payload.conversation_id,
       turn_id: turn.id,
-      business_id: payload.tenant_id,
+      business_id: payload.business_id,
       stage: 'integrity',
       event: 'completed',
       detail: { decision: decision.decision, reason: decision.reason },

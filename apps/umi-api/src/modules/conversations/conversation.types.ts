@@ -4,7 +4,7 @@
  * `docs/migration/2026-06-25-phase3-conversaflow-binding-preflight.md` §2.
  *
  * Legacy → canonical renames carried here: `customer_id → person_id`,
- * `business_id → tenant_id`, `body → content`.
+ * `business_id → business_id`, `body → content`.
  */
 
 /** A single line item in the conversation's draft cart (`runtime.conversation_state.draft_cart`). */

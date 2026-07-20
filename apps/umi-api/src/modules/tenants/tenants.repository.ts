@@ -33,7 +33,7 @@ export interface LocationProfileRow extends LocationRow {
 /**
  * Tenant/branch/product reads + admin writes. Tenant-scoped queries run on the
  * request path after TenantAccessGuard set the RLS context, so they go through
- * `withTenant` (umi_app, RLS) while still carrying explicit `tenant_id`
+ * `withTenant` (umi_app, RLS) while still carrying explicit `business_id`
  * predicates (defense in depth). The cross-tenant `/me/tenants` list and product
  * ENTITLEMENTS use the worker pool — the latter is MANDATORY because entitlements
  * moved to the SEALED `umi.subscription_item` (no umi_app USAGE on `umi`).
@@ -62,7 +62,7 @@ export class TenantsRepository {
          ARRAY[COALESCE(ta.role, 'super_admin')] AS "roles"
        FROM tenant.business AS t
        LEFT JOIN tenant.tenant_access AS ta
-         ON ta.tenant_id = t.id
+         ON ta.business_id = t.id
         AND ta.login_id  = $1::uuid
         AND ta.status    = 'active'
        WHERE t.status = 'active'
@@ -88,7 +88,7 @@ export class TenantsRepository {
     }>(
       `SELECT product_key AS "productKey", status, config
          FROM umi.subscription_item
-        WHERE tenant_id = $1::uuid
+        WHERE business_id = $1::uuid
         ORDER BY product_key`,
       [tenantId],
     );
@@ -106,8 +106,8 @@ export class TenantsRepository {
       c.query<LocationRow>(
         `SELECT l.id::text, l.slug, l.name, t.timezone, l.status
          FROM tenant.branch AS l
-         JOIN tenant.business AS t ON t.id = l.tenant_id
-         WHERE l.tenant_id = $1::uuid
+         JOIN tenant.business AS t ON t.id = l.business_id
+         WHERE l.business_id = $1::uuid
          ORDER BY l.created_at ASC, l.id ASC`,
         [tenantId],
       ),
@@ -137,7 +137,7 @@ export class TenantsRepository {
       c.query<{ id: string }>(
         `SELECT id::text AS id
          FROM tenant.branch
-         WHERE tenant_id = $1::uuid AND status = 'active'
+         WHERE business_id = $1::uuid AND status = 'active'
          ORDER BY created_at ASC, id ASC
          LIMIT 1`,
         [tenantId],
@@ -155,7 +155,7 @@ export class TenantsRepository {
       c.query<LocationRow>(
         `SELECT id::text, slug, name, NULL::text AS timezone, status
          FROM tenant.branch
-         WHERE tenant_id = $1::uuid AND id = $2::uuid AND status = 'active'
+         WHERE business_id = $1::uuid AND id = $2::uuid AND status = 'active'
          LIMIT 1`,
         [tenantId, locationId],
       ),
@@ -177,7 +177,7 @@ export class TenantsRepository {
       const { rows } = await this.pg.query<{ id: string }>(
         `SELECT id::text AS id
          FROM tenant.branch
-         WHERE tenant_id = $1::uuid AND id = $2::uuid AND status = 'active'
+         WHERE business_id = $1::uuid AND id = $2::uuid AND status = 'active'
          LIMIT 1`,
         [tenantId, requestedLocationId],
       );
@@ -189,7 +189,7 @@ export class TenantsRepository {
     const { rows } = await this.pg.query<{ id: string }>(
       `SELECT id::text AS id
        FROM tenant.branch
-       WHERE tenant_id = $1::uuid AND status = 'active'
+       WHERE business_id = $1::uuid AND status = 'active'
        ORDER BY created_at ASC, id ASC
        LIMIT 1`,
       [tenantId],
@@ -208,7 +208,7 @@ export class TenantsRepository {
     const { rows } = await this.pg.query<{ id: string; name: string }>(
       `SELECT id::text AS id, name
        FROM tenant.branch
-       WHERE tenant_id = $1::uuid AND status = 'active'
+       WHERE business_id = $1::uuid AND status = 'active'
        ORDER BY created_at ASC, id ASC`,
       [tenantId],
     );
@@ -238,7 +238,7 @@ export class TenantsRepository {
               aliases,
               word_similarity(lower($2), search_text) AS sim
          FROM tenant.branch
-        WHERE tenant_id = $1::uuid AND status = 'active'
+        WHERE business_id = $1::uuid AND status = 'active'
         ORDER BY sim DESC, created_at ASC`,
       [tenantId, query],
     );
@@ -299,7 +299,7 @@ export class TenantsRepository {
              aliases = COALESCE($6::text[], aliases),
              descriptor = CASE WHEN $7::boolean THEN $8 ELSE descriptor END,
              updated_at = now()
-         WHERE id = $2::uuid AND tenant_id = $1::uuid
+         WHERE id = $2::uuid AND business_id = $1::uuid
          RETURNING id::text, slug, name, timezone, status, aliases, descriptor`,
         [
           tenantId,
@@ -327,7 +327,7 @@ export class TenantsRepository {
       c.query<LocationProfileRow>(
         `SELECT id::text, slug, name, NULL::text AS timezone, status, aliases, descriptor
          FROM tenant.branch
-         WHERE tenant_id = $1::uuid AND status <> 'archived'
+         WHERE business_id = $1::uuid AND status <> 'archived'
          ORDER BY created_at ASC, id ASC`,
         [tenantId],
       ),

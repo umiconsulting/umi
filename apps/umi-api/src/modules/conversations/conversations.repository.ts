@@ -11,7 +11,7 @@ import type { ConversationRecord, DraftCart } from './conversation.types';
  *   * `runtime.conversation_state` — the LIVE cart/CAS machinery (current_state,
  *     draft_cart, pending_clarification, selected_location_id, and the
  *     optimistic-lock cursors state_version / draft_cart_version). One row per
- *     conversation, keyed (tenant_id, conversation_id).
+ *     conversation, keyed (business_id, conversation_id).
  *
  * The public {@link ConversationRecord} shape is unchanged — it is a JOIN of the
  * two tables (its `personId` field carries `tenant.conversation.customer_id`).
@@ -23,7 +23,7 @@ import type { ConversationRecord, DraftCart } from './conversation.types';
 
 interface ConversationRow {
   id: string;
-  tenant_id: string;
+  business_id: string;
   person_id: string;
   order_id: string | null;
   status: string;
@@ -39,7 +39,7 @@ interface ConversationRow {
 // columns off `runtime.conversation_state s` (LEFT JOIN + COALESCE so a thread
 // without a state row still maps cleanly).
 const SELECT_FIELDS = `c.id::text                                AS id,
-  c.tenant_id::text                        AS tenant_id,
+  c.business_id::text                        AS business_id,
   c.customer_id::text                      AS person_id,
   c.order_id::text                         AS order_id,
   c.status                                 AS status,
@@ -52,12 +52,12 @@ const SELECT_FIELDS = `c.id::text                                AS id,
 
 const FROM_JOIN = `FROM tenant.conversation c
   LEFT JOIN runtime.conversation_state s
-    ON s.tenant_id = c.tenant_id AND s.conversation_id = c.id`;
+    ON s.business_id = c.business_id AND s.conversation_id = c.id`;
 
 function mapRow(row: ConversationRow): ConversationRecord {
   return {
     id: row.id,
-    tenantId: row.tenant_id,
+    tenantId: row.business_id,
     personId: row.person_id,
     orderId: row.order_id,
     status: row.status,
@@ -98,7 +98,7 @@ export class ConversationsRepository {
         `SELECT ${SELECT_FIELDS}
            ${FROM_JOIN}
           WHERE c.customer_id = $1
-            AND c.tenant_id = $2
+            AND c.business_id = $2
             AND c.status IN ('open', 'active', 'pending')
           ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
           LIMIT 1`,
@@ -116,7 +116,7 @@ export class ConversationsRepository {
 
       const conv = await client.query<{ id: string }>(
         `INSERT INTO tenant.conversation
-           (tenant_id, customer_id, status, last_message_at)
+           (business_id, customer_id, status, last_message_at)
          VALUES ($1, $2, 'open', now())
          RETURNING id::text AS id`,
         [tenantId, personId],
@@ -128,15 +128,15 @@ export class ConversationsRepository {
 
       await client.query(
         `INSERT INTO runtime.conversation_state
-           (tenant_id, conversation_id, current_state, state_version, draft_cart_version)
+           (business_id, conversation_id, current_state, state_version, draft_cart_version)
          VALUES ($1, $2, 'initial', 0, 0)
-         ON CONFLICT (tenant_id, conversation_id) DO NOTHING`,
+         ON CONFLICT (business_id, conversation_id) DO NOTHING`,
         [tenantId, conversationId],
       );
 
       const created = await client.query<ConversationRow>(
         `SELECT ${SELECT_FIELDS} ${FROM_JOIN}
-          WHERE c.id = $1 AND c.tenant_id = $2 LIMIT 1`,
+          WHERE c.id = $1 AND c.business_id = $2 LIMIT 1`,
         [conversationId, tenantId],
       );
       if (!created.rows[0]) {

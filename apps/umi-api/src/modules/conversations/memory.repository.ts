@@ -49,7 +49,7 @@ export class MemoryRepository {
     }>(
       `SELECT metadata->>'key' AS key, metadata->'value' AS value
          FROM tenant.customer_note
-        WHERE customer_id = $1 AND tenant_id = $2 AND source = $3
+        WHERE customer_id = $1 AND business_id = $2 AND source = $3
         ORDER BY created_at`,
       [personId, tenantId, PREFERENCES_SOURCE],
     );
@@ -90,7 +90,7 @@ export class MemoryRepository {
          FROM tenant.message m
          JOIN tenant.conversation c ON c.id = m.conversation_id
         WHERE c.customer_id = $2
-          AND m.tenant_id = $1
+          AND m.business_id = $1
           AND m.body_embedding IS NOT NULL
           AND m.sender = ANY($5)
           AND m.id NOT IN (SELECT id FROM recent)
@@ -160,7 +160,7 @@ export class MemoryRepository {
     await this.pg.workerTx(async (client) => {
       await client.query(
         `DELETE FROM tenant.customer_note
-          WHERE tenant_id = $1 AND customer_id = $2 AND source = $3`,
+          WHERE business_id = $1 AND customer_id = $2 AND source = $3`,
         [tenantId, personId, PREFERENCES_SOURCE],
       );
       for (const [key, value] of Object.entries(facts)) {
@@ -168,7 +168,7 @@ export class MemoryRepository {
           typeof value === 'string' ? value : JSON.stringify(value);
         await client.query(
           `INSERT INTO tenant.customer_note
-             (tenant_id, customer_id, fact, source, metadata)
+             (business_id, customer_id, fact, source, metadata)
            VALUES ($1, $2, $3, $4, jsonb_build_object('key', $5::text, 'value', $6::jsonb))`,
           [
             tenantId,

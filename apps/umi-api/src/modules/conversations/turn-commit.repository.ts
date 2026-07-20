@@ -48,7 +48,7 @@ export class TurnCommitRepository {
       //    (or will be) delivered exactly once.
       const ob = await client.query<{ id: string }>(
         `INSERT INTO runtime.outbox_event
-           (tenant_id, event_type, aggregate_id, idempotency_key, payload)
+           (business_id, event_type, aggregate_id, idempotency_key, payload)
          VALUES ($1, $2, $3, $4, $5::jsonb)
          ON CONFLICT (idempotency_key) DO NOTHING
          RETURNING id`,
@@ -95,7 +95,7 @@ export class TurnCommitRepository {
       // 3. Persist the assistant message. Only now is the turn truly committed.
       const msg = await client.query<{ id: string }>(
         `INSERT INTO tenant.message
-           (tenant_id, conversation_id, sender, body, message_index)
+           (business_id, conversation_id, sender, body, message_index)
          VALUES ($1, $2, 'assistant', $3,
            (SELECT COALESCE(MAX(message_index) + 1, 0)
               FROM tenant.message WHERE conversation_id = $2))

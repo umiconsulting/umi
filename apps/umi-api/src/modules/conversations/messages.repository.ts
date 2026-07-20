@@ -42,7 +42,7 @@ export class MessagesRepository {
     try {
       const { rows } = await this.pg.query<{ id: string }>(
         `INSERT INTO tenant.message
-           (tenant_id, conversation_id, sender, body, intent, twilio_message_sid, message_index)
+           (business_id, conversation_id, sender, body, intent, twilio_message_sid, message_index)
          VALUES (
            $1, $2, $3, $4, $5, $6,
            (SELECT COALESCE(MAX(message_index) + 1, 0)
@@ -121,7 +121,7 @@ export class MessagesRepository {
          FROM tenant.message
         WHERE body_embedding IS NULL
           AND body IS NOT NULL
-          AND ($2::uuid IS NULL OR tenant_id = $2::uuid)
+          AND ($2::uuid IS NULL OR business_id = $2::uuid)
         LIMIT $1`,
       [limit, tenantId ?? null],
     );
