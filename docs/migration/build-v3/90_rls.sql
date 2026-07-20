@@ -49,8 +49,9 @@ grant select on umi.subscription, umi.subscription_item, umi.invoice,
 --     umi.audit_log (sealed). Left ungranted = unreadable by the request path.
 --   umi.effective_entitlement VIEW (security_invoker) — SELECT only:
 grant select on umi.effective_entitlement to api;
---   Views are read-only for api (the tenant grant-all handed it DML on the view too):
-revoke insert, update, delete on tenant.conversation_analytics from api;
+--   Views are read-only for api (the tenant grant-all handed it DML on the views too):
+revoke insert, update, delete on
+  tenant.conversation_analytics, tenant.order_total, tenant.order_ticket from api;
 
 --   runtime — only the machinery the request path legitimately serves, scoped:
 grant select, insert, update on runtime.conversation_state to api;   -- live convo FSM

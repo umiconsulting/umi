@@ -28,11 +28,22 @@ select * from (values
        where n.nspname='runtime' and c.relrowsecurity and c.relforcerowsecurity
          and c.relname in ('conversation_state','reminder_sent'))),
   -- Views: security_invoker -------------------------------------------------
-  ('views security_invoker (2)',
-    (select case when count(*)=2 then 'PASS' else 'FAIL' end from pg_class c
+  -- EVERY view in umi/tenant must enforce the caller's RLS. An owner-rights view
+  -- leaks cross-tenant (the audit reproduced this on conversation_analytics: 0
+  -- base rows, 11 cross-tenant view rows). Assert none is missing the option —
+  -- count-agnostic, so adding a view (order_total/order_ticket) can't silently pass.
+  ('every umi/tenant view is security_invoker',
+    (select case when count(*)=0 then 'PASS' else 'FAIL' end from pg_class c
        join pg_namespace n on n.oid=c.relnamespace
        where c.relkind='v' and n.nspname in ('umi','tenant')
-         and c.reloptions @> array['security_invoker=true'])),
+         and not (coalesce(c.reloptions,'{}') @> array['security_invoker=true']))),
+  -- The invoker check is count-agnostic, so it can't notice a contract view being
+  -- dropped. Assert the two order projections that consumers depend on still exist.
+  ('build-v3 order views exist (order_total, order_ticket)',
+    (select case when count(*)=2 then 'PASS' else 'FAIL' end from pg_class c
+       join pg_namespace n on n.oid=c.relnamespace
+       where c.relkind='v' and n.nspname='tenant'
+         and c.relname in ('order_total','order_ticket'))),
   ('api holds no DML on any view',
     (select case when bool_or(has_table_privilege('api',c.oid,'insert')
                            or has_table_privilege('api',c.oid,'update')
@@ -82,8 +93,8 @@ select * from (values
        from unnest(array['api','worker','readonly']) r) x)),
   -- Trigger function search_path pinned -------------------------------------
   ('trigger funcs have pinned search_path',
-    (select case when count(*)=2 then 'PASS' else 'FAIL' end from pg_proc p
-       where p.proname in ('tg_touch_updated_at','tg_append_only')
+    (select case when count(*)=3 then 'PASS' else 'FAIL' end from pg_proc p
+       where p.proname in ('tg_touch_updated_at','tg_append_only','tg_order_item_void_only')
          and array_to_string(coalesce(p.proconfig,'{}'),',') like '%search_path%')),
   -- Data hygiene (credential + PII cleaning) --------------------------------
   ('0 active users with NULL password hash',

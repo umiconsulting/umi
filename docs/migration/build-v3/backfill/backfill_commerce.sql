@@ -138,10 +138,15 @@ where b.id = oh.tenant_id;
 --      (order-level free text, unmodeled), kitchen_status (derived from latest
 --      order_event), station_id/name/pickup_person (KDS routing scratch),
 --      cancellation_reason* (contaminated free text; canceled fact is in status).
+--    total_cents: NOT carried as a stored column. build-v3 DERIVES the order total
+--      (Σ live lines, tenant.order_total). PROVEN lossless on this snapshot:
+--      total_cents = Σ(unit_price*qty WHERE NOT is_cancelled) for all 51 orders
+--      (590300 = 590300); the stored total already excluded the 3 voided lines.
+--      cancel_reason left NULL (source free-text is contaminated — see above).
 -- ----------------------------------------------------------------------------
 insert into tenant.customer_order
   (id, business_id, branch_id, customer_id, conversation_id, source,
-   fulfillment_type, status, total, external_ref, placed_at, created_at, updated_at)
+   fulfillment_type, status, external_ref, placed_at, created_at, updated_at)
 select o.id,
        o.tenant_id,
        null::uuid,
@@ -154,7 +159,6 @@ select o.id,
          when 'completed' then 'completed'
          when 'cancelled' then 'canceled'
        end,
-       o.total_cents::bigint,
        o.source_transaction_id,
        o.placed_at,
        o.created_at,
@@ -163,24 +167,30 @@ from ops.orders o;
 
 -- ----------------------------------------------------------------------------
 -- 5. ops.order_items  ->  tenant.order_item   (MAP)
---    68 non-null product_id all resolve. variant_name (63) + is_cancelled (3)
---    folded into notes (target has neither column). name = order-time snapshot.
+--    68 non-null product_id all resolve. variant_name (63) folded into notes.
+--    name = order-time snapshot.
+--    is_cancelled (3 lines / 2 orders) -> voided_at (the void tombstone). The
+--      source carries only the boolean, so updated_at stands in for the unknown
+--      exact void time — what matters is non-null, so the line leaves the
+--      derived total (this is what makes tenant.order_total reconcile to 590300).
+--    void_reason left NULL — the source has no reason (and these are known tests),
+--      so we do not fabricate one; same rule as customer_order.cancel_reason.
 --    DROPPED: display_order (cosmetic), kitchen_status (derived), metadata.
---    station_id null (source has no per-line station).
+--    station_id DEFERRED (source has no per-line station; column not built — see
+--      20_tenant.sql / ORDER_MODEL.md §5).
 -- ----------------------------------------------------------------------------
 insert into tenant.order_item
-  (id, order_id, product_id, station_id, name, quantity, unit_price, notes, created_at)
+  (id, order_id, product_id, name, quantity, unit_price, voided_at, notes, created_at)
 select oi.id,
        oi.order_id,
        oi.product_id,
-       null::uuid,
        oi.name,
        oi.quantity,
        oi.unit_price_cents::bigint,
+       case when oi.is_cancelled then oi.updated_at end,
        nullif(btrim(concat_ws(' · ',
               nullif(btrim(oi.variant_name), ''),
-              nullif(btrim(oi.notes), ''),
-              case when oi.is_cancelled then '[cancelado]' end)), ''),
+              nullif(btrim(oi.notes), ''))), ''),
        oi.created_at
 from ops.order_items oi;
 
@@ -214,20 +224,11 @@ where e.event_kind = 'status_changed';
 commit;
 
 -- ============================================================================
--- RECONCILE  (run after backfill)
+-- RECONCILE
+-- The authoritative, automated commerce checks live in reconcile_v3.sql (run by
+-- 00_run_backfill.sh). It asserts counts (customer_order=51, order_item=73,
+-- order_event=78), the two money invariants (all-lines Σ=612600, derived live
+-- total Σ=590300), and — stronger than any aggregate — PER-ORDER (derived vs
+-- source total) and PER-ITEM (is_cancelled <-> voided_at, by id) equality, so a
+-- compensating +X/-X cannot hide. Do not re-add weaker aggregate-only hints here.
 -- ============================================================================
--- select 'product_category', count(*) from tenant.product_category            -- expect 12
--- union all select 'product', count(*) from tenant.product                    -- expect 136
--- union all select 'option_group', count(*) from tenant.product_option_group  -- expect 66
--- union all select 'modifier', count(*) from tenant.product_modifier          -- expect 1256
--- union all select 'customer_order', count(*) from tenant.customer_order       -- expect 51
--- union all select 'order_item', count(*) from tenant.order_item               -- expect 73
--- union all select 'order_event', count(*) from tenant.order_event;            -- expect 78 (status_changed only)
--- -- money preserved
--- select (select sum(total_cents) from ops.orders) src,
---        (select sum(total) from tenant.customer_order) dst;                   -- must match
--- select (select sum(unit_price_cents*quantity) from ops.order_items) src,
---        (select sum(unit_price*quantity) from tenant.order_item) dst;         -- must match
--- -- no NULL status leaked
--- select count(*) from tenant.customer_order where status is null;             -- expect 0
--- select count(*) from tenant.order_event where status is null;                -- expect 0
