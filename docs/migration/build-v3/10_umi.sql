@@ -110,7 +110,7 @@ create table umi.feature (
                                         --   finer features are dotted under it ('kds.multi_branch',
                                         --   'cash.gift_cards','cash.max_branches')
   module       text not null
-                 check (module in ('cash','dashboard','conversaflow','kds')),
+                 check (module in ('cash','dashboard','conversaflow','kds','pos')),
   name         text not null,
   description  text,
   kind         text not null
@@ -118,7 +118,7 @@ create table umi.feature (
   created_at   timestamptz not null default now()
 );
 comment on column umi.feature.module is
-  'The product module a feature belongs to (the access "door": cash/dashboard/conversaflow/kds). '
+  'The product module a feature belongs to (the access "door": cash/dashboard/conversaflow/kds/pos). '
   'A bare module flag (key=module) grants the whole module; dotted keys are sub-features under it. '
   'Promote to a umi.module catalog only if the dashboard registry needs display attributes.';
 comment on column umi.feature.kind is

@@ -30,12 +30,18 @@
 -- until a real pricing reason appears). feature.module = the product module itself.
 -- ----------------------------------------------------------------------------
 
--- 4 product-module features (the "doors")
+-- 5 product-module features (the "doors"). `pos` (UmiPOS) is in the catalog so it
+-- can be entitlement-gated + billed, but is bundled into NO plan below — a café
+-- gains it only when POS is explicitly sold (a plan_feature grant or an
+-- entitlement_override). Pricing/bundling is an owner decision; catalog presence
+-- is the prerequisite (H-4/H-8). No existing café is entitled to pos, so the
+-- per-café gate counts and effective_entitlement stay unchanged.
 insert into umi.feature (key, module, name, kind) values
   ('cash',        'cash',        'Loyalty & Stored Value (umi-cash)', 'flag'),
   ('dashboard',   'dashboard',   'Owner Dashboard',                   'flag'),
   ('conversaflow','conversaflow','WhatsApp Agent (ConversaFlow)',     'flag'),
-  ('kds',         'kds',         'Kitchen Display (KDS)',             'flag')
+  ('kds',         'kds',         'Kitchen Display (KDS)',             'flag'),
+  ('pos',         'pos',         'Point of Sale (UmiPOS)',            'flag')
 on conflict (key) do nothing;
 
 -- 3 public tiers

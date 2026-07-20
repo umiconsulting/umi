@@ -7,8 +7,8 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { PRODUCT_KEYS, PRODUCT_ACTIVE_STATUSES, isProductStatusActive } = require('../dist/entitlements.cjs');
 
-test('PRODUCT_KEYS = the real gateable products (no observability/landing)', () => {
-  assert.deepEqual([...PRODUCT_KEYS], ['cash', 'conversaflow', 'kds', 'dashboard']);
+test('PRODUCT_KEYS = the real gateable products (incl. pos; no observability/landing)', () => {
+  assert.deepEqual([...PRODUCT_KEYS], ['cash', 'conversaflow', 'kds', 'dashboard', 'pos']);
 });
 
 test('PRODUCT_ACTIVE_STATUSES matches server.js port', () => {

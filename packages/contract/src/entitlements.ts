@@ -13,12 +13,13 @@
  * Products a tenant can be entitled to — the values `@RequireProduct(...)` gates
  * on, and the `product` field in the dashboard module registry.
  *
- * Note: `core.product_instances.product_key` additionally permits `observability`
- * and `landing`, but those are not tenant-purchasable products (an internal
- * subsystem and Umi's own marketing site) and no `@RequireProduct` gates on them.
- * `pos` joins this list when the POS product ships.
+ * Note: the entitlement catalog (`umi.feature`) additionally permits internal/
+ * non-purchasable modules that no `@RequireProduct` gates on. `pos` (UmiPOS) IS a
+ * purchasable product: it lives in the catalog and is gateable here, but is bundled
+ * into no plan yet — a café is entitled only when POS is explicitly sold (a
+ * `umi.plan_feature` grant or `umi.entitlement_override`).
  */
-export const PRODUCT_KEYS = ['cash', 'conversaflow', 'kds', 'dashboard'] as const;
+export const PRODUCT_KEYS = ['cash', 'conversaflow', 'kds', 'dashboard', 'pos'] as const;
 export type ProductKey = (typeof PRODUCT_KEYS)[number];
 
 /**
