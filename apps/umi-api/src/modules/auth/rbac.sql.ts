@@ -10,7 +10,8 @@
  */
 export const SUPER_ADMIN_SA_CTE = `sa AS (
          SELECT EXISTS (
-           SELECT 1 FROM tenant.tenant_access
-           WHERE login_id = $1::uuid AND role = 'super_admin' AND status = 'active'
+           SELECT 1 FROM umi.user_role AS ur
+           JOIN umi.role AS r ON r.id = ur.role_id
+           WHERE ur.user_id = $1::uuid AND r.key = 'super_admin'
          ) AS is_sa
        )`;

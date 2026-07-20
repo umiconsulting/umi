@@ -57,18 +57,19 @@ export class TenantsRepository {
       `WITH ${SUPER_ADMIN_SA_CTE}
        SELECT
          t.id::text AS "id",
-         t.slug     AS "slug",
+         t.id::text AS "slug",
          t.name     AS "name",
          t.timezone AS "timezone",
-         ARRAY[COALESCE(ta.role, 'super_admin')] AS "roles"
+         COALESCE(array_agg(r.key) FILTER (WHERE r.key IS NOT NULL),
+                  ARRAY['super_admin']) AS "roles"
        FROM tenant.business AS t
-       LEFT JOIN tenant.tenant_access AS ta
-         ON ta.business_id = t.id
-        AND ta.login_id  = $1::uuid
-        AND ta.status    = 'active'
+       LEFT JOIN umi.user_role AS ur
+         ON ur.business_id = t.id AND ur.user_id = $1::uuid
+       LEFT JOIN umi.role AS r ON r.id = ur.role_id
        WHERE t.status = 'active'
-         AND (ta.id IS NOT NULL OR (SELECT is_sa FROM sa))
-       ORDER BY t.slug`,
+         AND (ur.id IS NOT NULL OR (SELECT is_sa FROM sa))
+       GROUP BY t.id, t.name, t.timezone
+       ORDER BY t.name`,
       [userId],
     );
     return rows;

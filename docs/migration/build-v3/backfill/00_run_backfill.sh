@@ -40,6 +40,9 @@ for d in loyalty_v3 identity loyalty commerce comms device growth; do
   psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$BF/backfill_$d.sql"
 done
 
+echo "== seed: RBAC role -> permission grants (source had none) =="
+psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$BF/seed_rbac.sql"
+
 echo "== cross-schema FKs + RLS (data now present) =="
 for f in 50_cross_schema_fk 90_rls; do
   psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$DDL/$f.sql"

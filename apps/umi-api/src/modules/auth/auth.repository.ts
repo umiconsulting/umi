@@ -110,17 +110,18 @@ export class AuthRepository {
       `WITH ${SUPER_ADMIN_SA_CTE}
        SELECT
          t.id::text AS "id",
-         t.slug     AS "slug",
+         t.id::text AS "slug",
          t.name     AS "name",
-         ARRAY[COALESCE(ta.role, 'super_admin')] AS "roles"
+         COALESCE(array_agg(r.key) FILTER (WHERE r.key IS NOT NULL),
+                  ARRAY['super_admin']) AS "roles"
        FROM tenant.business AS t
-       LEFT JOIN tenant.tenant_access AS ta
-         ON ta.business_id = t.id
-        AND ta.login_id  = $1::uuid
-        AND ta.status    = 'active'
+       LEFT JOIN umi.user_role AS ur
+         ON ur.business_id = t.id AND ur.user_id = $1::uuid
+       LEFT JOIN umi.role AS r ON r.id = ur.role_id
        WHERE t.status = 'active'
-         AND (ta.id IS NOT NULL OR (SELECT is_sa FROM sa))
-       ORDER BY t.slug`,
+         AND (ur.id IS NOT NULL OR (SELECT is_sa FROM sa))
+       GROUP BY t.id, t.name
+       ORDER BY t.name`,
       [userId],
     );
     return rows;
@@ -140,32 +141,32 @@ export class AuthRepository {
   ): Promise<MembershipAccess | null> {
     const { rows } = await this.pg.query<MembershipAccess>(
       `WITH ${SUPER_ADMIN_SA_CTE},
-       edge AS (
-         SELECT ta.id, ta.role
-         FROM tenant.tenant_access AS ta
-         WHERE ta.login_id = $1::uuid
-           AND ta.business_id = $2::uuid
-           AND ta.status = 'active'
-         LIMIT 1
+       grants AS (
+         SELECT ur.id, r.key AS role_key
+         FROM umi.user_role AS ur
+         JOIN umi.role AS r ON r.id = ur.role_id
+         WHERE ur.user_id = $1::uuid AND ur.business_id = $2::uuid
        )
        SELECT
-         e.id::text  AS "membershipId",
+         (SELECT id::text FROM grants ORDER BY id LIMIT 1) AS "membershipId",
          t.id::text  AS "tenantId",
-         t.slug      AS "slug",
+         t.id::text  AS "slug",
          t.name      AS "name",
          t.timezone  AS "timezone",
-         ARRAY[COALESCE(e.role, 'super_admin')] AS "roles",
+         COALESCE((SELECT array_agg(role_key) FROM grants),
+                  ARRAY['super_admin']) AS "roles",
          COALESCE(
-           (SELECT array_agg(rp.permission_key)
+           (SELECT array_agg(DISTINCT p.key)
               FROM umi.role_permission AS rp
-             WHERE rp.role = COALESCE(e.role, 'super_admin')),
+              JOIN umi.role AS r        ON r.id = rp.role_id
+              JOIN umi.permission AS p  ON p.id = rp.permission_id
+             WHERE r.key IN (SELECT role_key FROM grants)),
            '{}'
          ) AS "permissions"
        FROM tenant.business AS t
-       LEFT JOIN edge AS e ON true
        WHERE t.id = $2::uuid
          AND t.status = 'active'
-         AND (e.id IS NOT NULL OR (SELECT is_sa FROM sa))
+         AND (EXISTS (SELECT 1 FROM grants) OR (SELECT is_sa FROM sa))
        LIMIT 1`,
       [userId, tenantId],
     );
