@@ -1,100 +1,111 @@
-import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import type { PoolClient, QueryResultRow } from 'pg';
 import { PgService } from '../../shared/database/pg.service';
 
 /**
  * The identity resolver — the TS replacement for the dropped core.resolve_contact
- * SECURITY DEFINER RPC (a bypass-RLS hole). It writes the federated identity graph
- * (tenant.contact ← tenant.contact_identity, tenant.contact ← tenant.customer)
- * deterministically, on the BYPASSRLS worker pool with explicit business_id
- * predicates (both callers — cash self-registration + WhatsApp ingress — are
- * unauthenticated), or composed into a caller's transaction via `client`.
+ * SECURITY DEFINER RPC (a bypass-RLS hole). It resolves-or-creates a customer for a
+ * (channel, value) deterministically on the BYPASSRLS worker pool with explicit
+ * business_id predicates (both callers — cash self-registration + WhatsApp ingress —
+ * are unauthenticated), or composed into a caller's transaction via `client`.
  *
- * DETERMINISTIC-FIRST (mirrors the old RPC's ladder): normalize → look up the
- * per-channel dedup spine → reuse, else create under an advisory lock with
- * ON CONFLICT + re-select-the-winner. A NULL normalized value never mints
- * duplicates: it falls back to a synthesized deterministic external_id guarded by
- * the (business_id, channel_id, external_id) partial-unique.
+ * FLAT identity model (build-v3, owner decision 2026-07-09, see
+ * docs/architecture/2026-07-09-enterprise-conceptual-review.md): the central concept
+ * is the **Customer** — "a person the café knows, identified by their Mexican mobile
+ * phone," reachable through one or more channels. `tenant.contact` is one reachability
+ * row per channel (channel_id + raw + normalized) pointing straight at the customer
+ * (`contact.customer_id`). There is NO probabilistic-resolution engine (`contact_identity`
+ * + `channel` catalog + confidence/match_type were proven inert and dropped): phone is
+ * an UNVERIFIED soft key, dedup is soft via `customer.merged_into_id`.
  *
- * CROSS-CHANNEL UNIFICATION (deterministic only): phone-family channels
- * (normalization_rule='e164' → phone/whatsapp/sms) that share the same E.164
- * resolve to ONE contact. Lookups for a phone-family channel search the whole
- * family, and a canonical `phone` identity is attached to the contact — so cash
- * (phone) and WhatsApp reach the same customer. Non-phone channels dedup only
- * within their own channel (no probabilistic merge here).
+ * DETERMINISTIC-FIRST: normalize → look up the phone-family reachability spine → reuse
+ * the customer, else create one under an advisory lock (re-check inside). A NULL
+ * normalized value never unifies (it just gets its own reachability row). Cross-channel
+ * unification is natural: phone/whatsapp/sms all normalize to the same E.164, so a match
+ * on `(business_id, normalized_value)` across the phone family reaches one customer.
  */
 @Injectable()
 export class IdentityResolver {
   private readonly logger = new Logger(IdentityResolver.name);
 
-  /** key → channel row. Global catalog, process-lifetime memoized. */
+  /** key → channel row (id + code-side normalization rule). Process-lifetime memoized. */
   private channelCache = new Map<string, ChannelRow>();
   /** ids of the e164 phone-family channels (phone/whatsapp/sms), lazily loaded. */
-  private phoneFamily: { ids: string[]; phoneId: string } | null = null;
+  private phoneFamily: { ids: string[] } | null = null;
 
   constructor(private readonly pg: PgService) {}
 
-  /** The canonical global channel catalog (mirrors the 11_tenant_core seed). */
+  /**
+   * The canonical global channel catalog. Normalization rules live HERE (code-side):
+   * the flat model keeps no normalization_rule column on umi.channel_type.
+   */
   static readonly CANONICAL_CHANNELS: ReadonlyArray<
-    [key: string, namespace: string | null, rule: NormalizationRule, det: boolean, trust: number]
+    [key: string, rule: NormalizationRule]
   > = [
-    ['phone', null, 'e164', true, 0.9],
-    ['whatsapp', 'meta', 'e164', true, 0.85],
-    ['sms', null, 'e164', true, 0.85],
-    ['email', null, 'lower', true, 0.8],
-    ['instagram', 'meta', 'none', false, 0.6],
-    ['messenger', 'meta', 'none', false, 0.6],
-    ['pos', null, 'none', false, 0.5],
-    ['web', null, 'none', false, 0.5],
-    ['manual', null, 'none', false, 0.5],
+    ['phone', 'e164'],
+    ['whatsapp', 'e164'],
+    ['sms', 'e164'],
+    ['email', 'lower'],
+    ['instagram', 'none'],
+    ['messenger', 'none'],
+    ['pos', 'none'],
+    ['web', 'none'],
+    ['manual', 'none'],
   ];
 
+  private static readonly RULE_BY_KEY: ReadonlyMap<string, NormalizationRule> =
+    new Map(IdentityResolver.CANONICAL_CHANNELS);
+
+  private static readonly PHONE_FAMILY_KEYS: readonly string[] =
+    IdentityResolver.CANONICAL_CHANNELS.filter(([, r]) => r === 'e164').map(([k]) => k);
+
   /**
-   * Idempotently upsert the canonical channel catalog on the worker pool. The DDL
-   * seeds it too — this is a bootstrap safety net for environments that manage
+   * Idempotently ensure the channel catalog exists on the worker pool. The DDL seeds
+   * umi.channel_type — this is a bootstrap safety net for environments that manage
    * reference data from the app. Clears the memo so a re-seed is observed.
    */
   async seedChannels(): Promise<void> {
-    for (const [key, ns, rule, det, trust] of IdentityResolver.CANONICAL_CHANNELS) {
+    for (const [key] of IdentityResolver.CANONICAL_CHANNELS) {
       await this.pg.query(
-        `INSERT INTO tenant.channel (key, namespace, normalization_rule, deterministic_matchable, default_trust)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO umi.channel_type (key, name)
+         VALUES ($1, initcap($1))
          ON CONFLICT (key) DO NOTHING`,
-        [key, ns, rule, det, trust],
+        [key],
       );
     }
     this.channelCache.clear();
     this.phoneFamily = null;
   }
 
-  /** Resolve (and memoize) a channel row by key. Throws on an unknown channel. */
+  /** Resolve (and memoize) a channel by key: its umi.channel_type id + code-side rule. */
   async resolveChannel(channelKey: string, client?: PoolClient): Promise<ChannelRow> {
     const cached = this.channelCache.get(channelKey);
     if (cached) return cached;
-    const { rows } = await this.run<ChannelRow>(
+    const { rows } = await this.run<{ id: string; key: string }>(
       client ?? null,
-      `SELECT id::text AS id, key,
-              normalization_rule AS "normalizationRule",
-              deterministic_matchable AS "deterministicMatchable"
-       FROM tenant.channel WHERE key = $1 LIMIT 1`,
+      `SELECT id::text AS id, key FROM umi.channel_type WHERE key = $1 LIMIT 1`,
       [channelKey],
     );
     const row = rows[0];
     if (!row) {
       throw new Error(
-        `identity: unknown channel '${channelKey}' — is tenant.channel seeded?`,
+        `identity: unknown channel '${channelKey}' — is umi.channel_type seeded?`,
       );
     }
-    this.channelCache.set(channelKey, row);
-    return row;
+    const channel: ChannelRow = {
+      id: row.id,
+      key: row.key,
+      normalizationRule: IdentityResolver.RULE_BY_KEY.get(channelKey) ?? 'none',
+    };
+    this.channelCache.set(channelKey, channel);
+    return channel;
   }
 
   /**
-   * The single resolve-or-create entry point. Returns the stable contact +
-   * customer ids for the given (channel, value). Composable: pass `client` to run
-   * inside the caller's transaction (e.g. cash register composing card creation);
-   * otherwise runs in its own worker transaction.
+   * The single resolve-or-create entry point. Returns the stable contact + customer
+   * ids for the given (channel, value). Composable: pass `client` to run inside the
+   * caller's transaction (e.g. cash register composing card creation); otherwise runs
+   * in its own worker transaction.
    */
   async resolveIdentity(input: ResolveInput): Promise<ResolvedIdentity> {
     if (input.client) return this.resolveWithin(input.client, input);
@@ -110,85 +121,58 @@ export class IdentityResolver {
     const normalized = await this.normalize(c, channelKey, input.rawValue);
     const isPhoneFamily = channel.normalizationRule === 'e164' && normalized != null;
 
-    // A NULL normalized value would escape the dedup unique (NULLS DISTINCT), so
-    // synthesize a stable external_id and rely on the external_id partial-unique.
-    const externalKey =
-      input.externalId ??
-      (normalized == null ? this.deriveExternalKey(input) : null);
-
-    // Phone-family lookups search the whole family (phone/whatsapp/sms) so a
-    // shared E.164 unifies; other channels dedup within themselves.
+    // Phone-family lookups search the whole family (phone/whatsapp/sms) so a shared
+    // E.164 unifies; other channels dedup within themselves. A NULL normalized value
+    // cannot unify — it always mints a fresh reachability row (soft-key model).
     const lookupChannelIds = isPhoneFamily
-      ? (await this.getPhoneFamily(c)).ids
+      ? await this.getPhoneFamily(c)
       : [channel.id];
 
-    let contactId = await this.findContact(
-      c,
-      tenantId,
-      lookupChannelIds,
-      normalized,
-      channel.id,
-      externalKey,
-    );
+    let found =
+      normalized == null
+        ? null
+        : await this.findCustomer(c, tenantId, lookupChannelIds, normalized);
+    let customerId: string;
     let created = false;
 
-    if (!contactId) {
+    if (found) {
+      customerId = found;
+    } else {
       // Serialize concurrent first-sightings of the same identity.
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1)::bigint)', [
-        `${tenantId}:${normalized ?? `${channel.id}:${externalKey}`}`,
+        `${tenantId}:${normalized ?? `${channel.id}:new`}`,
       ]);
-      contactId = await this.findContact(
-        c,
-        tenantId,
-        lookupChannelIds,
-        normalized,
-        channel.id,
-        externalKey,
-      );
-      if (!contactId) {
-        contactId = await this.createContact(c, tenantId);
+      found =
+        normalized == null
+          ? null
+          : await this.findCustomer(c, tenantId, lookupChannelIds, normalized);
+      if (found) {
+        customerId = found;
+      } else {
+        customerId = await this.createCustomer(c, tenantId, input.displayName ?? null);
         created = true;
       }
     }
 
-    // Ensure THIS channel's reachability row exists on the contact (idempotent).
-    await this.ensureIdentity(c, {
+    // Ensure THIS channel's reachability row exists on the customer (idempotent). For
+    // WhatsApp this stores the as-received +521… reply address (see getReplyContext).
+    const contactId = await this.ensureContact(c, {
       tenantId,
-      contactId,
+      customerId,
       channelId: channel.id,
+      isPhoneFamily: channel.normalizationRule === 'e164',
+      rawValue: input.rawValue,
       normalized,
-      externalId: externalKey,
-      displayValue: input.rawValue,
-      collectedVia: input.collectedVia ?? channelKey,
       verified: input.verified ?? false,
+      channelKey,
     });
 
-    // Deterministic cross-channel unification: attach the canonical `phone`
-    // identity so cash(phone) and whatsapp/sms share this contact.
-    if (isPhoneFamily && channelKey !== 'phone' && normalized) {
-      const { phoneId } = await this.getPhoneFamily(c);
-      await this.ensureIdentity(c, {
-        tenantId,
-        contactId,
-        channelId: phoneId,
-        normalized,
-        externalId: null,
-        displayValue: input.rawValue,
-        collectedVia: `unified:${channelKey}`,
-        verified: false,
-      });
-    }
-
-    const customerId = await this.ensureCustomer(c, tenantId, contactId, {
-      name: input.displayName ?? null,
-    });
     return { contactId, customerId, created };
   }
 
   /**
-   * Lookup-ONLY (no create) over the deterministic spine. Used by public read
-   * paths (cash-register.findExisting, cash-write.findPersonCard). Phone-family
-   * values match across the family.
+   * Lookup-ONLY (no create) over the reachability spine. Phone-family values match
+   * across the family. Returns the surviving customer (follows merged_into_id).
    */
   async lookupIdentity(input: LookupInput): Promise<LookupResult | null> {
     const channel = await this.resolveChannel(input.channelKey);
@@ -197,73 +181,34 @@ export class IdentityResolver {
       (input.rawValue != null
         ? await this.normalize(null, input.channelKey, input.rawValue)
         : null);
-    const isPhoneFamily = channel.normalizationRule === 'e164' && normalized != null;
+    if (normalized == null) return null;
+    const isPhoneFamily = channel.normalizationRule === 'e164';
     const lookupChannelIds = isPhoneFamily
-      ? (await this.getPhoneFamily(null)).ids
+      ? await this.getPhoneFamily(null)
       : [channel.id];
 
-    const contactId = await this.findContact(
+    const { rows } = await this.run<{ contactId: string; customerId: string }>(
       null,
-      input.tenantId,
-      lookupChannelIds,
-      normalized,
-      channel.id,
-      input.externalId ?? null,
+      `SELECT c.id::text        AS "contactId",
+              coalesce(m.id, cu.id)::text AS "customerId"
+         FROM tenant.contact c
+         JOIN tenant.customer cu ON cu.id = c.customer_id
+         LEFT JOIN tenant.customer m ON m.id = cu.merged_into_id
+        WHERE c.business_id = $1::uuid
+          AND c.channel_id = ANY($2::uuid[])
+          AND c.normalized_value = $3
+        ORDER BY c.is_primary DESC, c.updated_at DESC
+        LIMIT 1`,
+      [input.tenantId, lookupChannelIds, normalized],
     );
-    if (!contactId) return null;
-    const { rows } = await this.run<{ customerId: string | null }>(
-      null,
-      `SELECT id::text AS "customerId" FROM tenant.customer
-       WHERE business_id = $1::uuid AND contact_id = $2::uuid LIMIT 1`,
-      [input.tenantId, contactId],
-    );
-    return { contactId, customerId: rows[0]?.customerId ?? null };
-  }
-
-  /** INSERT-or-reuse the one customer per contact. */
-  async ensureCustomer(
-    c: PoolClient | null,
-    tenantId: string,
-    contactId: string,
-    patch?: { name?: string | null; bornAt?: string | null },
-  ): Promise<string> {
-    // COALESCE so an incoming null never clobbers an existing name/born_at.
-    const { rows } = await this.run<{ id: string }>(
-      c,
-      `INSERT INTO tenant.customer (business_id, contact_id, name, born_at)
-         VALUES ($1::uuid, $2::uuid, nullif($3, ''), $4::date)
-       ON CONFLICT (business_id, contact_id) DO UPDATE
-         SET name = COALESCE(tenant.customer.name, EXCLUDED.name),
-             born_at = COALESCE(tenant.customer.born_at, EXCLUDED.born_at),
-             updated_at = now()
-       RETURNING id::text AS id`,
-      [tenantId, contactId, patch?.name ?? null, patch?.bornAt ?? null],
-    );
-    return rows[0].id;
-  }
-
-  /** Replaces cash-register.updatePerson: profile only, never reachability. */
-  async updateCustomerProfile(
-    tenantId: string,
-    customerId: string,
-    patch: { name?: string | null; bornAt?: string | null },
-    client?: PoolClient,
-  ): Promise<void> {
-    await this.run(
-      client ?? null,
-      `UPDATE tenant.customer
-         SET name = COALESCE($3, name),
-             born_at = COALESCE($4::date, born_at),
-             updated_at = now()
-       WHERE business_id = $1::uuid AND id = $2::uuid`,
-      [tenantId, customerId, patch.name ?? null, patch.bornAt ?? null],
-    );
+    const r = rows[0];
+    return r ? { contactId: r.contactId, customerId: r.customerId } : null;
   }
 
   /**
-   * The customer's name + the channel reply address (WhatsApp's as-received
-   * +521… display_value that Twilio must reply to — avoids error 63015).
-   * Replaces identity.getPerson/getPersonName.
+   * The customer's name + the channel reply address (WhatsApp's as-received +521…
+   * raw_phone_number that Twilio must reply to — avoids error 63015). `canonicalValue`
+   * is the E.164 anchor. Replaces identity.getPerson/getPersonName.
    */
   async getReplyContext(
     tenantId: string,
@@ -277,22 +222,33 @@ export class IdentityResolver {
     }>(
       null,
       `SELECT cu.name,
-              ci.normalized_value AS "canonicalValue",
-              ci.display_value    AS "replyAddress"
+              anchor.normalized_value AS "canonicalValue",
+              coalesce(reply.raw_phone_number, anchor.normalized_value) AS "replyAddress"
        FROM tenant.customer cu
        LEFT JOIN LATERAL (
-         SELECT i.normalized_value, i.display_value
-         FROM tenant.contact_identity i
-         JOIN tenant.channel ch ON ch.id = i.channel_id
-         WHERE i.business_id = cu.business_id
-           AND i.contact_id = cu.contact_id
-           AND ch.key = $3
-         ORDER BY i.is_primary DESC, i.last_seen_at DESC
+         SELECT co.normalized_value
+         FROM tenant.contact co
+         JOIN umi.channel_type ch ON ch.id = co.channel_id
+         WHERE co.business_id = cu.business_id
+           AND co.customer_id = cu.id
+           AND ch.key = ANY($3::text[])
+           AND co.normalized_value IS NOT NULL
+         ORDER BY co.is_primary DESC, co.updated_at DESC
          LIMIT 1
-       ) ci ON true
+       ) anchor ON true
+       LEFT JOIN LATERAL (
+         SELECT co.raw_phone_number
+         FROM tenant.contact co
+         JOIN umi.channel_type ch ON ch.id = co.channel_id
+         WHERE co.business_id = cu.business_id
+           AND co.customer_id = cu.id
+           AND ch.key = $4
+         ORDER BY co.is_primary DESC, co.updated_at DESC
+         LIMIT 1
+       ) reply ON true
        WHERE cu.business_id = $1::uuid AND cu.id = $2::uuid
        LIMIT 1`,
-      [tenantId, customerId, channelKey],
+      [tenantId, customerId, IdentityResolver.PHONE_FAMILY_KEYS, channelKey],
     );
     const r = rows[0];
     if (!r) return null;
@@ -305,7 +261,7 @@ export class IdentityResolver {
 
   // ── internals ──────────────────────────────────────────────────────────────
 
-  /** DB-side normalize (immutable, identical to any backfill). */
+  /** DB-side normalize (immutable, identical to the backfill's core.normalize_phone). */
   private async normalize(
     c: PoolClient | null,
     channelKey: string,
@@ -319,143 +275,133 @@ export class IdentityResolver {
     return rows[0]?.n ?? null;
   }
 
-  /** ids of the e164 phone-family channels + the canonical `phone` id. */
-  private async getPhoneFamily(
-    c: PoolClient | null,
-  ): Promise<{ ids: string[]; phoneId: string }> {
-    if (this.phoneFamily) return this.phoneFamily;
-    const { rows } = await this.run<{ id: string; key: string }>(
+  /** ids of the e164 phone-family channels (phone/whatsapp/sms). */
+  private async getPhoneFamily(c: PoolClient | null): Promise<string[]> {
+    if (this.phoneFamily) return this.phoneFamily.ids;
+    const { rows } = await this.run<{ id: string }>(
       c,
-      `SELECT id::text AS id, key FROM tenant.channel WHERE normalization_rule = 'e164'`,
-      [],
+      `SELECT id::text AS id FROM umi.channel_type WHERE key = ANY($1::text[])`,
+      [IdentityResolver.PHONE_FAMILY_KEYS],
     );
-    const phone = rows.find((r) => r.key === 'phone');
-    if (!phone) {
-      throw new Error('identity: canonical `phone` channel missing from catalog');
+    if (rows.length === 0) {
+      throw new Error('identity: phone-family channels missing from umi.channel_type');
     }
-    this.phoneFamily = { ids: rows.map((r) => r.id), phoneId: phone.id };
-    return this.phoneFamily;
+    this.phoneFamily = { ids: rows.map((r) => r.id) };
+    return this.phoneFamily.ids;
   }
 
   /**
-   * A stable external_id for identities with no normalized value, so they can't
-   * escape the dedup unique via NULLS DISTINCT. Phone-like → last-10 digits;
-   * otherwise a source-tagged key (falls back to a random uuid only when there is
-   * genuinely nothing deterministic to key on).
+   * Find the surviving customer reachable at `normalized` across `channelIds`.
+   * Follows customer.merged_into_id so a soft-merged duplicate resolves to its target.
    */
-  private deriveExternalKey(input: ResolveInput): string {
-    const digits = (input.rawValue ?? '').replace(/\D/g, '');
-    if (digits.length >= 10) return `last10:${digits.slice(-10)}`;
-    const src = input.collectedVia ?? input.channelKey ?? 'unknown';
-    return `src:${src}:${input.externalId ?? input.rawValue ?? randomUUID()}`;
-  }
-
-  /** Find a contact by normalized value (across channelIds) then by external_id. */
-  private async findContact(
+  private async findCustomer(
     c: PoolClient | null,
     tenantId: string,
     channelIds: string[],
-    normalized: string | null,
-    externalChannelId: string,
-    externalId: string | null,
+    normalized: string,
   ): Promise<string | null> {
-    if (normalized != null) {
-      const { rows } = await this.run<{ contactId: string }>(
-        c,
-        `SELECT contact_id::text AS "contactId"
-         FROM tenant.contact_identity
-         WHERE business_id = $1::uuid
-           AND channel_id = ANY($2::uuid[])
-           AND normalized_value = $3
-         ORDER BY is_primary DESC, last_seen_at DESC
-         LIMIT 1`,
-        [tenantId, channelIds, normalized],
-      );
-      if (rows[0]) return rows[0].contactId;
-    }
-    if (externalId != null) {
-      const { rows } = await this.run<{ contactId: string }>(
-        c,
-        `SELECT contact_id::text AS "contactId"
-         FROM tenant.contact_identity
-         WHERE business_id = $1::uuid
-           AND channel_id = $2::uuid
-           AND external_id = $3
-         LIMIT 1`,
-        [tenantId, externalChannelId, externalId],
-      );
-      if (rows[0]) return rows[0].contactId;
-    }
-    return null;
+    const { rows } = await this.run<{ customerId: string }>(
+      c,
+      `SELECT coalesce(m.id, cu.id)::text AS "customerId"
+         FROM tenant.contact ct
+         JOIN tenant.customer cu ON cu.id = ct.customer_id
+         LEFT JOIN tenant.customer m ON m.id = cu.merged_into_id
+        WHERE ct.business_id = $1::uuid
+          AND ct.channel_id = ANY($2::uuid[])
+          AND ct.normalized_value = $3
+        ORDER BY ct.is_primary DESC, ct.updated_at DESC
+        LIMIT 1`,
+      [tenantId, channelIds, normalized],
+    );
+    return rows[0]?.customerId ?? null;
   }
 
-  private async createContact(
+  private async createCustomer(
     c: PoolClient,
     tenantId: string,
+    name: string | null,
   ): Promise<string> {
     const { rows } = await c.query<{ id: string }>(
-      `INSERT INTO tenant.contact (business_id) VALUES ($1::uuid) RETURNING id::text AS id`,
-      [tenantId],
+      `INSERT INTO tenant.customer (business_id, name)
+         VALUES ($1::uuid, nullif($2, ''))
+       RETURNING id::text AS id`,
+      [tenantId, name],
     );
     return rows[0].id;
   }
 
   /**
-   * Idempotent reachability upsert. Value-keyed rows conflict on
-   * (business_id, channel_id, normalized_value); external-only rows conflict on the
-   * (business_id, channel_id, external_id) partial-unique. is_primary is set only
-   * when the contact has no primary for this channel yet.
+   * Idempotent per-channel reachability upsert. One reachability row per
+   * (customer, channel, normalized_value): reuse it if present (refresh updated_at +
+   * upgrade verification), else insert. First row for (customer, channel) is primary.
+   * Phone-family stores the raw as-received number in raw_phone_number; other channels
+   * store it in raw_value. No unique constraint exists (phone is a soft key), so the
+   * caller must hold the advisory lock when a create is possible.
    */
-  private async ensureIdentity(
+  private async ensureContact(
     c: PoolClient,
     i: {
       tenantId: string;
-      contactId: string;
+      customerId: string;
       channelId: string;
+      isPhoneFamily: boolean;
+      rawValue: string | null;
       normalized: string | null;
-      externalId: string | null;
-      displayValue: string | null;
-      collectedVia: string | null;
       verified: boolean;
+      channelKey: string;
     },
-  ): Promise<void> {
-    // First primary for (contact, channel)? Keeps the partial-unique satisfied.
-    const { rows: existing } = await c.query<{ n: string }>(
-      `SELECT 1 AS n FROM tenant.contact_identity
-       WHERE business_id = $1::uuid AND contact_id = $2::uuid AND channel_id = $3::uuid
-         AND is_primary LIMIT 1`,
-      [i.tenantId, i.contactId, i.channelId],
+  ): Promise<string> {
+    const { rows: existing } = await c.query<{ id: string }>(
+      `SELECT id::text AS id FROM tenant.contact
+        WHERE business_id = $1::uuid AND customer_id = $2::uuid AND channel_id = $3::uuid
+          AND normalized_value IS NOT DISTINCT FROM $4
+        LIMIT 1`,
+      [i.tenantId, i.customerId, i.channelId, i.normalized],
     );
-    const isPrimary = existing.length === 0;
-    const conflictTarget =
-      i.normalized != null
-        ? '(business_id, channel_id, normalized_value)'
-        : '(business_id, channel_id, external_id) WHERE external_id IS NOT NULL';
+    const verifiedVia = i.verified && i.channelKey === 'whatsapp'
+      ? 'whatsapp_inbound'
+      : 'self_asserted';
+    if (existing[0]) {
+      // Refresh; only ever upgrade verified false→true (whatsapp_inbound proves it).
+      await c.query(
+        `UPDATE tenant.contact
+            SET updated_at = now(),
+                verified = tenant.contact.verified OR $2,
+                verified_via = CASE WHEN $2 AND NOT tenant.contact.verified
+                                    THEN $3 ELSE tenant.contact.verified_via END
+          WHERE id = $1::uuid`,
+        [existing[0].id, i.verified, verifiedVia],
+      );
+      return existing[0].id;
+    }
 
-    await c.query(
-      `INSERT INTO tenant.contact_identity
-         (business_id, contact_id, channel_id, normalized_value, external_id,
-          display_value, collected_via, match_type, is_primary, verified_at, last_seen_at)
-       VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, 'deterministic', $8,
-               CASE WHEN $9 THEN now() ELSE NULL END, now())
-       ON CONFLICT ${conflictTarget} DO UPDATE
-         SET last_seen_at = now(),
-             verified_at = COALESCE(tenant.contact_identity.verified_at,
-                                    EXCLUDED.verified_at),
-             display_value = COALESCE(tenant.contact_identity.display_value,
-                                      EXCLUDED.display_value)`,
+    const { rows: primaryExists } = await c.query<{ n: number }>(
+      `SELECT 1 AS n FROM tenant.contact
+        WHERE business_id = $1::uuid AND customer_id = $2::uuid AND channel_id = $3::uuid
+          AND is_primary LIMIT 1`,
+      [i.tenantId, i.customerId, i.channelId],
+    );
+    const isPrimary = primaryExists.length === 0;
+
+    const { rows } = await c.query<{ id: string }>(
+      `INSERT INTO tenant.contact
+         (business_id, customer_id, channel_id, raw_phone_number, raw_value,
+          normalized_value, is_primary, verified, verified_via)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9)
+       RETURNING id::text AS id`,
       [
         i.tenantId,
-        i.contactId,
+        i.customerId,
         i.channelId,
+        i.isPhoneFamily ? i.rawValue : null,
+        i.isPhoneFamily ? null : i.rawValue,
         i.normalized,
-        i.externalId,
-        i.displayValue,
-        i.collectedVia,
         isPrimary,
         i.verified,
+        i.verified ? verifiedVia : 'self_asserted',
       ],
     );
+    return rows[0].id;
   }
 
   /** Run on the given client, else the worker pool. */
@@ -480,7 +426,6 @@ interface ChannelRow {
   id: string;
   key: string;
   normalizationRule: NormalizationRule;
-  deterministicMatchable: boolean;
 }
 
 export interface ResolveInput {
@@ -511,7 +456,7 @@ export interface LookupInput {
 
 export interface LookupResult {
   contactId: string;
-  customerId: string | null;
+  customerId: string;
 }
 
 export interface ReplyContext {
