@@ -47,8 +47,8 @@ export interface ResetTokenRecord {
  * Auth/membership/entitlement reads. These run BEFORE any tenant RLS context
  * exists (login resolves which tenants a user has), so they use the worker pool
  * (`query`) with explicit parameterized predicates — never `withTenant`. The
- * worker pool is also MANDATORY here because the entitlement + RBAC-policy tables
- * (`umi.subscription_item`, `umi.role_permission`) live in the SEALED `umi`
+ * worker pool is also MANDATORY here because the entitlement + RBAC-policy sources
+ * (`umi.effective_entitlement`, `umi.role_permission`) live in the SEALED `umi`
  * schema that `umi_app` has no USAGE on.
  *
  * build-v3 model: staff credentials + identity live on `umi.user` (email + hash +
@@ -193,20 +193,27 @@ export class AuthRepository {
   }
 
   /**
-   * Tenant-level product entitlement status. Entitlements live in the sealed
-   * `umi.subscription_item` (tenant granularity — no location_id), read on the
-   * worker pool.
+   * Tenant-level product entitlement status — the SINGLE SOURCE is the derived
+   * `umi.effective_entitlement` view (plan_feature overlaid by override, already
+   * filtered to trialing/active subscriptions). A feature is entitled iff an
+   * `enabled` row exists for it; we join `umi.subscription` back for the café's
+   * real status so the guard keeps its `active`/`trialing` vocabulary. Read on the
+   * worker pool, which is BYPASSRLS — the view is `security_invoker`, so RLS does
+   * NOT scope it here; the explicit `business_id` predicate does. Returns null when
+   * the feature is absent/disabled (→ `product_not_active`).
    */
   async productStatus(
     tenantId: string,
     productKey: string,
   ): Promise<string | null> {
     const { rows } = await this.pg.query<{ status: string }>(
-      `SELECT status
-       FROM umi.subscription_item
-       WHERE business_id = $1::uuid
-         AND product_key = $2
-       LIMIT 1`,
+      `SELECT s.status
+         FROM umi.effective_entitlement AS ee
+         JOIN umi.subscription          AS s ON s.business_id = ee.business_id
+        WHERE ee.business_id = $1::uuid
+          AND ee.feature_key = $2
+          AND ee.enabled
+        LIMIT 1`,
       [tenantId, productKey],
     );
     return rows[0]?.status ?? null;

@@ -36,11 +36,12 @@ export interface LocationProfileRow extends LocationRow {
  * `withTenant` (umi_app, RLS) while still carrying explicit `business_id`
  * predicates (defense in depth). The cross-tenant `/me/tenants` list and product
  * ENTITLEMENTS use the worker pool — the latter is MANDATORY because entitlements
- * moved to the SEALED `umi.subscription_item` (no umi_app USAGE on `umi`).
+ * live in the SEALED `umi` schema (no umi_app USAGE on `umi`).
  *
  * 4-schema model (canonical rebuild v2): core.tenants -> tenant.business,
- * core.locations -> tenant.branch, core.product_instances -> umi.subscription_item
- * (tenant granularity — no location_id), RBAC -> tenant.tenant_access single role.
+ * core.locations -> tenant.branch, core.product_instances -> the entitlement
+ * cluster read via `umi.effective_entitlement` (tenant granularity — no
+ * location_id), RBAC -> tenant.tenant_access single role.
  */
 @Injectable()
 export class TenantsRepository {
@@ -74,9 +75,14 @@ export class TenantsRepository {
   }
 
   /**
-   * Tenant-level product entitlements. Reads the SEALED umi.subscription_item on
-   * the WORKER pool (umi_app has no USAGE on `umi`). Entitlements are tenant-
-   * grained now — locationId is always null (kept for result-shape stability).
+   * Tenant-level product entitlements — the SINGLE SOURCE is the derived
+   * `umi.effective_entitlement` view (same source the EntitlementGuard reads), so
+   * the capabilities map and per-request gating can never disagree. Each `enabled`
+   * feature becomes a product keyed by `feature_key`, carrying the café's real
+   * subscription status (joined from `umi.subscription`). Read on the WORKER pool
+   * (BYPASSRLS): the view is `security_invoker`, so the explicit `business_id`
+   * predicate — not RLS — scopes it. `locationId` stays null (tenant-grained) and
+   * `config` is `{}` (build-v3 carries no per-product config in this view).
    */
   async loadProducts(
     tenantId: string,
@@ -84,18 +90,19 @@ export class TenantsRepository {
     const { rows } = await this.pg.query<{
       productKey: string;
       status: string;
-      config: Record<string, unknown> | null;
     }>(
-      `SELECT product_key AS "productKey", status, config
-         FROM umi.subscription_item
-        WHERE business_id = $1::uuid
-        ORDER BY product_key`,
+      `SELECT ee.feature_key AS "productKey", s.status
+         FROM umi.effective_entitlement AS ee
+         JOIN umi.subscription          AS s ON s.business_id = ee.business_id
+        WHERE ee.business_id = $1::uuid
+          AND ee.enabled
+        ORDER BY ee.feature_key`,
       [tenantId],
     );
     return Object.fromEntries(
       rows.map((r) => [
         r.productKey,
-        { status: r.status, locationId: null, config: r.config ?? {} },
+        { status: r.status, locationId: null, config: {} },
       ]),
     );
   }
