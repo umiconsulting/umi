@@ -10,6 +10,59 @@ import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 import type { AppConfig } from '../config/config.schema';
 import { getRequestContext } from './request-context';
 
+/** The connected role's D1-relevant attributes, read off `pg_roles`. */
+export interface PoolRoleAttributes {
+  role: string;
+  /** rolsuper — a superuser bypasses RLS and every grant. */
+  superuser: boolean;
+  /** rolbypassrls — reads/writes ignore RLS policies. */
+  bypassrls: boolean;
+  /**
+   * pg_has_role(current_user, <group>, 'USAGE') — the role can *use* the group's
+   * privileges without `SET ROLE`, i.e. it INHERITs them. Stronger than 'MEMBER':
+   * a NOINHERIT member holds the grant but not its privileges (D5), so USAGE
+   * catches that mis-wiring at boot instead of at the first query.
+   */
+  inheritsGroup: boolean;
+}
+
+/**
+ * Pure D1 boot-guard decision (SECURITY_GATE.md §4). Given the role a pool
+ * actually connected as, return a human-readable problem, or `null` when the
+ * pool is wired correctly. Role ATTRIBUTES (super/bypassrls) never inherit
+ * through membership, so they are read off `current_user` itself; `inheritsGroup`
+ * uses `pg_has_role(...,'USAGE')`, true only when the role INHERITs the group's
+ * privileges (prod/D5 wiring: `api_login IN ROLE api`) — so a correctly-wired
+ * login role passes and cutover stays an env change, not a code change. Exported
+ * so the guard is unit-testable without a DB.
+ */
+export function poolRoleProblem(
+  pool: 'app' | 'worker',
+  group: 'api' | 'worker',
+  wantBypassRls: boolean,
+  attrs: PoolRoleAttributes | undefined,
+): string | null {
+  if (!attrs) {
+    return `${pool} pool: current_user has no row in pg_roles (cannot verify D1).`;
+  }
+  const issues: string[] = [];
+  if (attrs.superuser) issues.push('role is SUPERUSER');
+  if (attrs.bypassrls !== wantBypassRls) {
+    issues.push(`rolbypassrls=${attrs.bypassrls} (expected ${wantBypassRls})`);
+  }
+  if (!attrs.inheritsGroup) {
+    issues.push(
+      `role does not inherit "${group}" (needs INHERIT membership so its grants are active)`,
+    );
+  }
+  if (issues.length === 0) return null;
+  return (
+    `${pool} pool role "${attrs.role}" is misconfigured: ${issues.join('; ')}. ` +
+    `The ${pool} pool must connect as "${group}" (or an INHERIT member of it) — ` +
+    `see SECURITY_GATE.md §4 D1 and test/integration/harness-roles.sql.`
+  );
+}
+
 /**
  * The single data-access primitive. No ORM (D8) — raw parameterized SQL.
  * Two pools, one per Postgres role — the role is embedded in each connection
@@ -68,6 +121,12 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
       this.worker.query('SELECT 1'),
     ]);
 
+    // D1 boot guard (SECURITY_GATE.md §4) — refuse to boot on a mis-wired
+    // DATABASE_URL_*. Runs on every boot (independent of TLS): a role that is
+    // superuser or wrongly (non-)BYPASSRLS is a silent privilege escalation the
+    // request path would run under, so we assert it here rather than assume it.
+    await this.assertPoolRoles();
+
     if (!this.tlsEnforced) {
       this.logger.log('Postgres pools ready (app + worker roles, no TLS — local/dev)');
       return;
@@ -92,6 +151,46 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
       }
     }
     this.logger.log('Postgres pools ready (app + worker roles, TLS verify-full)');
+  }
+
+  /**
+   * D1 boot guard — assert each pool connects as the role build-v3 intends, so a
+   * mis-wired `DATABASE_URL_*` aborts boot instead of silently over-privileging
+   * the request path:
+   *   - app pool    → NOT superuser, NOT BYPASSRLS, member of `api` (RLS confines it).
+   *   - worker pool → BYPASSRLS, NOT superuser, member of `worker` (the one machinery pool).
+   * `pg_has_role(current_user, <group>, 'USAGE')` on a role that doesn't exist
+   * throws — a DB without the `api`/`worker` roles is not build-v3 and must not boot.
+   */
+  private async assertPoolRoles(): Promise<void> {
+    const read = async (
+      pool: Pool,
+      group: 'api' | 'worker',
+    ): Promise<PoolRoleAttributes | undefined> => {
+      const { rows } = await pool.query<PoolRoleAttributes>(
+        `SELECT current_user::text AS role,
+                rolsuper           AS superuser,
+                rolbypassrls       AS bypassrls,
+                pg_has_role(current_user, $1, 'USAGE') AS "inheritsGroup"
+         FROM pg_roles WHERE rolname = current_user`,
+        [group],
+      );
+      return rows[0];
+    };
+    const [appAttrs, workerAttrs] = await Promise.all([
+      read(this.app, 'api'),
+      read(this.worker, 'worker'),
+    ]);
+    const problems = [
+      poolRoleProblem('app', 'api', false, appAttrs),
+      poolRoleProblem('worker', 'worker', true, workerAttrs),
+    ].filter((p): p is string => p !== null);
+    if (problems.length > 0) {
+      throw new Error(`D1 boot guard — refusing to boot. ${problems.join(' | ')}`);
+    }
+    this.logger.log(
+      'D1 role guard OK (app = RLS-confined api, worker = BYPASSRLS worker)',
+    );
   }
 
   async onModuleDestroy(): Promise<void> {
