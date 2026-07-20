@@ -37,7 +37,7 @@ export class CashRegisterRepository {
                 ls.self_registration AS self_registration,
                 (ls.id IS NOT NULL)  AS loyalty_configured
          FROM tenant.business AS t
-         LEFT JOIN tenant.loyalty_program AS ls ON ls.tenant_id = t.id
+         LEFT JOIN tenant.loyalty_program AS ls ON ls.business_id = t.id
          WHERE t.id = $1::uuid LIMIT 1`,
         [tenantId],
       ),
@@ -74,14 +74,14 @@ export class CashRegisterRepository {
               cu.name      AS display_name,
               EXISTS (
                 SELECT 1 FROM tenant.loyalty_card ca
-                 WHERE ca.tenant_id = cu.tenant_id
+                 WHERE ca.business_id = cu.business_id
                    AND ca.customer_id = cu.id
                    AND ca.status = 'active'
               )            AS has_card
          FROM tenant.contact_identity ci
          JOIN tenant.channel ch  ON ch.id = ci.channel_id
-         JOIN tenant.customer cu ON cu.tenant_id = ci.tenant_id AND cu.contact_id = ci.contact_id
-        WHERE ci.tenant_id = $1::uuid
+         JOIN tenant.customer cu ON cu.business_id = ci.business_id AND cu.contact_id = ci.contact_id
+        WHERE ci.business_id = $1::uuid
           AND ci.normalized_value = $2
           AND ch.normalization_rule = 'e164'
         ORDER BY ci.is_primary DESC, ci.last_seen_at DESC
@@ -144,7 +144,7 @@ export class CashRegisterRepository {
       const existing = (
         await c.query<{ id: string; card_number: string }>(
           `SELECT id::text, card_number FROM tenant.loyalty_card
-           WHERE tenant_id=$1::uuid AND customer_id=$2::uuid AND status='active'
+           WHERE business_id=$1::uuid AND customer_id=$2::uuid AND status='active'
            ORDER BY created_at LIMIT 1`,
           [input.tenantId, input.personId],
         )
@@ -155,7 +155,7 @@ export class CashRegisterRepository {
       const card = (
         await c.query<{ id: string; card_number: string }>(
           `INSERT INTO tenant.loyalty_card
-             (tenant_id, customer_id, card_number, qr_token, qr_issued_at, status)
+             (business_id, customer_id, card_number, qr_token, qr_issued_at, status)
            VALUES ($1::uuid, $2::uuid, $3, $4, now(), 'active')
            RETURNING id::text, card_number`,
           [input.tenantId, input.personId, input.cardNumber, input.qrToken],

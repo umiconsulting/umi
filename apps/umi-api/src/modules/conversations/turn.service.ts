@@ -112,7 +112,7 @@ export class TurnService {
       trace_id: traceId,
       conversation_id: payload.conversation_id,
       turn_id: payload.turn_id,
-      business_id: payload.tenant_id,
+      business_id: payload.business_id,
       stage: 'process',
       event: 'started',
       detail: { processor_version: PROCESSOR_VERSION },
@@ -123,11 +123,11 @@ export class TurnService {
     const [turn, conversation, person, businessRow, messageCount, branchContext] = await Promise.all([
       this.turns.loadTurn(payload.turn_id),
       this.conversations.loadById(payload.conversation_id),
-      this.identity.getPerson(payload.tenant_id, payload.person_id),
-      this.businessConfig.fetchConfigRow(payload.tenant_id),
+      this.identity.getPerson(payload.business_id, payload.person_id),
+      this.businessConfig.fetchConfigRow(payload.business_id),
       this.messages.countMessages(payload.conversation_id),
       this.resolveBranchContext(
-        payload.tenant_id,
+        payload.business_id,
         payload.conversation_id,
         payload.location_id ?? null,
       ),
@@ -151,7 +151,7 @@ export class TurnService {
 
     await this.turns.upsertTurn({
       existingTurnId: turn.id,
-      tenantId: payload.tenant_id,
+      tenantId: payload.business_id,
       conversationId: payload.conversation_id,
       personId: payload.person_id,
       status: 'processing',
@@ -168,7 +168,7 @@ export class TurnService {
     const rawWorkingMemory = await this.memory.buildWorkingMemory({
       conversationId: payload.conversation_id,
       personId: payload.person_id,
-      tenantId: payload.tenant_id,
+      tenantId: payload.business_id,
       currentMessage: turn.mergedUserText,
       totalMsgCount: messageCount,
       summary: conversation.summary,
@@ -182,7 +182,7 @@ export class TurnService {
     const voice = resolveVoiceConfig(
       businessRow?.config ?? null,
       businessRow?.name ?? null,
-      payload.tenant_id,
+      payload.business_id,
     );
     const systemPrompt = buildHarnessSystemPrompt({
       customerName: person.displayName,
@@ -204,7 +204,7 @@ export class TurnService {
       toolOutcomes,
       maxToolCalls: MAX_TOOL_CALLS_PER_TURN,
       toolContext: {
-        tenantId: payload.tenant_id,
+        tenantId: payload.business_id,
         personId: payload.person_id,
         conversationId: payload.conversation_id,
         turnId: payload.turn_id,
@@ -241,7 +241,7 @@ export class TurnService {
 
     // Transactional outbox commit: CAS state + assistant message + reply outbox row.
     const committed = await this.commit.commitTurnReply({
-      tenantId: payload.tenant_id,
+      tenantId: payload.business_id,
       conversationId: payload.conversation_id,
       expectedStateVersion: conversation.stateVersion,
       nextState: nextConversationState,
@@ -269,7 +269,7 @@ export class TurnService {
       trace_id: traceId,
       conversation_id: payload.conversation_id,
       turn_id: payload.turn_id,
-      business_id: payload.tenant_id,
+      business_id: payload.business_id,
       stage: 'process',
       event: 'outbox_inserted',
       detail: {
@@ -282,7 +282,7 @@ export class TurnService {
 
     await this.turns.upsertTurn({
       existingTurnId: turn.id,
-      tenantId: payload.tenant_id,
+      tenantId: payload.business_id,
       conversationId: payload.conversation_id,
       personId: payload.person_id,
       status: 'completed',
@@ -323,7 +323,7 @@ export class TurnService {
     await this.trace.logAiTurn({
       conversation_id: payload.conversation_id,
       customer_id: payload.person_id,
-      business_id: payload.tenant_id,
+      business_id: payload.business_id,
       model: MODEL,
       prompt_version: `${PROMPT_VERSION}.${PROCESSOR_VERSION}`,
       prompt_tokens: loopResult.inputTokens,
@@ -353,7 +353,7 @@ export class TurnService {
           assistant_message_id: committed.assistantMessageId,
           user_text: turn.mergedUserText,
           assistant_text: finalResponse,
-          tenant_id: payload.tenant_id,
+          business_id: payload.business_id,
           request_id: payload.request_id,
         },
         { priority: JobPriority.Background },
@@ -363,7 +363,7 @@ export class TurnService {
         'conversation.summarize',
         {
           conversation_id: payload.conversation_id,
-          tenant_id: payload.tenant_id,
+          business_id: payload.business_id,
           request_id: payload.request_id,
         },
         { priority: JobPriority.Background },
@@ -374,7 +374,7 @@ export class TurnService {
         {
           person_id: payload.person_id,
           conversation_id: payload.conversation_id,
-          tenant_id: payload.tenant_id,
+          business_id: payload.business_id,
           message_count: totalMsgCountAfter,
           request_id: payload.request_id,
         },
@@ -386,7 +386,7 @@ export class TurnService {
       trace_id: traceId,
       conversation_id: payload.conversation_id,
       turn_id: payload.turn_id,
-      business_id: payload.tenant_id,
+      business_id: payload.business_id,
       stage: 'process',
       event: 'completed',
       detail: metrics,
@@ -402,7 +402,7 @@ export class TurnService {
   ): Promise<void> {
     await this.turns.upsertTurn({
       existingTurnId: turn.id,
-      tenantId: payload.tenant_id,
+      tenantId: payload.business_id,
       conversationId: payload.conversation_id,
       personId: payload.person_id,
       status: 'superseded',
@@ -421,7 +421,7 @@ export class TurnService {
       trace_id: traceId,
       conversation_id: payload.conversation_id,
       turn_id: payload.turn_id,
-      business_id: payload.tenant_id,
+      business_id: payload.business_id,
       stage: 'process',
       event: 'superseded',
       detail: { processor_version: PROCESSOR_VERSION, reason },
@@ -433,7 +433,7 @@ export class TurnService {
       {
         conversation_id: payload.conversation_id,
         person_id: payload.person_id,
-        tenant_id: payload.tenant_id,
+        business_id: payload.business_id,
         request_id: payload.request_id,
       },
       { priority: JobPriority.Interactive },

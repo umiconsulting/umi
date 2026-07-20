@@ -37,7 +37,7 @@ export class VoiceSettingsRepository {
              FROM tenant.business t
              LEFT JOIN LATERAL (
                SELECT name, config FROM tenant.business
-                WHERE tenant_id = t.id ORDER BY created_at ASC LIMIT 1
+                WHERE business_id = t.id ORDER BY created_at ASC LIMIT 1
              ) b ON true
             WHERE t.id = $1::uuid`,
           [tenantId],
@@ -52,7 +52,7 @@ export class VoiceSettingsRepository {
 
   /**
    * Nested merge-write into `tenant.business.config.voice`. Single atomic upsert on
-   * the `businesses_tenant_id_key` UNIQUE(tenant_id) (same as
+   * the `businesses_business_id_key` UNIQUE(business_id) (same as
    * OrderingSettingsRepository) — no UPDATE-then-INSERT race. Creates the business
    * row with the tenant's real name when absent. The `||` jsonb operator shallow-
    * merges the patch into the existing `voice` object, so a `tone: null` in the
@@ -65,11 +65,11 @@ export class VoiceSettingsRepository {
     const json = JSON.stringify(voicePatch);
     await this.pg.withTenant((c) =>
       c.query(
-        `INSERT INTO tenant.business (tenant_id, name, config)
+        `INSERT INTO tenant.business (business_id, name, config)
          VALUES ($1::uuid,
                  COALESCE((SELECT name FROM tenant.business WHERE id = $1::uuid), 'Negocio'),
                  jsonb_build_object('voice', $2::jsonb))
-         ON CONFLICT (tenant_id) DO UPDATE
+         ON CONFLICT (business_id) DO UPDATE
            SET config = jsonb_set(
                  COALESCE(tenant.business.config, '{}'::jsonb),
                  '{voice}',

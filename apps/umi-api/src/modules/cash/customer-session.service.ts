@@ -59,7 +59,7 @@ export class CustomerSessionService {
     const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
     await this.pg.query(
       `INSERT INTO runtime.session
-         (tenant_id, principal_type, principal_id, token_hash, expires_at, is_active)
+         (business_id, principal_type, principal_id, token_hash, expires_at, is_active)
        VALUES ($1::uuid, $2, $3::uuid, $4, $5, true)`,
       [
         tenantId,

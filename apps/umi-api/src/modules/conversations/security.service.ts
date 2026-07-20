@@ -216,7 +216,7 @@ export class SecurityService {
       `SELECT id
          FROM tenant.conversation
         WHERE customer_id = $1
-          AND tenant_id = $2
+          AND business_id = $2
           AND status IN ('open', 'active', 'pending')
           AND last_message_at >= now() - interval '1 hour'
         ORDER BY last_message_at DESC

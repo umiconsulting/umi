@@ -25,7 +25,7 @@ describe('DeadLetterService', () => {
   it('persists a tenant-scoped job to runtime.dead_letters', async () => {
     const { svc, repo } = serviceWithRepo();
     await svc.recordTerminalFailure(
-      makeJob({ data: { tenant_id: 't1', foo: 1 }, attemptsMade: 3 }),
+      makeJob({ data: { business_id: 't1', foo: 1 }, attemptsMade: 3 }),
       new Error('boom'),
     );
     expect(repo.recordDeadLetter).toHaveBeenCalledWith(
@@ -60,7 +60,7 @@ describe('DeadLetterService', () => {
     const { svc, repo } = serviceWithRepo();
     const uuid = '11111111-2222-3333-4444-555555555555';
     await svc.recordTerminalFailure(
-      makeJob({ id: uuid, data: { tenant_id: 't1' } }),
+      makeJob({ id: uuid, data: { business_id: 't1' } }),
       new Error('x'),
     );
     expect(repo.recordDeadLetter).toHaveBeenCalledWith(
@@ -69,7 +69,7 @@ describe('DeadLetterService', () => {
 
     repo.recordDeadLetter.mockClear();
     await svc.recordTerminalFailure(
-      makeJob({ id: '42', data: { tenant_id: 't1' } }),
+      makeJob({ id: '42', data: { business_id: 't1' } }),
       new Error('x'),
     );
     expect(repo.recordDeadLetter).toHaveBeenCalledWith(
@@ -84,7 +84,7 @@ describe('DeadLetterService', () => {
     const svc = new DeadLetterService(repo as unknown as QueueRepository);
     await expect(
       svc.recordTerminalFailure(
-        makeJob({ data: { tenant_id: 't1' } }),
+        makeJob({ data: { business_id: 't1' } }),
         new Error('x'),
       ),
     ).resolves.toBeUndefined();

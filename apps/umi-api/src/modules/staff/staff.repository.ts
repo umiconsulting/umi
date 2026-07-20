@@ -39,7 +39,7 @@ export class StaffRepository {
       c.query<StaffRow>(
         `SELECT ${PROJECTION}, NULL::timestamptz AS "disabledAt"
          FROM tenant.staff
-         WHERE tenant_id = $1::uuid
+         WHERE business_id = $1::uuid
          ORDER BY
            CASE WHEN lower(name) = 'admin' THEN 0 ELSE 1 END,
            CASE status WHEN 'active' THEN 0 WHEN 'invited' THEN 1 ELSE 2 END,
@@ -57,7 +57,7 @@ export class StaffRepository {
   ): Promise<StaffRow> {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<StaffRow>(
-        `INSERT INTO tenant.staff (tenant_id, branch_id, name, phone, email, status)
+        `INSERT INTO tenant.staff (business_id, branch_id, name, phone, email, status)
          VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6)
          RETURNING ${PROJECTION}, NULL::timestamptz AS "disabledAt"`,
         [tenantId, locationId, data.name, data.phone, data.email, data.status],
@@ -84,7 +84,7 @@ export class StaffRepository {
              email = CASE WHEN $6::boolean THEN $7 ELSE email END,
              status = COALESCE($8, status),
              updated_at = now()
-         WHERE id = $2::uuid AND tenant_id = $1::uuid
+         WHERE id = $2::uuid AND business_id = $1::uuid
          RETURNING ${PROJECTION},
            CASE WHEN status = 'disabled' THEN updated_at ELSE NULL END AS "disabledAt"`,
         [
@@ -107,7 +107,7 @@ export class StaffRepository {
       c.query<{ id: string }>(
         `UPDATE tenant.staff
          SET status = 'disabled', updated_at = now()
-         WHERE id = $2::uuid AND tenant_id = $1::uuid
+         WHERE id = $2::uuid AND business_id = $1::uuid
          RETURNING id::text`,
         [tenantId, staffId],
       ),

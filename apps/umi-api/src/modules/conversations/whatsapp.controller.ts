@@ -185,7 +185,7 @@ export class WhatsappController {
       {
         conversation_id: conversation.id,
         person_id: personId,
-        tenant_id: tenantId,
+        business_id: tenantId,
         location_id: locationId,
         request_id: requestId,
       },

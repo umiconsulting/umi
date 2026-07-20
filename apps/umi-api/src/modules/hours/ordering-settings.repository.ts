@@ -58,7 +58,7 @@ export class OrderingSettingsRepository {
   async readWorker(tenantId: string): Promise<OrderingSettings> {
     const { rows } = await this.pg.query<{ config: RawConfig | null }>(
       `SELECT config FROM tenant.business
-        WHERE tenant_id = $1::uuid
+        WHERE business_id = $1::uuid
         ORDER BY created_at ASC
         LIMIT 1`,
       [tenantId],
@@ -72,7 +72,7 @@ export class OrderingSettingsRepository {
       c
         .query<{ config: RawConfig | null }>(
           `SELECT config FROM tenant.business
-            WHERE tenant_id = $1::uuid
+            WHERE business_id = $1::uuid
             ORDER BY created_at ASC
             LIMIT 1`,
           [tenantId],
@@ -84,7 +84,7 @@ export class OrderingSettingsRepository {
 
   /**
    * Merge-write the ordering scalars into `tenant.business.config` (shallow jsonb
-   * merge). Single atomic upsert on the `businesses_tenant_id_key` UNIQUE(tenant_id)
+   * merge). Single atomic upsert on the `businesses_business_id_key` UNIQUE(business_id)
    * — no UPDATE-then-INSERT race. If no business row exists yet, one is created
    * with the tenant's real name (never a blank), not a synthetic empty string.
    * Clears legacy `order_cutoff_time` whenever the buffer is set.
@@ -105,11 +105,11 @@ export class OrderingSettingsRepository {
     const mergeJson = JSON.stringify(merge);
     await this.pg.withTenant((c) =>
       c.query(
-        `INSERT INTO tenant.business (tenant_id, name, config)
+        `INSERT INTO tenant.business (business_id, name, config)
          VALUES ($1::uuid,
                  COALESCE((SELECT name FROM tenant.business WHERE id = $1::uuid), 'Negocio'),
                  $2::jsonb)
-         ON CONFLICT (tenant_id) DO UPDATE
+         ON CONFLICT (business_id) DO UPDATE
            SET config = COALESCE(tenant.business.config, '{}'::jsonb) || EXCLUDED.config,
                updated_at = now()`,
         [tenantId, mergeJson],

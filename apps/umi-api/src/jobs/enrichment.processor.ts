@@ -104,7 +104,7 @@ export class EnrichmentProcessor extends BaseProcessor {
   }
 
   private async extractFacts(p: Record<string, unknown>): Promise<void> {
-    const tenantId = String(p.tenant_id ?? '');
+    const tenantId = String(p.business_id ?? '');
     const personId = String(p.person_id ?? '');
     const conversationId = p.conversation_id as string | undefined;
     if (!tenantId || !personId || !conversationId) return;
@@ -120,8 +120,8 @@ export class EnrichmentProcessor extends BaseProcessor {
   }
 
   private async productEmbed(p: Record<string, unknown>): Promise<void> {
-    const tenantId = String(p.tenant_id ?? '');
-    if (!tenantId) throw new Error('product.embed requires tenant_id');
+    const tenantId = String(p.business_id ?? '');
+    if (!tenantId) throw new Error('product.embed requires business_id');
     const batchSize = (p.batch_size as number) ?? PRODUCT_EMBED_BATCH;
     const rows = await this.products.listNeedingEmbedding(tenantId, batchSize);
     if (!rows.length) return;
@@ -142,7 +142,7 @@ export class EnrichmentProcessor extends BaseProcessor {
 
   private async embedBackfill(p: Record<string, unknown>): Promise<void> {
     const batchSize = (p.batch_size as number) ?? BACKFILL_BATCH;
-    const tenantId = p.tenant_id as string | undefined;
+    const tenantId = p.business_id as string | undefined;
     const msgs = await this.messages.listNeedingEmbedding(batchSize, tenantId);
     if (!msgs.length) return;
     const embeddings = await this.voyage.generateEmbeddings(msgs.map((m) => m.content));

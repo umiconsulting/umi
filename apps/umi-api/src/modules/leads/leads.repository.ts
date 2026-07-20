@@ -8,7 +8,7 @@ import { PgService } from '../../shared/database/pg.service';
  * is needed. `grow` is a service-role-only schema, so this repository always
  * uses the BYPASSRLS **worker pool** (`pg.query`) — leads have no tenant and no
  * authenticated user, exactly like the lifecycle reads. Isolation is not an
- * issue: prospects are Umi-internal, `tenant_id` is NULL by design.
+ * issue: prospects are Umi-internal, `business_id` is NULL by design.
  *
  * Event-sourced: every mutation appends a `umi.prospect_event` row (email_sent,
  * email_failed, sequence_paused/resumed, responded, diagnostic_completed, …).

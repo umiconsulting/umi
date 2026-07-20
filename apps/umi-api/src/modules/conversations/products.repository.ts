@@ -69,7 +69,7 @@ export class ProductsRepository {
 
     const text = await this.pg.query<ProductRow>(
       `SELECT ${SELECT} ${FROM}
-        WHERE p.tenant_id = $1::uuid AND p.is_available = true
+        WHERE p.business_id = $1::uuid AND p.is_available = true
           AND (
             p.name ILIKE ANY($2)
             OR COALESCE(p.description,'') ILIKE ANY($2)
@@ -105,7 +105,7 @@ export class ProductsRepository {
     if (!embedding) return [];
     const sem = await this.pg.query<ProductRow>(
       `SELECT ${SELECT} ${FROM}
-        WHERE p.tenant_id = $1::uuid AND p.is_available = true
+        WHERE p.business_id = $1::uuid AND p.is_available = true
           AND p.name_embedding IS NOT NULL
           AND 1 - (p.name_embedding <=> $2::vector) >= 0.60
         ORDER BY p.name_embedding <=> $2::vector
@@ -128,7 +128,7 @@ export class ProductsRepository {
     if (!embedding) return [];
     const { rows } = await this.pg.query<ProductRow>(
       `SELECT ${SELECT} ${FROM}
-        WHERE p.tenant_id = $1::uuid AND p.is_available = true
+        WHERE p.business_id = $1::uuid AND p.is_available = true
           AND p.name_embedding IS NOT NULL
           AND 1 - (p.name_embedding <=> $2::vector) >= 0.30
         ORDER BY p.name_embedding <=> $2::vector
@@ -148,7 +148,7 @@ export class ProductsRepository {
   ): Promise<ProductRecord[]> {
     const { rows } = await this.pg.query<ProductRow>(
       `SELECT ${SELECT} ${FROM}
-        WHERE p.tenant_id = $1::uuid AND p.is_available = true
+        WHERE p.business_id = $1::uuid AND p.is_available = true
           AND ($2::text[] IS NULL OR pc.name = ANY($2))
         LIMIT $3`,
       [tenantId, categoryFilter, limit],
@@ -162,7 +162,7 @@ export class ProductsRepository {
       `SELECT DISTINCT pc.name
          FROM tenant.product p
          JOIN tenant.product_category pc ON pc.id = p.category_id
-        WHERE p.tenant_id = $1::uuid AND p.is_available = true`,
+        WHERE p.business_id = $1::uuid AND p.is_available = true`,
       [tenantId],
     );
     return rows
@@ -175,7 +175,7 @@ export class ProductsRepository {
     if (!ids.length) return new Map();
     const { rows } = await this.pg.query<ProductRow & { is_available: boolean }>(
       `SELECT ${SELECT}, p.is_available ${FROM}
-        WHERE p.tenant_id = $1::uuid AND p.id = ANY($2::uuid[])`,
+        WHERE p.business_id = $1::uuid AND p.id = ANY($2::uuid[])`,
       [tenantId, ids],
     );
     return new Map(rows.map((r) => [r.id, { ...mapRow(r), available: r.is_available }]));
@@ -188,7 +188,7 @@ export class ProductsRepository {
   ): Promise<Array<{ id: string; name: string; category: string | null; variants: ProductVariant[] }>> {
     const { rows } = await this.pg.query<ProductRow>(
       `SELECT ${SELECT} ${FROM}
-        WHERE p.tenant_id = $1::uuid AND p.is_available = true AND p.name_embedding IS NULL
+        WHERE p.business_id = $1::uuid AND p.is_available = true AND p.name_embedding IS NULL
         LIMIT $2`,
       [tenantId, limit],
     );
@@ -215,9 +215,9 @@ export class ProductsRepository {
     if (!name || !name.trim()) return null;
     const key = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'uncategorized';
     const { rows } = await this.pg.query<{ id: string }>(
-      `INSERT INTO tenant.product_category (tenant_id, key, name, sort_order, metadata)
+      `INSERT INTO tenant.product_category (business_id, key, name, sort_order, metadata)
        VALUES ($1::uuid, $2, $3, 0, '{}'::jsonb)
-       ON CONFLICT (tenant_id, key) DO UPDATE SET name = EXCLUDED.name, updated_at = now()
+       ON CONFLICT (business_id, key) DO UPDATE SET name = EXCLUDED.name, updated_at = now()
        RETURNING id::text`,
       [tenantId, key, name.trim()],
     );
@@ -245,7 +245,7 @@ export class ProductsRepository {
     const variantsJson = JSON.stringify(p.variants);
     const existing = await this.pg.query<{ id: string }>(
       `SELECT id::text FROM tenant.product
-        WHERE tenant_id = $1::uuid AND metadata->>'zettle_uuid' = $2 LIMIT 1`,
+        WHERE business_id = $1::uuid AND metadata->>'zettle_uuid' = $2 LIMIT 1`,
       [tenantId, p.zettleUuid],
     );
     if (existing.rows[0]) {
@@ -264,7 +264,7 @@ export class ProductsRepository {
     }
     await this.pg.query(
       `INSERT INTO tenant.product
-         (tenant_id, category_id, name, description, price_cents, is_available, variants, synced_at, metadata)
+         (business_id, category_id, name, description, price_cents, is_available, variants, synced_at, metadata)
        VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7::jsonb, now(),
                jsonb_build_object('zettle_uuid', $8, 'source', 'zettle'))`,
       [tenantId, p.categoryId, p.name, p.description, p.priceCents, p.isAvailable, variantsJson, p.zettleUuid],
@@ -275,7 +275,7 @@ export class ProductsRepository {
   async markUnavailableExcept(tenantId: string, zettleUuids: string[]): Promise<void> {
     await this.pg.query(
       `UPDATE tenant.product SET is_available = false, updated_at = now()
-        WHERE tenant_id = $1::uuid
+        WHERE business_id = $1::uuid
           AND metadata->>'zettle_uuid' IS NOT NULL
           AND NOT (metadata->>'zettle_uuid' = ANY($2::text[]))`,
       [tenantId, zettleUuids],
@@ -289,7 +289,7 @@ export class ProductsRepository {
   ): Promise<(ProductRecord & { available: boolean }) | null> {
     const { rows } = await this.pg.query<ProductRow & { is_available: boolean }>(
       `SELECT ${SELECT}, p.is_available ${FROM}
-        WHERE p.tenant_id = $1::uuid AND p.id = $2::uuid
+        WHERE p.business_id = $1::uuid AND p.id = $2::uuid
         LIMIT 1`,
       [tenantId, id],
     );

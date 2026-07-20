@@ -83,8 +83,8 @@ export class KdsService {
 
     const session: KdsDeviceSession = {
       deviceId: row.id,
-      tenantId: row.tenant_id,
-      businessId: row.tenant_id,
+      tenantId: row.business_id,
+      businessId: row.business_id,
       locationId:
         typeof row.metadata?.location_id === 'string'
           ? (row.metadata.location_id as string)
@@ -183,14 +183,14 @@ export class KdsService {
     if (pairing.used_at) return { status: 409, body: { status: 'used' } };
 
     const station = await this.repo.loadStation(
-      pairing.tenant_id,
+      pairing.business_id,
       pairing.location_id,
       pairing.station_id ?? '',
     );
     if (!station) return { status: 404, body: { error: 'station_not_found' } };
 
     const session = await this.repo.createDeviceSession({
-      tenantId: pairing.tenant_id,
+      tenantId: pairing.business_id,
       locationId: pairing.location_id,
       stationId: pairing.station_id,
       deviceName: pairing.requested_name || pairing.device_name,
@@ -211,8 +211,10 @@ export class KdsService {
         device_session: {
           device_id: session.id,
           token: session.token,
-          business_id: session.tenant_id,
-          tenant_id: session.tenant_id,
+          business_id: session.business_id,
+          // frozen iPad KDS contract still reads `tenant_id`; keep the wire key
+          // (sourced from the renamed column) until the device is updated.
+          tenant_id: session.business_id,
           location_id: pairing.location_id,
           station_id: session.station_id,
           station_name: station.name,
@@ -444,7 +446,7 @@ export class KdsService {
       });
       return { station };
     } catch (err) {
-      // unique (tenant_id, location_id, station_key)
+      // unique (business_id, location_id, station_key)
       if ((err as { code?: string })?.code === '23505') {
         throw new ConflictException({ error: 'station_exists' });
       }
@@ -676,7 +678,7 @@ export function ticketBelongsToDevice(
   session: KdsDeviceSession,
 ): order is OrderScopeRow {
   if (!order) return false;
-  const tenantMatches = order.tenant_id === session.tenantId;
+  const tenantMatches = order.business_id === session.tenantId;
   const locationMatches =
     !session.locationId ||
     order.location_id === session.locationId ||

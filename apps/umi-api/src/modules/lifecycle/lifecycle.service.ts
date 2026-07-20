@@ -156,7 +156,7 @@ export class LifecycleService {
       await this.enqueue.enqueue(
         QUEUES.outbound,
         'whatsapp.lifecycle',
-        { to: phone, body, tenant_id: tenant.id, card_id: cardId, journey },
+        { to: phone, body, business_id: tenant.id, card_id: cardId, journey },
         { priority: JobPriority.Background, jobId: `lc:${tenant.id}:${cardId}:${journey}` },
       );
     } catch (err) {

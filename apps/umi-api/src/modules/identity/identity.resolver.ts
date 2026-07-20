@@ -7,7 +7,7 @@ import { PgService } from '../../shared/database/pg.service';
  * The identity resolver — the TS replacement for the dropped core.resolve_contact
  * SECURITY DEFINER RPC (a bypass-RLS hole). It writes the federated identity graph
  * (tenant.contact ← tenant.contact_identity, tenant.contact ← tenant.customer)
- * deterministically, on the BYPASSRLS worker pool with explicit tenant_id
+ * deterministically, on the BYPASSRLS worker pool with explicit business_id
  * predicates (both callers — cash self-registration + WhatsApp ingress — are
  * unauthenticated), or composed into a caller's transaction via `client`.
  *
@@ -15,7 +15,7 @@ import { PgService } from '../../shared/database/pg.service';
  * per-channel dedup spine → reuse, else create under an advisory lock with
  * ON CONFLICT + re-select-the-winner. A NULL normalized value never mints
  * duplicates: it falls back to a synthesized deterministic external_id guarded by
- * the (tenant_id, channel_id, external_id) partial-unique.
+ * the (business_id, channel_id, external_id) partial-unique.
  *
  * CROSS-CHANNEL UNIFICATION (deterministic only): phone-family channels
  * (normalization_rule='e164' → phone/whatsapp/sms) that share the same E.164
@@ -214,7 +214,7 @@ export class IdentityResolver {
     const { rows } = await this.run<{ customerId: string | null }>(
       null,
       `SELECT id::text AS "customerId" FROM tenant.customer
-       WHERE tenant_id = $1::uuid AND contact_id = $2::uuid LIMIT 1`,
+       WHERE business_id = $1::uuid AND contact_id = $2::uuid LIMIT 1`,
       [input.tenantId, contactId],
     );
     return { contactId, customerId: rows[0]?.customerId ?? null };
@@ -230,9 +230,9 @@ export class IdentityResolver {
     // COALESCE so an incoming null never clobbers an existing name/born_at.
     const { rows } = await this.run<{ id: string }>(
       c,
-      `INSERT INTO tenant.customer (tenant_id, contact_id, name, born_at)
+      `INSERT INTO tenant.customer (business_id, contact_id, name, born_at)
          VALUES ($1::uuid, $2::uuid, nullif($3, ''), $4::date)
-       ON CONFLICT (tenant_id, contact_id) DO UPDATE
+       ON CONFLICT (business_id, contact_id) DO UPDATE
          SET name = COALESCE(tenant.customer.name, EXCLUDED.name),
              born_at = COALESCE(tenant.customer.born_at, EXCLUDED.born_at),
              updated_at = now()
@@ -255,7 +255,7 @@ export class IdentityResolver {
          SET name = COALESCE($3, name),
              born_at = COALESCE($4::date, born_at),
              updated_at = now()
-       WHERE tenant_id = $1::uuid AND id = $2::uuid`,
+       WHERE business_id = $1::uuid AND id = $2::uuid`,
       [tenantId, customerId, patch.name ?? null, patch.bornAt ?? null],
     );
   }
@@ -284,13 +284,13 @@ export class IdentityResolver {
          SELECT i.normalized_value, i.display_value
          FROM tenant.contact_identity i
          JOIN tenant.channel ch ON ch.id = i.channel_id
-         WHERE i.tenant_id = cu.tenant_id
+         WHERE i.business_id = cu.business_id
            AND i.contact_id = cu.contact_id
            AND ch.key = $3
          ORDER BY i.is_primary DESC, i.last_seen_at DESC
          LIMIT 1
        ) ci ON true
-       WHERE cu.tenant_id = $1::uuid AND cu.id = $2::uuid
+       WHERE cu.business_id = $1::uuid AND cu.id = $2::uuid
        LIMIT 1`,
       [tenantId, customerId, channelKey],
     );
@@ -364,7 +364,7 @@ export class IdentityResolver {
         c,
         `SELECT contact_id::text AS "contactId"
          FROM tenant.contact_identity
-         WHERE tenant_id = $1::uuid
+         WHERE business_id = $1::uuid
            AND channel_id = ANY($2::uuid[])
            AND normalized_value = $3
          ORDER BY is_primary DESC, last_seen_at DESC
@@ -378,7 +378,7 @@ export class IdentityResolver {
         c,
         `SELECT contact_id::text AS "contactId"
          FROM tenant.contact_identity
-         WHERE tenant_id = $1::uuid
+         WHERE business_id = $1::uuid
            AND channel_id = $2::uuid
            AND external_id = $3
          LIMIT 1`,
@@ -394,7 +394,7 @@ export class IdentityResolver {
     tenantId: string,
   ): Promise<string> {
     const { rows } = await c.query<{ id: string }>(
-      `INSERT INTO tenant.contact (tenant_id) VALUES ($1::uuid) RETURNING id::text AS id`,
+      `INSERT INTO tenant.contact (business_id) VALUES ($1::uuid) RETURNING id::text AS id`,
       [tenantId],
     );
     return rows[0].id;
@@ -402,8 +402,8 @@ export class IdentityResolver {
 
   /**
    * Idempotent reachability upsert. Value-keyed rows conflict on
-   * (tenant_id, channel_id, normalized_value); external-only rows conflict on the
-   * (tenant_id, channel_id, external_id) partial-unique. is_primary is set only
+   * (business_id, channel_id, normalized_value); external-only rows conflict on the
+   * (business_id, channel_id, external_id) partial-unique. is_primary is set only
    * when the contact has no primary for this channel yet.
    */
   private async ensureIdentity(
@@ -422,19 +422,19 @@ export class IdentityResolver {
     // First primary for (contact, channel)? Keeps the partial-unique satisfied.
     const { rows: existing } = await c.query<{ n: string }>(
       `SELECT 1 AS n FROM tenant.contact_identity
-       WHERE tenant_id = $1::uuid AND contact_id = $2::uuid AND channel_id = $3::uuid
+       WHERE business_id = $1::uuid AND contact_id = $2::uuid AND channel_id = $3::uuid
          AND is_primary LIMIT 1`,
       [i.tenantId, i.contactId, i.channelId],
     );
     const isPrimary = existing.length === 0;
     const conflictTarget =
       i.normalized != null
-        ? '(tenant_id, channel_id, normalized_value)'
-        : '(tenant_id, channel_id, external_id) WHERE external_id IS NOT NULL';
+        ? '(business_id, channel_id, normalized_value)'
+        : '(business_id, channel_id, external_id) WHERE external_id IS NOT NULL';
 
     await c.query(
       `INSERT INTO tenant.contact_identity
-         (tenant_id, contact_id, channel_id, normalized_value, external_id,
+         (business_id, contact_id, channel_id, normalized_value, external_id,
           display_value, collected_via, match_type, is_primary, verified_at, last_seen_at)
        VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, 'deterministic', $8,
                CASE WHEN $9 THEN now() ELSE NULL END, now())
