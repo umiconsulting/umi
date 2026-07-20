@@ -173,13 +173,19 @@ describe('build-v3 RLS · live-DB harness', () => {
 
   it('AuthRepository.productStatus gates off the entitlement view (worker pool)', async () => {
     const auth = new AuthRepository(pg);
-    // entitled features resolve to a status the guard accepts (active/trialing)…
-    expect(
-      isProductStatusActive(await auth.productStatus(id('Kalala Café'), 'cash')),
-    ).toBe(true);
-    expect(
-      isProductStatusActive(await auth.productStatus(id('Kalala Café'), 'kds')),
-    ).toBe(true);
+    // The café's real subscription status, straight from the source of truth.
+    const sub = await pg.query<{ status: string }>(
+      'select status from umi.subscription where business_id = $1',
+      [id('Kalala Café')],
+    );
+    const kalalaStatus = sub.rows[0].status;
+    // Each entitled feature resolves to the café's ACTUAL status (proves the
+    // join to umi.subscription), and that status grants access…
+    for (const feature of ['cash', 'kds'] as const) {
+      const status = await auth.productStatus(id('Kalala Café'), feature);
+      expect(status, `${feature} status`).toBe(kalalaStatus);
+      expect(isProductStatusActive(status), `${feature} active`).toBe(true);
+    }
     // …a feature the café isn't entitled to → null → EntitlementGuard 403s…
     expect(await auth.productStatus(id('El Gran Ribera'), 'kds')).toBeNull();
     // …and a canceled café is absent from the view entirely (fails closed).
@@ -195,7 +201,11 @@ describe('build-v3 RLS · live-DB harness', () => {
       'dashboard',
       'kds',
     ]);
-    expect(isProductStatusActive(kalala.cash.status)).toBe(true);
+    // Every returned product carries an access-granting status (the capabilities
+    // map the dashboard consumes never contains an inactive product).
+    for (const [key, product] of Object.entries(kalala)) {
+      expect(isProductStatusActive(product.status), `${key} status`).toBe(true);
+    }
     // capabilities read and per-request gating share one source → can't disagree.
     expect(await tenants.loadProducts(id('Néctar Café'))).toEqual({});
   });
