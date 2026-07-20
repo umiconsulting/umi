@@ -13,7 +13,14 @@ import {
 } from './module-registry';
 
 export interface Capabilities {
-  tenant: { id: string; slug: string; name: string; timezone: string | null };
+  tenant: {
+    id: string;
+    slug: string;
+    name: string;
+    timezone: string | null;
+    brandColor: string | null;
+    secondaryColor: string | null;
+  };
   selectedLocation: LocationRow | null;
   locations: LocationRow[];
   membership: {
@@ -45,9 +52,10 @@ export class TenantsService {
     access: TenantAccess,
     selectedLocationId: string | null,
   ): Promise<Capabilities> {
-    const [products, locations] = await Promise.all([
+    const [products, locations, branding] = await Promise.all([
       this.repo.loadProducts(access.tenantId),
       this.repo.loadLocations(access.tenantId),
+      this.repo.loadBranding(access.tenantId),
     ]);
 
     const selectedLocation = selectedLocationId
@@ -66,6 +74,8 @@ export class TenantsService {
         slug: access.slug,
         name: access.name,
         timezone: access.timezone,
+        brandColor: branding.brandColor,
+        secondaryColor: branding.secondaryColor,
       },
       selectedLocation,
       locations,
@@ -75,18 +85,24 @@ export class TenantsService {
     return { ...base, modules: buildModuleAvailability(base) };
   }
 
-  /** The settings payload mirrors server.js (dashboard product config defaults). */
+  /**
+   * The dashboard settings/theming payload. Branding comes from the build-v3
+   * home — the typed `tenant.business.brand_color` / `secondary_color` columns —
+   * NOT the dead per-product `config` (build-v3's entitlement view carries none,
+   * so that was structurally always the default). `subscriptionStatus` is the
+   * café's real status from the entitlement view. Defaults apply only when a café
+   * has set no color.
+   */
   buildSettings(capabilities: Capabilities): Record<string, unknown> {
     const dashboard = capabilities.products.dashboard;
-    const config = (dashboard?.config ?? {}) as Record<string, unknown>;
     return {
       id: capabilities.tenant.id,
       name: capabilities.tenant.name,
       slug: capabilities.tenant.slug,
       timezone: capabilities.tenant.timezone,
       subscriptionStatus: dashboard?.status?.toUpperCase?.() ?? 'ACTIVE',
-      primaryColor: config.primaryColor ?? '#B5605A',
-      secondaryColor: config.secondaryColor ?? '#E8C9A3',
+      primaryColor: capabilities.tenant.brandColor ?? '#B5605A',
+      secondaryColor: capabilities.tenant.secondaryColor ?? '#E8C9A3',
       products: capabilities.products,
       locations: capabilities.locations,
     };

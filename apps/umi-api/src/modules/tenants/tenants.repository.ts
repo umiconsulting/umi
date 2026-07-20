@@ -107,6 +107,28 @@ export class TenantsRepository {
     );
   }
 
+  /**
+   * Tenant branding for the dashboard settings/theming payload. build-v3 keeps
+   * branding as TYPED columns on `tenant.business` (`brand_color`,
+   * `secondary_color`, `logo_url` — "add columns rather than a catch-all blob").
+   * Runs on the RLS app pool (`withTenant`) with an explicit `business_id`
+   * predicate, like the other tenant reads.
+   */
+  async loadBranding(
+    tenantId: string,
+  ): Promise<{ brandColor: string | null; secondaryColor: string | null }> {
+    const { rows } = await this.pg.withTenant((c) =>
+      c.query<{ brandColor: string | null; secondaryColor: string | null }>(
+        `SELECT brand_color AS "brandColor", secondary_color AS "secondaryColor"
+         FROM tenant.business
+         WHERE id = $1::uuid
+         LIMIT 1`,
+        [tenantId],
+      ),
+    );
+    return rows[0] ?? { brandColor: null, secondaryColor: null };
+  }
+
   /** Branches with the (tenant) timezone, oldest first (tenant-neutral, deterministic). */
   async loadLocations(tenantId: string): Promise<LocationRow[]> {
     const { rows } = await this.pg.withTenant((c) =>

@@ -39,7 +39,8 @@ create table tenant.business (
                       check (menu_source in ('dashboard','pos_sync')),
   -- Branding (typed; add columns rather than a catch-all blob).
   logo_url          text,
-  brand_color       text,
+  brand_color       text,   -- primary brand color (dashboard theming + wallet pass)
+  secondary_color   text,   -- accent color (dashboard theming)
   -- Conversational agent config (owner-confirmed: typed columns on business).
   bot_voice         text,
   bot_tone          text,

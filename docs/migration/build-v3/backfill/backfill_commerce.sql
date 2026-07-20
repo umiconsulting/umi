@@ -89,7 +89,7 @@ where coalesce(btrim(v->>'name'), '') <> '';
 --    only NEW facts are folded as columns (owner rule: no rescue table).
 --    open_hours COLUMN built from the typed ops.business_hours rows (Kalala only).
 --    DROPPED (no build-v3 home, deliberately not modeled): id, business_type,
---      branding.{secondary_color,strip_image_url,pass_style,promo_message},
+--      branding.{strip_image_url,pass_style,promo_message},  -- secondary_color now folded to a typed column
 --      config.{payment_methods,order_cutoff_time,slack_channel_id,
 --      slack_channel_name,accepts_whatsapp_orders,bypass_phones,special_notice},
 --      config.hours/open_times (redundant with business_hours below).
@@ -99,8 +99,9 @@ where coalesce(btrim(v->>'name'), '') <> '';
 -- ----------------------------------------------------------------------------
 update tenant.business b set
   city        = coalesce(nullif(btrim(o.city), ''), b.city),
-  logo_url    = coalesce(o.branding->>'logo_url', b.logo_url),
-  brand_color = coalesce(o.branding->>'primary_color', b.brand_color),
+  logo_url        = coalesce(o.branding->>'logo_url', b.logo_url),
+  brand_color     = coalesce(o.branding->>'primary_color', b.brand_color),
+  secondary_color = coalesce(o.branding->>'secondary_color', b.secondary_color),
   bot_voice   = coalesce(o.config->'voice'->>'assistant_name', b.bot_voice),
   bot_tone    = coalesce(o.config->'voice'->>'tone_preset', b.bot_tone),
   updated_at  = now()
