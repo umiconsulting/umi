@@ -78,13 +78,13 @@ export class CashRegisterRepository {
                    AND ca.customer_id = cu.id
                    AND ca.status = 'active'
               )            AS has_card
-         FROM tenant.contact_identity ci
-         JOIN tenant.channel ch  ON ch.id = ci.channel_id
-         JOIN tenant.customer cu ON cu.business_id = ci.business_id AND cu.contact_id = ci.contact_id
-        WHERE ci.business_id = $1::uuid
-          AND ci.normalized_value = $2
-          AND ch.normalization_rule = 'e164'
-        ORDER BY ci.is_primary DESC, ci.last_seen_at DESC
+         FROM tenant.contact ct
+         JOIN umi.channel_type ch ON ch.id = ct.channel_id
+         JOIN tenant.customer cu ON cu.id = ct.customer_id
+        WHERE ct.business_id = $1::uuid
+          AND ct.normalized_value = $2
+          AND ch.key IN ('phone', 'whatsapp', 'sms')
+        ORDER BY ct.is_primary DESC, ct.updated_at DESC
         LIMIT 1`,
       [tenantId, normalizedPhone],
     );

@@ -922,14 +922,14 @@ export class KdsRepository {
     // reachability value — WhatsApp as-received display_value (avoids Twilio
     // 63015) else the phone E.164.
     const { rows } = await client.query<{ phone: string | null }>(
-      `SELECT COALESCE(ci.display_value, ci.normalized_value) AS phone
+      `SELECT COALESCE(ct.raw_phone_number, ct.normalized_value) AS phone
          FROM tenant.customer cu
-         JOIN tenant.contact_identity ci
-           ON ci.business_id = cu.business_id AND ci.contact_id = cu.contact_id
-         JOIN tenant.channel ch ON ch.id = ci.channel_id
+         JOIN tenant.contact ct
+           ON ct.business_id = cu.business_id AND ct.customer_id = cu.id
+         JOIN umi.channel_type ch ON ch.id = ct.channel_id
         WHERE cu.id = $1 AND cu.business_id = $2
           AND ch.key IN ('whatsapp', 'phone')
-        ORDER BY (ch.key = 'whatsapp') DESC, ci.is_primary DESC, ci.last_seen_at DESC
+        ORDER BY (ch.key = 'whatsapp') DESC, ct.is_primary DESC, ct.updated_at DESC
         LIMIT 1`,
       [personId, tenantId],
     );
