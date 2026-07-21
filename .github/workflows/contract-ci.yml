@@ -7,17 +7,18 @@ name: contract CI
 # Also runs on pushes to `build-v3`, which has no deploy workflow to re-check a
 # merge. Note that umi-api-deploy.yml does NOT cover this gate on main either:
 # it builds @umi/contract as a dependency, but never runs the route-literal tests.
+#
+# ⚠️ NO `paths:` FILTER — DO NOT ADD ONE. This check is REQUIRED by branch
+# protection on `build-v3`, and GitHub leaves a required-but-skipped check Pending
+# forever rather than treating it as passed — so a filter would make every PR that
+# misses it UNMERGEABLE, not faster. Unconditional is what makes "required" safe.
+# There is also a correctness argument here: this gate proves the route literals
+# still match the controllers, and a controller edit lives OUTSIDE packages/contract.
+# The old filter could not see the change most likely to break it.
 on:
   pull_request:
-    paths:
-      - "packages/contract/**"
-      - ".github/workflows/contract-ci.yml"
-  # Same path list, repeated: GitHub Actions does not support YAML anchors.
   push:
     branches: [build-v3]
-    paths:
-      - "packages/contract/**"
-      - ".github/workflows/contract-ci.yml"
 
 permissions:
   contents: read

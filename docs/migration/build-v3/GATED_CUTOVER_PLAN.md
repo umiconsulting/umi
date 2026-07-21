@@ -189,14 +189,23 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
 
 ## 5 · Current baseline (2026-07-21)
 
-- **`build-v3` HEAD:** `ea7647e` (PR #55). Merged in order: **#49** order cluster → **#50** mechanical
-  sweep → **#51** D1/D11 gate → **#54** P3 (identity/RBAC/WhatsApp/entitlement/POS) → **#55** lint baseline.
-- **In flight:** `chore/post-merge-ci` — post-merge CI trigger + the lint gate in CI.
+- **`build-v3` HEAD:** `01e28b8` (PR #56). Merged in order: **#49** order cluster → **#50** mechanical
+  sweep → **#51** D1/D11 gate → **#54** P3 (identity/RBAC/WhatsApp/entitlement/POS) → **#55** lint baseline
+  → **#56** post-merge CI + lint gate.
+- **In flight:** `chore/ci-required-checks` — drop the `paths:` filters, make the four checks REQUIRED.
 - **Preflight:** **140 / 218** unresolved · 46 interpolated (uncovered) · **0** `42883`.
 - **Units:** 359 · **Gate:** `security_gate.sql` PASS · `reconcile_v3.sql` PASS on the snapshot backfill.
-- **Branch protection (2026-07-21):** `build-v3` now requires a branch to be UP TO DATE with base before
-  merging (`strict: true`, no required contexts — path-filtered checks would deadlock a docs-only PR),
-  enforced for admins. Closes the stale-base hole: the tree CI tested is the tree that lands.
+- **Branch protection (2026-07-21):** `build-v3` requires a branch to be UP TO DATE with base before
+  merging (`strict: true`), enforced for admins. Closes the stale-base hole: the tree CI tested is the
+  tree that lands.
+- ✅ **The checks are now REQUIRED** (`lint`, `build-and-test`, `contract`, `tokens`). Until this landed,
+  `contexts` was empty: every gate ran, reported, and a red one still merged — instrumentation, not a
+  gate. The blocker was real, not an oversight — a required check that gets SKIPPED sits Pending forever
+  instead of passing, so requiring a path-filtered check would have made any PR that missed it permanently
+  unmergeable, admins included. Resolved by removing the `paths:` filters rather than by working around
+  them: the four jobs are 10–36s in parallel, so the filters were buying almost nothing and now cost
+  nothing. Measured, per PR: #54 ran 2 of 4 gates, **#55 ran only 1** — the lint-baseline PR itself was
+  merged without the lint gate ever running on it.
 - ✅ **Post-merge CI now runs** (`chore/post-merge-ci`). Every workflow used to be `pull_request`-only,
   and `umi-api-deploy.yml` is scoped to `main`, so a merge into `build-v3` triggered nothing — the PR was
   tested, the merge result never was. `umi-api-ci`, `contract-ci` and `tokens-ci` gain

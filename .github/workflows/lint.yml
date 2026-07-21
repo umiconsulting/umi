@@ -17,27 +17,18 @@ name: lint
 #
 # Pushes to `build-v3` are checked too: it has no deploy workflow, so a merge into
 # it would otherwise run nothing. `main` is covered by its PR gate plus the deploy.
+#
+# ⚠️ NO `paths:` FILTER — DO NOT ADD ONE. This check is REQUIRED by branch
+# protection on `build-v3`, and GitHub leaves a required-but-skipped check Pending
+# forever rather than treating it as passed. A path filter would therefore not make
+# a docs-only PR faster; it would make it UNMERGEABLE, with no failing check to fix
+# and (because protection is enforced for admins) no way to click through it. The
+# filters this workflow used to carry were removed for exactly that reason.
+# Unconditional is what makes "required" safe. The job is ~30s.
 on:
   pull_request:
-    paths:
-      - "apps/**"
-      - "packages/**"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "package.json"
-      - "turbo.json"
-      - ".github/workflows/lint.yml"
-  # Same path list, repeated: GitHub Actions does not support YAML anchors.
   push:
     branches: [build-v3]
-    paths:
-      - "apps/**"
-      - "packages/**"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "package.json"
-      - "turbo.json"
-      - ".github/workflows/lint.yml"
 
 permissions:
   contents: read
