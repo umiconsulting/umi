@@ -12,6 +12,12 @@ union all select 'audit_log(tenant)', (select count(*) from observability.audit_
 union all select 'customer_order', (select count(*) from ops.orders),        (select count(*) from tenant.customer_order)
 union all select 'order_item', (select count(*) from ops.order_items),       (select count(*) from tenant.order_item)
 union all select 'order_event', (select count(*) from ops.order_events where event_kind='status_changed'), (select count(*) from tenant.order_event)
+-- Asserted because it was silently ZERO: the backfill comment named
+-- runtime.product_embedding as the destination but no statement ever wrote there,
+-- so all 136 vectors were dropped while message_embedding carried its 1342 fine.
+-- A count nobody asserts is a count nobody notices going to 0.
+union all select 'product_embedding', (select count(*) from ops.products where name_embedding is not null), (select count(*) from runtime.product_embedding)
+union all select 'message_embedding', (select count(*) from comms.messages where embedding is not null), (select count(*) from runtime.message_embedding)
 order by 1;
 
 \echo ''

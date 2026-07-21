@@ -14,21 +14,61 @@ import {
  * canonically) to direct SQL: ILIKE waterfall (ranked in TS) → pgvector cosine
  * fallback (preflight §3/§4). Worker pool (unauthenticated WhatsApp path).
  *
- * Money: `price_cents` → pesos (legacy tool unit); the Zettle-native `variants`
- * jsonb (`{sku,name,price}`, price already pesos) passes through unchanged.
+ * ── build-v3 (2026-07-21) ──────────────────────────────────────────────────
+ * This file was written against build-v2 and referenced FIVE columns build-v3
+ * does not have. Every statement here failed, and none of it was visible: the
+ * queries are assembled from the `SELECT`/`FROM` constants below, so sql-preflight
+ * filed them under "interpolated — not covered" and never PREPAREd one.
+ *
+ *   price_cents            -> price          (bigint centavos, same unit)
+ *   is_available           -> active
+ *   metadata->>zettle_uuid -> external_ref   (typed, and now uniquely indexed)
+ *   name_embedding/model   -> runtime.product_embedding (product_id PK)
+ *   synced_at              -> runtime.integration_sync  (NOT this repo's job)
+ *
+ * VARIANTS are the real change. build-v2 kept a Zettle-native `variants` jsonb
+ * (`{name, price}`, price ABSOLUTE pesos). build-v3 models them relationally as
+ * product_option_group -> product_modifier, where a modifier carries a
+ * `price_delta` in centavos, so `product.price + delta` is the variant price
+ * (exactly how backfill_commerce.sql exploded them: 1256 modifiers over 66
+ * products, one 'Opciones' group each).
+ *
+ * The jsonb shape is REBUILT at the query boundary rather than pushed into the
+ * callers, because it is the tool layer's contract: `product-search.ts` ranks on
+ * variant names and `checkout.tools.ts` matches `variant_name` to re-price a
+ * reorder. Changing the relational model underneath must not change what the LLM
+ * tools see. Money stays where it belongs — centavos in the database, pesos at
+ * the tool boundary, converted once, here.
  */
 
 interface ProductRow {
   id: string;
   name: string;
-  price_cents: number | null;
+  price: string | number | null; // bigint → string over the wire
   description: string | null;
   category_name: string | null;
   variants: ProductVariant[] | null;
 }
 
-const SELECT = `p.id::text, p.name, p.price_cents, p.description,
-  pc.name AS category_name, p.variants`;
+/**
+ * Rebuild the Zettle-native variant array from the relational model. Absolute
+ * pesos per variant = (product base centavos + modifier delta centavos) / 100 —
+ * the inverse of the backfill's `round(price*100) - base`. Ordered by name so a
+ * menu renders deterministically (the source jsonb had no order to preserve).
+ */
+const VARIANTS = `(
+  SELECT COALESCE(
+           jsonb_agg(jsonb_build_object('name', m.name,
+                                        'price', (p.price + m.price_delta) / 100.0)
+                     ORDER BY m.name),
+           '[]'::jsonb)
+    FROM tenant.product_option_group g
+    JOIN tenant.product_modifier m ON m.option_group_id = g.id
+   WHERE g.product_id = p.id
+ ) AS variants`;
+
+const SELECT = `p.id::text, p.name, p.price, p.description,
+  pc.name AS category_name, ${VARIANTS}`;
 const FROM = `FROM tenant.product p
   LEFT JOIN tenant.product_category pc ON pc.id = p.category_id`;
 
@@ -36,7 +76,7 @@ function mapRow(r: ProductRow): ProductRecord {
   return {
     id: r.id,
     name: r.name,
-    price: (r.price_cents ?? 0) / 100, // centavos → pesos
+    price: Number(r.price ?? 0) / 100, // centavos → pesos
     description: r.description,
     category: r.category_name,
     variants: Array.isArray(r.variants) ? r.variants : [],
@@ -65,7 +105,7 @@ export class ProductsRepository {
 
     const text = await this.pg.query<ProductRow>(
       `SELECT ${SELECT} ${FROM}
-        WHERE p.business_id = $1::uuid AND p.is_available = true
+        WHERE p.business_id = $1::uuid AND p.active = true
           AND (
             p.name ILIKE ANY($2)
             OR COALESCE(p.description,'') ILIKE ANY($2)
@@ -73,14 +113,14 @@ export class ProductsRepository {
             -- "La Mesa de Leonor" with variants "Brookies", "Linzer Cookies", …)
             -- otherwise hides each item from a targeted search ("brookies") even
             -- though browse shows it — the TS ranker already scores variant names,
-            -- it just never received variant-only matches. jsonb_typeof guards a
-            -- non-array variants value so jsonb_array_elements can't error.
-            OR (
-              jsonb_typeof(p.variants) = 'array'
-              AND EXISTS (
-                SELECT 1 FROM jsonb_array_elements(p.variants) AS v
-                 WHERE v->>'name' ILIKE ANY($2)
-              )
+            -- it just never received variant-only matches. Now a plain join over
+            -- the relational modifiers, so the jsonb_typeof guard that kept
+            -- jsonb_array_elements from erroring on a non-array is no longer needed.
+            OR EXISTS (
+              SELECT 1
+                FROM tenant.product_option_group g
+                JOIN tenant.product_modifier m ON m.option_group_id = g.id
+               WHERE g.product_id = p.id AND m.name ILIKE ANY($2)
             )
           )
         LIMIT 250`,
@@ -101,10 +141,10 @@ export class ProductsRepository {
     if (!embedding) return [];
     const sem = await this.pg.query<ProductRow>(
       `SELECT ${SELECT} ${FROM}
-        WHERE p.business_id = $1::uuid AND p.is_available = true
-          AND p.name_embedding IS NOT NULL
-          AND 1 - (p.name_embedding <=> $2::vector) >= 0.60
-        ORDER BY p.name_embedding <=> $2::vector
+        JOIN runtime.product_embedding pe ON pe.product_id = p.id
+        WHERE p.business_id = $1::uuid AND p.active = true
+          AND 1 - (pe.embedding <=> $2::vector) >= 0.60
+        ORDER BY pe.embedding <=> $2::vector
         LIMIT $3`,
       [tenantId, JSON.stringify(embedding), limit],
     );
@@ -124,10 +164,10 @@ export class ProductsRepository {
     if (!embedding) return [];
     const { rows } = await this.pg.query<ProductRow>(
       `SELECT ${SELECT} ${FROM}
-        WHERE p.business_id = $1::uuid AND p.is_available = true
-          AND p.name_embedding IS NOT NULL
-          AND 1 - (p.name_embedding <=> $2::vector) >= 0.30
-        ORDER BY p.name_embedding <=> $2::vector
+        JOIN runtime.product_embedding pe ON pe.product_id = p.id
+        WHERE p.business_id = $1::uuid AND p.active = true
+          AND 1 - (pe.embedding <=> $2::vector) >= 0.30
+        ORDER BY pe.embedding <=> $2::vector
         LIMIT $3`,
       [tenantId, JSON.stringify(embedding), limit],
     );
@@ -142,7 +182,7 @@ export class ProductsRepository {
   ): Promise<ProductRecord[]> {
     const { rows } = await this.pg.query<ProductRow>(
       `SELECT ${SELECT} ${FROM}
-        WHERE p.business_id = $1::uuid AND p.is_available = true
+        WHERE p.business_id = $1::uuid AND p.active = true
           AND ($2::text[] IS NULL OR pc.name = ANY($2))
         LIMIT $3`,
       [tenantId, categoryFilter, limit],
@@ -156,7 +196,7 @@ export class ProductsRepository {
       `SELECT DISTINCT pc.name
          FROM tenant.product p
          JOIN tenant.product_category pc ON pc.id = p.category_id
-        WHERE p.business_id = $1::uuid AND p.is_available = true`,
+        WHERE p.business_id = $1::uuid AND p.active = true`,
       [tenantId],
     );
     return rows
@@ -170,12 +210,12 @@ export class ProductsRepository {
     ids: string[],
   ): Promise<Map<string, ProductRecord & { available: boolean }>> {
     if (!ids.length) return new Map();
-    const { rows } = await this.pg.query<ProductRow & { is_available: boolean }>(
-      `SELECT ${SELECT}, p.is_available ${FROM}
+    const { rows } = await this.pg.query<ProductRow & { active: boolean }>(
+      `SELECT ${SELECT}, p.active ${FROM}
         WHERE p.business_id = $1::uuid AND p.id = ANY($2::uuid[])`,
       [tenantId, ids],
     );
-    return new Map(rows.map((r) => [r.id, { ...mapRow(r), available: r.is_available }]));
+    return new Map(rows.map((r) => [r.id, { ...mapRow(r), available: r.active }]));
   }
 
   /** Products lacking a name embedding (product.embed enrichment). */
@@ -187,7 +227,10 @@ export class ProductsRepository {
   > {
     const { rows } = await this.pg.query<ProductRow>(
       `SELECT ${SELECT} ${FROM}
-        WHERE p.business_id = $1::uuid AND p.is_available = true AND p.name_embedding IS NULL
+        WHERE p.business_id = $1::uuid AND p.active = true
+          AND NOT EXISTS (
+            SELECT 1 FROM runtime.product_embedding pe WHERE pe.product_id = p.id
+          )
         LIMIT $2`,
       [tenantId, limit],
     );
@@ -199,40 +242,62 @@ export class ProductsRepository {
     }));
   }
 
+  /**
+   * The embedding is machinery, not catalog truth, so build-v3 keeps it in
+   * `runtime.product_embedding` (product_id PK) rather than as a column on the
+   * product. Upsert, because re-embedding a renamed product must replace the
+   * vector rather than fail or accumulate.
+   */
   async updateNameEmbedding(id: string, embedding: number[], model: string): Promise<void> {
     await this.pg.query(
-      `UPDATE tenant.product SET name_embedding = $2::vector, embedding_model = $3, updated_at = now()
-        WHERE id = $1::uuid`,
+      `INSERT INTO runtime.product_embedding (product_id, embedding, model)
+       VALUES ($1::uuid, $2::vector, $3)
+       ON CONFLICT (product_id) DO UPDATE
+         SET embedding = EXCLUDED.embedding, model = EXCLUDED.model`,
       [id, JSON.stringify(embedding), model],
     );
   }
 
   // ── zettle.sync catalog upsert (Phase 3d integrations) ──────────────────────
 
-  /** Get-or-create a category by name (key = slug); returns its id, or null. */
+  /**
+   * Get-or-create a category by name; returns its id, or null.
+   *
+   * build-v2 keyed this on a derived slug column (`key`) and upserted on it.
+   * build-v3 has no `key` — the NAME is the category's identity, so the slug and
+   * its normalization are gone rather than reimplemented. `DO UPDATE SET name`
+   * (rather than DO NOTHING) is kept so the statement always RETURNs a row; with
+   * DO NOTHING an existing category yields zero rows and the caller would read
+   * that as "no category" and detach every product from it.
+   */
   async getOrCreateCategory(tenantId: string, name: string | null): Promise<string | null> {
     if (!name || !name.trim()) return null;
-    const key =
-      name
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '') || 'uncategorized';
     const { rows } = await this.pg.query<{ id: string }>(
-      `INSERT INTO tenant.product_category (business_id, key, name, sort_order, metadata)
-       VALUES ($1::uuid, $2, $3, 0, '{}'::jsonb)
-       ON CONFLICT (business_id, key) DO UPDATE SET name = EXCLUDED.name, updated_at = now()
+      `INSERT INTO tenant.product_category (business_id, name, display_order)
+       VALUES ($1::uuid, $2, 0)
+       ON CONFLICT (business_id, name) DO UPDATE SET name = EXCLUDED.name
        RETURNING id::text`,
-      [tenantId, key, name.trim()],
+      [tenantId, name.trim()],
     );
     return rows[0]?.id ?? null;
   }
 
   /**
-   * Upsert a Zettle product, keyed on `metadata->>'zettle_uuid'` (no column/unique
-   * for it canonically). Nulls `name_embedding` only when name/variants actually
-   * changed (so product.embed re-embeds just those). `priceCents` is centavos
-   * (Zettle minor units); `variants` jsonb carries pesos prices (Zettle-native).
+   * Upsert a Zettle product, keyed on `external_ref` (build-v2 hid the id in
+   * `metadata->>'zettle_uuid'` with no constraint, so this had to SELECT-then-write
+   * and two concurrent syncs could both miss and both INSERT — it is now one atomic
+   * ON CONFLICT on the partial unique index).
+   *
+   * `priceCents` is centavos (Zettle minor units) and lands in `price` unchanged.
+   * Variants are no longer a jsonb column: they are REPLACED wholesale in the
+   * relational model below, in the same transaction as the product row, because a
+   * product whose price moved must not be visible next to modifier deltas computed
+   * from the old price.
+   *
+   * `synced_at` is gone on purpose — a sync cursor is integration machinery and
+   * belongs to `runtime.integration_sync`, not to catalog truth. Likewise the
+   * `metadata.source='zettle'` provenance blob: `external_ref` being non-null IS
+   * the statement that this product came from the integration.
    */
   async upsertFromZettle(
     tenantId: string,
@@ -246,61 +311,87 @@ export class ProductsRepository {
       isAvailable: boolean;
     },
   ): Promise<void> {
-    const variantsJson = JSON.stringify(p.variants);
-    const existing = await this.pg.query<{ id: string }>(
-      `SELECT id::text FROM tenant.product
-        WHERE business_id = $1::uuid AND metadata->>'zettle_uuid' = $2 LIMIT 1`,
-      [tenantId, p.zettleUuid],
-    );
-    if (existing.rows[0]) {
-      await this.pg.query(
-        `UPDATE tenant.product SET
-            name = $3, description = $4, category_id = $5::uuid, price_cents = $6,
-            variants = $7::jsonb, is_available = $8, synced_at = now(), updated_at = now(),
-            name_embedding = CASE
-              WHEN name IS DISTINCT FROM $3 OR variants IS DISTINCT FROM $7::jsonb
-              THEN NULL ELSE name_embedding END,
-            metadata = metadata || jsonb_build_object('zettle_uuid', $2, 'source', 'zettle')
-          WHERE id = $9::uuid`,
-        [
-          tenantId,
-          p.zettleUuid,
-          p.name,
-          p.description,
-          p.categoryId,
-          p.priceCents,
-          variantsJson,
-          p.isAvailable,
-          existing.rows[0].id,
-        ],
+    await this.pg.workerTx(async (client) => {
+      // Read the PREVIOUS searchable text before the upsert overwrites it. This
+      // cannot be folded into the upsert's RETURNING: `excluded` is not in scope
+      // there, and by then the table alias already holds the NEW value, so the
+      // comparison could never be true. It is only used to decide whether to
+      // re-embed, so a miss caused by a concurrent insert is harmless — the worst
+      // case is one unnecessary re-embed, while ON CONFLICT still keeps the write
+      // atomic.
+      const before = await client.query<{ name: string; price: string }>(
+        `SELECT name, price::text FROM tenant.product
+          WHERE business_id = $1::uuid AND external_ref = $2`,
+        [tenantId, p.zettleUuid],
       );
-      return;
-    }
-    await this.pg.query(
-      `INSERT INTO tenant.product
-         (business_id, category_id, name, description, price_cents, is_available, variants, synced_at, metadata)
-       VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7::jsonb, now(),
-               jsonb_build_object('zettle_uuid', $8, 'source', 'zettle'))`,
-      [
-        tenantId,
-        p.categoryId,
-        p.name,
-        p.description,
-        p.priceCents,
-        p.isAvailable,
-        variantsJson,
-        p.zettleUuid,
-      ],
-    );
+      const prev = before.rows[0];
+      const textMoved = !prev || prev.name !== p.name || Number(prev.price) !== p.priceCents;
+
+      const { rows } = await client.query<{ id: string }>(
+        `INSERT INTO tenant.product
+           (business_id, category_id, name, description, price, active, external_ref)
+         VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7)
+         ON CONFLICT (business_id, external_ref) WHERE external_ref IS NOT NULL
+           DO UPDATE SET
+             category_id = EXCLUDED.category_id,
+             name        = EXCLUDED.name,
+             description = EXCLUDED.description,
+             price       = EXCLUDED.price,
+             active      = EXCLUDED.active,
+             updated_at  = now()
+         RETURNING id::text`,
+        [tenantId, p.categoryId, p.name, p.description, p.priceCents, p.isAvailable, p.zettleUuid],
+      );
+      const productId = rows[0].id;
+
+      // Replace the variant set. Delete-then-insert rather than a diff: the group
+      // is a single 'Opciones' bag owned entirely by the sync, the counts are tiny
+      // (1256 modifiers across the whole catalog), and a diff would have to reason
+      // about deltas that shift whenever the base price moves. The cascade from
+      // option_group removes the modifiers.
+      await client.query(`DELETE FROM tenant.product_option_group WHERE product_id = $1::uuid`, [
+        productId,
+      ]);
+      if (p.variants.length) {
+        const g = await client.query<{ id: string }>(
+          `INSERT INTO tenant.product_option_group (product_id, name, min_select, max_select)
+           VALUES ($1::uuid, 'Opciones', 0, NULL)
+           RETURNING id::text`,
+          [productId],
+        );
+        for (const v of p.variants) {
+          // Zettle gives an ABSOLUTE price in pesos; the model stores a delta from
+          // the product base in centavos, so base + delta reproduces it exactly.
+          await client.query(
+            `INSERT INTO tenant.product_modifier (option_group_id, name, price_delta)
+             VALUES ($1::uuid, $2, $3)`,
+            [g.rows[0].id, v.name, Math.round(Number(v.price) * 100) - p.priceCents],
+          );
+        }
+      }
+
+      // Re-embed only when the searchable text actually moved. The embedding is a
+      // separate row now, so "invalidate" is a DELETE, and listNeedingEmbedding's
+      // NOT EXISTS picks it up on the next enrichment pass.
+      if (textMoved) {
+        await client.query(`DELETE FROM runtime.product_embedding WHERE product_id = $1::uuid`, [
+          productId,
+        ]);
+      }
+    });
   }
 
-  /** Mark Zettle-sourced products absent from the latest sync as unavailable. */
+  /**
+   * Mark Zettle-sourced products absent from the latest sync as unavailable.
+   * `external_ref IS NOT NULL` is what scopes this to integration-owned rows, so a
+   * hand-created product is never deactivated by a sync that has never heard of it.
+   */
   async markUnavailableExcept(tenantId: string, zettleUuids: string[]): Promise<void> {
     await this.pg.query(
-      `UPDATE tenant.product SET is_available = false, updated_at = now()
+      `UPDATE tenant.product SET active = false, updated_at = now()
         WHERE business_id = $1::uuid
-          AND metadata->>'zettle_uuid' IS NOT NULL
-          AND NOT (metadata->>'zettle_uuid' = ANY($2::text[]))`,
+          AND external_ref IS NOT NULL
+          AND NOT (external_ref = ANY($2::text[]))`,
       [tenantId, zettleUuids],
     );
   }
@@ -310,12 +401,12 @@ export class ProductsRepository {
     tenantId: string,
     id: string,
   ): Promise<(ProductRecord & { available: boolean }) | null> {
-    const { rows } = await this.pg.query<ProductRow & { is_available: boolean }>(
-      `SELECT ${SELECT}, p.is_available ${FROM}
+    const { rows } = await this.pg.query<ProductRow & { active: boolean }>(
+      `SELECT ${SELECT}, p.active ${FROM}
         WHERE p.business_id = $1::uuid AND p.id = $2::uuid
         LIMIT 1`,
       [tenantId, id],
     );
-    return rows[0] ? { ...mapRow(rows[0]), available: rows[0].is_available } : null;
+    return rows[0] ? { ...mapRow(rows[0]), available: rows[0].active } : null;
   }
 }

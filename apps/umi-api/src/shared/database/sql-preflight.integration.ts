@@ -243,6 +243,14 @@ describe('build-v3 SQL preflight · every backend statement parses against the r
         return strict;
       } finally {
         await client.query('ROLLBACK');
+        // PREPARE is NOT transactional — a prepared statement SURVIVES the
+        // ROLLBACK above (verified: `BEGIN; PREPARE x; ROLLBACK;` leaves x in
+        // pg_prepared_statements). Reusing one name therefore poisons the whole
+        // run: the first statement that parses leaves `_preflight` behind, and
+        // every statement after it fails 42P05 "already exists" — which is not a
+        // schema code, so it was swallowed as a harness limitation while still
+        // being counted as checked. That silently skipped 88 statements.
+        await client.query('DEALLOCATE ALL');
       }
     };
 

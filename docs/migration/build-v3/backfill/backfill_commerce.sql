@@ -44,8 +44,12 @@ from ops.product_categories pc;
 -- ----------------------------------------------------------------------------
 -- 2. ops.products  ->  tenant.product   (MAP)
 --    price_cents -> price (bigint centavos). external_ref <- metadata.zettle_uuid.
---    DROPPED: name_embedding/embedding_model (-> runtime.product_embedding),
---    synced_at (sync cursor -> runtime.integration_sync), metadata (source_*
+--    MOVED (not dropped): name_embedding/embedding_model -> runtime.product_embedding
+--    in step 2c below. This comment previously said "DROPPED ... (-> runtime.
+--    product_embedding)" and named a destination that no statement ever wrote to, so
+--    all 136 vectors were silently discarded while backfill_comms.sql carried its
+--    1342 message embeddings correctly. The comment was right; the code was missing.
+--    DROPPED: synced_at (sync cursor -> runtime.integration_sync), metadata (source_*
 --    provenance = telemetry), variants (exploded below). description '' -> null.
 -- ----------------------------------------------------------------------------
 insert into tenant.product
@@ -82,6 +86,19 @@ from og
 join ops.products p on p.id = og.product_id
 cross join lateral jsonb_array_elements(p.variants) v
 where coalesce(btrim(v->>'name'), '') <> '';
+
+-- 2c. ops.products.name_embedding -> runtime.product_embedding            (136 rows)
+--     Same rule and same reason as runtime.message_embedding in backfill_comms.sql:
+--     the vector's honest home is the semantic index, and it is CARRIED rather than
+--     regenerated so cutover does not start with product search returning nothing
+--     and a bill for 136 Voyage calls.
+--     Provenance labelled honestly from the source: all 136 are 'voyage-3' (note this
+--     differs from messages, which are 'voyage-4-lite') and all are 1024-dim, matching
+--     runtime.product_embedding.embedding extensions.vector(1024).
+insert into runtime.product_embedding (product_id, embedding, model, created_at)
+select p.id, p.name_embedding, coalesce(p.embedding_model, 'voyage-3'), p.created_at
+from ops.products p
+where p.name_embedding is not null;
 
 -- ----------------------------------------------------------------------------
 -- 3. ops.businesses + ops.business_hours  ->  tenant.business COLUMNS  (MAP/fold)

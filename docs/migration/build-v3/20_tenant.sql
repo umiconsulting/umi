@@ -331,6 +331,12 @@ create table tenant.product_category (
   display_order integer not null default 0,
   created_at    timestamptz not null default now()
 );
+-- The catalog sync gets-or-creates a category BY NAME on every run. build-v2 keyed
+-- that on a slug column (`key`) which build-v3 correctly does not have — the name is
+-- the identity. Without this, the upsert has no conflict target and a re-sync forks
+-- a second "Bebidas". 0 duplicate (business_id, name) pairs in the source.
+create unique index product_category_business_name_uidx
+  on tenant.product_category (business_id, name);
 
 create table tenant.product (
   id           uuid primary key default gen_random_uuid(),
@@ -344,6 +350,14 @@ create table tenant.product (
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
+-- The Zettle sync identifies a product by its external id. build-v2 kept that in
+-- `metadata->>'zettle_uuid'` with no constraint, so the sync had to SELECT-then-write
+-- and two concurrent runs could both miss and both INSERT. external_ref is the typed
+-- home; this makes the upsert atomic. Partial: hand-created products have no ref.
+-- 136/136 source products carry one, with 0 duplicates.
+create unique index product_external_ref_uidx
+  on tenant.product (business_id, external_ref)
+  where external_ref is not null;
 comment on column tenant.product.price is
   'Centavos. Name embeddings live in runtime.product_embedding, not here.';
 
