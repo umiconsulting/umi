@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
-import { I } from '@/icons.jsx'
-import { XSep } from '@/shell.jsx'
+import React, { useState, useEffect } from 'react';
+import { I } from '@/icons.jsx';
+import { XSep } from '@/shell.jsx';
 import {
   approveDevicePairing,
   createKdsStation,
@@ -13,12 +13,11 @@ import {
   useDevicePairings,
   useDevicesData,
   useKdsStations,
-} from '@/data.jsx'
+} from '@/data.jsx';
 
 // Screen 3 — Devices (KDS)
 // Data: useDevicesData() → kds.device_sessions from Supabase
 // Status derived from local heartbeat: <10s=live, <20s=slow, else=offline.
-
 
 const DEVICE_LIVE_MS = 10_000;
 const DEVICE_OFFLINE_MS = 20_000;
@@ -44,135 +43,243 @@ function deriveStatus(lastUsedAt) {
 const POLL_INTERVAL = 8; // seconds — heartbeat is every 5 s, catch a miss quickly
 
 const DevicesScreen = () => {
-  const [refresh,     setRefresh]     = useState(0);
+  const [refresh, setRefresh] = useState(0);
   const [stationOpen, setStationOpen] = useState(false);
-  const [addOpen,     setAddOpen]     = useState(false);
-  const [editDevice,  setEditDevice]  = useState(null);
-  const [countdown,   setCountdown]   = useState(POLL_INTERVAL);
+  const [addOpen, setAddOpen] = useState(false);
+  const [editDevice, setEditDevice] = useState(null);
+  const [countdown, setCountdown] = useState(POLL_INTERVAL);
 
   // Auto-poll local heartbeat data so offline/online transitions are picked up.
-  useEffect(function() {
+  useEffect(function () {
     setCountdown(POLL_INTERVAL);
-    const pollId = setInterval(function() {
-      setRefresh(function(r) { return r + 1; });
+    const pollId = setInterval(function () {
+      setRefresh(function (r) {
+        return r + 1;
+      });
       setCountdown(POLL_INTERVAL);
     }, POLL_INTERVAL * 1000);
-    const tickId = setInterval(function() {
-      setCountdown(function(c) { return c <= 1 ? POLL_INTERVAL : c - 1; });
+    const tickId = setInterval(function () {
+      setCountdown(function (c) {
+        return c <= 1 ? POLL_INTERVAL : c - 1;
+      });
     }, 1000);
-    return function() { clearInterval(pollId); clearInterval(tickId); };
+    return function () {
+      clearInterval(pollId);
+      clearInterval(tickId);
+    };
   }, []);
 
   const { data: rawDevices, loading } = useDevicesData(refresh);
   const { data: stations } = useKdsStations(refresh);
   const { data: pairings } = useDevicePairings(refresh);
-  const devices = (rawDevices || []).map(function(d) {
+  const devices = (rawDevices || []).map(function (d) {
     // Heartbeat (local, 5-s cadence) is the authoritative connection signal.
     // last_used_at (cloud) only updates on order bumps — not a heartbeat.
     const hbStatus = d._heartbeatStatus || null;
     const hbSeenMs = d._heartbeatSeenMs || null;
     const connectionStatus = hbStatus || deriveStatus(d.last_used_at);
     return {
-      id:      d.device_id,
-      name:    d.device_name,
+      id: d.device_id,
+      name: d.device_name,
       station: d.station_name || d.station_id,
       stationId: d.station_id,
-      status:  connectionStatus,
+      status: connectionStatus,
       hasHeartbeat: !!hbStatus,
-      open:    d.open || 0,
-      last:    hbSeenMs ? fmtLastSeen(new Date(hbSeenMs).toISOString()) : fmtLastSeen(d.last_used_at),
-      pin:     d.pin || '• • • • • •',
-      model:   d.model || 'iPad',
-      ip:      d.ip || '—',
-      _raw:    d,
+      open: d.open || 0,
+      last: hbSeenMs ? fmtLastSeen(new Date(hbSeenMs).toISOString()) : fmtLastSeen(d.last_used_at),
+      pin: d.pin || '• • • • • •',
+      model: d.model || 'iPad',
+      ip: d.ip || '—',
+      _raw: d,
     };
   });
 
-  const liveCount = devices.filter(function(d) { return d.status === 'live'; }).length;
+  const liveCount = devices.filter(function (d) {
+    return d.status === 'live';
+  }).length;
 
   return (
-    <div style={{display:'flex', flexDirection:'column', gap:24}}>
-
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Header */}
       <div className="ed-head fade-up d1">
         <div className="titles">
           <div className="sec-index">
-            <span className="nn">A</span><span>/</span>
+            <span className="nn">A</span>
+            <span>/</span>
             <span>
-              EN VIVO <XSep/> {devices.length} DEVICES <XSep/> {liveCount} LIVE
-              {loading && <span style={{marginLeft:8, fontSize:10, opacity:0.6}}>· actualizando…</span>}
+              EN VIVO <XSep /> {devices.length} DEVICES <XSep /> {liveCount} LIVE
+              {loading && (
+                <span style={{ marginLeft: 8, fontSize: 10, opacity: 0.6 }}>· actualizando…</span>
+              )}
             </span>
           </div>
           <h2>Dispositivos pareados</h2>
           <div className="en">Paired KDS devices · kds.device_sessions</div>
         </div>
-        <div style={{display:'flex', gap:10}}>
-          <button className="btn btn-ghost btn-sm focusable" onClick={() => { setRefresh(r => r+1); setCountdown(POLL_INTERVAL); }}>
-            <I.Refresh size={14}/> Actualizar
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            className="btn btn-ghost btn-sm focusable"
+            onClick={() => {
+              setRefresh((r) => r + 1);
+              setCountdown(POLL_INTERVAL);
+            }}
+          >
+            <I.Refresh size={14} /> Actualizar
           </button>
           <button className="btn btn-secondary focusable" onClick={() => setStationOpen(true)}>
-            <I.Layout size={16}/> Estaciones
+            <I.Layout size={16} /> Estaciones
           </button>
           <button className="btn btn-primary focusable" onClick={() => setAddOpen(true)}>
-            <I.Plus size={16}/> Añadir dispositivo
+            <I.Plus size={16} /> Añadir dispositivo
           </button>
         </div>
       </div>
 
       {/* Devices grid */}
-      <div className="grid grid-2 fade-up d2" style={{gap:12}}>
-        {devices.map(function(d) {
+      <div className="grid grid-2 fade-up d2" style={{ gap: 12 }}>
+        {devices.map(function (d) {
           return (
             <div
               key={d.id}
               className={'list-card ' + d.status}
-              style={{padding: 0, paddingRight: 16, cursor:'pointer', transition:'box-shadow 0.15s'}}
+              style={{
+                padding: 0,
+                paddingRight: 16,
+                cursor: 'pointer',
+                transition: 'box-shadow 0.15s',
+              }}
               onClick={() => setEditDevice(d)}
-              onMouseEnter={e => e.currentTarget.style.boxShadow='var(--shadow-pop)'}
-              onMouseLeave={e => e.currentTarget.style.boxShadow=''}
+              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = 'var(--shadow-pop)')}
+              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = '')}
             >
-              <div className="l-strip"/>
-              <div style={{paddingTop:14, paddingBottom:14, flex:1, display:'flex', gap:14, alignItems:'center', minWidth:0}}>
-                <div style={{
-                  width:40, height:40, borderRadius:12,
-                  background:'var(--canvas-2)', color:'var(--umi-navy)',
-                  display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
-                }}>
-                  <I.Tablet size={18}/>
+              <div className="l-strip" />
+              <div
+                style={{
+                  paddingTop: 14,
+                  paddingBottom: 14,
+                  flex: 1,
+                  display: 'flex',
+                  gap: 14,
+                  alignItems: 'center',
+                  minWidth: 0,
+                }}
+              >
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
+                    background: 'var(--canvas-2)',
+                    color: 'var(--umi-navy)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <I.Tablet size={18} />
                 </div>
 
-                <div style={{flex:1, minWidth:0}}>
-                  <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:3, flexWrap:'nowrap'}}>
-                    <span style={{fontWeight:600, fontSize:14, color:'var(--ink-1)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{d.name}</span>
-                    <span className="chip" style={{fontSize:10, height:20, fontWeight:600, letterSpacing:'0.08em', flexShrink:0}}>{d.station || 'SIN ASIGNAR'}</span>
-                  </div>
-                  <div style={{display:'flex', alignItems:'center', gap:6, fontSize:12, color:'var(--ink-3)', flexWrap:'nowrap'}}>
-                    <span style={{display:'inline-flex', alignItems:'center', gap:4, flexShrink:0}}>
-                      <span className={'s-dot ' + d.status}/>
-                      {loading && d.status !== 'live'
-                        ? <span style={{color:'var(--warning)', fontStyle:'italic'}}>Reconectando…</span>
-                        : d.status === 'live' ? 'Live' : d.status === 'slow' ? 'Slow' : 'Offline'
-                      }
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      marginBottom: 3,
+                      flexWrap: 'nowrap',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        fontSize: 14,
+                        color: 'var(--ink-1)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {d.name}
                     </span>
-                    <span style={{color:'var(--ink-4)'}}>·</span>
-                    <span style={{whiteSpace:'nowrap'}}>Visto {d.last}</span>
+                    <span
+                      className="chip"
+                      style={{
+                        fontSize: 10,
+                        height: 20,
+                        fontWeight: 600,
+                        letterSpacing: '0.08em',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {d.station || 'SIN ASIGNAR'}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 12,
+                      color: 'var(--ink-3)',
+                      flexWrap: 'nowrap',
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <span className={'s-dot ' + d.status} />
+                      {loading && d.status !== 'live' ? (
+                        <span style={{ color: 'var(--warning)', fontStyle: 'italic' }}>
+                          Reconectando…
+                        </span>
+                      ) : d.status === 'live' ? (
+                        'Live'
+                      ) : d.status === 'slow' ? (
+                        'Slow'
+                      ) : (
+                        'Offline'
+                      )}
+                    </span>
+                    <span style={{ color: 'var(--ink-4)' }}>·</span>
+                    <span style={{ whiteSpace: 'nowrap' }}>Visto {d.last}</span>
                     {d.status === 'offline' && !loading && (
-                      <span style={{color:'var(--ink-4)', fontSize:11}}>· en {countdown}s</span>
+                      <span style={{ color: 'var(--ink-4)', fontSize: 11 }}>· en {countdown}s</span>
                     )}
                   </div>
                 </div>
 
-                <div style={{textAlign:'center', flexShrink:0}}>
-                  <div className="eyebrow" style={{fontSize:9, marginBottom:2}}>ÓRDENES</div>
-                  <div style={{fontFamily:'var(--font-display)', fontSize:22, fontWeight:600, lineHeight:1, color: d.status === 'offline' ? 'var(--ink-4)' : 'var(--ink-1)'}}>{d.open}</div>
+                <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                  <div className="eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>
+                    ÓRDENES
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 22,
+                      fontWeight: 600,
+                      lineHeight: 1,
+                      color: d.status === 'offline' ? 'var(--ink-4)' : 'var(--ink-1)',
+                    }}
+                  >
+                    {d.open}
+                  </div>
                 </div>
 
                 <button
                   className="btn-icon focusable"
-                  onClick={e => { e.stopPropagation(); setEditDevice(d); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditDevice(d);
+                  }}
                   aria-label="Editar dispositivo"
                 >
-                  <I.Edit size={15}/>
+                  <I.Edit size={15} />
                 </button>
               </div>
             </div>
@@ -184,28 +291,51 @@ const DevicesScreen = () => {
         <PairingRequestsCard
           pairings={pairings}
           stations={stations || []}
-          onChanged={() => setRefresh(r => r + 1)}
+          onChanged={() => setRefresh((r) => r + 1)}
         />
       )}
 
       {/* Connection legend */}
-      <div className="card fade-up d3" style={{padding:'18px 22px', display:'flex', gap:24, alignItems:'center', flexWrap:'wrap'}}>
+      <div
+        className="card fade-up d3"
+        style={{
+          padding: '18px 22px',
+          display: 'flex',
+          gap: 24,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+        }}
+      >
         <div className="eyebrow">Connection legend</div>
-        <span className="legend"><span className="s-dot live"/> Live · responding under 10 s</span>
-        <span className="legend"><span className="s-dot slow"/> Slow · responding 10–20 s</span>
-        <span className="legend"><span className="s-dot offline"/> Offline · no heartbeat 20 s+</span>
-        <span style={{marginLeft:'auto', fontSize:12.5, color:'var(--ink-3)'}}>
-          Source · <span style={{fontFamily:'var(--font-mono)'}}>local heartbeat</span> + <span style={{fontFamily:'var(--font-mono)'}}>kds.device_sessions</span>
+        <span className="legend">
+          <span className="s-dot live" /> Live · responding under 10 s
+        </span>
+        <span className="legend">
+          <span className="s-dot slow" /> Slow · responding 10–20 s
+        </span>
+        <span className="legend">
+          <span className="s-dot offline" /> Offline · no heartbeat 20 s+
+        </span>
+        <span style={{ marginLeft: 'auto', fontSize: 12.5, color: 'var(--ink-3)' }}>
+          Source · <span style={{ fontFamily: 'var(--font-mono)' }}>local heartbeat</span> +{' '}
+          <span style={{ fontFamily: 'var(--font-mono)' }}>kds.device_sessions</span>
         </span>
       </div>
 
-      {stationOpen && <StationPanel onClose={() => setStationOpen(false)} devices={devices} stations={stations || []} onChanged={() => setRefresh(r => r + 1)}/>}
+      {stationOpen && (
+        <StationPanel
+          onClose={() => setStationOpen(false)}
+          devices={devices}
+          stations={stations || []}
+          onChanged={() => setRefresh((r) => r + 1)}
+        />
+      )}
       {addOpen && (
         <AddDevicePanel
           onClose={() => setAddOpen(false)}
           stations={stations || []}
           pairings={pairings || []}
-          onProvisioned={() => setRefresh(r => r + 1)}
+          onProvisioned={() => setRefresh((r) => r + 1)}
         />
       )}
       {editDevice && (
@@ -213,7 +343,10 @@ const DevicesScreen = () => {
           device={editDevice}
           stations={stations || []}
           onClose={() => setEditDevice(null)}
-          onSaved={() => { setEditDevice(null); setRefresh(r => r + 1); }}
+          onSaved={() => {
+            setEditDevice(null);
+            setRefresh((r) => r + 1);
+          }}
         />
       )}
     </div>
@@ -229,15 +362,18 @@ const PAIRING_ERROR_MESSAGES = {
 // console for debugging.
 function pairingErrorMessage(err) {
   return (
-    PAIRING_ERROR_MESSAGES[err && err.code] ||
-    'No se pudo completar la acción. Intenta de nuevo.'
+    PAIRING_ERROR_MESSAGES[err && err.code] || 'No se pudo completar la acción. Intenta de nuevo.'
   );
 }
 
 const PairingRequestsCard = ({ pairings, stations, onChanged }) => {
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
-  const stationById = Object.fromEntries((stations || []).map(function(s) { return [s.id, s]; }));
+  const stationById = Object.fromEntries(
+    (stations || []).map(function (s) {
+      return [s.id, s];
+    }),
+  );
 
   async function approve(id) {
     setBusy(id + ':approve');
@@ -268,64 +404,106 @@ const PairingRequestsCard = ({ pairings, stations, onChanged }) => {
   }
 
   return (
-    <div className="card fade-up d3" style={{padding:'18px 22px', display:'flex', flexDirection:'column', gap:12}}>
-      <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:16}}>
+    <div
+      className="card fade-up d3"
+      style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 12 }}
+    >
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}
+      >
         <div>
           <div className="eyebrow">Primer pareo</div>
-          <h2 className="h-section" style={{marginTop:4}}>Solicitudes KDS pendientes</h2>
+          <h2 className="h-section" style={{ marginTop: 4 }}>
+            Solicitudes KDS pendientes
+          </h2>
         </div>
         <button className="btn btn-ghost btn-sm" onClick={onChanged}>
-          <I.Refresh size={14}/> Actualizar
+          <I.Refresh size={14} /> Actualizar
         </button>
       </div>
       {error && (
-        <div style={{fontSize:12.5, color:'var(--danger)', background:'var(--danger-soft)', borderRadius:10, padding:'9px 12px'}}>
+        <div
+          style={{
+            fontSize: 12.5,
+            color: 'var(--danger)',
+            background: 'var(--danger-soft)',
+            borderRadius: 10,
+            padding: '9px 12px',
+          }}
+        >
           {error}
         </div>
       )}
-      <div style={{display:'flex', flexDirection:'column', gap:8}}>
-        {pairings.map(function(p) {
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {pairings.map(function (p) {
           const station = stationById[p.station_id];
           const requested = p.requested_name || 'Esperando iPad';
           const pendingApproval = p.status === 'pending' && p.requested_name;
-          const expired = p.status === 'pending' && p.expires_at && new Date(p.expires_at).getTime() < Date.now();
+          const expired =
+            p.status === 'pending' && p.expires_at && new Date(p.expires_at).getTime() < Date.now();
           return (
-            <div key={p.id} className="list-card" style={{padding:14, alignItems:'center'}}>
-              <div style={{paddingLeft:14, flex:1, minWidth:0}}>
-                <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:3}}>
-                  <b style={{fontSize:14}}>{p.device_name}</b>
-                  <span className="chip" style={{height:22, fontSize:10.5, letterSpacing:'0.08em'}}>
+            <div key={p.id} className="list-card" style={{ padding: 14, alignItems: 'center' }}>
+              <div style={{ paddingLeft: 14, flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 3 }}>
+                  <b style={{ fontSize: 14 }}>{p.device_name}</b>
+                  <span
+                    className="chip"
+                    style={{ height: 22, fontSize: 10.5, letterSpacing: '0.08em' }}
+                  >
                     {station?.name || p.station_id}
                   </span>
-                  <span className="chip" style={{
-                    height:22,
-                    fontSize:10.5,
-                    color: p.status === 'approved' ? 'var(--success)' : expired ? 'var(--danger)' : 'var(--warning)',
-                    background: p.status === 'approved' ? 'var(--success-soft)' : expired ? 'var(--danger-soft)' : 'var(--warning-soft)',
-                  }}>
-                    {p.status === 'approved' ? 'Aprobado' : expired ? 'Expirada' : pendingApproval ? 'Confirmar' : 'Esperando'}
+                  <span
+                    className="chip"
+                    style={{
+                      height: 22,
+                      fontSize: 10.5,
+                      color:
+                        p.status === 'approved'
+                          ? 'var(--success)'
+                          : expired
+                            ? 'var(--danger)'
+                            : 'var(--warning)',
+                      background:
+                        p.status === 'approved'
+                          ? 'var(--success-soft)'
+                          : expired
+                            ? 'var(--danger-soft)'
+                            : 'var(--warning-soft)',
+                    }}
+                  >
+                    {p.status === 'approved'
+                      ? 'Aprobado'
+                      : expired
+                        ? 'Expirada'
+                        : pendingApproval
+                          ? 'Confirmar'
+                          : 'Esperando'}
                   </span>
                 </div>
-                <div style={{fontSize:12.5, color:'var(--ink-3)'}}>
-                  iPad · {requested} <XSep/> expira {new Date(p.expires_at).toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' })}
+                <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
+                  iPad · {requested} <XSep /> expira{' '}
+                  {new Date(p.expires_at).toLocaleTimeString('es-MX', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
                 </div>
               </div>
               {p.status === 'pending' && (
-                <div style={{display:'flex', gap:8}}>
+                <div style={{ display: 'flex', gap: 8 }}>
                   <button
                     className="btn btn-ghost btn-sm"
                     disabled={busy === p.id + ':deny'}
                     onClick={() => deny(p.id)}
                   >
-                    <I.X size={14}/> Rechazar
+                    <I.X size={14} /> Rechazar
                   </button>
                   <button
                     className="btn btn-primary btn-sm"
                     disabled={!p.requested_name || expired || busy === p.id + ':approve'}
-                    style={{opacity: (p.requested_name && !expired) ? 1 : 0.5}}
+                    style={{ opacity: p.requested_name && !expired ? 1 : 0.5 }}
                     onClick={() => approve(p.id)}
                   >
-                    <I.Check size={14}/> Aprobar
+                    <I.Check size={14} /> Aprobar
                   </button>
                 </div>
               )}
@@ -338,13 +516,13 @@ const PairingRequestsCard = ({ pairings, stations, onChanged }) => {
 };
 
 const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
-  const [name,     setName]     = useState(device.name);
-  const [station,  setStation]  = useState(device.stationId || '');
-  const [reveal,   setReveal]   = useState(false);
-  const [saving,   setSaving]   = useState(false);
+  const [name, setName] = useState(device.name);
+  const [station, setStation] = useState(device.stationId || '');
+  const [reveal, setReveal] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [confirmingRevoke, setConfirmingRevoke] = useState(false);
-  const [error,    setError]    = useState(null);
+  const [error, setError] = useState(null);
 
   async function save() {
     setSaving(true);
@@ -370,35 +548,69 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
     }
   }
 
-  const statusLabel = device.status === 'live' ? 'En vivo' : device.status === 'slow' ? 'Lento' : 'Sin conexión';
+  const statusLabel =
+    device.status === 'live' ? 'En vivo' : device.status === 'slow' ? 'Lento' : 'Sin conexión';
 
   return (
     <>
-      <div className="sheet-backdrop" onClick={onClose}/>
+      <div className="sheet-backdrop" onClick={onClose} />
       <aside className="sheet">
         <div className="sheet-head">
           <div>
             <div className="eyebrow">KDS · Dispositivo</div>
-            <h2 className="h-section" style={{marginTop:4}}>Gestionar dispositivo</h2>
+            <h2 className="h-section" style={{ marginTop: 4 }}>
+              Gestionar dispositivo
+            </h2>
           </div>
-          <button className="btn-icon" onClick={onClose} aria-label="Cerrar"><I.X size={16}/></button>
+          <button className="btn-icon" onClick={onClose} aria-label="Cerrar">
+            <I.X size={16} />
+          </button>
         </div>
         <div className="sheet-body">
           {/* Status summary */}
-          <div className="card" style={{padding:'14px 18px', display:'flex', alignItems:'center', gap:14}}>
-            <div style={{width:40, height:40, borderRadius:12, background:'var(--canvas-2)', color:'var(--umi-navy)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
-              <I.Tablet size={18}/>
+          <div
+            className="card"
+            style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}
+          >
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                background: 'var(--canvas-2)',
+                color: 'var(--umi-navy)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <I.Tablet size={18} />
             </div>
-            <div style={{flex:1}}>
-              <div style={{display:'flex', alignItems:'center', gap:6, marginBottom:2}}>
-                <span className={'s-dot ' + device.status}/>
-                <span style={{fontSize:13, fontWeight:600, color:'var(--ink-1)'}}>{statusLabel}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <span className={'s-dot ' + device.status} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>
+                  {statusLabel}
+                </span>
               </div>
-              <div style={{fontSize:12, color:'var(--ink-3)'}}>Visto {device.last}</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Visto {device.last}</div>
             </div>
-            <div style={{textAlign:'right'}}>
-              <div className="eyebrow" style={{fontSize:9, marginBottom:3}}>ÓRDENES ABIERTAS</div>
-              <div style={{fontFamily:'var(--font-display)', fontSize:26, fontWeight:600, lineHeight:1, color: device.status === 'offline' ? 'var(--ink-4)' : 'var(--ink-1)'}}>{device.open}</div>
+            <div style={{ textAlign: 'right' }}>
+              <div className="eyebrow" style={{ fontSize: 9, marginBottom: 3 }}>
+                ÓRDENES ABIERTAS
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 26,
+                  fontWeight: 600,
+                  lineHeight: 1,
+                  color: device.status === 'offline' ? 'var(--ink-4)' : 'var(--ink-1)',
+                }}
+              >
+                {device.open}
+              </div>
             </div>
           </div>
 
@@ -408,53 +620,86 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
               className="input tall"
               placeholder="e.g. Cocina Caliente 1"
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={(e) => setName(e.target.value)}
             />
           </div>
 
           <div className="field">
             <label>Estación asignada</label>
-            <select className="select" style={{height:52, borderRadius:14}} value={station} onChange={e => setStation(e.target.value)}>
+            <select
+              className="select"
+              style={{ height: 52, borderRadius: 14 }}
+              value={station}
+              onChange={(e) => setStation(e.target.value)}
+            >
               <option value="">Sin asignar</option>
-              {(stations || []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {(stations || []).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
             </select>
           </div>
 
           <div className="field">
             <label>Session ID</label>
-            <div style={{display:'flex', alignItems:'center', gap:8}}>
-              <span className="pin-box" style={{flex:1, fontFamily:'var(--font-mono)', fontSize:10.5, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span
+                className="pin-box"
+                style={{
+                  flex: 1,
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10.5,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
                 {reveal ? device.id : '••••••••-••••-••••-••••-••••••••••••'}
               </span>
-              <button className="pin-reveal focusable" onClick={() => setReveal(r => !r)} aria-label={reveal ? 'Ocultar' : 'Mostrar'}>
-                {reveal ? <I.EyeOff size={15}/> : <I.Eye size={15}/>}
+              <button
+                className="pin-reveal focusable"
+                onClick={() => setReveal((r) => !r)}
+                aria-label={reveal ? 'Ocultar' : 'Mostrar'}
+              >
+                {reveal ? <I.EyeOff size={15} /> : <I.Eye size={15} />}
               </button>
             </div>
           </div>
 
           {error && (
-            <div style={{fontSize:12.5, color:'var(--danger)', background:'var(--danger-soft)', borderRadius:10, padding:'9px 12px'}}>
+            <div
+              style={{
+                fontSize: 12.5,
+                color: 'var(--danger)',
+                background: 'var(--danger-soft)',
+                borderRadius: 10,
+                padding: '9px 12px',
+              }}
+            >
               {error}
             </div>
           )}
 
-          <div style={{borderTop:'1px solid var(--line-soft)', paddingTop:16, marginTop:4}}>
+          <div style={{ borderTop: '1px solid var(--line-soft)', paddingTop: 16, marginTop: 4 }}>
             <button
               className="btn btn-ghost btn-sm focusable"
-              style={{color:'var(--danger)'}}
+              style={{ color: 'var(--danger)' }}
               disabled={removing}
               onClick={() => setConfirmingRevoke(true)}
             >
-              <I.Trash size={14}/> {removing ? 'Revocando…' : 'Revocar dispositivo'}
+              <I.Trash size={14} /> {removing ? 'Revocando…' : 'Revocar dispositivo'}
             </button>
           </div>
         </div>
         <div className="sheet-foot">
-          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-ghost" onClick={onClose}>
+            Cancelar
+          </button>
           <button
             className="btn btn-primary focusable"
             disabled={!name.trim() || saving}
-            style={{opacity: name.trim() && !saving ? 1 : 0.5}}
+            style={{ opacity: name.trim() && !saving ? 1 : 0.5 }}
             onClick={save}
           >
             {saving ? 'Guardando…' : 'Guardar cambios'}
@@ -463,27 +708,50 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
       </aside>
       {confirmingRevoke && (
         <>
-          <div className="sheet-backdrop" onClick={() => !removing && setConfirmingRevoke(false)}/>
-          <aside className="sheet" style={{maxWidth:420}}>
+          <div className="sheet-backdrop" onClick={() => !removing && setConfirmingRevoke(false)} />
+          <aside className="sheet" style={{ maxWidth: 420 }}>
             <div className="sheet-head">
               <div>
                 <div className="eyebrow">KDS · Acceso</div>
-                <h2 className="h-section" style={{marginTop:4}}>Revocar dispositivo</h2>
+                <h2 className="h-section" style={{ marginTop: 4 }}>
+                  Revocar dispositivo
+                </h2>
               </div>
-              <button className="btn-icon" disabled={removing} onClick={() => setConfirmingRevoke(false)} aria-label="Cerrar"><I.X size={16}/></button>
+              <button
+                className="btn-icon"
+                disabled={removing}
+                onClick={() => setConfirmingRevoke(false)}
+                aria-label="Cerrar"
+              >
+                <I.X size={16} />
+              </button>
             </div>
             <div className="sheet-body">
-              <p style={{margin:0, color:'var(--ink-2)', fontSize:14.5, lineHeight:1.5}}>
+              <p style={{ margin: 0, color: 'var(--ink-2)', fontSize: 14.5, lineHeight: 1.5 }}>
                 Este iPad se cerrará y tendrá que parearse de nuevo con un PIN.
               </p>
               {error && (
-                <div style={{fontSize:12.5, color:'var(--danger)', background:'var(--danger-soft)', borderRadius:10, padding:'9px 12px'}}>
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    color: 'var(--danger)',
+                    background: 'var(--danger-soft)',
+                    borderRadius: 10,
+                    padding: '9px 12px',
+                  }}
+                >
                   {error}
                 </div>
               )}
             </div>
             <div className="sheet-foot">
-              <button className="btn btn-ghost" disabled={removing} onClick={() => setConfirmingRevoke(false)}>Cancelar</button>
+              <button
+                className="btn btn-ghost"
+                disabled={removing}
+                onClick={() => setConfirmingRevoke(false)}
+              >
+                Cancelar
+              </button>
               <button className="btn btn-primary focusable" disabled={removing} onClick={remove}>
                 {removing ? 'Revocando…' : 'Revocar'}
               </button>
@@ -523,7 +791,12 @@ const StationRow = ({ station, count, onChanged, onError }) => {
   const [name, setName] = useState(station.name);
   const [busy, setBusy] = useState(false);
 
-  useEffect(function() { setName(station.name); }, [station.name]);
+  useEffect(
+    function () {
+      setName(station.name);
+    },
+    [station.name],
+  );
 
   const trimmed = name.trim();
   const dirty = trimmed && trimmed !== station.name;
@@ -548,7 +821,12 @@ const StationRow = ({ station, count, onChanged, onError }) => {
 
   async function remove() {
     if (busy) return;
-    if (!window.confirm(`¿Archivar la estación "${station.name}"? Dejará de aparecer al asignar dispositivos.`)) return;
+    if (
+      !window.confirm(
+        `¿Archivar la estación "${station.name}"? Dejará de aparecer al asignar dispositivos.`,
+      )
+    )
+      return;
     setBusy(true);
     onError && onError(null);
     try {
@@ -562,26 +840,55 @@ const StationRow = ({ station, count, onChanged, onError }) => {
   }
 
   return (
-    <div className="list-card" style={{padding:14, alignItems:'center'}}>
-      <div style={{paddingLeft:14, flex:1, display:'flex', alignItems:'center', gap:12}}>
-        <div style={{width:34, height:34, borderRadius:10, background:'var(--canvas-2)', color:'var(--umi-navy)', display:'flex', alignItems:'center', justifyContent:'center'}}>
-          <I.Layout size={16}/>
+    <div className="list-card" style={{ padding: 14, alignItems: 'center' }}>
+      <div style={{ paddingLeft: 14, flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 10,
+            background: 'var(--canvas-2)',
+            color: 'var(--umi-navy)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <I.Layout size={16} />
         </div>
-        <div style={{flex:1}}>
+        <div style={{ flex: 1 }}>
           <input
             className="input"
-            style={{height:36, border:'1px solid transparent', background:'transparent', padding:'0 8px', fontWeight:600, fontSize:14}}
+            style={{
+              height: 36,
+              border: '1px solid transparent',
+              background: 'transparent',
+              padding: '0 8px',
+              fontWeight: 600,
+              fontSize: 14,
+            }}
             value={name}
             disabled={busy}
-            onChange={function(e) { setName(e.target.value); }}
+            onChange={function (e) {
+              setName(e.target.value);
+            }}
             onBlur={rename}
-            onKeyDown={function(e) { if (e.key === 'Enter') e.currentTarget.blur(); }}
+            onKeyDown={function (e) {
+              if (e.key === 'Enter') e.currentTarget.blur();
+            }}
           />
-          <div style={{fontSize:11.5, color:'var(--ink-3)', paddingLeft:8, marginTop:-2}}>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)', paddingLeft: 8, marginTop: -2 }}>
             {count} device{count !== 1 ? 's' : ''} assigned{dirty ? ' · sin guardar' : ''}
           </div>
         </div>
-        <button className="btn-icon" aria-label="Archivar estación" onClick={remove} disabled={busy}><I.Trash size={15}/></button>
+        <button
+          className="btn-icon"
+          aria-label="Archivar estación"
+          onClick={remove}
+          disabled={busy}
+        >
+          <I.Trash size={15} />
+        </button>
       </div>
     </div>
   );
@@ -590,32 +897,48 @@ const StationRow = ({ station, count, onChanged, onError }) => {
 const StationPanel = ({ onClose, devices, stations, onChanged }) => {
   const [error, setError] = useState(null);
   const list = stations || [];
-  const { name: newName, setName: setNewName, busy: saving, create } = useCreateStation(function() {
+  const {
+    name: newName,
+    setName: setNewName,
+    busy: saving,
+    create,
+  } = useCreateStation(function () {
     onChanged && onChanged();
   });
-  function addStation() { return create(setError); }
+  function addStation() {
+    return create(setError);
+  }
 
   return (
     <>
-      <div className="sheet-backdrop" onClick={onClose}/>
+      <div className="sheet-backdrop" onClick={onClose} />
       <aside className="sheet">
         <div className="sheet-head">
           <div>
             <div className="eyebrow">Devices · KDS</div>
-            <h2 className="h-section" style={{marginTop:4}}>Estaciones</h2>
+            <h2 className="h-section" style={{ marginTop: 4 }}>
+              Estaciones
+            </h2>
           </div>
-          <button className="btn-icon" onClick={onClose} aria-label="Close"><I.X size={16}/></button>
+          <button className="btn-icon" onClick={onClose} aria-label="Close">
+            <I.X size={16} />
+          </button>
         </div>
         <div className="sheet-body">
-          <p style={{color:'var(--ink-2)', margin:0, fontSize:13.5}}>
-            Los tickets se enrutan a estaciones según la categoría del menú. Cada estación puede asignarse a uno o más iPads.
+          <p style={{ color: 'var(--ink-2)', margin: 0, fontSize: 13.5 }}>
+            Los tickets se enrutan a estaciones según la categoría del menú. Cada estación puede
+            asignarse a uno o más iPads.
           </p>
           {list.length === 0 && (
-            <div style={{fontSize:13, color:'var(--ink-3)'}}>Aún no hay estaciones. Crea la primera abajo.</div>
+            <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>
+              Aún no hay estaciones. Crea la primera abajo.
+            </div>
           )}
-          <div style={{display:'flex', flexDirection:'column', gap:8}}>
-            {list.map(function(s) {
-              var count = (devices || []).filter(function(d) { return d.stationId === s.id; }).length;
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {list.map(function (s) {
+              var count = (devices || []).filter(function (d) {
+                return d.stationId === s.id;
+              }).length;
               return (
                 <StationRow
                   key={s.id}
@@ -628,28 +951,47 @@ const StationPanel = ({ onClose, devices, stations, onChanged }) => {
             })}
           </div>
           {error && (
-            <div style={{fontSize:12.5, color:'var(--danger)', background:'var(--danger-soft)', borderRadius:10, padding:'10px 12px'}}>
+            <div
+              style={{
+                fontSize: 12.5,
+                color: 'var(--danger)',
+                background: 'var(--danger-soft)',
+                borderRadius: 10,
+                padding: '10px 12px',
+              }}
+            >
               {error}
             </div>
           )}
           <div className="field">
             <label>Nueva estación</label>
-            <div style={{display:'flex', gap:8}}>
+            <div style={{ display: 'flex', gap: 8 }}>
               <input
                 className="input"
                 placeholder="e.g. Cocina Caliente"
                 value={newName}
-                onChange={function(e) { setNewName(e.target.value); }}
-                onKeyDown={function(e) { if (e.key === 'Enter') addStation(); }}
+                onChange={function (e) {
+                  setNewName(e.target.value);
+                }}
+                onKeyDown={function (e) {
+                  if (e.key === 'Enter') addStation();
+                }}
               />
-              <button className="btn btn-primary focusable" onClick={addStation} disabled={saving || !newName.trim()} style={{whiteSpace:'nowrap'}}>
-                <I.Plus size={16}/> {saving ? 'Creando…' : 'Crear'}
+              <button
+                className="btn btn-primary focusable"
+                onClick={addStation}
+                disabled={saving || !newName.trim()}
+                style={{ whiteSpace: 'nowrap' }}
+              >
+                <I.Plus size={16} /> {saving ? 'Creando…' : 'Crear'}
               </button>
             </div>
           </div>
         </div>
         <div className="sheet-foot">
-          <button className="btn btn-ghost" onClick={onClose}>Cerrar</button>
+          <button className="btn btn-ghost" onClick={onClose}>
+            Cerrar
+          </button>
         </div>
       </aside>
     </>
@@ -657,24 +999,33 @@ const StationPanel = ({ onClose, devices, stations, onChanged }) => {
 };
 
 const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
-  const [name,    setName]    = useState('');
+  const [name, setName] = useState('');
   const [station, setStation] = useState('');
   const [pairing, setPairing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   const hasStations = (stations || []).length > 0;
-  const { name: newStationName, setName: setNewStationName, busy: creatingStation, create: createStationInline } =
-    useCreateStation(function(createdStation) {
-      if (createdStation && createdStation.id) setStation(createdStation.id);
-      onProvisioned && onProvisioned();
-    });
+  const {
+    name: newStationName,
+    setName: setNewStationName,
+    busy: creatingStation,
+    create: createStationInline,
+  } = useCreateStation(function (createdStation) {
+    if (createdStation && createdStation.id) setStation(createdStation.id);
+    onProvisioned && onProvisioned();
+  });
 
-  React.useEffect(function() {
-    if (!station && stations && stations[0]) setStation(stations[0].id);
-  }, [stations, station]);
+  React.useEffect(
+    function () {
+      if (!station && stations && stations[0]) setStation(stations[0].id);
+    },
+    [stations, station],
+  );
 
-  function addStation() { return createStationInline(setError); }
+  function addStation() {
+    return createStationInline(setError);
+  }
 
   async function createDevice() {
     setSaving(true);
@@ -690,92 +1041,164 @@ const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
     }
   }
 
-  const selectedStation = (stations || []).find(function(s) { return s.id === station; });
-  const activePairings = (pairings || []).filter(function(p) { return p.status === 'pending' || p.status === 'approved'; });
+  const selectedStation = (stations || []).find(function (s) {
+    return s.id === station;
+  });
+  const activePairings = (pairings || []).filter(function (p) {
+    return p.status === 'pending' || p.status === 'approved';
+  });
 
   return (
     <>
-      <div className="sheet-backdrop" onClick={onClose}/>
+      <div className="sheet-backdrop" onClick={onClose} />
       <aside className="sheet">
         <div className="sheet-head">
           <div>
             <div className="eyebrow">KDS</div>
-            <h2 className="h-section" style={{marginTop:4}}>Pair a new iPad</h2>
+            <h2 className="h-section" style={{ marginTop: 4 }}>
+              Pair a new iPad
+            </h2>
           </div>
-          <button className="btn-icon" onClick={onClose} aria-label="Close"><I.X size={16}/></button>
+          <button className="btn-icon" onClick={onClose} aria-label="Close">
+            <I.X size={16} />
+          </button>
         </div>
         <div className="sheet-body">
           <div className="field">
             <label>Device name</label>
-            <input className="input tall" placeholder="e.g. Cocina Caliente 2" value={name} onChange={function(e) { setName(e.target.value); }}/>
+            <input
+              className="input tall"
+              placeholder="e.g. Cocina Caliente 2"
+              value={name}
+              onChange={function (e) {
+                setName(e.target.value);
+              }}
+            />
           </div>
           <div className="field">
             <label>Assign to station</label>
             {hasStations ? (
-              <select className="select" style={{height:52, borderRadius:14}} value={station} onChange={function(e) { setStation(e.target.value); }}>
-                {(stations || []).map(function(s) { return <option key={s.id} value={s.id}>{s.name}</option>; })}
+              <select
+                className="select"
+                style={{ height: 52, borderRadius: 14 }}
+                value={station}
+                onChange={function (e) {
+                  setStation(e.target.value);
+                }}
+              >
+                {(stations || []).map(function (s) {
+                  return (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  );
+                })}
               </select>
             ) : (
               <>
-                <div style={{fontSize:12.5, color:'var(--ink-3)', marginBottom:8}}>
+                <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 8 }}>
                   No hay estaciones todavía. Crea una para asignar este dispositivo.
                 </div>
-                <div style={{display:'flex', gap:8}}>
+                <div style={{ display: 'flex', gap: 8 }}>
                   <input
                     className="input"
                     placeholder="Nombre de la estación"
                     value={newStationName}
-                    onChange={function(e) { setNewStationName(e.target.value); }}
-                    onKeyDown={function(e) { if (e.key === 'Enter') addStation(); }}
+                    onChange={function (e) {
+                      setNewStationName(e.target.value);
+                    }}
+                    onKeyDown={function (e) {
+                      if (e.key === 'Enter') addStation();
+                    }}
                   />
-                  <button className="btn btn-secondary focusable" onClick={addStation} disabled={creatingStation || !newStationName.trim()} style={{whiteSpace:'nowrap'}}>
-                    <I.Plus size={16}/> {creatingStation ? 'Creando…' : 'Crear estación'}
+                  <button
+                    className="btn btn-secondary focusable"
+                    onClick={addStation}
+                    disabled={creatingStation || !newStationName.trim()}
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    <I.Plus size={16} /> {creatingStation ? 'Creando…' : 'Crear estación'}
                   </button>
                 </div>
               </>
             )}
           </div>
           {error && (
-            <div style={{fontSize:12.5, color:'var(--danger)', background:'var(--danger-soft)', borderRadius:10, padding:'10px 12px'}}>
+            <div
+              style={{
+                fontSize: 12.5,
+                color: 'var(--danger)',
+                background: 'var(--danger-soft)',
+                borderRadius: 10,
+                padding: '10px 12px',
+              }}
+            >
               {error}
             </div>
           )}
           {pairing && (
-          <div className="field">
-            <label>PIN de primer pareo</label>
-            <div className="card-warm" style={{padding:'20px 24px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:18}}>
-              <div>
-                <div className="display" style={{fontSize:42, fontFamily:'var(--font-mono)', letterSpacing:'0.12em', color:'var(--ink-warm)', lineHeight:1}}>
-                  {pairing.pin.slice(0, 3)} {pairing.pin.slice(3)}
+            <div className="field">
+              <label>PIN de primer pareo</label>
+              <div
+                className="card-warm"
+                style={{
+                  padding: '20px 24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 18,
+                }}
+              >
+                <div>
+                  <div
+                    className="display"
+                    style={{
+                      fontSize: 42,
+                      fontFamily: 'var(--font-mono)',
+                      letterSpacing: '0.12em',
+                      color: 'var(--ink-warm)',
+                      lineHeight: 1,
+                    }}
+                  >
+                    {pairing.pin.slice(0, 3)} {pairing.pin.slice(3)}
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--ink-warm-soft)' }}>
+                    Esperando solicitud del iPad
+                  </div>
                 </div>
-                <div style={{marginTop:8, fontSize:12.5, color:'var(--ink-warm-soft)'}}>
-                  Esperando solicitud del iPad
+                <div style={{ textAlign: 'right' }}>
+                  <div className="eyebrow on-warm" style={{ marginBottom: 4 }}>
+                    station
+                  </div>
+                  <div style={{ fontWeight: 600, color: 'var(--ink-warm)' }}>
+                    {selectedStation?.name || pairing.station_id}
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--ink-warm-soft)' }}>
+                    Expira{' '}
+                    {new Date(pairing.expires_at).toLocaleTimeString('es-MX', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </div>
                 </div>
               </div>
-              <div style={{textAlign:'right'}}>
-                <div className="eyebrow on-warm" style={{marginBottom:4}}>station</div>
-                <div style={{fontWeight:600, color:'var(--ink-warm)'}}>{selectedStation?.name || pairing.station_id}</div>
-                <div style={{marginTop:6, fontSize:11.5, color:'var(--ink-warm-soft)'}}>
-                  Expira {new Date(pairing.expires_at).toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' })}
-                </div>
-              </div>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-3)' }}>
+                Enter this PIN on the KDS iPad. When it appears in pending requests, approve it from
+                this screen.
+              </p>
             </div>
-            <p style={{margin:0, fontSize:13, color:'var(--ink-3)'}}>
-              Enter this PIN on the KDS iPad. When it appears in pending requests, approve it from this screen.
-            </p>
-          </div>
           )}
           {activePairings.length > 0 && (
             <div className="field">
               <label>Solicitudes activas</label>
-              <div style={{display:'flex', flexDirection:'column', gap:8}}>
-                {activePairings.map(function(p) {
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {activePairings.map(function (p) {
                   return (
-                    <div key={p.id} className="list-card" style={{padding:12}}>
-                      <div style={{paddingLeft:12, flex:1, minWidth:0}}>
-                        <div style={{fontWeight:600, fontSize:13.5}}>{p.device_name}</div>
-                        <div style={{fontSize:12, color:'var(--ink-3)', marginTop:2}}>
-                          {p.requested_name || 'Esperando iPad'} <XSep/> {p.status}
+                    <div key={p.id} className="list-card" style={{ padding: 12 }}>
+                      <div style={{ paddingLeft: 12, flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13.5 }}>{p.device_name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
+                          {p.requested_name || 'Esperando iPad'} <XSep /> {p.status}
                         </div>
                       </div>
                     </div>
@@ -786,14 +1209,17 @@ const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
           )}
         </div>
         <div className="sheet-foot">
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
           <button
             className="btn btn-primary"
             disabled={!name.trim() || !station || saving || pairing}
-            style={{opacity: name.trim() && station && !saving && !pairing ? 1 : 0.5}}
+            style={{ opacity: name.trim() && station && !saving && !pairing ? 1 : 0.5 }}
             onClick={createDevice}
           >
-            <I.Refresh size={15}/> {saving ? 'Generando…' : pairing ? 'PIN generado' : 'Generar PIN'}
+            <I.Refresh size={15} />{' '}
+            {saving ? 'Generando…' : pairing ? 'PIN generado' : 'Generar PIN'}
           </button>
         </div>
       </aside>
@@ -801,4 +1227,4 @@ const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
   );
 };
 
-export default DevicesScreen
+export default DevicesScreen;

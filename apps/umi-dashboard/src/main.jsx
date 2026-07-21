@@ -1,10 +1,10 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 // Suppress React Router v6→v7 migration warnings — harmless in v6
-import { AuthProvider } from '@/lib/auth.jsx'
-import App from './app.jsx'
-import './styles.css'
+import { AuthProvider } from '@/lib/auth.jsx';
+import App from './app.jsx';
+import './styles.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -13,5 +13,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <App />
       </AuthProvider>
     </BrowserRouter>
-  </React.StrictMode>
-)
+  </React.StrictMode>,
+);

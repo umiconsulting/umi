@@ -22,14 +22,7 @@ export default [
   // findings on the first run — linting build artifacts would leave `pnpm lint`
   // permanently red on code nobody wrote, which is how a gate gets ignored.
   {
-    ignores: [
-      'dist/**',
-      'build/**',
-      'node_modules/**',
-      '.vercel/**',
-      '.turbo/**',
-      'coverage/**',
-    ],
+    ignores: ['dist/**', 'build/**', 'node_modules/**', '.vercel/**', '.turbo/**', 'coverage/**'],
   },
 
   js.configs.recommended,

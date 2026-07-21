@@ -1,8 +1,8 @@
 // Single source of the entitlement vocabulary — @umi/contract/entitlements
 // (zero-dep, so no zod enters this browser bundle; resolved via the Vite source
 // alias). Re-exported to keep this module's public surface unchanged.
-import { PRODUCT_ACTIVE_STATUSES } from '@umi/contract/entitlements'
-export { PRODUCT_ACTIVE_STATUSES }
+import { PRODUCT_ACTIVE_STATUSES } from '@umi/contract/entitlements';
+export { PRODUCT_ACTIVE_STATUSES };
 
 export const MODULES = {
   overview: {
@@ -79,7 +79,7 @@ export const MODULES = {
     product: 'dashboard',
     role: 'super_admin',
   },
-}
+};
 
 export const MODULE_ORDER = [
   'overview',
@@ -92,23 +92,23 @@ export const MODULE_ORDER = [
   'hours',
   'settings',
   'products-billing',
-]
+];
 
 export function isProductActive(productKey, capabilities) {
-  const status = capabilities?.products?.[productKey]?.status
-  return PRODUCT_ACTIVE_STATUSES.has(status)
+  const status = capabilities?.products?.[productKey]?.status;
+  return PRODUCT_ACTIVE_STATUSES.has(status);
 }
 
 export function hasRequiredRole(moduleConfig, capabilities) {
-  if (!moduleConfig?.role) return true
-  const membership = capabilities?.membership
-  return membership?.role === moduleConfig.role || membership?.permissions?.includes?.('*')
+  if (!moduleConfig?.role) return true;
+  const membership = capabilities?.membership;
+  return membership?.role === moduleConfig.role || membership?.permissions?.includes?.('*');
 }
 
 export function getModuleAvailability(moduleKey, capabilities) {
-  const moduleConfig = MODULES[moduleKey]
+  const moduleConfig = MODULES[moduleKey];
   if (!moduleConfig) {
-    return { available: false, reason: 'unknown_module' }
+    return { available: false, reason: 'unknown_module' };
   }
   if (!isProductActive(moduleConfig.product, capabilities)) {
     return {
@@ -116,7 +116,7 @@ export function getModuleAvailability(moduleKey, capabilities) {
       reason: 'product_missing',
       product: moduleConfig.product,
       locationScoped: !!moduleConfig.locationScoped,
-    }
+    };
   }
   if (!hasRequiredRole(moduleConfig, capabilities)) {
     return {
@@ -124,23 +124,23 @@ export function getModuleAvailability(moduleKey, capabilities) {
       reason: 'role_required',
       role: moduleConfig.role,
       locationScoped: !!moduleConfig.locationScoped,
-    }
+    };
   }
-  return { available: true, locationScoped: !!moduleConfig.locationScoped }
+  return { available: true, locationScoped: !!moduleConfig.locationScoped };
 }
 
 export function buildModuleAvailability(capabilities) {
   return Object.fromEntries(
-    MODULE_ORDER.map((moduleKey) => [moduleKey, getModuleAvailability(moduleKey, capabilities)])
-  )
+    MODULE_ORDER.map((moduleKey) => [moduleKey, getModuleAvailability(moduleKey, capabilities)]),
+  );
 }
 
 export function canShowModule(moduleKey, capabilities) {
-  return getModuleAvailability(moduleKey, capabilities).available
+  return getModuleAvailability(moduleKey, capabilities).available;
 }
 
 export function getVisibleModules(capabilities) {
-  return MODULE_ORDER
-    .filter((moduleKey) => canShowModule(moduleKey, capabilities))
-    .map((moduleKey) => MODULES[moduleKey])
+  return MODULE_ORDER.filter((moduleKey) => canShowModule(moduleKey, capabilities)).map(
+    (moduleKey) => MODULES[moduleKey],
+  );
 }
