@@ -101,12 +101,16 @@ const DiagnosticQuiz = () => {
   });
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Inicializar tiempo de inicio cuando comience el quiz
+  // Marcar el inicio cuando el usuario entra a las preguntas. La condición anterior
+  // (`startTime === Date.now()`) solo era cierta si el efecto corría en el mismo
+  // milisegundo que el render inicial, así que nunca se cumplía: `startTime` se
+  // quedaba en la hora de montaje y `completionTime` incluía el tiempo que el
+  // usuario pasó en la pantalla de bienvenida.
   useEffect(() => {
-    if (stage === "questions" && startTime === Date.now()) {
+    if (stage === "questions") {
       setStartTime(Date.now());
     }
-  }, [stage, startTime]);
+  }, [stage]);
 
   useEffect(() => {
     if (stage === "welcome") return;
@@ -237,7 +241,8 @@ const DiagnosticQuiz = () => {
     setAnswers({});
     setLoading(false);
     setContactInfo(null);
-    setStartTime(Date.now());
+    // `startTime` no se toca aquí: el efecto de arriba lo fija cuando el usuario
+    // vuelve a entrar a las preguntas. Un solo escritor para un solo dato.
     setDiagnosticState({ status: "idle", message: "" });
   };
 

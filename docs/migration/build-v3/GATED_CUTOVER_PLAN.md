@@ -189,18 +189,26 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
 
 ## 5 · Current baseline (2026-07-21)
 
-- **`build-v3` HEAD:** `1ad3bbb` (PR #54). Merged in order: **#49** order cluster → **#50** mechanical
-  sweep → **#51** D1/D11 gate → **#54** P3 (identity/RBAC/WhatsApp/entitlement/POS).
-- **In flight:** `chore/lint-baseline` — Prettier scope + the first ESLint surface.
+- **`build-v3` HEAD:** `ea7647e` (PR #55). Merged in order: **#49** order cluster → **#50** mechanical
+  sweep → **#51** D1/D11 gate → **#54** P3 (identity/RBAC/WhatsApp/entitlement/POS) → **#55** lint baseline.
+- **In flight:** `chore/post-merge-ci` — post-merge CI trigger + the lint gate in CI.
 - **Preflight:** **140 / 218** unresolved · 46 interpolated (uncovered) · **0** `42883`.
 - **Units:** 359 · **Gate:** `security_gate.sql` PASS · `reconcile_v3.sql` PASS on the snapshot backfill.
 - **Branch protection (2026-07-21):** `build-v3` now requires a branch to be UP TO DATE with base before
   merging (`strict: true`, no required contexts — path-filtered checks would deadlock a docs-only PR),
   enforced for admins. Closes the stale-base hole: the tree CI tested is the tree that lands.
-- ⚠️ **Post-merge CI does NOT run.** Every workflow is `pull_request`-only, and `umi-api-deploy.yml` is
-  scoped to `main`, so a merge into `build-v3` triggers nothing. pr-gates gate 5 is **BLOCKED, not
-  passed**. Fix = a `push: branches: [build-v3]` trigger; see
-  `docs/reports/2026-07-21-linting-toolchain-research.md`.
+- ✅ **Post-merge CI now runs** (`chore/post-merge-ci`). Every workflow used to be `pull_request`-only,
+  and `umi-api-deploy.yml` is scoped to `main`, so a merge into `build-v3` triggered nothing — the PR was
+  tested, the merge result never was. `umi-api-ci`, `contract-ci` and `tokens-ci` gain
+  `push: branches: [build-v3]`; `main` stays off the push list because `umi-api-deploy.yml` re-runs the
+  same gate before it ships. **pr-gates gate 5 is unblocked once this merges** — confirm the first run
+  on the merge commit, because the trigger only proves itself post-merge.
+- ✅ **`pnpm lint` now runs in CI** (new `lint.yml`). PR #55 built the ratchet but no workflow ran it, so
+  it only caught a violation if someone remembered to run it locally. Red-green verified through
+  `turbo run lint`, not just the package script: a new unused variable gives exit 1, removing it gives 0.
+- ⏳ **`pnpm format:check` deliberately NOT in CI.** 307 files still fail Prettier. Adding it before the
+  format pass would make the gate red on arrival, which is how a gate becomes noise. It lands in the same
+  PR as the format pass. See `docs/reports/2026-07-21-linting-toolchain-research.md`.
 
 ### The 140 remaining, mapped to phases
 

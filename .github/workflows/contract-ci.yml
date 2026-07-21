@@ -3,8 +3,18 @@ name: contract CI
 # Gates the @umi/contract package: types compile, the dual build succeeds, and the
 # route literals stay byte-exact to the controllers. dist/ is git-ignored (umi-api
 # builds it in-workspace; the dashboard uses the source), so CI builds it here.
+#
+# Also runs on pushes to `build-v3`, which has no deploy workflow to re-check a
+# merge. Note that umi-api-deploy.yml does NOT cover this gate on main either:
+# it builds @umi/contract as a dependency, but never runs the route-literal tests.
 on:
   pull_request:
+    paths:
+      - "packages/contract/**"
+      - ".github/workflows/contract-ci.yml"
+  # Same path list, repeated: GitHub Actions does not support YAML anchors.
+  push:
+    branches: [build-v3]
     paths:
       - "packages/contract/**"
       - ".github/workflows/contract-ci.yml"

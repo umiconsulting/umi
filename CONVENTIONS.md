@@ -81,6 +81,23 @@ style, ESLint owns correctness, and no ESLint stylistic rules are configured.
 - **Ignore build output in lint too.** The first dashboard run reported 244 errors, 200 of
   them inside `.vercel/` deploy output. A gate that is permanently red on generated code is a
   gate everyone learns to ignore — keep ESLint's `ignores` in step with `.prettierignore`.
+- **A gate nobody runs is not a gate.** `.github/workflows/lint.yml` runs `pnpm lint` on every
+  PR and on pushes to `build-v3`. It calls `turbo run lint`, not a per-package filter, so a
+  package is covered the day it adds a `lint` script. `pnpm format:check` is deliberately NOT
+  in CI yet — 307 files still fail Prettier, so it would be red on arrival; it lands with the
+  format pass.
+- **Verify a gate red-green, through the command CI runs.** A ratchet that cannot fail is
+  decoration. Add a violation, confirm exit 1, remove it, confirm exit 0 — via `pnpm lint`, not
+  just the package script, since the root command adds turbo (caching, exit-code propagation).
+- **Declare every ESLint plugin in the package that lints with it.** An undeclared plugin
+  resolves through pnpm's hoisted store, so its version is an accident of what some *other*
+  package installed. Adding `eslint-plugin-react-hooks@7` to the dashboard silently changed how
+  `apps/umi-landing-page` lints — it needs `^5` and got v7's React Compiler rules in CI. A lint
+  result you cannot reproduce is not a result.
+- **`--frozen-lockfile` does not mean your `node_modules` is right.** It validates the lockfile,
+  not the tree: a stray pre-pnpm directory under `apps/*/node_modules` survives it and reports
+  "Already up to date" while shadowing the real resolution. When a local lint result disagrees
+  with CI, suspect the local tree first — CI installs clean, and it was right both times here.
 
 Rationale and primary sources (ESLint vs Biome vs oxlint, the TypeScript-version squeeze):
 `docs/reports/2026-07-21-linting-toolchain-research.md`.

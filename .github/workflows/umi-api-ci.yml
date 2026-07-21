@@ -1,14 +1,29 @@
 name: umi-api CI
 
-# PR gate only. Pushes to main are checked + built + deployed by
-# umi-api-deploy.yml (which re-runs these same checks before shipping),
-# so running on `push` here too would just double the work on every merge.
+# Runs on every PR, and on pushes to `build-v3`.
+#
+# `main` is deliberately absent from the push list: umi-api-deploy.yml runs this
+# same typecheck + build + test gate before it ships, so a push trigger here
+# would double the work on every merge to main. `build-v3` has no deploy
+# workflow, so until this trigger existed a merge into it ran NO job at all —
+# the PR was tested, the merge result never was.
 #
 # umi-api is a pnpm workspace member: install/build/test run from the repo root
 # with pnpm --filter. Workspace-level files are watched too, since they affect
 # the umi-api build.
 on:
   pull_request:
+    paths:
+      - "apps/umi-api/**"
+      - "packages/contract/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "package.json"
+      - "turbo.json"
+      - ".github/workflows/umi-api-ci.yml"
+  # Same path list, repeated: GitHub Actions does not support YAML anchors.
+  push:
+    branches: [build-v3]
     paths:
       - "apps/umi-api/**"
       - "packages/contract/**"
