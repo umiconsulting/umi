@@ -18,3 +18,10 @@ ecab379  # style(umi-api)
 8d766eb  # style(packages)
 f459680  # style(ci,config)
 89fd4ba  # style(umi-api) second pass — Prettier is not idempotent
+
+# DELIBERATELY NOT LISTED: 102b690 ("style(docs): format Markdown…"). It reformats
+# the docs, but it also pins prettier, adds the Markdown `embeddedLanguageFormatting`
+# override, and rewrites two sentences whose prose "+" had been misparsed as a bullet.
+# Those are real authored changes, so hiding the commit from blame would hide a real
+# author. Blame on docs/*.md therefore lands here — that is the correct trade, not an
+# oversight. Do not "fix" it by adding the SHA.
