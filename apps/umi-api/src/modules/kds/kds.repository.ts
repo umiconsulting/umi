@@ -137,18 +137,20 @@ export interface DeviceListRow {
   metadata: Record<string, unknown>;
 }
 
-// The customer name (tenant.customer) + best reply phone (tenant.contact_identity)
-// for a ticket — prefers the WhatsApp as-received display_value (avoids Twilio
-// 63015), else the phone-channel normalized E.164. Shared by board reads.
+// The customer name (tenant.customer) + best reply phone (tenant.contact) for a
+// ticket — prefers the WhatsApp as-received raw_phone_number (avoids Twilio 63015),
+// else the phone-channel normalized E.164. Shared by board reads.
+// REPLY channels are ('whatsapp','phone') — deliberately NOT the identity dedup family
+// ('phone','whatsapp','sms'): we never reply over SMS.
 const CUSTOMER_NAME_PHONE_JOIN = `LEFT JOIN tenant.customer cu
     ON cu.business_id = t.business_id AND cu.id = t.customer_person_id
   LEFT JOIN LATERAL (
-    SELECT COALESCE(ci.display_value, ci.normalized_value) AS phone
-      FROM tenant.contact_identity ci
-      JOIN tenant.channel pch ON pch.id = ci.channel_id
-     WHERE ci.business_id = cu.business_id AND ci.contact_id = cu.contact_id
+    SELECT COALESCE(ct.raw_phone_number, ct.normalized_value) AS phone
+      FROM tenant.contact ct
+      JOIN umi.channel_type pch ON pch.id = ct.channel_id
+     WHERE ct.business_id = cu.business_id AND ct.customer_id = cu.id
        AND pch.key IN ('whatsapp', 'phone')
-     ORDER BY (pch.key = 'whatsapp') DESC, ci.is_primary DESC, ci.last_seen_at DESC
+     ORDER BY (pch.key = 'whatsapp') DESC, ct.is_primary DESC, ct.updated_at DESC
      LIMIT 1
   ) ph ON true`;
 

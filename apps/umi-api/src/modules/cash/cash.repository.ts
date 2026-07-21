@@ -249,16 +249,16 @@ export class CashRepository {
             WHERE v.business_id = cu.business_id AND v.card_id = c.id)                       AS last_visit,
           COALESCE((SELECT sum(abs(l.delta)) FROM tenant.loyalty_stored_value_ledger l
             WHERE l.business_id = cu.business_id AND l.card_id = c.id AND l.reason = 'purchase'), 0)::bigint AS ltv_centavos,
-          (SELECT ci.normalized_value FROM tenant.contact_identity ci
-             JOIN tenant.channel ch ON ch.id = ci.channel_id
-            WHERE ci.business_id = cu.business_id AND ci.contact_id = cu.contact_id
-              AND ch.normalization_rule = 'e164'
-            ORDER BY ci.is_primary DESC, ci.last_seen_at DESC LIMIT 1)                   AS phone,
-          (SELECT ci.normalized_value FROM tenant.contact_identity ci
-             JOIN tenant.channel ch ON ch.id = ci.channel_id
-            WHERE ci.business_id = cu.business_id AND ci.contact_id = cu.contact_id
+          (SELECT ct.normalized_value FROM tenant.contact ct
+             JOIN umi.channel_type ch ON ch.id = ct.channel_id
+            WHERE ct.business_id = cu.business_id AND ct.customer_id = cu.id
+              AND ch.key IN ('phone', 'whatsapp', 'sms')
+            ORDER BY ct.is_primary DESC, ct.updated_at DESC LIMIT 1)                     AS phone,
+          (SELECT ct.normalized_value FROM tenant.contact ct
+             JOIN umi.channel_type ch ON ch.id = ct.channel_id
+            WHERE ct.business_id = cu.business_id AND ct.customer_id = cu.id
               AND ch.key = 'email'
-            ORDER BY ci.is_primary DESC, ci.last_seen_at DESC LIMIT 1)                   AS email
+            ORDER BY ct.is_primary DESC, ct.updated_at DESC LIMIT 1)                     AS email
         FROM tenant.customer cu
         LEFT JOIN tenant.loyalty_card c
           ON c.business_id = cu.business_id AND c.customer_id = cu.id AND c.status = 'active'
