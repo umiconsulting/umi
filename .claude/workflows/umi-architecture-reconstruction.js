@@ -1,15 +1,23 @@
 export const meta = {
   name: 'umi-architecture-reconstruction',
-  description: 'Reconstruct the Umi business from a multi-product monorepo and derive a cost-minimizing, optionality-preserving architecture with ADRs',
-  whenToUse: 'Deep CTO-level reverse-engineering of the Umi platform: business reconstruction → domain model → requirements → industry comparison → tech selection, with adversarial assumption-challenge.',
+  description:
+    'Reconstruct the Umi business from a multi-product monorepo and derive a cost-minimizing, optionality-preserving architecture with ADRs',
+  whenToUse:
+    'Deep CTO-level reverse-engineering of the Umi platform: business reconstruction → domain model → requirements → industry comparison → tech selection, with adversarial assumption-challenge.',
   phases: [
-    { title: 'Evidence', detail: 'Parallel readers extract structured evidence from every subsystem' },
+    {
+      title: 'Evidence',
+      detail: 'Parallel readers extract structured evidence from every subsystem',
+    },
     { title: 'Research', detail: 'Parallel web research on comparable architectures & patterns' },
-    { title: 'Synthesis', detail: 'One agent per deliverable consumes full evidence+research bundle' },
+    {
+      title: 'Synthesis',
+      detail: 'One agent per deliverable consumes full evidence+research bundle',
+    },
     { title: 'Challenge', detail: 'Adversarial assumption-busting + completeness critic' },
     { title: 'Assemble', detail: 'Single writer assembles the master document to disk' },
   ],
-}
+};
 
 // ---------------------------------------------------------------------------
 // Shared grounding primer — established facts the orchestrator already verified.
@@ -76,7 +84,7 @@ REALITY CHECK to keep front-of-mind: the live tenant count appears VERY SMALL
 designed for a 5-vertical multi-tenant platform but the business today is a
 handful of restaurants. This gap (ambition vs current scale) must be surfaced,
 not papered over.
-`.trim()
+`.trim();
 
 const GOALS = `
 ANALYSIS CONTRACT (apply to every conclusion):
@@ -101,7 +109,7 @@ ANALYSIS CONTRACT (apply to every conclusion):
   business requirement, say so plainly and propose the simpler alternative.
 - Distinguish IMPLEMENTED (in code) from PLANNED/ASPIRATIONAL (in docs). Code is
   one evidence source among several; the business includes unbuilt intent.
-`.trim()
+`.trim();
 
 // ===========================================================================
 // PHASE 1+2 — Evidence extraction (repo) and Industry research (web), concurrent.
@@ -266,7 +274,7 @@ volume)? What is actually deployed and where? How much of the "platform" is live
 vs scaffolding? This is the reality anchor for right-sizing every recommendation.
 Quote paths and real numbers where found.`,
   },
-]
+];
 
 const RESEARCH_TASKS = [
   {
@@ -329,31 +337,41 @@ self-hostable embeddings (vs Voyage), pgvector vs dedicated vector DBs, controll
 LLM spend. Cite primary docs/engineering sources. Return a decision framework
 emphasizing OPTIONALITY and measurable advantage thresholds for choosing managed.`,
   },
-]
+];
 
-phase('Evidence')
-log(`Spawning ${EVIDENCE_TASKS.length} repo-evidence readers + ${RESEARCH_TASKS.length} industry-research agents concurrently`)
+phase('Evidence');
+log(
+  `Spawning ${EVIDENCE_TASKS.length} repo-evidence readers + ${RESEARCH_TASKS.length} industry-research agents concurrently`,
+);
 
 const allInputs = await parallel([
-  ...EVIDENCE_TASKS.map(t => () =>
-    agent(`${PRIMER}\n\n---\n\n${GOALS}\n\n---\n\nYOU ARE A REPO-EVIDENCE READER. ${t.prompt}\n\nReturn DENSE, well-structured markdown findings (use H3 headings + bullets, cite file paths). This is raw evidence for a downstream synthesis layer — be specific and quote real names/paths/numbers, not generalities. Flag explicitly where the repo CONTRADICTS the primer.`,
-      { label: t.label, phase: 'Evidence' })
-      .then(text => ({ kind: 'evidence', label: t.label, text }))
+  ...EVIDENCE_TASKS.map(
+    (t) => () =>
+      agent(
+        `${PRIMER}\n\n---\n\n${GOALS}\n\n---\n\nYOU ARE A REPO-EVIDENCE READER. ${t.prompt}\n\nReturn DENSE, well-structured markdown findings (use H3 headings + bullets, cite file paths). This is raw evidence for a downstream synthesis layer — be specific and quote real names/paths/numbers, not generalities. Flag explicitly where the repo CONTRADICTS the primer.`,
+        { label: t.label, phase: 'Evidence' },
+      ).then((text) => ({ kind: 'evidence', label: t.label, text })),
   ),
-  ...RESEARCH_TASKS.map(t => () =>
-    agent(`${GOALS}\n\n---\n\nYOU ARE AN INDUSTRY-RESEARCH AGENT for the Umi platform (context: ${PRIMER.slice(0, 900)}...). Use web search/fetch. ${t.prompt}\n\nReturn structured markdown: each PATTERN with (what it is, when to use, trade-offs, recurring cost / self-host implication) and CITATIONS (title + URL). Prefer primary sources. Be concrete and decision-oriented.`,
-      { label: t.label, phase: 'Research' })
-      .then(text => ({ kind: 'research', label: t.label, text }))
+  ...RESEARCH_TASKS.map(
+    (t) => () =>
+      agent(
+        `${GOALS}\n\n---\n\nYOU ARE AN INDUSTRY-RESEARCH AGENT for the Umi platform (context: ${PRIMER.slice(0, 900)}...). Use web search/fetch. ${t.prompt}\n\nReturn structured markdown: each PATTERN with (what it is, when to use, trade-offs, recurring cost / self-host implication) and CITATIONS (title + URL). Prefer primary sources. Be concrete and decision-oriented.`,
+        { label: t.label, phase: 'Research' },
+      ).then((text) => ({ kind: 'research', label: t.label, text })),
   ),
-]).then(rs => rs.filter(Boolean))
+]).then((rs) => rs.filter(Boolean));
 
-const evidence = allInputs.filter(r => r.kind === 'evidence')
-const research = allInputs.filter(r => r.kind === 'research')
-log(`Collected ${evidence.length} evidence blocks + ${research.length} research blocks`)
+const evidence = allInputs.filter((r) => r.kind === 'evidence');
+const research = allInputs.filter((r) => r.kind === 'research');
+log(`Collected ${evidence.length} evidence blocks + ${research.length} research blocks`);
 
-const EVIDENCE_BUNDLE = evidence.map(e => `\n===== EVIDENCE [${e.label}] =====\n${e.text}`).join('\n')
-const RESEARCH_BUNDLE = research.map(r => `\n===== RESEARCH [${r.label}] =====\n${r.text}`).join('\n')
-const BUNDLE = `${PRIMER}\n\n---\n\n=== REPO EVIDENCE BUNDLE ===\n${EVIDENCE_BUNDLE}\n\n=== INDUSTRY RESEARCH BUNDLE ===\n${RESEARCH_BUNDLE}`
+const EVIDENCE_BUNDLE = evidence
+  .map((e) => `\n===== EVIDENCE [${e.label}] =====\n${e.text}`)
+  .join('\n');
+const RESEARCH_BUNDLE = research
+  .map((r) => `\n===== RESEARCH [${r.label}] =====\n${r.text}`)
+  .join('\n');
+const BUNDLE = `${PRIMER}\n\n---\n\n=== REPO EVIDENCE BUNDLE ===\n${EVIDENCE_BUNDLE}\n\n=== INDUSTRY RESEARCH BUNDLE ===\n${RESEARCH_BUNDLE}`;
 
 // ===========================================================================
 // PHASE 3 — Synthesis: one agent per deliverable, each fed the full bundle.
@@ -528,18 +546,24 @@ abstraction + cost controls; (8) KDS reads a projection/view, not source of trut
 a clear position and name its revisit trigger. These are the load-bearing
 justifications — make them sharp.`,
   },
-]
+];
 
-phase('Synthesis')
-log(`Synthesizing ${DELIVERABLES.length} deliverables, each grounded in the full evidence+research bundle`)
+phase('Synthesis');
+log(
+  `Synthesizing ${DELIVERABLES.length} deliverables, each grounded in the full evidence+research bundle`,
+);
 
-const sections = await parallel(DELIVERABLES.map(d => () =>
-  agent(`${BUNDLE}\n\n---\n\n${GOALS}\n\n---\n\nYOU ARE A PRINCIPAL ARCHITECT writing ONE section of a CTO-level reconstruction-and-architecture report for Umi. Ground every claim in the EVIDENCE/RESEARCH bundle above; cite file paths (repo) and source URLs (research) where relevant. Distinguish IMPLEMENTED vs PLANNED. Challenge assumptions; prefer the simplest design that fits the REAL current scale with a clear growth path.\n\nWRITE THIS SECTION:\n${d.title}\n${d.prompt}\n\nOutput rules: return ONLY the markdown body for this section. Start at H2 ("## ${d.title}"). Use tables/bullets/sequence notation for density. No preamble, no closing meta-commentary, no "as an AI". Be decisive and specific — this is the final artifact.`,
-    { label: `synth:${d.key}`, phase: 'Synthesis' })
-    .then(md => ({ key: d.key, title: d.title, md }))
-).map(p => p)).then(rs => rs.filter(Boolean))
+const sections = await parallel(
+  DELIVERABLES.map(
+    (d) => () =>
+      agent(
+        `${BUNDLE}\n\n---\n\n${GOALS}\n\n---\n\nYOU ARE A PRINCIPAL ARCHITECT writing ONE section of a CTO-level reconstruction-and-architecture report for Umi. Ground every claim in the EVIDENCE/RESEARCH bundle above; cite file paths (repo) and source URLs (research) where relevant. Distinguish IMPLEMENTED vs PLANNED. Challenge assumptions; prefer the simplest design that fits the REAL current scale with a clear growth path.\n\nWRITE THIS SECTION:\n${d.title}\n${d.prompt}\n\nOutput rules: return ONLY the markdown body for this section. Start at H2 ("## ${d.title}"). Use tables/bullets/sequence notation for density. No preamble, no closing meta-commentary, no "as an AI". Be decisive and specific — this is the final artifact.`,
+        { label: `synth:${d.key}`, phase: 'Synthesis' },
+      ).then((md) => ({ key: d.key, title: d.title, md })),
+  ).map((p) => p),
+).then((rs) => rs.filter(Boolean));
 
-const SECTIONS_TEXT = sections.map(s => s.md).join('\n\n')
+const SECTIONS_TEXT = sections.map((s) => s.md).join('\n\n');
 
 // ===========================================================================
 // PHASE 4 — Adversarial challenge + completeness critic. Reads all sections.
@@ -583,28 +607,31 @@ data/infra/deploy architecture, cost, risk, stack, roadmap, ADRs). Produce a
 "Gaps, Contradictions & Open Questions" subsection (H2): a prioritized list, each
 item naming the section and the fix. Be specific; this is the last quality gate.`,
   },
-]
+];
 
-phase('Challenge')
-const challenges = await parallel(CHALLENGES.map(c => () =>
-  agent(`${PRIMER}\n\n---\n\n${GOALS}\n\n---\n\nDRAFT REPORT (all sections):\n\n${SECTIONS_TEXT}\n\n---\n\n${c.prompt}`,
-    { label: c.label, phase: 'Challenge' })
-    .then(md => ({ label: c.label, md }))
-).map(p => p)).then(rs => rs.filter(Boolean))
+phase('Challenge');
+const challenges = await parallel(
+  CHALLENGES.map(
+    (c) => () =>
+      agent(
+        `${PRIMER}\n\n---\n\n${GOALS}\n\n---\n\nDRAFT REPORT (all sections):\n\n${SECTIONS_TEXT}\n\n---\n\n${c.prompt}`,
+        { label: c.label, phase: 'Challenge' },
+      ).then((md) => ({ label: c.label, md })),
+  ).map((p) => p),
+).then((rs) => rs.filter(Boolean));
 
-const CHALLENGE_TEXT = challenges.map(c => c.md).join('\n\n')
+const CHALLENGE_TEXT = challenges.map((c) => c.md).join('\n\n');
 
 // ===========================================================================
 // PHASE 5 — Single assembler writes the master document to disk (one writer).
 // ===========================================================================
 
-phase('Assemble')
-const ORDERED = sections
-  .slice()
-  .sort((a, b) => parseInt(a.title) - parseInt(b.title))
-const ASSEMBLED_BODY = ORDERED.map(s => s.md).join('\n\n---\n\n')
+phase('Assemble');
+const ORDERED = sections.slice().sort((a, b) => parseInt(a.title) - parseInt(b.title));
+const ASSEMBLED_BODY = ORDERED.map((s) => s.md).join('\n\n---\n\n');
 
-const outPath = '/Users/juanlopez1/Documents/Repositories/Umi/docs/architecture/2026-06-21-umi-architecture-reconstruction.md'
+const outPath =
+  '/Users/juanlopez1/Documents/Repositories/Umi/docs/architecture/2026-06-21-umi-architecture-reconstruction.md';
 
 const assemblerSummary = await agent(
   `You are the EDITOR assembling the final CTO-level report for Umi. You are given
@@ -644,8 +671,8 @@ ${ASSEMBLED_BODY}
 ===== CHALLENGE APPENDIX (verbatim) =====
 ${CHALLENGE_TEXT}
 `,
-  { label: 'assemble:write-report', phase: 'Assemble' }
-)
+  { label: 'assemble:write-report', phase: 'Assemble' },
+);
 
 return {
   outPath,
@@ -654,4 +681,4 @@ return {
   researchCount: research.length,
   challengeCount: challenges.length,
   briefing: assemblerSummary,
-}
+};

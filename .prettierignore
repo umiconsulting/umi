@@ -27,3 +27,17 @@ apps/umi-cash/
 # adapter-sync-check guards. Skills are edited as prose; leave them as written.
 # (.claude/skills is a symlink INTO this directory, so one rule covers both.)
 .agents/skills/
+
+# ALL authored Markdown — the rule above, generalised once we measured it.
+# Prettier earns its keep on CODE, where it ends bikeshedding in review and makes
+# diffs mean something. On hand-written prose it earns nothing here: formatting
+# docs/ + the root .md files produced 3,758 changed lines, of which ~1,847 were
+# table-pipe padding and ~1,618 were *emphasis* -> _emphasis_. Both render
+# IDENTICALLY. That is a large diff across the architecture docs, buying a
+# rendered output nobody can tell apart, while burying real edits in noise and
+# conflicting with any in-flight doc branch.
+#
+# So the ruling is: Prettier formats code, not prose. Markdown is reviewed by
+# reading it. Removing this line is a decision to accept the churn above — it is
+# not a bug fix.
+**/*.md

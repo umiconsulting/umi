@@ -15,28 +15,28 @@ on:
   workflow_call:
     inputs:
       app_name:
-        description: "Service name, also the apps/<app_name> dir on the VPS (e.g. umi-api)"
+        description: 'Service name, also the apps/<app_name> dir on the VPS (e.g. umi-api)'
         type: string
         required: true
       app_dir:
-        description: "Path to the app in this repo (e.g. apps/umi-api)"
+        description: 'Path to the app in this repo (e.g. apps/umi-api)'
         type: string
         required: true
       package_name:
-        description: "pnpm workspace package name for --filter (e.g. @umi/api)"
+        description: 'pnpm workspace package name for --filter (e.g. @umi/api)'
         type: string
         required: true
       image:
-        description: "GHCR image name without tag (e.g. ghcr.io/umiconsulting/umi-api)"
+        description: 'GHCR image name without tag (e.g. ghcr.io/umiconsulting/umi-api)'
         type: string
         required: true
       node_version:
         type: string
-        default: "22"
+        default: '22'
       health_url:
-        description: "Optional URL to curl after deploy; empty disables the check"
+        description: 'Optional URL to curl after deploy; empty disables the check'
         type: string
-        default: ""
+        default: ''
 
 permissions:
   contents: read
