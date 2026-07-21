@@ -92,14 +92,21 @@ function CustomersList({ selectedId }) {
     return () => clearTimeout(timer)
   }, [search])
 
+  // Reads the previous params through the functional updater instead of closing over
+  // `params`. This effect both READS and WRITES the search params, so simply adding
+  // `params` to the dep array — what exhaustive-deps literally asks for — would loop:
+  // the effect sets params, the new URLSearchParams identity re-triggers it, forever.
+  // Taking `prev` removes the closure entirely, so there is nothing stale to track.
   useEffect(() => {
-    const next = new URLSearchParams(params)
-    if (debouncedSearch) next.set('q', debouncedSearch)
-    else next.delete('q')
-    if (page > 1) next.set('page', String(page))
-    else next.delete('page')
-    setParams(next, { replace: true })
-  }, [debouncedSearch, page])
+    setParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (debouncedSearch) next.set('q', debouncedSearch)
+      else next.delete('q')
+      if (page > 1) next.set('page', String(page))
+      else next.delete('page')
+      return next
+    }, { replace: true })
+  }, [debouncedSearch, page, setParams])
 
   const { data, loading, error } = useCustomersData({ page, search: debouncedSearch, filter })
   const customers = data?.customers || []
