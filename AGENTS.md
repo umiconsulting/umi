@@ -63,16 +63,23 @@ service, or infrastructure boundary, justify it against simpler options with exp
 Hermes is the local orchestrator. DeepSeek v4 Pro is the reasoning engine. The
 `codex-claude-pipeline` skill (loaded by Hermes) governs when to delegate to Codex
 or Claude Code. Agent procedures live under `.agents/skills/` (canonical per the
-2026-06-10 S1.5 decision); `.claude/skills/` is a generated mirror. Sync with:
-
-```sh
-rsync -ac --delete .agents/skills/ .claude/skills/
-diff -r .claude/skills .agents/skills   # must be empty
-```
+2026-06-10 S1.5 decision). Each tool reads its own path, so `.claude/skills/` is a **symlink**
+into it (`.claude/skills -> ../.agents/skills`) — one source of truth, nothing to regenerate.
+Write to `.agents/skills/`; the link reflects it instantly. `adapter-sync-check` guards the link.
+Symlinks assume macOS/Linux (Windows needs `git config core.symlinks true`).
 
 For workspace-wide work, inspect root instructions first. For project-specific work,
 descend into the owning repo and follow its `AGENTS.md` / `REPO_CONTEXT.md` if present.
 Prefer existing artifacts and owners over inventing parallel structures.
+
+## Agent skills
+
+### Issue tracker
+
+Work items and PRDs live as Trello cards (official Trello MCP, `https://mcp.trello.com/v1`);
+GitHub PRs are the review surface, linked to a card optionally. The `to-tickets` / `to-spec` /
+`triage` skills publish there; `code-review` checks a PR against its linked card when one is
+present. See [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
 
 ## Current stance
 
