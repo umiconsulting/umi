@@ -4,7 +4,7 @@
 - `task-router`
   - scope: route work to the correct Umi owner slice, then to direct execution, an existing project skill, or a subagent.
   - trigger patterns: multi-repo tasks, root-level docs, cross-product planning, ownership uncertainty.
-  - placement hints: start in root `.agents/skills/task-router/` (canonical source; `.claude/` is a symlink into it), then descend into the owning repo if the task becomes local.
+  - placement hints: start in root `.agents/skills/task-router/` (canonical source; `.claude/skills/` is a symlink into it), then descend into the owning repo if the task becomes local.
   - confidence: high
   - provenance: root workspace scaffold for Umi.
 - `scientific-research-check`
