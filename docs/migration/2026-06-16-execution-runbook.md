@@ -33,7 +33,7 @@ lives in `2026-06-16-migration-plan.md` (the executor). The earlier
 
 The architecture spec mandates domain names (`core`/`loyalty`/`ops`). The
 migration plan deliberately kept the existing physical names
-(`platform`/`cash`/`commerce`, *"Do not create core"*) to avoid churning live
+(`platform`/`cash`/`commerce`, _"Do not create core"_) to avoid churning live
 Supabase dependencies. **Resolution (confirmed): rename to the spec names.**
 
 > Migrate data into the **existing physical names** (`platform`/`cash`/`commerce`)
@@ -48,26 +48,31 @@ a hard live dependency that makes the rename unsafe, keep physical names + canon
 **compatibility views**. Default path is the rename.
 
 ### D2 — Identity placement (locked)
+
 Roles are edges. `password_hash` → `core.users` only. No `role`/`password_hash`
 in `core.people.metadata`. `CUSTOMER` → `people` (+contact_methods, +loyalty
 account). `ADMIN`/`STAFF` → `people` **+ `core.users` + `tenant_membership` (role) + `staff_members`**.
 
 ### D3 — Identifier table shape (locked)
+
 The identifier table is `core.contact_methods` with the **spec's columns**
 (`kind`, `normalized_value`, `display_value`, `is_primary`, `verified_at`) — not
 the old `contact_identities` shape. The `2026-06-16` plan's `contact_identities`
 inserts must be adapted to this shape.
 
 ### D4 — One phone normalizer (locked)
+
 `core.normalize_phone()` (E.164, MX `+52 1` handling) is the only normalizer.
 Both migration dedup and runtime `resolve_contact()` call it. No inline
 `regexp_replace` anywhere.
 
 ### D5 — Loyalty account grain (locked)
+
 One `loyalty.accounts` row **per person per program**, never per card. Preflight
 asserts cards-per-user; dedupe accounts by person where a user holds >1 card.
 
 ### D6 — Connection role model (✅ LOCKED — owner-confirmed 2026-06-17)
+
 `pg_roles` carries **connection identity** only, fixed at three: `umi_app`
 (RLS-enforced request role, non-superuser/non-`BYPASSRLS`), `umi_worker`
 (`BYPASSRLS` service/background), `umi_readonly` (analytics). The backend connects
@@ -105,6 +110,7 @@ role. All Supabase `authenticated` grants → `umi_app`, `service_role` →
 > backend consolidation → domain cutover.** Each phase: Goal · Actions · Gate · Rollback.
 
 ### Phase A — Preflight & reconciliation
+
 - **Goal:** clean inputs and aligned plans.
 - **Actions:** take today's fresh Cash dump; restore to staging; apply the canonical
   note's §4 conformance edits to both migration plans (names per D1, identity per
@@ -114,6 +120,7 @@ role. All Supabase `authenticated` grants → `umi_app`, `service_role` →
 - **Rollback:** n/a (read-only).
 
 ### Phase B — DDL only
+
 - **Goal:** schemas, tables, constraints, indexes, triggers, grants. No data.
 - **Actions:** `migration-plan §5`. Create `core.contact_methods` with the **D3** shape.
   Install `core.normalize_phone()` + `resolve_contact()` (SECURITY DEFINER,
@@ -129,6 +136,7 @@ role. All Supabase `authenticated` grants → `umi_app`, `service_role` →
 - **Rollback:** `migration-plan §5.9` (drop new objects; no data touched).
 
 ### Phase C — Cash → loyalty + core
+
 - **Goal:** move loyalty money + Cash identities, safely.
 - **Actions:** `cash-to-platform-migration` Steps 1–13 / `migration-plan §6`, **with corrections**:
   D2 (staff → users+membership+staff_members, not people.metadata), D4 (normalizer),
@@ -138,6 +146,7 @@ role. All Supabase `authenticated` grants → `umi_app`, `service_role` →
 - **Rollback:** `migration-plan §6.7` (`TRUNCATE` tagged target rows; Cash keeps running on the old project).
 
 ### Phase D — Identity unification
+
 - **Goal:** merge ConversaFlow customers into `people`; link conversations to `person_id`.
 - **Actions:** `migration-plan §7`, but dedup via `resolve_contact()` (D4), and
   route `dashboard_users → tenant_memberships`, staff → `staff_members` (D2). Guard
@@ -146,12 +155,15 @@ role. All Supabase `authenticated` grants → `umi_app`, `service_role` →
 - **Rollback:** `migration-plan §7.4`.
 
 ### Phase E — Split ConversaFlow → ops / comms / queue / observability
+
 - **Actions/Gate/Rollback:** `migration-plan §8` (memory_items keyed on `person_id`; outbox → `queue`).
 
 ### Phase F — KDS → device / kitchen / ops
+
 - **Actions/Gate/Rollback:** `migration-plan §9` (tickets are a projection of `ops.order_items`, not a source of truth).
 
 ### Phase G — Canonicalization rename (per D1, owner-confirmed)
+
 - **Goal:** physical names → spec names, atomically, before consumers repoint.
 - **Actions (catalog-only, one transaction):**
   ```sql
@@ -171,16 +183,18 @@ role. All Supabase `authenticated` grants → `umi_app`, `service_role` →
 - **Rollback:** reverse renames (same transaction shape).
 
 ### Phase H — Auth consolidation (Cash logins → `core.users`)
+
 - **Goal:** one login authority; **no password resets**.
 - **Actions:** Cash and dashboard both use Node `scryptSync(pw,salt,64)` — hashes are
   byte-compatible. Split Cash's `scrypt:salt:hash` → `core.users.(password_salt,
-  password_hash, password_algorithm='scrypt-sha256-v1')`. Tag legacy `salt:hash`
+password_hash, password_algorithm='scrypt-sha256-v1')`. Tag legacy `salt:hash`
   rows `sha256-legacy-v0`; dashboard verifies both formats and **rehashes to scrypt
   on next successful login**. Only `ADMIN`/`STAFF` get `core.users` rows.
 - **Gate:** sample 5 Cash admins log into the new dashboard with their existing passwords on staging.
 - **Rollback:** old Cash admin auth still live; remove `core.users` credential rows.
 
 ### Phase I — Backend / API build
+
 - **Goal:** the three-tier API (see §5). Build **tier 1 first**.
 - **Actions:** DB RPCs (tier 1) → deployed dashboard backend over the platform
   schema (tier 2: `/api/me/tenants`, `/api/tenants/:id/capabilities`, customer-360,
@@ -190,6 +204,7 @@ role. All Supabase `authenticated` grants → `umi_app`, `service_role` →
 - **Rollback:** per-route revert; old paths remain until each route is verified.
 
 ### Phase J — Domain cutover (Cash admin → `dashboard.umiconsulting.co`) — ⏸ DEFERRED
+
 - **Status:** Deferred by owner (2026-06-16). Not on the critical path; tackle after
   database integrity is locked. Steps preserved below for when it's scheduled.
 - **Goal:** fold the Cash **admin** surface into the unified dashboard; **keep the customer wallet on `cash.`**.
@@ -203,11 +218,13 @@ role. All Supabase `authenticated` grants → `umi_app`, `service_role` →
 - **Rollback:** remove the redirect (old Cash admin login still functional).
 
 ### Phase K — Final verification
+
 - **Actions:** `migration-plan §10` — every source table accounted for; source→target
   financial totals (re-run on the **fresh** dump); tenant-isolation (`tenant_id` + RLS) on every tenant-scoped table.
 - **Gate:** 0 mismatches across §10.1–10.3.
 
 ### Phase L — Cleanup & cutover finalization
+
 - **Actions:** deprecate live Cash project `rrkzhisnadfrgnhntkiz` to **read-only** only
   after counts + core operations match through soak; drop `legacy.*`/`public.*` after
   confirming no reads; crons → `queue` job-worker; remove duplicate Prisma + dual paths.
@@ -230,11 +247,11 @@ role. All Supabase `authenticated` grants → `umi_app`, `service_role` →
 
 ## 5. API contract (the functions → where they live)
 
-| Tier | Runtime | What | Examples |
-|---|---|---|---|
-| 1 | DB, `SECURITY DEFINER`, `service_role` only | identity & money primitives | `resolve_contact()`, `normalize_phone()`, `award_points()`, ledger writes |
-| 2 | Deployed dashboard backend (Node) over the platform schema | admin API & reads | `GET /api/me/tenants`, `GET /api/tenants/:id/capabilities`, customer-360, admin CRUD |
-| 3 | Edge functions (narrow) | ingress / jobs / device | `whatsapp-handler` (calls `resolve_contact`), `job-worker`, `kds-command`/`kds-pairing` |
+| Tier | Runtime                                                    | What                        | Examples                                                                                |
+| ---- | ---------------------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------- |
+| 1    | DB, `SECURITY DEFINER`, `service_role` only                | identity & money primitives | `resolve_contact()`, `normalize_phone()`, `award_points()`, ledger writes               |
+| 2    | Deployed dashboard backend (Node) over the platform schema | admin API & reads           | `GET /api/me/tenants`, `GET /api/tenants/:id/capabilities`, customer-360, admin CRUD    |
+| 3    | Edge functions (narrow)                                    | ingress / jobs / device     | `whatsapp-handler` (calls `resolve_contact`), `job-worker`, `kds-command`/`kds-pairing` |
 
 `GET /api/me/tenants` = the active-membership query (user → active
 `tenant_memberships` + roles, filtered by `status='active'` and tenant status).

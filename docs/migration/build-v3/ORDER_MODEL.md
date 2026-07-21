@@ -1,6 +1,6 @@
 # The order model — decision record
 
-*build-v3 · `tenant` schema · order cluster · 2026-07-15*
+_build-v3 · `tenant` schema · order cluster · 2026-07-15_
 
 How build-v3 represents an order, why it is shaped that way, and the small delta the
 current DDL still needs. Grounded in two things: the real production data (the prod
@@ -21,16 +21,16 @@ with the café-specific parts quarantined to one seam. Genericity lives in the
 
 Three separable facts, each at the grain where it is actually true:
 
-| fact | entity | grain | why this grain |
-|---|---|---|---|
-| the commercial agreement | `tenant.customer_order` | order | one agreement to buy |
-| what was bought | `tenant.order_item` | line | a line is one product at one price |
-| where each item is prepared | `order_item.station_id` | **line** | a station is a *preparation locus*; a latte is made at the bar, a panini at the grill — two loci for one order |
-| how far along the ticket is | `tenant.order_event` | **order** | the ticket advances as a unit (see §3) |
+| fact                        | entity                  | grain     | why this grain                                                                                                 |
+| --------------------------- | ----------------------- | --------- | -------------------------------------------------------------------------------------------------------------- |
+| the commercial agreement    | `tenant.customer_order` | order     | one agreement to buy                                                                                           |
+| what was bought             | `tenant.order_item`     | line      | a line is one product at one price                                                                             |
+| where each item is prepared | `order_item.station_id` | **line**  | a station is a _preparation locus_; a latte is made at the bar, a panini at the grill — two loci for one order |
+| how far along the ticket is | `tenant.order_event`    | **order** | the ticket advances as a unit (see §3)                                                                         |
 
 The KDS is a **projection** over this — it groups lines by order, tags each line's
 station, and advances through `order_event`. It is **not the owner** of the order.
-The dashboard reads `customer_order` directly; a future POS *writes* it with
+The dashboard reads `customer_order` directly; a future POS _writes_ it with
 `source='pos'`. One row, many views — never a KDS-only artifact.
 
 ### The ticket is a shared projection, and `order_event` is its status spine
@@ -38,7 +38,7 @@ The dashboard reads `customer_order` directly; a future POS *writes* it with
 The KDS "ticket" — the live, per-order, actionable view (live lines + status + who +
 timing) — is **one of two fundamental projections** of an order, not a KDS artifact:
 
-- **Live projection (the ticket):** mutable, status-driven. Consumed by a *family* —
+- **Live projection (the ticket):** mutable, status-driven. Consumed by a _family_ —
   the KDS (act: fire/bump), **customer status notifications** ("preparing / listo", the
   outbound slice), a pickup/handoff board, a dashboard "orders in flight" monitor, an
   expediter/all-day aggregation, and outbound aggregator/delivery status sync
@@ -60,11 +60,11 @@ This is why **`order_event` is load-bearing now, not deferred**: it is the statu
 every live consumer subscribes to. The deciding test was never "is the KDS in scope" but
 "**do we notify the customer on status change?**" — and we do. Two status consumers (KDS +
 customer) earn the transition spine independently of the KDS roadmap. It stays thin —
-*real status transitions only, not a catch-all event log* (per its DDL comment).
+_real status transitions only, not a catch-all event log_ (per its DDL comment).
 
-Two roles, one status, no contradiction: the *current* status is the denormalized
+Two roles, one status, no contradiction: the _current_ status is the denormalized
 `customer_order.status` — that is what the `order_ticket` view reads, one cheap column, no
-per-order aggregation. `order_event` is the append-only *transition* stream: a writer
+per-order aggregation. `order_event` is the append-only _transition_ stream: a writer
 advances `customer_order.status` **and** appends an `order_event` row, and notification
 consumers subscribe to that stream (a new row → a "listo" push). The ticket reads the
 snapshot; the spine drives the change. They must be written together, never one without
@@ -78,19 +78,19 @@ Not reasoned from taste — measured, then cross-checked against the industry.
 
 **Station → the line.** In the source, `ops.orders.station_id` is **null on all 51
 orders**, there is **one** station ("cafe"), and **zero** routing rules
-(`kitchen.station_assignments` = 0). So the current *data* does not force per-line;
-it is a **capacity choice**. But the *industry* removes all doubt: Toast routes **by
+(`kitchen.station_assignments` = 0). So the current _data_ does not force per-line;
+it is a **capacity choice**. But the _industry_ removes all doubt: Toast routes **by
 menu item** to per-item prep stations and **one order splits across stations**
 (salad / grill / fry), with independent per-station bump as an option; Square splits
 "complex tickets across multiple stations, appetizers → fry, entrees → grill." Per-line
-routing is the **universal standard**, so *when* a routing FK exists it belongs on the
+routing is the **universal standard**, so _when_ a routing FK exists it belongs on the
 line — that grain ruling is settled.
 
-But the ruling is about *where*, not *whether to build now*. `order_item.station_id` is
+But the ruling is about _where_, not _whether to build now_. `order_item.station_id` is
 null on **every** source line (the source `order_items` has no station column at all), so
 deferring it deletes no data and adding it later is a plain nullable `ALTER` — nothing to
-retrofit, because the "can't re-grain populated history" cost only bites when there *is*
-history. **This is only about the per-line FK.** The `tenant.station` *table* itself is a
+retrofit, because the "can't re-grain populated history" cost only bites when there _is_
+history. **This is only about the per-line FK.** The `tenant.station` _table_ itself is a
 different thing: the KDS device pairs to it and tickets are tagged with it
 (`kds.repository.ts` reads it today), and the iPad KDS contract is frozen — so the table
 **stays, as config** (§5). Do not conflate the two.
@@ -99,7 +99,7 @@ different thing: the KDS device pairs to it and tickets are tagged with it
 statuses. The source carried a per-line `kitchen_status` and **never once used the
 granularity**. Toast's **default is bump-together**; per-station independent bump is an
 opt-in config. So `order_event` stays at the order grain, and the DDL is written so a
-line/station split is a *future config*, not a schema change.
+line/station split is a _future config_, not a schema change.
 
 ---
 
@@ -129,10 +129,10 @@ Why mark-don't-delete, and why it is not optional:
   of it silently disappearing — impossible under delete-in-place.
 
 **When does an order lock?** At **fired / sent-to-kitchen**, not at served. This is the
-industry rule: Toast freezes a fired order (*Strict Mode*), Vendure freezes at
-`ArrangingPayment`, Square at *invoiced* — all the same idea: **lock once production or
+industry rule: Toast freezes a fired order (_Strict Mode_), Vendure freezes at
+`ArrangingPayment`, Square at _invoiced_ — all the same idea: **lock once production or
 money is committed.** Before fire, amend freely; after fire, a change is a
-*void-with-cost*, not an edit.
+_void-with-cost_, not an edit.
 
 **Right-weight, not a saga.** The industry spectrum runs Square (versioned in-place
 mutate + optimistic concurrency) → Vendure (freeze + explicit `OrderModification`) →
@@ -141,31 +141,31 @@ overwrite** — a change is always a recorded event. But Medusa's full change-ac
 subsystem is over-built for **2 amended orders in 51**. build-v3 lands at Square's
 weight: `voided_at` on the line + a new line = a poor-man's version history that
 still answers "what was ordered vs. what was made." Medusa's action-type enum is the
-reference to grow *toward* (exchange/return analytics), not to build now.
+reference to grow _toward_ (exchange/return analytics), not to build now.
 
 ### Cancel vs void vs comp vs refund — four operations, two axes
 
 "Cancel / void / refund" get conflated, but the industry (Toast, Square) decides between
 them with **two independent questions**, not one:
 
-1. **Has the money settled?** — separates *void* from *refund*. Not settled (same day,
+1. **Has the money settled?** — separates _void_ from _refund_. Not settled (same day,
    before the nightly batch) → **void**, reverse as if it never happened, no fee. Already
    settled (batch closed / prior day) → **refund**, a new reversing transaction. It is
    **timing, not reason** ([Toast: void vs. refund](https://support.toasttab.com/en/article/Understand-when-to-void-vs-refund)).
-2. **Was the product made?** — separates *void* from *comp*. Not made (wrong item, a
+2. **Was the product made?** — separates _void_ from _comp_. Not made (wrong item, a
    duplicate) → **void**, inventory returns, no cost. Made and served but not charged →
    **comp**, you ate the ingredients so it **hits food cost** — Toast implements it as a
-   100 %-off discount: *"if inventory has already been impacted, the item should be comped
-   instead of voided."*
+   100 %-off discount: _"if inventory has already been impacted, the item should be comped
+   instead of voided."_
 
 Mapped onto build-v3, three of the four have a home and one is deferred:
 
-| operation | trigger | home | cost |
-|---|---|---|---|
-| **Cancel** | the whole **order** is called off | `customer_order.status='canceled'` + `cancel_reason` | none (if unmade) |
-| **Void** | a **line** killed, not-yet-made / not-settled | `order_item.voided_at` (+ `void_reason`) | none — inventory returns |
-| **Comp** | a line **made**, not charged (service recovery — "fly in the food") | **deferred** (a discount entity) | food cost absorbed |
-| **Refund** | **money** already settled, returned | `refund` → `payment` (append-only) | money out (+ cost if made) |
+| operation  | trigger                                                             | home                                                 | cost                       |
+| ---------- | ------------------------------------------------------------------- | ---------------------------------------------------- | -------------------------- |
+| **Cancel** | the whole **order** is called off                                   | `customer_order.status='canceled'` + `cancel_reason` | none (if unmade)           |
+| **Void**   | a **line** killed, not-yet-made / not-settled                       | `order_item.voided_at` (+ `void_reason`)             | none — inventory returns   |
+| **Comp**   | a line **made**, not charged (service recovery — "fly in the food") | **deferred** (a discount entity)                     | food cost absorbed         |
+| **Refund** | **money** already settled, returned                                 | `refund` → `payment` (append-only)                   | money out (+ cost if made) |
 
 Two rules keep them straight. **(a) The axes are orthogonal — money never collapses into
 status.** There is deliberately **no `'refunded'` order status**: a refunded order is
@@ -190,15 +190,15 @@ line-type when food-cost analytics earns it — the same build-when-earned disci
 The word "total" hides three different facts, and conflating them is a real bug. They
 have different homes and different mutability:
 
-| number | answers | home | mutable |
-|---|---|---|---|
-| **working / owed total** | "what does this order cost *right now*" | `Σ live lines` (derived) | **yes** — moves as lines are added/voided |
-| **charged** | "what we actually took from the customer" | `payment.amount` (captured at pay time) | **no** — frozen fact |
-| **revenue** | "what did we make last week" | aggregate over `payment` | **no** — reads frozen facts |
+| number                   | answers                                   | home                                    | mutable                                   |
+| ------------------------ | ----------------------------------------- | --------------------------------------- | ----------------------------------------- |
+| **working / owed total** | "what does this order cost _right now_"   | `Σ live lines` (derived)                | **yes** — moves as lines are added/voided |
+| **charged**              | "what we actually took from the customer" | `payment.amount` (captured at pay time) | **no** — frozen fact                      |
+| **revenue**              | "what did we make last week"              | aggregate over `payment`                | **no** — reads frozen facts               |
 
-**Working total → derived, operational for the *open* order.** Drop the stored
+**Working total → derived, operational for the _open_ order.** Drop the stored
 `customer_order.total`; compute `SUM(unit_price * quantity) WHERE voided_at IS NULL`
-at read time — a **view now**, a trigger-cached column *only* if the dashboard ever sorts
+at read time — a **view now**, a trigger-cached column _only_ if the dashboard ever sorts
 thousands of orders by amount (a speed optimization, not a truth change; generated
 columns can't do it — they can't sum child rows). While an order is open the total must
 be live (the customer switched to oat milk, the number has to move), and for a 2–5 line
@@ -207,7 +207,7 @@ order the SUM is sub-millisecond with an index on `order_item(order_id)`. This k
 **self-heals on every amendment** because a voided line falls out of the SUM.
 
 **At the money boundary → capture, do not keep deriving.** When the customer pays, write
-`payment.amount`. From that instant "what we charged" is the payment row, *not* a re-SUM
+`payment.amount`. From that instant "what we charged" is the payment row, _not_ a re-SUM
 of the lines. If a line is later voided, the working total drops below `SUM(payments)` and
 the gap **is** the refund owed (`paid − owed`), settled by a **compensating ledger entry**
 — append-only, never an edit to a past row (same rule `loyalty_stored_value_ledger`
@@ -236,7 +236,7 @@ right place: **structure** holds what you filter, sum, join or constrain; **conf
 holds what the owner edits at business cadence (never a migration); **data** holds the
 per-instance tail nobody queries across. Square proves the pattern — one `CatalogObject`
 with a `type` discriminator + `*_data` payload models item, variation, modifier, tax and
-discount as rows in *one* table, and `CUSTOM_ATTRIBUTE_DEFINITION` extends without schema
+discount as rows in _one_ table, and `CUSTOM_ATTRIBUTE_DEFINITION` extends without schema
 change. Sorting the whole cluster this way keeps the order **structure** to four small
 tables — `customer_order`, `order_item`, `order_event` (the status spine), `payment` — of
 which only **two are touched** (columns added / total derived). `station` and the whole
@@ -272,7 +272,7 @@ payment          already right — money in, method⟨check⟩, reconciled
 Money, FKs, status and dates only. `total` is a projection so it can't drift;
 `voided_at` is the void tombstone (3 real lines + waste truth); snapshot `name` /
 `unit_price` are correct, not redundant (Square snapshots catalog too — the order must
-remember what was charged). The **ticket** is a *view* over `customer_order` +
+remember what was charged). The **ticket** is a _view_ over `customer_order` +
 `order_event` + live lines (§1) — defined once, read by the KDS and customer status
 notifications today.
 
@@ -284,7 +284,7 @@ min/max) · `product_modifier` (e.g. "Oat milk" +$0.50) · `product_branch_avail
 station a device pairs to and a ticket is tagged with (`kds.repository.ts`
 `loadStation` / `listStations`; the iPad KDS contract is frozen), and the owner sets up
 stations at business cadence. One row today, but it has a real consumer — it is **kept**,
-as config, not dropped. What is *not* config is a station table baked into the *order's*
+as config, not dropped. What is _not_ config is a station table baked into the _order's_
 structure: the order **references** the catalog and the KDS derives a ticket's station
 from the device login, so the order itself carries no station.
 
@@ -297,18 +297,18 @@ in `unit_price`, so a customization rides as a value, **not** a column-per-varia
 
 ### The collapse — what the 28 source columns become
 
-| source | ruling | build-v3 |
-|---|---|---|
-| `cancellation_reason/_code/_note` + `partial_*` (6) | 6 → 2 | `customer_order.cancel_reason` (order) + `order_item.voided_at` (line; partial split used **0×**). Line-level `void_reason` is added as new structure, carried **NULL** — the source reasons are contaminated |
-| `kitchen_status` (order + line) | collapse | `status` field (0/51 ever diverged) |
-| `ops.orders.station_id` · `station_name` | drop | the *order* carries no station; the KDS ticket derives it from the device login. Both were null on all 51 orders anyway. (`tenant.station` the table is kept — see Config.) |
-| `metadata` · `details` · `notes` (order blobs) | 3 → 0 | dropped — order-level free text is unmodeled (contaminated, like `cancellation_reason`); per-line `order_item.notes` covers customization. Add a named `customer_order.notes` when a real consumer (delivery instructions) earns it |
-| `order_item.metadata jsonb` · `variant_name` | fold | into `name` / `notes` |
-| `slack_message_ts` · `source_transaction_id` | → | `external_ref`; rest dropped (machinery, not order truth) |
+| source                                              | ruling   | build-v3                                                                                                                                                                                                                            |
+| --------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cancellation_reason/_code/_note` + `partial_*` (6) | 6 → 2    | `customer_order.cancel_reason` (order) + `order_item.voided_at` (line; partial split used **0×**). Line-level `void_reason` is added as new structure, carried **NULL** — the source reasons are contaminated                       |
+| `kitchen_status` (order + line)                     | collapse | `status` field (0/51 ever diverged)                                                                                                                                                                                                 |
+| `ops.orders.station_id` · `station_name`            | drop     | the _order_ carries no station; the KDS ticket derives it from the device login. Both were null on all 51 orders anyway. (`tenant.station` the table is kept — see Config.)                                                         |
+| `metadata` · `details` · `notes` (order blobs)      | 3 → 0    | dropped — order-level free text is unmodeled (contaminated, like `cancellation_reason`); per-line `order_item.notes` covers customization. Add a named `customer_order.notes` when a real consumer (delivery instructions) earns it |
+| `order_item.metadata jsonb` · `variant_name`        | fold     | into `name` / `notes`                                                                                                                                                                                                               |
+| `slack_message_ts` · `source_transaction_id`        | →        | `external_ref`; rest dropped (machinery, not order truth)                                                                                                                                                                           |
 
 ### Deferred — earned later, decision recorded, table not built
 
-- **`order_item.station_id`** (per-line routing FK, *not* the `station` table) — a build-v3
+- **`order_item.station_id`** (per-line routing FK, _not_ the `station` table) — a build-v3
   invention (the source lines have no station column), null on 100% of lines, backed by 0
   routing rules, and read by nothing (the KDS ticket's station comes from the device login,
   not the line). Add when a second station + real routing exist; the §2 grain ruling (it
@@ -318,7 +318,7 @@ in `unit_price`, so a customization rides as a value, **not** a column-per-varia
   needs "$4 latte + $0.50 oat" split out. Until then the delta is folded into `unit_price`.
 - **`replaces_id`** (line supersession) — no consumer (`partial_cancellation_reason` 0×);
   add only for substitution analytics. A per-line amendment saga is **refused** at 2/51.
-- **discount / comp cluster** (an order-/line-level discount entity, of which a *comp* is the
+- **discount / comp cluster** (an order-/line-level discount entity, of which a _comp_ is the
   100 %-off case) — build-v3 has **no** discount mechanism yet (only `product_modifier.price_delta`).
   Discounts, comps and promos are a whole feature, Phase-3+. Interim: a service recovery is a
   `voided_at` line with `void_reason='comp'` (cost still derivable from `order_event`). Add the
@@ -345,7 +345,7 @@ locally** against the prod snapshot (port 5233) — **not** on prod:
 
 - `20_tenant.sql` — `customer_order` drops stored `total`, adds `cancel_reason`;
   `order_item` drops `station_id`, adds `voided_at` + `void_reason` + a `CHECK
-  (quantity>0, unit_price>=0)` + an `(order_id)` index + the `tg_order_item_void_only`
+(quantity>0, unit_price>=0)` + an `(order_id)` index + the `tg_order_item_void_only`
   immutability trigger; two new `security_invoker` views `tenant.order_total` (Σ live
   lines, with its meaning-by-status contract) and `tenant.order_ticket` (live line-grain
   projection that **includes** voided lines so the KDS renders VOID).
@@ -376,8 +376,8 @@ Middleware like Deliverect exists to normalize many channels → **one canonical
 KPI). Today **Umi is one of those channels** (WhatsApp), and its orders must land as one
 order the dashboard/KDS can see — the exact visibility gap this model closes. If Umi
 grows into the POS, it becomes the **injection target**, so its order must be able to
-(a) *receive* orders tagged by origin (`source ∈ whatsapp · pos · web · dashboard`, and
-later `aggregator`) and (b) *emit* status outward. `source` + `external_ref` are the
+(a) _receive_ orders tagged by origin (`source ∈ whatsapp · pos · web · dashboard`, and
+later `aggregator`) and (b) _emit_ status outward. `source` + `external_ref` are the
 origin-tagging fields that make an order injection-ready, and are **already present**; a
 tenant-scoped `idempotency_key` (with a uniqueness constraint) is the **planned** third —
 it makes re-injection duplicate-safe and lands when the injection path is built, not now.
@@ -389,6 +389,7 @@ The model is ecosystem-compatible by construction; the one rule is to never let
 ## Sources
 
 Industry cross-check (2026-07-15):
+
 - Square Orders API — [How It Works](https://developer.squareup.com/docs/orders-api/how-it-works) · [Update Orders](https://developer.squareup.com/docs/orders-api/manage-orders/update-orders)
 - [Vendure — Order Lifecycle & State Machine](https://docs.vendure.io/current/core/core-concepts/orders)
 - [Medusa — Order Change](https://docs.medusajs.com/resources/commerce-modules/order/order-change)

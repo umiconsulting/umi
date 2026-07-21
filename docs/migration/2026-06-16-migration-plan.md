@@ -78,15 +78,15 @@ cutover; equivalent `grow.*` tables are created in Phase 0.
 
 ## 2. Current State Inventory
 
-| Schema | Current tables | Current rows | Plan |
-|---|---:|---:|---|
-| `platform` | 17 | 33 | Keep as identity/core. Enrich with migrated identities. |
-| `cash` | 11 | 0 | Use as loyalty target. Add safe columns/ledgers if missing. |
-| `commerce` | 7 | 0 | Keep as ops/order target. Add ops tables if missing. |
-| `conversaflow` | 28 | 18,335 | Split in Phases 2-3. Leave source intact. |
-| `kds` | 7 | 275 | Split into `device`, `kitchen`, and `commerce` projections. |
-| `observability` | 3 | 0 | Keep and expand as observability target. |
-| `umi_cash` | 13 | 240 | Migrate to `platform` + `cash` in Phase 1. Leave source intact. |
+| Schema          | Current tables | Current rows | Plan                                                            |
+| --------------- | -------------: | -----------: | --------------------------------------------------------------- |
+| `platform`      |             17 |           33 | Keep as identity/core. Enrich with migrated identities.         |
+| `cash`          |             11 |            0 | Use as loyalty target. Add safe columns/ledgers if missing.     |
+| `commerce`      |              7 |            0 | Keep as ops/order target. Add ops tables if missing.            |
+| `conversaflow`  |             28 |       18,335 | Split in Phases 2-3. Leave source intact.                       |
+| `kds`           |              7 |          275 | Split into `device`, `kitchen`, and `commerce` projections.     |
+| `observability` |              3 |            0 | Keep and expand as observability target.                        |
+| `umi_cash`      |             13 |          240 | Migrate to `platform` + `cash` in Phase 1. Leave source intact. |
 
 Authoritative source row counts used for verification:
 
@@ -126,46 +126,46 @@ umi_cash: ApplePushToken 49, BirthdayReward 0, GiftCard 1, Location 3,
 
 ### `platform`
 
-| Current table | Destination | Action |
-|---|---|---|
-| `tenants` | `platform.tenants` | Keep. Phase 1 maps `umi_cash."Tenant"` by slug and enriches metadata. |
-| `locations` | `platform.locations` | Keep. Phase 1 inserts 3 `umi_cash."Location"` rows. |
-| `people` | `platform.people` | Keep. Phase 1 inserts Cash people; Phase 2 merges ConversaFlow customers. |
-| `users` | `platform.users` | Keep. Phase 1/2 only insert dashboard/staff login rows when identity is known. |
-| `tenant_memberships` | `platform.tenant_memberships` | Keep. Phase 2 maps `dashboard_users` here. |
-| `staff_members` | `platform.staff_members` | Keep. Phase 1 may insert `umi_cash."User"` rows with role `ADMIN`/`STAFF`. |
-| `contact_identities` | `platform.contact_identities` | Keep. Phase 1/2 insert phone/email identities. |
-| `contact_merge_candidates` | same | Keep; currently empty. Used for ambiguous identity matches. |
-| `external_refs` | same | Keep; optional audit references. `_migration` is the durable map source. |
-| `leads` | `grow.leads` | Current table empty. Create `grow.leads`; do not drop platform compatibility yet. |
-| `lead_events` | `grow.lead_events` | Current table empty. Create `grow.lead_events`; no data to move. |
-| `password_reset_tokens` | same | Keep; identity auth support. |
-| `permissions` | same | Keep; RBAC. |
-| `roles` | same | Keep; RBAC. |
-| `role_permissions` | same | Keep; RBAC. |
-| `membership_roles` | same | Keep; RBAC. |
-| `product_instances` | `grow.product_instances` | Current table empty. Create grow copy; keep compatibility table. |
+| Current table              | Destination                   | Action                                                                            |
+| -------------------------- | ----------------------------- | --------------------------------------------------------------------------------- |
+| `tenants`                  | `platform.tenants`            | Keep. Phase 1 maps `umi_cash."Tenant"` by slug and enriches metadata.             |
+| `locations`                | `platform.locations`          | Keep. Phase 1 inserts 3 `umi_cash."Location"` rows.                               |
+| `people`                   | `platform.people`             | Keep. Phase 1 inserts Cash people; Phase 2 merges ConversaFlow customers.         |
+| `users`                    | `platform.users`              | Keep. Phase 1/2 only insert dashboard/staff login rows when identity is known.    |
+| `tenant_memberships`       | `platform.tenant_memberships` | Keep. Phase 2 maps `dashboard_users` here.                                        |
+| `staff_members`            | `platform.staff_members`      | Keep. Phase 1 may insert `umi_cash."User"` rows with role `ADMIN`/`STAFF`.        |
+| `contact_identities`       | `platform.contact_identities` | Keep. Phase 1/2 insert phone/email identities.                                    |
+| `contact_merge_candidates` | same                          | Keep; currently empty. Used for ambiguous identity matches.                       |
+| `external_refs`            | same                          | Keep; optional audit references. `_migration` is the durable map source.          |
+| `leads`                    | `grow.leads`                  | Current table empty. Create `grow.leads`; do not drop platform compatibility yet. |
+| `lead_events`              | `grow.lead_events`            | Current table empty. Create `grow.lead_events`; no data to move.                  |
+| `password_reset_tokens`    | same                          | Keep; identity auth support.                                                      |
+| `permissions`              | same                          | Keep; RBAC.                                                                       |
+| `roles`                    | same                          | Keep; RBAC.                                                                       |
+| `role_permissions`         | same                          | Keep; RBAC.                                                                       |
+| `membership_roles`         | same                          | Keep; RBAC.                                                                       |
+| `product_instances`        | `grow.product_instances`      | Current table empty. Create grow copy; keep compatibility table.                  |
 
 ### `cash`
 
 `cash` is the loyalty target. All 11 existing empty tables stay in place:
 
-| Table | Source data |
-|---|---|
-| `wallet_programs` | `umi_cash."Tenant"` program/pass/branding settings |
-| `loyalty_accounts` | one account per migrated `umi_cash."LoyaltyCard"`/person |
-| `loyalty_cards` | `umi_cash."LoyaltyCard"` |
-| `points_ledger` | append-only points movements; balance = `sum(delta)` |
-| `balances` | derived points cache, maintained by `points_ledger` insert trigger |
-| `visit_events` | `umi_cash."Visit"` |
+| Table                 | Source data                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------- |
+| `wallet_programs`     | `umi_cash."Tenant"` program/pass/branding settings                                    |
+| `loyalty_accounts`    | one account per migrated `umi_cash."LoyaltyCard"`/person                              |
+| `loyalty_cards`       | `umi_cash."LoyaltyCard"`                                                              |
+| `points_ledger`       | append-only points movements; balance = `sum(delta)`                                  |
+| `balances`            | derived points cache, maintained by `points_ledger` insert trigger                    |
+| `visit_events`        | `umi_cash."Visit"`                                                                    |
 | `wallet_transactions` | non-points money (`umi_cash."Transaction"` plus optional opening-balance adjustments) |
-| `reward_configs` | `umi_cash."RewardConfig"` |
-| `reward_redemptions` | `umi_cash."RewardRedemption"`; currently 0 |
-| `gift_cards` | `umi_cash."GiftCard"` |
-| `automation_rules` | empty architecture table for birthday, win-back, streak, and goal-proximity rules |
-| `passes` | Apple/Google pass fields from `umi_cash."LoyaltyCard"` |
-| `pass_devices` | `umi_cash."ApplePushToken"` |
-| `otp_verifications` | `umi_cash."OtpVerification"` |
+| `reward_configs`      | `umi_cash."RewardConfig"`                                                             |
+| `reward_redemptions`  | `umi_cash."RewardRedemption"`; currently 0                                            |
+| `gift_cards`          | `umi_cash."GiftCard"`                                                                 |
+| `automation_rules`    | empty architecture table for birthday, win-back, streak, and goal-proximity rules     |
+| `passes`              | Apple/Google pass fields from `umi_cash."LoyaltyCard"`                                |
+| `pass_devices`        | `umi_cash."ApplePushToken"`                                                           |
+| `otp_verifications`   | `umi_cash."OtpVerification"`                                                          |
 
 If missing from live DDL, Phase 0 adds ledger-support columns/tables inside
 `cash`; it does not create a separate `loyalty` schema. Do not remove
@@ -189,48 +189,48 @@ orders/payments. Phase 3 adds or uses:
 
 ### `conversaflow`
 
-| Current table | Destination | Phase |
-|---|---|---:|
-| `customers` | `platform.people`, `platform.contact_identities` | 2 |
-| `dashboard_users` | `platform.users`, `platform.tenant_memberships` | 2 |
-| `businesses` | `commerce.businesses` | 3 |
-| `channels` | `commerce.channels` | 3 |
-| `channel_accounts` | `commerce.channel_accounts` | 3 |
-| `products` | `commerce.products` | 3 |
-| `transactions` | `commerce.orders` | 3 |
-| `transaction_status_events` | `commerce.order_events` | 3 |
-| `conversations` | `comms.conversations` | 3 |
-| `messages` | `comms.messages` | 3 |
-| `conversation_turns` | `comms.conversation_turns` | 3 |
-| `tool_calls` | `comms.tool_calls` | 3 |
-| `memory_items` | `comms.memory_items` | 3 |
-| `customer_preferences` | `comms.customer_preferences` | 3 |
-| `conversation_outcomes` | `comms.conversation_outcomes` | 3 |
-| `daily_summaries` | `comms.daily_summaries` | 3 |
-| `jobs` | `queue.jobs` with `source_table='jobs'` | 3 |
-| `workflow_jobs` | `queue.jobs` with `source_table='workflow_jobs'` | 3 |
-| `job_attempts` | `queue.job_attempts` | 3 |
-| `outbox` | `queue.outbox_events` | 3 |
-| `inbound_events` | `queue.inbound_events` | 3 |
-| `business_config_changes` | `observability.audit_log` | 3 |
-| `ai_turn_logs` | `observability.ai_runs` | 3 |
-| `edge_function_logs` | `observability.edge_logs` | 3 |
-| `eval_traces` | `observability.evaluation_traces` | 3 |
-| `pipeline_traces` | `observability.pipeline_traces` | 3 |
-| `security_logs` | `observability.security_events` | 3 |
-| `zettle_oauth_tokens` | no rows; future target `commerce.integration_tokens` or Vault | 3 |
+| Current table               | Destination                                                   | Phase |
+| --------------------------- | ------------------------------------------------------------- | ----: |
+| `customers`                 | `platform.people`, `platform.contact_identities`              |     2 |
+| `dashboard_users`           | `platform.users`, `platform.tenant_memberships`               |     2 |
+| `businesses`                | `commerce.businesses`                                         |     3 |
+| `channels`                  | `commerce.channels`                                           |     3 |
+| `channel_accounts`          | `commerce.channel_accounts`                                   |     3 |
+| `products`                  | `commerce.products`                                           |     3 |
+| `transactions`              | `commerce.orders`                                             |     3 |
+| `transaction_status_events` | `commerce.order_events`                                       |     3 |
+| `conversations`             | `comms.conversations`                                         |     3 |
+| `messages`                  | `comms.messages`                                              |     3 |
+| `conversation_turns`        | `comms.conversation_turns`                                    |     3 |
+| `tool_calls`                | `comms.tool_calls`                                            |     3 |
+| `memory_items`              | `comms.memory_items`                                          |     3 |
+| `customer_preferences`      | `comms.customer_preferences`                                  |     3 |
+| `conversation_outcomes`     | `comms.conversation_outcomes`                                 |     3 |
+| `daily_summaries`           | `comms.daily_summaries`                                       |     3 |
+| `jobs`                      | `queue.jobs` with `source_table='jobs'`                       |     3 |
+| `workflow_jobs`             | `queue.jobs` with `source_table='workflow_jobs'`              |     3 |
+| `job_attempts`              | `queue.job_attempts`                                          |     3 |
+| `outbox`                    | `queue.outbox_events`                                         |     3 |
+| `inbound_events`            | `queue.inbound_events`                                        |     3 |
+| `business_config_changes`   | `observability.audit_log`                                     |     3 |
+| `ai_turn_logs`              | `observability.ai_runs`                                       |     3 |
+| `edge_function_logs`        | `observability.edge_logs`                                     |     3 |
+| `eval_traces`               | `observability.evaluation_traces`                             |     3 |
+| `pipeline_traces`           | `observability.pipeline_traces`                               |     3 |
+| `security_logs`             | `observability.security_events`                               |     3 |
+| `zettle_oauth_tokens`       | no rows; future target `commerce.integration_tokens` or Vault |     3 |
 
 ### `kds`
 
-| Current table | Destination | Phase |
-|---|---|---:|
-| `device_sessions` | `device.devices`, `device.sessions` | 4 |
-| `device_pairing_requests` | `device.pairing_requests` | 4 |
-| `device_events` | `device.events` | 4 |
-| `stations` | `kitchen.stations` | 4 |
-| `tickets` | `commerce.orders` only for missing order projections; otherwise map to existing orders | 4 |
-| `ticket_items` | `commerce.order_items` | 4 |
-| `ticket_events` | `commerce.order_events` | 4 |
+| Current table             | Destination                                                                            | Phase |
+| ------------------------- | -------------------------------------------------------------------------------------- | ----: |
+| `device_sessions`         | `device.devices`, `device.sessions`                                                    |     4 |
+| `device_pairing_requests` | `device.pairing_requests`                                                              |     4 |
+| `device_events`           | `device.events`                                                                        |     4 |
+| `stations`                | `kitchen.stations`                                                                     |     4 |
+| `tickets`                 | `commerce.orders` only for missing order projections; otherwise map to existing orders |     4 |
+| `ticket_items`            | `commerce.order_items`                                                                 |     4 |
+| `ticket_events`           | `commerce.order_events`                                                                |     4 |
 
 Target kitchen stores station configuration only. Ticket data is converted into
 operational order state, then KDS reads a view (`kitchen.v_kds_tickets`) rather
@@ -2348,8 +2348,7 @@ from umi_cash."Transaction"
 where type not in ('TOPUP', 'PURCHASE');
 ```
 
-Expected: all `row_count_ok` and `balance_ok` are true; all orphan failures are
-0. Mark phase verified:
+Expected: all `row_count_ok` and `balance_ok` are true; all orphan failures are 0. Mark phase verified:
 
 ```sql
 update _migration.phase_runs

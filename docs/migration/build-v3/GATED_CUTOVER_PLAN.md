@@ -9,7 +9,7 @@
 >
 > **This is a living document.** Each phase below carries both its Definition of Done **and** its
 > current status (merged PRs, the tracked preflight number, what's next). It is internal-only — it is
-> *about* gates, convergence, and the transition. The architecture docs argue from v3 as the finished
+> _about_ gates, convergence, and the transition. The architecture docs argue from v3 as the finished
 > system; this one tracks the road there.
 
 ---
@@ -33,7 +33,7 @@ And the measurable arbiter that ranks progress across all of it:
 ## 2 · Why the spine is DDL-first (the lesson that reorders everything)
 
 A 20-agent adversarial audit (2026-07-12) proved the backend↔schema convergence was **~89% broken**
-while **every existing gate reported green**. `schema-parity` matched table *names* only (blind to
+while **every existing gate reported green**. `schema-parity` matched table _names_ only (blind to
 columns, quoted idents, functions); `security_gate.sql` checked structure, not content;
 `reconcile_v3.sql` checked rows and money. All three were GREEN on a DB where the WhatsApp bot never
 replied, every login returned `permissions=[]`, and umi-cash could not persist a customer session.
@@ -52,18 +52,18 @@ Two consequences shape this roadmap:
 
 > **Supersedes.** This DDL-first spine replaces the earlier code-convergence-first plan, which framed
 > "Phase 1" as a pure rename sweep. The audit proved that framing false: the name convergence and the
-> feature rework are the *same job* for the order / identity / WhatsApp modules. The old numbering is
+> feature rework are the _same job_ for the order / identity / WhatsApp modules. The old numbering is
 > retired — do not cross-reference it.
 
 ---
 
 ## 3 · The gate (three runnable instruments)
 
-| Instrument | What it proves | Command | Current |
-|---|---|---|---|
-| **`sql-preflight.integration.ts`** | Every backend SQL statement resolves against live build-v3 (schema validity) | `cd apps/umi-api && npm run test:integration` | **140 / 218 unresolved** (as of PR #54) |
-| **`security_gate.sql`** | RLS+FORCE, least-privilege grants, credential lockdown, data hygiene (24 structural + 3 behavioral) | `PGPORT=5233 psql -v ON_ERROR_STOP=1 -d umi_backfill_v3 -f security_gate.sql` → `SECURITY GATE PASSED` | **PASS** |
-| **`reconcile_v3.sql`** | Backfill fidelity — counts + money invariants + **per-order / per-item** field-level equality | `PGPORT=5233 psql -v ON_ERROR_STOP=1 -d umi_backfill_v3 -f backfill/reconcile_v3.sql` | **PASS** |
+| Instrument                         | What it proves                                                                                      | Command                                                                                                | Current                                 |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------- |
+| **`sql-preflight.integration.ts`** | Every backend SQL statement resolves against live build-v3 (schema validity)                        | `cd apps/umi-api && npm run test:integration`                                                          | **140 / 218 unresolved** (as of PR #54) |
+| **`security_gate.sql`**            | RLS+FORCE, least-privilege grants, credential lockdown, data hygiene (24 structural + 3 behavioral) | `PGPORT=5233 psql -v ON_ERROR_STOP=1 -d umi_backfill_v3 -f security_gate.sql` → `SECURITY GATE PASSED` | **PASS**                                |
+| **`reconcile_v3.sql`**             | Backfill fidelity — counts + money invariants + **per-order / per-item** field-level equality       | `PGPORT=5233 psql -v ON_ERROR_STOP=1 -d umi_backfill_v3 -f backfill/reconcile_v3.sql`                  | **PASS**                                |
 
 Local DB targets (port `5233`): `umi_prod_snapshot` = source truth · `umi_backfill_v3` = backfill
 result (preflight + reconcile run here) · `umi_build_v3` = pristine from-scratch DDL (`99_verify`).
@@ -79,14 +79,17 @@ un-quarantined on macOS (`xattr -dr com.apple.quarantine node_modules`) and
 Legend: ✅ done · 🔄 in flight · ⏳ pending · ◑ partial
 
 ### P0 — Gate repair ✅ DONE
+
 **Goal.** Make the real baseline measurable before touching anything else.
 **Delivered.** `sql-preflight.integration.ts` (`fa9277d`); `security_gate.sql` extended to 24 + 3;
 `reconcile_v3.sql` extended from rows+money to **per-order / per-item** field-level checks.
 **DoD.** All three instruments run locally and produce a trustworthy number. ✅
 
 ### P1 — DDL delta (atomic) 🔄 IN PROGRESS
-**Goal.** Reshape the schema so the backend's SQL *can* resolve — applied as one atomic migration set.
+
+**Goal.** Reshape the schema so the backend's SQL _can_ resolve — applied as one atomic migration set.
 **Scope.**
+
 - ✅ **Order cluster** — `PR #49` (`fed8c08`). `tenant.customer_order` / `order_item` / `order_event`
   (+ `payment`), **derived** order total (no stored `total`), void model (`voided_at`/`void_reason` +
   immutability trigger), `order_total` / `order_ticket` views. See `ORDER_MODEL.md`.
@@ -99,7 +102,7 @@ Legend: ✅ done · 🔄 in flight · ⏳ pending · ◑ partial
   excludes `'cash'`).
 - ⏳ **hours** — typed `tenant.business_hours` + fold `open_hours`; drop the `business.config` read.
 - ⏳ **identity dissolution** — `contact_identity` / `channel` / `whatsapp_number` → the build-v3 model.
-- ⏳ **`90_rls.sql` booby-trap** — delete the hard-coded child-list rows in the *same* commit that adds
+- ⏳ **`90_rls.sql` booby-trap** — delete the hard-coded child-list rows in the _same_ commit that adds
   `business_id` to `station`/`order_event` (else `42710` aborts the whole RLS rebuild).
 - ⏳ **Backfill rewrite to PRESERVE** — extend the reconcile to field-level for each new carry.
 
@@ -112,20 +115,23 @@ Legend: ✅ done · 🔄 in flight · ⏳ pending · ◑ partial
 preflight failures; `security_gate.sql` + `reconcile_v3.sql` stay PASS.
 
 ### P2 — Mechanical name sweep ✅ DONE
+
 **Goal.** `tenant_id` → `business_id` across the backend (488 refs; the single largest preflight cause).
 **Delivered.** `PR #50` (`f843e2e` / `b83c5c3`) — 387 renames across 37 files. **Preserved:** the
 `app.tenant_id` GUC (`pg.service.ts` dual-sets it with `app.current_business`) and the **frozen iPad
 `device_session.tenant_id` wire key** (now sourced from the renamed column). tsc clean, 325 tests pass.
 **Result.** Preflight **191 → 160** (only 31 retired directly — most `tenant_id` refs sit in statements
-that *also* hit a missing table/column, so they clear only when P1/P3/P4 land).
+that _also_ hit a missing table/column, so they clear only when P1/P3/P4 land).
 **⚠️ Invariant.** The worker pool is `BYPASSRLS`; dropping one `business_id` predicate = a **silent
 cross-tenant read** nothing catches. Every touched query keeps its predicate.
 
 ### P3 — Identity / RBAC / WhatsApp / entitlement / POS ✅ DONE (self-contained)
+
 **Goal.** Complete the request-path features on the build-v3 base.
 **Delivered.** `PR #54` (`1ad3bbb`), 23 commits.
+
 - ✅ **Entitlement single-source** via `umi.effective_entitlement`; ✅ **POS server seat** (`pos` product
-  + contract-seam design). [[project_umipos_nexo_integration_2026_07_14]]
+  - contract-seam design). [[project_umipos_nexo_integration_2026_07_14]]
 - ✅ **Identity → the FLAT model** (owner decision 2026-07-09, see
   `docs/architecture/2026-07-09-enterprise-conceptual-review.md`). The resolver had been written against
   a federated graph the DDL never built; that code was 3 days stale, not the spec. `umi.e164` +
@@ -151,6 +157,7 @@ permissions; the bot replies (add it to the smoke test — its failure is silent
 identity/entitlement failures; gate stays green.
 
 ### P4 — Conversation pipeline / hours / birthday / KDS / order repos ⏳ PENDING
+
 **Goal.** The remaining domain rewrites onto the new shapes.
 **Scope.** `conversation_turn` read paths (replay/crash guard, `merged_user_text`, debounce, supersede);
 `GET /hours` off typed `business_hours`; birthday_reward as a per-card **entitlement**, not a
@@ -160,12 +167,14 @@ per-business rule; **KDS** reproduce the frozen iPad JSON over the redesigned op
 **DoD.** Preflight → **0 unresolved**; conversation/hours/KDS/order behavioral checks green; gate green.
 
 ### P5 — 4-repo lockstep slug release ⏳ PENDING
+
 **Goal.** Route businesses **by id**; drop `slug` — but **keep `tenant.business.handle`** (the `.pkpass`
 files already on customers' phones bake `/api/{handle}/passes/apple`; dropping the URL kills wallet-pass
 updates forever). Requires a coordinated `@umi/contract` **MAJOR** release across the 4 consumers.
 **DoD.** All 4 repos build against the new contract; wallet-pass URLs still resolve.
 
 ### P6 — Deployment-gate provisioning (`SECURITY_GATE.md §4`) ◑ PARTIAL
+
 **Done:** D1 (boot-guard role reconciliation, `PR #51`) · D2 (dual-GUC expand/contract) · D11 (auth
 substrate worker-only + static AST gate, `PR #51`).
 **Pending:** D3 pooler SET-LOCAL isolation · D4 TLS verify-full (VPS→Supabase) · D5 SCRAM verifiers on
@@ -174,6 +183,7 @@ login roles · D6 pg_hba/network · D7 extensions · D8 no FDW remnants · D9 se
 **DoD.** Every §4 row checked with recorded evidence.
 
 ### P7 — Cutover rehearsal → production cutover ⏳ PENDING
+
 **Goal.** The coordinated one-shot flip (downtime OK, same DB, no split-brain).
 **Mechanism — FDW replay.** Port the 7-file backfill from local `INSERT…SELECT` to `postgres_fdw`
 replay against prod source `xbudk`, preserving run order (vertical → 6 domains → cross-FK/RLS) and
@@ -217,7 +227,7 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
   `turbo run lint`, not just the package script: a new unused variable gives exit 1, removing it gives 0.
 - ✅ **`pnpm format:check` now runs in CI, green.** The repo-wide format pass landed (306 tracked files,
   per-package commits, each verified through its own gate: umi-api 359/359 + typecheck, dashboard build,
-  contract 18/18, tokens dist byte-identical + 5/5). It runs as a *step* inside the `lint` job, not as a
+  contract 18/18, tokens dist byte-identical + 5/5). It runs as a _step_ inside the `lint` job, not as a
   new job — a new job would be an unenforced context, and renaming the existing one would stop the
   required `lint` context from ever reporting. Two rulings came out of it: Markdown is excluded from
   Prettier entirely (formatting `docs/` was 3,758 lines of table padding and `*`→`_`, rendering
@@ -232,14 +242,14 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
 
 ### The 140 remaining, mapped to phases
 
-| Error | Count | What | Owning phase |
-|---|---:|---|---|
-| `42P01` undefined_table | 11 | `tenant.order` → `customer_order` | P4 (order repos) |
-| | ~8 | `contact_identity` / `channel` — ONLY in `customers.repository` (Customer 360) | P4 (order-entangled) |
-| | 5 | `open_hours` → `business_hours` | P4 (hours) |
-| | ~4 | `birthday_reward` (2), `conversation_turn` (1), `v_kds_tickets` | P4 |
-| `42703` undefined_column | 116 | non-`tenant_id` drift: `slug` (P5), `visits_required`, `total_cents`/`details`, outbox `run_at`/`published_at`/`max_attempts`, `born_at`, `subscription_item.status`, and the `tenant.message` pipeline columns | P4 / P5 |
-| `42883` undefined_function | **0** | `normalize_phone` / `normalize_identity` — ✅ resolved by `umi.e164` | — |
+| Error                      | Count | What                                                                                                                                                                                                            | Owning phase         |
+| -------------------------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `42P01` undefined_table    |    11 | `tenant.order` → `customer_order`                                                                                                                                                                               | P4 (order repos)     |
+|                            |    ~8 | `contact_identity` / `channel` — ONLY in `customers.repository` (Customer 360)                                                                                                                                  | P4 (order-entangled) |
+|                            |     5 | `open_hours` → `business_hours`                                                                                                                                                                                 | P4 (hours)           |
+|                            |    ~4 | `birthday_reward` (2), `conversation_turn` (1), `v_kds_tickets`                                                                                                                                                 | P4                   |
+| `42703` undefined_column   |   116 | non-`tenant_id` drift: `slug` (P5), `visits_required`, `total_cents`/`details`, outbox `run_at`/`published_at`/`max_attempts`, `born_at`, `subscription_item.status`, and the `tenant.message` pipeline columns | P4 / P5              |
+| `42883` undefined_function | **0** | `normalize_phone` / `normalize_identity` — ✅ resolved by `umi.e164`                                                                                                                                            | —                    |
 
 Plus **47 interpolated statements** that preflight cannot cover (counted, not hidden — they need
 manual/live-path validation). Exact splits live in the `npm run test:integration` output.

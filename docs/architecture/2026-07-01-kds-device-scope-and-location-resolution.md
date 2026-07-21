@@ -19,7 +19,7 @@ A location-bound KDS iPad could see a WhatsApp order on the board but could not 
 
 The defect is **not** the one missing conditional that produced the 404. It is that **"what a device may see" and "what a device may act on" are encoded twice** — once as a SQL `WHERE` clause in the board read, once as a hand-written boolean in the command guard — and the two encodings drifted. The null-escape mismatch is only the first drift to surface; the structure guarantees more.
 
-A stop-the-bleeding fix has shipped. The durable fix is to **collapse the two encodings into one scope predicate** (make divergence unrepresentable) and to **make the residual loud** (a user-initiated mutation must never fail silently). Separately, the upstream data condition that triggered it — WhatsApp orders landing with `location_id = null` — is a *legitimate* domain state for multi-location tenants and must be **handled**, not outlawed; it can be **reduced** with a tenant-aware location resolver.
+A stop-the-bleeding fix has shipped. The durable fix is to **collapse the two encodings into one scope predicate** (make divergence unrepresentable) and to **make the residual loud** (a user-initiated mutation must never fail silently). Separately, the upstream data condition that triggered it — WhatsApp orders landing with `location_id = null` — is a _legitimate_ domain state for multi-location tenants and must be **handled**, not outlawed; it can be **reduced** with a tenant-aware location resolver.
 
 ## 1. Incident
 
@@ -59,7 +59,7 @@ locationMatches = !('7cb0a615…') || (null === '7cb0a615…') = false || false 
 
 → guard returns `false` → `command` returns `{ status: 404, error: 'ticket_not_found' }`. The board never checks `location_id`, so it displayed the order regardless. Result: **visible but unactionable.** Note `stationMatches` already has the correct `|| order.station_id == null` broadcast escape; `locationMatches` was simply missing the symmetric one.
 
-Because the guard gates *every* command action, a location-bound device could not accept / ready / complete / cancel / partial-cancel **any** null-location order — not just cancel.
+Because the guard gates _every_ command action, a location-bound device could not accept / ready / complete / cancel / partial-cancel **any** null-location order — not just cancel.
 
 ### Why it was silent
 
@@ -67,7 +67,7 @@ The iPad treats a non-2xx command response as a no-op and surfaces nothing. A `4
 
 ### Why the dashboard was unaffected
 
-`transitionFromDashboard` (`kds.service.ts`) loads the order by tenant only (`loadOrderForScope`) and does **not** call `ticketBelongsToDevice`. So the owner-authed dashboard path can cancel the same order today — this is the current manual unblock for stuck orders. (Caveat: the dashboard *orders list* uses a 24 h window, so a >24 h order may not be listed even though the transition endpoint accepts its id.)
+`transitionFromDashboard` (`kds.service.ts`) loads the order by tenant only (`loadOrderForScope`) and does **not** call `ticketBelongsToDevice`. So the owner-authed dashboard path can cancel the same order today — this is the current manual unblock for stuck orders. (Caveat: the dashboard _orders list_ uses a 24 h window, so a >24 h order may not be listed even though the transition endpoint accepts its id.)
 
 ## 3. Fix shipped (stop-the-bleeding)
 
@@ -80,13 +80,13 @@ const locationMatches =
   order.location_id == null;            // ← broadcast (null-location) orders, like null-station
 ```
 
-Still tenant-scoped (no cross-tenant exposure); a *different, explicit* location on the order is still rejected. Regression test added in `kds.service.spec.ts` (`ticketBelongsToDevice lets a location-bound device act on a broadcast (null-location) order`) — the pre-existing test used a location-*unbound* session, which is why it never caught this. `43/43` KDS tests pass.
+Still tenant-scoped (no cross-tenant exposure); a _different, explicit_ location on the order is still rejected. Regression test added in `kds.service.spec.ts` (`ticketBelongsToDevice lets a location-bound device act on a broadcast (null-location) order`) — the pre-existing test used a location-_unbound_ session, which is why it never caught this. `43/43` KDS tests pass.
 
 This is a patch, not the resolution. It closes the location dimension; it does not remove the ability to introduce a new divergence.
 
 ## 4. Decision — make the structural cause impossible; make the residual loud
 
-"Impossible" and "loud" answer different questions — *can this invalid state be represented?* vs *if it happens anyway, do we find out?* — and are assigned per layer.
+"Impossible" and "loud" answer different questions — _can this invalid state be represented?_ vs _if it happens anyway, do we find out?_ — and are assigned per layer.
 
 ### 4.1 Impossible: one scope predicate (primary)
 
@@ -99,9 +99,9 @@ AND (:stationId  IS NULL OR station_id  IS NULL OR station_id  = :stationId)
 AND (:locationId IS NULL OR location_id IS NULL OR location_id = :locationId)
 ```
 
-- Apply the fragment inside `loadOrderForScope`; the command's existing `if (!order) → 404` path *becomes* the authorization. `ticketBelongsToDevice` is then deleted — there is no second predicate to keep in sync.
+- Apply the fragment inside `loadOrderForScope`; the command's existing `if (!order) → 404` path _becomes_ the authorization. `ticketBelongsToDevice` is then deleted — there is no second predicate to keep in sync.
 - Divergence is not tested-against; it is unrepresentable. A future scope dimension is added in one place.
-- **Behavior change to flag:** `boardSnapshot` currently applies **no** location filter, so a location-bound device is presently *over-showing* (it sees every location's orders) while *under-acting*. Unifying fixes both directions: a location-bound device will see its own location's orders plus broadcasts. Confirm that is the intended board semantics before shipping.
+- **Behavior change to flag:** `boardSnapshot` currently applies **no** location filter, so a location-bound device is presently _over-showing_ (it sees every location's orders) while _under-acting_. Unifying fixes both directions: a location-bound device will see its own location's orders plus broadcasts. Confirm that is the intended board semantics before shipping.
 
 ### 4.2 Loud: the residual (backstop)
 
@@ -118,17 +118,17 @@ Priority: §4.1 first. A loud-but-still-broken cancel is still a broken cancel; 
 
 Deciding fact (live query, active locations per tenant):
 
-| tenant | active locations |
-|---|---|
-| `1860305f-…` (the stuck-order tenant) | **2** |
-| `b1f5da3c-…` | 1 |
-| `a13905a2-…` | 1 |
+| tenant                                | active locations |
+| ------------------------------------- | ---------------- |
+| `1860305f-…` (the stuck-order tenant) | **2**            |
+| `b1f5da3c-…`                          | 1                |
+| `a13905a2-…`                          | 1                |
 
 So exactly one live tenant is genuinely multi-location, and it is the one producing null-location orders. This makes the resolution policy **conditional** — "always ask the customer" would be pure friction for the two single-location tenants.
 
 ### 5.1 Resolver shape (one function, config-driven)
 
-The function is a *location resolver*, not a "prompt for branch". It decides whether asking is even necessary:
+The function is a _location resolver_, not a "prompt for branch". It decides whether asking is even necessary:
 
 ```
 resolveOrderLocation(tenantId, conversationState):

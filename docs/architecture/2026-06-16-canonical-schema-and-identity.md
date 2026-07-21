@@ -14,17 +14,17 @@ plans must be edited to conform before any backend/API code is written.
 `platform-database-architecture.md` is the source of truth. Domain names, not
 product names. Any migration doc still using the "supersedes" column is wrong.
 
-| Canonical | Holds | Supersedes (do not use) |
-|---|---|---|
-| `core` | identity & tenancy | `platform` |
-| `ops` | orders, catalog, payments | `commerce` |
-| `comms` | conversations, memory, knowledge | (conversaflow conversation/memory tables) |
-| `loyalty` | points, rewards, wallet, passes | `cash` |
-| `device` | hardware pairing, sessions | (kds device tables) |
-| `kitchen` | station config | (kds station tables) |
-| `queue` | jobs, outbox, webhooks, idempotency | `pipe`, conversaflow job/outbox tables |
-| `observability` | traces, audit, logs | (kept) |
-| `grow` | leads, subscriptions, feature flags | platform.leads/product_instances |
+| Canonical       | Holds                               | Supersedes (do not use)                   |
+| --------------- | ----------------------------------- | ----------------------------------------- |
+| `core`          | identity & tenancy                  | `platform`                                |
+| `ops`           | orders, catalog, payments           | `commerce`                                |
+| `comms`         | conversations, memory, knowledge    | (conversaflow conversation/memory tables) |
+| `loyalty`       | points, rewards, wallet, passes     | `cash`                                    |
+| `device`        | hardware pairing, sessions          | (kds device tables)                       |
+| `kitchen`       | station config                      | (kds station tables)                      |
+| `queue`         | jobs, outbox, webhooks, idempotency | `pipe`, conversaflow job/outbox tables    |
+| `observability` | traces, audit, logs                 | (kept)                                    |
+| `grow`          | leads, subscriptions, feature flags | platform.leads/product_instances          |
 
 Column-name reconciliation: identifiers table is **`core.contact_methods`**
 (not `contact_identities`). The async schema is **`queue`** (not `pipe`).
@@ -55,9 +55,9 @@ column or a metadata tag.
 
 ### Cash `User` row mapping (canonical)
 
-| Source `role` | Maps to |
-|---|---|
-| `CUSTOMER` | `core.people` + `core.contact_methods` (+ `loyalty.accounts`) |
+| Source `role`     | Maps to                                                                                                                            |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `CUSTOMER`        | `core.people` + `core.contact_methods` (+ `loyalty.accounts`)                                                                      |
 | `ADMIN` / `STAFF` | `core.people` (they are humans) **+ `core.users` (holds password_hash) + `core.tenant_memberships` (role) + `core.staff_members`** |
 
 **Forbidden:** writing `role` or `password_hash` into `core.people.metadata`

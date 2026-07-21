@@ -20,14 +20,14 @@ Status: **IMPLEMENTED** on branch `feat/multibranch-order-resolution` (PR #29). 
 
 ## Architecture revision (as built — supersedes the flag-based draft below)
 
-The exploratory design below gated the feature behind a global `BRANCH_RESOLUTION_ENABLED` env flag. **That was dropped.** A global boolean can't express a per-tenant fact (is *this* business multi-branch?), and it conflated rollout-safety with business capability. The as-built architecture instead makes branch selection a **domain policy whose behavior is derived purely from data**:
+The exploratory design below gated the feature behind a global `BRANCH_RESOLUTION_ENABLED` env flag. **That was dropped.** A global boolean can't express a per-tenant fact (is _this_ business multi-branch?), and it conflated rollout-safety with business capability. The as-built architecture instead makes branch selection a **domain policy whose behavior is derived purely from data**:
 
 **`OrderLocationResolver`** (`src/modules/conversations/order-location.resolver.ts`) — one service, one precedence, consumed by the write path (checkout), the prompt path (turn.service), and the `set_branch` tool:
 
-1. **ByChannel** — the inbound number is bound to a branch (`channel_accounts.location_id`). *Defined but dormant* today (tenants use one number); works with no code change when a tenant adopts per-branch numbers.
+1. **ByChannel** — the inbound number is bound to a branch (`channel_accounts.location_id`). _Defined but dormant_ today (tenants use one number); works with no code change when a tenant adopts per-branch numbers.
 2. **BySole** — the tenant has exactly one active branch → resolved, no question.
 3. **BySelection** — multi-branch, the customer already chose (durable `comms.conversations.selected_location_id`).
-4. **NeedsSelection** — multi-branch, no valid choice yet → the bot asks *once*, in the business voice, via the `# SUCURSALES` prompt block; `set_branch` records the answer.
+4. **NeedsSelection** — multi-branch, no valid choice yet → the bot asks _once_, in the business voice, via the `# SUCURSALES` prompt block; `set_branch` records the answer.
 5. **None** — no active branch → order still written (NULL location), never blocked over a config gap.
 
 Consequences vs. the draft: **no feature flag**; the scattered active-location `count` checks collapse into the resolver; a single-branch café can never reach the selection path (it resolves `BySole`); rollout is "apply the additive migration, deploy, done — all multi-branch tenants at once." The migration adds only `selected_location_id` (not `aliases[]`/`descriptor`, which are Phase 2). `pg_trgm`/embeddings remain Phase 2/3 refinements on top of this policy.
@@ -44,7 +44,7 @@ Everywhere the draft below says "gated behind `BRANCH_RESOLUTION_ENABLED`" or "c
 
 A WhatsApp business with more than one branch needs each order routed to the branch the customer actually wants — from free text like "chapule" (→ Chapultepec), a neighborhood, or a landmark. We cannot hand-maintain a synonym table, and we cannot let a fuzzy guess silently commit, because **a wrong branch means the wrong kitchen makes the food.**
 
-The decision: add a **`resolve_branch` tool that validates, never invents.** The LLM does the fuzzy match in-prompt from an injected branch list (zero new matching infra); the tool only *validates* the pick against the tenant's real active branches and assigns a confidence band. **Only a deterministic exact match may auto-commit.** Every fuzzy/model pick is confirm-or-ask, and the resolved branch is **echoed back at order confirmation** ("recoges en Chapultepec, ¿correcto?") so a wrong route is always catchable before `createOrder` writes the ticket.
+The decision: add a **`resolve_branch` tool that validates, never invents.** The LLM does the fuzzy match in-prompt from an injected branch list (zero new matching infra); the tool only _validates_ the pick against the tenant's real active branches and assigns a confidence band. **Only a deterministic exact match may auto-commit.** Every fuzzy/model pick is confirm-or-ask, and the resolved branch is **echoed back at order confirmation** ("recoges en Chapultepec, ¿correcto?") so a wrong route is always catchable before `createOrder` writes the ticket.
 
 Three properties make this fit the existing system without fighting it:
 
@@ -56,7 +56,7 @@ Three properties make this fit the existing system without fighting it:
 
 ## 1. Problem & current behavior
 
-Today a WhatsApp order's branch is decided at *ingress*, not by the customer:
+Today a WhatsApp order's branch is decided at _ingress_, not by the customer:
 
 - `whatsapp.controller.ts:97-102` resolves the inbound business number to `{ tenantId, locationId }` via `resolveInboundTenant`, and enqueues `location_id` onto the turn (`:189`).
 - `tenant-resolution.service.ts:53` returns `account.locationId` (the `ops.channel_accounts.location_id` bound to that number), or `null` on the DEFAULT_TENANT_ID fallback (`:66-70`).
@@ -65,22 +65,22 @@ Today a WhatsApp order's branch is decided at *ingress*, not by the customer:
 
 So unless the WhatsApp number is itself branch-bound, **every order is written `location_id = NULL`**, and the customer has no way to choose a branch. For a single-branch tenant that is merely untidy (NULL instead of the one real location). For a multi-branch tenant it is unworkable.
 
-**Already shipped (display side):** `kds.repository.ts` `listOrders` now NULL-escapes its branch filter (`AND (o.location_id = $N OR o.location_id IS NULL)`) so NULL-location orders surface on the dashboard regardless of the selected branch — matching the iPad `boardSnapshot`, which carries no location filter. That makes today's orders *visible*; this document is about making them *routed*.
+**Already shipped (display side):** `kds.repository.ts` `listOrders` now NULL-escapes its branch filter (`AND (o.location_id = $N OR o.location_id IS NULL)`) so NULL-location orders surface on the dashboard regardless of the selected branch — matching the iPad `boardSnapshot`, which carries no location filter. That makes today's orders _visible_; this document is about making them _routed_.
 
 ---
 
 ## 2. Architectural facts that constrain the design
 
-| Fact | Evidence | Consequence for the design |
-|---|---|---|
-| `ctx.locationId` is re-derived from ingress **every turn** | `turn.service.ts:170` | A customer's branch pick cannot live in `ctx.locationId` — it would be clobbered next turn. It needs a **durable column**. |
-| Locations live in `core.locations`; columns are `id, tenant_id, slug, name, address, lat, lng, status, metadata, created_at, updated_at` — **no alias/descriptor/embedding/timezone** | `docs/migration/build/10_core.sql`; `12_ops.sql:22` | Matching metadata (aliases, descriptor, embedding) must be **added** to `core.locations`. Timezone stays tenant-level (`core.tenants.timezone`). |
-| Composite `references core.locations (tenant_id, id) on delete set null` is the house pattern | `12_ops.sql:125` (`ops.orders.location_id`) | The durable conversation column uses the **same composite FK** → a cross-tenant branch id is structurally impossible, and deleting a branch nulls stale picks. |
-| Tools register at exactly 3 seams | `tool-definitions.ts:8`; `tools.service.ts:33-87`; `conversations.module.ts:70-76` | `resolve_branch` = add schema + `case` + provider. No other wiring. |
-| `needs_clarification` is the first-class "ask the customer" channel | `tool-loop.service.ts:961-977` | Disambiguation returns a `needs_clarification` string; the loop stores `resume_tool/resume_input` in `pending_clarification` and the LLM voices the question. **No hardcoded strings.** |
-| Tool results pass through a whitelist (`compactToolObservation`) | `tool-loop.service.ts:61-89` | `success/match_type/message/needs_clarification/candidates` already survive → **no tool-loop edit needed.** |
-| The turn budget is 4 tool calls | `turn.service.ts:32` (`MAX_TOOL_CALLS_PER_TURN`) | `resolve_branch` must be cheap / short-circuit; keep it one deterministic call. |
-| `resolveLocationIdWorker(tenantId, hint)` already returns sole/oldest-active on the worker pool | `tenants.repository.ts:156-177` | The single-branch fallback and the NULL→oldest-active fix reuse existing code. |
+| Fact                                                                                                                                                                                  | Evidence                                                                           | Consequence for the design                                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ctx.locationId` is re-derived from ingress **every turn**                                                                                                                            | `turn.service.ts:170`                                                              | A customer's branch pick cannot live in `ctx.locationId` — it would be clobbered next turn. It needs a **durable column**.                                                              |
+| Locations live in `core.locations`; columns are `id, tenant_id, slug, name, address, lat, lng, status, metadata, created_at, updated_at` — **no alias/descriptor/embedding/timezone** | `docs/migration/build/10_core.sql`; `12_ops.sql:22`                                | Matching metadata (aliases, descriptor, embedding) must be **added** to `core.locations`. Timezone stays tenant-level (`core.tenants.timezone`).                                        |
+| Composite `references core.locations (tenant_id, id) on delete set null` is the house pattern                                                                                         | `12_ops.sql:125` (`ops.orders.location_id`)                                        | The durable conversation column uses the **same composite FK** → a cross-tenant branch id is structurally impossible, and deleting a branch nulls stale picks.                          |
+| Tools register at exactly 3 seams                                                                                                                                                     | `tool-definitions.ts:8`; `tools.service.ts:33-87`; `conversations.module.ts:70-76` | `resolve_branch` = add schema + `case` + provider. No other wiring.                                                                                                                     |
+| `needs_clarification` is the first-class "ask the customer" channel                                                                                                                   | `tool-loop.service.ts:961-977`                                                     | Disambiguation returns a `needs_clarification` string; the loop stores `resume_tool/resume_input` in `pending_clarification` and the LLM voices the question. **No hardcoded strings.** |
+| Tool results pass through a whitelist (`compactToolObservation`)                                                                                                                      | `tool-loop.service.ts:61-89`                                                       | `success/match_type/message/needs_clarification/candidates` already survive → **no tool-loop edit needed.**                                                                             |
+| The turn budget is 4 tool calls                                                                                                                                                       | `turn.service.ts:32` (`MAX_TOOL_CALLS_PER_TURN`)                                   | `resolve_branch` must be cheap / short-circuit; keep it one deterministic call.                                                                                                         |
+| `resolveLocationIdWorker(tenantId, hint)` already returns sole/oldest-active on the worker pool                                                                                       | `tenants.repository.ts:156-177`                                                    | The single-branch fallback and the NULL→oldest-active fix reuse existing code.                                                                                                          |
 
 ---
 
@@ -88,7 +88,7 @@ So unless the WhatsApp number is itself branch-bound, **every order is written `
 
 - The **LLM** reads an injected `# SUCURSALES` block (branch name + short descriptor) and maps the customer's free text — "chapule", "la de la Roma", "cerca del parque" — to a branch, calling `resolve_branch`. This is the fuzzy layer, and it needs **zero new matching infrastructure**.
 - The **tool** does not trust the model's pick blindly. It runs a deterministic ladder (§4) on the worker (BYPASSRLS) pool with explicit `tenant_id` predicates, and returns a **confidence band**, never a bare commit.
-- **Auto-commit is reserved for a deterministic exact match only.** Every model/fuzzy outcome is at most *confirm*.
+- **Auto-commit is reserved for a deterministic exact match only.** Every model/fuzzy outcome is at most _confirm_.
 - On auto/single, the tool persists the pick to `comms.conversations.selected_location_id` and still requires the **echo-back** at confirmation.
 
 This keeps the model as the flexible front door and the database as the source of truth, and makes a silent wrong-branch commit structurally impossible.
@@ -237,12 +237,12 @@ Enforcement point: `checkout.tools.ts` `confirmOrder` (`:126`) and `reorderLastO
 `resolveOrderLocation` (worker pool, deterministic per turn, no LLM):
 
 1. If `conv.selectedLocationId` is set, re-validates active, **and has been echo-back-confirmed** → use it.
-2. Else if the matched `ops.channel_accounts.location_id` is **non-NULL** (an explicitly branch-*locked* number) → the channel binding **wins** over a fuzzy in-conversation mention. (Precedence is inverted vs. the naive design: a fuzzy mention must not override a number that was deliberately locked to a branch. An *explicit echo-back-confirmed* pick may still override — see open decision §11.1.)
+2. Else if the matched `ops.channel_accounts.location_id` is **non-NULL** (an explicitly branch-_locked_ number) → the channel binding **wins** over a fuzzy in-conversation mention. (Precedence is inverted vs. the naive design: a fuzzy mention must not override a number that was deliberately locked to a branch. An _explicit echo-back-confirmed_ pick may still override — see open decision §11.1.)
 3. Else count active locations:
    - `<= 1` → `resolveLocationIdWorker(tenantId, ctx.locationId)` (sole/oldest-active) — **fixes the NULL-vs-oldest-active asymmetry** where hours already resolved to oldest-active but the order wrote NULL.
    - `>= 2` with no valid confirmed selection → **DO NOT WRITE.** Return `needs_clarification` ("elegir sucursal antes de confirmar") to force the branch question via `pendingClarification`.
 
-**Mandatory echo-back:** even when a selection exists, the resolved branch *name* is injected as data into the `awaiting_confirmation` summary + `formatOrderCustomerReply`, plus an orchestration rule ("confirma la sucursal `<X>` antes de cerrar el pedido"), so the model must name the branch back to the customer. A wrong route is catchable **before** `createOrder`.
+**Mandatory echo-back:** even when a selection exists, the resolved branch _name_ is injected as data into the `awaiting_confirmation` summary + `formatOrderCustomerReply`, plus an orchestration rule ("confirma la sucursal `<X>` antes de cerrar el pedido"), so the model must name the branch back to the customer. A wrong route is catchable **before** `createOrder`.
 
 Correctness details:
 
@@ -287,10 +287,10 @@ Honors the no-hardcoded-user-messages rule exactly like the existing safety gate
 
 ## 11. Open decisions (owner)
 
-1. **Locked-number precedence.** For a WhatsApp number bound to a specific branch (`ops.channel_accounts.location_id` non-null): this design lets an *explicit echo-back-confirmed* pick override the lock, but a *fuzzy* mention cannot. Confirm this, or decide a locked number is immutable regardless of what the customer says.
+1. **Locked-number precedence.** For a WhatsApp number bound to a specific branch (`ops.channel_accounts.location_id` non-null): this design lets an _explicit echo-back-confirmed_ pick override the lock, but a _fuzzy_ mention cannot. Confirm this, or decide a locked number is immutable regardless of what the customer says.
 2. **Alias curation & disjointness.** Who curates `aliases[]`/`descriptor` per branch, and do we enforce cross-branch alias uniqueness (tenant-scoped) so an owner data-entry slip can't create a false exact hit?
 3. **pg_trgm in Phase 2, or stay LLM-exact-only?** Recommendation: ship it — `pg_trgm` is already live in the `extensions` schema, the row set is `<= 15`, and it is the cheapest ambiguity defense.
-4. **Phase 0 scope confirmation.** Ship the NULL→oldest-active fix for single-branch tenants only (recommended). If wanted for all tenants, it must ship *after* Phase 1's gate exists.
+4. **Phase 0 scope confirmation.** Ship the NULL→oldest-active fix for single-branch tenants only (recommended). If wanted for all tenants, it must ship _after_ Phase 1's gate exists.
 5. **`MAX_PROMPT_BRANCHES` cap** value and above-cap behavior (degrade to ask-neighborhood + exact-match, flag the tenant for Tier C).
 6. **Migration timing.** The Phase 1 columns are additive/dormant and safe to apply to prod ahead of the flag flip (owner-gated Supabase CLI apply).
 
@@ -322,7 +322,7 @@ Add a guard test asserting `commitTurnReply` never writes `selected_location_id`
 
 ## 13. Rejected alternatives
 
-- **Silent-auto from a trigram/cosine threshold (the naive "ladder" design).** Rejected for its *default posture*: auto-committing from a fuzzy score silently cooks the wrong kitchen for a mis-anchored query ("cerca de Polanco, aquí en Anzures" → auto Polanco). We keep the skeleton (durable column, composite FK, checkout gate), discard the silent-auto.
-- **Pure LLM slot-filling with no validation ladder.** Rejected because validating *referential* integrity (is this a real active branch?) is not validating *intent* (is it the branch the customer meant?); a valid-but-wrong id passes, persists, and writes with no echo-back. We keep its cheap in-prompt matching, add the intent defenses (echo-back, ambiguity detection).
+- **Silent-auto from a trigram/cosine threshold (the naive "ladder" design).** Rejected for its _default posture_: auto-committing from a fuzzy score silently cooks the wrong kitchen for a mis-anchored query ("cerca de Polanco, aquí en Anzures" → auto Polanco). We keep the skeleton (durable column, composite FK, checkout gate), discard the silent-auto.
+- **Pure LLM slot-filling with no validation ladder.** Rejected because validating _referential_ integrity (is this a real active branch?) is not validating _intent_ (is it the branch the customer meant?); a valid-but-wrong id passes, persists, and writes with no echo-back. We keep its cheap in-prompt matching, add the intent defenses (echo-back, ambiguity detection).
 - **Embeddings in Phase 1.** Rejected as premature — in-prompt LLM matching over `<= 15` branches plus a free `pg_trgm` second vote covers the one multi-branch tenant with no Voyage/HNSW cost. Deferred to Phase 3, and only if in-prompt picking measurably degrades.
 - **Positional "#N" branch refs.** Rejected — the prompt orders by `created_at` while the customer hears a voiced/regrouped list, so "la segunda" indexes a different branch. Name/slug/alias only.

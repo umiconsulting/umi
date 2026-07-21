@@ -1,6 +1,6 @@
 # Issue tracker: Trello (+ GitHub PRs as the review surface)
 
-Work items and PRDs for this repo live as **Trello cards**; code review happens on **GitHub PRs**. A card is the *spec* (what the change must do); a PR is the *implementation and review*. Use the official **Trello MCP** (`https://mcp.trello.com/v1`) for all card operations, and the `gh` CLI for pull requests.
+Work items and PRDs for this repo live as **Trello cards**; code review happens on **GitHub PRs**. A card is the _spec_ (what the change must do); a PR is the _implementation and review_. Use the official **Trello MCP** (`https://mcp.trello.com/v1`) for all card operations, and the `gh` CLI for pull requests.
 
 The connected Trello workspace is Umi's — one workspace per MCP connection. If the Trello MCP is not connected in the current session, say so and stop; do not guess a card's contents.
 
@@ -17,7 +17,7 @@ The spec/PRD for a change is its linked **Trello card**:
 
 ## Linking a PR to its card — optional
 
-Linking is opportunistic, never required — most PRs won't carry one. When a PR *does* implement a specific card, it can declare it with a line in the **PR description**:
+Linking is opportunistic, never required — most PRs won't carry one. When a PR _does_ implement a specific card, it can declare it with a line in the **PR description**:
 
 ```
 Trello: https://trello.com/c/<shortLink>
