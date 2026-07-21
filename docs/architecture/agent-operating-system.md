@@ -58,16 +58,14 @@ Current adapters:
 These adapters should stay aligned with `AGENTS.md`, not diverge from it.
 
 **Canonical procedure layer (decided 2026-06-10, plan S1.5):** root `.agents/skills/` is the
-single source of truth for skills, the registry, the routing ledger, and skill seeds. Root
-`.claude/skills/` is a generated mirror — never hand-edit it. Regenerate and verify with:
+single source of truth for skills, the registry, the routing ledger, and skill seeds. Each tool
+reads its own path, so `.claude/skills/` is a **symlink** into it
+(`.claude/skills -> ../.agents/skills`) — one source of truth, nothing to regenerate. Write to
+`.agents/skills/`; the link reflects it instantly. `adapter-sync-check` guards the link (symlinks
+assume macOS/Linux; Windows needs `git config core.symlinks true`).
 
-```sh
-rsync -ac --delete .agents/skills/ .claude/skills/
-diff -r .claude/skills .agents/skills   # must be empty
-```
-
-Expected non-mirrored deltas: `.claude/settings.local.json` (machine-local) and `.agents/agents/`
-(neutral agent specs, no `.claude` equivalent yet).
+Expected non-linked paths: `.claude/settings.local.json` (machine-local) and `.agents/agents/`
+(neutral agent specs, no adapter equivalent yet).
 
 ## Principles
 
@@ -141,6 +139,6 @@ When a workspace-wide rule changes:
 2. Update this document if the operating model changed
 3. Update maps, governance docs, or repo contexts if retrieval changed
 4. Update `CLAUDE.md` only as an adapter or shortcut
-5. Update `.agents/skills/` (canonical) only if a procedure changed, then regenerate the
-   `.claude/skills/` mirror (`rsync -ac --delete .agents/skills/ .claude/skills/`) and verify
-   `diff -r` is empty before finishing the task
+5. Update `.agents/skills/` (canonical) only if a procedure changed — `.claude/skills/` is a
+   symlink into it, so the change is reflected instantly; no regeneration step (run
+   `adapter-sync-check` only if the link was replaced by a copy)
