@@ -4,7 +4,7 @@
 - `task-router`
   - scope: route work to the correct Umi owner slice, then to direct execution, an existing project skill, or a subagent.
   - trigger patterns: multi-repo tasks, root-level docs, cross-product planning, ownership uncertainty.
-  - placement hints: start in root `.agents/skills/task-router/` (canonical source; `.claude/` is a generated mirror), then descend into the owning repo if the task becomes local.
+  - placement hints: start in root `.agents/skills/task-router/` (canonical source; `.claude/` is a symlink into it), then descend into the owning repo if the task becomes local.
   - confidence: high
   - provenance: root workspace scaffold for Umi.
 - `scientific-research-check`
@@ -44,15 +44,15 @@
   - confidence: medium
   - provenance: imported reference distilled from official PostgreSQL guidance.
 - `code-review`
-  - scope: AI-powered code review using CodeRabbit for changed code, PRs, and quality/security passes.
+  - scope: two-axis code review (Standards + Spec) of a diff against a fixed point, from Matt Pocock's engineering skill set; runs the axes as parallel sub-agents.
   - trigger patterns: explicit review requests; pre-merge quality, security, or bug-hunt passes on changed code.
   - placement hints: run from the repo whose diff is under review.
   - confidence: medium
-  - provenance: adopted from the root `.claude` adapter layer during S1.5 re-convergence (2026-06-10).
+  - provenance: replaced the CodeRabbit-based adapter skill with Matt Pocock's engineering `code-review` during the engineering-skills install.
 - `adapter-sync-check`
-  - scope: verify and restore convergence between canonical `.agents/skills/` and the generated `.claude/skills/` mirror.
-  - trigger patterns: any write to a root skill/registry/ledger/seed file; workspace health checks; suspected adapter drift.
-  - placement hints: run from the workspace root; canonical writes go to `.agents/`, never the mirror.
+  - scope: verify the tool adapter paths (`.claude/skills`, plus `.cursor`/`.codex` if present) are symlinks into canonical `.agents/skills/`, and restore any link replaced by a copy.
+  - trigger patterns: after clone/checkout; any write through an adapter path; workspace health checks; suspected adapter drift.
+  - placement hints: run from the workspace root; canonical writes go to `.agents/`, the links reflect them.
   - confidence: high
   - provenance: promoted at the Phase 1 checkpoint (2026-06-10) from the `adapter-sync-check` seed — traces: 2026-06-09 audit drift diff, 2026-06-10 S1.5 re-convergence.
 - `staging-validation-runner`
