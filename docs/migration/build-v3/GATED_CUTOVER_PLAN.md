@@ -202,8 +202,16 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
 - **`build-v3` HEAD:** `01e28b8` (PR #56). Merged in order: **#49** order cluster → **#50** mechanical
   sweep → **#51** D1/D11 gate → **#54** P3 (identity/RBAC/WhatsApp/entitlement/POS) → **#55** lint baseline
   → **#56** post-merge CI + lint gate.
-- **In flight:** `chore/ci-required-checks` — drop the `paths:` filters, make the four checks REQUIRED.
-- **Preflight:** **140 / 218** unresolved · 46 interpolated (uncovered) · **0** `42883`.
+- **In flight:** `feat/p4-order-repos` — P4 order track (DDL delta landed; repos next).
+- **Preflight:** **171** unresolved · 218 PREPAREd verbatim + **31 of 46 interpolated now
+  RECONSTRUCTED** · **15** still uncovered (named in the coverage line) · **0** `42883`.
+  ⚠️ **The jump 140 → 171 is not a regression — it is the gate no longer under-reporting.**
+  The 46 interpolated statements were "counted, not hidden", but nobody looked inside, and
+  `products.repository.ts` was failing every one of its statements in there (it reads
+  `p.price_cents` + `p.variants`; build-v3 has `price`, and variants are relational). The
+  detail report also caps each error code at 40, so with 116 `42703` the printed list was a
+  SAMPLE that read like a worklist — there is now an untruncated per-file rollup.
+
 - **Units:** 359 · **Gate:** `security_gate.sql` PASS · `reconcile_v3.sql` PASS on the snapshot backfill.
 - **Branch protection (2026-07-21):** `build-v3` requires a branch to be UP TO DATE with base before
   merging (`strict: true`), enforced for admins. Closes the stale-base hole: the tree CI tested is the
@@ -220,8 +228,16 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
   and `umi-api-deploy.yml` is scoped to `main`, so a merge into `build-v3` triggered nothing — the PR was
   tested, the merge result never was. `umi-api-ci`, `contract-ci` and `tokens-ci` gain
   `push: branches: [build-v3]`; `main` stays off the push list because `umi-api-deploy.yml` re-runs the
-  same gate before it ships. **pr-gates gate 5 is unblocked once this merges** — confirm the first run
-  on the merge commit, because the trigger only proves itself post-merge.
+  same gate before it ships. **pr-gates gate 5 is CLOSED — confirmed, not assumed:** merge commit
+  `01e28b8` fired all four workflows on `push` and all four passed (`umi-api CI` 36s, `lint` 29s,
+  `contract CI` 25s, `tokens CI` 10s). First checked merge into `build-v3`.
+- ⚠️ **The lint gate caught a real defect on its first run**, which is the argument for it. `@umi/landing`
+  declared no `eslint-plugin-react-hooks`, so it resolved v7 from pnpm's hoisted store (put there by
+  #55's dashboard devDependency) against a config requiring `^5` — #55 changed how another app lints
+  without touching it. Local disagreed because a stray pre-pnpm `node_modules` directory from 2026-05-20
+  survives `--frozen-lockfile`. Fixed by declaring the plugin; traps recorded in `CONVENTIONS.md`.
+  It also surfaced a live data bug: the landing diagnostic quiz never stamped its start time, so every
+  recorded `completionTime` measured from page load and is inflated by an unknown amount.
 - ✅ **`pnpm lint` now runs in CI** (new `lint.yml`). PR #55 built the ratchet but no workflow ran it, so
   it only caught a violation if someone remembered to run it locally. Red-green verified through
   `turbo run lint`, not just the package script: a new unused variable gives exit 1, removing it gives 0.
@@ -240,19 +256,45 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
   sequence engine is dormant behind `LEADS_SEQUENCE_ENABLED` — but it is unowned and invisible, because
   `lint` is the only gate covering that package. Fix or delete the test before the leads cutover.
 
-### The 140 remaining, mapped to phases
+### The 171 remaining, BY FILE (the real worklist)
 
-| Error                      | Count | What                                                                                                                                                                                                            | Owning phase         |
-| -------------------------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| `42P01` undefined_table    |    11 | `tenant.order` → `customer_order`                                                                                                                                                                               | P4 (order repos)     |
-|                            |    ~8 | `contact_identity` / `channel` — ONLY in `customers.repository` (Customer 360)                                                                                                                                  | P4 (order-entangled) |
-|                            |     5 | `open_hours` → `business_hours`                                                                                                                                                                                 | P4 (hours)           |
-|                            |    ~4 | `birthday_reward` (2), `conversation_turn` (1), `v_kds_tickets`                                                                                                                                                 | P4                   |
-| `42703` undefined_column   |   116 | non-`tenant_id` drift: `slug` (P5), `visits_required`, `total_cents`/`details`, outbox `run_at`/`published_at`/`max_attempts`, `born_at`, `subscription_item.status`, and the `tenant.message` pipeline columns | P4 / P5              |
-| `42883` undefined_function | **0** | `normalize_phone` / `normalize_identity` — ✅ resolved by `umi.e164`                                                                                                                                            | —                    |
+This replaces the by-error-code table, which was built from the capped detail report and
+therefore under-counted. `npm run test:integration` now prints this rollup untruncated.
 
-Plus **47 interpolated statements** that preflight cannot cover (counted, not hidden — they need
-manual/live-path validation). Exact splits live in the `npm run test:integration` output.
+| File                                                            | Unresolved | Owning track                       |
+| --------------------------------------------------------------- | ---------: | ---------------------------------- |
+| `kds/kds.repository.ts`                                         |     **40** | P4 order + `v_kds_tickets`         |
+| `conversations/products.repository.ts`                          |     **13** | **catalog — UNTRACKED, see below** |
+| `cash/cash-write.repository.ts`                                 |         11 | cash columns                       |
+| `cash/cash.repository.ts`                                       |         11 | cash columns                       |
+| `conversations/conversations.repository.ts`                     |         10 | conversation pipeline              |
+| `leads/leads.repository.ts`                                     |     **10** | growth — previously invisible      |
+| `cash/cash-scan.repository.ts`                                  |          9 | birthday + hours                   |
+| `customers/customers.repository.ts`                             |          9 | Customer 360 (identity-entangled)  |
+| `jobs/queue.repository.ts`                                      |          8 | outbox exactly-once (P1 DDL)       |
+| `conversations/orders.repository.ts`                            |          7 | P4 order                           |
+| `conversation-turns` · `memory` · `tenants`                     |     5 each | pipeline / P5                      |
+| `hours` · `lifecycle`                                           |     4 each | P4 hours / lifecycle               |
+| `cash-register` · `turn-commit` · `ordering-settings` · `staff` |     3 each | —                                  |
+| `auth` · `messages` · `voice-settings`                          |     2 each | P5 slug / pipeline                 |
+| `customer-session` · `business-config`                          |     1 each | —                                  |
+
+**`42883` remains 0** (`umi.e164` resolved the normalize functions).
+
+> ### ⚠️ NEW: the product catalog is an untracked cluster
+>
+> `products.repository.ts` reads and writes **five columns that do not exist** in build-v3:
+> `price_cents` (→ `price`), `variants` jsonb (→ relational `product_option_group` +
+> `product_modifier`), `is_available` (→ `active`), `synced_at`, `metadata`. Both the bot's
+> read path and the **Zettle sync writer** (`jobs/integrations.processor.ts`) are broken.
+>
+> It is in **no** phase of this spine, and it **blocks the P4 order track**: `validateItems`
+> gates every checkout and needs variants, and reorder round-trips `variant_name` (set on
+> **63 of 73** source lines). It was invisible until the gate learned to reconstruct
+> interpolated SQL.
+
+Still uncovered after reconstruction: **15** statements —`lifecycle`×4, `trace.service`×4,
+`auth`×2, `kds`×2, `cash`×1, `conversation-turns`×1, `tenants`×1. Named, not just counted.
 
 ---
 
