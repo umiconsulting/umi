@@ -58,10 +58,24 @@ current — treat them as history unless linked from `README.md` or `AGENTS.md`.
 **Prettier formats; ESLint finds bugs.** They are not competitors here — Prettier owns
 style, ESLint owns correctness, and no ESLint stylistic rules are configured.
 
-- **Prettier scope.** `.prettierignore` excludes build outputs, the frozen `apps/umi-cash`,
-  the Swift app, and **`.agents/skills/`** — that last one is authored prose (the procedure
-  layer, mirrored to `.claude/skills` by symlink), not generated code, and it was 53% of the
-  formatting debt. Reformatting prose to satisfy a formatter that never ran on it is churn.
+- **Prettier formats code, not prose.** `.prettierignore` excludes build outputs, the frozen
+  `apps/umi-cash`, the Swift app, captured run artifacts, per-developer local files, and
+  **all Markdown**. The Markdown rule started as `.agents/skills/` (authored prose, mirrored
+  to `.claude/skills` by symlink, 53% of the debt) and was generalised once measured:
+  formatting `docs/` + the root `.md` files produced **3,758 changed lines, ~1,847 of them
+  table-pipe padding and ~1,618 `*emphasis*` → `_emphasis_`** — which render identically. A
+  large conflict-prone diff across the architecture docs, for output no reader can tell apart.
+- **Prettier is not always idempotent — `format` then `format:check` can still be red.**
+  Three `umi-api` spec files were still reported unformatted *after* `prettier --write` had
+  rewritten them; a second pass changed them again and only then did `--check` agree. The
+  trigger is method-chain breaking (`vi.fn().mockResolvedValue({ ... })`) that pass 1 explodes
+  and pass 2 collapses. If `format:check` fails on a tree you just formatted, run `pnpm format`
+  again before assuming CI is wrong. It converged in 2 passes; the 3rd was a no-op.
+- **Formatting-only commits belong in `.git-blame-ignore-revs`.** A 306-file reformat would
+  otherwise make `git blame` attribute every touched line to whoever ran the formatter.
+  GitHub honours the file automatically; locally run
+  `git config blame.ignoreRevsFile .git-blame-ignore-revs` once. Only list commits that are
+  genuinely formatting-only — listing a behaviour change would hide a real author.
 - **ESLint 10, flat config, per package.** Not v9: it reaches EOL 2026-08-06. Config lives in
   each package's `eslint.config.js`; there is no root config, because the packages genuinely
   differ (a NestJS service and a plain-JSX SPA want different rules).
@@ -83,9 +97,9 @@ style, ESLint owns correctness, and no ESLint stylistic rules are configured.
   gate everyone learns to ignore — keep ESLint's `ignores` in step with `.prettierignore`.
 - **A gate nobody runs is not a gate.** `.github/workflows/lint.yml` runs `pnpm lint` on every
   PR and on pushes to `build-v3`. It calls `turbo run lint`, not a per-package filter, so a
-  package is covered the day it adds a `lint` script. `pnpm format:check` is deliberately NOT
-  in CI yet — 307 files still fail Prettier, so it would be red on arrival; it lands with the
-  format pass.
+  package is covered the day it adds a `lint` script. `pnpm format:check` runs in the same job
+  as a second step — held back until the format pass landed so it went green on arrival, and
+  added as a *step* rather than a job so the required check name `lint` does not change.
 - **A required check must never be path-filtered.** GitHub does not treat a required check
   that got skipped as passed — it leaves it Pending, forever, and the PR cannot merge. There
   is no failing check to fix, and with protection enforced for admins there is nobody who can

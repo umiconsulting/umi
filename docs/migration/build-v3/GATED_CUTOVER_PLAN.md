@@ -215,9 +215,20 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
 - ✅ **`pnpm lint` now runs in CI** (new `lint.yml`). PR #55 built the ratchet but no workflow ran it, so
   it only caught a violation if someone remembered to run it locally. Red-green verified through
   `turbo run lint`, not just the package script: a new unused variable gives exit 1, removing it gives 0.
-- ⏳ **`pnpm format:check` deliberately NOT in CI.** 307 files still fail Prettier. Adding it before the
-  format pass would make the gate red on arrival, which is how a gate becomes noise. It lands in the same
-  PR as the format pass. See `docs/reports/2026-07-21-linting-toolchain-research.md`.
+- ✅ **`pnpm format:check` now runs in CI, green.** The repo-wide format pass landed (306 tracked files,
+  per-package commits, each verified through its own gate: umi-api 359/359 + typecheck, dashboard build,
+  contract 18/18, tokens dist byte-identical + 5/5). It runs as a *step* inside the `lint` job, not as a
+  new job — a new job would be an unenforced context, and renaming the existing one would stop the
+  required `lint` context from ever reporting. Two rulings came out of it: Markdown is excluded from
+  Prettier entirely (formatting `docs/` was 3,758 lines of table padding and `*`→`_`, rendering
+  identically), and Prettier is **not idempotent** on some files — 3 specs needed a second pass before
+  `--check` agreed. Formatting commits are listed in `.git-blame-ignore-revs`.
+  See `docs/reports/2026-07-21-linting-toolchain-research.md`.
+- ⚠️ **`apps/umi-landing-page` has a failing test, and NO workflow runs it.** `diagnostic-trigger`
+  "Debe respetar emails ya enviados" fails: an already-sent Day-0 welcome email is still queued, i.e. a
+  duplicate welcome to a lead. Pre-dates the format pass and PR #56 (fails at `ea7647e`). Not live — the
+  sequence engine is dormant behind `LEADS_SEQUENCE_ENABLED` — but it is unowned and invisible, because
+  `lint` is the only gate covering that package. Fix or delete the test before the leads cutover.
 
 ### The 140 remaining, mapped to phases
 
