@@ -107,7 +107,6 @@ export class WhatsappController {
       kind: 'whatsapp',
       rawValue: phone,
       displayName: profileName,
-      sourceSystem: 'whatsapp',
     });
     if (!personId) {
       this.logger.error(`identity resolution failed; dropping. request_id=${requestId}`);

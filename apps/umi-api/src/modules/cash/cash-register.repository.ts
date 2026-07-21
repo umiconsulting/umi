@@ -104,7 +104,6 @@ export class CashRegisterRepository {
       channelKey: 'phone',
       rawValue: rawPhone,
       displayName,
-      collectedVia: 'umi-cash',
     });
     return resolved.customerId;
   }

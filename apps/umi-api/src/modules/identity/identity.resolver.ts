@@ -453,13 +453,17 @@ interface ChannelRow {
   normalizationRule: NormalizationRule;
 }
 
+// NOTE: `externalId` and `collectedVia` are deliberately ABSENT. They were the
+// federated resolver's scratch space (external_id / collected_via), struck by the
+// 2026-07-09 review as inert (0/458 populated) and never rebuilt in the flat model.
+// Accepting them and silently discarding them is worse than not accepting them: the
+// provenance they carried is already implicit in `channelKey` (a phone resolve from
+// cash IS umi-cash; a whatsapp resolve IS whatsapp), so nothing is lost.
 export interface ResolveInput {
   tenantId: string;
   channelKey: string;
   rawValue: string;
-  externalId?: string | null;
   displayName?: string | null;
-  collectedVia?: string | null;
   verified?: boolean;
   /** Compose into the caller's transaction instead of a fresh worker txn. */
   client?: PoolClient;
@@ -476,7 +480,6 @@ export interface LookupInput {
   channelKey: string;
   rawValue?: string;
   normalizedValue?: string;
-  externalId?: string | null;
 }
 
 export interface LookupResult {

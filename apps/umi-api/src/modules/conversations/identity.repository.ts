@@ -27,16 +27,12 @@ export class IdentityRepository {
     kind: string;
     rawValue: string;
     displayName?: string | null;
-    sourceSystem?: string | null;
-    externalId?: string | null;
   }): Promise<string | null> {
     const resolved = await this.resolver.resolveIdentity({
       tenantId: params.tenantId,
       channelKey: params.kind,
       rawValue: params.rawValue,
       displayName: params.displayName ?? null,
-      collectedVia: params.sourceSystem ?? null,
-      externalId: params.externalId ?? null,
     });
     return resolved?.customerId ?? null;
   }
