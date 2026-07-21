@@ -1,0 +1,68 @@
+name: lint
+
+# Runs `pnpm lint` — the same command CONVENTIONS.md tells a developer to run.
+#
+# PR #55 made that command real (an ESLint suppressions ratchet that fails on any
+# NEW violation), but no workflow ran it, so the ratchet only caught anything if
+# someone remembered to run it locally. A gate nobody runs is not a gate.
+#
+# `turbo run lint` is used rather than a per-package filter so that any package
+# which later adds a `lint` script is covered the day it adds it, with no edit here.
+# Today that is @umi/dashboard and @umi/landing.
+#
+# NOT included: `pnpm format:check`. 307 files still fail Prettier, so adding it
+# now would make this workflow red on arrival — which is how a gate becomes noise
+# people learn to ignore (the same lesson as the `.vercel/` finding in PR #55).
+# Add it in the same PR that lands the format pass, not before.
+#
+# Pushes to `build-v3` are checked too: it has no deploy workflow, so a merge into
+# it would otherwise run nothing. `main` is covered by its PR gate plus the deploy.
+on:
+  pull_request:
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "package.json"
+      - "turbo.json"
+      - ".github/workflows/lint.yml"
+  # Same path list, repeated: GitHub Actions does not support YAML anchors.
+  push:
+    branches: [build-v3]
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "package.json"
+      - "turbo.json"
+      - ".github/workflows/lint.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      - name: Enable pnpm (corepack)
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.29.3 --activate
+
+      # Full install, not a --filter: turbo discovers the lint task across every
+      # workspace member, so every member's devDependencies must be present.
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint

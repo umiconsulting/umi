@@ -4,8 +4,17 @@ name: tokens CI
 # app-scoped `npm install` and never execute the monorepo generator). This gate
 # proves the committed output still matches source and the parity tests pass, so a
 # stale or hand-edited dist/ can't silently drift.
+#
+# Also runs on pushes to `build-v3`: no deploy workflow re-checks a merge there,
+# and a stale dist/ is exactly the kind of drift a merge can introduce.
 on:
   pull_request:
+    paths:
+      - "packages/tokens/**"
+      - ".github/workflows/tokens-ci.yml"
+  # Same path list, repeated: GitHub Actions does not support YAML anchors.
+  push:
+    branches: [build-v3]
     paths:
       - "packages/tokens/**"
       - ".github/workflows/tokens-ci.yml"
