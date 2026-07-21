@@ -121,7 +121,7 @@ export const configSchema = z.object({
   // Location-pin tool (geo). Optional; the tool degrades to text when unset.
   GOOGLE_MAPS_API_KEY: z.string().optional(),
   // Tenant-resolution fallback (Phase 3): when an inbound WhatsApp number has no
-  // matching ops.channel_accounts row, messages resolve to this tenant. Lets the
+  // matching tenant.whatsapp_number row, messages resolve to this tenant. Lets the
   // single live tenant keep working before its number is seeded in channel_accounts.
   DEFAULT_TENANT_ID: z.string().uuid().optional(),
   ZETTLE_CLIENT_ID: z.string().optional(),

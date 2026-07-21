@@ -44,7 +44,7 @@ export class OutboxRouter {
 
 /**
  * The transactional-outbox relay (spec §10.4). A domain service writes its state
- * change + a `queue.outbox_events` row in one DB transaction; this relay drains
+ * change + a `runtime.outbox_events` row in one DB transaction; this relay drains
  * pending rows and pushes each into the matching BullMQ queue, then stamps it
  * delivered — so a crash between "write" and "send" can never drop a customer
  * reply. BullMQ is the execution layer over this durable boundary.

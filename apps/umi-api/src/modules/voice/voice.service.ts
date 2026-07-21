@@ -11,7 +11,7 @@ import { UpdateVoiceDto } from './dto/update-voice.dto';
 
 /**
  * Voice & tone settings — the dashboard-facing read/write over the SAME jsonb the
- * WhatsApp bot resolves (`ops.businesses.config.voice`). Sibling of HoursService:
+ * WhatsApp bot resolves (`tenant.business.config.voice`). Sibling of HoursService:
  * the dashboard chips (tone_preset) + advanced overrides (assistant name / freeform
  * tone / style notes) are persisted here; the engine reads them via
  * resolveVoiceConfig. TONE_PRESETS is the one shared catalog (no duplication).

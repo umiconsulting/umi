@@ -29,13 +29,13 @@ export type OrderLocation =
  * multi-branch one always does. Precedence:
  *
  *   1. ByChannel   — the inbound WhatsApp number is bound to a branch
- *                    (`ops.channel_accounts.location_id`, surfaced as the turn's
+ *                    (`tenant.whatsapp_number.branch_id`, surfaced as the turn's
  *                    location). Defined but dormant today (tenants use one number);
  *                    when a tenant adopts per-branch numbers it works with no code
  *                    change.
  *   2. BySole      — the tenant has exactly one active branch.
  *   3. BySelection — multi-branch, and the customer already chose (durable
- *                    `comms.conversations.selected_location_id`).
+ *                    `runtime.conversation_state.selected_location_id`).
  *   4. NeedsSel    — multi-branch, no valid choice yet → ask once.
  *   5. None        — the tenant has no active branch (degenerate/misconfigured).
  *

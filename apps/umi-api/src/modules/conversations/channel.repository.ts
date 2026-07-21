@@ -8,11 +8,12 @@ export interface ResolvedChannelAccount {
 }
 
 /**
- * Reads `ops.channel_accounts` to map an inbound provider address (the business's
- * WhatsApp number) to its tenant. The Twilio webhook is unauthenticated (no member
- * user → can't satisfy the RLS `can_access_tenant` check), so this runs on the
- * BYPASSRLS worker pool with explicit predicates — there is no tenant context yet;
- * resolving it is the whole point.
+ * Reads `tenant.whatsapp_number` (build-v2 — folds the old `ops.channel_accounts`
+ * + `ops.channels` pair into one relation) to map an inbound provider address (the
+ * business's WhatsApp number) to its tenant. The Twilio webhook is unauthenticated
+ * (no member user → can't satisfy the RLS `can_access_tenant` check), so this runs
+ * on the BYPASSRLS worker pool with explicit predicates — there is no tenant
+ * context yet; resolving it is the whole point.
  */
 @Injectable()
 export class ChannelRepository {
@@ -28,16 +29,15 @@ export class ChannelRepository {
     prefixedNumber: string,
   ): Promise<ResolvedChannelAccount | null> {
     const { rows } = await this.pg.query<ResolvedChannelAccount>(
-      `SELECT ca.tenant_id::text       AS "tenantId",
-              ca.location_id::text     AS "locationId",
-              ca.id::text              AS "channelAccountId"
-       FROM ops.channel_accounts AS ca
-       JOIN ops.channels AS ch ON ch.id = ca.channel_id
-       WHERE ch.key = 'whatsapp'
-         AND ca.status = 'active'
-         AND ( $1 IN (ca.provider_account_id, ca.address)
-            OR $2 IN (ca.provider_account_id, ca.address) )
-       ORDER BY ca.updated_at DESC
+      `SELECT wn.tenant_id::text        AS "tenantId",
+              wn.branch_id::text       AS "locationId",
+              wn.id::text              AS "channelAccountId"
+       FROM tenant.whatsapp_number AS wn
+       WHERE wn.channel_key = 'whatsapp'
+         AND wn.status = 'active'
+         AND ( $1 IN (wn.provider_account_id, wn.phone_number)
+            OR $2 IN (wn.provider_account_id, wn.phone_number) )
+       ORDER BY wn.updated_at DESC
        LIMIT 2`,
       [bareNumber, prefixedNumber],
     );

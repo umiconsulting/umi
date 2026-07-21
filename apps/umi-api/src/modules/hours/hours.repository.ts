@@ -19,7 +19,7 @@ export interface DayInput {
 export class HoursRepository {
   constructor(private readonly pg: PgService) {}
 
-  /** Per-day rows for a tenant/location (location_id may be NULL). */
+  /** Per-day rows for a tenant/location (branch_id may be NULL). */
   async read(
     tenantId: string,
     locationId: string | null,
@@ -28,9 +28,9 @@ export class HoursRepository {
       c.query<BusinessHourRow>(
         `SELECT day_of_week, opens_at::text AS opens_at,
                 closes_at::text AS closes_at, is_closed
-         FROM ops.business_hours
+         FROM tenant.open_hours
          WHERE tenant_id = $1::uuid
-           AND location_id IS NOT DISTINCT FROM $2::uuid`,
+           AND branch_id IS NOT DISTINCT FROM $2::uuid`,
         [tenantId, locationId],
       ),
     );
@@ -49,9 +49,9 @@ export class HoursRepository {
     const { rows } = await this.pg.query<BusinessHourRow>(
       `SELECT day_of_week, opens_at::text AS opens_at,
               closes_at::text AS closes_at, is_closed
-       FROM ops.business_hours
+       FROM tenant.open_hours
        WHERE tenant_id = $1::uuid
-         AND location_id IS NOT DISTINCT FROM $2::uuid`,
+         AND branch_id IS NOT DISTINCT FROM $2::uuid`,
       [tenantId, locationId],
     );
     return rows;
@@ -65,15 +65,15 @@ export class HoursRepository {
   ): Promise<void> {
     await this.pg.withTenant(async (c) => {
       await c.query(
-        `DELETE FROM ops.business_hours
+        `DELETE FROM tenant.open_hours
          WHERE tenant_id = $1::uuid
-           AND location_id IS NOT DISTINCT FROM $2::uuid`,
+           AND branch_id IS NOT DISTINCT FROM $2::uuid`,
         [tenantId, locationId],
       );
       for (const d of days) {
         await c.query(
-          `INSERT INTO ops.business_hours
-             (tenant_id, location_id, day_of_week, opens_at, closes_at, is_closed)
+          `INSERT INTO tenant.open_hours
+             (tenant_id, branch_id, day_of_week, opens_at, closes_at, is_closed)
            VALUES ($1::uuid, $2::uuid, $3, $4::time, $5::time, $6)`,
           [tenantId, locationId, d.dow, d.opens, d.closes, d.isClosed],
         );

@@ -10,7 +10,9 @@ export interface TenantAccess {
   slug: string;
   name: string;
   timezone: string | null;
-  membershipId: string;
+  // null for a synthesized global-super_admin access (no explicit edge in this
+  // tenant). Client-informational only — never a DB write key.
+  membershipId: string | null;
   role: string | null;
   roles: string[];
   permissions: string[]; // ['*'] for super_admin

@@ -5,8 +5,8 @@ import { HoursService, type BotDayWindow } from '../hours/hours.service';
 /**
  * Business hours + ordering-window logic for the WhatsApp bot. This is now a
  * THIN consumer of the canonical source (HoursService): weekly hours from
- * `ops.business_hours`, timezone from `core.tenants.timezone`, and ordering
- * scalars (accepts/cutoff/notice/bypass) from `ops.businesses.config` — the SAME
+ * `tenant.open_hours`, timezone from `tenant.tenant.timezone`, and ordering
+ * scalars (accepts/cutoff/notice/bypass) from `tenant.business.config` — the SAME
  * data the dashboard Hours screen writes. There are no hardcoded café defaults:
  * a day with no row / is_closed / null times is CLOSED (fail-closed), and the
  * order-cutoff buffer is tenant-configurable (the dashboard slider), with 30 as
@@ -18,7 +18,7 @@ import { HoursService, type BotDayWindow } from '../hours/hours.service';
 
 export const ORDER_CUTOFF_BUFFER_MINUTES = 30;
 
-// dow 0=Sun..6=Sat, matching ops.business_hours.day_of_week and getLocalTimeParts.
+// dow 0=Sun..6=Sat, matching tenant.open_hours.day_of_week and getLocalTimeParts.
 const WEEKDAY_LABELS: string[] = [
   'Domingo',
   'Lunes',

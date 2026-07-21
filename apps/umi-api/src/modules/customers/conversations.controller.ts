@@ -7,7 +7,7 @@ import { CustomersService } from './customers.service';
 
 /**
  * Tenant-wide conversation list (admin view). Slug-routed + membership-checked;
- * no product gate, matching server.js. Reads `comms.*` + `core.people`.
+ * no product gate, matching server.js. Reads `tenant.conversation` + `tenant.customer`.
  */
 @UseGuards(AuthGuard, TenantAccessGuard)
 @Controller('api/:slug/admin/conversations')

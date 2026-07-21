@@ -6,7 +6,7 @@ import { PgService } from '../shared/database/pg.service';
  * against the live platform DB on 2026-06-24
  * (`docs/migration/2026-06-24-phase1c-queue-schema-preflight.md`). All access is
  * via the worker pool — `queue` is a service-role-only schema (§9.1) and every
- * table carries a NOT NULL `tenant_id` FK to `core.tenants`.
+ * table carries a NOT NULL `tenant_id` FK to `tenant.tenant`.
  *
  * BullMQ owns *execution* state (queue.jobs/job_attempts are superseded, §10.5).
  * This repository owns the durable boundaries BullMQ does not: the inbound
@@ -40,11 +40,11 @@ export interface OutboxEventRow {
 export class QueueRepository {
   constructor(private readonly pg: PgService) {}
 
-  // ── queue.dead_letters — exhausted-job sink ────────────────────────────────
+  // ── runtime.dead_letters — exhausted-job sink ────────────────────────────────
 
   async recordDeadLetter(dl: DeadLetterInput): Promise<void> {
     await this.pg.query(
-      `INSERT INTO queue.dead_letters
+      `INSERT INTO runtime.dead_letters
          (tenant_id, source_schema, source_table, source_id, event_type, payload, error, attempts)
        VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8)`,
       [
@@ -60,7 +60,7 @@ export class QueueRepository {
     );
   }
 
-  // ── queue.inbound_events — idempotent ingress gate ─────────────────────────
+  // ── runtime.inbound_events — idempotent ingress gate ─────────────────────────
 
   /**
    * Register an inbound provider event (e.g. Twilio MessageSid). Returns the
@@ -76,7 +76,7 @@ export class QueueRepository {
     payload: unknown;
   }): Promise<{ id: string; duplicate: boolean }> {
     const inserted = await this.pg.query<{ id: string }>(
-      `INSERT INTO queue.inbound_events
+      `INSERT INTO runtime.inbound_events
          (tenant_id, provider, provider_event_id, event_type, payload_hash, payload)
        VALUES ($1,$2,$3,$4,$5,$6::jsonb)
        ON CONFLICT (provider, provider_event_id) DO NOTHING
@@ -94,13 +94,13 @@ export class QueueRepository {
       return { id: inserted.rows[0].id, duplicate: false };
     }
     const existing = await this.pg.query<{ id: string }>(
-      `SELECT id FROM queue.inbound_events WHERE provider = $1 AND provider_event_id = $2`,
+      `SELECT id FROM runtime.inbound_events WHERE provider = $1 AND provider_event_id = $2`,
       [input.provider, input.providerEventId],
     );
     return { id: existing.rows[0]?.id ?? '', duplicate: true };
   }
 
-  // ── queue.idempotency_keys — generic dedup ─────────────────────────────────
+  // ── runtime.idempotency_keys — generic dedup ─────────────────────────────────
 
   /**
    * Claim an idempotency key. Returns true if this caller claimed it (first
@@ -113,7 +113,7 @@ export class QueueRepository {
     expiresAt?: Date | null,
   ): Promise<boolean> {
     const res = await this.pg.query(
-      `INSERT INTO queue.idempotency_keys (tenant_id, scope, key, expires_at)
+      `INSERT INTO runtime.idempotency_keys (tenant_id, scope, key, expires_at)
        VALUES ($1,$2,$3,$4)
        ON CONFLICT (tenant_id, scope, key) DO NOTHING`,
       [tenantId, scope, key, expiresAt ?? null],
@@ -121,7 +121,7 @@ export class QueueRepository {
     return (res.rowCount ?? 0) > 0;
   }
 
-  // ── queue.outbox_events — transactional outbox (relay drains this) ─────────
+  // ── runtime.outbox_events — transactional outbox (relay drains this) ─────────
 
   /**
    * Atomically claim a batch of deliverable outbox rows, flipping them to
@@ -145,10 +145,10 @@ export class QueueRepository {
       attempts: number;
       max_attempts: number;
     }>(
-      `UPDATE queue.outbox_events o
+      `UPDATE runtime.outbox_events o
           SET status = 'delivering', run_at = now()
         FROM (
-          SELECT id FROM queue.outbox_events
+          SELECT id FROM runtime.outbox_events
            WHERE (status = 'pending' AND run_at <= now())
               OR (status = 'delivering'
                   AND run_at < now() - make_interval(secs => $2))
@@ -175,7 +175,7 @@ export class QueueRepository {
 
   async markOutboxDelivered(id: string): Promise<void> {
     await this.pg.query(
-      `UPDATE queue.outbox_events
+      `UPDATE runtime.outbox_events
           SET status = 'delivered', published_at = now(), error = NULL
         WHERE id = $1`,
       [id],
@@ -188,7 +188,7 @@ export class QueueRepository {
    */
   async markOutboxFailed(id: string, error: string): Promise<void> {
     await this.pg.query(
-      `UPDATE queue.outbox_events
+      `UPDATE runtime.outbox_events
           SET attempts = attempts + 1,
               status = CASE WHEN attempts + 1 >= max_attempts THEN 'dead' ELSE 'pending' END,
               run_at = now() + (interval '5 seconds' * power(2, attempts)),
@@ -206,7 +206,7 @@ export class QueueRepository {
    */
   async deferOutbox(id: string, deferSeconds: number): Promise<void> {
     await this.pg.query(
-      `UPDATE queue.outbox_events
+      `UPDATE runtime.outbox_events
           SET status = 'pending', run_at = now() + make_interval(secs => $2)
         WHERE id = $1`,
       [id, deferSeconds],

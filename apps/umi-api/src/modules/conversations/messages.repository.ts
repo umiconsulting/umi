@@ -2,9 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
 
 /**
- * Queries for `comms.messages`. Ported from the message-persistence half of
- * `_shared/memory.ts` and rebound to canonical columns (preflight §2):
- *   legacy `body → content`, `provider_message_id/MessageSid → twilio_message_sid`.
+ * Queries for `tenant.message` (build-v2; was `comms.messages`). Column rebind:
+ * `role → sender`, `content → body`, `embedding → body_embedding`. Reads that feed
+ * the prompt still expose `{ role, content }` via aliases so callers stay put.
  *
  * Runs on the worker pool (unauthenticated WhatsApp path). Inserts use plain
  * `query` (autocommit) — NOT a transaction — so a unique-violation on a duplicate
@@ -41,12 +41,12 @@ export class MessagesRepository {
   }): Promise<string | null> {
     try {
       const { rows } = await this.pg.query<{ id: string }>(
-        `INSERT INTO comms.messages
-           (tenant_id, conversation_id, role, content, intent, twilio_message_sid, message_index)
+        `INSERT INTO tenant.message
+           (tenant_id, conversation_id, sender, body, intent, twilio_message_sid, message_index)
          VALUES (
            $1, $2, $3, $4, $5, $6,
            (SELECT COALESCE(MAX(message_index) + 1, 0)
-              FROM comms.messages WHERE conversation_id = $2)
+              FROM tenant.message WHERE conversation_id = $2)
          )
          RETURNING id`,
         [
@@ -65,7 +65,7 @@ export class MessagesRepository {
       // (message_index has no unique index, so its MAX+1 allocation can't 23505 —
       // a concurrent insert at worst shares an index and ordering falls back to
       // created_at.) Narrowing here avoids masking an unrelated 23505 as a dup.
-      if (e.code === '23505' && e.constraint === 'comms_messages_twilio_sid_uidx') {
+      if (e.code === '23505' && e.constraint === 'tenant_message_twilio_sid_uidx') {
         this.logger.log(
           `message_already_processed twilio_sid=${params.twilioMessageSid}`,
         );
@@ -84,8 +84,8 @@ export class MessagesRepository {
     limit: number,
   ): Promise<RecentMessage[]> {
     const { rows } = await this.pg.query<RecentMessage>(
-      `SELECT role, content
-         FROM comms.messages
+      `SELECT sender AS role, COALESCE(body, '') AS content
+         FROM tenant.message
         WHERE conversation_id = $1
         ORDER BY created_at DESC
         LIMIT $2`,
@@ -101,8 +101,8 @@ export class MessagesRepository {
     take: number,
   ): Promise<RecentMessage[]> {
     const { rows } = await this.pg.query<RecentMessage>(
-      `SELECT role, content
-         FROM comms.messages
+      `SELECT sender AS role, COALESCE(body, '') AS content
+         FROM tenant.message
         WHERE conversation_id = $1
         ORDER BY created_at DESC
         OFFSET $2 LIMIT $3`,
@@ -117,9 +117,10 @@ export class MessagesRepository {
     tenantId?: string,
   ): Promise<Array<{ id: string; content: string }>> {
     const { rows } = await this.pg.query<{ id: string; content: string }>(
-      `SELECT id::text, content
-         FROM comms.messages
-        WHERE embedding IS NULL
+      `SELECT id::text, COALESCE(body, '') AS content
+         FROM tenant.message
+        WHERE body_embedding IS NULL
+          AND body IS NOT NULL
           AND ($2::uuid IS NULL OR tenant_id = $2::uuid)
         LIMIT $1`,
       [limit, tenantId ?? null],
@@ -129,7 +130,7 @@ export class MessagesRepository {
 
   async countMessages(conversationId: string): Promise<number> {
     const { rows } = await this.pg.query<{ n: string }>(
-      `SELECT count(*)::text AS n FROM comms.messages WHERE conversation_id = $1`,
+      `SELECT count(*)::text AS n FROM tenant.message WHERE conversation_id = $1`,
       [conversationId],
     );
     return Number(rows[0]?.n ?? 0);
@@ -142,8 +143,8 @@ export class MessagesRepository {
     model: string,
   ): Promise<void> {
     await this.pg.query(
-      `UPDATE comms.messages
-          SET embedding = $2::vector, embedding_model = $3
+      `UPDATE tenant.message
+          SET body_embedding = $2::vector, embedding_model = $3
         WHERE id = $1`,
       [messageId, JSON.stringify(embedding), model],
     );
