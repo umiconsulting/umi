@@ -128,31 +128,21 @@ export class IdentityResolver {
       ? await this.getPhoneFamily(c)
       : [channel.id];
 
-    let found =
+    // Serialize the WHOLE resolve under one advisory lock keyed on the identity:
+    // createCustomer AND ensureContact both do find-then-write, and tenant.contact
+    // has no unique (soft-key model), so a concurrent resolve for the same identity
+    // could otherwise mint a duplicate customer OR a duplicate reachability row.
+    // Different identities hash to different keys, so unrelated resolves never contend.
+    await c.query('SELECT pg_advisory_xact_lock(hashtext($1)::bigint)', [
+      `${tenantId}:${normalized ?? `${channel.id}:new`}`,
+    ]);
+    const found =
       normalized == null
         ? null
         : await this.findCustomer(c, tenantId, lookupChannelIds, normalized);
-    let customerId: string;
-    let created = false;
-
-    if (found) {
-      customerId = found;
-    } else {
-      // Serialize concurrent first-sightings of the same identity.
-      await c.query('SELECT pg_advisory_xact_lock(hashtext($1)::bigint)', [
-        `${tenantId}:${normalized ?? `${channel.id}:new`}`,
-      ]);
-      found =
-        normalized == null
-          ? null
-          : await this.findCustomer(c, tenantId, lookupChannelIds, normalized);
-      if (found) {
-        customerId = found;
-      } else {
-        customerId = await this.createCustomer(c, tenantId, input.displayName ?? null);
-        created = true;
-      }
-    }
+    const customerId =
+      found ?? (await this.createCustomer(c, tenantId, input.displayName ?? null));
+    const created = found == null;
 
     // Ensure THIS channel's reachability row exists on the customer (idempotent). For
     // WhatsApp this stores the as-received +521… reply address (see getReplyContext).
