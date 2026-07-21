@@ -10,6 +10,9 @@
 --     psql -p 5233 -d umi_backfill_v3 -f apps/umi-api/test/integration/harness-roles.sql
 --
 -- Roles are cluster-global, so rebuilding umi_backfill_v3 does NOT drop them.
+-- ⚠️ BUT schema/table GRANTS live inside the database, so 00_run_backfill.sh
+--    (which drops and recreates it) DOES drop them. Re-run this file after
+--    every rebuild, or identity-normalization.integration.ts will refuse to run.
 --
 -- ⚠️ CRITICAL Postgres semantics, load-bearing for prod too (D5):
 --    BYPASSRLS / SUPERUSER / LOGIN are ROLE ATTRIBUTES and are NEVER inherited
@@ -23,5 +26,19 @@ do $$ begin
   end if;
   if not exists (select 1 from pg_roles where rolname = 'worker_login') then
     create role worker_login login password 'harness_worker' bypassrls in role worker;
+  end if;
+end $$;
+
+-- ----------------------------------------------------------------------------
+-- Migration-verification reads (identity-normalization.integration.ts).
+-- That suite pins the build-v3 target against the COEXISTING legacy snapshot
+-- (core.*), so the harness worker needs read access to the source schemas.
+-- Local coexist DB only — prod has no core.* — and READ ONLY, so this cannot
+-- become a write path. Skipped automatically on a pristine build.
+-- ----------------------------------------------------------------------------
+do $$ begin
+  if to_regclass('core.contact_methods') is not null then
+    grant usage on schema core to worker;
+    grant select on all tables in schema core to worker;
   end if;
 end $$;

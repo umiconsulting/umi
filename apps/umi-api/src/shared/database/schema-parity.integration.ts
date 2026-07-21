@@ -22,6 +22,13 @@ const WORKER_DSN =
   process.env.DATABASE_URL_WORKER ??
   'postgresql://worker_login:harness_worker@127.0.0.1:5233/umi_backfill_v3';
 
+// The D1 boot guard refuses to boot a BYPASSRLS app pool, so the app pool must connect
+// as an INHERIT member of `api` (api_login) exactly as prod provisions it — even though
+// this check only queries on the worker pool.
+const APP_DSN =
+  process.env.DATABASE_URL_APP ??
+  'postgresql://api_login:harness_api@127.0.0.1:5233/umi_backfill_v3';
+
 // `from|join|into|update [only] <schema>.<name>` — the places a table name appears.
 // The optional `"` group is load-bearing: build-v2 used `tenant."order"` (a reserved
 // word), and a bare [a-z_] charclass silently CANNOT match it — that blind spot hid a
@@ -78,7 +85,7 @@ function extractRefs(srcRoot: string): Ref[] {
 
 function makeConfig(): ConfigService<AppConfig, true> {
   const env: Record<string, string | undefined> = {
-    DATABASE_URL_APP: WORKER_DSN, // parity check only uses the worker pool
+    DATABASE_URL_APP: APP_DSN, // D1 boot guard: app pool must be an `api` member
     DATABASE_URL_WORKER: WORKER_DSN,
     PGSSLROOTCERT: undefined,
   };
