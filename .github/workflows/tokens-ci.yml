@@ -7,17 +7,17 @@ name: tokens CI
 #
 # Also runs on pushes to `build-v3`: no deploy workflow re-checks a merge there,
 # and a stale dist/ is exactly the kind of drift a merge can introduce.
+#
+# ⚠️ NO `paths:` FILTER — DO NOT ADD ONE. This check is REQUIRED by branch
+# protection on `build-v3`, and GitHub leaves a required-but-skipped check Pending
+# forever rather than treating it as passed — so a filter would make every PR that
+# misses it UNMERGEABLE, not faster. Unconditional is what makes "required" safe.
+# This job runs no install at all and finishes in ~10s; the filter saved nothing
+# worth a deadlock.
 on:
   pull_request:
-    paths:
-      - "packages/tokens/**"
-      - ".github/workflows/tokens-ci.yml"
-  # Same path list, repeated: GitHub Actions does not support YAML anchors.
   push:
     branches: [build-v3]
-    paths:
-      - "packages/tokens/**"
-      - ".github/workflows/tokens-ci.yml"
 
 permissions:
   contents: read

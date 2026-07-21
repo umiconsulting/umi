@@ -11,27 +11,16 @@ name: umi-api CI
 # umi-api is a pnpm workspace member: install/build/test run from the repo root
 # with pnpm --filter. Workspace-level files are watched too, since they affect
 # the umi-api build.
+#
+# ⚠️ NO `paths:` FILTER — DO NOT ADD ONE. This check is REQUIRED by branch
+# protection on `build-v3`, and GitHub leaves a required-but-skipped check Pending
+# forever rather than treating it as passed — so a filter would make every PR that
+# misses it UNMERGEABLE, not faster. Unconditional is what makes "required" safe.
+# The job is ~35s, which is not worth a deadlock.
 on:
   pull_request:
-    paths:
-      - "apps/umi-api/**"
-      - "packages/contract/**"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "package.json"
-      - "turbo.json"
-      - ".github/workflows/umi-api-ci.yml"
-  # Same path list, repeated: GitHub Actions does not support YAML anchors.
   push:
     branches: [build-v3]
-    paths:
-      - "apps/umi-api/**"
-      - "packages/contract/**"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "package.json"
-      - "turbo.json"
-      - ".github/workflows/umi-api-ci.yml"
 
 permissions:
   contents: read

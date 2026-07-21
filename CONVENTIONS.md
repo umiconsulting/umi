@@ -86,6 +86,16 @@ style, ESLint owns correctness, and no ESLint stylistic rules are configured.
   package is covered the day it adds a `lint` script. `pnpm format:check` is deliberately NOT
   in CI yet — 307 files still fail Prettier, so it would be red on arrival; it lands with the
   format pass.
+- **A required check must never be path-filtered.** GitHub does not treat a required check
+  that got skipped as passed — it leaves it Pending, forever, and the PR cannot merge. There
+  is no failing check to fix, and with protection enforced for admins there is nobody who can
+  click through it. So the four required workflows (`lint`, `build-and-test`, `contract`,
+  `tokens`) deliberately carry **no `paths:` filter**: unconditional is what makes "required"
+  safe. Do not add one back to buy speed — they run in parallel in well under a minute, and a
+  filter on a required check does not make a PR faster, it makes it unmergeable. This also
+  fixed a real blind spot: `contract`'s gate proves the route literals still match the
+  controllers, and a controller edit lives outside `packages/contract`, so the old filter
+  could not see the change most likely to break it.
 - **Verify a gate red-green, through the command CI runs.** A ratchet that cannot fail is
   decoration. Add a violation, confirm exit 1, remove it, confirm exit 0 — via `pnpm lint`, not
   just the package script, since the root command adds turbo (caching, exit-code propagation).
