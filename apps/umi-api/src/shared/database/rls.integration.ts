@@ -36,10 +36,7 @@ function makeConfig(): ConfigService<AppConfig, true> {
     DATABASE_URL_WORKER: WORKER_DSN,
     PGSSLROOTCERT: undefined, // local plaintext; TLS is exercised by prod config
   };
-  return { get: (key: string) => env[key] } as unknown as ConfigService<
-    AppConfig,
-    true
-  >;
+  return { get: (key: string) => env[key] } as unknown as ConfigService<AppConfig, true>;
 }
 
 describe('build-v3 RLS · live-DB harness', () => {
@@ -80,9 +77,7 @@ describe('build-v3 RLS · live-DB harness', () => {
 
   it('worker pool bypasses RLS (sees every tenant + the auth substrate)', async () => {
     expect(workerBusinessCount).toBeGreaterThanOrEqual(2);
-    const users = await pg.query<{ n: number }>(
-      'select count(*)::int n from umi.user',
-    );
+    const users = await pg.query<{ n: number }>('select count(*)::int n from umi.user');
     expect(users.rows[0].n).toBeGreaterThan(0);
     const creds = await pg.query<{ n: number }>(
       'select count(*)::int n from umi.user where password_hash is not null',
@@ -93,9 +88,7 @@ describe('build-v3 RLS · live-DB harness', () => {
   it('api pool fails CLOSED with no tenant scope (0 rows, no error)', async () => {
     const c = await pg.app.connect();
     try {
-      const { rows } = await c.query<{ n: number }>(
-        'select count(*)::int n from tenant.business',
-      );
+      const { rows } = await c.query<{ n: number }>('select count(*)::int n from tenant.business');
       expect(rows[0].n).toBe(0);
     } finally {
       c.release();
@@ -126,9 +119,9 @@ describe('build-v3 RLS · live-DB harness', () => {
   it('api pool cannot read credential columns on umi.user', async () => {
     const c = await pg.app.connect();
     try {
-      await expect(
-        c.query('select password_hash from umi.user limit 1'),
-      ).rejects.toThrow(/permission denied/i);
+      await expect(c.query('select password_hash from umi.user limit 1')).rejects.toThrow(
+        /permission denied/i,
+      );
       // ...but identity columns are readable (not secret).
       const ok = await c.query('select id, email from umi.user limit 1');
       expect(ok.rows.length).toBeGreaterThan(0);
@@ -140,12 +133,12 @@ describe('build-v3 RLS · live-DB harness', () => {
   it('api pool has zero privilege on the runtime auth substrate', async () => {
     const c = await pg.app.connect();
     try {
-      await expect(
-        c.query('select count(*) from runtime.password_reset_token'),
-      ).rejects.toThrow(/permission denied/i);
-      await expect(
-        c.query('select count(*) from runtime.session'),
-      ).rejects.toThrow(/permission denied/i);
+      await expect(c.query('select count(*) from runtime.password_reset_token')).rejects.toThrow(
+        /permission denied/i,
+      );
+      await expect(c.query('select count(*) from runtime.session')).rejects.toThrow(
+        /permission denied/i,
+      );
     } finally {
       c.release();
     }
@@ -161,12 +154,7 @@ describe('build-v3 RLS · live-DB harness', () => {
       return r.rows.map((x) => x.feature_key);
     };
     // Active cafés match product_instances; canceled cafés are empty (honor billing status).
-    expect(await modulesFor('Kalala Café')).toEqual([
-      'cash',
-      'conversaflow',
-      'dashboard',
-      'kds',
-    ]);
+    expect(await modulesFor('Kalala Café')).toEqual(['cash', 'conversaflow', 'dashboard', 'kds']);
     expect(await modulesFor('El Gran Ribera')).toEqual(['cash', 'dashboard']);
     expect(await modulesFor('Néctar Café')).toEqual([]);
   });
@@ -195,12 +183,7 @@ describe('build-v3 RLS · live-DB harness', () => {
   it('TenantsRepository.loadProducts mirrors the entitlement view per café', async () => {
     const tenants = new TenantsRepository(pg);
     const kalala = await tenants.loadProducts(id('Kalala Café'));
-    expect(Object.keys(kalala).sort()).toEqual([
-      'cash',
-      'conversaflow',
-      'dashboard',
-      'kds',
-    ]);
+    expect(Object.keys(kalala).sort()).toEqual(['cash', 'conversaflow', 'dashboard', 'kds']);
     // Every returned product carries an access-granting status (the capabilities
     // map the dashboard consumes never contains an inactive product).
     for (const [key, product] of Object.entries(kalala)) {

@@ -3,12 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { PgService } from '../database/pg.service';
 import { TraceService } from './trace.service';
 
-function makeService(
-  queryImpl?: (text: string, params: unknown[]) => Promise<unknown>,
-) {
+function makeService(queryImpl?: (text: string, params: unknown[]) => Promise<unknown>) {
   const query = vi.fn(
-    queryImpl ??
-      (async (_text: string, _params: unknown[]) => ({ rows: [], rowCount: 1 })),
+    queryImpl ?? (async (_text: string, _params: unknown[]) => ({ rows: [], rowCount: 1 })),
   );
   const pg = { query } as unknown as PgService;
   const config = {

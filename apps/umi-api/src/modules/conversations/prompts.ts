@@ -55,7 +55,10 @@ function sanitizeCustomerFacts(facts: CustomerFacts): CustomerFacts {
 function sanitizeMemorySnippet(text: string): string {
   return text
     .replace(/^\s*(system|assistant|user|cliente|asistente)\s*:/gim, '')
-    .replace(/\b(ignore|disregard|forget|override)\s+(all\s+)?(previous|prior|above)\b/gi, '[removed]')
+    .replace(
+      /\b(ignore|disregard|forget|override)\s+(all\s+)?(previous|prior|above)\b/gi,
+      '[removed]',
+    )
     .replace(/\[\/?INST\]/gi, '')
     .replace(/<\|[^|]*\|>/g, '')
     .trim();
@@ -84,9 +87,7 @@ function buildWorkingMemorySections(ctx: PromptContext): string {
   const facts = wm?.facts;
   const hasFacts =
     !!facts &&
-    (Object.values(facts) as unknown[]).some((v) =>
-      Array.isArray(v) ? v.length > 0 : v != null,
-    );
+    (Object.values(facts) as unknown[]).some((v) => (Array.isArray(v) ? v.length > 0 : v != null));
 
   const factsSection = hasFacts
     ? `\n## HISTORIAL DEL CLIENTE\n${formatFacts(
@@ -100,7 +101,10 @@ function buildWorkingMemorySections(ctx: PromptContext): string {
 
   const semanticSection = wm?.semanticContext?.length
     ? `\n## CONTEXTO RELEVANTE DE CONVERSACIONES PASADAS\n${wm.semanticContext
-        .map((m) => `[${m.role === 'assistant' ? 'assistant' : 'user'}]: ${sanitizeMemorySnippet(m.content)}`)
+        .map(
+          (m) =>
+            `[${m.role === 'assistant' ? 'assistant' : 'user'}]: ${sanitizeMemorySnippet(m.content)}`,
+        )
         .join('\n')}\n`
     : '';
 
@@ -109,26 +113,22 @@ function buildWorkingMemorySections(ctx: PromptContext): string {
 Motivo de la cancelación parcial: ${ctx.partialCancelledOrder.reason}
 Items cancelados:
 ${
-        ctx.partialCancelledOrder.cancelledItems
-          .map(
-            (item) =>
-              `- ${item.quantity}x ${item.name}${
-                item.variantName ? ` (${item.variantName})` : ''
-              }`,
-          )
-          .join('\n') || '- Ninguno'
-      }
+  ctx.partialCancelledOrder.cancelledItems
+    .map(
+      (item) =>
+        `- ${item.quantity}x ${item.name}${item.variantName ? ` (${item.variantName})` : ''}`,
+    )
+    .join('\n') || '- Ninguno'
+}
 Items restantes:
 ${
-        ctx.partialCancelledOrder.remainingItems
-          .map(
-            (item) =>
-              `- ${item.quantity}x ${item.name}${
-                item.variantName ? ` (${item.variantName})` : ''
-              }`,
-          )
-          .join('\n') || '- Ninguno'
-      }
+  ctx.partialCancelledOrder.remainingItems
+    .map(
+      (item) =>
+        `- ${item.quantity}x ${item.name}${item.variantName ? ` (${item.variantName})` : ''}`,
+    )
+    .join('\n') || '- Ninguno'
+}
 Si el cliente acepta estos cambios, confirma el pedido actualizado. Si quiere cancelar todo, procede con la cancelación completa. Si pide más modificaciones, primero aclara si desea aceptar/cancelar el pedido ajustado o iniciar un pedido nuevo aparte. No inicies un pedido nuevo automáticamente.\n`
     : '';
 
@@ -147,9 +147,7 @@ export function buildVoiceSystemPrompt(params: {
     : 'Cliente: Desconocido';
 
   const styleNotes = params.voice.style_notes?.length
-    ? `\nNotas de estilo:\n${params.voice.style_notes
-        .map((note) => `- ${note}`)
-        .join('\n')}`
+    ? `\nNotas de estilo:\n${params.voice.style_notes.map((note) => `- ${note}`).join('\n')}`
     : '';
 
   return `

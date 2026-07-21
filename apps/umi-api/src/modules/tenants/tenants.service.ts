@@ -7,10 +7,7 @@ import {
   type ProductInstance,
   type TenantSummary,
 } from './tenants.repository';
-import {
-  buildModuleAvailability,
-  type ModuleAvailability,
-} from './module-registry';
+import { buildModuleAvailability, type ModuleAvailability } from './module-registry';
 
 export interface Capabilities {
   tenant: {
@@ -59,8 +56,8 @@ export class TenantsService {
     ]);
 
     const selectedLocation = selectedLocationId
-      ? locations.find((l) => l.id === selectedLocationId) ?? null
-      : locations.find((l) => l.status === 'active') ?? locations[0] ?? null;
+      ? (locations.find((l) => l.id === selectedLocationId) ?? null)
+      : (locations.find((l) => l.status === 'active') ?? locations[0] ?? null);
 
     const membership = {
       id: access.membershipId,

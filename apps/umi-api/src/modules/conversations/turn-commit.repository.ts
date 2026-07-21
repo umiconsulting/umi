@@ -87,10 +87,9 @@ export class TurnCommitRepository {
       if (!cas.rows.length) return { committed: false };
 
       // Touch the durable thread so listing/ordering by last_message_at stays fresh.
-      await client.query(
-        `UPDATE tenant.conversation SET last_message_at = now() WHERE id = $1`,
-        [params.conversationId],
-      );
+      await client.query(`UPDATE tenant.conversation SET last_message_at = now() WHERE id = $1`, [
+        params.conversationId,
+      ]);
 
       // 3. Persist the assistant message. Only now is the turn truly committed.
       // sender='bot' — the DB vocabulary (customer|bot|staff|system), not the LLM

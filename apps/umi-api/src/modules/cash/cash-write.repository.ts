@@ -35,8 +35,7 @@ export interface CardRow {
   normalized_email: string | null;
 }
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Customer-facing cash writes on the canonical `tenant.*` schema. Money moves
@@ -171,8 +170,14 @@ export class CashWriteRepository {
        VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8)
        ON CONFLICT (business_id, idempotency_key) DO NOTHING`,
       [
-        d.tenantId, d.cardId, d.staffMemberId ?? null, d.deltaCents,
-        d.reason ?? d.type, d.sourceType ?? d.type, d.sourceId ?? null, d.idempotencyKey,
+        d.tenantId,
+        d.cardId,
+        d.staffMemberId ?? null,
+        d.deltaCents,
+        d.reason ?? d.type,
+        d.sourceType ?? d.type,
+        d.sourceId ?? null,
+        d.idempotencyKey,
       ],
     );
     // Whether newly inserted or an idempotent replay, the balance is the current
@@ -192,9 +197,7 @@ export class CashWriteRepository {
   }
 
   /** Debit for a purchase: lock the card, check balance, debit, rotate QR. */
-  async purchase(
-    d: WalletDelta & { amountCents: number; newQrToken: string },
-  ): Promise<number> {
+  async purchase(d: WalletDelta & { amountCents: number; newQrToken: string }): Promise<number> {
     return this.pg.withTenant(async (c) => {
       // Lock the card row so concurrent purchases on the same card serialize.
       const locked = await c.query<Row>(
@@ -265,8 +268,15 @@ export class CashWriteRepository {
          VALUES ($1::uuid, $2, $3, $4::uuid, $5, $6, $7, $8, $9)
          RETURNING id::text, code, amount_cents`,
         [
-          input.tenantId, input.code, input.amountCents, input.staffMemberId,
-          input.senderName, input.message, input.recipientEmail, input.recipientPhone, input.recipientName,
+          input.tenantId,
+          input.code,
+          input.amountCents,
+          input.staffMemberId,
+          input.senderName,
+          input.message,
+          input.recipientEmail,
+          input.recipientPhone,
+          input.recipientName,
         ],
       );
       const gc = rows[0];
@@ -326,9 +336,8 @@ export class CashWriteRepository {
     return this.pg.workerTx(async (c) => {
       let customer: Row | undefined;
       if (by.phone) {
-        const norm = (
-          await c.query<Row>(`SELECT tenant.normalize_phone($1) AS n`, [by.phone])
-        ).rows[0]?.n;
+        const norm = (await c.query<Row>(`SELECT tenant.normalize_phone($1) AS n`, [by.phone]))
+          .rows[0]?.n;
         if (!norm) return null;
         customer = (
           await c.query<Row>(
@@ -397,7 +406,13 @@ export class CashWriteRepository {
         `INSERT INTO tenant.loyalty_gift_card_ledger
            (business_id, gift_card_id, delta, reason, source_type, source_id, idempotency_key)
          VALUES ($1::uuid, $2::uuid, $3, 'redeem', 'loyalty_card', $4::text, $5)`,
-        [args.tenantId, args.giftCardId, -args.amountCents, args.cardId, `giftledger_${args.giftCardId}`],
+        [
+          args.tenantId,
+          args.giftCardId,
+          -args.amountCents,
+          args.cardId,
+          `giftledger_${args.giftCardId}`,
+        ],
       );
 
       return this.applyWalletDelta(c, {
@@ -408,7 +423,9 @@ export class CashWriteRepository {
         idempotencyKey: `giftredeem_${args.giftCardId}`,
         sourceType: 'gift_card',
         sourceId: args.giftCardId,
-        description: args.senderName ? `Tarjeta de regalo de ${args.senderName}` : 'Tarjeta de regalo',
+        description: args.senderName
+          ? `Tarjeta de regalo de ${args.senderName}`
+          : 'Tarjeta de regalo',
       });
     });
   }

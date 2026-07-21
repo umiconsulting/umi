@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { AppConfig } from '../shared/config/config.schema';
 import { EnqueueService } from './enqueue.service';
@@ -102,17 +97,12 @@ export class OutboxRelayService implements OnModuleInit, OnModuleDestroy {
     if (this.draining) return;
     this.draining = true;
     try {
-      const events = await this.repo.claimPendingOutbox(
-        this.batchSize,
-        this.outboxLeaseSeconds,
-      );
+      const events = await this.repo.claimPendingOutbox(this.batchSize, this.outboxLeaseSeconds);
       for (const event of events) {
         await this.relayOne(event);
       }
     } catch (err) {
-      this.logger.error(
-        `outbox drain failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      this.logger.error(`outbox drain failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       this.draining = false;
     }
@@ -136,10 +126,7 @@ export class OutboxRelayService implements OnModuleInit, OnModuleDestroy {
     } catch (err) {
       // Enqueue itself failed — BullMQ did NOT accept the job. Safe to retry
       // with backoff (→ 'dead' at max_attempts).
-      await this.repo.markOutboxFailed(
-        event.id,
-        err instanceof Error ? err.message : String(err),
-      );
+      await this.repo.markOutboxFailed(event.id, err instanceof Error ? err.message : String(err));
       return;
     }
 

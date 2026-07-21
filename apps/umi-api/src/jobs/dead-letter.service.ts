@@ -2,8 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import { QueueRepository } from './queue.repository';
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Pull a tenant id out of a job payload, tolerating both casings. */
 function extractTenantId(data: unknown): string | null {

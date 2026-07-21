@@ -6,10 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CashWriteService } from './cash-write.service';
-import {
-  GiftCardAlreadyRedeemedError,
-  InsufficientBalanceError,
-} from './cash-write.repository';
+import { GiftCardAlreadyRedeemedError, InsufficientBalanceError } from './cash-write.repository';
 
 function make() {
   const repo = {
@@ -48,14 +45,21 @@ describe('CashWriteService.topup', () => {
   it('credits the wallet and refreshes the pass', async () => {
     const r = await h.svc.topup('t1', 'u1', { cardId: 'KAL-001', amountCentavos: 15000 });
     expect(h.repo.creditWallet).toHaveBeenCalledOnce();
-    expect(h.repo.creditWallet.mock.calls[0][0]).toMatchObject({ type: 'topup', deltaCents: 15000 });
+    expect(h.repo.creditWallet.mock.calls[0][0]).toMatchObject({
+      type: 'topup',
+      deltaCents: 15000,
+    });
     expect(h.walletPass.refreshCard).toHaveBeenCalledWith('card-1');
     expect(r.newBalanceCentavos).toBe(15000);
   });
 
   it('rejects amounts outside the bounds', async () => {
-    await expect(h.svc.topup('t1', 'u1', { cardId: 'x', amountCentavos: 50 })).rejects.toBeInstanceOf(BadRequestException);
-    await expect(h.svc.topup('t1', 'u1', { cardId: 'x', amountCentavos: 2_000_000 })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      h.svc.topup('t1', 'u1', { cardId: 'x', amountCentavos: 50 }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      h.svc.topup('t1', 'u1', { cardId: 'x', amountCentavos: 2_000_000 }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('blocks topping up your own card', async () => {
@@ -109,7 +113,10 @@ describe('CashWriteService.issueGiftCard', () => {
     h.repo.insertGiftCard
       .mockRejectedValueOnce({ code: '23505' })
       .mockResolvedValueOnce({ id: 'g1', code: 'AAAA-BBBB', amount_cents: 20000 });
-    const r = await h.svc.issueGiftCard('t1', 'u1', { amountCentavos: 20000, recipientEmail: 'a@b.co' });
+    const r = await h.svc.issueGiftCard('t1', 'u1', {
+      amountCentavos: 20000,
+      recipientEmail: 'a@b.co',
+    });
     expect(h.repo.insertGiftCard).toHaveBeenCalledTimes(2);
     expect(r.giftCard.code).toBe('AAAA-BBBB');
   });
@@ -121,23 +128,50 @@ describe('CashWriteService.redeemGiftCard', () => {
 
   it('404s an unknown code', async () => {
     h.repo.findGiftCardByCode.mockResolvedValue(null);
-    await expect(h.svc.redeemGiftCard('t1', 'abc', { phone: '+52' })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(h.svc.redeemGiftCard('t1', 'abc', { phone: '+52' })).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('rejects an already-redeemed card', async () => {
-    h.repo.findGiftCardByCode.mockResolvedValue({ id: 'g1', amount_cents: 5000, redeemed_at: new Date(), expires_at: null });
-    await expect(h.svc.redeemGiftCard('t1', 'abc', { phone: '+52' })).rejects.toBeInstanceOf(BadRequestException);
+    h.repo.findGiftCardByCode.mockResolvedValue({
+      id: 'g1',
+      amount_cents: 5000,
+      redeemed_at: new Date(),
+      expires_at: null,
+    });
+    await expect(h.svc.redeemGiftCard('t1', 'abc', { phone: '+52' })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 
   it('asks for registration when no card matches the contact', async () => {
-    h.repo.findGiftCardByCode.mockResolvedValue({ id: 'g1', amount_cents: 5000, redeemed_at: null, expires_at: null, sender_name: 'X' });
+    h.repo.findGiftCardByCode.mockResolvedValue({
+      id: 'g1',
+      amount_cents: 5000,
+      redeemed_at: null,
+      expires_at: null,
+      sender_name: 'X',
+    });
     h.repo.findPersonCard.mockResolvedValue(null);
-    await expect(h.svc.redeemGiftCard('t1', 'abc', { email: 'x@y.co' })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(h.svc.redeemGiftCard('t1', 'abc', { email: 'x@y.co' })).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('credits the recipient wallet when valid', async () => {
-    h.repo.findGiftCardByCode.mockResolvedValue({ id: 'g1', amount_cents: 5000, redeemed_at: null, expires_at: null, sender_name: 'X' });
-    h.repo.findPersonCard.mockResolvedValue({ personId: 'p1', displayName: 'Ana', cardId: 'card-1' });
+    h.repo.findGiftCardByCode.mockResolvedValue({
+      id: 'g1',
+      amount_cents: 5000,
+      redeemed_at: null,
+      expires_at: null,
+      sender_name: 'X',
+    });
+    h.repo.findPersonCard.mockResolvedValue({
+      personId: 'p1',
+      displayName: 'Ana',
+      cardId: 'card-1',
+    });
     h.repo.redeemGiftCard.mockResolvedValue(5000);
     const r = await h.svc.redeemGiftCard('t1', 'abc', { phone: '+52' });
     expect(r.newBalanceMXN).toContain('50');
@@ -145,9 +179,21 @@ describe('CashWriteService.redeemGiftCard', () => {
   });
 
   it('maps a redeem race to already-redeemed', async () => {
-    h.repo.findGiftCardByCode.mockResolvedValue({ id: 'g1', amount_cents: 5000, redeemed_at: null, expires_at: null, sender_name: 'X' });
-    h.repo.findPersonCard.mockResolvedValue({ personId: 'p1', displayName: 'Ana', cardId: 'card-1' });
+    h.repo.findGiftCardByCode.mockResolvedValue({
+      id: 'g1',
+      amount_cents: 5000,
+      redeemed_at: null,
+      expires_at: null,
+      sender_name: 'X',
+    });
+    h.repo.findPersonCard.mockResolvedValue({
+      personId: 'p1',
+      displayName: 'Ana',
+      cardId: 'card-1',
+    });
     h.repo.redeemGiftCard.mockRejectedValue(new GiftCardAlreadyRedeemedError());
-    await expect(h.svc.redeemGiftCard('t1', 'abc', { phone: '+52' })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(h.svc.redeemGiftCard('t1', 'abc', { phone: '+52' })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 });

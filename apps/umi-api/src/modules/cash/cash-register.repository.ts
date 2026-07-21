@@ -94,11 +94,7 @@ export class CashRegisterRepository {
   }
 
   /** Find-or-create the customer via the identity resolver (raw phone in). */
-  async resolveContact(
-    tenantId: string,
-    rawPhone: string,
-    displayName: string,
-  ): Promise<string> {
+  async resolveContact(tenantId: string, rawPhone: string, displayName: string): Promise<string> {
     const resolved = await this.resolver.resolveIdentity({
       tenantId,
       channelKey: 'phone',

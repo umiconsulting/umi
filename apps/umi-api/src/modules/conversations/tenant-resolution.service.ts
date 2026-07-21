@@ -83,5 +83,8 @@ export class TenantResolutionService {
  */
 export function normalizeAddress(raw: string | null | undefined): string {
   if (!raw) return '';
-  return raw.trim().replace(/^whatsapp:/i, '').trim();
+  return raw
+    .trim()
+    .replace(/^whatsapp:/i, '')
+    .trim();
 }

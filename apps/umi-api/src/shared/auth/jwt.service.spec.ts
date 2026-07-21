@@ -33,24 +33,18 @@ describe('JwtService', () => {
   it('rejects an access token presented as a refresh token (kind mismatch)', async () => {
     const svc = jwtWith(FULL);
     const access = await svc.signAccess({ sub: 'u1', email: 'a@b.co' });
-    await expect(svc.verifyRefresh(access)).rejects.toBeInstanceOf(
-      UnauthorizedException,
-    );
+    await expect(svc.verifyRefresh(access)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('rejects a token signed with a different secret', async () => {
     const a = jwtWith(FULL);
     const b = jwtWith({ ...FULL, JWT_SECRET: 'a-totally-different-secret-value' });
     const token = await a.signAccess({ sub: 'u1', email: 'a@b.co' });
-    await expect(b.verifyAccess(token)).rejects.toBeInstanceOf(
-      UnauthorizedException,
-    );
+    await expect(b.verifyAccess(token)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('throws a config error (not 401) when JWT_SECRET is missing', async () => {
     const svc = jwtWith({ JWT_ACCESS_TTL: '15m', JWT_REFRESH_TTL: '30d' });
-    await expect(
-      svc.signAccess({ sub: 'u1', email: 'a@b.co' }),
-    ).rejects.toThrow(/JWT_SECRET/);
+    await expect(svc.signAccess({ sub: 'u1', email: 'a@b.co' })).rejects.toThrow(/JWT_SECRET/);
   });
 });

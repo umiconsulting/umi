@@ -160,9 +160,7 @@ export class ConversationsRepository {
    * (live in-flight state). Only called when BRANCH_RESOLUTION_ENABLED is on and
    * the tenant is multi-branch (Phase 1 branch resolution).
    */
-  async getSelectedLocationWorker(
-    conversationId: string,
-  ): Promise<string | null> {
+  async getSelectedLocationWorker(conversationId: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ selected_location_id: string | null }>(
       `SELECT selected_location_id::text AS selected_location_id
          FROM runtime.conversation_state WHERE conversation_id = $1`,
@@ -217,9 +215,7 @@ export class ConversationsRepository {
           conversationId,
           patch.currentState ?? null,
           Object.prototype.hasOwnProperty.call(patch, 'pendingClarification'),
-          patch.pendingClarification != null
-            ? JSON.stringify(patch.pendingClarification)
-            : null,
+          patch.pendingClarification != null ? JSON.stringify(patch.pendingClarification) : null,
           expectedStateVersion,
         ],
       );
@@ -258,26 +254,21 @@ export class ConversationsRepository {
               updated_at         = now()
         WHERE conversation_id = $1 AND draft_cart_version = $2
         RETURNING draft_cart_version::text`,
-      [
-        conversationId,
-        expectedCartVersion,
-        draftCart != null ? JSON.stringify(draftCart) : null,
-      ],
+      [conversationId, expectedCartVersion, draftCart != null ? JSON.stringify(draftCart) : null],
     );
     return rows[0] ? Number(rows[0].draft_cart_version) : null;
   }
 
   async setSummary(conversationId: string, summary: string): Promise<void> {
-    await this.pg.query(
-      `UPDATE tenant.conversation SET summary = $2 WHERE id = $1`,
-      [conversationId, summary],
-    );
+    await this.pg.query(`UPDATE tenant.conversation SET summary = $2 WHERE id = $1`, [
+      conversationId,
+      summary,
+    ]);
   }
 
   async touch(conversationId: string): Promise<void> {
-    await this.pg.query(
-      `UPDATE tenant.conversation SET last_message_at = now() WHERE id = $1`,
-      [conversationId],
-    );
+    await this.pg.query(`UPDATE tenant.conversation SET last_message_at = now() WHERE id = $1`, [
+      conversationId,
+    ]);
   }
 }

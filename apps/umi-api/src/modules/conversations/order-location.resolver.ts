@@ -73,9 +73,7 @@ export class OrderLocationResolver {
     }
 
     // 3. BySelection — multi-branch, the customer already chose.
-    const selectedId = await this.conversations.getSelectedLocationWorker(
-      params.conversationId,
-    );
+    const selectedId = await this.conversations.getSelectedLocationWorker(params.conversationId);
     if (selectedId) {
       const chosen = locations.find((l) => l.id === selectedId);
       if (chosen) {

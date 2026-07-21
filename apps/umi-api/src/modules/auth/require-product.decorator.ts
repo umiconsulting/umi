@@ -9,5 +9,4 @@ export const REQUIRE_PRODUCT = 'umi:requireProduct';
  * enabled for the café in `umi.effective_entitlement` (the derived view, already
  * filtered to trialing/active subscriptions).
  */
-export const RequireProduct = (productKey: ProductKey) =>
-  SetMetadata(REQUIRE_PRODUCT, productKey);
+export const RequireProduct = (productKey: ProductKey) => SetMetadata(REQUIRE_PRODUCT, productKey);

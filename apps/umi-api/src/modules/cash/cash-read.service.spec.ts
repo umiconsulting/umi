@@ -38,7 +38,9 @@ describe('CashReadService.getAnalytics', () => {
     const h = make();
     h.repo.analytics.mockResolvedValue({
       recentVisits: [],
-      topCards: [{ userId: 'u1', name: 'Ana', cardNumber: 'K1', totalVisits: 9, balanceCentavos: 10000 }],
+      topCards: [
+        { userId: 'u1', name: 'Ana', cardNumber: 'K1', totalVisits: 9, balanceCentavos: 10000 },
+      ],
       recentUsers: [],
       balanceRow: [{ sum: 200000 }],
       topupsRow: [{ sum: 30000 }],

@@ -58,10 +58,7 @@ export class VoiceSettingsRepository {
    * merges the patch into the existing `voice` object, so a `tone: null` in the
    * patch OVERWRITES a stale freeform override (the clear-override mechanism).
    */
-  async write(
-    tenantId: string,
-    voicePatch: Record<string, unknown>,
-  ): Promise<void> {
+  async write(tenantId: string, voicePatch: Record<string, unknown>): Promise<void> {
     const json = JSON.stringify(voicePatch);
     await this.pg.withTenant((c) =>
       c.query(

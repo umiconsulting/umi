@@ -10,8 +10,24 @@ import { StaffRepository, type StaffRow } from './staff.repository';
 
 // Ported from server.js DEFAULT_PERMISSIONS — synthesized per role (not stored).
 const DEFAULT_PERMISSIONS: Record<string, Record<string, boolean>> = {
-  ADMIN: { scan: true, topup: true, analytics: true, settings: true, staff: true, giftcards: true, kds: true },
-  STAFF: { scan: true, topup: true, analytics: false, settings: false, staff: false, giftcards: false, kds: true },
+  ADMIN: {
+    scan: true,
+    topup: true,
+    analytics: true,
+    settings: true,
+    staff: true,
+    giftcards: true,
+    kds: true,
+  },
+  STAFF: {
+    scan: true,
+    topup: true,
+    analytics: false,
+    settings: false,
+    staff: false,
+    giftcards: false,
+    kds: true,
+  },
 };
 
 function normalizeRole(role: unknown): 'ADMIN' | 'STAFF' {
@@ -56,10 +72,7 @@ export class StaffService {
       email: row.email,
       role: row.role,
       status: row.status,
-      permissions:
-        row.permissions ??
-        DEFAULT_PERMISSIONS[row.role] ??
-        DEFAULT_PERMISSIONS.STAFF,
+      permissions: row.permissions ?? DEFAULT_PERMISSIONS[row.role] ?? DEFAULT_PERMISSIONS.STAFF,
       createdAt: iso(row.createdAt),
       updatedAt: iso(row.updatedAt),
       invitedAt: iso(row.invitedAt),
@@ -86,10 +99,7 @@ export class StaffService {
       throw new BadRequestException('phone or email is required');
     }
 
-    const locationId = await this.tenants.resolveLocationId(
-      tenantId,
-      requestedLocationId,
-    );
+    const locationId = await this.tenants.resolveLocationId(tenantId, requestedLocationId);
     try {
       const row = await this.repo.insert(tenantId, locationId, {
         name,
@@ -100,19 +110,13 @@ export class StaffService {
       return this.toDto(row);
     } catch (err) {
       if (isUniqueViolation(err)) {
-        throw new ConflictException(
-          'Staff member already exists for this business',
-        );
+        throw new ConflictException('Staff member already exists for this business');
       }
       throw err;
     }
   }
 
-  async update(
-    tenantId: string,
-    staffId: string,
-    body: StaffInput,
-  ): Promise<StaffDto> {
+  async update(tenantId: string, staffId: string, body: StaffInput): Promise<StaffDto> {
     const patch: {
       name?: string;
       phone?: string | null;
@@ -123,9 +127,7 @@ export class StaffService {
     if (has(body, 'phone')) patch.phone = String(body.phone ?? '').trim() || null;
     if (has(body, 'email')) patch.email = String(body.email ?? '').trim() || null;
     if (has(body, 'status')) {
-      patch.status = ['active', 'invited', 'disabled'].includes(
-        body.status as string,
-      )
+      patch.status = ['active', 'invited', 'disabled'].includes(body.status as string)
         ? (body.status as string)
         : null;
     }

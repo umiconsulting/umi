@@ -54,11 +54,7 @@ export class ProductsRepository {
    * Two-tier search: ILIKE candidates ranked in TS; on no hits, pgvector cosine
    * (threshold 0.60). Ranking is the behavior-critical TS layer (preserved).
    */
-  async searchByQuery(
-    tenantId: string,
-    query: string,
-    limit = 10,
-  ): Promise<ProductRecord[]> {
+  async searchByQuery(tenantId: string, query: string, limit = 10): Promise<ProductRecord[]> {
     const tokens = query
       .toLowerCase()
       .split(/\s+/)
@@ -135,9 +131,7 @@ export class ProductsRepository {
         LIMIT $3`,
       [tenantId, JSON.stringify(embedding), limit],
     );
-    return rows
-      .map(mapRow)
-      .filter((p) => !INTERNAL_ONLY_CATEGORIES.has(p.category ?? ''));
+    return rows.map(mapRow).filter((p) => !INTERNAL_ONLY_CATEGORIES.has(p.category ?? ''));
   }
 
   /** Available products for a browse intent, optionally filtered by category names. */
@@ -171,7 +165,10 @@ export class ProductsRepository {
   }
 
   /** Fetch products by id (order validation / re-price). Includes unavailable. */
-  async getByIds(tenantId: string, ids: string[]): Promise<Map<string, ProductRecord & { available: boolean }>> {
+  async getByIds(
+    tenantId: string,
+    ids: string[],
+  ): Promise<Map<string, ProductRecord & { available: boolean }>> {
     if (!ids.length) return new Map();
     const { rows } = await this.pg.query<ProductRow & { is_available: boolean }>(
       `SELECT ${SELECT}, p.is_available ${FROM}
@@ -185,7 +182,9 @@ export class ProductsRepository {
   async listNeedingEmbedding(
     tenantId: string,
     limit: number,
-  ): Promise<Array<{ id: string; name: string; category: string | null; variants: ProductVariant[] }>> {
+  ): Promise<
+    Array<{ id: string; name: string; category: string | null; variants: ProductVariant[] }>
+  > {
     const { rows } = await this.pg.query<ProductRow>(
       `SELECT ${SELECT} ${FROM}
         WHERE p.business_id = $1::uuid AND p.is_available = true AND p.name_embedding IS NULL
@@ -213,7 +212,12 @@ export class ProductsRepository {
   /** Get-or-create a category by name (key = slug); returns its id, or null. */
   async getOrCreateCategory(tenantId: string, name: string | null): Promise<string | null> {
     if (!name || !name.trim()) return null;
-    const key = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'uncategorized';
+    const key =
+      name
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'uncategorized';
     const { rows } = await this.pg.query<{ id: string }>(
       `INSERT INTO tenant.product_category (business_id, key, name, sort_order, metadata)
        VALUES ($1::uuid, $2, $3, 0, '{}'::jsonb)
@@ -258,7 +262,17 @@ export class ProductsRepository {
               THEN NULL ELSE name_embedding END,
             metadata = metadata || jsonb_build_object('zettle_uuid', $2, 'source', 'zettle')
           WHERE id = $9::uuid`,
-        [tenantId, p.zettleUuid, p.name, p.description, p.categoryId, p.priceCents, variantsJson, p.isAvailable, existing.rows[0].id],
+        [
+          tenantId,
+          p.zettleUuid,
+          p.name,
+          p.description,
+          p.categoryId,
+          p.priceCents,
+          variantsJson,
+          p.isAvailable,
+          existing.rows[0].id,
+        ],
       );
       return;
     }
@@ -267,7 +281,16 @@ export class ProductsRepository {
          (business_id, category_id, name, description, price_cents, is_available, variants, synced_at, metadata)
        VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7::jsonb, now(),
                jsonb_build_object('zettle_uuid', $8, 'source', 'zettle'))`,
-      [tenantId, p.categoryId, p.name, p.description, p.priceCents, p.isAvailable, variantsJson, p.zettleUuid],
+      [
+        tenantId,
+        p.categoryId,
+        p.name,
+        p.description,
+        p.priceCents,
+        p.isAvailable,
+        variantsJson,
+        p.zettleUuid,
+      ],
     );
   }
 

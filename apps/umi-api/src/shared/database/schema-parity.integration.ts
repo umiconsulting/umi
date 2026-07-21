@@ -45,15 +45,12 @@ function sourceFiles(root: string): string[] {
     if (!entry.isFile()) continue;
     const name = entry.name;
     if (!name.endsWith('.ts')) continue;
-    if (
-      name.endsWith('.spec.ts') ||
-      name.endsWith('.integration.ts') ||
-      name.endsWith('.d.ts')
-    )
+    if (name.endsWith('.spec.ts') || name.endsWith('.integration.ts') || name.endsWith('.d.ts'))
       continue;
     // entry.parentPath (node 20.12+) / fallback to path property
-    const dir = (entry as unknown as { parentPath?: string; path?: string })
-      .parentPath ?? (entry as unknown as { path: string }).path;
+    const dir =
+      (entry as unknown as { parentPath?: string; path?: string }).parentPath ??
+      (entry as unknown as { path: string }).path;
     out.push(join(dir, name));
   }
   return out;
@@ -89,10 +86,7 @@ function makeConfig(): ConfigService<AppConfig, true> {
     DATABASE_URL_WORKER: WORKER_DSN,
     PGSSLROOTCERT: undefined,
   };
-  return { get: (k: string) => env[k] } as unknown as ConfigService<
-    AppConfig,
-    true
-  >;
+  return { get: (k: string) => env[k] } as unknown as ConfigService<AppConfig, true>;
 }
 
 describe('build-v3 schema parity · backend SQL references real relations', () => {

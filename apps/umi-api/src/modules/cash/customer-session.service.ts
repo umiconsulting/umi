@@ -61,13 +61,7 @@ export class CustomerSessionService {
       `INSERT INTO runtime.session
          (business_id, principal_type, principal_id, token_hash, expires_at, is_active)
        VALUES ($1::uuid, $2, $3::uuid, $4, $5, true)`,
-      [
-        tenantId,
-        isCustomer ? 'person' : 'user',
-        subjectId,
-        tokenHash,
-        expiresAt,
-      ],
+      [tenantId, isCustomer ? 'person' : 'user', subjectId, tokenHash, expiresAt],
     );
     return { accessToken, refreshToken };
   }

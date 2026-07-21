@@ -11,10 +11,7 @@ function adapterWith(values: Record<string, unknown>): EmailAdapter {
 }
 
 /** Inject a fake transporter so getTransporter() short-circuits (no real SMTP). */
-function withTransporter(
-  adapter: EmailAdapter,
-  sendMail: ReturnType<typeof vi.fn>,
-) {
+function withTransporter(adapter: EmailAdapter, sendMail: ReturnType<typeof vi.fn>) {
   (adapter as unknown as { transporter: unknown }).transporter = { sendMail };
 }
 
@@ -27,9 +24,7 @@ const SMTP = {
 
 describe('EmailAdapter', () => {
   it('returns null when SMTP is not configured', async () => {
-    expect(
-      await adapterWith({}).send({ to: 'a@b.co', subject: 's', html: '<p>x</p>' }),
-    ).toBeNull();
+    expect(await adapterWith({}).send({ to: 'a@b.co', subject: 's', html: '<p>x</p>' })).toBeNull();
   });
 
   it('sends and returns the provider message id', async () => {
@@ -43,9 +38,7 @@ describe('EmailAdapter', () => {
       html: '<p>x</p>',
     });
     expect(result).toEqual({ messageId: 'm-1' });
-    expect(sendMail).toHaveBeenCalledWith(
-      expect.objectContaining({ to: 'a@b.co', subject: 'hi' }),
-    );
+    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ to: 'a@b.co', subject: 'hi' }));
   });
 
   it('uses EMAIL_FROM as the sender (no hard-coded fallback)', async () => {
@@ -54,9 +47,7 @@ describe('EmailAdapter', () => {
     withTransporter(adapter, sendMail);
 
     await adapter.send({ to: 'a@b.co', subject: 's', html: '<p>x</p>' });
-    expect(sendMail).toHaveBeenCalledWith(
-      expect.objectContaining({ from: 'noreply@umi.test' }),
-    );
+    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ from: 'noreply@umi.test' }));
   });
 
   it('skips (returns null) when no from address is configured', async () => {
@@ -76,8 +67,6 @@ describe('EmailAdapter', () => {
   it('returns null when sendMail throws', async () => {
     const adapter = adapterWith(SMTP);
     withTransporter(adapter, vi.fn().mockRejectedValue(new Error('smtp down')));
-    expect(
-      await adapter.send({ to: 'a@b.co', subject: 's', html: '<p>x</p>' }),
-    ).toBeNull();
+    expect(await adapter.send({ to: 'a@b.co', subject: 's', html: '<p>x</p>' })).toBeNull();
   });
 });

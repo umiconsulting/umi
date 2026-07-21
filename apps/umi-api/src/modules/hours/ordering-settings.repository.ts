@@ -42,9 +42,7 @@ function toSettings(config: RawConfig | null): OrderingSettings {
   return {
     acceptsOrders: config?.accepts_whatsapp_orders !== false, // default true
     orderCutoffMinutes:
-      typeof config?.order_cutoff_minutes === 'number'
-        ? config.order_cutoff_minutes
-        : null,
+      typeof config?.order_cutoff_minutes === 'number' ? config.order_cutoff_minutes : null,
     specialNotice: config?.special_notice ?? null,
     bypassPhones: Array.isArray(config?.bypass_phones) ? config.bypass_phones : [],
   };

@@ -170,9 +170,7 @@ export class KdsRepository {
     // NOT "root-location only". listStations() returns all-location stations, so
     // forcing branch_id IS NULL here would reject a valid dashboard selection.
     const locClause = locationId ? 'AND branch_id = $3' : '';
-    const params = locationId
-      ? [stationId, tenantId, locationId]
-      : [stationId, tenantId];
+    const params = locationId ? [stationId, tenantId, locationId] : [stationId, tenantId];
     const { rows } = await this.pg.query<StationRow>(
       `SELECT id, business_id, branch_id AS location_id, name
          FROM tenant.station
@@ -270,11 +268,7 @@ export class KdsRepository {
   }
 
   /** Rename an active/disabled station. Returns null if not found. */
-  async updateStation(input: {
-    tenantId: string;
-    stationId: string;
-    name: string;
-  }): Promise<{
+  async updateStation(input: { tenantId: string; stationId: string; name: string }): Promise<{
     id: string;
     station_key: string;
     name: string;
@@ -355,12 +349,8 @@ export class KdsRepository {
     locationId: string | null,
     limit: number,
   ): Promise<Record<string, unknown>[]> {
-    const locClause = locationId
-      ? 'AND location_id = $2'
-      : 'AND location_id IS NULL';
-    const params = locationId
-      ? [tenantId, locationId, limit]
-      : [tenantId, limit];
+    const locClause = locationId ? 'AND location_id = $2' : 'AND location_id IS NULL';
+    const params = locationId ? [tenantId, locationId, limit] : [tenantId, limit];
     const limitParam = locationId ? '$3' : '$2';
     const { rows } = await this.pg.query(
       `SELECT id, business_id, location_id, station_id, device_name, requested_name,
@@ -387,9 +377,7 @@ export class KdsRepository {
         ? `status = 'approved', approved_by = $3, approved_at = now(), updated_at = now()`
         : `status = 'denied', denied_at = now(), updated_at = now()`;
     const params =
-      action === 'approve'
-        ? [pairingId, tenantId, adminUserId]
-        : [pairingId, tenantId];
+      action === 'approve' ? [pairingId, tenantId, adminUserId] : [pairingId, tenantId];
     // Approve requires a still-valid window. Deny is a dismissal, so it also
     // clears pending requests already past expires_at — those linger in the
     // list (status is still 'pending' until dismissed) and would otherwise be
@@ -407,9 +395,7 @@ export class KdsRepository {
   }
 
   /** Newest pending non-expired requests, for the global PIN match (kds_start). */
-  async findPendingPairingsForPin(
-    limit: number,
-  ): Promise<PairingPollRow[]> {
+  async findPendingPairingsForPin(limit: number): Promise<PairingPollRow[]> {
     const { rows } = await this.pg.query<PairingPollRow>(
       `SELECT id, pin_hash, pin_salt, status, attempt_count, max_attempts, expires_at
          FROM runtime.pairing
@@ -422,10 +408,7 @@ export class KdsRepository {
   }
 
   /** Record the device's chosen name after a PIN match (does not touch attempts). */
-  async setPairingRequestedName(
-    pairingId: string,
-    requestedName: string,
-  ): Promise<void> {
+  async setPairingRequestedName(pairingId: string, requestedName: string): Promise<void> {
     await this.pg.query(
       `UPDATE runtime.pairing
           SET requested_name = $2, updated_at = now()
@@ -540,9 +523,7 @@ export class KdsRepository {
           WHERE principal_type = 'device' AND principal_id = $1`,
         [deviceRegistryId],
       );
-      await client.query(`DELETE FROM tenant.device WHERE id = $1`, [
-        deviceRegistryId,
-      ]);
+      await client.query(`DELETE FROM tenant.device WHERE id = $1`, [deviceRegistryId]);
     });
   }
 
@@ -560,17 +541,13 @@ export class KdsRepository {
 
   /** Liveness touch on every board/command poll (the prod heartbeat signal). */
   async touchSession(sessionId: string): Promise<void> {
-    await this.pg.query(
-      `UPDATE runtime.session SET last_used_at = now() WHERE id = $1`,
-      [sessionId],
-    );
+    await this.pg.query(`UPDATE runtime.session SET last_used_at = now() WHERE id = $1`, [
+      sessionId,
+    ]);
   }
 
   /** Heartbeat endpoint: touch + record source ip in metadata. */
-  async heartbeatTouch(
-    deviceId: string,
-    ip: string | null,
-  ): Promise<boolean> {
+  async heartbeatTouch(deviceId: string, ip: string | null): Promise<boolean> {
     const { rowCount } = await this.pg.query(
       `UPDATE runtime.session
           SET last_used_at = now(),
@@ -581,10 +558,7 @@ export class KdsRepository {
     return (rowCount ?? 0) > 0;
   }
 
-  async listDevices(
-    tenantId: string,
-    locationId: string | null,
-  ): Promise<DeviceListRow[]> {
+  async listDevices(tenantId: string, locationId: string | null): Promise<DeviceListRow[]> {
     const locClause = locationId ? `AND s.metadata->>'location_id' = $2` : '';
     const params = locationId ? [tenantId, locationId] : [tenantId];
     const { rows } = await this.pg.query<DeviceListRow>(
@@ -642,13 +616,7 @@ export class KdsRepository {
                 station_id  = CASE WHEN $5 THEN $4 ELSE station_id END
           WHERE id = $1 AND business_id = $2
         RETURNING principal_id`,
-        [
-          deviceId,
-          tenantId,
-          patch.deviceName ?? null,
-          patch.stationId ?? null,
-          setStation,
-        ],
+        [deviceId, tenantId, patch.deviceName ?? null, patch.stationId ?? null, setStation],
       );
       if (sess.rowCount === 0) return false;
       const registryId = sess.rows[0]?.principal_id;
@@ -659,13 +627,7 @@ export class KdsRepository {
                   station_id = CASE WHEN $5 THEN $4 ELSE station_id END,
                   updated_at = now()
             WHERE id = $1 AND business_id = $2`,
-          [
-            registryId,
-            tenantId,
-            patch.deviceName ?? null,
-            patch.stationId ?? null,
-            setStation,
-          ],
+          [registryId, tenantId, patch.deviceName ?? null, patch.stationId ?? null, setStation],
         );
       }
       return true;
@@ -757,10 +719,7 @@ export class KdsRepository {
   }
 
   /** Most-recent events for the dashboard ticker. */
-  async recentEvents(
-    tenantId: string,
-    limit: number,
-  ): Promise<EventRow[]> {
+  async recentEvents(tenantId: string, limit: number): Promise<EventRow[]> {
     const { rows } = await this.pg.query<EventRow>(
       `SELECT e.kitchen_sequence       AS sequence,
               e.order_id                AS ticket_id,
@@ -868,10 +827,7 @@ export class KdsRepository {
   }
 
   /** Next per-tenant kitchen_sequence (no sequence object exists — MAX+1 in-tx). */
-  private async nextKitchenSequence(
-    client: PoolClient,
-    tenantId: string,
-  ): Promise<number> {
+  private async nextKitchenSequence(client: PoolClient, tenantId: string): Promise<number> {
     // Serialize per-tenant sequence allocation: MAX+1 under default isolation can
     // hand the same number to concurrent transitions (cursor consumers using
     // `> after_sequence` would then miss one). The xact-scoped advisory lock is
@@ -960,11 +916,7 @@ export class KdsRepository {
       // Lock + derive current status so a concurrent transition can't make this one
       // overwrite stale state or emit a wrong old_status. The service pre-checks
       // against a pre-transaction snapshot; this is the authoritative re-check.
-      const locked = await this.lockOrderAndStatus(
-        client,
-        order.id,
-        order.business_id,
-      );
+      const locked = await this.lockOrderAndStatus(client, order.id, order.business_id);
       if (!locked) {
         throw new KdsHttpError(404, { error: 'ticket_not_found' });
       }
@@ -1022,11 +974,7 @@ export class KdsRepository {
       );
 
       if (input.notifyBody) {
-        const phone = await this.customerPhone(
-          client,
-          order.business_id,
-          order.person_id,
-        );
+        const phone = await this.customerPhone(client, order.business_id, order.person_id);
         if (phone) {
           await client.query(
             `INSERT INTO runtime.outbox_event
@@ -1077,11 +1025,7 @@ export class KdsRepository {
     return this.pg.workerTx(async (client) => {
       // Lock + derive current status so a transition that committed just before this
       // lock can't be overwritten and the event can't carry a stale old_status.
-      const locked = await this.lockOrderAndStatus(
-        client,
-        order.id,
-        order.business_id,
-      );
+      const locked = await this.lockOrderAndStatus(client, order.id, order.business_id);
       if (!locked) {
         throw new KdsHttpError(404, { error: 'ticket_not_found' });
       }
@@ -1160,16 +1104,10 @@ export class KdsRepository {
         ],
       );
 
-      const phone = await this.customerPhone(
-        client,
-        order.business_id,
-        order.person_id,
-      );
+      const phone = await this.customerPhone(client, order.business_id, order.person_id);
       // Only emit when notifications are enabled (buildNotifyBody returns null
       // when KDS_STATUS_NOTIFY_ENABLED is off) AND a customer phone exists.
-      const body = phone
-        ? input.buildNotifyBody(cancelled.rows, remaining.rows)
-        : null;
+      const body = phone ? input.buildNotifyBody(cancelled.rows, remaining.rows) : null;
       if (phone && body) {
         await client.query(
           `INSERT INTO runtime.outbox_event

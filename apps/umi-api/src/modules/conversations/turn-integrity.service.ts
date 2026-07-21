@@ -31,13 +31,8 @@ export interface TurnProcessPayload extends TurnIntegrityPayload {
  *  A missing release timestamp falls back to the stable per-turn id rather than a
  *  collision-prone empty suffix (the enqueue is only reached on the released path,
  *  so in practice `releasedAt` is always set). */
-export function turnProcessJobId(
-  turnId: string,
-  releasedAt: string | null | undefined,
-): string {
-  return releasedAt
-    ? `turn_process:${turnId}:${releasedAt}`
-    : `turn_process:${turnId}`;
+export function turnProcessJobId(turnId: string, releasedAt: string | null | undefined): string {
+  return releasedAt ? `turn_process:${turnId}:${releasedAt}` : `turn_process:${turnId}`;
 }
 
 /**

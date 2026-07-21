@@ -24,7 +24,9 @@ const CTX: ToolContext = {
 
 function make(responses: ReturnType<typeof msg>[]) {
   const queue = [...responses];
-  const anthropic = { createMessage: vi.fn().mockImplementation(() => Promise.resolve(queue.shift() ?? null)) };
+  const anthropic = {
+    createMessage: vi.fn().mockImplementation(() => Promise.resolve(queue.shift() ?? null)),
+  };
   const tools = {
     definitions: () => [],
     execute: vi.fn().mockResolvedValue({ success: true, summary_text: 'ok' }),

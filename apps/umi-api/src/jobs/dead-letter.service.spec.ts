@@ -41,13 +41,8 @@ describe('DeadLetterService', () => {
 
   it('accepts camelCase tenantId too', async () => {
     const { svc, repo } = serviceWithRepo();
-    await svc.recordTerminalFailure(
-      makeJob({ data: { tenantId: 't2' } }),
-      new Error('x'),
-    );
-    expect(repo.recordDeadLetter).toHaveBeenCalledWith(
-      expect.objectContaining({ tenantId: 't2' }),
-    );
+    await svc.recordTerminalFailure(makeJob({ data: { tenantId: 't2' } }), new Error('x'));
+    expect(repo.recordDeadLetter).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 't2' }));
   });
 
   it('is log-only for infra jobs with no tenant (FK would reject)', async () => {
@@ -63,18 +58,14 @@ describe('DeadLetterService', () => {
       makeJob({ id: uuid, data: { business_id: 't1' } }),
       new Error('x'),
     );
-    expect(repo.recordDeadLetter).toHaveBeenCalledWith(
-      expect.objectContaining({ sourceId: uuid }),
-    );
+    expect(repo.recordDeadLetter).toHaveBeenCalledWith(expect.objectContaining({ sourceId: uuid }));
 
     repo.recordDeadLetter.mockClear();
     await svc.recordTerminalFailure(
       makeJob({ id: '42', data: { business_id: 't1' } }),
       new Error('x'),
     );
-    expect(repo.recordDeadLetter).toHaveBeenCalledWith(
-      expect.objectContaining({ sourceId: null }),
-    );
+    expect(repo.recordDeadLetter).toHaveBeenCalledWith(expect.objectContaining({ sourceId: null }));
   });
 
   it('never throws when the dead-letter insert fails (best-effort)', async () => {
@@ -83,10 +74,7 @@ describe('DeadLetterService', () => {
     };
     const svc = new DeadLetterService(repo as unknown as QueueRepository);
     await expect(
-      svc.recordTerminalFailure(
-        makeJob({ data: { business_id: 't1' } }),
-        new Error('x'),
-      ),
+      svc.recordTerminalFailure(makeJob({ data: { business_id: 't1' } }), new Error('x')),
     ).resolves.toBeUndefined();
   });
 });

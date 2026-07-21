@@ -82,9 +82,7 @@ export class QrService {
       .digest('hex')
       .slice(0, 16); // 8-byte truncated tag, lowercase hex
     if (providedHmac.length !== expectedHmac.length) return null;
-    if (
-      !timingSafeEqual(Buffer.from(providedHmac), Buffer.from(expectedHmac))
-    ) {
+    if (!timingSafeEqual(Buffer.from(providedHmac), Buffer.from(expectedHmac))) {
       return null;
     }
     return cardNumber;

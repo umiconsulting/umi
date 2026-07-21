@@ -23,14 +23,8 @@ export class HoursTenantController {
   ) {}
 
   @Get()
-  async get(
-    @Tenant() tenant: TenantAccess,
-    @Query('locationId') locationId?: string,
-  ) {
-    const resolved = await this.tenants.resolveLocationId(
-      tenant.tenantId,
-      locationId ?? null,
-    );
+  async get(@Tenant() tenant: TenantAccess, @Query('locationId') locationId?: string) {
+    const resolved = await this.tenants.resolveLocationId(tenant.tenantId, locationId ?? null);
     return this.hours.getHours(tenant.tenantId, resolved, tenant.timezone);
   }
 
@@ -40,10 +34,7 @@ export class HoursTenantController {
     @Body() dto: UpdateHoursDto,
     @Query('locationId') locationId?: string,
   ) {
-    const resolved = await this.tenants.resolveLocationId(
-      tenant.tenantId,
-      locationId ?? null,
-    );
+    const resolved = await this.tenants.resolveLocationId(tenant.tenantId, locationId ?? null);
     await this.hours.updateAll(tenant.tenantId, resolved, {
       hours: dto.hours,
       timezone: dto.timezone,

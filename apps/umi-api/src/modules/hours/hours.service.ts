@@ -127,11 +127,7 @@ export class HoursService {
   }
 
   /** Weekly-hours-only write (kept for back-compat callers). */
-  async updateHours(
-    tenantId: string,
-    locationId: string | null,
-    hours: unknown,
-  ): Promise<void> {
+  async updateHours(tenantId: string, locationId: string | null, hours: unknown): Promise<void> {
     await this.writeHours(tenantId, locationId, hours);
   }
 
@@ -215,10 +211,7 @@ export class HoursService {
     tenantId: string,
     requestedLocationId: string | null,
   ): Promise<BotHours> {
-    const locationId = await this.tenants.resolveLocationIdWorker(
-      tenantId,
-      requestedLocationId,
-    );
+    const locationId = await this.tenants.resolveLocationIdWorker(tenantId, requestedLocationId);
     const [rows, ordering, tz] = await Promise.all([
       this.repo.readWorker(tenantId, locationId),
       this.ordering.readWorker(tenantId),

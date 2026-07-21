@@ -14,7 +14,10 @@ import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 @Injectable()
 export class PasswordService {
   /** Derive a {salt, hash} pair for a new/changed password. */
-  hash(password: string, salt: string = randomBytes(16).toString('hex')): {
+  hash(
+    password: string,
+    salt: string = randomBytes(16).toString('hex'),
+  ): {
     salt: string;
     hash: string;
   } {
@@ -37,8 +40,6 @@ export class PasswordService {
       return false;
     }
     const actual = scryptSync(password, salt, 64);
-    return (
-      actual.length === expected.length && timingSafeEqual(actual, expected)
-    );
+    return actual.length === expected.length && timingSafeEqual(actual, expected);
   }
 }

@@ -36,7 +36,12 @@ export class CashRegisterService {
     private readonly qr: QrService,
   ) {}
 
-  async register(tenantId: string, tenantName: string, input: RegisterInput, userAgent: string | null) {
+  async register(
+    tenantId: string,
+    tenantName: string,
+    input: RegisterInput,
+    userAgent: string | null,
+  ) {
     const cfg = await this.repo.tenantConfig(tenantId);
     if (!cfg) throw new NotFoundException({ error: 'Tenant no encontrado' });
     if (!cfg.selfRegistration) {

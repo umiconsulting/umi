@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { readFileSync } from 'node:fs';
 import { Pool, type PoolClient, type QueryResultRow } from 'pg';
@@ -105,9 +100,7 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
     // pg.Pool emits 'error' for idle clients (DB restart, network drop). Without
     // a listener, that unhandled event would crash the process — log and let the
     // pool replace the client.
-    this.app.on('error', (err) =>
-      this.logger.error(`app pool error: ${err.message}`, err.stack),
-    );
+    this.app.on('error', (err) => this.logger.error(`app pool error: ${err.message}`, err.stack));
     this.worker.on('error', (err) =>
       this.logger.error(`worker pool error: ${err.message}`, err.stack),
     );
@@ -116,10 +109,7 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit(): Promise<void> {
     // Fail fast if either pool can't reach Postgres (don't claim both are
     // ready when only one was verified).
-    await Promise.all([
-      this.app.query('SELECT 1'),
-      this.worker.query('SELECT 1'),
-    ]);
+    await Promise.all([this.app.query('SELECT 1'), this.worker.query('SELECT 1')]);
 
     // D1 boot guard (SECURITY_GATE.md §4) — refuse to boot on a mis-wired
     // DATABASE_URL_*. Runs on every boot (independent of TLS): a role that is
@@ -188,9 +178,7 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
     if (problems.length > 0) {
       throw new Error(`D1 boot guard — refusing to boot. ${problems.join(' | ')}`);
     }
-    this.logger.log(
-      'D1 role guard OK (app = RLS-confined api, worker = BYPASSRLS worker)',
-    );
+    this.logger.log('D1 role guard OK (app = RLS-confined api, worker = BYPASSRLS worker)');
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -213,9 +201,7 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
   async withTenant<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
     const ctx = getRequestContext();
     if (!ctx?.tenantId) {
-      throw new Error(
-        'withTenant() requires a request tenant context (set by AuthGuard).',
-      );
+      throw new Error('withTenant() requires a request tenant context (set by AuthGuard).');
     }
     return this.runWithTenant(ctx.tenantId, ctx.userId, work);
   }
@@ -239,10 +225,7 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
         "SELECT set_config('app.tenant_id', $1, true), set_config('app.current_business', $1, true)",
         [tenantId],
       );
-      await client.query('SELECT set_config($1, $2, true)', [
-        'app.user_id',
-        userId ?? '',
-      ]);
+      await client.query('SELECT set_config($1, $2, true)', ['app.user_id', userId ?? '']);
       const result = await work(client);
       await client.query('COMMIT');
       return result;

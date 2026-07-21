@@ -55,10 +55,7 @@ export class BranchTools {
     private readonly conversations: ConversationsRepository,
   ) {}
 
-  async setBranch(
-    ctx: ToolContext,
-    input: { branch?: string },
-  ): Promise<ToolResult> {
+  async setBranch(ctx: ToolContext, input: { branch?: string }): Promise<ToolResult> {
     const raw = (input.branch ?? '').trim();
     const candidates = await this.tenants.matchBranchCandidates(ctx.tenantId, raw);
     if (candidates.length <= 1) {
@@ -113,10 +110,7 @@ export class BranchTools {
     );
   }
 
-  private async persist(
-    ctx: ToolContext,
-    loc: { id: string; name: string },
-  ): Promise<ToolResult> {
+  private async persist(ctx: ToolContext, loc: { id: string; name: string }): Promise<ToolResult> {
     await this.conversations.setSelectedLocationWorker(ctx.conversationId, loc.id);
     return {
       success: true,

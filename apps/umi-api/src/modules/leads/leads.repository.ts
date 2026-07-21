@@ -135,9 +135,7 @@ export class LeadsRepository {
    * keep the original diagnostic_date (like the ported updateExistingLead) and
    * only refresh name/company/phone/diagnostic_data.
    */
-  async upsertByEmail(
-    input: UpsertLeadInput,
-  ): Promise<{ lead: LeadRecord; isNew: boolean }> {
+  async upsertByEmail(input: UpsertLeadInput): Promise<{ lead: LeadRecord; isNew: boolean }> {
     const existing = await this.findActiveByEmail(input.email);
     if (existing) {
       return { lead: await this.applyUpdate(existing.id, input), isNew: false };
@@ -176,10 +174,7 @@ export class LeadsRepository {
   }
 
   /** Refresh a lead's mutable fields, keeping its original diagnostic_date. */
-  private async applyUpdate(
-    id: string,
-    input: UpsertLeadInput,
-  ): Promise<LeadRecord> {
+  private async applyUpdate(id: string, input: UpsertLeadInput): Promise<LeadRecord> {
     const { rows } = await this.pg.query<LeadRow>(
       `UPDATE umi.prospect
           SET name = $2,

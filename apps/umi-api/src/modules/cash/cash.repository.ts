@@ -60,10 +60,10 @@ export class CashRepository {
 
   async updateTenantName(tenantId: string, name: string): Promise<void> {
     await this.pg.withTenant((c) =>
-      c.query(
-        `UPDATE tenant.business SET name = $2, updated_at = now() WHERE id = $1::uuid`,
-        [tenantId, name],
-      ),
+      c.query(`UPDATE tenant.business SET name = $2, updated_at = now() WHERE id = $1::uuid`, [
+        tenantId,
+        name,
+      ]),
     );
   }
 
@@ -134,8 +134,15 @@ export class CashRepository {
   async analytics(tenantId: string, w: AnalyticsWindows): Promise<Row> {
     return this.pg.withTenant(async (c) => {
       const [
-        recentVisits, topCards, recentUsers, balanceRow,
-        topupsRow, rewardsRow, activeRow, totalsRow, activeRewardConfigRow,
+        recentVisits,
+        topCards,
+        recentUsers,
+        balanceRow,
+        topupsRow,
+        rewardsRow,
+        activeRow,
+        totalsRow,
+        activeRewardConfigRow,
       ] = await Promise.all([
         c.query<Row>(
           `SELECT occurred_at AS "scannedAt" FROM tenant.loyalty_visit
@@ -222,11 +229,15 @@ export class CashRepository {
   ): Promise<{ rows: Row[]; total: number }> {
     const like = `%${opts.search}%`;
     const order =
-      opts.sort === 'visits' ? 'total_visits DESC NULLS LAST'
-      : opts.sort === 'balance' ? 'balance_cents DESC NULLS LAST'
-      : opts.sort === 'inactive' ? 'last_visit ASC NULLS FIRST'
-      : opts.sort === 'ltv' ? 'ltv_centavos DESC NULLS LAST'
-      : 'created_at DESC';
+      opts.sort === 'visits'
+        ? 'total_visits DESC NULLS LAST'
+        : opts.sort === 'balance'
+          ? 'balance_cents DESC NULLS LAST'
+          : opts.sort === 'inactive'
+            ? 'last_visit ASC NULLS FIRST'
+            : opts.sort === 'ltv'
+              ? 'ltv_centavos DESC NULLS LAST'
+              : 'created_at DESC';
     // The per-customer derived projection (balance/visits/cycle/pending/ltv from the
     // ledgers; phone/email from the identity spine). One active card per customer.
     const CUST_CTE = `
@@ -322,14 +333,17 @@ export class CashRepository {
   async upsertRewardConfig(
     tenantId: string,
     _programId: string,
-    data: { visitsRequired: number; rewardName: string; rewardDescription: string | null; rewardCostCentavos: number },
+    data: {
+      visitsRequired: number;
+      rewardName: string;
+      rewardDescription: string | null;
+      rewardCostCentavos: number;
+    },
   ): Promise<Row> {
     return this.pg.withTenant(async (c) => {
       // Serialize concurrent reward-rule saves per tenant so the
       // deactivate-then-insert can't interleave into two is_active=true rows.
-      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
-        `reward_config:${tenantId}`,
-      ]);
+      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`reward_config:${tenantId}`]);
       await c.query(
         `UPDATE tenant.loyalty_reward SET is_active = false
          WHERE business_id = $1::uuid AND is_active = true`,
@@ -343,7 +357,13 @@ export class CashRepository {
                    visits_required AS "visitsRequired", reward_name AS "rewardName",
                    reward_description AS "rewardDescription", reward_cost_cents AS "rewardCostCentavos",
                    is_active AS "isActive", activated_at AS "activatedAt"`,
-        [tenantId, data.visitsRequired, data.rewardName, data.rewardDescription, data.rewardCostCentavos],
+        [
+          tenantId,
+          data.visitsRequired,
+          data.rewardName,
+          data.rewardDescription,
+          data.rewardCostCentavos,
+        ],
       );
       return rows[0];
     });

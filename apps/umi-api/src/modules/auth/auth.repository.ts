@@ -106,9 +106,7 @@ export class AuthRepository {
    * super_admin edge) sees EVERY active tenant, tagged with its explicit role
    * where one exists, else 'super_admin'.
    */
-  async findTenantsForUser(
-    userId: string,
-  ): Promise<TenantMembershipSummary[]> {
+  async findTenantsForUser(userId: string): Promise<TenantMembershipSummary[]> {
     const { rows } = await this.pg.query<TenantMembershipSummary>(
       `WITH ${SUPER_ADMIN_SA_CTE}
        SELECT
@@ -138,10 +136,7 @@ export class AuthRepository {
    * {membershipId:null, role:'super_admin', permissions:['*']} so the guard
    * grants it (never 404s Umi's own operator).
    */
-  async findMembershipAccess(
-    userId: string,
-    tenantId: string,
-  ): Promise<MembershipAccess | null> {
+  async findMembershipAccess(userId: string, tenantId: string): Promise<MembershipAccess | null> {
     const { rows } = await this.pg.query<MembershipAccess>(
       `WITH ${SUPER_ADMIN_SA_CTE},
        grants AS (
@@ -191,9 +186,7 @@ export class AuthRepository {
   }
 
   /** Resolve tenant id + name from a slug (public routes need the name). */
-  async tenantBySlug(
-    slug: string,
-  ): Promise<{ id: string; name: string; slug: string } | null> {
+  async tenantBySlug(slug: string): Promise<{ id: string; name: string; slug: string } | null> {
     const { rows } = await this.pg.query<{ id: string; name: string; slug: string }>(
       `SELECT id::text AS id, name, slug FROM tenant.business WHERE slug = $1 LIMIT 1`,
       [slug],
@@ -211,10 +204,7 @@ export class AuthRepository {
    * NOT scope it here; the explicit `business_id` predicate does. Returns null when
    * the feature is absent/disabled (→ `product_not_active`).
    */
-  async productStatus(
-    tenantId: string,
-    productKey: string,
-  ): Promise<string | null> {
+  async productStatus(tenantId: string, productKey: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ status: string }>(
       `SELECT s.status
          FROM umi.effective_entitlement AS ee
@@ -229,11 +219,7 @@ export class AuthRepository {
   }
 
   // ── password reset (runtime.password_reset_token, user-keyed) ──
-  async insertResetToken(
-    userId: string,
-    tokenHash: string,
-    expiresAt: Date,
-  ): Promise<void> {
+  async insertResetToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
     await this.pg.query(
       `INSERT INTO runtime.password_reset_token (user_id, token_hash, expires_at)
        VALUES ($1::uuid, $2, $3)`,
@@ -253,11 +239,7 @@ export class AuthRepository {
     return rows[0] ?? null;
   }
 
-  async updatePassword(
-    userId: string,
-    salt: string,
-    hash: string,
-  ): Promise<void> {
+  async updatePassword(userId: string, salt: string, hash: string): Promise<void> {
     await this.pg.query(
       `UPDATE umi.user
        SET password_salt = $2, password_hash = $3, updated_at = now()

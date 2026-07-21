@@ -52,10 +52,7 @@ export class JwtService {
     return this.sign({ sub: userId, typ: 'refresh' }, this.refreshTtl);
   }
 
-  private async sign(
-    payload: JWTPayload & { typ: TokenKind },
-    ttl: string,
-  ): Promise<string> {
+  private async sign(payload: JWTPayload & { typ: TokenKind }, ttl: string): Promise<string> {
     return new SignJWT(payload)
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()

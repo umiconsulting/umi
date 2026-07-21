@@ -40,7 +40,9 @@ export class OutboundProcessor extends BaseProcessor {
         // Fail fast on a malformed job rather than coercing to ''/NaN and
         // handing Twilio a bad request (which it would reject anyway).
         if (!to || !from || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-          throw new Error(`twilio.location_pin missing/invalid fields (to/from/lat/lng) #${job.id}`);
+          throw new Error(
+            `twilio.location_pin missing/invalid fields (to/from/lat/lng) #${job.id}`,
+          );
         }
         const res = await this.twilio.sendLocationPin({
           to,

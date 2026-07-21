@@ -2,10 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ConfigService } from '@nestjs/config';
 import { buildCookieOptions, parseDurationSeconds } from './cookies';
 
-function cfg(values: Record<string, unknown>): ConfigService<
-  Record<string, unknown>,
-  true
-> {
+function cfg(values: Record<string, unknown>): ConfigService<Record<string, unknown>, true> {
   return { get: (k: string) => values[k] } as unknown as ConfigService<
     Record<string, unknown>,
     true

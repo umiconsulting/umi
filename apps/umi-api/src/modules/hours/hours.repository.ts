@@ -20,10 +20,7 @@ export class HoursRepository {
   constructor(private readonly pg: PgService) {}
 
   /** Per-day rows for a tenant/location (branch_id may be NULL). */
-  async read(
-    tenantId: string,
-    locationId: string | null,
-  ): Promise<BusinessHourRow[]> {
+  async read(tenantId: string, locationId: string | null): Promise<BusinessHourRow[]> {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<BusinessHourRow>(
         `SELECT day_of_week, opens_at::text AS opens_at,
@@ -42,10 +39,7 @@ export class HoursRepository {
    * unauthenticated WhatsApp bot path (no member user → can't use withTenant).
    * Isolation is the explicit business_id predicate.
    */
-  async readWorker(
-    tenantId: string,
-    locationId: string | null,
-  ): Promise<BusinessHourRow[]> {
+  async readWorker(tenantId: string, locationId: string | null): Promise<BusinessHourRow[]> {
     const { rows } = await this.pg.query<BusinessHourRow>(
       `SELECT day_of_week, opens_at::text AS opens_at,
               closes_at::text AS closes_at, is_closed
@@ -58,11 +52,7 @@ export class HoursRepository {
   }
 
   /** Atomic replace: delete + reinsert the day rows in one transaction. */
-  async replace(
-    tenantId: string,
-    locationId: string | null,
-    days: DayInput[],
-  ): Promise<void> {
+  async replace(tenantId: string, locationId: string | null, days: DayInput[]): Promise<void> {
     await this.pg.withTenant(async (c) => {
       await c.query(
         `DELETE FROM tenant.open_hours

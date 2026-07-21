@@ -8,11 +8,14 @@ import {
 import { ConfigService } from '@nestjs/config';
 import type { AppConfig } from '../../shared/config/config.schema';
 import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
-import { KdsRepository, type OrderScopeRow, type TicketRow, type EventRow, type DeviceListRow } from './kds.repository';
 import {
-  partialCancelNotificationBody,
-  statusNotificationBody,
-} from './kds-notify.copy';
+  KdsRepository,
+  type OrderScopeRow,
+  type TicketRow,
+  type EventRow,
+  type DeviceListRow,
+} from './kds.repository';
+import { partialCancelNotificationBody, statusNotificationBody } from './kds-notify.copy';
 import {
   asSixDigitPin,
   asText,
@@ -86,9 +89,7 @@ export class KdsService {
       tenantId: row.business_id,
       businessId: row.business_id,
       locationId:
-        typeof row.metadata?.location_id === 'string'
-          ? (row.metadata.location_id as string)
-          : null,
+        typeof row.metadata?.location_id === 'string' ? (row.metadata.location_id as string) : null,
       stationId: row.station_id,
       deviceName: row.device_name,
     };
@@ -99,10 +100,7 @@ export class KdsService {
   // ═══════════════════════════ iPad: pairing ════════════════════════════════
 
   /** Device-side pairing (kds_start / kds_status). Admin actions are dashboard-only. */
-  async pairing(
-    body: Record<string, unknown>,
-    ip: string | null = null,
-  ): Promise<KdsResult> {
+  async pairing(body: Record<string, unknown>, ip: string | null = null): Promise<KdsResult> {
     const action = asText(body.action);
     if (!action) return { status: 400, body: { error: 'missing_action' } };
 
@@ -111,10 +109,7 @@ export class KdsService {
     return { status: 400, body: { error: 'unknown_action' } };
   }
 
-  private async kdsStart(
-    body: Record<string, unknown>,
-    ip: string | null,
-  ): Promise<KdsResult> {
+  private async kdsStart(body: Record<string, unknown>, ip: string | null): Promise<KdsResult> {
     const pin = asSixDigitPin(body.pin);
     const requestedName = asText(body.device_name) || 'Kitchen iPad';
     if (!pin) return { status: 400, body: { error: 'invalid_pin' } };
@@ -122,11 +117,7 @@ export class KdsService {
     // Brute-force guard: cap PIN guesses per source IP. A pairing-row attempt
     // counter is unenforceable in this flow (a global PIN match can't attribute
     // a wrong guess to a specific pairing), so rate-limit the endpoint instead.
-    if (
-      ip &&
-      !this.rateLimit.hit(`kds:pair:${ip}`, PAIR_RATE_MAX, PAIR_RATE_WINDOW_MS)
-        .allowed
-    ) {
+    if (ip && !this.rateLimit.hit(`kds:pair:${ip}`, PAIR_RATE_MAX, PAIR_RATE_WINDOW_MS).allowed) {
       return { status: 429, body: { error: 'rate_limited' } };
     }
 
@@ -160,10 +151,7 @@ export class KdsService {
     const pairing = await this.repo.getPairing(pairingId);
     if (!pairing) return { status: 404, body: { error: 'pairing_not_found' } };
 
-    if (
-      pairing.status === 'pending' &&
-      new Date(pairing.expires_at).getTime() <= Date.now()
-    ) {
+    if (pairing.status === 'pending' && new Date(pairing.expires_at).getTime() <= Date.now()) {
       await this.repo.expirePairing(pairingId);
       return { status: 200, body: { status: 'expired' } };
     }
@@ -173,9 +161,7 @@ export class KdsService {
         status: 200,
         body: {
           status: pairing.status,
-          ...(pairing.status === 'pending'
-            ? { poll_after_seconds: POLL_AFTER_SECONDS }
-            : {}),
+          ...(pairing.status === 'pending' ? { poll_after_seconds: POLL_AFTER_SECONDS } : {}),
         },
       };
     }
@@ -226,34 +212,21 @@ export class KdsService {
 
   // ════════════════════════════ iPad: board ════════════════════════════════
 
-  async board(
-    session: KdsDeviceSession,
-    body: Record<string, unknown>,
-  ): Promise<KdsResult> {
+  async board(session: KdsDeviceSession, body: Record<string, unknown>): Promise<KdsResult> {
     const action = asText(body.action);
     if (!action) return { status: 400, body: { error: 'missing_action' } };
 
     if (action === 'snapshot') {
-      const rows = await this.repo.boardSnapshot(
-        session.tenantId,
-        session.stationId,
-      );
+      const rows = await this.repo.boardSnapshot(session.tenantId, session.stationId);
       return { status: 200, body: { ok: true, data: rows.map(toSnapshotRow) } };
     }
 
     if (action === 'events') {
-      const after = Number.isFinite(Number(body.after_sequence))
-        ? Number(body.after_sequence)
-        : 0;
+      const after = Number.isFinite(Number(body.after_sequence)) ? Number(body.after_sequence) : 0;
       const limit = Number.isFinite(Number(body.limit))
         ? Math.min(Math.max(Number(body.limit), 1), 500)
         : 200;
-      const rows = await this.repo.ticketEvents(
-        session.tenantId,
-        session.stationId,
-        after,
-        limit,
-      );
+      const rows = await this.repo.ticketEvents(session.tenantId, session.stationId, after, limit);
       return { status: 200, body: { ok: true, data: rows.map(toEventRow) } };
     }
 
@@ -266,10 +239,7 @@ export class KdsService {
 
   // ═══════════════════════════ iPad: command ════════════════════════════════
 
-  async command(
-    session: KdsDeviceSession,
-    body: Record<string, unknown>,
-  ): Promise<KdsResult> {
+  async command(session: KdsDeviceSession, body: Record<string, unknown>): Promise<KdsResult> {
     const action = asText(body.action);
     if (!action) return { status: 400, body: { error: 'missing_action' } };
 
@@ -279,11 +249,7 @@ export class KdsService {
       if (!ticketId || !target) {
         return { status: 400, body: { error: 'missing_required_fields' } };
       }
-      const order = await this.repo.loadOrderForScope(
-        session.tenantId,
-        ticketId,
-        asUuid(ticketId),
-      );
+      const order = await this.repo.loadOrderForScope(session.tenantId, ticketId, asUuid(ticketId));
       if (!ticketBelongsToDevice(order, session)) {
         return { status: 404, body: { error: 'ticket_not_found' } };
       }
@@ -310,27 +276,16 @@ export class KdsService {
 
     if (action === 'partial_cancel_items') {
       const ticketId = asText(body.ticket_id);
-      const rawIds = Array.isArray(body.item_ids)
-        ? (body.item_ids as unknown[])
-        : [];
+      const rawIds = Array.isArray(body.item_ids) ? (body.item_ids as unknown[]) : [];
       // Validate every id as a uuid BEFORE the `::uuid[]` cast (a bad value would
       // otherwise surface as a raw 500 instead of a clean 400).
       const mappedIds = rawIds.map((v) => asUuid(v));
       const reasonCode = asText(body.reason_code);
-      if (
-        !ticketId ||
-        mappedIds.length === 0 ||
-        mappedIds.some((x) => x === null) ||
-        !reasonCode
-      ) {
+      if (!ticketId || mappedIds.length === 0 || mappedIds.some((x) => x === null) || !reasonCode) {
         return { status: 400, body: { error: 'missing_required_fields' } };
       }
       const itemIds = [...new Set(mappedIds as string[])];
-      const order = await this.repo.loadOrderForScope(
-        session.tenantId,
-        ticketId,
-        asUuid(ticketId),
-      );
+      const order = await this.repo.loadOrderForScope(session.tenantId, ticketId, asUuid(ticketId));
       if (!ticketBelongsToDevice(order, session)) {
         return { status: 404, body: { error: 'ticket_not_found' } };
       }
@@ -343,9 +298,7 @@ export class KdsService {
         actorId: session.deviceId,
         actorChannel: session.stationId,
         buildNotifyBody: (cancelled, remaining) =>
-          this.notifyEnabled
-            ? partialCancelNotificationBody(cancelled, remaining)
-            : null,
+          this.notifyEnabled ? partialCancelNotificationBody(cancelled, remaining) : null,
       });
       return {
         status: 200,
@@ -365,10 +318,7 @@ export class KdsService {
 
   // ════════════════════════════ Heartbeat ══════════════════════════════════
 
-  async heartbeat(
-    body: Record<string, unknown>,
-    ip: string | null,
-  ): Promise<KdsResult> {
+  async heartbeat(body: Record<string, unknown>, ip: string | null): Promise<KdsResult> {
     const deviceId = asUuid(body.device_id);
     if (deviceId) await this.repo.heartbeatTouch(deviceId, ip);
     // Always 200 (fire-and-forget liveness ping), mirroring the legacy contract.
@@ -395,9 +345,7 @@ export class KdsService {
     return { orders: rows.map(toOrderRow) };
   }
 
-  async tickerForDashboard(
-    tenantId: string,
-  ): Promise<{ events: unknown[] }> {
+  async tickerForDashboard(tenantId: string): Promise<{ events: unknown[] }> {
     const rows = await this.repo.recentEvents(tenantId, 50);
     return { events: rows.map(toTickerRow) };
   }
@@ -431,11 +379,7 @@ export class KdsService {
     // Pre-check catches tenant-wide (location_id IS NULL) duplicates the DB's
     // NULL-distinct unique index would let through; the 23505 catch below is the
     // race backstop and covers location-scoped dupes.
-    const existing = await this.repo.findActiveStationByKey(
-      tenantId,
-      locationId,
-      stationKey,
-    );
+    const existing = await this.repo.findActiveStationByKey(tenantId, locationId, stationKey);
     if (existing) throw new ConflictException({ error: 'station_exists' });
     try {
       const station = await this.repo.createStation({
@@ -474,10 +418,7 @@ export class KdsService {
   }
 
   /** Archive a station (soft delete — hidden from the active list). */
-  async archiveStation(
-    tenantId: string,
-    stationId: string,
-  ): Promise<{ ok: true }> {
+  async archiveStation(tenantId: string, stationId: string): Promise<{ ok: true }> {
     const id = asUuid(stationId);
     if (!id) throw new BadRequestException({ error: 'invalid_station_id' });
     const ok = await this.repo.archiveStation(tenantId, id);
@@ -489,11 +430,7 @@ export class KdsService {
     tenantId: string,
     locationId: string | null,
   ): Promise<{ pairings: unknown[] }> {
-    const pairings = await this.repo.listPairingRequests(
-      tenantId,
-      locationId,
-      PAIRING_LIST_LIMIT,
-    );
+    const pairings = await this.repo.listPairingRequests(tenantId, locationId, PAIRING_LIST_LIMIT);
     return { pairings };
   }
 
@@ -518,9 +455,7 @@ export class KdsService {
     const pin = randomPin();
     const pinSalt = randomHex(16);
     const pinHash = hashPin(pin, pinSalt);
-    const expiresAt = new Date(
-      Date.now() + PIN_TTL_MINUTES * 60_000,
-    ).toISOString();
+    const expiresAt = new Date(Date.now() + PIN_TTL_MINUTES * 60_000).toISOString();
 
     const row = await this.repo.insertPairingRequest({
       tenantId,
@@ -549,12 +484,7 @@ export class KdsService {
   ): Promise<{ ok: true; pairing: { id: string; status: string } }> {
     const id = asUuid(pairingId);
     if (!id) throw new BadRequestException({ error: 'invalid_pairing_id' });
-    const updated = await this.repo.dispositionPairing(
-      id,
-      tenantId,
-      'approve',
-      adminUserId,
-    );
+    const updated = await this.repo.dispositionPairing(id, tenantId, 'approve', adminUserId);
     if (!updated) throw new BadRequestException({ error: 'pairing_not_pending' });
     return { ok: true, pairing: updated };
   }
@@ -588,10 +518,7 @@ export class KdsService {
     return { ok: true };
   }
 
-  async revokeDevice(
-    tenantId: string,
-    deviceId: string,
-  ): Promise<{ ok: true }> {
+  async revokeDevice(tenantId: string, deviceId: string): Promise<{ ok: true }> {
     const id = asUuid(deviceId);
     if (!id) throw new BadRequestException({ error: 'invalid_device_id' });
     const ok = await this.repo.revokeSession(tenantId, id);
@@ -610,11 +537,7 @@ export class KdsService {
     if (!target) {
       throw new BadRequestException({ error: 'missing_required_fields' });
     }
-    const order = await this.repo.loadOrderForScope(
-      tenantId,
-      ticketId,
-      asUuid(ticketId),
-    );
+    const order = await this.repo.loadOrderForScope(tenantId, ticketId, asUuid(ticketId));
     if (!order) {
       throw new NotFoundException({ error: 'ticket_not_found' });
     }
@@ -636,10 +559,7 @@ export class KdsService {
       // The repo re-checks under a row lock; surface a lost-race conflict as a
       // proper HTTP status (the iPad path catches KdsHttpError directly).
       if (e instanceof KdsHttpError) {
-        throw new HttpException(
-          e.body as string | Record<string, unknown>,
-          e.status,
-        );
+        throw new HttpException(e.body as string | Record<string, unknown>, e.status);
       }
       throw e;
     }
@@ -667,7 +587,7 @@ export function stationKeyFromName(input: string): string {
   return input
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '')
     .slice(0, 40);
@@ -680,13 +600,9 @@ export function ticketBelongsToDevice(
   if (!order) return false;
   const tenantMatches = order.business_id === session.tenantId;
   const locationMatches =
-    !session.locationId ||
-    order.location_id === session.locationId ||
-    order.location_id == null;
+    !session.locationId || order.location_id === session.locationId || order.location_id == null;
   const stationMatches =
-    !session.stationId ||
-    order.station_id === session.stationId ||
-    order.station_id == null;
+    !session.stationId || order.station_id === session.stationId || order.station_id == null;
   return tenantMatches && locationMatches && stationMatches;
 }
 

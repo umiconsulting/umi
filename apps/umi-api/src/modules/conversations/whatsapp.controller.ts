@@ -74,7 +74,12 @@ export class WhatsappController {
         return emptyTwiml();
       }
     } else {
-      const valid = validateTwilioSignature(this.authToken, signature ?? '', this.webhookUrl, params);
+      const valid = validateTwilioSignature(
+        this.authToken,
+        signature ?? '',
+        this.webhookUrl,
+        params,
+      );
       if (!valid) {
         this.logger.warn(`twilio_sig_invalid request_id=${requestId}`);
         return emptyTwiml(); // drop silently (don't process unsigned requests)
@@ -159,7 +164,9 @@ export class WhatsappController {
         payload: { phone_hash: this.trace.hashPhone(phone), message_length: message.length },
       });
       if (gate.duplicate) {
-        this.logger.log(`inbound_event_seen message_sid=${messageSid} (continuing; message-level dedup is authoritative)`);
+        this.logger.log(
+          `inbound_event_seen message_sid=${messageSid} (continuing; message-level dedup is authoritative)`,
+        );
       }
     }
 

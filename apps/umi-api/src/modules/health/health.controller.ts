@@ -8,9 +8,7 @@ export class HealthController {
 
   /** Liveness/readiness. 200 when DB + Redis are reachable, else 503. */
   @Get()
-  async get(
-    @Res({ passthrough: true }) reply: FastifyReply,
-  ): Promise<HealthResult> {
+  async get(@Res({ passthrough: true }) reply: FastifyReply): Promise<HealthResult> {
     const result = await this.health.check();
     if (result.status !== 'ok') {
       void reply.status(503);

@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ConfigService } from '@nestjs/config';
-import {
-  OutboxRelayService,
-  OutboxRouter,
-} from './outbox-relay.service';
+import { OutboxRelayService, OutboxRouter } from './outbox-relay.service';
 import type { EnqueueService } from './enqueue.service';
 import type { OutboxEventRow, QueueRepository } from './queue.repository';
 import { QUEUES } from './queues';
@@ -123,7 +120,10 @@ describe('OutboxRelayService', () => {
       queue: QUEUES.outbound,
       jobName: 'twilio.reply',
     });
-    repo.claimPendingOutbox.mockResolvedValueOnce([event(), event({ id: 'evt-2', idempotencyKey: 'idem-2' })]);
+    repo.claimPendingOutbox.mockResolvedValueOnce([
+      event(),
+      event({ id: 'evt-2', idempotencyKey: 'idem-2' }),
+    ]);
 
     await svc.tick();
 

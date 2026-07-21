@@ -29,10 +29,7 @@ export function normalizeRoleKey(roles: string[] | null | undefined): string | n
 }
 
 /** Effective permission list — super_admin gets the wildcard. */
-export function effectivePermissions(
-  role: string | null,
-  permissions: string[],
-): string[] {
+export function effectivePermissions(role: string | null, permissions: string[]): string[] {
   return role === 'super_admin' ? ['*'] : permissions;
 }
 

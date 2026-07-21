@@ -10,8 +10,7 @@ import { AuthRepository } from './auth.repository';
 import { effectivePermissions, normalizeRoleKey } from './roles';
 import type { AuthedRequest, TenantAccess } from './auth.types';
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Resolves the active tenant from the route (`:tenantId` uuid or `:slug`),
@@ -57,9 +56,7 @@ export class TenantAccessGuard implements CanActivate {
     return true;
   }
 
-  private async resolveTenantId(
-    params: Record<string, string>,
-  ): Promise<string | null> {
+  private async resolveTenantId(params: Record<string, string>): Promise<string | null> {
     const raw = params.tenantId;
     if (raw && UUID_RE.test(raw)) return raw;
     if (params.slug) return this.repo.tenantIdForSlug(params.slug);

@@ -249,7 +249,8 @@ export class CartTools {
         if (!resolvedVariant.success) {
           return {
             ...needsInputToolError(
-              resolvedVariant.needs_clarification ?? 'Necesito más detalle para cambiar esa opción.',
+              resolvedVariant.needs_clarification ??
+                'Necesito más detalle para cambiar esa opción.',
             ),
             needs_clarification: resolvedVariant.needs_clarification,
           };

@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  effectivePermissions,
-  hasPermission,
-  normalizeRoleKey,
-} from './roles';
+import { effectivePermissions, hasPermission, normalizeRoleKey } from './roles';
 
 describe('roles', () => {
   it('picks the highest-precedence role', () => {

@@ -1,9 +1,4 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { isProductStatusActive } from '@umi/contract';
 import { AuthRepository } from './auth.repository';
@@ -23,10 +18,10 @@ export class EntitlementGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const productKey = this.reflector.getAllAndOverride<string>(
-      REQUIRE_PRODUCT,
-      [context.getHandler(), context.getClass()],
-    );
+    const productKey = this.reflector.getAllAndOverride<string>(REQUIRE_PRODUCT, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
     if (!productKey) return true;
 
     const req = context.switchToHttp().getRequest<AuthedRequest>();

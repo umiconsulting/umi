@@ -47,9 +47,7 @@ export class CheckoutTools {
    */
   private async resolveOrderLocation(
     ctx: ToolContext,
-  ): Promise<
-    { ok: true; locationId: string | null } | { ok: false; ask: ToolResult }
-  > {
+  ): Promise<{ ok: true; locationId: string | null } | { ok: false; ask: ToolResult }> {
     const resolution = await this.locations.resolve({
       tenantId: ctx.tenantId,
       conversationId: ctx.conversationId,
@@ -76,8 +74,11 @@ export class CheckoutTools {
   private async validateItems(
     tenantId: string,
     items: DraftCart['items'],
-  ): Promise<{ ok: true; items: OrderItemSnapshot[]; total: number } | { ok: false; error: ToolResult }> {
-    if (!items.length) return { ok: false, error: terminalToolError('No hay productos en la orden.') };
+  ): Promise<
+    { ok: true; items: OrderItemSnapshot[]; total: number } | { ok: false; error: ToolResult }
+  > {
+    if (!items.length)
+      return { ok: false, error: terminalToolError('No hay productos en la orden.') };
     const productMap = await this.products.getByIds(tenantId, [
       ...new Set(items.map((it) => it.product_id)),
     ]);
@@ -132,7 +133,9 @@ export class CheckoutTools {
       ctx.customerPhone,
     );
     if (!within) {
-      return terminalToolError(await this.hours.getOrdersClosedMessage(ctx.tenantId, ctx.locationId ?? null));
+      return terminalToolError(
+        await this.hours.getOrdersClosedMessage(ctx.tenantId, ctx.locationId ?? null),
+      );
     }
     return null;
   }
@@ -190,10 +193,7 @@ export class CheckoutTools {
     };
   }
 
-  async reorderLastOrder(
-    ctx: ToolContext,
-    input: { customer_note?: string },
-  ): Promise<ToolResult> {
+  async reorderLastOrder(ctx: ToolContext, input: { customer_note?: string }): Promise<ToolResult> {
     const closed = await this.assertOrderingOpen(ctx);
     if (closed) return closed;
 
@@ -219,7 +219,7 @@ export class CheckoutTools {
       items: revalidated.items,
       customerNote: input.customer_note ?? last.customerNote ?? null,
       pickupPerson: last.pickupPerson ?? null,
-      personalMessage: last.pickupPerson ? last.personalMessage ?? null : null,
+      personalMessage: last.pickupPerson ? (last.personalMessage ?? null) : null,
       sourceTransactionId: this.idempotencyKey(ctx),
     });
 
@@ -227,7 +227,11 @@ export class CheckoutTools {
       success: true,
       order_id: result.orderId,
       total: result.total,
-      customer_reply: formatOrderCustomerReply(result.orderId, result.total, last.pickupPerson ?? undefined),
+      customer_reply: formatOrderCustomerReply(
+        result.orderId,
+        result.total,
+        last.pickupPerson ?? undefined,
+      ),
       message: `Orden repetida exitosamente. Total: ${formatMoney(result.total)}`,
     };
   }
@@ -281,7 +285,12 @@ export class CheckoutTools {
     const replyBody = trimmedReason
       ? `Tu pedido fue cancelado exitosamente.\nMotivo: ${trimmedReason}`
       : 'Tu pedido fue cancelado exitosamente.';
-    return { success: true, order_id: cancellable.id, customer_reply: replyBody, message: replyBody };
+    return {
+      success: true,
+      order_id: cancellable.id,
+      customer_reply: replyBody,
+      message: replyBody,
+    };
   }
 
   /** Phase 4 (KDS partial cancellation). Inert until KDS is ported. */

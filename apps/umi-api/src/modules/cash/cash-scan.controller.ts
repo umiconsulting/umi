@@ -24,11 +24,7 @@ export class CashScanController {
   constructor(private readonly scan: CashScanService) {}
 
   @Post()
-  run(
-    @Tenant() t: TenantAccess,
-    @CurrentUser() user: AuthUser,
-    @Body() dto: ScanDto,
-  ) {
+  run(@Tenant() t: TenantAccess, @CurrentUser() user: AuthUser, @Body() dto: ScanDto) {
     return this.scan.scan(t.tenantId, user.id, dto);
   }
 }

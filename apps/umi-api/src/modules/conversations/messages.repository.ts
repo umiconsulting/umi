@@ -67,9 +67,7 @@ export class MessagesRepository {
       // a concurrent insert at worst shares an index and ordering falls back to
       // created_at.) Narrowing here avoids masking an unrelated 23505 as a dup.
       if (e.code === '23505' && e.constraint === 'tenant_message_twilio_sid_uidx') {
-        this.logger.log(
-          `message_already_processed twilio_sid=${params.twilioMessageSid}`,
-        );
+        this.logger.log(`message_already_processed twilio_sid=${params.twilioMessageSid}`);
         return DUPLICATE_MESSAGE;
       }
       this.logger.error(
@@ -80,10 +78,7 @@ export class MessagesRepository {
   }
 
   /** Recent messages, newest first (the caller reverses to chronological order). */
-  async getRecentMessages(
-    conversationId: string,
-    limit: number,
-  ): Promise<RecentMessage[]> {
+  async getRecentMessages(conversationId: string, limit: number): Promise<RecentMessage[]> {
     const { rows } = await this.pg.query<RecentMessage>(
       `SELECT CASE sender WHEN 'customer' THEN 'user' WHEN 'bot' THEN 'assistant'
                           WHEN 'staff' THEN 'assistant' ELSE 'system' END AS role,
@@ -142,11 +137,7 @@ export class MessagesRepository {
   }
 
   /** RAG-02: persist a message embedding after async generation (enrichment). */
-  async updateEmbedding(
-    messageId: string,
-    embedding: number[],
-    model: string,
-  ): Promise<void> {
+  async updateEmbedding(messageId: string, embedding: number[], model: string): Promise<void> {
     await this.pg.query(
       `UPDATE tenant.message
           SET body_embedding = $2::vector, embedding_model = $3

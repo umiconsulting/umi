@@ -154,7 +154,9 @@ function isReadyForSummary(text: string): boolean {
 
 function isQuestionLike(text: string): boolean {
   const normalized = normalizeTurnText(text);
-  return text.includes('?') || /\b(ya quedo|quedo|entonces seria|seria|verdad|cierto)\b/.test(normalized);
+  return (
+    text.includes('?') || /\b(ya quedo|quedo|entonces seria|seria|verdad|cierto)\b/.test(normalized)
+  );
 }
 
 function isResetIntent(text: string): boolean {
@@ -166,7 +168,9 @@ function isResetIntent(text: string): boolean {
 function isOptionCorrectionIntent(text: string): boolean {
   const normalized = normalizeTurnText(text);
   return (
-    /\b(no era|era|cambialo|cambiala|cambia|me equivoque|mejor con|no de|en vez de)\b/.test(normalized) &&
+    /\b(no era|era|cambialo|cambiala|cambia|me equivoque|mejor con|no de|en vez de)\b/.test(
+      normalized,
+    ) &&
     /\b(coco|avena|almendra|deslactosada|soya|soja|caliente|rocas|frappe|frio|fria|chico|grande|gde|ch)\b/.test(
       normalized,
     )
@@ -188,10 +192,15 @@ function isAddIntent(text: string): boolean {
 function isGenericResetWithoutProduct(text: string): boolean {
   const normalized = normalizeTurnText(text);
   const hasReset =
-    /\b(otra orden|hacer otra orden|empezar de nuevo|empecemos de nuevo|olvida eso|olvida todo)\b/.test(normalized);
+    /\b(otra orden|hacer otra orden|empezar de nuevo|empecemos de nuevo|olvida eso|olvida todo)\b/.test(
+      normalized,
+    );
   if (!hasReset) return false;
   const remainder = normalized
-    .replace(/\b(otra orden|hacer otra orden|empezar de nuevo|empecemos de nuevo|olvida eso|olvida todo)\b/g, ' ')
+    .replace(
+      /\b(otra orden|hacer otra orden|empezar de nuevo|empecemos de nuevo|olvida eso|olvida todo)\b/g,
+      ' ',
+    )
     .replace(/\b(ok|okay|entonces|mejor|quiero|hacer|haz|una|un|la|el|olvida|todo|eso)\b/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -526,7 +535,8 @@ export class ToolLoopService {
           systemPrompt: params.systemPrompt,
           messages,
           reason: 'El modelo no pudo generar una respuesta en este intento.',
-          guidance: 'Discúlpate brevemente con el cliente y pregúntale si puede repetir su último mensaje.',
+          guidance:
+            'Discúlpate brevemente con el cliente y pregúntale si puede repetir su último mensaje.',
         });
         return {
           finalText: sanitizeOutput(voiced?.text ?? SYSTEM_ERROR_FALLBACK),
@@ -596,7 +606,12 @@ export class ToolLoopService {
           messages.push({
             role: 'assistant',
             content: [
-              { type: 'tool_use', id: forced.toolUseId, name: forced.toolName, input: forced.input },
+              {
+                type: 'tool_use',
+                id: forced.toolUseId,
+                name: forced.toolName,
+                input: forced.input,
+              },
             ] as Anthropic.ContentBlockParam[],
           });
           messages.push({
@@ -618,7 +633,8 @@ export class ToolLoopService {
             systemPrompt: params.systemPrompt,
             messages,
             reason: 'El modelo respondió con texto vacío.',
-            guidance: 'Responde brevemente al cliente reconociendo su mensaje y pregúntale cómo seguir.',
+            guidance:
+              'Responde brevemente al cliente reconociendo su mensaje y pregúntale cómo seguir.',
           });
           return {
             finalText: sanitizeOutput(voiced?.text ?? SYSTEM_ERROR_FALLBACK),
@@ -764,7 +780,12 @@ export class ToolLoopService {
           toolResultBlocks.push({
             type: 'tool_result',
             tool_use_id: toolUse.id,
-            content: JSON.stringify({ blocked: true, attempted_action: toolUse.name, reason, guidance }),
+            content: JSON.stringify({
+              blocked: true,
+              attempted_action: toolUse.name,
+              reason,
+              guidance,
+            }),
             is_error: true,
           });
           toolChain.push({
@@ -795,7 +816,10 @@ export class ToolLoopService {
           toolCallCount++;
           toolResultBytes += jsonByteLength(lookupResult);
           recentOrdersFound = Number(lookupResult?.found ?? 0) > 0;
-          const lookupObservation = compactToolObservation('get_recent_customer_orders', lookupResult);
+          const lookupObservation = compactToolObservation(
+            'get_recent_customer_orders',
+            lookupResult,
+          );
           toolChain.push({
             name: 'get_recent_customer_orders',
             input: { limit: 1 },
@@ -908,10 +932,16 @@ export class ToolLoopService {
         if (toolUse.name === 'edit_cart') {
           const resolvedInput = { ...toolUse.input };
           if (typeof resolvedInput.remove_query === 'string') {
-            resolvedInput.remove_query = resolveCartPronoun(resolvedInput.remove_query, params.draftCart);
+            resolvedInput.remove_query = resolveCartPronoun(
+              resolvedInput.remove_query,
+              params.draftCart,
+            );
           }
           if (typeof resolvedInput.target_query === 'string') {
-            resolvedInput.target_query = resolveCartPronoun(resolvedInput.target_query, params.draftCart);
+            resolvedInput.target_query = resolveCartPronoun(
+              resolvedInput.target_query,
+              params.draftCart,
+            );
           }
           toolUse = { ...toolUse, input: resolvedInput };
         }
@@ -960,7 +990,11 @@ export class ToolLoopService {
 
         if (typeof result?.needs_clarification === 'string') {
           const question = result.needs_clarification.trim();
-          pendingClarificationToReport = buildPendingClarification(toolUse.name, toolUse.input, question);
+          pendingClarificationToReport = buildPendingClarification(
+            toolUse.name,
+            toolUse.input,
+            question,
+          );
           toolResultBlocks.push({
             type: 'tool_result',
             tool_use_id: toolUse.id,

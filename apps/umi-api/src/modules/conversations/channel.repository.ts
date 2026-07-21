@@ -51,7 +51,9 @@ export class ChannelRepository {
     // prefixed), so a hand-written prefixed row could still collide with a bare one.
     // Keeping the guard: it is three lines, and the failure it prevents is cross-tenant.
     if (rows.length > 1) {
-      throw new Error(`ambiguous WhatsApp channel account: ${rows.length} active rows match "${bareNumber}"`);
+      throw new Error(
+        `ambiguous WhatsApp channel account: ${rows.length} active rows match "${bareNumber}"`,
+      );
     }
     return rows[0] ?? null;
   }

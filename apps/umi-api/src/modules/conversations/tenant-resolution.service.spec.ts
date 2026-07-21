@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ConfigService } from '@nestjs/config';
 import type { AppConfig } from '../../shared/config/config.schema';
-import {
-  TenantResolutionService,
-  normalizeAddress,
-} from './tenant-resolution.service';
+import { TenantResolutionService, normalizeAddress } from './tenant-resolution.service';
 import type { ChannelRepository } from './channel.repository';
 
 const TENANT = '11111111-1111-1111-1111-111111111111';
@@ -55,10 +52,7 @@ describe('TenantResolutionService', () => {
       source: 'channel_account',
     });
     // queried with both bare + prefixed forms
-    expect(findWhatsappAccount).toHaveBeenCalledWith(
-      '+14155238886',
-      'whatsapp:+14155238886',
-    );
+    expect(findWhatsappAccount).toHaveBeenCalledWith('+14155238886', 'whatsapp:+14155238886');
   });
 
   it('falls back to DEFAULT_TENANT_ID when no account matches', async () => {

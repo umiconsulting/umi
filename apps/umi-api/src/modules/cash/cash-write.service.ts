@@ -71,13 +71,19 @@ export class CashWriteService {
     dayStart.setHours(0, 0, 0, 0);
     const g = await this.repo.topupGuards(tenantId, card.id, staffMemberId, dayStart);
     if (staffMemberId && g.staffSum + input.amountCentavos > STAFF_DAILY_TOPUP_LIMIT) {
-      tooMany(`Límite diario de recargas alcanzado (máx. ${formatMxn2(STAFF_DAILY_TOPUP_LIMIT)} por día). Contacta al administrador.`);
+      tooMany(
+        `Límite diario de recargas alcanzado (máx. ${formatMxn2(STAFF_DAILY_TOPUP_LIMIT)} por día). Contacta al administrador.`,
+      );
     }
     if (g.cardSum + input.amountCentavos > CARD_DAILY_TOPUP_LIMIT) {
-      tooMany(`Esta tarjeta ya alcanzó su límite diario de recarga (máx. ${formatMxn2(CARD_DAILY_TOPUP_LIMIT)}). Contacta al administrador.`);
+      tooMany(
+        `Esta tarjeta ya alcanzó su límite diario de recarga (máx. ${formatMxn2(CARD_DAILY_TOPUP_LIMIT)}). Contacta al administrador.`,
+      );
     }
     if (g.cardCount >= MAX_TOPUPS_PER_CARD_PER_DAY) {
-      tooMany('Esta tarjeta ya recibió el máximo de recargas por hoy (3). Contacta al administrador.');
+      tooMany(
+        'Esta tarjeta ya recibió el máximo de recargas por hoy (3). Contacta al administrador.',
+      );
     }
 
     const balanceCents = await this.repo.creditWallet({
@@ -183,11 +189,7 @@ export class CashWriteService {
     };
   }
 
-  async redeemGiftCard(
-    tenantId: string,
-    code: string,
-    by: { phone?: string; email?: string },
-  ) {
+  async redeemGiftCard(tenantId: string, code: string, by: { phone?: string; email?: string }) {
     const normalizedCode = code.toUpperCase();
     const gift = await this.repo.findGiftCardByCode(tenantId, normalizedCode);
     if (!gift) throw new NotFoundException({ error: 'Código no válido' });

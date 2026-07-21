@@ -4,10 +4,7 @@
  * customer sees right after a scan; paraphrasing changes customer-facing voice.
  */
 export type LifecycleJourneyKey =
-  | 'first_visit'
-  | 'milestone_halfway'
-  | 'milestone_one_left'
-  | 'reward_earned';
+  'first_visit' | 'milestone_halfway' | 'milestone_one_left' | 'reward_earned';
 
 export const DEFAULT_LIFECYCLE_COPY: Record<LifecycleJourneyKey, string> = {
   first_visit: '¡Bienvenido a {tenant}, {name}! 🎉 Acumulaste tu primer sello.',
@@ -18,10 +15,7 @@ export const DEFAULT_LIFECYCLE_COPY: Record<LifecycleJourneyKey, string> = {
 };
 
 /** `{var}` interpolation; unknown vars are left literally in place (bug signal). */
-export function renderTemplate(
-  template: string,
-  vars: Record<string, string | number>,
-): string {
+export function renderTemplate(template: string, vars: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (match, key: string) => {
     const v = vars[key];
     return v !== undefined ? String(v) : match;

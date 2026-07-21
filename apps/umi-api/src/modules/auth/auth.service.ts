@@ -1,19 +1,11 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes } from 'node:crypto';
 import { PasswordService } from '../../shared/auth/password.service';
 import { JwtService } from '../../shared/auth/jwt.service';
 import { EmailAdapter } from '../../shared/adapters/email.adapter';
 import type { AppConfig } from '../../shared/config/config.schema';
-import {
-  AuthRepository,
-  type TenantMembershipSummary,
-} from './auth.repository';
+import { AuthRepository, type TenantMembershipSummary } from './auth.repository';
 
 export interface SessionUser {
   id: string;
@@ -60,11 +52,7 @@ export class AuthService {
     // Same generic 401 whether the user is missing or the password is wrong.
     if (
       !credential ||
-      !this.passwords.verify(
-        password,
-        credential.passwordSalt,
-        credential.passwordHash,
-      )
+      !this.passwords.verify(password, credential.passwordSalt, credential.passwordHash)
     ) {
       throw new UnauthorizedException('Credenciales incorrectas');
     }
@@ -144,8 +132,7 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
     await this.repo.insertResetToken(credential.userId, tokenHash, expiresAt);
 
-    const appUrl =
-      this.config.get('APP_URL', { infer: true }) ?? 'http://localhost:4010';
+    const appUrl = this.config.get('APP_URL', { infer: true }) ?? 'http://localhost:4010';
     const resetLink = `${appUrl}/reset-password?token=${token}`;
     const name = credential.displayName || credential.email;
 

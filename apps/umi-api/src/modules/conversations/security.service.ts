@@ -61,13 +61,15 @@ export function sanitizeInput(input: string | undefined | null): string {
 }
 
 export function sanitizeOutput(output: string): string {
-  return output
-    .replace(/ANTHROPIC_API_KEY/gi, '[REDACTED]')
-    .replace(/SUPABASE.*KEY/gi, '[REDACTED]')
-    .replace(/Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi, '[REDACTED]')
-    // Strip transcript-continuation hallucinations: lines starting with a role.
-    .replace(/\n(user|assistant|cliente|asistente):\s*.*/gi, '')
-    .trim();
+  return (
+    output
+      .replace(/ANTHROPIC_API_KEY/gi, '[REDACTED]')
+      .replace(/SUPABASE.*KEY/gi, '[REDACTED]')
+      .replace(/Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi, '[REDACTED]')
+      // Strip transcript-continuation hallucinations: lines starting with a role.
+      .replace(/\n(user|assistant|cliente|asistente):\s*.*/gi, '')
+      .trim()
+  );
 }
 
 export interface OrderItemInput {
@@ -142,10 +144,7 @@ export function validateCartItems(cart: unknown): {
     if (typeof item.product_id !== 'string' || item.product_id.trim().length === 0) {
       return { valid: false, reason: 'product_id inválido' };
     }
-    if (
-      typeof item.product_name !== 'string' ||
-      item.product_name.trim().length === 0
-    ) {
+    if (typeof item.product_name !== 'string' || item.product_name.trim().length === 0) {
       return { valid: false, reason: 'product_name inválido' };
     }
     if (item.variant_name != null && typeof item.variant_name !== 'string') {

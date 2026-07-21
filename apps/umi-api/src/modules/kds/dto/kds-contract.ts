@@ -25,8 +25,7 @@ export const KDS_DEVICE_TOKEN_HEADER = 'x-kds-device-token';
  */
 export const DEVICE_REVOKED_BODY = {
   error: 'device_revoked',
-  message:
-    'This KDS device has been removed. Pair it again from the dashboard.',
+  message: 'This KDS device has been removed. Pair it again from the dashboard.',
 } as const;
 
 // ── Pairing constants (frozen) ─────────────────────────────────────────────
@@ -46,21 +45,10 @@ export const DEVICE_OFFLINE_MS = 20_000; // < 20s → slow; else offline
 
 // ── Enums (frozen) ─────────────────────────────────────────────────────────
 
-export type PairingStatus =
-  | 'pending'
-  | 'approved'
-  | 'denied'
-  | 'expired'
-  | 'used';
+export type PairingStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'used';
 
 export type KitchenStatus =
-  | 'new'
-  | 'accepted'
-  | 'preparing'
-  | 'ready'
-  | 'completed'
-  | 'cancelled'
-  | 'partial_cancelled';
+  'new' | 'accepted' | 'preparing' | 'ready' | 'completed' | 'cancelled' | 'partial_cancelled';
 
 /** Statuses that keep a ticket on the live kitchen board (snapshot view). */
 export const BOARD_ACTIVE_STATUSES: KitchenStatus[] = [
@@ -121,10 +109,7 @@ const KITCHEN_STATUS_SET = new Set<KitchenStatus>([
  * in the contract module so both the service (pre-check) and the repository
  * (authoritative re-check inside the locked transaction) share one matrix.
  */
-export function validateTransition(
-  from: KitchenStatus | null,
-  to: KitchenStatus,
-): string | null {
+export function validateTransition(from: KitchenStatus | null, to: KitchenStatus): string | null {
   if (!KITCHEN_STATUS_SET.has(to)) return `invalid_target_status: ${to}`;
   const current = from ?? 'new';
   if (!STATUS_TRANSITIONS[current].includes(to)) {
@@ -189,8 +174,7 @@ export function hashPin(pin: string, salt: string): string {
 
 // ── Small validators (mirror the Deno helpers) ─────────────────────────────
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function asText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';

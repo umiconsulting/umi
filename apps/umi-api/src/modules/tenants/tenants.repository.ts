@@ -86,9 +86,7 @@ export class TenantsRepository {
    * predicate — not RLS — scopes it. `locationId` stays null (tenant-grained) and
    * `config` is `{}` (build-v3 carries no per-product config in this view).
    */
-  async loadProducts(
-    tenantId: string,
-  ): Promise<Record<string, ProductInstance>> {
+  async loadProducts(tenantId: string): Promise<Record<string, ProductInstance>> {
     const { rows } = await this.pg.query<{
       productKey: string;
       status: string;
@@ -102,10 +100,7 @@ export class TenantsRepository {
       [tenantId],
     );
     return Object.fromEntries(
-      rows.map((r) => [
-        r.productKey,
-        { status: r.status, locationId: null, config: {} },
-      ]),
+      rows.map((r) => [r.productKey, { status: r.status, locationId: null, config: {} }]),
     );
   }
 
@@ -178,10 +173,7 @@ export class TenantsRepository {
   }
 
   /** Verify a location belongs to the tenant and is active. */
-  async findActiveLocation(
-    tenantId: string,
-    locationId: string,
-  ): Promise<LocationRow | null> {
+  async findActiveLocation(tenantId: string, locationId: string): Promise<LocationRow | null> {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<LocationRow>(
         `SELECT id::text, slug, name, NULL::text AS timezone, status
@@ -233,9 +225,7 @@ export class TenantsRepository {
    * Feeds branch resolution: the `# SUCURSALES` prompt block, `set_branch`
    * validation, and the checkout branch gate.
    */
-  async listActiveLocationsWorker(
-    tenantId: string,
-  ): Promise<Array<{ id: string; name: string }>> {
+  async listActiveLocationsWorker(tenantId: string): Promise<Array<{ id: string; name: string }>> {
     const { rows } = await this.pg.query<{ id: string; name: string }>(
       `SELECT id::text AS id, name
        FROM tenant.branch

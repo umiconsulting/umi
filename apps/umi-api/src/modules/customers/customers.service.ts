@@ -2,15 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { formatMxn, iso } from '../../shared/format/money';
 import { isProductStatusActive } from '@umi/contract';
 import { TenantsRepository } from '../tenants/tenants.repository';
-import {
-  CustomersRepository,
-  type Row,
-} from './customers.repository';
+import { CustomersRepository, type Row } from './customers.repository';
 
 type Products = Record<string, { status?: string } | undefined>;
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isUuid(v: string): boolean {
   return UUID_RE.test(v);
@@ -60,14 +56,14 @@ export class CustomersService {
       identityList.some((i: Row) => i.identity_type === 'whatsapp');
     const hasOrders = Number(row.orders_count || 0) > 0;
     const needsReview =
-      Number(row.merge_candidate_count || 0) > 0 ||
-      Number(row.data_quality_count || 0) > 0;
+      Number(row.merge_candidate_count || 0) > 0 || Number(row.data_quality_count || 0) > 0;
     const factsCount = Number(row.memory_count || 0);
     const lastTouchAt = iso(row.last_touch_at || row.updated_at || row.created_at);
 
     return {
       id: row.id,
-      displayName: row.display_name || row.normalized_phone || row.phone || row.email || 'Unknown customer',
+      displayName:
+        row.display_name || row.normalized_phone || row.phone || row.email || 'Unknown customer',
       phone: row.phone || row.normalized_phone || '',
       normalizedPhone: row.normalized_phone || normalizeCustomerPhone(row.phone),
       email: row.email || '',
@@ -76,10 +72,24 @@ export class CustomersService {
       lastTouchAt,
       status: needsReview ? 'needs_review' : hasOrders || hasCash || hasWhatsapp ? 'active' : 'new',
       products: {
-        whatsapp: { available: conversaflowAvailable, active: hasWhatsapp, source: hasWhatsapp ? 'conversaflow' : 'none', conversations: Number(row.conversation_count || 0), activeConversations: Number(row.active_conversations || 0) },
+        whatsapp: {
+          available: conversaflowAvailable,
+          active: hasWhatsapp,
+          source: hasWhatsapp ? 'conversaflow' : 'none',
+          conversations: Number(row.conversation_count || 0),
+          activeConversations: Number(row.active_conversations || 0),
+        },
         cash: { available: cashAvailable, active: hasCash, source: hasCash ? 'cash' : 'none' },
-        orders: { available: kdsAvailable || conversaflowAvailable, active: hasOrders, source: hasOrders ? 'commerce' : 'none' },
-        giftCards: { available: cashAvailable, active: Number(row.gift_card_count || 0) > 0, source: Number(row.gift_card_count || 0) > 0 ? 'cash' : 'none' },
+        orders: {
+          available: kdsAvailable || conversaflowAvailable,
+          active: hasOrders,
+          source: hasOrders ? 'commerce' : 'none',
+        },
+        giftCards: {
+          available: cashAvailable,
+          active: Number(row.gift_card_count || 0) > 0,
+          source: Number(row.gift_card_count || 0) > 0 ? 'cash' : 'none',
+        },
       },
       value: {
         orders: Number(row.orders_count || 0),
@@ -92,7 +102,10 @@ export class CustomersService {
       memory: {
         factsCount,
         embeddingHealth: factsCount > 0 ? 'context_ready' : 'no_memory_yet',
-        summary: factsCount > 0 ? `${factsCount} memory item${factsCount === 1 ? '' : 's'}` : 'No extracted facts yet',
+        summary:
+          factsCount > 0
+            ? `${factsCount} memory item${factsCount === 1 ? '' : 's'}`
+            : 'No extracted facts yet',
       },
       dataQuality: {
         mergeCandidates: Number(row.merge_candidate_count || 0),
@@ -106,12 +119,22 @@ export class CustomersService {
   async list(
     tenantId: string,
     products: Products,
-    options: { page?: string; limit?: string; search?: string; filter?: string; contactId?: string } = {},
+    options: {
+      page?: string;
+      limit?: string;
+      search?: string;
+      filter?: string;
+      contactId?: string;
+    } = {},
   ) {
     const page = Math.max(1, parseInt(options.page || '1') || 1);
     const limit = Math.max(1, Math.min(parseInt(options.limit || '20') || 20, 100));
-    const search = String(options.search || '').trim().slice(0, 80);
-    const filter = String(options.filter || '').trim().slice(0, 24);
+    const search = String(options.search || '')
+      .trim()
+      .slice(0, 80);
+    const filter = String(options.filter || '')
+      .trim()
+      .slice(0, 24);
     const contactId = String(options.contactId || '').trim();
     const contactUuid = isUuid(contactId) ? contactId : tenantId;
 
@@ -206,14 +229,19 @@ export class CustomersService {
   }
 
   async identity(tenantId: string, contactId: string) {
-    const { identities, candidates, findings } = await this.repo.identity(
-      tenantId,
-      contactId,
-    );
+    const { identities, candidates, findings } = await this.repo.identity(tenantId, contactId);
     return {
       identities: identities.map((row) => ({ ...row, createdAt: iso(row.created_at) })),
-      mergeCandidates: candidates.map((row) => ({ ...row, createdAt: iso(row.created_at), resolvedAt: iso(row.resolved_at) })),
-      findings: findings.map((row) => ({ ...row, createdAt: iso(row.created_at), resolvedAt: iso(row.resolved_at) })),
+      mergeCandidates: candidates.map((row) => ({
+        ...row,
+        createdAt: iso(row.created_at),
+        resolvedAt: iso(row.resolved_at),
+      })),
+      findings: findings.map((row) => ({
+        ...row,
+        createdAt: iso(row.created_at),
+        resolvedAt: iso(row.resolved_at),
+      })),
     };
   }
 
@@ -253,10 +281,38 @@ export class CustomersService {
         activeConversations,
       },
       insights: [
-        { key: 'customer-growth', label: 'Customer base', value: payload.total, action: 'Open Customers', target: '/customers', status: payload.total > 0 ? 'ready' : 'empty' },
-        { key: 'whatsapp-health', label: 'WhatsApp customers', value: whatsappCustomers, action: 'Review WhatsApp tab', target: '/customers?filter=whatsapp', status: productActive(products, 'conversaflow') ? 'ready' : 'unavailable' },
-        { key: 'memory-health', label: 'Memory context ready', value: memoryReady, action: 'Review customers without memory', target: '/customers?filter=memory', status: memoryReady > 0 ? 'ready' : 'needs_attention' },
-        { key: 'identity-quality', label: 'Identity review', value: needsReview, action: 'Review Data tabs', target: '/customers?filter=review', status: needsReview > 0 ? 'needs_attention' : 'ready' },
+        {
+          key: 'customer-growth',
+          label: 'Customer base',
+          value: payload.total,
+          action: 'Open Customers',
+          target: '/customers',
+          status: payload.total > 0 ? 'ready' : 'empty',
+        },
+        {
+          key: 'whatsapp-health',
+          label: 'WhatsApp customers',
+          value: whatsappCustomers,
+          action: 'Review WhatsApp tab',
+          target: '/customers?filter=whatsapp',
+          status: productActive(products, 'conversaflow') ? 'ready' : 'unavailable',
+        },
+        {
+          key: 'memory-health',
+          label: 'Memory context ready',
+          value: memoryReady,
+          action: 'Review customers without memory',
+          target: '/customers?filter=memory',
+          status: memoryReady > 0 ? 'ready' : 'needs_attention',
+        },
+        {
+          key: 'identity-quality',
+          label: 'Identity review',
+          value: needsReview,
+          action: 'Review Data tabs',
+          target: '/customers?filter=review',
+          status: needsReview > 0 ? 'needs_attention' : 'ready',
+        },
       ],
     };
   }

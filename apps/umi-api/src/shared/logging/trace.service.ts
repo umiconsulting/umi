@@ -172,11 +172,7 @@ export class TraceService {
   }
 
   /** Best-effort insert: never throws — a failed trace must not break the caller. */
-  private async insert(
-    table: string,
-    text: string,
-    params: unknown[],
-  ): Promise<void> {
+  private async insert(table: string, text: string, params: unknown[]): Promise<void> {
     try {
       await this.pg.query(text, params);
     } catch (err) {

@@ -92,8 +92,7 @@ function appPoolKind(call: ts.CallExpression): AppPoolKind {
   const name = callee.name.text;
   if (APP_POOL_METHODS.has(name)) return 'call';
   const onApp =
-    ts.isPropertyAccessExpression(callee.expression) &&
-    callee.expression.name.text === 'app';
+    ts.isPropertyAccessExpression(callee.expression) && callee.expression.name.text === 'app';
   if (onApp && name === 'query') return 'call';
   if (onApp && name === 'connect') return 'connect';
   return 'none';
@@ -156,9 +155,7 @@ for (const file of files) {
         for (const rx of AUTH_SUBSTRATE) {
           const m = rx.exec(sql);
           if (m) {
-            const { line } = sf.getLineAndCharacterOfPosition(
-              scanNode.getStart(sf),
-            );
+            const { line } = sf.getLineAndCharacterOfPosition(scanNode.getStart(sf));
             const rel = relative(process.cwd(), file);
             const key = `${rel}:${line}:${m[0]}`;
             if (!seen.has(key)) {

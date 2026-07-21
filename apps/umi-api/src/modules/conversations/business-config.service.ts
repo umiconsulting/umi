@@ -91,9 +91,7 @@ function resolveToneText(
   const freeform = typeof voice?.tone === 'string' ? voice.tone.trim() : '';
   if (freeform) return freeform.slice(0, MAX_TONE_CHARS);
   const key =
-    typeof voice?.tone_preset === 'string'
-      ? (voice.tone_preset.trim() as TonePreset)
-      : undefined;
+    typeof voice?.tone_preset === 'string' ? (voice.tone_preset.trim() as TonePreset) : undefined;
   if (key && TONE_PRESETS[key]) return TONE_PRESETS[key].tone;
   return TONE_PRESETS[DEFAULT_TONE_PRESET].tone;
 }
@@ -110,8 +108,7 @@ export function resolveVoiceConfig(
   _tenantId: string, // kept for call-site symmetry/future logging; never used to throw
 ): VoiceConfig {
   const voice = (config?.voice ?? null) as
-    | (Partial<VoiceConfig> & { tone_preset?: unknown })
-    | null;
+    (Partial<VoiceConfig> & { tone_preset?: unknown }) | null;
 
   // Cap to the same bounds as UpdateVoiceDto (assistant_name 60, locale 20) so a
   // long business name or hand-seeded legacy row resolves to a value that still

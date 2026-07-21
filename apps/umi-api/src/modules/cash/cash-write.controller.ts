@@ -27,20 +27,12 @@ export class CashWriteController {
   constructor(private readonly cash: CashWriteService) {}
 
   @Post('topup')
-  topup(
-    @Tenant() t: TenantAccess,
-    @CurrentUser() user: AuthUser,
-    @Body() dto: TopupDto,
-  ) {
+  topup(@Tenant() t: TenantAccess, @CurrentUser() user: AuthUser, @Body() dto: TopupDto) {
     return this.cash.topup(t.tenantId, user.id, dto);
   }
 
   @Post('purchase')
-  purchase(
-    @Tenant() t: TenantAccess,
-    @CurrentUser() user: AuthUser,
-    @Body() dto: PurchaseDto,
-  ) {
+  purchase(@Tenant() t: TenantAccess, @CurrentUser() user: AuthUser, @Body() dto: PurchaseDto) {
     return this.cash.purchase(t.tenantId, user.id, dto);
   }
 

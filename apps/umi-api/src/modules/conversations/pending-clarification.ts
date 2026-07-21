@@ -17,7 +17,5 @@ export function getActivePendingClarification(
   now = new Date(),
 ): Record<string, unknown> | null {
   if (!pendingClarification) return null;
-  return isPendingClarificationExpired(pendingClarification, now)
-    ? null
-    : pendingClarification;
+  return isPendingClarificationExpired(pendingClarification, now) ? null : pendingClarification;
 }
