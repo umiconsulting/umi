@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
+import { roleToSender } from './message-vocab';
 
 /**
  * Queries for `tenant.message` (build-v2; was `comms.messages`). Column rebind:
@@ -52,7 +53,7 @@ export class MessagesRepository {
         [
           params.tenantId,
           params.conversationId,
-          params.role,
+          roleToSender(params.role),
           params.content,
           params.intent ?? null,
           params.twilioMessageSid ?? null,
@@ -84,7 +85,9 @@ export class MessagesRepository {
     limit: number,
   ): Promise<RecentMessage[]> {
     const { rows } = await this.pg.query<RecentMessage>(
-      `SELECT sender AS role, COALESCE(body, '') AS content
+      `SELECT CASE sender WHEN 'customer' THEN 'user' WHEN 'bot' THEN 'assistant'
+                          WHEN 'staff' THEN 'assistant' ELSE 'system' END AS role,
+              COALESCE(body, '') AS content
          FROM tenant.message
         WHERE conversation_id = $1
         ORDER BY created_at DESC
@@ -101,7 +104,9 @@ export class MessagesRepository {
     take: number,
   ): Promise<RecentMessage[]> {
     const { rows } = await this.pg.query<RecentMessage>(
-      `SELECT sender AS role, COALESCE(body, '') AS content
+      `SELECT CASE sender WHEN 'customer' THEN 'user' WHEN 'bot' THEN 'assistant'
+                          WHEN 'staff' THEN 'assistant' ELSE 'system' END AS role,
+              COALESCE(body, '') AS content
          FROM tenant.message
         WHERE conversation_id = $1
         ORDER BY created_at DESC

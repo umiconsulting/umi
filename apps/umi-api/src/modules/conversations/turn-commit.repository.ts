@@ -93,10 +93,12 @@ export class TurnCommitRepository {
       );
 
       // 3. Persist the assistant message. Only now is the turn truly committed.
+      // sender='bot' — the DB vocabulary (customer|bot|staff|system), not the LLM
+      // 'assistant' (which violates the CHECK). See message-vocab.ts.
       const msg = await client.query<{ id: string }>(
         `INSERT INTO tenant.message
            (business_id, conversation_id, sender, body, message_index)
-         VALUES ($1, $2, 'assistant', $3,
+         VALUES ($1, $2, 'bot', $3,
            (SELECT COALESCE(MAX(message_index) + 1, 0)
               FROM tenant.message WHERE conversation_id = $2))
          RETURNING id`,

@@ -230,7 +230,7 @@ export class SecurityService {
          count(*) FILTER (WHERE created_at >= now() - interval '1 minute') AS minute,
          count(*) FILTER (WHERE created_at >= now() - interval '1 hour')   AS hour
        FROM tenant.message
-       WHERE conversation_id = $1 AND sender = 'user'`,
+       WHERE conversation_id = $1 AND sender = 'customer'`,
       [conv.rows[0].id],
     );
 

@@ -101,7 +101,10 @@ export class ConversationTurnsRepository {
     limit = 20,
   ): Promise<MessageRunItem[]> {
     const { rows } = await this.pg.query<MessageRunItem>(
-      `SELECT id::text, sender AS role, COALESCE(body, '') AS content, created_at
+      `SELECT id::text,
+              CASE sender WHEN 'customer' THEN 'user' WHEN 'bot' THEN 'assistant'
+                          WHEN 'staff' THEN 'assistant' ELSE 'system' END AS role,
+              COALESCE(body, '') AS content, created_at
          FROM tenant.message
         WHERE conversation_id = $1
         ORDER BY created_at DESC
@@ -133,7 +136,7 @@ export class ConversationTurnsRepository {
     const { rows } = await this.pg.query(
       `SELECT 1
          FROM tenant.message
-        WHERE conversation_id = $1 AND sender = 'user' AND created_at > $2
+        WHERE conversation_id = $1 AND sender = 'customer' AND created_at > $2
           AND id <> ALL ($3::uuid[])
         LIMIT 1`,
       [conversationId, afterTimestamp, excludeMessageIds],
