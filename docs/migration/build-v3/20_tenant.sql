@@ -137,6 +137,27 @@ create table tenant.customer (
 comment on column tenant.customer.merged_into_id is
   'Non-null = this duplicate was merged into that customer (phone is an unverified soft key).';
 
+-- Resolve a customer to the SURVIVOR at the end of its merge chain. Reads must never
+-- stop at one hop: if A was merged into B and B later into C, a single hop lands on B,
+-- a row that is itself dead — the caller then stamps a card that nobody looks at.
+-- Nothing writes merged_into_id yet (there is no merge flow), so the read side has to
+-- be the robust one. Depth-capped: a cycle (A->B->A) can only ever be created by a bug,
+-- and this must degrade to a wrong-but-terminating answer, never an infinite walk.
+create or replace function tenant.customer_survivor(p_customer_id uuid) returns uuid
+  language sql stable
+  set search_path = pg_catalog as $$
+  with recursive walk(id, merged_into_id, depth) as (
+    select c.id, c.merged_into_id, 0
+      from tenant.customer c where c.id = p_customer_id
+    union all
+    select c.id, c.merged_into_id, w.depth + 1
+      from walk w
+      join tenant.customer c on c.id = w.merged_into_id
+     where w.merged_into_id is not null and w.depth < 16
+  )
+  select id from walk order by depth desc limit 1;
+$$;
+
 create table tenant.contact (
   id                uuid primary key default gen_random_uuid(),
   business_id       uuid not null references tenant.business(id) on delete cascade,

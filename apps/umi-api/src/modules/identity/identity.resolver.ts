@@ -187,10 +187,9 @@ export class IdentityResolver {
     const { rows } = await this.run<{ contactId: string; customerId: string }>(
       null,
       `SELECT c.id::text        AS "contactId",
-              coalesce(m.id, cu.id)::text AS "customerId"
+              tenant.customer_survivor(cu.id)::text AS "customerId"
          FROM tenant.contact c
          JOIN tenant.customer cu ON cu.id = c.customer_id
-         LEFT JOIN tenant.customer m ON m.id = cu.merged_into_id
         WHERE c.business_id = $1::uuid
           AND c.channel_id = ANY($2::uuid[])
           AND c.normalized_value = $3
@@ -299,10 +298,9 @@ export class IdentityResolver {
   ): Promise<string | null> {
     const { rows } = await this.run<{ customerId: string }>(
       c,
-      `SELECT coalesce(m.id, cu.id)::text AS "customerId"
+      `SELECT tenant.customer_survivor(cu.id)::text AS "customerId"
          FROM tenant.contact ct
          JOIN tenant.customer cu ON cu.id = ct.customer_id
-         LEFT JOIN tenant.customer m ON m.id = cu.merged_into_id
         WHERE ct.business_id = $1::uuid
           AND ct.channel_id = ANY($2::uuid[])
           AND ct.normalized_value = $3
@@ -328,10 +326,9 @@ export class IdentityResolver {
     if (raw === '') return null;
     const { rows } = await this.run<{ customerId: string }>(
       c,
-      `SELECT coalesce(m.id, cu.id)::text AS "customerId"
+      `SELECT tenant.customer_survivor(cu.id)::text AS "customerId"
          FROM tenant.contact ct
          JOIN tenant.customer cu ON cu.id = ct.customer_id
-         LEFT JOIN tenant.customer m ON m.id = cu.merged_into_id
         WHERE ct.business_id = $1::uuid
           AND ct.channel_id = ANY($2::uuid[])
           AND (ct.raw_phone_number = $3 OR ct.raw_value = $3)
