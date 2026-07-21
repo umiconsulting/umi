@@ -93,7 +93,12 @@ create table tenant.integration (
   connected_at        timestamptz not null default now(),
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now(),
-  unique (business_id, provider)
+  unique (business_id, provider),
+  -- Cross-tenant guard: two businesses may NEVER claim the same external account.
+  -- For provider='twilio' that account IS the inbound WhatsApp sender number, so a
+  -- collision would route one café's customer messages to another café. NULLs stay
+  -- distinct in Postgres, so a business with no number yet is unaffected.
+  unique (provider, external_account_id)
 );
 comment on table tenant.integration is
   'Generic external connection (POS sync / message sender / wallet issuer / AI). '
