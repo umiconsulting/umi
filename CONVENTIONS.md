@@ -52,3 +52,35 @@ not arbitrary):
 `docs/` is dated, newest-wins. Architecture notes under `docs/architecture/`,
 migration history under `docs/migration/`. There's no promise old dated files are
 current — treat them as history unless linked from `README.md` or `AGENTS.md`.
+
+## Linting & formatting
+
+**Prettier formats; ESLint finds bugs.** They are not competitors here — Prettier owns
+style, ESLint owns correctness, and no ESLint stylistic rules are configured.
+
+- **Prettier scope.** `.prettierignore` excludes build outputs, the frozen `apps/umi-cash`,
+  the Swift app, and **`.agents/skills/`** — that last one is authored prose (the procedure
+  layer, mirrored to `.claude/skills` by symlink), not generated code, and it was 53% of the
+  formatting debt. Reformatting prose to satisfy a formatter that never ran on it is churn.
+- **ESLint 10, flat config, per package.** Not v9: it reaches EOL 2026-08-06. Config lives in
+  each package's `eslint.config.js`; there is no root config, because the packages genuinely
+  differ (a NestJS service and a plain-JSX SPA want different rules).
+- **Type-aware rules only where there are types.** Everywhere `tsc --noEmit` runs, the
+  compiler is the safety net and linting earns its keep mainly through *type-aware* rules
+  (floating promises, misused promises). `apps/umi-dashboard` has no TypeScript at all, so
+  plain rules carry the whole load there.
+- **Adopt with a ratchet, not a big-bang fix.** New surfaces land via
+  `eslint . --suppress-all`, which writes `eslint-suppressions.json`. Existing debt is
+  recorded **in the repo, reviewable**, the gate goes green immediately, and any NEW
+  violation fails. Burn the file down over time; `--prune-suppressions` drops stale entries.
+  Suppress **errors**, not warnings — muting warnings just hides the signal.
+- **Never blind-`--fix` a hook rule.** `exhaustive-deps` is a heuristic, not a proof. In
+  `customers.jsx` the literal fix (adding `params` to an effect that both reads and writes
+  params) would have caused an infinite render loop; the correct fix removed the closure via
+  a functional updater. Read the finding before applying the machine's answer.
+- **Ignore build output in lint too.** The first dashboard run reported 244 errors, 200 of
+  them inside `.vercel/` deploy output. A gate that is permanently red on generated code is a
+  gate everyone learns to ignore — keep ESLint's `ignores` in step with `.prettierignore`.
+
+Rationale and primary sources (ESLint vs Biome vs oxlint, the TypeScript-version squeeze):
+`docs/reports/2026-07-21-linting-toolchain-research.md`.
