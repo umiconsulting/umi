@@ -7,7 +7,7 @@ Observation ledger for **potential** skills. A seed is a pattern observed too fe
 - Plant a seed the moment a pattern is observed, not at phase end.
 - A seed needs evidence: cite the ledger entry, audit section, or plan step where it appeared.
 - At every phase checkpoint of the active program plan, review all seeds: promote what now passes the gate, update counts, and **prune seeds that turned out to be one-offs** — a pruned seed is recorded as pruned, not deleted, so the negative result is kept.
-- Seeds are written to `.agents/` (canonical source, per the S1.5 decision of 2026-06-10); `.claude/` is a generated mirror — never hand-edit it.
+- Seeds are written to `.agents/` (canonical source, per the S1.5 decision of 2026-06-10); `.claude/skills/` is a symlink into `.agents/skills/` — write only under `.agents/`.
 
 ## Entry template
 
