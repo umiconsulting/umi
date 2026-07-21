@@ -136,10 +136,17 @@ export class IdentityResolver {
     await c.query('SELECT pg_advisory_xact_lock(hashtext($1)::bigint)', [
       `${tenantId}:${normalized ?? `${channel.id}:new`}`,
     ]);
-    const found =
+    let found =
       normalized == null
         ? null
         : await this.findCustomer(c, tenantId, lookupChannelIds, normalized);
+    // O-3 / L15: before minting a person, fall back to an EXACT raw match. A raw value
+    // we cannot normalize (Mayela's `+52` + only eight national digits) normalizes to
+    // NULL honestly — but without this fallback it would mint a FRESH customer on every
+    // registration attempt, orphaning her card, her stamp and her wallet pass.
+    if (found == null) {
+      found = await this.findCustomerByRaw(c, tenantId, lookupChannelIds, input.rawValue);
+    }
     const customerId =
       found ?? (await this.createCustomer(c, tenantId, input.displayName ?? null));
     const created = found == null;
@@ -306,6 +313,35 @@ export class IdentityResolver {
     return rows[0]?.customerId ?? null;
   }
 
+  /**
+   * O-3 fallback: find the customer by an EXACT raw value, for raws that cannot be
+   * normalized (so `normalized_value` is NULL and the deterministic spine can't match).
+   * Without this, every registration attempt with such a number mints a new person.
+   */
+  private async findCustomerByRaw(
+    c: PoolClient | null,
+    tenantId: string,
+    channelIds: string[],
+    rawValue: string | null,
+  ): Promise<string | null> {
+    const raw = (rawValue ?? '').trim();
+    if (raw === '') return null;
+    const { rows } = await this.run<{ customerId: string }>(
+      c,
+      `SELECT coalesce(m.id, cu.id)::text AS "customerId"
+         FROM tenant.contact ct
+         JOIN tenant.customer cu ON cu.id = ct.customer_id
+         LEFT JOIN tenant.customer m ON m.id = cu.merged_into_id
+        WHERE ct.business_id = $1::uuid
+          AND ct.channel_id = ANY($2::uuid[])
+          AND (ct.raw_phone_number = $3 OR ct.raw_value = $3)
+        ORDER BY ct.is_primary DESC, ct.updated_at DESC
+        LIMIT 1`,
+      [tenantId, channelIds, raw],
+    );
+    return rows[0]?.customerId ?? null;
+  }
+
   private async createCustomer(
     c: PoolClient,
     tenantId: string,
@@ -373,11 +409,14 @@ export class IdentityResolver {
     );
     const isPrimary = primaryExists.length === 0;
 
+    // normalized_value is NOT supplied: tenant.tg_contact_normalize derives it from the
+    // raw value (BACKFILL_METHODOLOGY L15). The app writing its own normalization here is
+    // exactly what kept the corruption self-consistent; `api` is also REVOKEd on the column.
     const { rows } = await c.query<{ id: string }>(
       `INSERT INTO tenant.contact
          (business_id, customer_id, channel_id, raw_phone_number, raw_value,
-          normalized_value, is_primary, verified, verified_via)
-       VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9)
+          is_primary, verified, verified_via)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8)
        RETURNING id::text AS id`,
       [
         i.tenantId,
@@ -385,7 +424,6 @@ export class IdentityResolver {
         i.channelId,
         i.isPhoneFamily ? i.rawValue : null,
         i.isPhoneFamily ? null : i.rawValue,
-        i.normalized,
         isPrimary,
         i.verified,
         i.verified ? verifiedVia : 'self_asserted',

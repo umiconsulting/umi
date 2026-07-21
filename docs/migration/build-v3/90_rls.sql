@@ -53,6 +53,12 @@ grant select on umi.effective_entitlement to api;
 revoke insert, update, delete on
   tenant.conversation_analytics, tenant.order_total, tenant.order_ticket from api;
 
+--   tenant.contact.normalized_value is DERIVED by tenant.tg_contact_normalize (60_triggers),
+--   never supplied. Revoking the column makes it UNFORGEABLE: an app can no longer write a
+--   hand-rolled normalization into it, which is exactly how the L15 corruption stayed
+--   self-consistent (same broken function on read and write). raw is the truth.
+revoke update (normalized_value) on tenant.contact from api;
+
 --   runtime — only the machinery the request path legitimately serves, scoped:
 grant select, insert, update on runtime.conversation_state to api;   -- live convo FSM
 grant select, insert          on runtime.reminder_sent    to api;    -- nudge dedup
