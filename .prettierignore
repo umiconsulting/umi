@@ -18,3 +18,12 @@ apps/umi-kds/
 
 # FROZEN app — do not reformat until the dashboard cutover
 apps/umi-cash/
+
+# Agent procedure layer — AUTHORED markdown, not generated code.
+# 343 of the repo's 648 Prettier offenders (53%) live here. Prettier's Markdown
+# printer would reflow prose, tables and code fences across every skill purely to
+# satisfy a formatter that has never run on them — churn with no reader benefit,
+# and it would fight the .agents -> .claude/skills symlink invariant that
+# adapter-sync-check guards. Skills are edited as prose; leave them as written.
+# (.claude/skills is a symlink INTO this directory, so one rule covers both.)
+.agents/skills/
