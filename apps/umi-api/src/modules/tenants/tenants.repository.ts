@@ -38,10 +38,11 @@ export interface LocationProfileRow extends LocationRow {
  * ENTITLEMENTS use the worker pool — the latter is MANDATORY because entitlements
  * live in the SEALED `umi` schema (no umi_app USAGE on `umi`).
  *
- * 4-schema model (canonical rebuild v2): core.tenants -> tenant.business,
- * core.locations -> tenant.branch, core.product_instances -> the entitlement
- * cluster read via `umi.effective_entitlement` (tenant granularity — no
- * location_id), RBAC -> tenant.tenant_access single role.
+ * build-v3 model: core.tenants -> tenant.business, core.locations -> tenant.branch,
+ * core.product_instances -> the entitlement cluster read via
+ * `umi.effective_entitlement` (business granularity — no location_id),
+ * RBAC -> `umi.user_role` grants joined to the `umi.role` catalog (a user may hold
+ * several roles per business, so roles come back as an array).
  */
 @Injectable()
 export class TenantsRepository {

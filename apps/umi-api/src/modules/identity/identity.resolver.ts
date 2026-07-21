@@ -156,12 +156,10 @@ export class IdentityResolver {
     const contactId = await this.ensureContact(c, {
       tenantId,
       customerId,
-      channelId: channel.id,
-      isPhoneFamily: channel.normalizationRule === 'e164',
+      channel,
       rawValue: input.rawValue,
       normalized,
       verified: input.verified ?? false,
-      channelKey,
     });
 
     return { contactId, customerId, created };
@@ -366,27 +364,28 @@ export class IdentityResolver {
     i: {
       tenantId: string;
       customerId: string;
-      channelId: string;
-      isPhoneFamily: boolean;
+      channel: ChannelRow;
       rawValue: string | null;
       normalized: string | null;
       verified: boolean;
-      channelKey: string;
     },
   ): Promise<string> {
+    // channelId / key / phone-family are all facets of the one resolved channel row;
+    // passing them separately let a caller supply an inconsistent trio.
+    const isPhoneFamily = i.channel.normalizationRule === 'e164';
     const { rows: existing } = await c.query<{ id: string }>(
       `SELECT id::text AS id FROM tenant.contact
         WHERE business_id = $1::uuid AND customer_id = $2::uuid AND channel_id = $3::uuid
           AND normalized_value IS NOT DISTINCT FROM $4
         LIMIT 1`,
-      [i.tenantId, i.customerId, i.channelId, i.normalized],
+      [i.tenantId, i.customerId, i.channel.id, i.normalized],
     );
     // `verified` means PROVEN, and the only proof we hold is an inbound WhatsApp message
     // from that number. Deriving BOTH columns from this one boolean makes the
     // contradictory pair (verified=true, self_asserted) unrepresentable in code, the way
     // constraint contact_verified_needs_proof makes it unrepresentable in the DB.
     // It gates proactive messaging, so "verified" must never mean "the customer typed it".
-    const proven = (i.verified ?? false) && i.channelKey === 'whatsapp';
+    const proven = (i.verified ?? false) && i.channel.key === 'whatsapp';
     if (existing[0]) {
       // Refresh; only ever upgrade verified false→true (whatsapp_inbound proves it).
       await c.query(
@@ -405,7 +404,7 @@ export class IdentityResolver {
       `SELECT 1 AS n FROM tenant.contact
         WHERE business_id = $1::uuid AND customer_id = $2::uuid AND channel_id = $3::uuid
           AND is_primary LIMIT 1`,
-      [i.tenantId, i.customerId, i.channelId],
+      [i.tenantId, i.customerId, i.channel.id],
     );
     const isPrimary = primaryExists.length === 0;
 
@@ -421,9 +420,9 @@ export class IdentityResolver {
       [
         i.tenantId,
         i.customerId,
-        i.channelId,
-        i.isPhoneFamily ? i.rawValue : null,
-        i.isPhoneFamily ? null : i.rawValue,
+        i.channel.id,
+        isPhoneFamily ? i.rawValue : null,
+        isPhoneFamily ? null : i.rawValue,
         isPrimary,
         proven,
         proven ? 'whatsapp_inbound' : 'self_asserted',

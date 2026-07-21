@@ -25,6 +25,3 @@ export function roleToSender(role: string): DbSender {
       return 'system'; // system, tool, or unknown
   }
 }
-
-/** The DB sender for an inbound customer message (filter value). */
-export const CUSTOMER_SENDER: DbSender = 'customer';

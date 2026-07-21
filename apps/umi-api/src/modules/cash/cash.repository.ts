@@ -19,7 +19,7 @@ export interface AnalyticsWindows {
  * purchase) is gone: topups = card_ledger reason='topup', revenue = |delta| where
  * reason='purchase'. Loyalty is program-less (config in `tenant.loyalty_program`,
  * one reward threshold in `tenant.loyalty_reward`). Identity phone/email come from
- * `tenant.contact_identity`.
+ * `tenant.contact` (flat: channel_id + normalized_value -> customer).
  */
 @Injectable()
 export class CashRepository {

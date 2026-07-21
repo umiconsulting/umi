@@ -1,10 +1,11 @@
 /**
- * Role model. A role is now a single enum value on the `tenant.tenant_access`
- * edge (one role per login per tenant) — never a column on a person.
- * Precedence is highest-first; `super_admin` implies all permissions (`*`).
- * `developer`/`tech_assist` are PARKED at the DB layer (not admitted to the
- * tenant_access / role_permission CHECKs) — kept here inert for forward-compat
- * so promoting them later is a pure DDL change with zero code churn.
+ * Role model. A role is a `umi.role` catalog row, granted through `umi.user_role`
+ * (user × role × scope) — never a column on a person. One human may hold MANY roles,
+ * so callers reduce the set with `normalizeRoleKey`; precedence is highest-first.
+ * A grant with `business_id IS NULL` is platform-wide, which is how `super_admin`
+ * reaches every business; `super_admin` implies all permissions (`*`).
+ * `developer`/`tech_assist` are PARKED (no `umi.role` row) — kept here inert for
+ * forward-compat so promoting them later is a pure seed change with zero code churn.
  */
 export const ROLE_PRECEDENCE = [
   'super_admin',

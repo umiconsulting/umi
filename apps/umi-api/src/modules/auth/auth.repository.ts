@@ -57,11 +57,14 @@ export interface ResetTokenRecord {
  * `super_admin` is Umi's cross-tenant operator: a user holding ANY `umi.user_role`
  * with role `super_admin` can select/access EVERY active business.
  *
- * PENDING (Phase 3a coordinated change — owner decision 2026-07-12 "route by id"):
- * `findTenantsForUser` / `findMembershipAccess` / `tenantIdForSlug` / `tenantBySlug`
- * still read `tenant.tenant_access` + the dropped `slug` column. That rewrite
- * (tenant_access→umi.user_role FK joins + drop slug, route by business id) changes
- * the /me/tenants + tenant-access API contract, so it lands with the dashboard.
+ * DONE: `findTenantsForUser` / `findMembershipAccess` now read `umi.user_role` joined
+ * to the `umi.role` catalog (multi-role, aggregated), and a `business_id IS NULL`
+ * grant is platform-wide.
+ *
+ * STILL PENDING (P5, "route by id"): `tenantIdForSlug` / `tenantBySlug` read the
+ * dropped `slug` column, and the queries above return the business id AS "slug" as an
+ * interim. Closing both halves changes the /me/tenants + tenant-access API contract,
+ * so it lands as a coordinated @umi/contract release with the dashboard.
  */
 @Injectable()
 export class AuthRepository {

@@ -676,7 +676,7 @@ export class KdsRepository {
 
   /**
    * Board snapshot for a device. Reads the canonical projection, resolves
-   * customer name (`tenant.customer`) + reply phone (`tenant.contact_identity`),
+   * customer name (`tenant.customer`) + reply phone (`tenant.contact`),
    * derives `last_event_sequence`, and scopes by tenant + station (NULL station =
    * broadcast, matching the legacy `get_board_snapshot`). Only on-board
    * (non-terminal) statuses are returned. The service remaps items to the frozen

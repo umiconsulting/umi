@@ -103,7 +103,7 @@ export class CashWriteRepository {
                 cu.contact_id::text                                      AS person_id,
                 cu.name                                                  AS display_name,
                 NULL::text                                               AS normalized_email
-                -- normalized_email lives in tenant.contact_identity → PR4 identity resolver
+                -- email reachability lives in tenant.contact (channel_type 'email')
          FROM tenant.loyalty_card AS c
          LEFT JOIN tenant.customer AS cu
            ON cu.business_id = c.business_id AND cu.id = c.customer_id
