@@ -191,17 +191,47 @@ $$;
 ALTER FUNCTION core.resolve_contact(uuid, text, text, text, text, text) OWNER TO postgres;
 
 -- ============================================================================
--- Verification. Run after applying. Expect a person id back, and a non-NULL
--- normalized_phone on the row it returns.
+-- Verification. Run on the PREVIEW database (db/preview/README.md) — it is
+-- schema-identical to live and holds synthetic data only. Substitute a tenant id
+-- and uncomment.
 --
---   select core.resolve_contact(
---     '<tenant_uuid>'::uuid, 'phone', '6671368634', 'Preflight Check', 'preflight', NULL);
---   select id, display_name, normalized_phone from core.people
---    where display_name = 'Preflight Check';
+-- Two traps this block exists to avoid. Do NOT check the result by filtering on
+-- display_name: resolve_contact sets that column only on INSERT, so when the
+-- number already belongs to someone it returns their row with their real name
+-- untouched, and a display_name filter comes back empty on a function that
+-- worked perfectly. And do NOT probe with a real customer's number — resolving
+-- it mutates that customer's row, and a cleanup step aimed at the probe would
+-- delete them. The number below is a throwaway, and the delete refuses to touch
+-- anyone who has an account.
 --
--- Run it twice: the second call must return the SAME id (idempotent) and must not
--- create a second person or contact_method. Then clean up.
+--   do $verify$
+--   declare
+--     v_tenant uuid := '<tenant_uuid>';
+--     v_a uuid; v_b uuid; v_phone text; v_contacts int; v_deleted int;
+--   begin
+--     -- separate statements, so the second call genuinely sees the first's write
+--     v_a := core.resolve_contact(v_tenant,'phone','5550000001','Preflight Check','preflight',null);
+--     v_b := core.resolve_contact(v_tenant,'phone','555 000 0001','Preflight Check','preflight',null);
 --
--- Do this on the preview database first (db/preview/README.md) — it is schema-
--- identical to live and holds synthetic data only.
+--     select normalized_phone into v_phone from core.people where id = v_a;
+--     select count(*) into v_contacts from core.contact_methods
+--      where tenant_id = v_tenant and normalized_value = '+525550000001';
+--
+--     assert v_a = v_b,                 'NOT IDEMPOTENT: one number resolved to two people';
+--     assert v_phone = '+525550000001', 'normalized_phone not written, got: ' || coalesce(v_phone,'NULL');
+--     assert v_contacts = 1,            'expected 1 contact_method, got ' || v_contacts;
+--     raise notice 'PASS - person %, normalized_phone %', v_a, v_phone;
+--
+--     -- clean up only the throwaway: a real customer would have an account
+--     delete from core.people p where p.id = v_a
+--       and not exists (select 1 from loyalty.accounts a where a.person_id = p.id);
+--     get diagnostics v_deleted = row_count;
+--     assert v_deleted = 1, 'probe row not removed - it has an account, inspect before deleting';
+--   end
+--   $verify$;
+--
+-- To confirm the heal path against real data instead, pick a person who is still
+-- NULL and resolve their own number, then re-read that same id:
+--
+--   select id from core.people where normalized_phone is null limit 1;
 -- ============================================================================
