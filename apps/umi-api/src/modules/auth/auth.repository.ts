@@ -142,10 +142,15 @@ export class AuthRepository {
     const { rows } = await this.pg.query<MembershipAccess>(
       `WITH ${SUPER_ADMIN_SA_CTE},
        grants AS (
+         -- business_id IS NULL is a PLATFORM-WIDE grant (umi.user_role: 'NULL =
+         -- platform-wide grant (superadmin)'), so it applies to every business —
+         -- otherwise a super_admin would be capped by whatever lesser role they happen
+         -- to hold on a given café, or locked out of one they hold no grant on.
          SELECT ur.id, r.key AS role_key
          FROM umi.user_role AS ur
          JOIN umi.role AS r ON r.id = ur.role_id
-         WHERE ur.user_id = $1::uuid AND ur.business_id = $2::uuid
+         WHERE ur.user_id = $1::uuid
+           AND (ur.business_id = $2::uuid OR ur.business_id IS NULL)
        )
        SELECT
          (SELECT id::text FROM grants ORDER BY id LIMIT 1) AS "membershipId",

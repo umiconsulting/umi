@@ -24,6 +24,26 @@ select 'super_admin',
        true
 where not exists (select 1 from umi.role where key = 'super_admin');
 
+-- Cross-tenant operator (owner decision 2026-07-21). backfill_identity notes the source
+-- modelled this as admin-on-every-tenant, which left hola@ without access to Northwest
+-- Café and made SUPER_ADMIN_SA_CTE dead code (nobody held the role, in v2 or v3). Make
+-- the concept REAL instead: a PLATFORM-WIDE grant — business_id NULL, exactly what
+-- umi.user_role documents as 'NULL = platform-wide grant (superadmin)'.
+-- NOTE: umi.user_role's RLS policy is business_id = umi.current_business(), which a NULL
+-- can never satisfy, so this row is deliberately invisible to the `api` pool; the auth
+-- queries that read it run on the worker pool.
+insert into umi.user_role (user_id, role_id, business_id, branch_id)
+select u.id, r.id, null, null
+from umi.user u
+cross join umi.role r
+where u.email = 'hola@umiconsulting.co'
+  and r.key = 'super_admin'
+  and not exists (
+    select 1 from umi.user_role x
+     where x.user_id = u.id and x.role_id = r.id
+       and x.business_id is null and x.branch_id is null
+  );
+
 -- role -> permission grants.
 insert into umi.role_permission (role_id, permission_id)
 select r.id, p.id
