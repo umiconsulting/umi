@@ -112,7 +112,7 @@ export class MemoryService {
             embedding: queryEmbedding,
             limit: 5,
             excludeRecent: 8,
-            roles: ['user'],
+            roles: ['customer'], // DB sender vocabulary (was LLM 'user'); see message-vocab.ts
           });
 
           if (similarMsgs.length === 0) {

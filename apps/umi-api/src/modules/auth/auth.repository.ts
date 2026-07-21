@@ -47,8 +47,8 @@ export interface ResetTokenRecord {
  * Auth/membership/entitlement reads. These run BEFORE any tenant RLS context
  * exists (login resolves which tenants a user has), so they use the worker pool
  * (`query`) with explicit parameterized predicates — never `withTenant`. The
- * worker pool is also MANDATORY here because the entitlement + RBAC-policy tables
- * (`umi.subscription_item`, `umi.role_permission`) live in the SEALED `umi`
+ * worker pool is also MANDATORY here because the entitlement + RBAC-policy sources
+ * (`umi.effective_entitlement`, `umi.role_permission`) live in the SEALED `umi`
  * schema that `umi_app` has no USAGE on.
  *
  * build-v3 model: staff credentials + identity live on `umi.user` (email + hash +
@@ -57,11 +57,14 @@ export interface ResetTokenRecord {
  * `super_admin` is Umi's cross-tenant operator: a user holding ANY `umi.user_role`
  * with role `super_admin` can select/access EVERY active business.
  *
- * PENDING (Phase 3a coordinated change — owner decision 2026-07-12 "route by id"):
- * `findTenantsForUser` / `findMembershipAccess` / `tenantIdForSlug` / `tenantBySlug`
- * still read `tenant.tenant_access` + the dropped `slug` column. That rewrite
- * (tenant_access→umi.user_role FK joins + drop slug, route by business id) changes
- * the /me/tenants + tenant-access API contract, so it lands with the dashboard.
+ * DONE: `findTenantsForUser` / `findMembershipAccess` now read `umi.user_role` joined
+ * to the `umi.role` catalog (multi-role, aggregated), and a `business_id IS NULL`
+ * grant is platform-wide.
+ *
+ * STILL PENDING (P5, "route by id"): `tenantIdForSlug` / `tenantBySlug` read the
+ * dropped `slug` column, and the queries above return the business id AS "slug" as an
+ * interim. Closing both halves changes the /me/tenants + tenant-access API contract,
+ * so it lands as a coordinated @umi/contract release with the dashboard.
  */
 @Injectable()
 export class AuthRepository {
@@ -110,17 +113,18 @@ export class AuthRepository {
       `WITH ${SUPER_ADMIN_SA_CTE}
        SELECT
          t.id::text AS "id",
-         t.slug     AS "slug",
+         t.id::text AS "slug",
          t.name     AS "name",
-         ARRAY[COALESCE(ta.role, 'super_admin')] AS "roles"
+         COALESCE(array_agg(r.key) FILTER (WHERE r.key IS NOT NULL),
+                  ARRAY['super_admin']) AS "roles"
        FROM tenant.business AS t
-       LEFT JOIN tenant.tenant_access AS ta
-         ON ta.business_id = t.id
-        AND ta.login_id  = $1::uuid
-        AND ta.status    = 'active'
+       LEFT JOIN umi.user_role AS ur
+         ON ur.business_id = t.id AND ur.user_id = $1::uuid
+       LEFT JOIN umi.role AS r ON r.id = ur.role_id
        WHERE t.status = 'active'
-         AND (ta.id IS NOT NULL OR (SELECT is_sa FROM sa))
-       ORDER BY t.slug`,
+         AND (ur.id IS NOT NULL OR (SELECT is_sa FROM sa))
+       GROUP BY t.id, t.name
+       ORDER BY t.name`,
       [userId],
     );
     return rows;
@@ -140,32 +144,37 @@ export class AuthRepository {
   ): Promise<MembershipAccess | null> {
     const { rows } = await this.pg.query<MembershipAccess>(
       `WITH ${SUPER_ADMIN_SA_CTE},
-       edge AS (
-         SELECT ta.id, ta.role
-         FROM tenant.tenant_access AS ta
-         WHERE ta.login_id = $1::uuid
-           AND ta.business_id = $2::uuid
-           AND ta.status = 'active'
-         LIMIT 1
+       grants AS (
+         -- business_id IS NULL is a PLATFORM-WIDE grant (umi.user_role: 'NULL =
+         -- platform-wide grant (superadmin)'), so it applies to every business —
+         -- otherwise a super_admin would be capped by whatever lesser role they happen
+         -- to hold on a given café, or locked out of one they hold no grant on.
+         SELECT ur.id, r.key AS role_key
+         FROM umi.user_role AS ur
+         JOIN umi.role AS r ON r.id = ur.role_id
+         WHERE ur.user_id = $1::uuid
+           AND (ur.business_id = $2::uuid OR ur.business_id IS NULL)
        )
        SELECT
-         e.id::text  AS "membershipId",
+         (SELECT id::text FROM grants ORDER BY id LIMIT 1) AS "membershipId",
          t.id::text  AS "tenantId",
-         t.slug      AS "slug",
+         t.id::text  AS "slug",
          t.name      AS "name",
          t.timezone  AS "timezone",
-         ARRAY[COALESCE(e.role, 'super_admin')] AS "roles",
+         COALESCE((SELECT array_agg(role_key) FROM grants),
+                  ARRAY['super_admin']) AS "roles",
          COALESCE(
-           (SELECT array_agg(rp.permission_key)
+           (SELECT array_agg(DISTINCT p.key)
               FROM umi.role_permission AS rp
-             WHERE rp.role = COALESCE(e.role, 'super_admin')),
+              JOIN umi.role AS r        ON r.id = rp.role_id
+              JOIN umi.permission AS p  ON p.id = rp.permission_id
+             WHERE r.key IN (SELECT role_key FROM grants)),
            '{}'
          ) AS "permissions"
        FROM tenant.business AS t
-       LEFT JOIN edge AS e ON true
        WHERE t.id = $2::uuid
          AND t.status = 'active'
-         AND (e.id IS NOT NULL OR (SELECT is_sa FROM sa))
+         AND (EXISTS (SELECT 1 FROM grants) OR (SELECT is_sa FROM sa))
        LIMIT 1`,
       [userId, tenantId],
     );
@@ -193,20 +202,27 @@ export class AuthRepository {
   }
 
   /**
-   * Tenant-level product entitlement status. Entitlements live in the sealed
-   * `umi.subscription_item` (tenant granularity — no location_id), read on the
-   * worker pool.
+   * Tenant-level product entitlement status — the SINGLE SOURCE is the derived
+   * `umi.effective_entitlement` view (plan_feature overlaid by override, already
+   * filtered to trialing/active subscriptions). A feature is entitled iff an
+   * `enabled` row exists for it; we join `umi.subscription` back for the café's
+   * real status so the guard keeps its `active`/`trialing` vocabulary. Read on the
+   * worker pool, which is BYPASSRLS — the view is `security_invoker`, so RLS does
+   * NOT scope it here; the explicit `business_id` predicate does. Returns null when
+   * the feature is absent/disabled (→ `product_not_active`).
    */
   async productStatus(
     tenantId: string,
     productKey: string,
   ): Promise<string | null> {
     const { rows } = await this.pg.query<{ status: string }>(
-      `SELECT status
-       FROM umi.subscription_item
-       WHERE business_id = $1::uuid
-         AND product_key = $2
-       LIMIT 1`,
+      `SELECT s.status
+         FROM umi.effective_entitlement AS ee
+         JOIN umi.subscription          AS s ON s.business_id = ee.business_id
+        WHERE ee.business_id = $1::uuid
+          AND ee.feature_key = $2
+          AND ee.enabled
+        LIMIT 1`,
       [tenantId, productKey],
     );
     return rows[0]?.status ?? null;

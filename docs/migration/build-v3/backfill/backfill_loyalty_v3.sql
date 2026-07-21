@@ -16,12 +16,17 @@ select p.id, p.tenant_id, p.display_name, p.birth_date, 'active',
        p.created_at, coalesce(p.updated_at, p.created_at)
 from core.people p;
 
--- 3. contact <- core.contact_methods  (raw truth + derived; verified fact)
+-- 3. contact <- core.contact_methods  (raw truth; normalized is DERIVED, never carried)
+--    normalized_value is deliberately NOT inserted: tenant.tg_contact_normalize derives
+--    it from the raw value via umi.e164 (BACKFILL_METHODOLOGY L15). Carrying the source
+--    column would import prod's corruption verbatim — the fatal country-code-1 branch
+--    rewrote real +1 numbers into Mexican numbers belonging to nobody. Letting the
+--    trigger derive repairs those rows in place, with no UPDATE pass.
 insert into tenant.contact (id, business_id, customer_id, channel_id,
-                            raw_phone_number, normalized_value, is_primary,
+                            raw_phone_number, is_primary,
                             verified, verified_via, created_at)
 select cm.id, cm.tenant_id, cm.person_id, ch.id,
-       cm.display_value, cm.normalized_value, coalesce(cm.is_primary,false),
+       cm.display_value, coalesce(cm.is_primary,false),
        (cm.verified_at is not null),
        case when cm.verified_at is not null then 'whatsapp_inbound' else 'self_asserted' end,
        cm.created_at

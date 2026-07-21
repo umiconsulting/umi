@@ -82,7 +82,8 @@ export class MemoryRepository {
           ORDER BY created_at DESC
           LIMIT $6
        )
-       SELECT m.sender AS role,
+       SELECT CASE m.sender WHEN 'customer' THEN 'user' WHEN 'bot' THEN 'assistant'
+                            WHEN 'staff' THEN 'assistant' ELSE 'system' END AS role,
               COALESCE(m.body, '') AS content,
               m.created_at,
               m.conversation_id::text AS conversation_id,
@@ -123,7 +124,8 @@ export class MemoryRepository {
           ORDER BY created_at DESC
           LIMIT $3
        )
-       SELECT m.sender AS role,
+       SELECT CASE m.sender WHEN 'customer' THEN 'user' WHEN 'bot' THEN 'assistant'
+                            WHEN 'staff' THEN 'assistant' ELSE 'system' END AS role,
               COALESCE(m.body, '') AS content,
               m.created_at,
               m.conversation_id::text AS conversation_id,

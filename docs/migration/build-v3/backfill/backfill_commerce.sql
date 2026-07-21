@@ -89,23 +89,42 @@ where coalesce(btrim(v->>'name'), '') <> '';
 --    only NEW facts are folded as columns (owner rule: no rescue table).
 --    open_hours COLUMN built from the typed ops.business_hours rows (Kalala only).
 --    DROPPED (no build-v3 home, deliberately not modeled): id, business_type,
---      branding.{secondary_color,strip_image_url,pass_style,promo_message},
+--      branding.{strip_image_url,pass_style,promo_message},  -- secondary_color now folded to a typed column
 --      config.{payment_methods,order_cutoff_time,slack_channel_id,
 --      slack_channel_name,accepts_whatsapp_orders,bypass_phones,special_notice},
 --      config.hours/open_times (redundant with business_hours below).
---    FLAGGED to OTHER domains (not folded here):
---      config.whatsapp -> tenant.integration(provider='twilio').external_account_id
+--    FLAGGED to OTHER domains:
+--      config.whatsapp -> tenant.integration(provider='twilio')  [FOLDED BELOW, 3b]
 --      config.address  -> tenant.branch.address
 -- ----------------------------------------------------------------------------
 update tenant.business b set
   city        = coalesce(nullif(btrim(o.city), ''), b.city),
-  logo_url    = coalesce(o.branding->>'logo_url', b.logo_url),
-  brand_color = coalesce(o.branding->>'primary_color', b.brand_color),
+  logo_url        = coalesce(o.branding->>'logo_url', b.logo_url),
+  brand_color     = coalesce(o.branding->>'primary_color', b.brand_color),
+  secondary_color = coalesce(o.branding->>'secondary_color', b.secondary_color),
   bot_voice   = coalesce(o.config->'voice'->>'assistant_name', b.bot_voice),
   bot_tone    = coalesce(o.config->'voice'->>'tone_preset', b.bot_tone),
   updated_at  = now()
 from ops.businesses o
 where b.id = o.tenant_id;
+
+-- 3b. ops.businesses.config->>'whatsapp'  ->  tenant.integration(provider='twilio')
+--     The INBOUND-ROUTING number: "a WhatsApp message arrived at N — which café owns
+--     it?" Without this the bot resolves nothing after cutover and fails CLOSED, so it
+--     looks like silence rather than an error. Only Kalala has a number today.
+--     ⚠️ The old ops.channel_accounts / ops.channels pair is EMPTY in prod — the live
+--     number lives in the business config blob, which is why this fold is the only
+--     source. provider='twilio' (NOT 'whatsapp' — that value violates the CHECK).
+--     Stored as BARE E.164: Twilio delivers 'whatsapp:+52…' and the backend strips the
+--     prefix before matching, so normalizing here keeps one canonical form and lets
+--     unique(provider, external_account_id) actually bite.
+insert into tenant.integration (business_id, provider, external_account_id, status)
+select o.tenant_id,
+       'twilio',
+       regexp_replace(btrim(o.config->>'whatsapp'), '^whatsapp:', ''),
+       'connected'
+from ops.businesses o
+where nullif(btrim(coalesce(o.config->>'whatsapp', '')), '') is not null;
 
 with oh as (
   select tenant_id,

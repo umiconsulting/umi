@@ -36,11 +36,13 @@ export interface LocationProfileRow extends LocationRow {
  * `withTenant` (umi_app, RLS) while still carrying explicit `business_id`
  * predicates (defense in depth). The cross-tenant `/me/tenants` list and product
  * ENTITLEMENTS use the worker pool — the latter is MANDATORY because entitlements
- * moved to the SEALED `umi.subscription_item` (no umi_app USAGE on `umi`).
+ * live in the SEALED `umi` schema (no umi_app USAGE on `umi`).
  *
- * 4-schema model (canonical rebuild v2): core.tenants -> tenant.business,
- * core.locations -> tenant.branch, core.product_instances -> umi.subscription_item
- * (tenant granularity — no location_id), RBAC -> tenant.tenant_access single role.
+ * build-v3 model: core.tenants -> tenant.business, core.locations -> tenant.branch,
+ * core.product_instances -> the entitlement cluster read via
+ * `umi.effective_entitlement` (business granularity — no location_id),
+ * RBAC -> `umi.user_role` grants joined to the `umi.role` catalog (a user may hold
+ * several roles per business, so roles come back as an array).
  */
 @Injectable()
 export class TenantsRepository {
@@ -56,27 +58,33 @@ export class TenantsRepository {
       `WITH ${SUPER_ADMIN_SA_CTE}
        SELECT
          t.id::text AS "id",
-         t.slug     AS "slug",
+         t.id::text AS "slug",
          t.name     AS "name",
          t.timezone AS "timezone",
-         ARRAY[COALESCE(ta.role, 'super_admin')] AS "roles"
+         COALESCE(array_agg(r.key) FILTER (WHERE r.key IS NOT NULL),
+                  ARRAY['super_admin']) AS "roles"
        FROM tenant.business AS t
-       LEFT JOIN tenant.tenant_access AS ta
-         ON ta.business_id = t.id
-        AND ta.login_id  = $1::uuid
-        AND ta.status    = 'active'
+       LEFT JOIN umi.user_role AS ur
+         ON ur.business_id = t.id AND ur.user_id = $1::uuid
+       LEFT JOIN umi.role AS r ON r.id = ur.role_id
        WHERE t.status = 'active'
-         AND (ta.id IS NOT NULL OR (SELECT is_sa FROM sa))
-       ORDER BY t.slug`,
+         AND (ur.id IS NOT NULL OR (SELECT is_sa FROM sa))
+       GROUP BY t.id, t.name, t.timezone
+       ORDER BY t.name`,
       [userId],
     );
     return rows;
   }
 
   /**
-   * Tenant-level product entitlements. Reads the SEALED umi.subscription_item on
-   * the WORKER pool (umi_app has no USAGE on `umi`). Entitlements are tenant-
-   * grained now — locationId is always null (kept for result-shape stability).
+   * Tenant-level product entitlements — the SINGLE SOURCE is the derived
+   * `umi.effective_entitlement` view (same source the EntitlementGuard reads), so
+   * the capabilities map and per-request gating can never disagree. Each `enabled`
+   * feature becomes a product keyed by `feature_key`, carrying the café's real
+   * subscription status (joined from `umi.subscription`). Read on the WORKER pool
+   * (BYPASSRLS): the view is `security_invoker`, so the explicit `business_id`
+   * predicate — not RLS — scopes it. `locationId` stays null (tenant-grained) and
+   * `config` is `{}` (build-v3 carries no per-product config in this view).
    */
   async loadProducts(
     tenantId: string,
@@ -84,20 +92,43 @@ export class TenantsRepository {
     const { rows } = await this.pg.query<{
       productKey: string;
       status: string;
-      config: Record<string, unknown> | null;
     }>(
-      `SELECT product_key AS "productKey", status, config
-         FROM umi.subscription_item
-        WHERE business_id = $1::uuid
-        ORDER BY product_key`,
+      `SELECT ee.feature_key AS "productKey", s.status
+         FROM umi.effective_entitlement AS ee
+         JOIN umi.subscription          AS s ON s.business_id = ee.business_id
+        WHERE ee.business_id = $1::uuid
+          AND ee.enabled
+        ORDER BY ee.feature_key`,
       [tenantId],
     );
     return Object.fromEntries(
       rows.map((r) => [
         r.productKey,
-        { status: r.status, locationId: null, config: r.config ?? {} },
+        { status: r.status, locationId: null, config: {} },
       ]),
     );
+  }
+
+  /**
+   * Tenant branding for the dashboard settings/theming payload. build-v3 keeps
+   * branding as TYPED columns on `tenant.business` (`brand_color`,
+   * `secondary_color`, `logo_url` — "add columns rather than a catch-all blob").
+   * Runs on the RLS app pool (`withTenant`) with an explicit `business_id`
+   * predicate, like the other tenant reads.
+   */
+  async loadBranding(
+    tenantId: string,
+  ): Promise<{ brandColor: string | null; secondaryColor: string | null }> {
+    const { rows } = await this.pg.withTenant((c) =>
+      c.query<{ brandColor: string | null; secondaryColor: string | null }>(
+        `SELECT brand_color AS "brandColor", secondary_color AS "secondaryColor"
+         FROM tenant.business
+         WHERE id = $1::uuid
+         LIMIT 1`,
+        [tenantId],
+      ),
+    );
+    return rows[0] ?? { brandColor: null, secondaryColor: null };
   }
 
   /** Branches with the (tenant) timezone, oldest first (tenant-neutral, deterministic). */

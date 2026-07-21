@@ -103,7 +103,7 @@ export class CashWriteRepository {
                 cu.contact_id::text                                      AS person_id,
                 cu.name                                                  AS display_name,
                 NULL::text                                               AS normalized_email
-                -- normalized_email lives in tenant.contact_identity → PR4 identity resolver
+                -- email reachability lives in tenant.contact (channel_type 'email')
          FROM tenant.loyalty_card AS c
          LEFT JOIN tenant.customer AS cu
            ON cu.business_id = c.business_id AND cu.id = c.customer_id
@@ -314,7 +314,7 @@ export class CashWriteRepository {
 
   /**
    * Resolve a customer + their card by phone (normalized) or email over the
-   * identity graph (build-v2): `tenant.contact_identity` → `tenant.customer` →
+   * flat identity model: `tenant.contact` → `tenant.customer` →
    * `tenant.loyalty_card` by `customer_id`. Phone matches across the e164 family (a
    * WhatsApp-only contact resolves the same customer); email matches the `email`
    * channel. `personId` is the `tenant.customer.id`.
@@ -333,12 +333,12 @@ export class CashWriteRepository {
         customer = (
           await c.query<Row>(
             `SELECT cu.id::text AS id, cu.name AS display_name
-               FROM tenant.contact_identity ci
-               JOIN tenant.channel ch  ON ch.id = ci.channel_id
-               JOIN tenant.customer cu ON cu.business_id = ci.business_id AND cu.contact_id = ci.contact_id
-              WHERE ci.business_id = $1::uuid AND ci.normalized_value = $2
-                AND ch.normalization_rule = 'e164'
-              ORDER BY ci.is_primary DESC, ci.last_seen_at DESC LIMIT 1`,
+               FROM tenant.contact ct
+               JOIN umi.channel_type ch ON ch.id = ct.channel_id
+               JOIN tenant.customer cu ON cu.id = ct.customer_id
+              WHERE ct.business_id = $1::uuid AND ct.normalized_value = $2
+                AND ch.key IN ('phone', 'whatsapp', 'sms')
+              ORDER BY ct.is_primary DESC, ct.updated_at DESC LIMIT 1`,
             [tenantId, norm],
           )
         ).rows[0];
@@ -346,11 +346,11 @@ export class CashWriteRepository {
         customer = (
           await c.query<Row>(
             `SELECT cu.id::text AS id, cu.name AS display_name
-               FROM tenant.contact_identity ci
-               JOIN tenant.channel ch  ON ch.id = ci.channel_id
-               JOIN tenant.customer cu ON cu.business_id = ci.business_id AND cu.contact_id = ci.contact_id
-              WHERE ci.business_id = $1::uuid AND ci.normalized_value = $2 AND ch.key = 'email'
-              ORDER BY ci.is_primary DESC, ci.last_seen_at DESC LIMIT 1`,
+               FROM tenant.contact ct
+               JOIN umi.channel_type ch ON ch.id = ct.channel_id
+               JOIN tenant.customer cu ON cu.id = ct.customer_id
+              WHERE ct.business_id = $1::uuid AND ct.normalized_value = $2 AND ch.key = 'email'
+              ORDER BY ct.is_primary DESC, ct.updated_at DESC LIMIT 1`,
             [tenantId, by.email.trim().toLowerCase()],
           )
         ).rows[0];

@@ -2,11 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { IdentityResolver } from '../identity/identity.resolver';
 
 /**
- * WhatsApp-ingress identity, thin adapter over the canonical {@link IdentityResolver}
- * (build-v2). The dropped `core.resolve_contact` SECURITY DEFINER RPC and the old
- * `core.people` / `core.contact_methods` reads are gone: resolution now writes the
- * federated graph `tenant.contact ← tenant.contact_identity`, `tenant.contact ←
- * tenant.customer` deterministically on the BYPASSRLS worker pool.
+ * WhatsApp-ingress identity, thin adapter over the canonical {@link IdentityResolver}.
+ * The dropped `core.resolve_contact` SECURITY DEFINER RPC and the old `core.people` /
+ * `core.contact_methods` reads are gone: resolution now writes the FLAT model —
+ * `tenant.contact` (one reachability row per channel) pointing at `tenant.customer` —
+ * deterministically on the BYPASSRLS worker pool.
  *
  * The id this returns is the resolved `tenant.customer.id` — the value the turn
  * engine threads as `person_id` in job payloads (a customer id, not the legacy
@@ -27,16 +27,12 @@ export class IdentityRepository {
     kind: string;
     rawValue: string;
     displayName?: string | null;
-    sourceSystem?: string | null;
-    externalId?: string | null;
   }): Promise<string | null> {
     const resolved = await this.resolver.resolveIdentity({
       tenantId: params.tenantId,
       channelKey: params.kind,
       rawValue: params.rawValue,
       displayName: params.displayName ?? null,
-      collectedVia: params.sourceSystem ?? null,
-      externalId: params.externalId ?? null,
     });
     return resolved?.customerId ?? null;
   }
@@ -52,9 +48,9 @@ export class IdentityRepository {
 
   /**
    * Customer display name + phones. `phone` is the canonical E.164 anchor
-   * (`tenant.contact_identity.normalized_value`) used for identity/prompt.
+   * (`tenant.contact.normalized_value`) used for identity/prompt.
    * `replyAddress` is the WhatsApp channel address AS RECEIVED
-   * (`tenant.contact_identity.display_value`, channel 'whatsapp') — that, not the
+   * (`tenant.contact.raw_phone_number`, channel 'whatsapp') — that, not the
    * normalized anchor, is what Twilio must reply to. Mexican mobiles arrive as
    * `+521…` (WhatsApp's extra `1`) but normalize to `+52…`; replying to the
    * normalized form fails Twilio **63015** ("number hasn't joined the sandbox").

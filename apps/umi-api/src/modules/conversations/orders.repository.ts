@@ -12,7 +12,7 @@ import type { DraftCartItem } from './conversation.types';
  * appends a `kitchen`/`new` event (so the KDS projection surfaces the ticket), and
  * cancelling appends a `cancellation` event; per-line `kitchen_status` stays on
  * `order_item`. `person_id → customer_id`, `location_id → branch_id`, and the
- * free-form `channel`/`source` collapse onto `channel_id → tenant.channel`.
+ * free-form `channel`/`source` collapse onto `channel_id → umi.channel_type`.
  *
  * Money boundary: the tool layer is in PESOS; this is where it converts to
  * CENTAVOS (`total_cents`, `unit_price_cents`). The `details` jsonb keeps a

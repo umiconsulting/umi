@@ -55,12 +55,12 @@ const DEFAULT_REWARD_NAME = 'Recompensa de temporada';
 const CARD_PERSON_JOIN = `
   JOIN tenant.customer pe ON pe.business_id = c.business_id AND pe.id = c.customer_id
   LEFT JOIN LATERAL (
-    SELECT COALESCE(ci.display_value, ci.normalized_value) AS phone
-      FROM tenant.contact_identity ci
-      JOIN tenant.channel ch ON ch.id = ci.channel_id
-     WHERE ci.business_id = c.business_id AND ci.contact_id = pe.contact_id
-       AND ch.key IN ('whatsapp', 'phone') AND ci.normalized_value IS NOT NULL
-     ORDER BY (ch.key = 'whatsapp') DESC, ci.is_primary DESC, ci.last_seen_at DESC
+    SELECT COALESCE(ct.raw_phone_number, ct.normalized_value) AS phone
+      FROM tenant.contact ct
+      JOIN umi.channel_type ch ON ch.id = ct.channel_id
+     WHERE ct.business_id = c.business_id AND ct.customer_id = pe.id
+       AND ch.key IN ('whatsapp', 'phone') AND ct.normalized_value IS NOT NULL
+     ORDER BY (ch.key = 'whatsapp') DESC, ct.is_primary DESC, ct.updated_at DESC
      LIMIT 1
   ) ph ON true`;
 const HAS_PHONE = `ph.phone IS NOT NULL`;

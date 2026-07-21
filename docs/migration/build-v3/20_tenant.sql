@@ -39,7 +39,8 @@ create table tenant.business (
                       check (menu_source in ('dashboard','pos_sync')),
   -- Branding (typed; add columns rather than a catch-all blob).
   logo_url          text,
-  brand_color       text,
+  brand_color       text,   -- primary brand color (dashboard theming + wallet pass)
+  secondary_color   text,   -- accent color (dashboard theming)
   -- Conversational agent config (owner-confirmed: typed columns on business).
   bot_voice         text,
   bot_tone          text,
@@ -92,7 +93,12 @@ create table tenant.integration (
   connected_at        timestamptz not null default now(),
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now(),
-  unique (business_id, provider)
+  unique (business_id, provider),
+  -- Cross-tenant guard: two businesses may NEVER claim the same external account.
+  -- For provider='twilio' that account IS the inbound WhatsApp sender number, so a
+  -- collision would route one café's customer messages to another café. NULLs stay
+  -- distinct in Postgres, so a business with no number yet is unaffected.
+  unique (provider, external_account_id)
 );
 comment on table tenant.integration is
   'Generic external connection (POS sync / message sender / wallet issuer / AI). '
@@ -131,6 +137,27 @@ create table tenant.customer (
 comment on column tenant.customer.merged_into_id is
   'Non-null = this duplicate was merged into that customer (phone is an unverified soft key).';
 
+-- Resolve a customer to the SURVIVOR at the end of its merge chain. Reads must never
+-- stop at one hop: if A was merged into B and B later into C, a single hop lands on B,
+-- a row that is itself dead — the caller then stamps a card that nobody looks at.
+-- Nothing writes merged_into_id yet (there is no merge flow), so the read side has to
+-- be the robust one. Depth-capped: a cycle (A->B->A) can only ever be created by a bug,
+-- and this must degrade to a wrong-but-terminating answer, never an infinite walk.
+create or replace function tenant.customer_survivor(p_customer_id uuid) returns uuid
+  language sql stable
+  set search_path = pg_catalog as $$
+  with recursive walk(id, merged_into_id, depth) as (
+    select c.id, c.merged_into_id, 0
+      from tenant.customer c where c.id = p_customer_id
+    union all
+    select c.id, c.merged_into_id, w.depth + 1
+      from walk w
+      join tenant.customer c on c.id = w.merged_into_id
+     where w.merged_into_id is not null and w.depth < 16
+  )
+  select id from walk order by depth desc limit 1;
+$$;
+
 create table tenant.contact (
   id                uuid primary key default gen_random_uuid(),
   business_id       uuid not null references tenant.business(id) on delete cascade,
@@ -143,7 +170,13 @@ create table tenant.contact (
   verified          boolean not null default false,
   verified_via      text check (verified_via in ('self_asserted','whatsapp_inbound')),
   created_at        timestamptz not null default now(),
-  updated_at        timestamptz not null default now()
+  updated_at        timestamptz not null default now(),
+  -- verified means PROVEN, and inbound WhatsApp is the only proof we have. Without
+  -- this, (verified=true, verified_via='self_asserted') is representable and directly
+  -- contradicts the column comment below — and `verified` gates who we may proactively
+  -- message, so a self-asserted number could be messaged as if it were consented.
+  constraint contact_verified_needs_proof
+    check (not verified or verified_via = 'whatsapp_inbound')
 );
 comment on table  tenant.contact is
   'Reachability per channel. NOT uniquely keyed on phone — umi-cash collects an UNVERIFIED '

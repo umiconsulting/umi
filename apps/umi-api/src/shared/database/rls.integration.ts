@@ -1,5 +1,8 @@
+import { isProductStatusActive } from '@umi/contract';
 import type { ConfigService } from '@nestjs/config';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { AuthRepository } from '../../modules/auth/auth.repository';
+import { TenantsRepository } from '../../modules/tenants/tenants.repository';
 import type { AppConfig } from '../config/config.schema';
 import { PgService } from './pg.service';
 
@@ -166,5 +169,44 @@ describe('build-v3 RLS · live-DB harness', () => {
     ]);
     expect(await modulesFor('El Gran Ribera')).toEqual(['cash', 'dashboard']);
     expect(await modulesFor('Néctar Café')).toEqual([]);
+  });
+
+  it('AuthRepository.productStatus gates off the entitlement view (worker pool)', async () => {
+    const auth = new AuthRepository(pg);
+    // The café's real subscription status, straight from the source of truth.
+    const sub = await pg.query<{ status: string }>(
+      'select status from umi.subscription where business_id = $1',
+      [id('Kalala Café')],
+    );
+    const kalalaStatus = sub.rows[0].status;
+    // Each entitled feature resolves to the café's ACTUAL status (proves the
+    // join to umi.subscription), and that status grants access…
+    for (const feature of ['cash', 'kds'] as const) {
+      const status = await auth.productStatus(id('Kalala Café'), feature);
+      expect(status, `${feature} status`).toBe(kalalaStatus);
+      expect(isProductStatusActive(status), `${feature} active`).toBe(true);
+    }
+    // …a feature the café isn't entitled to → null → EntitlementGuard 403s…
+    expect(await auth.productStatus(id('El Gran Ribera'), 'kds')).toBeNull();
+    // …and a canceled café is absent from the view entirely (fails closed).
+    expect(await auth.productStatus(id('Néctar Café'), 'cash')).toBeNull();
+  });
+
+  it('TenantsRepository.loadProducts mirrors the entitlement view per café', async () => {
+    const tenants = new TenantsRepository(pg);
+    const kalala = await tenants.loadProducts(id('Kalala Café'));
+    expect(Object.keys(kalala).sort()).toEqual([
+      'cash',
+      'conversaflow',
+      'dashboard',
+      'kds',
+    ]);
+    // Every returned product carries an access-granting status (the capabilities
+    // map the dashboard consumes never contains an inactive product).
+    for (const [key, product] of Object.entries(kalala)) {
+      expect(isProductStatusActive(product.status), `${key} status`).toBe(true);
+    }
+    // capabilities read and per-request gating share one source → can't disagree.
+    expect(await tenants.loadProducts(id('Néctar Café'))).toEqual({});
   });
 });

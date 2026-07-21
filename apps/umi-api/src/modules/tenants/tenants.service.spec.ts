@@ -8,6 +8,9 @@ function make() {
     tenantsForUser: vi.fn(),
     loadProducts: vi.fn(),
     loadLocations: vi.fn(),
+    loadBranding: vi
+      .fn()
+      .mockResolvedValue({ brandColor: null, secondaryColor: null }),
     findActiveLocation: vi.fn(),
     updateTenantSettings: vi.fn().mockResolvedValue(undefined),
     updateLocation: vi.fn(),
@@ -76,17 +79,37 @@ describe('TenantsService.buildCapabilities', () => {
 });
 
 describe('TenantsService.buildSettings', () => {
-  it('falls back to brand-color defaults when dashboard config is empty', async () => {
+  it('defaults branding colors when the café has set none', async () => {
     const h = make();
     h.repo.loadLocations.mockResolvedValue([]);
     h.repo.loadProducts.mockResolvedValue({
       dashboard: { status: 'trialing', locationId: null, config: {} },
+    });
+    h.repo.loadBranding.mockResolvedValue({
+      brandColor: null,
+      secondaryColor: null,
     });
     const caps = await h.svc.buildCapabilities(ACCESS, null);
     const settings = h.svc.buildSettings(caps);
     expect(settings.subscriptionStatus).toBe('TRIALING');
     expect(settings.primaryColor).toBe('#B5605A');
     expect(settings.secondaryColor).toBe('#E8C9A3');
+  });
+
+  it('sources both colors from the typed tenant.business columns', async () => {
+    const h = make();
+    h.repo.loadLocations.mockResolvedValue([]);
+    h.repo.loadProducts.mockResolvedValue({
+      dashboard: { status: 'active', locationId: null, config: {} },
+    });
+    h.repo.loadBranding.mockResolvedValue({
+      brandColor: '#123456',
+      secondaryColor: '#abcdef',
+    });
+    const caps = await h.svc.buildCapabilities(ACCESS, null);
+    const settings = h.svc.buildSettings(caps);
+    expect(settings.primaryColor).toBe('#123456');
+    expect(settings.secondaryColor).toBe('#abcdef');
   });
 });
 

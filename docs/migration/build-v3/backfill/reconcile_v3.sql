@@ -74,8 +74,12 @@ group by b.name, s.status order by b.name;
 select t.name, string_agg(pi.product_key,',' order by pi.product_key) as provisioned
 from core.tenants t join core.product_instances pi on pi.tenant_id=t.id
 group by t.name order by t.name;
-\echo '-- packaging seed (expect feature=4, plan=3, plan_feature=7):'
+\echo '-- packaging seed (expect feature=5, plan=3, plan_feature=7 — pos is catalog-only, in no plan):'
 select (select count(*) from umi.feature) feature, (select count(*) from umi.plan) plan, (select count(*) from umi.plan_feature) plan_feature;
+\echo '-- pos is catalog-only (expect pos_plan_feature=0; a nonzero means pos got bundled into a plan):'
+select count(*) as pos_plan_feature
+  from umi.plan_feature pf join umi.feature f on f.id = pf.feature_id
+ where f.key = 'pos';
 
 \echo ''
 \echo '========== E. ORPHAN FK SWEEP (expect all 0) =========='
