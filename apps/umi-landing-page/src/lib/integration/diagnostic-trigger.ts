@@ -1,16 +1,8 @@
 // src/lib/integration/diagnosticTrigger.ts
-import { getSequenceManager } from "../email/sequence-manager";
-import {
-  LeadDatabase,
-  DiagnosticData,
-  LeadData,
-  EmailLog,
-} from "../database/sqlite";
-import {
-  LeadDatabasePostgres,
-  getLeadDatabasePostgres,
-} from "../database/postgres";
-import { v4 as uuidv4 } from "uuid";
+import { getSequenceManager } from '../email/sequence-manager';
+import { LeadDatabase, DiagnosticData, LeadData, EmailLog } from '../database/sqlite';
+import { LeadDatabasePostgres, getLeadDatabasePostgres } from '../database/postgres';
+import { v4 as uuidv4 } from 'uuid';
 
 // Interface para el resultado del procesamiento
 export interface ProcessDiagnosticResult {
@@ -70,8 +62,8 @@ export class DiagnosticTrigger {
       this.database = database;
       this.isPostgres = database instanceof LeadDatabasePostgres;
     } else {
-      const dbType = process.env.DATABASE_TYPE || "sqlite";
-      if (dbType === "postgres") {
+      const dbType = process.env.DATABASE_TYPE || 'sqlite';
+      if (dbType === 'postgres') {
         this.database = getLeadDatabasePostgres();
         this.isPostgres = true;
       } else {
@@ -98,15 +90,9 @@ export class DiagnosticTrigger {
     return (this.database as LeadDatabase).upsertLead(leadData);
   }
 
-  private async wasEmailSent(
-    leadId: string,
-    sequenceDay: number
-  ): Promise<boolean> {
+  private async wasEmailSent(leadId: string, sequenceDay: number): Promise<boolean> {
     if (this.isPostgres) {
-      return (this.database as LeadDatabasePostgres).wasEmailSentAsync(
-        leadId,
-        sequenceDay
-      );
+      return (this.database as LeadDatabasePostgres).wasEmailSentAsync(leadId, sequenceDay);
     }
     return (this.database as LeadDatabase).wasEmailSent(leadId, sequenceDay);
   }
@@ -125,13 +111,9 @@ export class DiagnosticTrigger {
     return (this.database as LeadDatabase).getDaysElapsed(leadId);
   }
 
-  private async getLeadsPendingEmails(): Promise<
-    (LeadData & { daysElapsed: number })[]
-  > {
+  private async getLeadsPendingEmails(): Promise<(LeadData & { daysElapsed: number })[]> {
     if (this.isPostgres) {
-      return (
-        this.database as LeadDatabasePostgres
-      ).getLeadsPendingEmailsAsync();
+      return (this.database as LeadDatabasePostgres).getLeadsPendingEmailsAsync();
     }
     return (this.database as LeadDatabase).getLeadsPendingEmails();
   }
@@ -139,9 +121,7 @@ export class DiagnosticTrigger {
   // -----------------------------------------------------------------------
   // processDiagnostic
   // -----------------------------------------------------------------------
-  async processDiagnostic(
-    submission: DiagnosticSubmission
-  ): Promise<ProcessDiagnosticResult> {
+  async processDiagnostic(submission: DiagnosticSubmission): Promise<ProcessDiagnosticResult> {
     try {
       this.validateSubmission(submission);
 
@@ -153,7 +133,7 @@ export class DiagnosticTrigger {
         return await this.createNewLead(submission);
       }
     } catch (error) {
-      console.error("❌ Error procesando diagnóstico:", error);
+      console.error('❌ Error procesando diagnóstico:', error);
       throw error;
     }
   }
@@ -161,9 +141,7 @@ export class DiagnosticTrigger {
   // -----------------------------------------------------------------------
   // createNewLead
   // -----------------------------------------------------------------------
-  private async createNewLead(
-    submission: DiagnosticSubmission
-  ): Promise<ProcessDiagnosticResult> {
+  private async createNewLead(submission: DiagnosticSubmission): Promise<ProcessDiagnosticResult> {
     const leadId = uuidv4();
 
     const diagnosticData: DiagnosticData = {
@@ -214,7 +192,7 @@ export class DiagnosticTrigger {
   // -----------------------------------------------------------------------
   private async updateExistingLead(
     existingLead: LeadData,
-    submission: DiagnosticSubmission
+    submission: DiagnosticSubmission,
   ): Promise<ProcessDiagnosticResult> {
     const updatedDiagnosticData: DiagnosticData = {
       score: submission.diagnosticResult.score,
@@ -276,22 +254,18 @@ export class DiagnosticTrigger {
     const daysElapsed = this.isPostgres
       ? 0
       : (this.database as LeadDatabase).getDaysElapsed(lead.id);
-    const emailsToSend: Array<{ template: string; day: number; subject: string }> =
-      [];
+    const emailsToSend: Array<{ template: string; day: number; subject: string }> = [];
 
     const emailSequence = [
-      { day: 0, template: "diagnostic_welcome", subject: "Bienvenida" },
-      { day: 2, template: "diagnostic_followup_1", subject: "Seguimiento 1" },
-      { day: 5, template: "diagnostic_followup_2", subject: "Seguimiento 2" },
-      { day: 10, template: "diagnostic_followup_3", subject: "Seguimiento 3" },
+      { day: 0, template: 'diagnostic_welcome', subject: 'Bienvenida' },
+      { day: 2, template: 'diagnostic_followup_1', subject: 'Seguimiento 1' },
+      { day: 5, template: 'diagnostic_followup_2', subject: 'Seguimiento 2' },
+      { day: 10, template: 'diagnostic_followup_3', subject: 'Seguimiento 3' },
     ];
 
     for (const emailConfig of emailSequence) {
       // For postgres we can't check synchronously — handled at send time
-      if (
-        daysElapsed >= emailConfig.day ||
-        this.isPostgres
-      ) {
+      if (daysElapsed >= emailConfig.day || this.isPostgres) {
         emailsToSend.push(emailConfig);
       }
     }
@@ -310,21 +284,17 @@ export class DiagnosticTrigger {
     const daysElapsed = this.isPostgres
       ? 999
       : (this.database as LeadDatabase).getDaysElapsed(lead.id);
-    const emailsToSend: Array<{ template: string; day: number; subject: string }> =
-      [];
+    const emailsToSend: Array<{ template: string; day: number; subject: string }> = [];
 
     const emailSequence = [
-      { day: 0, template: "diagnostic_welcome", subject: "Bienvenida" },
-      { day: 2, template: "diagnostic_followup_1", subject: "Seguimiento 1" },
-      { day: 5, template: "diagnostic_followup_2", subject: "Seguimiento 2" },
-      { day: 10, template: "diagnostic_followup_3", subject: "Seguimiento 3" },
+      { day: 0, template: 'diagnostic_welcome', subject: 'Bienvenida' },
+      { day: 2, template: 'diagnostic_followup_1', subject: 'Seguimiento 1' },
+      { day: 5, template: 'diagnostic_followup_2', subject: 'Seguimiento 2' },
+      { day: 10, template: 'diagnostic_followup_3', subject: 'Seguimiento 3' },
     ];
 
     for (const emailConfig of emailSequence) {
-      if (
-        daysElapsed >= emailConfig.day ||
-        this.isPostgres
-      ) {
+      if (daysElapsed >= emailConfig.day || this.isPostgres) {
         emailsToSend.push(emailConfig);
       }
     }
@@ -337,7 +307,7 @@ export class DiagnosticTrigger {
   // -----------------------------------------------------------------------
   private async sendScheduledEmails(
     leadId: string,
-    emails: Array<{ template: string; day: number; subject: string }>
+    emails: Array<{ template: string; day: number; subject: string }>,
   ): Promise<void> {
     for (const email of emails) {
       try {
@@ -346,12 +316,10 @@ export class DiagnosticTrigger {
           templateName: email.template,
           sequenceDay: email.day,
           subject: email.subject,
-          status: "sent",
+          status: 'sent',
         });
 
-        console.log(
-          `📧 Email enviado: ${email.template} (Day ${email.day}) para lead ${leadId}`
-        );
+        console.log(`📧 Email enviado: ${email.template} (Day ${email.day}) para lead ${leadId}`);
       } catch (error) {
         console.error(`❌ Error enviando email ${email.template}:`, error);
 
@@ -360,7 +328,7 @@ export class DiagnosticTrigger {
           templateName: email.template,
           sequenceDay: email.day,
           subject: email.subject,
-          status: "failed",
+          status: 'failed',
         });
       }
     }
@@ -394,12 +362,10 @@ export class DiagnosticTrigger {
         }
       }
 
-      console.log(
-        `📊 Resumen: ${processed} procesados, ${sent} enviados, ${failed} fallidos`
-      );
+      console.log(`📊 Resumen: ${processed} procesados, ${sent} enviados, ${failed} fallidos`);
       return { processed, sent, failed };
     } catch (error) {
-      console.error("❌ Error en processScheduledEmails:", error);
+      console.error('❌ Error en processScheduledEmails:', error);
       return { processed: 0, sent: 0, failed: 0 };
     }
   }
@@ -417,7 +383,7 @@ export class DiagnosticTrigger {
         emailsSent: dbMetrics.emailsSentToday,
       };
     } catch (error) {
-      console.error("❌ Error obteniendo métricas:", error);
+      console.error('❌ Error obteniendo métricas:', error);
       return {
         totalLeads: 0,
         activeSequences: 0,
@@ -431,25 +397,19 @@ export class DiagnosticTrigger {
   // -----------------------------------------------------------------------
   private validateSubmission(submission: DiagnosticSubmission): void {
     if (!submission.email || !this.isValidEmail(submission.email)) {
-      throw new Error("Email inválido");
+      throw new Error('Email inválido');
     }
 
     if (!submission.name || submission.name.trim().length === 0) {
-      throw new Error("Nombre requerido");
+      throw new Error('Nombre requerido');
     }
 
-    if (
-      !submission.submissionDate ||
-      !this.isValidDate(submission.submissionDate)
-    ) {
-      throw new Error("Fecha de submisión inválida");
+    if (!submission.submissionDate || !this.isValidDate(submission.submissionDate)) {
+      throw new Error('Fecha de submisión inválida');
     }
 
-    if (
-      !submission.diagnosticResult ||
-      typeof submission.diagnosticResult.score !== "number"
-    ) {
-      throw new Error("Resultado de diagnóstico inválido");
+    if (!submission.diagnosticResult || typeof submission.diagnosticResult.score !== 'number') {
+      throw new Error('Resultado de diagnóstico inválido');
     }
   }
 
@@ -478,8 +438,6 @@ export const getDiagnosticTrigger = (): DiagnosticTrigger => {
   return diagnosticTriggerInstance;
 };
 
-export const createDiagnosticTrigger = (
-  database?: AnyLeadDatabase
-): DiagnosticTrigger => {
+export const createDiagnosticTrigger = (database?: AnyLeadDatabase): DiagnosticTrigger => {
   return new DiagnosticTrigger(database);
 };

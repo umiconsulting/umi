@@ -1,7 +1,7 @@
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/Button";
-import ProgressBar from "./ProgressBar";
-import { ArrowRight, Check, RotateCcw } from "lucide-react";
+import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/Button';
+import ProgressBar from './ProgressBar';
+import { ArrowRight, Check, RotateCcw } from 'lucide-react';
 
 interface SnapshotResultProps {
   score: number;
@@ -34,7 +34,7 @@ const SnapshotResult = ({
       currentStep={4}
       totalSteps={5}
       messages={{
-        4: "Resultados preliminares - 80% completado",
+        4: 'Resultados preliminares - 80% completado',
       }}
     />
 
@@ -83,13 +83,16 @@ const SnapshotResult = ({
       </p>
       <ul className="mb-6 grid gap-3 md:grid-cols-3">
         {[
-          "Lectura de tus fricciones por producto Umi",
-          "Orden sugerido de activación",
-          "Riesgos operativos a resolver primero",
+          'Lectura de tus fricciones por producto Umi',
+          'Orden sugerido de activación',
+          'Riesgos operativos a resolver primero',
         ].map((item) => (
-          <li key={item} className="flex items-start gap-2 rounded-[18px] bg-white/72 p-4 text-sm font-bold text-umi-blue-deep">
+          <li
+            key={item}
+            className="flex items-start gap-2 rounded-[18px] bg-white/72 p-4 text-sm font-bold text-umi-blue-deep"
+          >
             <Check size={17} className="mt-0.5 shrink-0 text-umi-blue-dark" strokeWidth={2} />
-              <span>{item}</span>
+            <span>{item}</span>
           </li>
         ))}
       </ul>

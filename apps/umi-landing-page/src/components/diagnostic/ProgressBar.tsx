@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion } from 'framer-motion';
 
 interface ProgressBarProps {
   currentStep: number;
@@ -6,11 +6,7 @@ interface ProgressBarProps {
   messages?: { [key: number]: string };
 }
 
-const ProgressBar = ({
-  currentStep,
-  totalSteps,
-  messages,
-}: ProgressBarProps) => {
+const ProgressBar = ({ currentStep, totalSteps, messages }: ProgressBarProps) => {
   const progressPercentage = (currentStep / totalSteps) * 100;
 
   return (

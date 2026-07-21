@@ -1,17 +1,12 @@
 // src/lib/database/postgres.ts
 // PostgreSQL adapter for landing page leads — async-only interface for Postgres.
 // The diagnosticTrigger selects between this and the SQLite adapter via DATABASE_TYPE env.
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from '@supabase/supabase-js';
 
 // Re-export the shared interfaces from sqlite.ts so consumers don't
 // need to know which adapter is active.
-export type {
-  DiagnosticData,
-  LeadData,
-  EmailLog,
-  LeadMetrics,
-} from "./sqlite";
-import type { DiagnosticData, LeadData, EmailLog, LeadMetrics } from "./sqlite";
+export type { DiagnosticData, LeadData, EmailLog, LeadMetrics } from './sqlite';
+import type { DiagnosticData, LeadData, EmailLog, LeadMetrics } from './sqlite';
 
 // ---------------------------------------------------------------------------
 // Row shapes coming from Postgres (snake_case)
@@ -68,7 +63,7 @@ function leadRowToLeadData(row: LeadRow): LeadData {
     sequencePaused: row.sequence_paused,
     diagnosticData: row.diagnostic_data || {
       score: 0,
-      level: "Inicial",
+      level: 'Inicial',
       recommendations: [],
       areas: { dataCollection: 0, analysis: 0, visualization: 0, decisionMaking: 0 },
     },
@@ -98,11 +93,11 @@ export class LeadDatabasePostgres {
       const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
       if (!url || !key) {
         throw new Error(
-          "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for Postgres adapter"
+          'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for Postgres adapter',
         );
       }
       this.supabase = createClient(url, key, {
-        db: { schema: "platform" },
+        db: { schema: 'platform' },
       });
     }
   }
@@ -112,13 +107,13 @@ export class LeadDatabasePostgres {
   // -----------------------------------------------------------------------
   async findLeadByEmailAsync(email: string): Promise<LeadData | null> {
     const { data, error } = await this.supabase
-      .from("leads")
-      .select("*")
-      .eq("email", email)
+      .from('leads')
+      .select('*')
+      .eq('email', email)
       .maybeSingle();
 
     if (error) {
-      console.error("❌ Error buscando lead por email:", error);
+      console.error('❌ Error buscando lead por email:', error);
       return null;
     }
     if (!data) return null;
@@ -145,13 +140,10 @@ export class LeadDatabasePostgres {
     };
 
     if (existing) {
-      const { error } = await this.supabase
-        .from("leads")
-        .update(row)
-        .eq("email", leadData.email);
+      const { error } = await this.supabase.from('leads').update(row).eq('email', leadData.email);
 
       if (error) {
-        console.error("❌ Error actualizando lead:", error);
+        console.error('❌ Error actualizando lead:', error);
         throw error;
       }
     } else {
@@ -160,19 +152,17 @@ export class LeadDatabasePostgres {
         id: leadData.id,
         created_at: leadData.createdAt || new Date().toISOString(),
       };
-      const { error } = await this.supabase
-        .from("leads")
-        .insert(insertRow);
+      const { error } = await this.supabase.from('leads').insert(insertRow);
 
       if (error) {
-        console.error("❌ Error creando lead:", error);
+        console.error('❌ Error creando lead:', error);
         throw error;
       }
     }
 
     const result = await this.findLeadByEmailAsync(leadData.email);
     if (!result) {
-      throw new Error("Error: No se pudo recuperar el lead después de upsert");
+      throw new Error('Error: No se pudo recuperar el lead después de upsert');
     }
     return result;
   }
@@ -180,19 +170,16 @@ export class LeadDatabasePostgres {
   // -----------------------------------------------------------------------
   // wasEmailSentAsync
   // -----------------------------------------------------------------------
-  async wasEmailSentAsync(
-    leadId: string,
-    sequenceDay: number
-  ): Promise<boolean> {
+  async wasEmailSentAsync(leadId: string, sequenceDay: number): Promise<boolean> {
     const { count, error } = await this.supabase
-      .from("lead_events")
-      .select("*", { count: "exact", head: true })
-      .eq("lead_id", leadId)
-      .eq("event_type", "email_sent")
-      .eq("event_data->>sequence_day", String(sequenceDay));
+      .from('lead_events')
+      .select('*', { count: 'exact', head: true })
+      .eq('lead_id', leadId)
+      .eq('event_type', 'email_sent')
+      .eq('event_data->>sequence_day', String(sequenceDay));
 
     if (error) {
-      console.error("❌ Error verificando email enviado:", error);
+      console.error('❌ Error verificando email enviado:', error);
       return false;
     }
     return (count ?? 0) > 0;
@@ -202,41 +189,41 @@ export class LeadDatabasePostgres {
   // logEmailSentAsync
   // -----------------------------------------------------------------------
   async logEmailSentAsync(emailLog: EmailLog): Promise<void> {
-    const { error } = await this.supabase
-      .from("lead_events")
-      .insert({
-        lead_id: emailLog.leadId,
-        event_type: emailLog.status === "failed" ? "email_failed" : "email_sent",
-        event_data: {
-          template_name: emailLog.templateName,
-          sequence_day: emailLog.sequenceDay,
-          subject: emailLog.subject,
-          status: emailLog.status,
-        },
-      });
+    const { error } = await this.supabase.from('lead_events').insert({
+      lead_id: emailLog.leadId,
+      event_type: emailLog.status === 'failed' ? 'email_failed' : 'email_sent',
+      event_data: {
+        template_name: emailLog.templateName,
+        sequence_day: emailLog.sequenceDay,
+        subject: emailLog.subject,
+        status: emailLog.status,
+      },
+    });
 
     if (error) {
-      console.error("❌ Error registrando email enviado:", error);
+      console.error('❌ Error registrando email enviado:', error);
       throw error;
     }
 
     // Also update last_email_sent_at on the lead
     const emailKey = `${emailLog.templateName}_day_${emailLog.sequenceDay}`;
     await this.supabase
-      .from("leads")
+      .from('leads')
       .update({
         last_email_sent_at: emailLog.sentAt || new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-      .eq("id", emailLog.leadId);
+      .eq('id', emailLog.leadId);
 
     // Append to emails_sent array
-    await this.supabase.rpc("append_to_array", {
-      table_name: "leads",
-      column_name: "emails_sent",
-      row_id: emailLog.leadId,
-      value: emailKey,
-    }).maybeSingle();
+    await this.supabase
+      .rpc('append_to_array', {
+        table_name: 'leads',
+        column_name: 'emails_sent',
+        row_id: emailLog.leadId,
+        value: emailKey,
+      })
+      .maybeSingle();
   }
 
   // -----------------------------------------------------------------------
@@ -244,13 +231,13 @@ export class LeadDatabasePostgres {
   // -----------------------------------------------------------------------
   async getDaysElapsedAsync(leadId: string): Promise<number> {
     const { data, error } = await this.supabase
-      .from("leads")
-      .select("diagnostic_date")
-      .eq("id", leadId)
+      .from('leads')
+      .select('diagnostic_date')
+      .eq('id', leadId)
       .maybeSingle();
 
     if (error || !data) {
-      console.error("❌ Error calculando días transcurridos:", error);
+      console.error('❌ Error calculando días transcurridos:', error);
       return 0;
     }
 
@@ -265,17 +252,15 @@ export class LeadDatabasePostgres {
   // -----------------------------------------------------------------------
   // getLeadsPendingEmailsAsync
   // -----------------------------------------------------------------------
-  async getLeadsPendingEmailsAsync(): Promise<
-    (LeadData & { daysElapsed: number })[]
-  > {
+  async getLeadsPendingEmailsAsync(): Promise<(LeadData & { daysElapsed: number })[]> {
     const { data, error } = await this.supabase
-      .from("leads")
-      .select("*")
-      .eq("sequence_paused", false)
-      .order("diagnostic_date", { ascending: true });
+      .from('leads')
+      .select('*')
+      .eq('sequence_paused', false)
+      .order('diagnostic_date', { ascending: true });
 
     if (error) {
-      console.error("❌ Error obteniendo leads pendientes:", error);
+      console.error('❌ Error obteniendo leads pendientes:', error);
       return [];
     }
 
@@ -296,25 +281,25 @@ export class LeadDatabasePostgres {
   // -----------------------------------------------------------------------
   async getMetricsAsync(): Promise<LeadMetrics> {
     const { count: totalLeads } = await this.supabase
-      .from("leads")
-      .select("*", { count: "exact", head: true });
+      .from('leads')
+      .select('*', { count: 'exact', head: true });
 
     const { count: activeSequences } = await this.supabase
-      .from("leads")
-      .select("*", { count: "exact", head: true })
-      .eq("sequence_paused", false);
+      .from('leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('sequence_paused', false);
 
     const { count: pausedSequences } = await this.supabase
-      .from("leads")
-      .select("*", { count: "exact", head: true })
-      .eq("sequence_paused", true);
+      .from('leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('sequence_paused', true);
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toISOString().split('T')[0];
     const { count: emailsSentToday } = await this.supabase
-      .from("lead_events")
-      .select("*", { count: "exact", head: true })
-      .eq("event_type", "email_sent")
-      .gte("created_at", today);
+      .from('lead_events')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_type', 'email_sent')
+      .gte('created_at', today);
 
     return {
       totalLeads: totalLeads ?? 0,
@@ -332,26 +317,24 @@ export class LeadDatabasePostgres {
   // -----------------------------------------------------------------------
   async pauseSequenceAsync(leadId: string, reason?: string): Promise<void> {
     const { error: updateError } = await this.supabase
-      .from("leads")
+      .from('leads')
       .update({
         sequence_paused: true,
-        pause_reason: reason || "Pausado manualmente",
+        pause_reason: reason || 'Pausado manualmente',
         updated_at: new Date().toISOString(),
       })
-      .eq("id", leadId);
+      .eq('id', leadId);
 
     if (updateError) {
-      console.error("❌ Error pausando secuencia:", updateError);
+      console.error('❌ Error pausando secuencia:', updateError);
       throw updateError;
     }
 
-    await this.supabase
-      .from("lead_events")
-      .insert({
-        lead_id: leadId,
-        event_type: "sequence_paused",
-        event_data: { reason: reason || "Pausado manualmente" },
-      });
+    await this.supabase.from('lead_events').insert({
+      lead_id: leadId,
+      event_type: 'sequence_paused',
+      event_data: { reason: reason || 'Pausado manualmente' },
+    });
   }
 
   // -----------------------------------------------------------------------
@@ -359,25 +342,23 @@ export class LeadDatabasePostgres {
   // -----------------------------------------------------------------------
   async resumeSequenceAsync(leadId: string): Promise<void> {
     const { error } = await this.supabase
-      .from("leads")
+      .from('leads')
       .update({
         sequence_paused: false,
         pause_reason: null,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", leadId);
+      .eq('id', leadId);
 
     if (error) {
-      console.error("❌ Error reanudando secuencia:", error);
+      console.error('❌ Error reanudando secuencia:', error);
       throw error;
     }
 
-    await this.supabase
-      .from("lead_events")
-      .insert({
-        lead_id: leadId,
-        event_type: "sequence_resumed",
-      });
+    await this.supabase.from('lead_events').insert({
+      lead_id: leadId,
+      event_type: 'sequence_resumed',
+    });
 
     console.log(`✅ Secuencia reanudada para lead ${leadId}`);
   }
@@ -387,14 +368,14 @@ export class LeadDatabasePostgres {
   // -----------------------------------------------------------------------
   async getLeadEmailLogsAsync(leadId: string): Promise<EmailLog[]> {
     const { data, error } = await this.supabase
-      .from("lead_events")
-      .select("*")
-      .eq("lead_id", leadId)
-      .in("event_type", ["email_sent", "email_failed"])
-      .order("created_at", { ascending: false });
+      .from('lead_events')
+      .select('*')
+      .eq('lead_id', leadId)
+      .in('event_type', ['email_sent', 'email_failed'])
+      .order('created_at', { ascending: false });
 
     if (error) {
-      console.error("❌ Error obteniendo logs del lead:", error);
+      console.error('❌ Error obteniendo logs del lead:', error);
       return [];
     }
 
@@ -402,15 +383,12 @@ export class LeadDatabasePostgres {
       const ed = row.event_data || {};
       const log: EmailLog = {
         leadId: row.lead_id,
-        templateName: (ed.template_name as string) || "",
+        templateName: (ed.template_name as string) || '',
         sequenceDay: (ed.sequence_day as number) || 0,
         sentAt: row.created_at,
-        status:
-          row.event_type === "email_failed"
-            ? ("failed" as const)
-            : ("sent" as const),
+        status: row.event_type === 'email_failed' ? ('failed' as const) : ('sent' as const),
       };
-      if ((ed.subject as string)) log.subject = ed.subject as string;
+      if (ed.subject as string) log.subject = ed.subject as string;
       return log;
     });
   }
@@ -420,13 +398,13 @@ export class LeadDatabasePostgres {
   // -----------------------------------------------------------------------
   async findLeadByIdAsync(id: string): Promise<LeadData | null> {
     const { data, error } = await this.supabase
-      .from("leads")
-      .select("*")
-      .eq("id", id)
+      .from('leads')
+      .select('*')
+      .eq('id', id)
       .maybeSingle();
 
     if (error) {
-      console.error("❌ Error buscando lead por ID:", error);
+      console.error('❌ Error buscando lead por ID:', error);
       return null;
     }
     if (!data) return null;
@@ -438,13 +416,13 @@ export class LeadDatabasePostgres {
   // -----------------------------------------------------------------------
   async getActiveLeadsAsync(): Promise<LeadData[]> {
     const { data, error } = await this.supabase
-      .from("leads")
-      .select("*")
-      .eq("sequence_paused", false)
-      .order("diagnostic_date", { ascending: false });
+      .from('leads')
+      .select('*')
+      .eq('sequence_paused', false)
+      .order('diagnostic_date', { ascending: false });
 
     if (error) {
-      console.error("❌ Error obteniendo leads activos:", error);
+      console.error('❌ Error obteniendo leads activos:', error);
       return [];
     }
 
@@ -456,7 +434,7 @@ export class LeadDatabasePostgres {
   // -----------------------------------------------------------------------
   close(): void {
     // Supabase client is stateless — no connection to close.
-    console.log("✅ Conexión a base de datos cerrada (Supabase — no-op)");
+    console.log('✅ Conexión a base de datos cerrada (Supabase — no-op)');
   }
 }
 
@@ -474,7 +452,7 @@ export function getLeadDatabasePostgres(): LeadDatabasePostgres {
 
 export function createLeadDatabasePostgres(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  client?: any
+  client?: any,
 ): LeadDatabasePostgres {
   return new LeadDatabasePostgres(client);
 }

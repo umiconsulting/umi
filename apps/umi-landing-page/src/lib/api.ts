@@ -6,10 +6,7 @@
 // pre-cutover behavior, so this is a pure reversible Vercel-env flip (mirrors the
 // dashboard's VITE_AUTH_MODE gate). umi-api must include this origin in its
 // CORS_ORIGINS. These endpoints use no cookies, so no credentials are needed.
-export const UMI_API_BASE = (process.env.NEXT_PUBLIC_UMI_API_BASE ?? '').replace(
-  /\/+$/,
-  '',
-);
+export const UMI_API_BASE = (process.env.NEXT_PUBLIC_UMI_API_BASE ?? '').replace(/\/+$/, '');
 
 /** Prefix a same-origin API path with the umi-api base when configured. */
 export function apiUrl(path: string): string {

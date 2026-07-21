@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
 const SIGNALS = [
-  "WhatsApp -> pedidos estructurados",
-  "Cocina -> estados visibles",
-  "Wallet -> visitas recurrentes",
-  "Dashboard -> decisiones de dueño",
-  "Logs -> confianza operativa",
+  'WhatsApp -> pedidos estructurados',
+  'Cocina -> estados visibles',
+  'Wallet -> visitas recurrentes',
+  'Dashboard -> decisiones de dueño',
+  'Logs -> confianza operativa',
 ];
 
 export default function Logos() {

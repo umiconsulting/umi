@@ -1,6 +1,6 @@
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/Button";
-import SocialProof from "./SocialProof";
+import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/Button';
+import SocialProof from './SocialProof';
 
 interface ResultPoint {
   title: string;
@@ -48,12 +48,13 @@ const FullResult = ({
       <h3 className="mb-2 text-[clamp(28px,3.6vw,44px)] font-extrabold leading-[1.05] text-umi-blue-deep">
         {title}
       </h3>
-      <p className="mx-auto max-w-2xl font-semibold leading-[1.6] text-[rgba(20,33,66,0.66)]">{description}</p>
+      <p className="mx-auto max-w-2xl font-semibold leading-[1.6] text-[rgba(20,33,66,0.66)]">
+        {description}
+      </p>
 
       <div className="mt-4 inline-block rounded-full bg-[#eef3ff] px-4 py-2">
         <p className="text-sm font-bold text-[rgba(20,33,66,0.66)]">
-          <span className="text-umi-blue-dark">Informe enviado a:</span>{" "}
-          {contactInfo.email}
+          <span className="text-umi-blue-dark">Informe enviado a:</span> {contactInfo.email}
         </p>
       </div>
     </div>
@@ -64,8 +65,8 @@ const FullResult = ({
           Plan de acción personalizado
         </h4>
         <p className="mb-6 font-semibold text-[rgba(20,33,66,0.66)]">
-          Basándonos en tu diagnóstico, estas son acciones iniciales para
-          conectar mejor la operación:
+          Basándonos en tu diagnóstico, estas son acciones iniciales para conectar mejor la
+          operación:
         </p>
 
         <div className="space-y-6">
@@ -75,7 +76,9 @@ const FullResult = ({
               className="rounded-[20px] border border-[var(--stroke)] bg-[#fffdf8] p-5"
             >
               <h5 className="mb-1 text-lg font-extrabold text-umi-blue-deep">{point.title}</h5>
-              <p className="font-semibold leading-[1.55] text-[rgba(20,33,66,0.64)]">{point.description}</p>
+              <p className="font-semibold leading-[1.55] text-[rgba(20,33,66,0.64)]">
+                {point.description}
+              </p>
             </div>
           ))}
         </div>
@@ -91,10 +94,7 @@ const FullResult = ({
               Cuéntanos tu operación y afinamos el primer alcance.
             </p>
           </div>
-          <Button
-            variant="primary"
-            onClick={() => (window.location.href = "#contacto")}
-          >
+          <Button variant="primary" onClick={() => (window.location.href = '#contacto')}>
             Contactar
           </Button>
         </div>
@@ -102,7 +102,7 @@ const FullResult = ({
     </div>
 
     <div className="mb-6 rounded-[26px] bg-[#eef3ff] p-6">
-        <h4 className="mb-4 font-extrabold text-umi-blue-deep">Lecturas sugeridas</h4>
+      <h4 className="mb-4 font-extrabold text-umi-blue-deep">Lecturas sugeridas</h4>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="rounded-[20px] border border-[var(--stroke)] bg-white/80 p-4">
           <h5 className="mb-2 font-extrabold text-umi-blue-deep">Mapa de operación</h5>
@@ -166,10 +166,7 @@ const FullResult = ({
         </svg>
         Reiniciar diagnóstico
       </Button>
-      <Button
-        variant="primary"
-        onClick={() => (window.location.href = "#contacto")}
-      >
+      <Button variant="primary" onClick={() => (window.location.href = '#contacto')}>
         Hablar con Umi
       </Button>
     </div>

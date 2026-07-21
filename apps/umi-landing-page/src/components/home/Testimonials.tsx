@@ -1,22 +1,19 @@
-"use client";
+'use client';
 
-import { motion } from "framer-motion";
+import { motion } from 'framer-motion';
 
 const PRINCIPLES = [
   {
-    title: "Confianza antes que magia",
-    text:
-      "El manual original habla de conexión, respeto y lluvia de ideas segura. En producto eso se traduce en trazas, contratos claros y decisiones explicables.",
+    title: 'Confianza antes que magia',
+    text: 'El manual original habla de conexión, respeto y lluvia de ideas segura. En producto eso se traduce en trazas, contratos claros y decisiones explicables.',
   },
   {
-    title: "Apps delgadas, backend fuerte",
-    text:
-      "KDS, Cash, Dashboard y Logs consumen superficies normalizadas. La verdad operativa vive donde se puede auditar y recomponer.",
+    title: 'Apps delgadas, backend fuerte',
+    text: 'KDS, Cash, Dashboard y Logs consumen superficies normalizadas. La verdad operativa vive donde se puede auditar y recomponer.',
   },
   {
-    title: "Diseño para trabajo real",
-    text:
-      "Cocina necesita targets grandes; gerencia necesita señales escaneables; soporte necesita historia. Cada interfaz debe respetar su contexto.",
+    title: 'Diseño para trabajo real',
+    text: 'Cocina necesita targets grandes; gerencia necesita señales escaneables; soporte necesita historia. Cada interfaz debe respetar su contexto.',
   },
 ];
 
@@ -61,9 +58,7 @@ const Testimonials = () => {
             transition={{ duration: 0.6, delay: i * 0.1 }}
             className="rounded-[26px] border border-[var(--stroke)] bg-[#fffdf8] p-8 shadow-[0_18px_60px_rgba(34,57,121,0.06)] md:p-10 lg:p-12"
           >
-            <div className="text-[12px] text-umi-accent font-extrabold mb-8">
-              0{i + 1}
-            </div>
+            <div className="text-[12px] text-umi-accent font-extrabold mb-8">0{i + 1}</div>
             <h3 className="font-sans text-[25px] leading-[1.18] font-extrabold text-umi-blue-deep mb-4">
               {item.title}
             </h3>

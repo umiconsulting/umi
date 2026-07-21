@@ -1,9 +1,9 @@
 // src/lib/integration/__tests__/diagnosticTrigger.test.ts - ARCHIVO COMPLETO CORREGIDO
-import { describe, test, expect, beforeEach, afterEach } from "@jest/globals";
-import { DiagnosticTrigger } from "../diagnostic-trigger";
-import { LeadDatabase, DiagnosticData } from "../../database/sqlite";
-import { existsSync, unlinkSync } from "fs";
-import path from "path";
+import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
+import { DiagnosticTrigger } from '../diagnostic-trigger';
+import { LeadDatabase, DiagnosticData } from '../../database/sqlite';
+import { existsSync, unlinkSync } from 'fs';
+import path from 'path';
 
 // Interface para submisión de diagnóstico (diferente de DiagnosticData interna)
 
@@ -30,9 +30,9 @@ interface DiagnosticSubmission {
   submissionDate: string;
 }
 
-describe("DiagnosticTrigger Integration", () => {
+describe('DiagnosticTrigger Integration', () => {
   let integration: DiagnosticTrigger;
-  const testDbPath = path.join(process.cwd(), "data", "test-integration.db");
+  const testDbPath = path.join(process.cwd(), 'data', 'test-integration.db');
 
   beforeEach(() => {
     // Limpiar base de datos de test si existe
@@ -55,18 +55,18 @@ describe("DiagnosticTrigger Integration", () => {
     }
   });
 
-  describe("Procesamiento de diagnósticos", () => {
-    test("Debe crear nuevo lead con datos completos", async () => {
+  describe('Procesamiento de diagnósticos', () => {
+    test('Debe crear nuevo lead con datos completos', async () => {
       const submission: DiagnosticSubmission = {
-        email: "complete@example.com",
-        name: "Complete User",
-        company: "Complete Corp",
+        email: 'complete@example.com',
+        name: 'Complete User',
+        company: 'Complete Corp',
         diagnosticResult: {
           score: 85,
-          level: "Avanzado",
+          level: 'Avanzado',
           recommendations: [
-            "Implementar análisis predictivo",
-            "Automatizar reportes en tiempo real",
+            'Implementar análisis predictivo',
+            'Automatizar reportes en tiempo real',
           ],
           areas: {
             dataCollection: 90,
@@ -75,7 +75,7 @@ describe("DiagnosticTrigger Integration", () => {
             decisionMaking: 85,
           },
         },
-        submissionDate: "2025-01-01T10:00:00Z",
+        submissionDate: '2025-01-01T10:00:00Z',
       };
 
       const result = await integration.processDiagnostic(submission);
@@ -83,28 +83,28 @@ describe("DiagnosticTrigger Integration", () => {
 
       // Verificar que el lead fue creado correctamente
       const database = new LeadDatabase();
-      const lead = database.findLeadByEmail("complete@example.com");
+      const lead = database.findLeadByEmail('complete@example.com');
 
       expect(lead).toBeDefined();
-      expect(lead?.name).toBe("Complete User");
-      expect(lead?.company).toBe("Complete Corp");
+      expect(lead?.name).toBe('Complete User');
+      expect(lead?.company).toBe('Complete Corp');
       expect(lead?.diagnosticData.score).toBe(85);
-      expect(lead?.diagnosticData.level).toBe("Avanzado");
+      expect(lead?.diagnosticData.level).toBe('Avanzado');
       expect(lead?.diagnosticData.areas.dataCollection).toBe(90);
       expect(lead?.sequencePaused).toBe(false);
 
       database.close();
     });
 
-    test("Debe actualizar lead existente sin duplicar email Day 0", async () => {
+    test('Debe actualizar lead existente sin duplicar email Day 0', async () => {
       const firstSubmission: DiagnosticSubmission = {
-        email: "existing@example.com",
-        name: "Existing Lead",
-        company: "Company",
+        email: 'existing@example.com',
+        name: 'Existing Lead',
+        company: 'Company',
         diagnosticResult: {
           score: 50,
-          level: "Básico",
-          recommendations: ["Recomendación inicial"],
+          level: 'Básico',
+          recommendations: ['Recomendación inicial'],
           areas: {
             dataCollection: 50,
             analysis: 50,
@@ -112,7 +112,7 @@ describe("DiagnosticTrigger Integration", () => {
             decisionMaking: 50,
           },
         },
-        submissionDate: "2025-01-01T10:00:00Z",
+        submissionDate: '2025-01-01T10:00:00Z',
       };
 
       // Primera submisión
@@ -126,38 +126,37 @@ describe("DiagnosticTrigger Integration", () => {
       // Segunda submisión del mismo lead
       const secondSubmission: DiagnosticSubmission = {
         ...firstSubmission,
-        name: "Updated Name",
+        name: 'Updated Name',
         diagnosticResult: {
           ...firstSubmission.diagnosticResult,
           score: 70,
-          level: "Intermedio",
+          level: 'Intermedio',
         },
-        submissionDate: "2025-01-01T11:00:00Z",
+        submissionDate: '2025-01-01T11:00:00Z',
       };
 
-      const secondResult =
-        await integration.processDiagnostic(secondSubmission);
+      const secondResult = await integration.processDiagnostic(secondSubmission);
       expect(secondResult.isNewLead).toBe(false);
 
       // Verificar que el lead fue actualizado
       const database = new LeadDatabase();
-      const updatedLead = database.findLeadByEmail("existing@example.com");
-      expect(updatedLead?.name).toBe("Updated Name");
+      const updatedLead = database.findLeadByEmail('existing@example.com');
+      expect(updatedLead?.name).toBe('Updated Name');
       expect(updatedLead?.diagnosticData.score).toBe(70);
-      expect(updatedLead?.diagnosticData.level).toBe("Intermedio");
+      expect(updatedLead?.diagnosticData.level).toBe('Intermedio');
 
       database.close();
     });
 
-    test("Debe manejar lead sin empresa", async () => {
+    test('Debe manejar lead sin empresa', async () => {
       const submission: DiagnosticSubmission = {
-        email: "nocompany@example.com",
-        name: "No Company User",
+        email: 'nocompany@example.com',
+        name: 'No Company User',
         // company is undefined
         diagnosticResult: {
           score: 60,
-          level: "Intermedio",
-          recommendations: ["Recomendación básica"],
+          level: 'Intermedio',
+          recommendations: ['Recomendación básica'],
           areas: {
             dataCollection: 60,
             analysis: 60,
@@ -165,29 +164,29 @@ describe("DiagnosticTrigger Integration", () => {
             decisionMaking: 60,
           },
         },
-        submissionDate: "2025-01-01T10:00:00Z",
+        submissionDate: '2025-01-01T10:00:00Z',
       };
 
       const result = await integration.processDiagnostic(submission);
       expect(result.isNewLead).toBe(true);
 
       const database = new LeadDatabase();
-      const lead = database.findLeadByEmail("nocompany@example.com");
+      const lead = database.findLeadByEmail('nocompany@example.com');
       expect(lead).toBeDefined();
       expect(lead?.company).toBeUndefined();
 
       database.close();
     });
 
-    test("Debe manejar caracteres especiales y acentos", async () => {
+    test('Debe manejar caracteres especiales y acentos', async () => {
       const submission: DiagnosticSubmission = {
-        email: "josé.maría@example.com",
-        name: "José María Rodríguez",
-        company: "Ñoño & Cía",
+        email: 'josé.maría@example.com',
+        name: 'José María Rodríguez',
+        company: 'Ñoño & Cía',
         diagnosticResult: {
           score: 75,
-          level: "Avanzado",
-          recommendations: ["Implementación de análisis avanzado"],
+          level: 'Avanzado',
+          recommendations: ['Implementación de análisis avanzado'],
           areas: {
             dataCollection: 75,
             analysis: 75,
@@ -195,28 +194,28 @@ describe("DiagnosticTrigger Integration", () => {
             decisionMaking: 75,
           },
         },
-        submissionDate: "2025-01-01T10:00:00Z",
+        submissionDate: '2025-01-01T10:00:00Z',
       };
 
       const result = await integration.processDiagnostic(submission);
       expect(result.isNewLead).toBe(true);
 
       const database = new LeadDatabase();
-      const lead = database.findLeadByEmail("josé.maría@example.com");
-      expect(lead?.name).toBe("José María Rodríguez");
-      expect(lead?.company).toBe("Ñoño & Cía");
+      const lead = database.findLeadByEmail('josé.maría@example.com');
+      expect(lead?.name).toBe('José María Rodríguez');
+      expect(lead?.company).toBe('Ñoño & Cía');
 
       database.close();
     });
 
-    test("Debe manejar datos JSON complejos en diagnosticData", async () => {
+    test('Debe manejar datos JSON complejos en diagnosticData', async () => {
       const submission: DiagnosticSubmission = {
-        email: "complex@example.com",
-        name: "Complex Data User",
+        email: 'complex@example.com',
+        name: 'Complex Data User',
         diagnosticResult: {
           score: 80,
-          level: "Avanzado",
-          recommendations: ["Recomendación compleja"],
+          level: 'Avanzado',
+          recommendations: ['Recomendación compleja'],
           areas: {
             dataCollection: 80,
             analysis: 80,
@@ -224,43 +223,43 @@ describe("DiagnosticTrigger Integration", () => {
             decisionMaking: 80,
           },
           metadata: {
-            industry: "Technology",
-            size: "Medium",
-            challenges: ["Data integration", "Real-time analysis"],
+            industry: 'Technology',
+            size: 'Medium',
+            challenges: ['Data integration', 'Real-time analysis'],
           },
           questionResponses: {
-            q1: "Advanced",
-            q2: ["Option A", "Option C"],
-            q3: { preference: "automated", budget: "high" },
+            q1: 'Advanced',
+            q2: ['Option A', 'Option C'],
+            q3: { preference: 'automated', budget: 'high' },
           },
         },
-        submissionDate: "2025-01-01T10:00:00Z",
+        submissionDate: '2025-01-01T10:00:00Z',
       };
 
       const result = await integration.processDiagnostic(submission);
       expect(result.isNewLead).toBe(true);
 
       const database = new LeadDatabase();
-      const lead = database.findLeadByEmail("complex@example.com");
+      const lead = database.findLeadByEmail('complex@example.com');
       expect(lead?.diagnosticData.score).toBe(80);
 
       database.close();
     });
   });
 
-  describe("Cálculo de emails pendientes", () => {
-    test("Debe enviar emails correspondientes según días transcurridos", async () => {
+  describe('Cálculo de emails pendientes', () => {
+    test('Debe enviar emails correspondientes según días transcurridos', async () => {
       // Crear un lead de hace 3 días
       const threeDaysAgo = new Date();
       threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
       const submission: DiagnosticSubmission = {
-        email: "threedaysago@example.com",
-        name: "Three Days User",
+        email: 'threedaysago@example.com',
+        name: 'Three Days User',
         diagnosticResult: {
           score: 60,
-          level: "Básico",
-          recommendations: ["Recomendación básica"],
+          level: 'Básico',
+          recommendations: ['Recomendación básica'],
           areas: {
             dataCollection: 60,
             analysis: 60,
@@ -280,21 +279,21 @@ describe("DiagnosticTrigger Integration", () => {
       expect(dayTwoEmail).toBeDefined();
     });
 
-    test("Debe respetar emails ya enviados", async () => {
+    test('Debe respetar emails ya enviados', async () => {
       const database = new LeadDatabase();
 
       // Crear lead inicial con DiagnosticData completa
       const leadData = {
-        id: "test-respect-emails",
-        email: "respectemails@example.com",
-        name: "Respect Emails Lead",
-        diagnosticDate: "2025-01-01T10:00:00Z",
+        id: 'test-respect-emails',
+        email: 'respectemails@example.com',
+        name: 'Respect Emails Lead',
+        diagnosticDate: '2025-01-01T10:00:00Z',
         emailsSent: [],
         sequencePaused: false,
         diagnosticData: {
           score: 60,
-          level: "Básico",
-          recommendations: ["Recomendación inicial"],
+          level: 'Básico',
+          recommendations: ['Recomendación inicial'],
           areas: {
             dataCollection: 60,
             analysis: 60,
@@ -308,23 +307,23 @@ describe("DiagnosticTrigger Integration", () => {
 
       // Simular que Day 0 ya fue enviado
       database.logEmailSent({
-        leadId: "test-respect-emails",
-        templateName: "diagnostic_welcome",
+        leadId: 'test-respect-emails',
+        templateName: 'diagnostic_welcome',
         sequenceDay: 0,
-        status: "sent",
+        status: 'sent',
       });
 
       // Simular que han pasado 3 días
-      const threeDaysLater = new Date("2025-01-01T10:00:00Z");
+      const threeDaysLater = new Date('2025-01-01T10:00:00Z');
       threeDaysLater.setDate(threeDaysLater.getDate() + 3);
 
       const submission: DiagnosticSubmission = {
-        email: "respectemails@example.com",
-        name: "Respect Emails Lead",
+        email: 'respectemails@example.com',
+        name: 'Respect Emails Lead',
         diagnosticResult: {
           score: 65,
-          level: "Intermedio",
-          recommendations: ["Recomendación actualizada"],
+          level: 'Intermedio',
+          recommendations: ['Recomendación actualizada'],
           areas: {
             dataCollection: 65,
             analysis: 65,
@@ -349,8 +348,8 @@ describe("DiagnosticTrigger Integration", () => {
     });
   });
 
-  describe("Métricas", () => {
-    test("Debe retornar métricas iniciales", () => {
+  describe('Métricas', () => {
+    test('Debe retornar métricas iniciales', () => {
       const metrics = integration.getMetrics();
 
       expect(metrics).toBeDefined();
@@ -358,15 +357,15 @@ describe("DiagnosticTrigger Integration", () => {
       expect(metrics.activeSequences).toBe(0);
     });
 
-    test("Debe actualizar métricas correctamente", async () => {
+    test('Debe actualizar métricas correctamente', async () => {
       // Crear algunos leads
       const submission1: DiagnosticSubmission = {
-        email: "metrics1@example.com",
-        name: "Metrics User 1",
+        email: 'metrics1@example.com',
+        name: 'Metrics User 1',
         diagnosticResult: {
           score: 60,
-          level: "Básico",
-          recommendations: ["Recomendación 1"],
+          level: 'Básico',
+          recommendations: ['Recomendación 1'],
           areas: {
             dataCollection: 60,
             analysis: 60,
@@ -374,16 +373,16 @@ describe("DiagnosticTrigger Integration", () => {
             decisionMaking: 60,
           },
         },
-        submissionDate: "2025-01-01T10:00:00Z",
+        submissionDate: '2025-01-01T10:00:00Z',
       };
 
       const submission2: DiagnosticSubmission = {
-        email: "metrics2@example.com",
-        name: "Metrics User 2",
+        email: 'metrics2@example.com',
+        name: 'Metrics User 2',
         diagnosticResult: {
           score: 80,
-          level: "Avanzado",
-          recommendations: ["Recomendación 2"],
+          level: 'Avanzado',
+          recommendations: ['Recomendación 2'],
           areas: {
             dataCollection: 80,
             analysis: 80,
@@ -391,7 +390,7 @@ describe("DiagnosticTrigger Integration", () => {
             decisionMaking: 80,
           },
         },
-        submissionDate: "2025-01-01T10:00:00Z",
+        submissionDate: '2025-01-01T10:00:00Z',
       };
 
       await integration.processDiagnostic(submission1);
@@ -403,19 +402,19 @@ describe("DiagnosticTrigger Integration", () => {
     });
   });
 
-  describe("Procesamiento de emails programados", () => {
-    test("Debe procesar emails pendientes correctamente", async () => {
+  describe('Procesamiento de emails programados', () => {
+    test('Debe procesar emails pendientes correctamente', async () => {
       // Crear un lead de hace algunos días para simular emails pendientes
       const twoDaysAgo = new Date();
       twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
 
       const submission: DiagnosticSubmission = {
-        email: "scheduled@example.com",
-        name: "Scheduled Email Lead",
+        email: 'scheduled@example.com',
+        name: 'Scheduled Email Lead',
         diagnosticResult: {
           score: 70,
-          level: "Intermedio",
-          recommendations: ["Recomendación programada"],
+          level: 'Intermedio',
+          recommendations: ['Recomendación programada'],
           areas: {
             dataCollection: 70,
             analysis: 70,
@@ -436,16 +435,16 @@ describe("DiagnosticTrigger Integration", () => {
     });
   });
 
-  describe("Manejo de errores", () => {
-    test("Debe validar datos de entrada", async () => {
+  describe('Manejo de errores', () => {
+    test('Debe validar datos de entrada', async () => {
       const invalidSubmissions = [
         // Email inválido
         {
-          email: "invalid-email",
-          name: "Test User",
+          email: 'invalid-email',
+          name: 'Test User',
           diagnosticResult: {
             score: 60,
-            level: "Intermedio",
+            level: 'Intermedio',
             recommendations: [],
             areas: {
               dataCollection: 60,
@@ -454,15 +453,15 @@ describe("DiagnosticTrigger Integration", () => {
               decisionMaking: 60,
             },
           },
-          submissionDate: "2025-01-01T10:00:00Z",
+          submissionDate: '2025-01-01T10:00:00Z',
         },
         // Nombre vacío
         {
-          email: "test@example.com",
-          name: "",
+          email: 'test@example.com',
+          name: '',
           diagnosticResult: {
             score: 60,
-            level: "Intermedio",
+            level: 'Intermedio',
             recommendations: [],
             areas: {
               dataCollection: 60,
@@ -471,31 +470,29 @@ describe("DiagnosticTrigger Integration", () => {
               decisionMaking: 60,
             },
           },
-          submissionDate: "2025-01-01T10:00:00Z",
+          submissionDate: '2025-01-01T10:00:00Z',
         },
       ];
 
       for (const invalidSubmission of invalidSubmissions) {
         await expect(
-          integration.processDiagnostic(
-            invalidSubmission as DiagnosticSubmission
-          )
+          integration.processDiagnostic(invalidSubmission as DiagnosticSubmission),
         ).rejects.toThrow();
       }
     });
   });
 
-  describe("Integración completa", () => {
-    test("Debe manejar flujo completo de lead lifecycle", async () => {
+  describe('Integración completa', () => {
+    test('Debe manejar flujo completo de lead lifecycle', async () => {
       // 1. Crear nuevo lead
       const submission: DiagnosticSubmission = {
-        email: "lifecycle@example.com",
-        name: "Lifecycle Test",
-        company: "Test Corp",
+        email: 'lifecycle@example.com',
+        name: 'Lifecycle Test',
+        company: 'Test Corp',
         diagnosticResult: {
           score: 65,
-          level: "Intermedio",
-          recommendations: ["Recomendación 1"],
+          level: 'Intermedio',
+          recommendations: ['Recomendación 1'],
           areas: {
             dataCollection: 65,
             analysis: 65,
@@ -503,7 +500,7 @@ describe("DiagnosticTrigger Integration", () => {
             decisionMaking: 65,
           },
         },
-        submissionDate: "2025-01-01T10:00:00Z",
+        submissionDate: '2025-01-01T10:00:00Z',
       };
 
       const createResult = await integration.processDiagnostic(submission);
@@ -517,9 +514,9 @@ describe("DiagnosticTrigger Integration", () => {
         diagnosticResult: {
           ...submission.diagnosticResult,
           score: 75,
-          level: "Avanzado",
+          level: 'Avanzado',
         },
-        submissionDate: "2025-01-03T10:00:00Z", // 2 días después
+        submissionDate: '2025-01-03T10:00:00Z', // 2 días después
       };
 
       const updateResult = await integration.processDiagnostic(laterSubmission);
@@ -527,9 +524,9 @@ describe("DiagnosticTrigger Integration", () => {
 
       // 3. Verificar que el lead fue actualizado
       const database = new LeadDatabase();
-      const lead = database.findLeadByEmail("lifecycle@example.com");
+      const lead = database.findLeadByEmail('lifecycle@example.com');
       expect(lead?.diagnosticData.score).toBe(75);
-      expect(lead?.diagnosticData.level).toBe("Avanzado");
+      expect(lead?.diagnosticData.level).toBe('Avanzado');
 
       // 4. Procesar emails programados
       const cronResult = await integration.processScheduledEmails();

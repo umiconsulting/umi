@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createEmailService, getInternalEmail } from "@/lib/email/email-service";
+import { NextRequest, NextResponse } from 'next/server';
+import { createEmailService, getInternalEmail } from '@/lib/email/email-service';
 
 // Tipos para el formulario de contacto
 interface ContactFormData {
@@ -13,11 +13,11 @@ interface ContactFormData {
 // Función para generar el template del correo para Umi
 const generateUmiEmailTemplate = (data: ContactFormData): string => {
   const needTranslations: Record<string, string> = {
-    conversaflow: "Pedidos y atención por WhatsApp",
-    kds: "Cocina / KDS",
-    cash: "Lealtad / wallet",
-    suite: "Suite completa",
-    indeciso: "Aún no sabe por dónde empezar",
+    conversaflow: 'Pedidos y atención por WhatsApp',
+    kds: 'Cocina / KDS',
+    cash: 'Lealtad / wallet',
+    suite: 'Suite completa',
+    indeciso: 'Aún no sabe por dónde empezar',
   };
 
   return `
@@ -58,7 +58,7 @@ const generateUmiEmailTemplate = (data: ContactFormData): string => {
             <div class="value priority-high">
               <strong>${data.name}</strong><br>
               Email: ${data.email}<br>
-              Empresa: ${data.company || "No especificada"}
+              Empresa: ${data.company || 'No especificada'}
             </div>
           </div>
 
@@ -72,7 +72,7 @@ const generateUmiEmailTemplate = (data: ContactFormData): string => {
           <div class="section">
             <span class="label">Mensaje:</span>
             <div class="value">
-              ${data.message || "Sin mensaje adicional"}
+              ${data.message || 'Sin mensaje adicional'}
             </div>
           </div>
 
@@ -100,13 +100,13 @@ const generateUmiEmailTemplate = (data: ContactFormData): string => {
 
         <div class="footer">
           <p><strong>Umi</strong> - Sistema operativo para restaurantes conectados</p>
-          <p>Recibido: ${new Date().toLocaleString("es-ES", {
-            timeZone: "America/Mexico_City",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
+          <p>Recibido: ${new Date().toLocaleString('es-ES', {
+            timeZone: 'America/Mexico_City',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
           })}</p>
         </div>
       </div>
@@ -188,19 +188,13 @@ export async function POST(request: NextRequest) {
 
     // Validación básica
     if (!data.name || !data.email) {
-      return NextResponse.json(
-        { error: "Nombre y email son requeridos" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Nombre y email son requeridos' }, { status: 400 });
     }
 
     // Validar formato de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(data.email)) {
-      return NextResponse.json(
-        { error: "Formato de email inválido" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Formato de email inválido' }, { status: 400 });
     }
 
     const emailService = createEmailService();
@@ -209,32 +203,32 @@ export async function POST(request: NextRequest) {
     // Email para Umi (notificación interna)
     const umiMailOptions = {
       to: internalEmail,
-      subject: `Nueva consulta Umi de ${data.name} - ${data.company || "Cliente potencial"}`,
+      subject: `Nueva consulta Umi de ${data.name} - ${data.company || 'Cliente potencial'}`,
       html: generateUmiEmailTemplate(data),
       replyTo: data.email,
-      campaign: "contact_form",
-      priority: "high" as const,
+      campaign: 'contact_form',
+      priority: 'high' as const,
       // También incluir versión texto plano para mejor deliverability
       text: `
         Nueva consulta recibida:
         
         Cliente: ${data.name}
         Email: ${data.email}
-        Empresa: ${data.company || "No especificada"}
+        Empresa: ${data.company || 'No especificada'}
         Necesidad: ${data.need}
-        Mensaje: ${data.message || "Sin mensaje adicional"}
+        Mensaje: ${data.message || 'Sin mensaje adicional'}
         
-        Fecha: ${new Date().toLocaleString("es-ES")}
+        Fecha: ${new Date().toLocaleString('es-ES')}
       `,
     };
 
     // Email de respuesta automática al cliente
     const clientMailOptions = {
       to: data.email,
-      subject: "Hemos recibido tu consulta - Umi",
+      subject: 'Hemos recibido tu consulta - Umi',
       html: generateClientAutoReply(data),
-      campaign: "contact_auto_reply",
-      priority: "normal" as const,
+      campaign: 'contact_auto_reply',
+      priority: 'normal' as const,
       text: `
         Hola ${data.name},
         
@@ -249,28 +243,25 @@ export async function POST(request: NextRequest) {
     };
 
     // Enviar ambos emails usando el servicio centralizado del repo original.
-    const result = await emailService.sendBulkEmails([
-      umiMailOptions,
-      clientMailOptions,
-    ]);
+    const result = await emailService.sendBulkEmails([umiMailOptions, clientMailOptions]);
 
     emailService.close();
 
     if (result.failed > 0) {
       return NextResponse.json(
         {
-          error: "Error enviando email",
+          error: 'Error enviando email',
           details:
-            process.env.NODE_ENV === "development"
+            process.env.NODE_ENV === 'development'
               ? `${result.failed} de ${result.sent + result.failed} emails fallaron`
               : undefined,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     // Log para debugging (remover en producción)
-    console.log("Emails enviados exitosamente:", {
+    console.log('Emails enviados exitosamente:', {
       cliente: data.email,
       empresa: data.company,
       destinoInterno: internalEmail,
@@ -279,17 +270,17 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Consulta enviada exitosamente",
+      message: 'Consulta enviada exitosamente',
     });
   } catch (error) {
-    console.error("Error al enviar email:", error);
+    console.error('Error al enviar email:', error);
 
     return NextResponse.json(
       {
-        error: "Error interno del servidor",
-        details: process.env.NODE_ENV === "development" ? error : undefined,
+        error: 'Error interno del servidor',
+        details: process.env.NODE_ENV === 'development' ? error : undefined,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
