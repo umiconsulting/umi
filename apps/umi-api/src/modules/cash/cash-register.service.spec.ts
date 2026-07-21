@@ -9,14 +9,12 @@ import { CashRegisterService } from './cash-register.service';
 
 function make() {
   const repo = {
-    tenantConfig: vi
-      .fn()
-      .mockResolvedValue({
-        name: 'Kala',
-        loyaltyConfigured: true,
-        cardPrefix: null,
-        selfRegistration: true,
-      }),
+    tenantConfig: vi.fn().mockResolvedValue({
+      name: 'Kala',
+      loyaltyConfigured: true,
+      cardPrefix: null,
+      selfRegistration: true,
+    }),
     normalizePhone: vi.fn().mockResolvedValue('+5219991234567'),
     findExisting: vi.fn().mockResolvedValue(null),
     resolveContact: vi.fn().mockResolvedValue('person-1'),

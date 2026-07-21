@@ -15,14 +15,12 @@ function make() {
     getUserPersonId: vi.fn().mockResolvedValue(null),
   };
   const repo = {
-    tenantConfig: vi
-      .fn()
-      .mockResolvedValue({
-        name: 'Kala',
-        timezone: 'America/Mexico_City',
-        lifecycleCopy: {},
-        birthdayRewardName: 'Café gratis',
-      }),
+    tenantConfig: vi.fn().mockResolvedValue({
+      name: 'Kala',
+      timezone: 'America/Mexico_City',
+      lifecycleCopy: {},
+      birthdayRewardName: 'Café gratis',
+    }),
     activeRewardConfig: vi
       .fn()
       .mockResolvedValue({ id: 'rc1', visits_required: 10, reward_name: 'Café' }),
@@ -31,15 +29,13 @@ function make() {
     recentRedemptionWithin: vi.fn().mockResolvedValue(false),
     activeBirthdayReward: vi.fn().mockResolvedValue(null),
     isAfterHours: vi.fn().mockResolvedValue(false),
-    performScan: vi
-      .fn()
-      .mockResolvedValue({
-        total_visits: 6,
-        visits_this_cycle: 4,
-        pending_rewards: 0,
-        balance_cents: 0,
-        card_number: 'KAL-1',
-      }),
+    performScan: vi.fn().mockResolvedValue({
+      total_visits: 6,
+      visits_this_cycle: 4,
+      pending_rewards: 0,
+      balance_cents: 0,
+      card_number: 'KAL-1',
+    }),
   };
   const walletPass = { refreshCard: vi.fn().mockResolvedValue(undefined) };
   const email = { send: vi.fn().mockResolvedValue(null) };

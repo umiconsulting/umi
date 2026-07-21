@@ -104,14 +104,12 @@ describe('CheckoutTools.confirmOrder', () => {
     };
     // Default: a single-branch tenant that resolves to its sole location.
     locations = {
-      resolve: vi
-        .fn()
-        .mockResolvedValue({
-          kind: 'resolved',
-          locationId: 'loc-sole',
-          source: 'sole',
-          name: 'Centro',
-        }),
+      resolve: vi.fn().mockResolvedValue({
+        kind: 'resolved',
+        locationId: 'loc-sole',
+        source: 'sole',
+        name: 'Centro',
+      }),
     };
   });
 
@@ -226,14 +224,12 @@ describe('CheckoutTools.reorderLastOrder', () => {
     };
     // Default: a single-branch tenant that resolves to its sole location.
     locations = {
-      resolve: vi
-        .fn()
-        .mockResolvedValue({
-          kind: 'resolved',
-          locationId: 'loc-sole',
-          source: 'sole',
-          name: 'Centro',
-        }),
+      resolve: vi.fn().mockResolvedValue({
+        kind: 'resolved',
+        locationId: 'loc-sole',
+        source: 'sole',
+        name: 'Centro',
+      }),
     };
   });
 
