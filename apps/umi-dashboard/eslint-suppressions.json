@@ -1,0 +1,129 @@
+{
+  "src/app.jsx": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "src/data.jsx": {
+    "react-hooks/rules-of-hooks": {
+      "count": 2
+    }
+  },
+  "src/icons.jsx": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "src/lib/auth.jsx": {
+    "no-unused-vars": {
+      "count": 1
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/lib/tenant-context.jsx": {
+    "no-unused-vars": {
+      "count": 1
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 2
+    }
+  },
+  "src/screens/conversations.jsx": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "src/screens/customers.jsx": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "src/screens/devices.jsx": {
+    "react-hooks/purity": {
+      "count": 1
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 3
+    }
+  },
+  "src/screens/gift-cards.jsx": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "src/screens/hours.jsx": {
+    "no-unused-vars": {
+      "count": 2
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/screens/login.jsx": {
+    "no-unused-vars": {
+      "count": 1
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/screens/members.jsx": {
+    "no-unused-vars": {
+      "count": 2
+    }
+  },
+  "src/screens/orders.jsx": {
+    "no-unused-vars": {
+      "count": 3
+    },
+    "react-hooks/purity": {
+      "count": 1
+    }
+  },
+  "src/screens/overview.jsx": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "src/screens/products-billing.jsx": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "src/screens/reset-password.jsx": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "src/screens/settings.jsx": {
+    "no-unused-vars": {
+      "count": 1
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 2
+    }
+  },
+  "src/screens/staff.jsx": {
+    "no-unused-vars": {
+      "count": 3
+    }
+  },
+  "src/shell.jsx": {
+    "no-unused-vars": {
+      "count": 1
+    },
+    "react-hooks/static-components": {
+      "count": 2
+    }
+  },
+  "src/tweaks-panel.jsx": {
+    "no-unused-vars": {
+      "count": 1
+    },
+    "react-hooks/refs": {
+      "count": 4
+    }
+  }
+}

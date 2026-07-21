@@ -61,7 +61,7 @@ Two consequences shape this roadmap:
 
 | Instrument | What it proves | Command | Current |
 |---|---|---|---|
-| **`sql-preflight.integration.ts`** | Every backend SQL statement resolves against live build-v3 (schema validity) | `cd apps/umi-api && npm run test:integration` | **160 / 215 unresolved** (as of PR #50) |
+| **`sql-preflight.integration.ts`** | Every backend SQL statement resolves against live build-v3 (schema validity) | `cd apps/umi-api && npm run test:integration` | **140 / 218 unresolved** (as of PR #54) |
 | **`security_gate.sql`** | RLS+FORCE, least-privilege grants, credential lockdown, data hygiene (24 structural + 3 behavioral) | `PGPORT=5233 psql -v ON_ERROR_STOP=1 -d umi_backfill_v3 -f security_gate.sql` → `SECURITY GATE PASSED` | **PASS** |
 | **`reconcile_v3.sql`** | Backfill fidelity — counts + money invariants + **per-order / per-item** field-level equality | `PGPORT=5233 psql -v ON_ERROR_STOP=1 -d umi_backfill_v3 -f backfill/reconcile_v3.sql` | **PASS** |
 
@@ -121,23 +121,30 @@ that *also* hit a missing table/column, so they clear only when P1/P3/P4 land).
 **⚠️ Invariant.** The worker pool is `BYPASSRLS`; dropping one `business_id` predicate = a **silent
 cross-tenant read** nothing catches. Every touched query keeps its predicate.
 
-### P3 — Identity / RBAC / WhatsApp / entitlement / POS 🔄 IN FLIGHT
+### P3 — Identity / RBAC / WhatsApp / entitlement / POS ✅ DONE (self-contained)
 **Goal.** Complete the request-path features on the build-v3 base.
-**Scope & status.**
-- 🔄 **Entitlement single-source** — read `umi.effective_entitlement` (security_invoker, RLS-scoped)
-  instead of raw `subscription_item`; keep `@RequireProduct` + `isProductStatusActive` from
-  `@umi/contract`. In flight on `feat/phase3-entitlement-pos` (`e700f95`).
-- 🔄 **POS server seat** — `pos` product + write endpoints, entitlement-guarded, zod-validated
-  (`4b0e6e2`; contract-seam design). [[project_umipos_nexo_integration_2026_07_14]]
-- ⏳ **Identity resolver** — `provider='twilio'` (the channel-type CHECK excludes `'whatsapp'`);
-  `identity.resolver.ts` replaces the dropped `resolve_contact` RPC.
-- ⏳ **RBAC seed** — `super_admin` never existed in `umi.role`; the map is 0-row with no seed → every
-  login `permissions=[]`. Seed **after** `backfill_identity`.
-- ⏳ **WhatsApp sender fix** — code filters `sender='user'` but the CHECK is
-  `(customer,bot,staff,system)` → the bot is silently dead. Plus `conversation_state` seeding (0 rows
-  vs 11 open conversations → infinite requeue).
-- ⚠️ **Staff writes** — route to `workerTx` with an explicit `business_id` predicate. **Never**
+**Delivered.** `PR #54` (`1ad3bbb`), 23 commits.
+- ✅ **Entitlement single-source** via `umi.effective_entitlement`; ✅ **POS server seat** (`pos` product
+  + contract-seam design). [[project_umipos_nexo_integration_2026_07_14]]
+- ✅ **Identity → the FLAT model** (owner decision 2026-07-09, see
+  `docs/architecture/2026-07-09-enterprise-conceptual-review.md`). The resolver had been written against
+  a federated graph the DDL never built; that code was 3 days stale, not the spec. `umi.e164` +
+  `tenant.normalize_identity` added, `contact.normalized_value` made DERIVED (BEFORE trigger) and
+  UNFORGEABLE (`REVOKE UPDATE`), repairing the L15 fatal branch.
+- ✅ **RBAC** — the access queries read build-v2 `tenant_access`/`login_id` and a nonexistent
+  `rp.permission_key`, all INTERPOLATED so preflight never saw them (login would return
+  `permissions=[]`). Rewritten onto `umi.user_role` + `seed_rbac.sql`; `super_admin` made real as a
+  PLATFORM-WIDE grant (owner decision 2026-07-21 — a deliberate privilege change: the operator goes
+  from 4 cafés to all 5).
+- ✅ **WhatsApp sender vocabulary** — DB speaks `(customer,bot,staff,system)`, the LLM speaks
+  `user/assistant`; bridged at the repository boundary with a red-green-verified regression test.
+- ⚠️ **Staff writes → `workerTx`** — NOT done, carried to P4. **Never**
   `grant insert/update on umi.user to api` (no RLS on `umi.user` → cross-tenant write primitive).
+
+**Residuals moved to P4 (they are P4-entangled, not P3 leftovers):** Customer 360
+(`customers.repository` mixes `contact_identity` + `tenant."order"` + `customer.contact_id` in single
+statements) and the message-pipeline schema (`tenant.message` has no `business_id`/`message_index`/
+`twilio_message_sid`/`intent`/`body_embedding`), so end-to-end WhatsApp needs P4 too.
 
 **DoD.** Entitlement returns the same set as `product_instances` for the seeded cafés; login yields real
 permissions; the bot replies (add it to the smoke test — its failure is silent); preflight retires the
@@ -180,25 +187,31 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
 
 ---
 
-## 5 · Current baseline (2026-07-20)
+## 5 · Current baseline (2026-07-21)
 
-- **`build-v3` HEAD:** `8be72ed` (PR #51). Merged in order: **#49** order cluster → **#50** mechanical
-  sweep → **#51** D1/D11 gate.
-- **In flight:** `feat/phase3-entitlement-pos` (5 commits ahead) — entitlement single-source + POS seat
-  (P3), not yet merged.
-- **Preflight:** **160 / 215** unresolved (as of PR #50).
-- **Gate:** `security_gate.sql` PASS · `reconcile_v3.sql` PASS on the snapshot backfill.
+- **`build-v3` HEAD:** `1ad3bbb` (PR #54). Merged in order: **#49** order cluster → **#50** mechanical
+  sweep → **#51** D1/D11 gate → **#54** P3 (identity/RBAC/WhatsApp/entitlement/POS).
+- **In flight:** `chore/lint-baseline` — Prettier scope + the first ESLint surface.
+- **Preflight:** **140 / 218** unresolved · 46 interpolated (uncovered) · **0** `42883`.
+- **Units:** 359 · **Gate:** `security_gate.sql` PASS · `reconcile_v3.sql` PASS on the snapshot backfill.
+- **Branch protection (2026-07-21):** `build-v3` now requires a branch to be UP TO DATE with base before
+  merging (`strict: true`, no required contexts — path-filtered checks would deadlock a docs-only PR),
+  enforced for admins. Closes the stale-base hole: the tree CI tested is the tree that lands.
+- ⚠️ **Post-merge CI does NOT run.** Every workflow is `pull_request`-only, and `umi-api-deploy.yml` is
+  scoped to `main`, so a merge into `build-v3` triggers nothing. pr-gates gate 5 is **BLOCKED, not
+  passed**. Fix = a `push: branches: [build-v3]` trigger; see
+  `docs/reports/2026-07-21-linting-toolchain-research.md`.
 
-### The 160 remaining, mapped to phases
+### The 140 remaining, mapped to phases
 
 | Error | Count | What | Owning phase |
 |---|---:|---|---|
 | `42P01` undefined_table | 11 | `tenant.order` → `customer_order` | P4 (order repos) |
-| | 16 | `contact_identity` / `channel` / `whatsapp_number` dissolved | P3 (identity) |
+| | ~8 | `contact_identity` / `channel` — ONLY in `customers.repository` (Customer 360) | P4 (order-entangled) |
 | | 5 | `open_hours` → `business_hours` | P4 (hours) |
-| | ~4 | `birthday_reward` (2), `conversation_turn` (1), `outbox_event` (1) | P1 / P4 |
-| `42703` undefined_column | 121 | non-`tenant_id` drift: `slug`, `visits_required`, `total_cents`/`details`, outbox `run_at`/`published_at`/`max_attempts`, `born_at`, `contact_id`, `subscription_item.status` | P1 / P3 / P4 |
-| `42883` undefined_function | 3 | `normalize_phone` ×2, `normalize_identity` | P1 (DB functions) |
+| | ~4 | `birthday_reward` (2), `conversation_turn` (1), `v_kds_tickets` | P4 |
+| `42703` undefined_column | 116 | non-`tenant_id` drift: `slug` (P5), `visits_required`, `total_cents`/`details`, outbox `run_at`/`published_at`/`max_attempts`, `born_at`, `subscription_item.status`, and the `tenant.message` pipeline columns | P4 / P5 |
+| `42883` undefined_function | **0** | `normalize_phone` / `normalize_identity` — ✅ resolved by `umi.e164` | — |
 
 Plus **47 interpolated statements** that preflight cannot cover (counted, not hidden — they need
 manual/live-path validation). Exact splits live in the `npm run test:integration` output.

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { getAuthHeaders } from './auth.jsx'
 import { apiUrl, withCreds, errMessage } from './config.js'
 import { buildModuleAvailability, canShowModule, getVisibleModules, isProductActive } from './module-registry.js'
@@ -95,7 +95,11 @@ export function TenantProvider({ children }) {
     else window.localStorage.removeItem(SELECTED_LOCATION_KEY)
   }
 
-  const updateSelectedTenant = (patch) => {
+  // useCallback + an explicit dep so the memo below can track it. It closes over
+  // selectedTenantId; today that value is also in the memo's deps, so the closure
+  // happens to stay fresh — but nothing enforced that. The moment this reads one more
+  // reactive value, every context consumer would silently receive a stale function.
+  const updateSelectedTenant = useCallback((patch) => {
     if (!selectedTenantId || !patch) return
     setTenants(prev => prev.map(tenant => (
       tenant.id === selectedTenantId ? { ...tenant, ...patch } : tenant
@@ -103,7 +107,7 @@ export function TenantProvider({ children }) {
     setCapabilities(prev => (
       prev?.tenant ? { ...prev, tenant: { ...prev.tenant, ...patch } } : prev
     ))
-  }
+  }, [selectedTenantId])
 
   const value = useMemo(() => ({
     tenants,
@@ -120,7 +124,7 @@ export function TenantProvider({ children }) {
     isProductActive: (productKey) => isProductActive(productKey, capabilities),
     canShowModule: (moduleKey) => canShowModule(moduleKey, capabilities),
     visibleModules: getVisibleModules(capabilities),
-  }), [tenants, selectedTenantId, selectedLocationId, capabilities, loading, error])
+  }), [tenants, selectedTenantId, selectedLocationId, capabilities, loading, error, updateSelectedTenant])
 
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>
 }
