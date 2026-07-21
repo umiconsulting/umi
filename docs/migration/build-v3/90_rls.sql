@@ -63,9 +63,16 @@ revoke update (normalized_value) on tenant.contact from api;
 grant select, insert, update on runtime.conversation_state to api;   -- live convo FSM
 grant select, insert          on runtime.reminder_sent    to api;    -- nudge dedup
 grant select, insert          on runtime.idempotency_key  to api;    -- request dedup
+-- product_embedding: SELECT only. Semantic product search is a REQUEST-path read
+-- (the bot's menu fallback), and it is being moved off the BYPASSRLS worker pool onto
+-- the RLS-enforced api pool — which it cannot do without reading this table. The row
+-- is a vector keyed by product_id and carries no tenant fact of its own; isolation
+-- comes from the join to tenant.product, which IS under RLS. No write: only the
+-- worker's enrichment pass produces embeddings.
+grant select                  on runtime.product_embedding to api;   -- RAG read path
 --   NOT granted to api: session/otp/password_reset_token/device_session/pairing (auth
 --     substrate -> auth definer/worker only), outbox/inbound/dead_letter (queue -> worker),
---     product/message/knowledge_embedding (RAG -> worker), integration_sync/pass_device.
+--     message/knowledge_embedding (RAG -> worker), integration_sync/pass_device.
 
 -- ---- Credentials are NEVER on the request path: column-lock umi.user ----
 --   password_hash/salt/algorithm are read ONLY by the worker pool / a SECURITY DEFINER

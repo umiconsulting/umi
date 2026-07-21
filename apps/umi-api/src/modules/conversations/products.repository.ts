@@ -103,7 +103,8 @@ export class ProductsRepository {
       .slice(0, 8);
     const likePatterns = [`%${query.trim()}%`, ...tokens.map((t) => `%${t}%`)];
 
-    const text = await this.pg.query<ProductRow>(
+    const text = await this.pg.tquery<ProductRow>(
+      tenantId,
       `SELECT ${SELECT} ${FROM}
         WHERE p.business_id = $1::uuid AND p.active = true
           AND (
@@ -139,7 +140,8 @@ export class ProductsRepository {
     // Semantic fallback.
     const embedding = await this.voyage.generateEmbedding(query, 'query');
     if (!embedding) return [];
-    const sem = await this.pg.query<ProductRow>(
+    const sem = await this.pg.tquery<ProductRow>(
+      tenantId,
       `SELECT ${SELECT} ${FROM}
         JOIN runtime.product_embedding pe ON pe.product_id = p.id
         WHERE p.business_id = $1::uuid AND p.active = true
@@ -162,7 +164,8 @@ export class ProductsRepository {
   ): Promise<ProductRecord[]> {
     const embedding = await this.voyage.generateEmbedding(query, 'query');
     if (!embedding) return [];
-    const { rows } = await this.pg.query<ProductRow>(
+    const { rows } = await this.pg.tquery<ProductRow>(
+      tenantId,
       `SELECT ${SELECT} ${FROM}
         JOIN runtime.product_embedding pe ON pe.product_id = p.id
         WHERE p.business_id = $1::uuid AND p.active = true
@@ -180,7 +183,8 @@ export class ProductsRepository {
     categoryFilter: string[] | null,
     limit = 80,
   ): Promise<ProductRecord[]> {
-    const { rows } = await this.pg.query<ProductRow>(
+    const { rows } = await this.pg.tquery<ProductRow>(
+      tenantId,
       `SELECT ${SELECT} ${FROM}
         WHERE p.business_id = $1::uuid AND p.active = true
           AND ($2::text[] IS NULL OR pc.name = ANY($2))
@@ -192,7 +196,8 @@ export class ProductsRepository {
 
   /** Distinct customer-facing category names (browse suggestions). */
   async categorySuggestions(tenantId: string): Promise<string[]> {
-    const { rows } = await this.pg.query<{ name: string | null }>(
+    const { rows } = await this.pg.tquery<{ name: string | null }>(
+      tenantId,
       `SELECT DISTINCT pc.name
          FROM tenant.product p
          JOIN tenant.product_category pc ON pc.id = p.category_id
@@ -210,7 +215,8 @@ export class ProductsRepository {
     ids: string[],
   ): Promise<Map<string, ProductRecord & { available: boolean }>> {
     if (!ids.length) return new Map();
-    const { rows } = await this.pg.query<ProductRow & { active: boolean }>(
+    const { rows } = await this.pg.tquery<ProductRow & { active: boolean }>(
+      tenantId,
       `SELECT ${SELECT}, p.active ${FROM}
         WHERE p.business_id = $1::uuid AND p.id = ANY($2::uuid[])`,
       [tenantId, ids],
@@ -225,7 +231,8 @@ export class ProductsRepository {
   ): Promise<
     Array<{ id: string; name: string; category: string | null; variants: ProductVariant[] }>
   > {
-    const { rows } = await this.pg.query<ProductRow>(
+    const { rows } = await this.pg.tquery<ProductRow>(
+      tenantId,
       `SELECT ${SELECT} ${FROM}
         WHERE p.business_id = $1::uuid AND p.active = true
           AND NOT EXISTS (
@@ -247,6 +254,11 @@ export class ProductsRepository {
    * `runtime.product_embedding` (product_id PK) rather than as a column on the
    * product. Upsert, because re-embedding a renamed product must replace the
    * vector rather than fail or accumulate.
+   *
+   * Stays on the worker pool: `api` holds SELECT on runtime.product_embedding (for
+   * the request-path semantic read) but no write, because producing embeddings is
+   * the enrichment job's business, not a request's. The `id` is not tenant-checked
+   * here — it comes from listNeedingEmbedding, which is tenant-scoped.
    */
   async updateNameEmbedding(id: string, embedding: number[], model: string): Promise<void> {
     await this.pg.query(
@@ -272,7 +284,8 @@ export class ProductsRepository {
    */
   async getOrCreateCategory(tenantId: string, name: string | null): Promise<string | null> {
     if (!name || !name.trim()) return null;
-    const { rows } = await this.pg.query<{ id: string }>(
+    const { rows } = await this.pg.tquery<{ id: string }>(
+      tenantId,
       `INSERT INTO tenant.product_category (business_id, name, display_order)
        VALUES ($1::uuid, $2, 0)
        ON CONFLICT (business_id, name) DO UPDATE SET name = EXCLUDED.name
@@ -385,9 +398,16 @@ export class ProductsRepository {
    * Mark Zettle-sourced products absent from the latest sync as unavailable.
    * `external_ref IS NOT NULL` is what scopes this to integration-owned rows, so a
    * hand-created product is never deactivated by a sync that has never heard of it.
+   *
+   * Deliberately on `tquery`, not the worker pool: this is the most dangerous shape
+   * in the file — an UPDATE across many rows whose ONLY tenant guard is one
+   * predicate. On the BYPASSRLS pool, deleting that `business_id = $1` would
+   * deactivate EVERY tenant's catalog in a single statement, and nothing would fail.
+   * Under RLS the same mistake touches zero rows outside this business.
    */
   async markUnavailableExcept(tenantId: string, zettleUuids: string[]): Promise<void> {
-    await this.pg.query(
+    await this.pg.tquery(
+      tenantId,
       `UPDATE tenant.product SET active = false, updated_at = now()
         WHERE business_id = $1::uuid
           AND external_ref IS NOT NULL
@@ -401,7 +421,8 @@ export class ProductsRepository {
     tenantId: string,
     id: string,
   ): Promise<(ProductRecord & { available: boolean }) | null> {
-    const { rows } = await this.pg.query<ProductRow & { active: boolean }>(
+    const { rows } = await this.pg.tquery<ProductRow & { active: boolean }>(
+      tenantId,
       `SELECT ${SELECT}, p.active ${FROM}
         WHERE p.business_id = $1::uuid AND p.id = $2::uuid
         LIMIT 1`,
