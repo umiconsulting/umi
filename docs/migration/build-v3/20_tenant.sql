@@ -438,7 +438,9 @@ create table tenant.customer_order (
   status           text not null default 'placed'
                      check (status in ('placed','preparing','ready','completed','canceled')),
   cancel_reason    text,                          -- codes/notes for a void; contaminated free-text history NOT carried
-  external_ref     text,                          -- Zettle order id when synced
+  notes            text,                          -- order-level note the customer gave at checkout
+  pickup_person    text,                          -- who collects the order, when not the buyer
+  external_ref     text,                          -- Zettle order id when synced; also the bot's idempotency key
   placed_at        timestamptz not null default now(),
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
@@ -446,6 +448,32 @@ create table tenant.customer_order (
   -- lines) via tenant.order_total below — it cannot drift and self-heals on a
   -- void. Money-truth for a settled order lives on tenant.payment, not here.
 );
+comment on column tenant.customer_order.notes is
+  'Order-level note captured at checkout. This is the NAMED column ORDER_MODEL.md §5 sanctions '
+  '("add a named customer_order.notes when a real consumer earns it") — NOT a revived free-text '
+  'blob. Both ends exist today: the WhatsApp checkout writes it, and the FROZEN iPad KDS ticket '
+  'renders it to the barista as `customer_note`. Per-line customization belongs on '
+  'order_item.notes; a lasting customer preference belongs on tenant.customer_note.';
+comment on column tenant.customer_order.pickup_person is
+  'Who collects the order, when that is not the buyer. Also a frozen KDS ticket field. Never '
+  'populated in the source (0/51) but written by the WhatsApp checkout, so it gets a real column '
+  'rather than a hard-coded null in the contract.';
+-- NOTE: personal_message (the gift message that accompanies pickup_person) is
+-- DEFERRED, not forgotten — see ORDER_MODEL.md §5 Deferred. It never had a column
+-- (it lived in the details blob), it is written on 0 of 51 source orders, and the
+-- only thing that ever displayed it was a Slack controller that no longer exists.
+-- The KDS will earn it back. Re-add as a plain nullable text column then; there is
+-- no history to retrofit precisely because there is none.
+
+-- Idempotency for order INJECTION (ORDER_MODEL.md §6 planned this as "when the
+-- injection path is built" — it already is: the WhatsApp checkout is one).
+-- conversations/orders.repository.ts retries a turn with the SAME external_ref and
+-- relies on ON CONFLICT to return the existing order; without this index the
+-- conflict target does not exist and a retried turn creates a DUPLICATE order.
+-- Partial, so the many orders with no external ref are unconstrained.
+create unique index customer_order_external_ref_uidx
+  on tenant.customer_order (business_id, external_ref)
+  where external_ref is not null;
 
 create table tenant.order_item (
   id           uuid primary key default gen_random_uuid(),
@@ -507,6 +535,7 @@ create trigger order_item_void_only
 
 create table tenant.order_event (
   id          uuid primary key default gen_random_uuid(),
+  sequence    bigint generated always as identity,
   order_id    uuid not null references tenant.customer_order(id) on delete cascade,
   status      text not null
                 check (status in ('placed','preparing','ready','completed','canceled')),
@@ -514,6 +543,18 @@ create table tenant.order_event (
   occurred_at timestamptz not null default now()
 );
 comment on table tenant.order_event is 'Real status transitions only — not a catch-all event log.';
+-- The status spine has TWO consumer shapes, and this column serves the second one.
+-- PUSH (ORDER_MODEL.md §1): a new row fires a "listo" notification — needs no cursor.
+-- PULL: the FROZEN iPad KDS polls incrementally — `after_sequence` in the request,
+-- `WHERE sequence > $n ORDER BY sequence` in the query, `last_event_sequence` on
+-- every ticket. That needs a TOTAL ORDER, and occurred_at cannot supply one: in the
+-- source events, 63 occurred_at values are TIED, so a `> timestamp` cursor silently
+-- skips or replays events at every tie — the KDS would drop ticket transitions with
+-- nothing raising an error. Monotonic bigint, assigned by the database, never reused.
+create index tenant_order_event_sequence_idx on tenant.order_event (sequence);
+comment on column tenant.order_event.sequence is
+  'Monotonic cursor for incremental polling (frozen KDS `after_sequence`). Ordering only — '
+  'gaps are expected and meaningless; never treat it as a count.';
 
 create table tenant.payment (
   id           uuid primary key default gen_random_uuid(),
