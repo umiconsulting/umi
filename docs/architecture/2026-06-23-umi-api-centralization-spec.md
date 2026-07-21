@@ -3,7 +3,7 @@
 **Date:** 2026-06-23
 **Status:** **Phases 0–2 LIVE in production (2026-06-25).** Phase 0 (deploy + health), Phase 1 (durable BullMQ work engine + adapters), and Phase 2 (dashboard backend + **live** cash on canonical `loyalty.*`) are deployed at `https://api.umiconsulting.co`; the umi-dashboard SPA is cut over to umi-api (httpOnly-cookie auth). Realized deploy/role model in [`apps/umi-api/docs/vps-setup.md`](../../apps/umi-api/docs/vps-setup.md). **Phase 3 (ConversaFlow) is LIVE** (WhatsApp pipeline cut over to the VPS); **Phases 4 (KDS) & 5 (landing-page leads) are BUILT and dormant pre-cutover** (merged/ready, flag-gated OFF). Remaining: KDS iPad + landing repoints, Stage 4 dual-writer cutover (umi-cash still writes `loyalty.*`), Phase 6 decommission, Phase 7 umi-cash.
 **Owner decision:** Build a single centralized backend API (`apps/umi-api`) on a VPS. Eliminate Supabase Edge Functions. Route every app except `umi-logs` to it. Keep `umi-cash` running on its own repo for now.
-**Supersedes / reconciles:** `docs/architecture/2026-05-23-api-backend-centralization-audit.md` (which recommended *not* building a central API and *keeping* edge functions). That recommendation was correct for its moment — it was gated on the database consolidation completing first. The unified platform database **launched to production on 2026-06-20**, which satisfies the program's sequencing invariant (*database consolidation → backend consolidation → monorepo*). We are now at the backend-consolidation step, and the owner has chosen a single VPS-hosted API over the edge-function model.
+**Supersedes / reconciles:** `docs/architecture/2026-05-23-api-backend-centralization-audit.md` (which recommended _not_ building a central API and _keeping_ edge functions). That recommendation was correct for its moment — it was gated on the database consolidation completing first. The unified platform database **launched to production on 2026-06-20**, which satisfies the program's sequencing invariant (_database consolidation → backend consolidation → monorepo_). We are now at the backend-consolidation step, and the owner has chosen a single VPS-hosted API over the edge-function model.
 
 ---
 
@@ -13,12 +13,12 @@
 
 Consolidate all backend/runtime logic that is today fragmented across **four** runtimes into **one** clean, maintainable TypeScript service:
 
-| Today (fragmented) | Becomes |
-|---|---|
+| Today (fragmented)                                                                                                                                       | Becomes                                     |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
 | `umi-conversaflow` Supabase **Edge Functions** (Deno): `whatsapp-handler`, `job-worker`, `kds-command`, `kds-board`, `kds-pairing`, `zettle-oauth-setup` | `apps/umi-api` HTTP routes + BullMQ workers |
-| `umi-dashboard` Express backend (`server.js`, 2,829 lines) | `apps/umi-api` admin/owner modules |
-| `umi-landing-page` lead/email backend (SQLite + Next API routes) | `apps/umi-api` leads module + Postgres |
-| `pg_cron` scheduled jobs | BullMQ repeatable jobs |
+| `umi-dashboard` Express backend (`server.js`, 2,829 lines)                                                                                               | `apps/umi-api` admin/owner modules          |
+| `umi-landing-page` lead/email backend (SQLite + Next API routes)                                                                                         | `apps/umi-api` leads module + Postgres      |
+| `pg_cron` scheduled jobs                                                                                                                                 | BullMQ repeatable jobs                      |
 
 ### 1.2 Explicit Non-Goals (this program)
 
@@ -34,26 +34,26 @@ Consolidate all backend/runtime logic that is today fragmented across **four** r
 
 Each decision is tagged with its basis per the workspace research standard (`AGENTS.md`): **[Fact]** documented fact, **[Tradeoff]** source-backed tradeoff, **[Owner]** owner directive, **[Inference]** Umi-specific inference.
 
-| # | Decision | Basis |
-|---|---|---|
-| D1 | One centralized service, `apps/umi-api`, deployed to a **VPS** (long-running process, not serverless/edge). | [Owner] |
-| D2 | **NestJS on the Fastify adapter** (`@nestjs/platform-fastify`). NestJS enforces module boundaries structurally (the strongest guardrail against spaghetti across many domains); Fastify gives throughput + TS-first ergonomics and a clean raw-body hook for Twilio signature validation. | [Owner] + [Tradeoff] |
-| D3 | **BullMQ (Redis-backed)** is the job engine for all async work (turns, embeddings, summaries, fact extraction, Zettle sync, cash lifecycle crons, outbound WhatsApp). Replaces the Deno worker's hand-rolled Postgres poll-loop + `pg_cron` + HTTP-trigger. | [Owner] + [Tradeoff] |
-| D4 | **Eliminate Supabase Edge Functions.** All ingress/commands/jobs become VPS routes + workers. | [Owner] |
-| D5 | **Route everything to `umi-api` except `umi-logs`.** Dashboard, ConversaFlow ingress, KDS, and landing-page leads all call `umi-api`. | [Owner] |
-| D6 | **`umi-cash` stays independent and online**, coexisting on the shared platform Postgres. Deferred to a later phase. | [Owner] |
-| D7 | **DB stays on the consolidated platform Postgres**; `umi-api` connects directly (no PostgREST). Existing SQL functions/RPCs are reused via direct queries (DRY). | [Inference] + [Fact] |
-| D8 | **No ORM. Raw SQL via `pg` (node-postgres)** — hand-written parameterized queries in repositories. Migrations stay **Supabase migrations** while the DB is on Supabase, and become **Sqitch + hand-written PostgreSQL SQL** when the database is lifted onto PostgreSQL on the VPS. (The dashboard already used only raw SQL through Prisma `$queryRaw`, so dropping the ORM is a small change.) | [Owner] |
-| D9 | **Unified auth:** JWT (access + refresh) in httpOnly cookies, `scrypt` password verification (preserve existing hashes), entitlement + role guards. Replaces the dashboard's header-only "session" and the three separate JWT schemes. | [Tradeoff] + [Inference] |
-| D10 | **File structure is flat, business-named, and self-describing** (§6). This is a hard requirement, not a preference. | [Owner] |
-| D11 | ~~Cash write paths feature-flagged OFF and ship inert.~~ **REVERSED by owner (2026-06-25): cash ships fully LIVE.** umi-api now serves customer-facing writes on canonical `loyalty.*` (top-up, purchase, gift-card issue/redeem, scan, self-registration). `CASH_WRITE_ENABLED` is vestigial. `umi-cash` still also writes `loyalty.*` — the two coexist (append-only ledger, `balance = SUM`); retiring umi-cash's writes is the Stage 4 dual-writer decision. | [Owner] |
+| #   | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Basis                    |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| D1  | One centralized service, `apps/umi-api`, deployed to a **VPS** (long-running process, not serverless/edge).                                                                                                                                                                                                                                                                                                                                                      | [Owner]                  |
+| D2  | **NestJS on the Fastify adapter** (`@nestjs/platform-fastify`). NestJS enforces module boundaries structurally (the strongest guardrail against spaghetti across many domains); Fastify gives throughput + TS-first ergonomics and a clean raw-body hook for Twilio signature validation.                                                                                                                                                                        | [Owner] + [Tradeoff]     |
+| D3  | **BullMQ (Redis-backed)** is the job engine for all async work (turns, embeddings, summaries, fact extraction, Zettle sync, cash lifecycle crons, outbound WhatsApp). Replaces the Deno worker's hand-rolled Postgres poll-loop + `pg_cron` + HTTP-trigger.                                                                                                                                                                                                      | [Owner] + [Tradeoff]     |
+| D4  | **Eliminate Supabase Edge Functions.** All ingress/commands/jobs become VPS routes + workers.                                                                                                                                                                                                                                                                                                                                                                    | [Owner]                  |
+| D5  | **Route everything to `umi-api` except `umi-logs`.** Dashboard, ConversaFlow ingress, KDS, and landing-page leads all call `umi-api`.                                                                                                                                                                                                                                                                                                                            | [Owner]                  |
+| D6  | **`umi-cash` stays independent and online**, coexisting on the shared platform Postgres. Deferred to a later phase.                                                                                                                                                                                                                                                                                                                                              | [Owner]                  |
+| D7  | **DB stays on the consolidated platform Postgres**; `umi-api` connects directly (no PostgREST). Existing SQL functions/RPCs are reused via direct queries (DRY).                                                                                                                                                                                                                                                                                                 | [Inference] + [Fact]     |
+| D8  | **No ORM. Raw SQL via `pg` (node-postgres)** — hand-written parameterized queries in repositories. Migrations stay **Supabase migrations** while the DB is on Supabase, and become **Sqitch + hand-written PostgreSQL SQL** when the database is lifted onto PostgreSQL on the VPS. (The dashboard already used only raw SQL through Prisma `$queryRaw`, so dropping the ORM is a small change.)                                                                 | [Owner]                  |
+| D9  | **Unified auth:** JWT (access + refresh) in httpOnly cookies, `scrypt` password verification (preserve existing hashes), entitlement + role guards. Replaces the dashboard's header-only "session" and the three separate JWT schemes.                                                                                                                                                                                                                           | [Tradeoff] + [Inference] |
+| D10 | **File structure is flat, business-named, and self-describing** (§6). This is a hard requirement, not a preference.                                                                                                                                                                                                                                                                                                                                              | [Owner]                  |
+| D11 | ~~Cash write paths feature-flagged OFF and ship inert.~~ **REVERSED by owner (2026-06-25): cash ships fully LIVE.** umi-api now serves customer-facing writes on canonical `loyalty.*` (top-up, purchase, gift-card issue/redeem, scan, self-registration). `CASH_WRITE_ENABLED` is vestigial. `umi-cash` still also writes `loyalty.*` — the two coexist (append-only ledger, `balance = SUM`); retiring umi-cash's writes is the Stage 4 dual-writer decision. | [Owner]                  |
 
 ### 2.1 Coexistence boundaries (accepted defaults — vetoable in review)
 
 These follow from D5 + D6 and resolve the overlap between "route everything to the API" and "don't migrate cash":
 
-1. **Cash lifecycle WhatsApp crons come into `umi-api`.** They are *ConversaFlow* code today (`supabase/functions/job-worker/processors/cash-cron.ts`: birthday rewards, winback, streaks, welcome-no-visit), not `umi-cash` code. They only *read* `loyalty.*` and send WhatsApp. They migrate with the rest of the worker. `umi-cash` keeps its own Apple-pass push cron. No conflict (different channels).
-2. **The cash domain is built in `umi-api` with reads live and writes inert (D11).** Dashboard cash *reads* (analytics, customer list, gift-cards, reward-config) go live. The customer-facing **write** paths (wallet topup/purchase, scan/visit, reward redemption, gift-card issue/redeem, account/card creation) are built and tested but **flag-gated OFF** and unmounted, because `umi-cash` is still the live writer on the shared `cash`/`loyalty` tables. No dual writes (§11.5).
+1. **Cash lifecycle WhatsApp crons come into `umi-api`.** They are _ConversaFlow_ code today (`supabase/functions/job-worker/processors/cash-cron.ts`: birthday rewards, winback, streaks, welcome-no-visit), not `umi-cash` code. They only _read_ `loyalty.*` and send WhatsApp. They migrate with the rest of the worker. `umi-cash` keeps its own Apple-pass push cron. No conflict (different channels).
+2. **The cash domain is built in `umi-api` with reads live and writes inert (D11).** Dashboard cash _reads_ (analytics, customer list, gift-cards, reward-config) go live. The customer-facing **write** paths (wallet topup/purchase, scan/visit, reward redemption, gift-card issue/redeem, account/card creation) are built and tested but **flag-gated OFF** and unmounted, because `umi-cash` is still the live writer on the shared `cash`/`loyalty` tables. No dual writes (§11.5).
 3. **`umi-cash` stays the live writer and fully independent** — its own Twilio/Resend, its own customer-facing writes, its own passes/APN. We do not reroute it through `umi-api` yet, and `umi-api` does not write the customer-facing wallet tables until activation. The lifecycle-nudge `lifecycle_sends` dedup writes (existing ConversaFlow behavior, non-conflicting) stay active.
 
 ---
@@ -113,7 +113,7 @@ These are enforceable rules, applied in code review:
 2. **External systems are reached only through adapters** (`src/shared/adapters/*`). No `fetch('https://api.twilio…')` outside `twilio.adapter.ts`. One canonical adapter per external service — this kills the duplicated Twilio/email code the audit flagged.
 3. **One of everything cross-cutting:** one DB client, one auth layer, one logging/tracing layer, one config loader. If it's infrastructure, it lives in `src/shared/` and is injected, never re-implemented per module.
 4. **DTOs + validation at the edge** (`class-validator` / `zod`). Every request body and response shape is a named DTO. The KDS contract DTOs (§8.1) are frozen and contract-tested.
-5. **Modules own a domain, not a layer.** `modules/kds/` contains *everything* KDS (controller, service, guard, dto) — you never hunt across the tree to understand one feature.
+5. **Modules own a domain, not a layer.** `modules/kds/` contains _everything_ KDS (controller, service, guard, dto) — you never hunt across the tree to understand one feature.
 6. **Idempotency and retries are declarative**, expressed via BullMQ job options + deterministic job IDs (§10.3), not hand-rolled per processor.
 7. **No mystery files.** Every file is named `<thing>.<role>.ts`. A new engineer can guess any path. (§6)
 
@@ -121,25 +121,25 @@ These are enforceable rules, applied in code review:
 
 ## 5. Technology Stack
 
-| Concern | Choice | Notes |
-|---|---|---|
-| Runtime | Node.js 22 LTS | Long-running on the VPS |
-| Framework | NestJS + `@nestjs/platform-fastify` | D2 |
-| HTTP server | Fastify | Raw-body hook for Twilio signature (§11.4) |
-| Jobs/queues | BullMQ + `@nestjs/bullmq` + Redis 7 | D3 |
-| Scheduling | BullMQ repeatable jobs | Replaces `pg_cron` |
-| Data access | **`pg` (node-postgres)** — raw parameterized SQL, no ORM | D8; queries co-located in repositories |
-| Migrations | **Supabase migrations** now → **Sqitch + hand-written SQL** after the DB moves to the VPS | D8; umi-api ships no ORM-migrate |
-| AI | `@anthropic-ai/sdk` (Claude Haiku) | Port of `_shared/adapters/anthropic.ts` |
-| Embeddings | Voyage AI (HTTP) | Port of `_shared/voyage.ts` |
-| Messaging | Twilio REST (WhatsApp) | Port of `_shared/adapters/twilio.ts` |
-| Email | Nodemailer (Brevo SMTP) | Dashboard password reset + landing sequences |
-| POS | Zettle OAuth + product API | Port of `zettle-oauth-setup` + `zettle-sync` |
-| Validation | `class-validator` + `class-transformer` (or `zod`) | DTOs |
-| Auth | `jose` (JWT) + Node `crypto.scrypt` | Preserve existing password hashes |
-| Reverse proxy / TLS | Caddy | Automatic HTTPS for the public webhook/API |
-| Process/orchestration | Docker Compose | `umi-api`, `umi-worker`, `redis`, `caddy` |
-| Tests | Vitest/Jest + Supertest | Unit + integration + KDS contract tests |
+| Concern               | Choice                                                                                    | Notes                                        |
+| --------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Runtime               | Node.js 22 LTS                                                                            | Long-running on the VPS                      |
+| Framework             | NestJS + `@nestjs/platform-fastify`                                                       | D2                                           |
+| HTTP server           | Fastify                                                                                   | Raw-body hook for Twilio signature (§11.4)   |
+| Jobs/queues           | BullMQ + `@nestjs/bullmq` + Redis 7                                                       | D3                                           |
+| Scheduling            | BullMQ repeatable jobs                                                                    | Replaces `pg_cron`                           |
+| Data access           | **`pg` (node-postgres)** — raw parameterized SQL, no ORM                                  | D8; queries co-located in repositories       |
+| Migrations            | **Supabase migrations** now → **Sqitch + hand-written SQL** after the DB moves to the VPS | D8; umi-api ships no ORM-migrate             |
+| AI                    | `@anthropic-ai/sdk` (Claude Haiku)                                                        | Port of `_shared/adapters/anthropic.ts`      |
+| Embeddings            | Voyage AI (HTTP)                                                                          | Port of `_shared/voyage.ts`                  |
+| Messaging             | Twilio REST (WhatsApp)                                                                    | Port of `_shared/adapters/twilio.ts`         |
+| Email                 | Nodemailer (Brevo SMTP)                                                                   | Dashboard password reset + landing sequences |
+| POS                   | Zettle OAuth + product API                                                                | Port of `zettle-oauth-setup` + `zettle-sync` |
+| Validation            | `class-validator` + `class-transformer` (or `zod`)                                        | DTOs                                         |
+| Auth                  | `jose` (JWT) + Node `crypto.scrypt`                                                       | Preserve existing password hashes            |
+| Reverse proxy / TLS   | Caddy                                                                                     | Automatic HTTPS for the public webhook/API   |
+| Process/orchestration | Docker Compose                                                                            | `umi-api`, `umi-worker`, `redis`, `caddy`    |
+| Tests                 | Vitest/Jest + Supertest                                                                   | Unit + integration + KDS contract tests      |
 
 ---
 
@@ -258,17 +258,17 @@ apps/umi-api/
 
 **Naming rules (one table, no exceptions):**
 
-| Suffix | Means |
-|---|---|
-| `.module.ts` | NestJS module wiring |
-| `.controller.ts` | HTTP routes for a domain |
-| `.service.ts` | business logic |
-| `.repository.ts` | DB queries for a domain |
-| `.processor.ts` | BullMQ queue consumer |
-| `.scheduler.ts` | repeatable/cron job producer |
-| `.guard.ts` | auth/authorization |
-| `.adapter.ts` | wrapper around one external system |
-| `.dto.ts` (in `dto/`) | request/response shapes |
+| Suffix                | Means                              |
+| --------------------- | ---------------------------------- |
+| `.module.ts`          | NestJS module wiring               |
+| `.controller.ts`      | HTTP routes for a domain           |
+| `.service.ts`         | business logic                     |
+| `.repository.ts`      | DB queries for a domain            |
+| `.processor.ts`       | BullMQ queue consumer              |
+| `.scheduler.ts`       | repeatable/cron job producer       |
+| `.guard.ts`           | auth/authorization                 |
+| `.adapter.ts`         | wrapper around one external system |
+| `.dto.ts` (in `dto/`) | request/response shapes            |
 
 Folder names are **business nouns** (`auth`, `tenants`, `customers`, `conversations`, `kds`, `leads`, `cash-insights`, `hours`, `staff`). No abbreviations, no codenames, no `utils/`, `helpers/`, `lib/` grab-bags.
 
@@ -276,59 +276,59 @@ Folder names are **business nouns** (`auth`, `tenants`, `customers`, `conversati
 
 ## 7. Business-Logic Inventory & Migration Map
 
-This is *what moves, from where, to which module.* It is the source-of-truth checklist for the port.
+This is _what moves, from where, to which module._ It is the source-of-truth checklist for the port.
 
 ### 7.1 From `umi-conversaflow` (Deno edge functions → `umi-api`)
 
-| Source | Target | Notes |
-|---|---|---|
-| `whatsapp-handler/index.ts` (ingress: parse Twilio, security, MessageSid idempotency, enqueue `turn.integrity`) | `modules/conversations/whatsapp.controller.ts` | Returns empty TwiML fast; enqueues to BullMQ instead of `triggerJobWorker()` |
-| `whatsapp-handler/security.ts` | `modules/conversations/security.service.ts` | Rate limit, prompt-injection, output sanitization |
-| `whatsapp-handler/prompts.ts`, `intent-extractor.ts`, `business-hours.ts` | `modules/conversations/{prompts,intent,business-hours}` | |
-| `whatsapp-handler/tools.ts` (80KB) | `modules/conversations/tools/*.tools.ts` | **Split by concern** (catalog/cart/checkout/customer/location). Biggest single chunk. |
-| `job-worker/processors/turn-integrity.ts`, `turn-process.ts`, `turn-*.ts`, `tool-outcomes.ts` | `jobs/turns.processor.ts` + `modules/conversations/turn.service.ts` | The mini-harness loop (Claude + tools + memory) |
-| `job-worker/processors/{message-embed,conversation-summarize,customer-extract-facts,product-embed,embed-backfill}.ts` | `jobs/enrichment.processor.ts` | |
-| `job-worker/processors/zettle-sync.ts` + `zettle-oauth-setup/` | `jobs/integrations.processor.ts` + `shared/adapters/zettle.adapter.ts` | |
-| `job-worker/processors/cash-cron.ts` (birthday/winback/streak/welcome/reward-expiring/goal-proximity) | `jobs/lifecycle.scheduler.ts` + `jobs/outbound.processor.ts` | Boundary §2.1.1 — these are ConversaFlow code |
-| `job-worker/dispatchers/twilio-dispatcher.ts` (reply, status/cancel/location notifications) | `jobs/outbound.processor.ts` | |
-| `kds-command/`, `kds-board/`, `kds-pairing/` | `modules/kds/` | Exact contract preserved (§8.1) |
-| `_shared/adapters/{anthropic,twilio}.ts`, `_shared/voyage.ts` | `shared/adapters/` | |
-| `_shared/memory.ts`, `turns.ts`, `pending-clarification.ts`, `normalize-phone.ts`, `business-config.ts`, `synonyms.ts` | `modules/conversations/memory.service.ts` + repositories | |
-| `_shared/logger.ts` (slog, logAiTurn, logPipelineTrace, logSecurityEvent) | `shared/logging/` | Keeps writing `observability.*` for `umi-logs` |
-| `_shared/workflow.ts` (insertJob/insertOutbox/triggerJobWorker/priorities) | `jobs/queues.ts` + BullMQ enqueue | The HTTP trigger goes away — BullMQ push |
-| `_shared/kds-device-auth.ts` | `modules/kds/device-auth.guard.ts` | |
+| Source                                                                                                                 | Target                                                                 | Notes                                                                                 |
+| ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `whatsapp-handler/index.ts` (ingress: parse Twilio, security, MessageSid idempotency, enqueue `turn.integrity`)        | `modules/conversations/whatsapp.controller.ts`                         | Returns empty TwiML fast; enqueues to BullMQ instead of `triggerJobWorker()`          |
+| `whatsapp-handler/security.ts`                                                                                         | `modules/conversations/security.service.ts`                            | Rate limit, prompt-injection, output sanitization                                     |
+| `whatsapp-handler/prompts.ts`, `intent-extractor.ts`, `business-hours.ts`                                              | `modules/conversations/{prompts,intent,business-hours}`                |                                                                                       |
+| `whatsapp-handler/tools.ts` (80KB)                                                                                     | `modules/conversations/tools/*.tools.ts`                               | **Split by concern** (catalog/cart/checkout/customer/location). Biggest single chunk. |
+| `job-worker/processors/turn-integrity.ts`, `turn-process.ts`, `turn-*.ts`, `tool-outcomes.ts`                          | `jobs/turns.processor.ts` + `modules/conversations/turn.service.ts`    | The mini-harness loop (Claude + tools + memory)                                       |
+| `job-worker/processors/{message-embed,conversation-summarize,customer-extract-facts,product-embed,embed-backfill}.ts`  | `jobs/enrichment.processor.ts`                                         |                                                                                       |
+| `job-worker/processors/zettle-sync.ts` + `zettle-oauth-setup/`                                                         | `jobs/integrations.processor.ts` + `shared/adapters/zettle.adapter.ts` |                                                                                       |
+| `job-worker/processors/cash-cron.ts` (birthday/winback/streak/welcome/reward-expiring/goal-proximity)                  | `jobs/lifecycle.scheduler.ts` + `jobs/outbound.processor.ts`           | Boundary §2.1.1 — these are ConversaFlow code                                         |
+| `job-worker/dispatchers/twilio-dispatcher.ts` (reply, status/cancel/location notifications)                            | `jobs/outbound.processor.ts`                                           |                                                                                       |
+| `kds-command/`, `kds-board/`, `kds-pairing/`                                                                           | `modules/kds/`                                                         | Exact contract preserved (§8.1)                                                       |
+| `_shared/adapters/{anthropic,twilio}.ts`, `_shared/voyage.ts`                                                          | `shared/adapters/`                                                     |                                                                                       |
+| `_shared/memory.ts`, `turns.ts`, `pending-clarification.ts`, `normalize-phone.ts`, `business-config.ts`, `synonyms.ts` | `modules/conversations/memory.service.ts` + repositories               |                                                                                       |
+| `_shared/logger.ts` (slog, logAiTurn, logPipelineTrace, logSecurityEvent)                                              | `shared/logging/`                                                      | Keeps writing `observability.*` for `umi-logs`                                        |
+| `_shared/workflow.ts` (insertJob/insertOutbox/triggerJobWorker/priorities)                                             | `jobs/queues.ts` + BullMQ enqueue                                      | The HTTP trigger goes away — BullMQ push                                              |
+| `_shared/kds-device-auth.ts`                                                                                           | `modules/kds/device-auth.guard.ts`                                     |                                                                                       |
 
 ### 7.2 From `umi-dashboard` (Express `server.js` → `umi-api`)
 
-| Source route group | Target module | Notes |
-|---|---|---|
-| `/api/auth/local/{login,forgot-password,reset-password}` | `modules/auth/` | Unify onto D9 (JWT cookies); keep scrypt verify; keep Brevo reset email |
-| `/api/me/tenants`, `/api/tenants/:id/{capabilities,settings,locations}` | `modules/tenants/` | |
-| `/api/:slug/admin/staff*` | `modules/staff/` | |
-| `/api/:slug/admin/hours` | `modules/hours/` | |
-| `/api/tenants/:id/customers*`, `/customers/:id/{timeline,conversations,orders,cash,identity}`, `/insights/customer-platform` | `modules/customers/` | The Customer 360 composite reads. Decompose the 120-line lateral-join query into per-domain loaders. |
-| `/api/:slug/admin/{stats,analytics,reward-config,customers,gift-cards}` | `modules/cash/` (read side) | Reads go live (boundary §2.1.2). Write side built from `umi-cash` `src/lib/wallet.ts` etc. but flag-gated (D11) |
-| `/api/:slug/admin/conversations` | `modules/customers/` or `conversations/` | List view (reads `comms.*`) |
-| `/api/kds/*`, `/api/:slug/admin/devices*`, `/api/:slug/orders*` | `modules/kds/` | **Remove the `callKdsPairingBackend` proxy duplicate** — call the in-process KDS service directly (kills the duplication the audit flagged) |
-| `createMailTransport` (Brevo) | `shared/adapters/email.adapter.ts` | One canonical email adapter |
-| In-memory KDS heartbeats (`/api/kds/heartbeat`) | `modules/kds/` + Redis or `device.*` | In-memory won't survive two processes; back it with Redis/DB |
+| Source route group                                                                                                           | Target module                            | Notes                                                                                                                                       |
+| ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/auth/local/{login,forgot-password,reset-password}`                                                                     | `modules/auth/`                          | Unify onto D9 (JWT cookies); keep scrypt verify; keep Brevo reset email                                                                     |
+| `/api/me/tenants`, `/api/tenants/:id/{capabilities,settings,locations}`                                                      | `modules/tenants/`                       |                                                                                                                                             |
+| `/api/:slug/admin/staff*`                                                                                                    | `modules/staff/`                         |                                                                                                                                             |
+| `/api/:slug/admin/hours`                                                                                                     | `modules/hours/`                         |                                                                                                                                             |
+| `/api/tenants/:id/customers*`, `/customers/:id/{timeline,conversations,orders,cash,identity}`, `/insights/customer-platform` | `modules/customers/`                     | The Customer 360 composite reads. Decompose the 120-line lateral-join query into per-domain loaders.                                        |
+| `/api/:slug/admin/{stats,analytics,reward-config,customers,gift-cards}`                                                      | `modules/cash/` (read side)              | Reads go live (boundary §2.1.2). Write side built from `umi-cash` `src/lib/wallet.ts` etc. but flag-gated (D11)                             |
+| `/api/:slug/admin/conversations`                                                                                             | `modules/customers/` or `conversations/` | List view (reads `comms.*`)                                                                                                                 |
+| `/api/kds/*`, `/api/:slug/admin/devices*`, `/api/:slug/orders*`                                                              | `modules/kds/`                           | **Remove the `callKdsPairingBackend` proxy duplicate** — call the in-process KDS service directly (kills the duplication the audit flagged) |
+| `createMailTransport` (Brevo)                                                                                                | `shared/adapters/email.adapter.ts`       | One canonical email adapter                                                                                                                 |
+| In-memory KDS heartbeats (`/api/kds/heartbeat`)                                                                              | `modules/kds/` + Redis or `device.*`     | In-memory won't survive two processes; back it with Redis/DB                                                                                |
 
 ### 7.3 From `umi-landing-page` (Next API + SQLite → `umi-api` + Postgres)
 
-| Source | Target | Notes |
-|---|---|---|
-| `/api/contact`, `/api/diagnostic`, `/api/leads`, `/api/webhook/email-response` | `modules/leads/` | |
-| `lib/integration/diagnosticTrigger.ts` (scoring + lead create/update) | `modules/leads/diagnostic.service.ts` | |
-| `lib/email/sequenceManager.ts` (diagnostic_followup, meeting_noshow sequences) | `modules/leads/sequences.service.ts` + `jobs/lifecycle.scheduler.ts` | Sequence sends become repeatable jobs (replaces `/api/cron/email-sequence`) |
-| `lib/email/emailService.ts` + templates | `shared/adapters/email.adapter.ts` + `modules/leads` templates | |
-| `better-sqlite3` `leads`, `email_logs` | `grow.leads`, `grow.lead_events` (§9.3) | Canonical home for prospects (`tenant_id` NULL); SQLite retired; landing page calls the API |
+| Source                                                                         | Target                                                               | Notes                                                                                       |
+| ------------------------------------------------------------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `/api/contact`, `/api/diagnostic`, `/api/leads`, `/api/webhook/email-response` | `modules/leads/`                                                     |                                                                                             |
+| `lib/integration/diagnosticTrigger.ts` (scoring + lead create/update)          | `modules/leads/diagnostic.service.ts`                                |                                                                                             |
+| `lib/email/sequenceManager.ts` (diagnostic_followup, meeting_noshow sequences) | `modules/leads/sequences.service.ts` + `jobs/lifecycle.scheduler.ts` | Sequence sends become repeatable jobs (replaces `/api/cron/email-sequence`)                 |
+| `lib/email/emailService.ts` + templates                                        | `shared/adapters/email.adapter.ts` + `modules/leads` templates       |                                                                                             |
+| `better-sqlite3` `leads`, `email_logs`                                         | `grow.leads`, `grow.lead_events` (§9.3)                              | Canonical home for prospects (`tenant_id` NULL); SQLite retired; landing page calls the API |
 
 ### 7.4 Stays put
 
-| App | What stays | Why |
-|---|---|---|
-| `umi-cash` | Stays the **live writer**: customer-facing wallet/loyalty writes, Apple/Google passes, APN push, customer/staff auth, its own crons. | D6 — not migrated; coexists on shared DB |
-| `umi-cash` cash *business logic* (`src/lib/wallet.ts`, rewards math, gift-card logic, lifecycle, identity) | **mirrored into `modules/cash/` (built, but write side inert)** | D11 — reads serve dashboard; writes ship dormant for later activation. Source of truth for the write port. |
+| App                                                                                                        | What stays                                                                                                                           | Why                                                                                                        |
+| ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `umi-cash`                                                                                                 | Stays the **live writer**: customer-facing wallet/loyalty writes, Apple/Google passes, APN push, customer/staff auth, its own crons. | D6 — not migrated; coexists on shared DB                                                                   |
+| `umi-cash` cash _business logic_ (`src/lib/wallet.ts`, rewards math, gift-card logic, lifecycle, identity) | **mirrored into `modules/cash/` (built, but write side inert)**                                                                      | D11 — reads serve dashboard; writes ship dormant for later activation. Source of truth for the write port. |
 
 **Cash passes/APN — confirm at activation, not now:** Apple PassKit `.pkpass` generation, the PassKit v1 web-service protocol, Google Wallet JWTs, and APN push are issuer-URL- and cert-bound and provide no value while cash writes are inert. Recommendation: **defer building these into `umi-api` until activation (Phase 7)**; keep them in `umi-cash` meanwhile. Flag for veto if you want them built-inert now too.
 | `umi-logs` | All of it (trace UI, `observability.*` reads) | Non-goal |
@@ -344,20 +344,22 @@ The Swift client calls three endpoints and depends on **exact** field names, enu
 
 **Endpoints** (POST, JSON):
 
-| Function | New path | Legacy alias (transition) | Purpose |
-|---|---|---|---|
-| pairing | `/kds/pairing` | `/functions/v1/kds-pairing` | `kds_start`, `kds_status` PIN flow |
-| board | `/kds/board` | `/functions/v1/kds-board` | `snapshot`, `events` (poll, not realtime) |
-| command | `/kds/command` | `/functions/v1/kds-command` | `transition_ticket`, `partial_cancel_items` |
+| Function | New path       | Legacy alias (transition)   | Purpose                                     |
+| -------- | -------------- | --------------------------- | ------------------------------------------- |
+| pairing  | `/kds/pairing` | `/functions/v1/kds-pairing` | `kds_start`, `kds_status` PIN flow          |
+| board    | `/kds/board`   | `/functions/v1/kds-board`   | `snapshot`, `events` (poll, not realtime)   |
+| command  | `/kds/command` | `/functions/v1/kds-command` | `transition_ticket`, `partial_cancel_items` |
 
 **Must preserve exactly:**
+
 - Headers: `Authorization: Bearer <anonKey>`, `apikey`, and `X-KDS-Device-Token` (after pairing).
 - Revocation: when the device session (`device.sessions`) is inactive, respond `{ "error": "device_revoked" }` on 401/403 → the app clears Keychain and returns to pairing.
 - Snapshot/event row shapes (`ticket_id`, `source_transaction_id`, `status`, `station_id/name`, `items[]`, `last_event_sequence`, etc.) and event `kind` values (`status_changed`, `order_upserted`, `order_removed`, `snapshot_reconciled`) with monotonic `sequence`.
 - Status enum (`new|accepted|preparing|ready|completed|cancelled|partial_cancelled`) and cancel reason codes (`out_of_stock|kitchen_overload|closing_soon|customer_no_show|duplicate_order|other`).
 
 **Canonical data source under the frozen contract:** the contract is preserved at the API boundary, but underneath it reads/writes the **canonical** model, not a `kds.*` table tree (§9.1):
-- Board snapshot + ticket state come from **`ops.order_items.kitchen_status` + `ops.order_events`**, exposed via the **`v_kds_tickets`** projection view. KDS's only write is `ops.order_items.kitchen_status` (via the command RPC). Tickets are a *projection*, not a source of truth.
+
+- Board snapshot + ticket state come from **`ops.order_items.kitchen_status` + `ops.order_events`**, exposed via the **`v_kds_tickets`** projection view. KDS's only write is `ops.order_items.kitchen_status` (via the command RPC). Tickets are a _projection_, not a source of truth.
 - Stations are **`kitchen.stations`**; device pairing/sessions are **`device.pairing_requests`/`device.sessions`**.
 - A `transition_ticket`/`partial_cancel_items` command updates `ops` order state and emits a `queue.outbox_events` row (`order.status_changed`) that drives the customer status-notification send (§10.4) — replacing the old "KDS trigger writes outbox" path.
 - Confirm the live projection/RPC names (`v_kds_tickets`, the transition RPC) at bind time; the iPad client never sees these names, only the frozen JSON.
@@ -374,8 +376,8 @@ The Swift client calls three endpoints and depends on **exact** field names, enu
 
 ### 8.3 Observability (for `umi-logs`)
 
-- **Confirmed live binding (Phase 1b):** `umi-logs` reads its runtime trace tables from schema **`conversaflow`** (its client default is `DB_SCHEMA || 'conversaflow'`), specifically **`ai_turn_logs`, `edge_function_logs`, `security_logs`** (it does *not* read `pipeline_traces`/`eval_traces` — those are internal). So `umi-api`'s `TraceService` writes those exact tables/columns in the configured `OBSERVABILITY_SCHEMA` (default `conversaflow`), best-effort, via the `umi_worker` pool — `umi-logs` keeps working unchanged.
-- This is *not yet* the canonical `observability.ai_runs`/`pipeline_spans`/`security_events` model from `platform-database-architecture.md` — that rename hasn't been applied to the live runtime trace tables. Rebinding is a one-line `OBSERVABILITY_SCHEMA`/table-name change when/if the observability migration lands and `umi-logs` cuts over.
+- **Confirmed live binding (Phase 1b):** `umi-logs` reads its runtime trace tables from schema **`conversaflow`** (its client default is `DB_SCHEMA || 'conversaflow'`), specifically **`ai_turn_logs`, `edge_function_logs`, `security_logs`** (it does _not_ read `pipeline_traces`/`eval_traces` — those are internal). So `umi-api`'s `TraceService` writes those exact tables/columns in the configured `OBSERVABILITY_SCHEMA` (default `conversaflow`), best-effort, via the `umi_worker` pool — `umi-logs` keeps working unchanged.
+- This is _not yet_ the canonical `observability.ai_runs`/`pipeline_spans`/`security_events` model from `platform-database-architecture.md` — that rename hasn't been applied to the live runtime trace tables. Rebinding is a one-line `OBSERVABILITY_SCHEMA`/table-name change when/if the observability migration lands and `umi-logs` cuts over.
 
 ---
 
@@ -385,21 +387,22 @@ The Swift client calls three endpoints and depends on **exact** field names, enu
 
 The platform DB uses **domain-named canonical schemas**, confirmed by the normative `docs/architecture/2026-06-16-canonical-schema-and-identity.md` and the source-of-truth `docs/architecture/platform-database-architecture.md`, and matching the dashboard/cash cutovers (2026-06-20). The old `platform`/`conversaflow`/`kds`/`umi_cash` names visible in `docs/migration/audit-output/supabase-prod-schema.sql` are the **pre-rename** state and must not be used — the migration moved old → new.
 
-| Schema | Holds | Key tables (the API touches) |
-|---|---|---|
-| `core` | identity & tenancy | `tenants`, `locations`, `people`, `contact_methods`, `users`, `tenant_memberships`, `roles`/`membership_roles`/`permissions`, `staff_members` |
-| `ops` | business operations | `businesses`, `channels`, `channel_accounts`, `products`, `product_categories`, `orders`, `order_items` (**holds `kitchen_status` — KDS tickets live here**), `order_events`, `payments`, `business_hours` |
-| `comms` | AI conversations & memory | `conversations`, `messages`, `conversation_turns`, `tool_calls`, `memory_items`, `knowledge_documents`, `knowledge_chunks` (pgvector), `customer_preferences` |
-| `loyalty` | points, rewards, wallet, passes | `programs`, `accounts`, `cards`, `points_ledger` (append-only), `balances` (derived), `reward_configs`, `reward_redemptions`, `gift_cards`, `gift_card_ledger`, `wallet_transactions`, `wallet_passes`, `pass_devices`, `visit_events`, `automation_rules`, `otp_verifications` |
-| `device` | hardware pairing & sessions | `devices`, `sessions`, `pairing_requests`, `events` |
-| `kitchen` | station config only | `stations`, `station_groups`, `station_assignments` |
-| `queue` | async infra (service-role only) | `jobs`, `job_attempts`, `outbox_events`, `inbound_events`, `idempotency_keys`, `dead_letters` |
-| `observability` | traces/audit/logs (service-role only) | `ai_runs`, `tool_calls`, `pipeline_spans`, `audit_log`, `security_events`, `edge_logs`, `data_quality_findings` |
-| `grow` | Umi-internal: leads, subs, flags (service-role only) | `leads` (`tenant_id` NULL), `lead_events`, `subscriptions`, `feature_flags` |
+| Schema          | Holds                                                | Key tables (the API touches)                                                                                                                                                                                                                                                    |
+| --------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core`          | identity & tenancy                                   | `tenants`, `locations`, `people`, `contact_methods`, `users`, `tenant_memberships`, `roles`/`membership_roles`/`permissions`, `staff_members`                                                                                                                                   |
+| `ops`           | business operations                                  | `businesses`, `channels`, `channel_accounts`, `products`, `product_categories`, `orders`, `order_items` (**holds `kitchen_status` — KDS tickets live here**), `order_events`, `payments`, `business_hours`                                                                      |
+| `comms`         | AI conversations & memory                            | `conversations`, `messages`, `conversation_turns`, `tool_calls`, `memory_items`, `knowledge_documents`, `knowledge_chunks` (pgvector), `customer_preferences`                                                                                                                   |
+| `loyalty`       | points, rewards, wallet, passes                      | `programs`, `accounts`, `cards`, `points_ledger` (append-only), `balances` (derived), `reward_configs`, `reward_redemptions`, `gift_cards`, `gift_card_ledger`, `wallet_transactions`, `wallet_passes`, `pass_devices`, `visit_events`, `automation_rules`, `otp_verifications` |
+| `device`        | hardware pairing & sessions                          | `devices`, `sessions`, `pairing_requests`, `events`                                                                                                                                                                                                                             |
+| `kitchen`       | station config only                                  | `stations`, `station_groups`, `station_assignments`                                                                                                                                                                                                                             |
+| `queue`         | async infra (service-role only)                      | `jobs`, `job_attempts`, `outbox_events`, `inbound_events`, `idempotency_keys`, `dead_letters`                                                                                                                                                                                   |
+| `observability` | traces/audit/logs (service-role only)                | `ai_runs`, `tool_calls`, `pipeline_spans`, `audit_log`, `security_events`, `edge_logs`, `data_quality_findings`                                                                                                                                                                 |
+| `grow`          | Umi-internal: leads, subs, flags (service-role only) | `leads` (`tenant_id` NULL), `lead_events`, `subscriptions`, `feature_flags`                                                                                                                                                                                                     |
 
 **Architectural laws this imposes on `umi-api` (from `platform-database-architecture.md` §3, §5):**
+
 - **FKs point down into `core` only.** No cross-product FK. Cross-product effects flow through **`queue.outbox_events`** (transactional outbox; §10).
-- **KDS reads a projection, not a table tree.** Order state is `ops.order_items.kitchen_status` + `ops.order_events`, exposed via the **`v_kds_tickets`** view. `kitchen.*` is station *config* only. Device pairing/sessions are `device.*`. (§8.1)
+- **KDS reads a projection, not a table tree.** Order state is `ops.order_items.kitchen_status` + `ops.order_events`, exposed via the **`v_kds_tickets`** view. `kitchen.*` is station _config_ only. Device pairing/sessions are `device.*`. (§8.1)
 - **Loyalty writes go through gated `SECURITY DEFINER` RPCs** (`FOR UPDATE` on account rows, idempotency keys, append-only `points_ledger`). This is exactly the surface kept inert under D11 (§11.5).
 - **Product → schema write scope** (matrix, §5 of the architecture doc): ConversaFlow writes `comms` + `queue.outbox_events`; Cash writes `loyalty` + `queue.outbox_events`; KDS writes `ops.order_items` (`kitchen_status`); Landing writes `grow`; Dashboard writes `core`/`ops`/`loyalty`/`grow`. Each module's repository is constrained to its column in this matrix.
 
@@ -417,7 +420,7 @@ The platform DB uses **domain-named canonical schemas**, confirmed by the normat
 
 ### 9.3 Landing-page leads → `grow.*` (existing schema, not net-new)
 
-Leads already have a canonical home: **`grow.leads`** and **`grow.lead_events`** (per `platform-database-architecture.md` §grow — leads are Umi-internal prospects with `tenant_id` NULL, never tenant-scoped contacts). The landing migration *populates* these, it does not invent a schema:
+Leads already have a canonical home: **`grow.leads`** and **`grow.lead_events`** (per `platform-database-architecture.md` §grow — leads are Umi-internal prospects with `tenant_id` NULL, never tenant-scoped contacts). The landing migration _populates_ these, it does not invent a schema:
 
 - Map SQLite `leads` → **`grow.leads`** (id, email unique, name, phone, company, role_title, consent_state, lifecycle_status, `diagnostic_data` jsonb, diagnostic_date, attribution: first_contact_channel/campaign + utm_source/medium/campaign/content/term, referrer, landing_path, submitted_form, source_app, first_contact_at, sequence_paused, pause_reason, last_email_sent_at, timestamps). Add any of these columns the live `grow.leads` lacks via a small additive migration.
 - Map SQLite `email_logs` + sequence state → **`grow.lead_events`** (event-sourced: `email_sent`, `email_failed`, `sequence_paused/resumed`, `responded`, `unsubscribed`, `converted`, with `event_data` jsonb carrying template_name/sequence_day).
@@ -438,13 +441,13 @@ The dashboard already reaches the platform DB via the Supabase **session pooler*
 
 ### 10.1 Queues (single source of truth in `jobs/queues.ts`)
 
-| Queue | Jobs | Producer |
-|---|---|---|
-| `turns` | `turn.integrity`, `turn.process` | whatsapp ingress; turn.process can enqueue follow-ups |
-| `enrichment` | `message.embed`, `conversation.summarize`, `customer.extract_facts`, `product.embed`, `embed.backfill` | turn.process; backfill scheduler |
-| `outbound` | `twilio.reply`, `twilio.status_notification`, `twilio.cancel_notification`, `twilio.location_pin`, `whatsapp.lifecycle` | turn.process; KDS triggers; lifecycle scheduler |
-| `integrations` | `zettle.sync` | scheduler / manual |
-| `lifecycle` | cash crons + landing email sequences | repeatable scheduler |
+| Queue          | Jobs                                                                                                                    | Producer                                              |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `turns`        | `turn.integrity`, `turn.process`                                                                                        | whatsapp ingress; turn.process can enqueue follow-ups |
+| `enrichment`   | `message.embed`, `conversation.summarize`, `customer.extract_facts`, `product.embed`, `embed.backfill`                  | turn.process; backfill scheduler                      |
+| `outbound`     | `twilio.reply`, `twilio.status_notification`, `twilio.cancel_notification`, `twilio.location_pin`, `whatsapp.lifecycle` | turn.process; KDS triggers; lifecycle scheduler       |
+| `integrations` | `zettle.sync`                                                                                                           | scheduler / manual                                    |
+| `lifecycle`    | cash crons + landing email sequences                                                                                    | repeatable scheduler                                  |
 
 ### 10.2 Scheduling (replaces `pg_cron`)
 
@@ -471,12 +474,12 @@ This keeps the canonical guarantee (no lost reply/award on a crash between write
 
 ### 10.5 Mapping to the canonical `queue.*` tables
 
-| Canonical table | Role under BullMQ |
-|---|---|
-| `queue.inbound_events` | **Idempotent ingress gate** — Twilio `MessageSid`, `UNIQUE(provider, provider_event_id)`. Webhook inserts here first; duplicates are dropped before any enqueue. |
-| `queue.outbox_events` | **Transactional outbox** (§10.4). The durable source the relay drains into BullMQ. |
-| `queue.idempotency_keys` | Generic dedup for non-event operations. |
-| `queue.dead_letters` | Sink for BullMQ-exhausted jobs, for manual inspection (preserves the current dead-letter audit trail). |
+| Canonical table               | Role under BullMQ                                                                                                                                                                 |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `queue.inbound_events`        | **Idempotent ingress gate** — Twilio `MessageSid`, `UNIQUE(provider, provider_event_id)`. Webhook inserts here first; duplicates are dropped before any enqueue.                  |
+| `queue.outbox_events`         | **Transactional outbox** (§10.4). The durable source the relay drains into BullMQ.                                                                                                |
+| `queue.idempotency_keys`      | Generic dedup for non-event operations.                                                                                                                                           |
+| `queue.dead_letters`          | Sink for BullMQ-exhausted jobs, for manual inspection (preserves the current dead-letter audit trail).                                                                            |
 | `queue.jobs` / `job_attempts` | **Superseded for execution** by BullMQ/Redis. Keep the tables only if a Postgres-visible job audit is still wanted; otherwise execution state lives in Redis + `observability.*`. |
 
 ---
@@ -486,7 +489,7 @@ This keeps the canonical guarantee (no lost reply/award on a crash between write
 ### 11.1 Today (fragmented)
 
 - Dashboard: scrypt password, **header `X-UMI-User-ID`** (no real token), entitlement via `product_instances`.
-- Cash: JWT (jose) access/refresh — *stays in cash*.
+- Cash: JWT (jose) access/refresh — _stays in cash_.
 - UMI admin: separate JWT.
 
 ### 11.2 Target for `umi-api`
@@ -494,12 +497,14 @@ This keeps the canonical guarantee (no lost reply/award on a crash between write
 Two layers, never conflated (per `2026-06-16-canonical-schema-and-identity.md` §2.1, locked 2026-06-17):
 
 **(a) Connection identity → fixed Postgres roles + RLS.** Three roles only, they never grow with tenants/users:
-- **`umi_app`** — the web request role. Non-superuser, **non-`BYPASSRLS`**. The backend connects as this and runs `SET LOCAL app.user_id = … ; SET LOCAL app.tenant_id = …` per request, so RLS on `ops`/`comms`/`loyalty`/`device`/`kitchen` is *really* enforced (a code bug cannot cross tenants). RLS policies live in `local-postgres/050_rls_tenant_isolation.sql`.
+
+- **`umi_app`** — the web request role. Non-superuser, **non-`BYPASSRLS`**. The backend connects as this and runs `SET LOCAL app.user_id = … ; SET LOCAL app.tenant_id = …` per request, so RLS on `ops`/`comms`/`loyalty`/`device`/`kitchen` is _really_ enforced (a code bug cannot cross tenants). RLS policies live in `local-postgres/050_rls_tenant_isolation.sql`.
 - **`umi_worker`** — `BYPASSRLS` service/background role for the worker; the only role that touches `queue.*`, `observability.*`, `grow.*` (service-role-only schemas).
 - **`umi_readonly`** — analytics.
 - Supabase grant mapping: `authenticated → umi_app`, `service_role → umi_worker`, `anon` dropped.
 
 **(b) User authorization → JWT + guards + RPC re-checks.**
+
 - **JWT access + refresh in httpOnly cookies** (`jose`). Replaces the header-only scheme (D9). CSRF-protected via SameSite + CSRF token on mutations.
 - **`password.service.ts`** verifies existing `scrypt` hashes (no forced reset; optional upgrade-on-login). Hashes live in `core.users` (never in a `core.people` row surfaced by Customer 360).
 - **`AuthGuard`** (valid JWT) + **`EntitlementGuard`** (`product_not_active` 403, reading `core.product_instances` status `active|trialing`) + **`@Roles`/`@RequirePermission`** decorators. Roles are **edges** — `core.tenant_memberships` + `membership_roles` + `permissions`, never a column on `people`, never a Postgres role per tenant.
@@ -559,76 +564,86 @@ VPS env file (root-only) or SOPS/Doppler: `DATABASE_URL` (+ direct/session), `RE
 Each phase ships independently, is reversible, and has explicit acceptance criteria. Edge functions stay deployed until each domain is verified on the VPS — **the cutover point per domain is a single webhook/URL/config flip, which can be flipped back.**
 
 ### Phase 0 — Foundations ✅ LIVE
+
 **Scope:** Scaffold `apps/umi-api` (NestJS + Fastify, the §6 structure, root `README.md` map). `DatabaseModule` (`pg.service.ts` two pools + `request-context.middleware.ts` per-request context + `PgService.withTenant` `SET LOCAL` §9.2/§11.2), `ConfigModule` (typed env), `LoggingModule`, `HealthModule`. BullMQ + Redis wired with an empty queue. Dual bootstrap (`main.ts` / `worker.ts`). Dockerfile + compose + Caddy. CI. Deploy a hello-world to the VPS with TLS. Confirm the live `v_kds_tickets` projection + loyalty write-RPC names and write the repository SQL accordingly.
 **Done when:** VPS serves `GET /health` over HTTPS (DB + Redis green); CI deploys; a tenant-scoped test query proves RLS isolation under `umi_app`.
 
 ### Phase 1 — Shared core & adapters ✅ LIVE
+
 **Scope:** Port adapters (`twilio`, `anthropic`, `voyage`, `zettle`, `email`) as injectable providers with unit tests. Port logging/tracing (`observability.*` writes verified readable by `umi-logs`). Stand up `jobs/queues.ts` + BullMQ worker bootstrap with idempotency/retry/dead-letter policy (no domain processors yet).
 **Done when:** adapters unit-tested; a no-op job round-trips through BullMQ with retry + dead-letter; a trace row appears in `umi-logs`.
 
 ### Phase 2 — Auth + admin/owner domain (dashboard backend) ✅ LIVE (cash shipped LIVE, not inert)
+
 **Scope:** `AuthModule` (JWT cookies, scrypt verify, guards, entitlement, Brevo reset). `TenantsModule`, `StaffModule`, `HoursModule`, `CustomersModule` (Customer 360 reads, decomposed), `CashModule`. Decompose `server.js` into these. Point the **dashboard frontend** at the new API base URL (env), behind a flag.
 **Shipped reality (D11 reversed):** the cash **write** side is LIVE, not inert — top-up, purchase, gift-card issue/redeem, scan, and customer self-registration write canonical `loyalty.*` directly. The dashboard SPA is cut over (`cookie` auth mode). Verified against a prod-schema replica (36/36 integration under enforced RLS, cross-tenant isolation, `server.js` parity) and in-browser.
 **Done when:** ✅ the full dashboard admin-panel flow (login, tenants, staff, hours, customers, customer-360, cash analytics + writes, entitlement 403s) runs against `umi-api` on the VPS, parity-checked against `server.js`.
 **Rollback:** clear the dashboard's `VITE_AUTH_MODE`/`VITE_API_BASE` Vercel vars → redeploy → back on `server.js`.
 
 ### Phase 3 — Conversational engine (ConversaFlow ingress + worker)
+
 **Scope:** `modules/conversations/*` (whatsapp ingress, security, prompts, intent, memory, tools split by concern). `jobs/turns.processor.ts`, `enrichment.processor.ts`, `outbound.processor.ts`, `integrations.processor.ts`. Transactional-outbox relay for the reply path (§10.4). Cash lifecycle crons in `lifecycle.scheduler.ts` (§2.1.1).
 **Cutover:** repoint the **Twilio webhook URL** to the VPS. Canary/soak against live WhatsApp traffic; compare replies + traces to the edge function.
 **Done when:** real WhatsApp orders flow end-to-end on the VPS (ingress → turn → tools → reply → outbound), embeddings/summaries/facts run, KDS status notifications fire, cash lifecycle nudges send, all traced in `umi-logs`.
 **Rollback:** repoint the Twilio webhook to the edge function.
 
 ### Phase 4 — KDS endpoints 🟢 BUILT (dormant, pre-cutover)
+
 **Status (2026-06-27):** Code-complete in `apps/umi-api/src/modules/kds/*`. 236/236 vitest (37 new KDS unit + contract tests) + tsc + build green; **verified end-to-end (25/25) against the local prod-schema replica** exercising the real `KdsRepository`/`KdsService` over canonical `core`/`ops`/`queue`/`device`/`kitchen`: WhatsApp order → `v_kds_tickets` board → pairing PIN → device-auth → transition (writes `ops.orders`/`order_items.kitchen_status` + append-only `ops.order_events` + `queue.outbox_events`) → events cursor → partial cancel → **device revocation** → dashboard device list. The replica run caught two real bugs the mocked tests couldn't (the `ops.order_events` **partial** unique index needs `ON CONFLICT (tenant_id, idempotency_key) WHERE idempotency_key IS NOT NULL`; a just-paired device is `offline` until its first board poll touches `last_used_at`). **Dormant** — nothing changes until the iPad is repointed and `KDS_STATUS_NOTIFY_ENABLED` is flipped.
 **Realized design (vs. the original plan):**
+
 - **No canonical `kds.*` RPCs exist** (the platform build ships only the `ops.v_kds_tickets` projection + append-only `ops.order_events`, not `get_board_snapshot`/`transition_ticket`/etc.). So board reads + transitions/partial-cancels are **reimplemented in TypeScript** (`KdsRepository`) over `ops.*`, preserving the frozen iPad JSON byte-for-byte (item `unit_price` in currency units, `customer_name/phone` resolved from `core.people`, `last_event_sequence` from `order_events`).
 - **Frozen iPad endpoints** (`KdsController`): `POST /kds/{pairing,board,command}` + `/functions/v1/kds-*` aliases (no global prefix, so aliases are literal paths). They own the Fastify `@Res()` reply to emit byte-exact bodies/status/headers and bypass the global `AllExceptionsFilter` (which would wrap `device_revoked`). Device auth is in-handler (a CanActivate guard couldn't produce the frozen body through the global filter).
 - **Dashboard surface** (`KdsDashboardController` + `KdsAdminController`): `/api/tenants/:tenantId/kds/*` (devices, orders, ticker, stations, pairing, provision/pairing-pin, approve/deny, update/revoke, transition) + `/api/:slug/admin/{devices,orders,orders/:id/transition}` aliases — the SPA's KDS screens stop 404ing. Guard stack = `AuthGuard, TenantAccessGuard, EntitlementGuard('kds')` (same trust model as cash admin; no per-action permission).
-- **Device registry (owner-directed):** pairing populates a `device.devices` row (`device_type='kds'`) and links the session to it. The canonical model is ONE `device.devices` registry discriminated by `device_type` (`kds|kiosk|printer|scanner|terminal|sensor|clock|signage`) — POS/printers later reuse the *same* `device.sessions`/`pairing_requests`/`events` lifecycle, so device-auth is written once. `kitchen.*` is the kitchen *domain* (stations/routing a KDS device attaches to), not hardware; `device.*` is the product-neutral hardware plane.
+- **Device registry (owner-directed):** pairing populates a `device.devices` row (`device_type='kds'`) and links the session to it. The canonical model is ONE `device.devices` registry discriminated by `device_type` (`kds|kiosk|printer|scanner|terminal|sensor|clock|signage`) — POS/printers later reuse the _same_ `device.sessions`/`pairing_requests`/`events` lifecycle, so device-auth is written once. `kitchen.*` is the kitchen _domain_ (stations/routing a KDS device attaches to), not hardware; `device.*` is the product-neutral hardware plane.
 - **Heartbeat = `device.sessions.last_used_at`** (no Redis added — there is no general Redis client, only the BullMQ connection). The board/command poll touches it; the dashboard derives live/slow/offline server-side. The dashboard's broken same-origin `/api/kds/heartbeats` call was removed and folded into `GET /kds/devices` (the "remove the `callKdsPairingBackend` duplicate" deliverable; `server.js` stays dead/untouched).
 - **Order→notify loop:** a transition emits `queue.outbox_events (event_type='twilio.status_notification' | 'twilio.cancel_notification')` — routes the existing OutboxRelay/OutboundProcessor already handle, so **no job-engine changes**. Gated by the new `KDS_STATUS_NOTIFY_ENABLED` (default false) to avoid double-send while the edge `kds.transition_ticket` RPC is still live.
-**Cutover:** pull `main` on the VPS (`device.*`/`kitchen.*` must exist on prod — bind-time confirm before flip); update KDS `Info.plist` to the VPS; ship an app build. Aliases keep old builds working during rollout. Then flip `KDS_STATUS_NOTIFY_ENABLED=true` together with decommissioning the edge functions.
-**Done when:** on staging then prod — pairing PIN flow, board snapshot+polling, transitions, partial cancels, and **device revocation** all verified against the VPS; contract tests green. *(Local-replica equivalent: ✅.)*
-**Rollback:** KDS config points back at the edge functions (still deployed).
+  **Cutover:** pull `main` on the VPS (`device.*`/`kitchen.*` must exist on prod — bind-time confirm before flip); update KDS `Info.plist` to the VPS; ship an app build. Aliases keep old builds working during rollout. Then flip `KDS_STATUS_NOTIFY_ENABLED=true` together with decommissioning the edge functions.
+  **Done when:** on staging then prod — pairing PIN flow, board snapshot+polling, transitions, partial cancels, and **device revocation** all verified against the VPS; contract tests green. _(Local-replica equivalent: ✅.)_
+  **Rollback:** KDS config points back at the edge functions (still deployed).
 
 ### Phase 5 — Landing-page leads 🟢 BUILT (dormant, pre-cutover)
+
 **Status (2026-06-30, CodeRabbit-hardened 2026-07-01):** Code-complete in `apps/umi-api/src/modules/leads/*`. **295/295 vitest** (26 leads unit tests: scoring, sequence idempotency + reservation race, webhook HMAC, contact fail-closed) + tsc + build green. **Dormant** — public contact/diagnostic/webhook routes are mounted and live, but the background email-sequence tick stays OFF until `LEADS_SEQUENCE_ENABLED` is flipped (so the landing page's own cron stays the sole sender during the dual-run window).
 **CodeRabbit round (PR #12, 9 findings → 8 fixed + 1 deferred):** HTML-escape all user fields in the email templates (public-form XSS); anonymous admin surface removed — only contact/diagnostic/signature-verified-webhook stay public (list/metrics/mutate-by-id now exist only as service methods for a future authed owner surface); atomic email-step **reservation** in the repo (reserve→send→finalize/release) replaces the in-memory dedup so web `sendWelcome` + worker `sendDueEmails` can't double-send day 0; `upsertByEmail` retries on 23505 (TOCTOU); contact recipient fails closed (no hard-coded inbox); PII (email) dropped from logs; `LEADS_WEBHOOK_SECRET` required at boot when the sequence runs in prod. **Deferred:** raw-body HMAC (webhook signs re-serialized JSON, not raw bytes) — dormant + provider-undefined signing; a bootstrap raw-body change would touch every live JSON route, so it waits for a concrete provider.
 **Realized design (vs. the original plan):**
+
 - **No schema migration needed.** Bind-time check against the live platform DB (2026-06-30) confirmed `grow.leads` + `grow.lead_events` already exist with **every** column §9.3 lists (id, email, name, phone, company, role_title, consent_state, lifecycle_status, `diagnostic_data` jsonb, diagnostic_date, first_contact_* + utm_*, referrer, landing_path, submitted_form, source_app, sequence_paused, pause_reason, `emails_sent text[]`, last_email_sent_at, timestamps; `lead_events`: id, lead_id FK→leads ON DELETE CASCADE, event_type, `event_data` jsonb, created_at). RLS disabled, 0 rows. Partial-unique `grow_leads_email_active_uidx(email) WHERE lifecycle_status IN (new,nurturing,qualified)` → upsert is find-active-then-update-or-insert.
 - **Two overlapping landing senders unified into ONE idempotent engine.** The landing `diagnosticTrigger` (logged-but-didn't-send) + `sequenceManager` (sent-but-didn't-persist) collapse into `SequencesService`, deduped by membership of `diagnostic_followup_day_N` in `grow.leads.emails_sent`. Steps day 0/2/5/10/30 (real `day0Urgency…day30Reactivation` templates); the day-0 welcome fires immediately on diagnostic completion, the rest on the daily tick.
 - **`grow` is service-role-only → leads use the BYPASSRLS worker pool** (`PgService.query`), never `umi_app` — leads have no tenant/member. New `db/roles/003_grow_grants.sql` grants `grow` to `umi_worker` (no-op on prod where the worker is Supabase `postgres`; required on the local replica). Resolves the Phase-5 TODO in `002_api_grants.sql`.
 - **Frozen public contract preserved.** `LeadsController` (no guards) serves `/api/leads/{contact,diagnostic,webhook/email-response}` **plus** the legacy landing paths `/api/contact`, `/api/diagnostic`, `/api/webhook/email-response` as aliases, so the landing page cuts over with a base-URL swap. Contact form (internal notify reply-to prospect + auto-reply) is always live; scoring is the ported `calculateDiagnostic`; the email-response webhook is HMAC-SHA256 gated (`LEADS_WEBHOOK_SECRET`, fails closed in production).
 - **Repeatable job on the `lifecycle` queue** (§10.1): new `jobs/leads.scheduler.ts` upserts a daily `email_sequence` scheduler gated by `LEADS_SEQUENCE_ENABLED` (teardown when off); `LifecycleProcessor` handles it independently of the cash `LIFECYCLE_CRONS_ENABLED` flag (per-job flag check). Replaces the landing `/api/cron/email-sequence`.
 - **Landing frontend repoint is flag-gated** (mirrors the dashboard's Phase-2 `VITE_AUTH_MODE`): `apiUrl()` prefixes the two fetch sites with `NEXT_PUBLIC_UMI_API_BASE` when set; unset → same-origin (byte-identical current behavior). New env: `LEADS_SEQUENCE_ENABLED`, `CONTACT_TO_EMAIL`, `LEADS_WEBHOOK_SECRET`.
-**Cutover:** apply `003_grow_grants.sql` (or no-op on prod) → pull `main` on the VPS + rebuild → set `NEXT_PUBLIC_UMI_API_BASE=https://api.umiconsulting.co` on the landing Vercel project + add its origin to umi-api `CORS_ORIGINS` → flip `LEADS_SEQUENCE_ENABLED=true` **and** disable the landing SQLite/Vercel cron together → retire SQLite.
-**Done when:** lead capture, diagnostic scoring, and the full email sequence (incl. pause/unsubscribe/convert) run on the VPS with durable Postgres state. *(Unit-verified: ✅. Live cutover: pending owner.)*
-**Rollback:** clear `NEXT_PUBLIC_UMI_API_BASE` (landing back on its own routes/SQLite) + `LEADS_SEQUENCE_ENABLED=false`.
+  **Cutover:** apply `003_grow_grants.sql` (or no-op on prod) → pull `main` on the VPS + rebuild → set `NEXT_PUBLIC_UMI_API_BASE=https://api.umiconsulting.co` on the landing Vercel project + add its origin to umi-api `CORS_ORIGINS` → flip `LEADS_SEQUENCE_ENABLED=true` **and** disable the landing SQLite/Vercel cron together → retire SQLite.
+  **Done when:** lead capture, diagnostic scoring, and the full email sequence (incl. pause/unsubscribe/convert) run on the VPS with durable Postgres state. _(Unit-verified: ✅. Live cutover: pending owner.)_
+  **Rollback:** clear `NEXT_PUBLIC_UMI_API_BASE` (landing back on its own routes/SQLite) + `LEADS_SEQUENCE_ENABLED=false`.
 
 ### Phase 6 — Decommission & cleanup (DRY pass)
+
 **Scope:** Remove the Supabase Edge Functions (whatsapp-handler, job-worker, kds-*, zettle-oauth) and the `pg_cron` schedules now served by BullMQ. Remove `umi-dashboard/server.js` + `api/index.js`. Consolidate any remaining duplicate Twilio/email code. Confirm `umi-logs` still reads `observability.*` and `umi-cash` still works untouched. Final spaghetti/dup sweep.
 **Done when:** no live traffic hits any edge function; `umi-api` is the sole backend for all routed apps; duplication removed.
 
 ### Phase 7 — Dual-writer cutover + decommission `umi-cash` (LATER)
+
 **Cash writes already activated early (D11 reversed, Phase 2 — LIVE).** So this phase is no longer "activate"; it's the **Stage 4 dual-writer decision**: umi-api and `umi-cash` both currently write `loyalty.*` (safe coexistence — append-only ledger, `balance = SUM`). Soak-compare the two writers, then route customer cash-write traffic off `umi-cash` and retire its writers. The remaining build at this point is **passes/APN** if deferred (§7.4) — `.pkpass` generation, the PassKit v1 web-service protocol, Google Wallet, APN push — plus repointing the pass `webServiceURL` to the VPS and moving wallet certs into VPS secrets. Highest-risk (customer-facing money/loyalty) — own soak window.
 
 ---
 
 ## 14. Risk Register
 
-| Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|
-| Binding to a stale/wrong projection or RPC name (e.g. old `kds.*` vs `v_kds_tickets`) | Low | Medium | Schema is confirmed canonical (§9.1); only the `v_kds_tickets`/loyalty-RPC names need a bind-time check in Phase 0 |
-| RLS context not set → cross-tenant data leak or empty results | Medium | High | `umi_app` is non-`BYPASSRLS`; a Nest interceptor sets `SET LOCAL app.tenant_id/user_id` on every request; Phase 0 isolation test gates it |
-| Twilio webhook cutover drops/dupes messages | Low | High | MessageSid idempotency = BullMQ jobId; canary + instant rollback to edge fn |
-| KDS contract regression breaks the iPad app | Medium | High | Frozen DTOs + contract tests; `/functions/v1` aliases; staging verify incl. revocation |
-| Redis is a new SPOF/dependency | Medium | Medium | AOF persistence; health checks; documented managed-Redis upgrade path |
-| Transactional-outbox gap drops a customer reply on crash | Low | High | Outbox relay for the reply path (§10.4) |
-| VPS single point of failure / ops burden vs managed edge | Medium | Medium | Compose + health-gated CI; document 2nd-VPS path; acceptable at current volume |
-| Pooler can't do session features the worker needs | Low | Medium | Worker uses a direct connection; BullMQ removes the NOTIFY need |
-| Secrets copied from leaked values | Low | High | Rotate all; set fresh on VPS; never hardcode (§11.3) |
-| `umi-cash` and `umi-api` write-conflict on shared cash tables (dual writers) | Low | **High** | Built-but-inert writes (D11): `CASH_WRITE_ENABLED=false` leaves write routes unmounted **and** SELECT-only DB grant makes writes structurally impossible (§11.5). Lifecycle `lifecycle_sends` writes are the only carve-out (non-conflicting). |
-| `tools.ts` (80KB) port introduces behavior drift | Medium | Medium | Split by concern with tests per tool group; diff replies against edge fn during soak |
+| Risk                                                                                  | Likelihood | Impact   | Mitigation                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------- | ---------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Binding to a stale/wrong projection or RPC name (e.g. old `kds.*` vs `v_kds_tickets`) | Low        | Medium   | Schema is confirmed canonical (§9.1); only the `v_kds_tickets`/loyalty-RPC names need a bind-time check in Phase 0                                                                                                                             |
+| RLS context not set → cross-tenant data leak or empty results                         | Medium     | High     | `umi_app` is non-`BYPASSRLS`; a Nest interceptor sets `SET LOCAL app.tenant_id/user_id` on every request; Phase 0 isolation test gates it                                                                                                      |
+| Twilio webhook cutover drops/dupes messages                                           | Low        | High     | MessageSid idempotency = BullMQ jobId; canary + instant rollback to edge fn                                                                                                                                                                    |
+| KDS contract regression breaks the iPad app                                           | Medium     | High     | Frozen DTOs + contract tests; `/functions/v1` aliases; staging verify incl. revocation                                                                                                                                                         |
+| Redis is a new SPOF/dependency                                                        | Medium     | Medium   | AOF persistence; health checks; documented managed-Redis upgrade path                                                                                                                                                                          |
+| Transactional-outbox gap drops a customer reply on crash                              | Low        | High     | Outbox relay for the reply path (§10.4)                                                                                                                                                                                                        |
+| VPS single point of failure / ops burden vs managed edge                              | Medium     | Medium   | Compose + health-gated CI; document 2nd-VPS path; acceptable at current volume                                                                                                                                                                 |
+| Pooler can't do session features the worker needs                                     | Low        | Medium   | Worker uses a direct connection; BullMQ removes the NOTIFY need                                                                                                                                                                                |
+| Secrets copied from leaked values                                                     | Low        | High     | Rotate all; set fresh on VPS; never hardcode (§11.3)                                                                                                                                                                                           |
+| `umi-cash` and `umi-api` write-conflict on shared cash tables (dual writers)          | Low        | **High** | Built-but-inert writes (D11): `CASH_WRITE_ENABLED=false` leaves write routes unmounted **and** SELECT-only DB grant makes writes structurally impossible (§11.5). Lifecycle `lifecycle_sends` writes are the only carve-out (non-conflicting). |
+| `tools.ts` (80KB) port introduces behavior drift                                      | Medium     | Medium   | Split by concern with tests per tool group; diff replies against edge fn during soak                                                                                                                                                           |
 
 ---
 
@@ -651,4 +666,7 @@ Each phase ships independently, is reversible, and has explicit acceptance crite
 4. The codebase follows §6: three buckets, business-named folders, `<thing>.<role>.ts` files, a root `README.md` map — a new engineer can navigate it cold.
 5. KISS/DRY honored: one DB layer, one auth layer, one logging layer, one adapter per external system, no duplicated Twilio/email/KDS-pairing code.
 6. Tests: unit (services/adapters), integration (staging Postgres), KDS contract, and a WhatsApp soak parity check — all green.
+
+```
+
 ```

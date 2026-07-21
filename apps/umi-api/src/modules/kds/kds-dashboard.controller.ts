@@ -32,10 +32,7 @@ export class KdsDashboardController {
   constructor(private readonly kds: KdsService) {}
 
   @Get('devices')
-  listDevices(
-    @Tenant() t: TenantAccess,
-    @Query('locationId') locationId?: string,
-  ) {
+  listDevices(@Tenant() t: TenantAccess, @Query('locationId') locationId?: string) {
     return this.kds.listDevicesForDashboard(t.tenantId, locationId ?? null);
   }
 
@@ -45,11 +42,7 @@ export class KdsDashboardController {
     @Query('filter') filter?: string,
     @Query('locationId') locationId?: string,
   ) {
-    return this.kds.listOrdersForDashboard(
-      t.tenantId,
-      filter,
-      locationId ?? null,
-    );
+    return this.kds.listOrdersForDashboard(t.tenantId, filter, locationId ?? null);
   }
 
   @Get('ticker')
@@ -58,10 +51,7 @@ export class KdsDashboardController {
   }
 
   @Get('stations')
-  listStations(
-    @Tenant() t: TenantAccess,
-    @Query('locationId') locationId?: string,
-  ) {
+  listStations(@Tenant() t: TenantAccess, @Query('locationId') locationId?: string) {
     return this.kds.listStationsForDashboard(t.tenantId, locationId ?? null);
   }
 
@@ -84,18 +74,12 @@ export class KdsDashboardController {
   }
 
   @Delete('stations/:stationId')
-  archiveStation(
-    @Tenant() t: TenantAccess,
-    @Param('stationId') stationId: string,
-  ) {
+  archiveStation(@Tenant() t: TenantAccess, @Param('stationId') stationId: string) {
     return this.kds.archiveStation(t.tenantId, stationId);
   }
 
   @Get('devices/pairing')
-  listPairings(
-    @Tenant() t: TenantAccess,
-    @Query('locationId') locationId?: string,
-  ) {
+  listPairings(@Tenant() t: TenantAccess, @Query('locationId') locationId?: string) {
     return this.kds.listPairingsForDashboard(t.tenantId, locationId ?? null);
   }
 
@@ -128,10 +112,7 @@ export class KdsDashboardController {
   }
 
   @Post('devices/pairing/:pairingId/deny')
-  denyPairing(
-    @Tenant() t: TenantAccess,
-    @Param('pairingId') pairingId: string,
-  ) {
+  denyPairing(@Tenant() t: TenantAccess, @Param('pairingId') pairingId: string) {
     return this.kds.denyPairing(t.tenantId, pairingId);
   }
 
@@ -145,10 +126,7 @@ export class KdsDashboardController {
   }
 
   @Post('devices/:deviceId/revoke')
-  revokeDevice(
-    @Tenant() t: TenantAccess,
-    @Param('deviceId') deviceId: string,
-  ) {
+  revokeDevice(@Tenant() t: TenantAccess, @Param('deviceId') deviceId: string) {
     return this.kds.revokeDevice(t.tenantId, deviceId);
   }
 
@@ -159,12 +137,7 @@ export class KdsDashboardController {
     @Param('ticketId') ticketId: string,
     @Body() body: Record<string, unknown>,
   ) {
-    return this.kds.transitionFromDashboard(
-      t.tenantId,
-      user?.id ?? null,
-      ticketId,
-      body,
-    );
+    return this.kds.transitionFromDashboard(t.tenantId, user?.id ?? null, ticketId, body);
   }
 }
 
@@ -181,10 +154,7 @@ export class KdsAdminController {
   constructor(private readonly kds: KdsService) {}
 
   @Get('devices')
-  listDevices(
-    @Tenant() t: TenantAccess,
-    @Query('locationId') locationId?: string,
-  ) {
+  listDevices(@Tenant() t: TenantAccess, @Query('locationId') locationId?: string) {
     return this.kds.listDevicesForDashboard(t.tenantId, locationId ?? null);
   }
 
@@ -194,11 +164,7 @@ export class KdsAdminController {
     @Query('filter') filter?: string,
     @Query('locationId') locationId?: string,
   ) {
-    return this.kds.listOrdersForDashboard(
-      t.tenantId,
-      filter,
-      locationId ?? null,
-    );
+    return this.kds.listOrdersForDashboard(t.tenantId, filter, locationId ?? null);
   }
 
   @Post('orders/:ticketId/transition')
@@ -208,11 +174,6 @@ export class KdsAdminController {
     @Param('ticketId') ticketId: string,
     @Body() body: Record<string, unknown>,
   ) {
-    return this.kds.transitionFromDashboard(
-      t.tenantId,
-      user?.id ?? null,
-      ticketId,
-      body,
-    );
+    return this.kds.transitionFromDashboard(t.tenantId, user?.id ?? null, ticketId, body);
   }
 }

@@ -119,7 +119,11 @@ export class OrdersRepository {
           [params.tenantId, params.sourceTransactionId],
         );
         const row = existing.rows[0];
-        return { orderId: row?.id ?? '', total: (row?.total_cents ?? totalCents) / 100, created: false };
+        return {
+          orderId: row?.id ?? '',
+          total: (row?.total_cents ?? totalCents) / 100,
+          created: false,
+        };
       }
 
       const orderId = ins.rows[0].id;

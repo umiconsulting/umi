@@ -1,38 +1,40 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
-import { CFG, COOKIE_AUTH, LOCAL_SESSION, apiUrl, withCreds, errMessage } from './config.js'
-import { supabase } from './supabase.js'
-import { routes } from '@umi/contract/routes'
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { CFG, COOKIE_AUTH, LOCAL_SESSION, apiUrl, withCreds, errMessage } from './config.js';
+import { supabase } from './supabase.js';
+import { routes } from '@umi/contract/routes';
 
-const AuthContext = createContext(null)
-const LOCAL_SESSION_KEY = 'umi-dashboard-local-session'
+const AuthContext = createContext(null);
+const LOCAL_SESSION_KEY = 'umi-dashboard-local-session';
 
 function getLocalSession() {
-  const raw = window.localStorage.getItem(LOCAL_SESSION_KEY)
-  if (!raw) return null
+  const raw = window.localStorage.getItem(LOCAL_SESSION_KEY);
+  if (!raw) return null;
   try {
-    return JSON.parse(raw)
+    return JSON.parse(raw);
   } catch {
-    window.localStorage.removeItem(LOCAL_SESSION_KEY)
-    return null
+    window.localStorage.removeItem(LOCAL_SESSION_KEY);
+    return null;
   }
 }
 
 export function getStoredSession() {
-  if (LOCAL_SESSION) return getLocalSession()
-  return null
+  if (LOCAL_SESSION) return getLocalSession();
+  return null;
 }
 
 export async function getAuthHeaders() {
   // umi-api: auth rides in the httpOnly cookie (sent via credentials:'include'), no header.
-  if (COOKIE_AUTH) return {}
+  if (COOKIE_AUTH) return {};
 
   if (CFG.authMode === 'local') {
-    const session = getLocalSession()
-    return session?.user?.id ? { 'X-UMI-User-ID': session.user.id } : {}
+    const session = getLocalSession();
+    return session?.user?.id ? { 'X-UMI-User-ID': session.user.id } : {};
   }
 
-  const { data: { session } } = await supabase.auth.getSession()
-  return session ? { Authorization: 'Bearer ' + session.access_token } : {}
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return session ? { Authorization: 'Bearer ' + session.access_token } : {};
 }
 
 // ---------------------------------------------------------------------------
@@ -45,125 +47,152 @@ export async function getAuthHeaders() {
 // /refresh call. If refresh fails, the refresh cookie is dead too → clear the
 // session and bounce to /login.
 // ---------------------------------------------------------------------------
-const REFRESH_SKEW_MS = 60_000 // refresh 60s before the access token expires
-const MIN_REFRESH_MS = 30_000  // never schedule sooner than this
-let refreshTimer = null
-let refreshInFlight = null
-let accessExpiresAt = 0        // ms epoch; 0 = unknown
+const REFRESH_SKEW_MS = 60_000; // refresh 60s before the access token expires
+const MIN_REFRESH_MS = 30_000; // never schedule sooner than this
+let refreshTimer = null;
+let refreshInFlight = null;
+let accessExpiresAt = 0; // ms epoch; 0 = unknown
 
 function setLocalSession(session) {
   // Stamp an ABSOLUTE expiry at persist time. accessExpiresIn is relative to
   // when login/refresh issued the cookie, so on a later reload we must schedule
   // against the absolute timestamp — not Date.now()+accessExpiresIn, which would
   // reset the clock and could schedule a refresh after the cookie already died.
-  const secs = Number(session && session.accessExpiresIn)
-  const stampedAt = secs && isFinite(secs) ? Date.now() + secs * 1000 : 0
+  const secs = Number(session && session.accessExpiresIn);
+  const stampedAt = secs && isFinite(secs) ? Date.now() + secs * 1000 : 0;
   window.localStorage.setItem(
     LOCAL_SESSION_KEY,
-    JSON.stringify(stampedAt ? Object.assign({}, session, { accessExpiresAt: stampedAt }) : session),
-  )
+    JSON.stringify(
+      stampedAt ? Object.assign({}, session, { accessExpiresAt: stampedAt }) : session,
+    ),
+  );
 }
 
 function scheduleProactiveRefresh(session) {
-  if (!COOKIE_AUTH) return
-  if (refreshTimer) { clearTimeout(refreshTimer); refreshTimer = null }
-  const storedExpiresAt = Number(session && session.accessExpiresAt)
-  const secs = Number(session && session.accessExpiresIn)
-  accessExpiresAt = storedExpiresAt && isFinite(storedExpiresAt)
-    ? storedExpiresAt
-    : (secs && isFinite(secs) ? Date.now() + secs * 1000 : 0)
-  if (!accessExpiresAt) return
-  const delay = Math.max(accessExpiresAt - Date.now() - REFRESH_SKEW_MS, MIN_REFRESH_MS)
+  if (!COOKIE_AUTH) return;
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
+  const storedExpiresAt = Number(session && session.accessExpiresAt);
+  const secs = Number(session && session.accessExpiresIn);
+  accessExpiresAt =
+    storedExpiresAt && isFinite(storedExpiresAt)
+      ? storedExpiresAt
+      : secs && isFinite(secs)
+        ? Date.now() + secs * 1000
+        : 0;
+  if (!accessExpiresAt) return;
+  const delay = Math.max(accessExpiresAt - Date.now() - REFRESH_SKEW_MS, MIN_REFRESH_MS);
   refreshTimer = setTimeout(function () {
     // A failed proactive refresh means the refresh cookie is dead too — route
     // through the same cleanup the 401 path uses instead of leaving stale state.
-    refreshSession().then(function (ok) { if (!ok) handleSessionExpired() })
-  }, delay)
+    refreshSession().then(function (ok) {
+      if (!ok) handleSessionExpired();
+    });
+  }, delay);
 }
 
 // Single-flight refresh. Resolves true on success, false otherwise.
 export function refreshSession() {
-  if (!COOKIE_AUTH) return Promise.resolve(false)
-  if (refreshInFlight) return refreshInFlight
+  if (!COOKIE_AUTH) return Promise.resolve(false);
+  if (refreshInFlight) return refreshInFlight;
   refreshInFlight = (async function () {
     try {
-      const res = await fetch(apiUrl(routes.auth.refresh), withCreds({ method: 'POST' }))
-      if (!res.ok) return false
-      const payload = await res.json().catch(() => ({}))
+      const res = await fetch(apiUrl(routes.auth.refresh), withCreds({ method: 'POST' }));
+      if (!res.ok) return false;
+      const payload = await res.json().catch(() => ({}));
       if (payload && payload.session) {
-        setLocalSession(payload.session)
-        scheduleProactiveRefresh(payload.session)
+        setLocalSession(payload.session);
+        scheduleProactiveRefresh(payload.session);
       }
-      return true
+      return true;
     } catch (err) {
-      console.warn('session refresh failed', err)
-      return false
+      console.warn('session refresh failed', err);
+      return false;
     } finally {
-      refreshInFlight = null
+      refreshInFlight = null;
     }
-  })()
-  return refreshInFlight
+  })();
+  return refreshInFlight;
 }
 
 // Session is truly dead (refresh failed): drop local state and go to login.
 export function handleSessionExpired() {
-  if (refreshTimer) { clearTimeout(refreshTimer); refreshTimer = null }
-  accessExpiresAt = 0
-  window.localStorage.removeItem(LOCAL_SESSION_KEY)
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
+  accessExpiresAt = 0;
+  window.localStorage.removeItem(LOCAL_SESSION_KEY);
   if (!window.location.pathname.startsWith('/login')) {
-    window.location.assign('/login')
+    window.location.assign('/login');
   }
 }
 
 // Start proactive refresh + resume-refresh listeners. Returns a cleanup fn.
 export function startSessionAutoRefresh() {
-  if (!COOKIE_AUTH) return function () {}
-  const session = getLocalSession()
-  if (session) scheduleProactiveRefresh(session)
+  if (!COOKIE_AUTH) return function () {};
+  const session = getLocalSession();
+  if (session) scheduleProactiveRefresh(session);
   function onResume() {
-    if (!getLocalSession()) return
-    if (typeof document !== 'undefined' && document.visibilityState && document.visibilityState !== 'visible') return
+    if (!getLocalSession()) return;
+    if (
+      typeof document !== 'undefined' &&
+      document.visibilityState &&
+      document.visibilityState !== 'visible'
+    )
+      return;
     // Refresh only when at/near expiry — avoids a refresh storm on every focus.
     if (!accessExpiresAt || Date.now() >= accessExpiresAt - REFRESH_SKEW_MS) {
-      refreshSession().then(function (ok) { if (!ok) handleSessionExpired() })
+      refreshSession().then(function (ok) {
+        if (!ok) handleSessionExpired();
+      });
     }
   }
-  document.addEventListener('visibilitychange', onResume)
-  window.addEventListener('online', onResume)
+  document.addEventListener('visibilitychange', onResume);
+  window.addEventListener('online', onResume);
   return function () {
-    document.removeEventListener('visibilitychange', onResume)
-    window.removeEventListener('online', onResume)
-    if (refreshTimer) { clearTimeout(refreshTimer); refreshTimer = null }
-  }
+    document.removeEventListener('visibilitychange', onResume);
+    window.removeEventListener('online', onResume);
+    if (refreshTimer) {
+      clearTimeout(refreshTimer);
+      refreshTimer = null;
+    }
+  };
 }
 
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(undefined) // undefined = loading
-  const [needsPasswordReset, setNeedsPasswordReset] = useState(false)
+  const [session, setSession] = useState(undefined); // undefined = loading
+  const [needsPasswordReset, setNeedsPasswordReset] = useState(false);
 
   useEffect(() => {
     if (LOCAL_SESSION) {
-      setSession(getLocalSession())
-      return startSessionAutoRefresh()
+      setSession(getLocalSession());
+      return startSessionAutoRefresh();
     }
 
-    supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
-      if (event === 'PASSWORD_RECOVERY') setNeedsPasswordReset(true)
-      setSession(s)
-    })
-    return () => subscription.unsubscribe()
-  }, [])
+    supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === 'PASSWORD_RECOVERY') setNeedsPasswordReset(true);
+      setSession(s);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ session, loading: session === undefined, needsPasswordReset, setNeedsPasswordReset }}>
+    <AuthContext.Provider
+      value={{ session, loading: session === undefined, needsPasswordReset, setNeedsPasswordReset }}
+    >
       {children}
     </AuthContext.Provider>
-  )
+  );
 }
 
 export function useAuth() {
-  return useContext(AuthContext)
+  return useContext(AuthContext);
 }
 
 export async function signIn(email, password, remember = false) {
@@ -172,21 +201,24 @@ export async function signIn(email, password, remember = false) {
   // localStorage session id echoed as X-UMI-User-ID. Either way we cache session.* for the UI.
   // `remember` makes umi-api issue persistent cookies (vs session cookies).
   if (LOCAL_SESSION) {
-    const res = await fetch(apiUrl(routes.auth.login), withCreds({
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: email, password, remember }),
-    }))
-    const payload = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(errMessage(payload, 'Credenciales incorrectas'))
-    setLocalSession(payload.session)
-    window.location.assign('/')
-    return payload.session
+    const res = await fetch(
+      apiUrl(routes.auth.login),
+      withCreds({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: email, password, remember }),
+      }),
+    );
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(errMessage(payload, 'Credenciales incorrectas'));
+    setLocalSession(payload.session);
+    window.location.assign('/');
+    return payload.session;
   }
 
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-  if (error) throw error
-  return data.session
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  return data.session;
 }
 
 export async function signOut() {
@@ -197,16 +229,17 @@ export async function signOut() {
       // so check both — a failed server logout can leave the httpOnly cookie
       // valid. We still clear local state + redirect, but never silently.
       try {
-        const res = await fetch(apiUrl(routes.auth.logout), withCreds({ method: 'POST' }))
-        if (!res.ok) console.warn(`logout failed (${res.status}); auth cookie may persist server-side`)
+        const res = await fetch(apiUrl(routes.auth.logout), withCreds({ method: 'POST' }));
+        if (!res.ok)
+          console.warn(`logout failed (${res.status}); auth cookie may persist server-side`);
       } catch (err) {
-        console.warn('logout request failed; auth cookie may persist server-side', err)
+        console.warn('logout request failed; auth cookie may persist server-side', err);
       }
     }
-    window.localStorage.removeItem(LOCAL_SESSION_KEY)
-    window.location.assign('/login')
-    return
+    window.localStorage.removeItem(LOCAL_SESSION_KEY);
+    window.location.assign('/login');
+    return;
   }
 
-  await supabase.auth.signOut()
+  await supabase.auth.signOut();
 }

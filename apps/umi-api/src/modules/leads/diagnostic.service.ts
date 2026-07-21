@@ -32,18 +32,50 @@ export interface ProcessDiagnosticResult {
 
 // Ported from getScoreFromString (landing /api/diagnostic route).
 const SCORE_MAP: Record<string, number> = {
-  muy_bajo: 1, bajo: 2, medio: 3, alto: 4, muy_alto: 5,
-  nunca: 1, rara_vez: 2, a_veces: 3, frecuentemente: 4, siempre: 5,
-  inicial: 1, intermedio: 3, avanzado: 5,
-  pedidos: 1, cocina: 3, clientes: 5,
-  recopilacion: 1, organizacion: 3, interpretacion: 5,
+  muy_bajo: 1,
+  bajo: 2,
+  medio: 3,
+  alto: 4,
+  muy_alto: 5,
+  nunca: 1,
+  rara_vez: 2,
+  a_veces: 3,
+  frecuentemente: 4,
+  siempre: 5,
+  inicial: 1,
+  intermedio: 3,
+  avanzado: 5,
+  pedidos: 1,
+  cocina: 3,
+  clientes: 5,
+  recopilacion: 1,
+  organizacion: 3,
+  interpretacion: 5,
 };
 
 const AREA_KEYS = {
-  dataCollection: ['analytics_stage', 'data_challenge', 'data_sources', 'data_quality', 'data_integration'],
-  analysis: ['analytics_stage', 'decision_basis', 'analysis_tools', 'analysis_frequency', 'analysis_depth'],
+  dataCollection: [
+    'analytics_stage',
+    'data_challenge',
+    'data_sources',
+    'data_quality',
+    'data_integration',
+  ],
+  analysis: [
+    'analytics_stage',
+    'decision_basis',
+    'analysis_tools',
+    'analysis_frequency',
+    'analysis_depth',
+  ],
   visualization: ['analytics_stage', 'visualization_tools', 'dashboard_usage', 'report_creation'],
-  decisionMaking: ['decision_basis', 'data_challenge', 'decision_speed', 'data_driven_decisions', 'kpi_tracking'],
+  decisionMaking: [
+    'decision_basis',
+    'data_challenge',
+    'decision_speed',
+    'data_driven_decisions',
+    'kpi_tracking',
+  ],
 } as const;
 
 @Injectable()
@@ -94,10 +126,7 @@ export class DiagnosticService {
     return { score: total, level, recommendations, areas };
   }
 
-  private areaScore(
-    responses: Record<string, string | number>,
-    keys: readonly string[],
-  ): number {
+  private areaScore(responses: Record<string, string | number>, keys: readonly string[]): number {
     let total = 0;
     let valid = 0;
     for (const key of keys) {

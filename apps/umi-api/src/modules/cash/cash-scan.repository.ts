@@ -97,11 +97,7 @@ export class CashScanRepository {
   }
 
   /** A visit within the last `seconds` (wallet 60s replay guard). */
-  async recentVisitWithin(
-    tenantId: string,
-    cardId: string,
-    seconds: number,
-  ): Promise<boolean> {
+  async recentVisitWithin(tenantId: string, cardId: string, seconds: number): Promise<boolean> {
     const { rows } = await this.pg.withTenant((c) =>
       c.query(
         `SELECT 1 FROM tenant.loyalty_visit
@@ -115,11 +111,7 @@ export class CashScanRepository {
   }
 
   /** A visit since tenant-timezone local midnight (1-per-day guard). DST-safe. */
-  async visitedToday(
-    tenantId: string,
-    cardId: string,
-    tz: string,
-  ): Promise<boolean> {
+  async visitedToday(tenantId: string, cardId: string, tz: string): Promise<boolean> {
     const { rows } = await this.pg.withTenant((c) =>
       c.query(
         `SELECT 1 FROM tenant.loyalty_visit
@@ -149,10 +141,7 @@ export class CashScanRepository {
     return rows.length > 0;
   }
 
-  async activeBirthdayReward(
-    tenantId: string,
-    cardId: string,
-  ): Promise<{ id: string } | null> {
+  async activeBirthdayReward(tenantId: string, cardId: string): Promise<{ id: string } | null> {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<{ id: string }>(
         `SELECT id::text FROM tenant.birthday_reward

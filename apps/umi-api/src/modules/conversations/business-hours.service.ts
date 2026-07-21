@@ -148,9 +148,7 @@ export class BusinessHoursService {
     const name = row?.name ?? 'El café';
     const tz = bot.timezone;
     const { dayIndex, totalMinutes } = getLocalTimeParts(tz, now);
-    const phoneIsBypassed = phone
-      ? bot.ordering.bypassPhones.includes(phone)
-      : false;
+    const phoneIsBypassed = phone ? bot.ordering.bypassPhones.includes(phone) : false;
     const specialNotice = bot.ordering.specialNotice;
     const weeklyHours = buildWeeklyHours(bot.days);
 
@@ -180,8 +178,7 @@ export class BusinessHoursService {
     const buffer = bot.ordering.orderCutoffMinutes ?? ORDER_CUTOFF_BUFFER_MINUTES;
     const orderCutoffMinutes = closeMinutes - buffer;
     const isAcceptingOrders =
-      phoneIsBypassed ||
-      (totalMinutes >= openMinutes && totalMinutes < orderCutoffMinutes);
+      phoneIsBypassed || (totalMinutes >= openMinutes && totalMinutes < orderCutoffMinutes);
 
     return {
       isOpen: totalMinutes >= openMinutes && totalMinutes < closeMinutes,

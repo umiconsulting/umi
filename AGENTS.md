@@ -15,15 +15,15 @@ routing. What lives here is what no agent can infer.
 
 ## Product boundaries
 
-| Path | Owns |
-|------|------|
-| `apps/umi-kds` | Native iPad Kitchen Display System client |
-| `apps/umi-cash` | Loyalty, wallet, passes, Cash-specific Prisma |
+| Path                    | Owns                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------ |
+| `apps/umi-kds`          | Native iPad Kitchen Display System client                                            |
+| `apps/umi-cash`         | Loyalty, wallet, passes, Cash-specific Prisma                                        |
 | `apps/umi-conversaflow` | Shared Supabase backend, workflow jobs, prompts, traces, cross-channel normalization |
-| `apps/umi-logs` | ConversaFlow operational logs and trace UI |
-| `apps/umi-dashboard` | Owner dashboard app shell and live-data UI |
-| `apps/umi-landing-page` | Public landing and lead capture |
-| root `docs/` | Architecture, migration, governance, cross-product planning |
+| `apps/umi-logs`         | ConversaFlow operational logs and trace UI                                           |
+| `apps/umi-dashboard`    | Owner dashboard app shell and live-data UI                                           |
+| `apps/umi-landing-page` | Public landing and lead capture                                                      |
+| root `docs/`            | Architecture, migration, governance, cross-product planning                          |
 
 ## Database ownership
 
@@ -91,10 +91,10 @@ Exceptions:
 
 Answer in the language that the user writes. Each language has its standard:
 
-| Content | Standard |
-|---------|----------|
-| English, all content | ASD-STE100 |
-| Spanish, technical content | Español Técnico Simplificado (ETS) |
+| Content                    | Standard                               |
+| -------------------------- | -------------------------------------- |
+| English, all content       | ASD-STE100                             |
+| Spanish, technical content | Español Técnico Simplificado (ETS)     |
 | Spanish, all other content | Lenguaje claro (Red de Lenguaje Claro) |
 
 Spanish technical content is documentation, a commit message, a pull request, a code

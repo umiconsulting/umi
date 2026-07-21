@@ -94,10 +94,7 @@ export class CashCustomerController {
     const r = this.rateLimit.hit(key, max, WINDOW);
     if (!r.allowed) {
       void reply.header('Retry-After', String(Math.ceil((r.resetAt - Date.now()) / 1000)));
-      throw new HttpException(
-        { error: 'Demasiados intentos. Intenta de nuevo más tarde.' },
-        429,
-      );
+      throw new HttpException({ error: 'Demasiados intentos. Intenta de nuevo más tarde.' }, 429);
     }
   }
 }

@@ -28,9 +28,7 @@ describe('TwilioAdapter', () => {
   });
 
   it('posts to the Twilio Messages API and returns the SID', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: true, json: async () => ({ sid: 'SM123' }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ sid: 'SM123' }) });
     vi.stubGlobal('fetch', fetchMock);
 
     const r = await adapterWith(FULL).sendWhatsAppMessage({
@@ -40,12 +38,8 @@ describe('TwilioAdapter', () => {
 
     expect(r).toEqual({ sid: 'SM123' });
     const [url, opts] = fetchMock.mock.calls[0];
-    expect(url).toBe(
-      'https://api.twilio.com/2010-04-01/Accounts/AC1/Messages.json',
-    );
-    expect(opts.headers.Authorization).toBe(
-      'Basic ' + Buffer.from('AC1:tok').toString('base64'),
-    );
+    expect(url).toBe('https://api.twilio.com/2010-04-01/Accounts/AC1/Messages.json');
+    expect(opts.headers.Authorization).toBe('Basic ' + Buffer.from('AC1:tok').toString('base64'));
     expect(opts.body).toContain('From=whatsapp%3A%2B1555');
     expect(opts.body).toContain('To=whatsapp%3A%2B1999');
     expect(opts.body).toContain('Body=hello');
@@ -68,9 +62,7 @@ describe('TwilioAdapter', () => {
   });
 
   it('never double-prefixes an already-prefixed whatsapp: address', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: true, json: async () => ({ sid: 'SM7' }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ sid: 'SM7' }) });
     vi.stubGlobal('fetch', fetchMock);
 
     await adapterWith({ ...FULL, TWILIO_WHATSAPP_FROM: 'whatsapp:+1555' }).sendWhatsAppMessage({
@@ -83,9 +75,7 @@ describe('TwilioAdapter', () => {
   });
 
   it('builds a geo PersistentAction for location pins', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: true, json: async () => ({ sid: 'SM9' }) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ sid: 'SM9' }) });
     vi.stubGlobal('fetch', fetchMock);
 
     await adapterWith(FULL).sendLocationPin({
@@ -97,8 +87,6 @@ describe('TwilioAdapter', () => {
       label: 'Cafe',
     });
 
-    expect(fetchMock.mock.calls[0][1].body).toContain(
-      'PersistentAction=geo%3A19.4%2C-99.1%7CCafe',
-    );
+    expect(fetchMock.mock.calls[0][1].body).toContain('PersistentAction=geo%3A19.4%2C-99.1%7CCafe');
   });
 });

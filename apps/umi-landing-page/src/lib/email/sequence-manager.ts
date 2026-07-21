@@ -1,10 +1,10 @@
 // Manager de Secuencias Modular
 // src/lib/email/sequenceManager.ts
 
-import { EmailService, getEmailService, getInternalEmail } from "./email-service";
-import { EmailTemplates, EmailTemplateData } from "./templates";
-import { LeadDatabasePostgres, getLeadDatabasePostgres } from "../database/postgres";
-import { LeadDatabase } from "../database/sqlite";
+import { EmailService, getEmailService, getInternalEmail } from './email-service';
+import { EmailTemplates, EmailTemplateData } from './templates';
+import { LeadDatabasePostgres, getLeadDatabasePostgres } from '../database/postgres';
+import { LeadDatabase } from '../database/sqlite';
 
 type AnyLeadDatabase = LeadDatabase | LeadDatabasePostgres;
 
@@ -36,12 +36,12 @@ export interface Lead {
 export interface SequenceConfig {
   id: string;
   name: string;
-  trigger: "diagnostic_completed" | "no_response" | "meeting_missed";
+  trigger: 'diagnostic_completed' | 'no_response' | 'meeting_missed';
   emails: Array<{
     day: number;
     template: keyof typeof EmailTemplates;
     subject: string;
-    priority: "high" | "normal" | "low";
+    priority: 'high' | 'normal' | 'low';
     conditions?: (lead: Lead) => boolean;
   }>;
 }
@@ -60,7 +60,7 @@ interface EmailConfig {
   day: number;
   template: keyof typeof EmailTemplates;
   subject: string;
-  priority: "high" | "normal" | "low";
+  priority: 'high' | 'normal' | 'low';
   conditions?: (lead: Lead) => boolean;
 }
 
@@ -87,8 +87,8 @@ export class SequenceManager {
       this.isPostgres = database instanceof LeadDatabasePostgres;
     } else {
       // Auto-detect from env
-      const dbType = process.env.DATABASE_TYPE || "sqlite";
-      if (dbType === "postgres") {
+      const dbType = process.env.DATABASE_TYPE || 'sqlite';
+      if (dbType === 'postgres') {
         this.database = getLeadDatabasePostgres();
         this.isPostgres = true;
       } else {
@@ -101,42 +101,42 @@ export class SequenceManager {
   private initializeSequences() {
     // Secuencia principal de diagnóstico
     this.addSequence({
-      id: "diagnostic_followup",
-      name: "Seguimiento de Diagnóstico",
-      trigger: "diagnostic_completed",
+      id: 'diagnostic_followup',
+      name: 'Seguimiento de Diagnóstico',
+      trigger: 'diagnostic_completed',
       emails: [
         {
           day: 0,
-          template: "day0Urgency",
-          subject: "⚡ ¡Momento clave para ${company}!",
-          priority: "high",
+          template: 'day0Urgency',
+          subject: '⚡ ¡Momento clave para ${company}!',
+          priority: 'high',
         },
         {
           day: 2,
-          template: "day2Pressure",
-          subject: "⏰ ${company}: Ventana cerrándose",
-          priority: "high",
+          template: 'day2Pressure',
+          subject: '⏰ ${company}: Ventana cerrándose',
+          priority: 'high',
           conditions: (lead) => !this.hasRespondedRecently(lead, 2),
         },
         {
           day: 5,
-          template: "day5CaseStudy",
-          subject: "📊 Caso real: Empresa como ${company}",
-          priority: "normal",
+          template: 'day5CaseStudy',
+          subject: '📊 Caso real: Empresa como ${company}',
+          priority: 'normal',
           conditions: (lead) => !this.hasRespondedRecently(lead, 5),
         },
         {
           day: 10,
-          template: "day10FreeOffer",
-          subject: "🎁 Última oportunidad: Implementación gratuita",
-          priority: "normal",
+          template: 'day10FreeOffer',
+          subject: '🎁 Última oportunidad: Implementación gratuita',
+          priority: 'normal',
           conditions: (lead) => !this.hasRespondedRecently(lead, 10),
         },
         {
           day: 30,
-          template: "day30Reactivation",
-          subject: "📈 Actualización del mercado: Nuevas tendencias BI",
-          priority: "low",
+          template: 'day30Reactivation',
+          subject: '📈 Actualización del mercado: Nuevas tendencias BI',
+          priority: 'low',
           conditions: (lead) => !this.hasRespondedRecently(lead, 30),
         },
       ],
@@ -144,15 +144,15 @@ export class SequenceManager {
 
     // Secuencia para no-shows
     this.addSequence({
-      id: "meeting_noshow",
-      name: "Seguimiento No-Show",
-      trigger: "meeting_missed",
+      id: 'meeting_noshow',
+      name: 'Seguimiento No-Show',
+      trigger: 'meeting_missed',
       emails: [
         {
           day: 0,
-          template: "noShow",
-          subject: "❓ ¿Todo bien? Reagendemos tu consulta",
-          priority: "high",
+          template: 'noShow',
+          subject: '❓ ¿Todo bien? Reagendemos tu consulta',
+          priority: 'high',
         },
       ],
     });
@@ -170,7 +170,7 @@ export class SequenceManager {
 
   // Procesamiento principal
   async processAllSequences(): Promise<SequenceMetrics> {
-    console.log("🔄 Iniciando procesamiento de todas las secuencias...");
+    console.log('🔄 Iniciando procesamiento de todas las secuencias...');
 
     try {
       const leads = await this.getActiveLeads();
@@ -197,7 +197,7 @@ export class SequenceManager {
       this.metrics.emailsFailed += totalEmailsFailed;
 
       console.log(
-        `✅ Procesamiento completado: ${totalEmailsSent} enviados, ${totalEmailsFailed} fallidos`
+        `✅ Procesamiento completado: ${totalEmailsSent} enviados, ${totalEmailsFailed} fallidos`,
       );
 
       // Enviar reporte si hubo actividad
@@ -207,15 +207,13 @@ export class SequenceManager {
 
       return { ...this.metrics };
     } catch (error) {
-      console.error("❌ Error en processAllSequences:", error);
+      console.error('❌ Error en processAllSequences:', error);
       await this.sendErrorAlert(error);
       throw error;
     }
   }
 
-  async processLeadSequences(
-    lead: Lead
-  ): Promise<{ sent: number; failed: number }> {
+  async processLeadSequences(lead: Lead): Promise<{ sent: number; failed: number }> {
     let sent = 0;
     let failed = 0;
 
@@ -227,11 +225,7 @@ export class SequenceManager {
 
       for (const emailConfig of emailsToSend) {
         try {
-          const success = await this.sendSequenceEmail(
-            lead,
-            emailConfig,
-            sequence
-          );
+          const success = await this.sendSequenceEmail(lead, emailConfig, sequence);
           if (success) {
             sent++;
             await this.markEmailSent(lead, emailConfig, sequence);
@@ -256,15 +250,13 @@ export class SequenceManager {
 
     // Verificar si el lead está pausado
     if (lead.sequencePaused) {
-      console.log(
-        `⏸️ Lead ${lead.email} tiene secuencias pausadas: ${lead.pauseReason}`
-      );
+      console.log(`⏸️ Lead ${lead.email} tiene secuencias pausadas: ${lead.pauseReason}`);
       return applicable;
     }
 
     // Secuencia de diagnóstico
     if (!this.hasResponded(lead)) {
-      const diagnosticSequence = this.sequences.get("diagnostic_followup");
+      const diagnosticSequence = this.sequences.get('diagnostic_followup');
       if (diagnosticSequence) {
         applicable.push(diagnosticSequence);
       }
@@ -272,7 +264,7 @@ export class SequenceManager {
 
     // Secuencia de no-show
     if (lead.meetingScheduled && !lead.meetingAttended && lead.meetingDate) {
-      const noShowSequence = this.sequences.get("meeting_noshow");
+      const noShowSequence = this.sequences.get('meeting_noshow');
       if (noShowSequence) {
         applicable.push(noShowSequence);
       }
@@ -293,7 +285,7 @@ export class SequenceManager {
 
       // Calcular días transcurridos según el tipo de secuencia
       let daysSince: number;
-      if (sequence.trigger === "meeting_missed" && lead.meetingDate) {
+      if (sequence.trigger === 'meeting_missed' && lead.meetingDate) {
         daysSince = this.calculateDaysSince(lead.meetingDate);
       } else {
         daysSince = this.calculateDaysSince(lead.diagnosticDate);
@@ -303,9 +295,7 @@ export class SequenceManager {
       if (daysSince >= emailConfig.day) {
         // Aplicar condiciones adicionales si existen
         if (emailConfig.conditions && !emailConfig.conditions(lead)) {
-          console.log(
-            `⚠️ Condición no cumplida para ${lead.email}, email día ${emailConfig.day}`
-          );
+          console.log(`⚠️ Condición no cumplida para ${lead.email}, email día ${emailConfig.day}`);
           continue;
         }
 
@@ -319,7 +309,7 @@ export class SequenceManager {
   private async sendSequenceEmail(
     lead: Lead,
     emailConfig: EmailConfig,
-    sequence: SequenceConfig
+    sequence: SequenceConfig,
   ): Promise<boolean> {
     // Convertir lead a EmailTemplateData
     const templateData: EmailTemplateData = {
@@ -343,44 +333,32 @@ export class SequenceManager {
       .replace(/\$\{company\}/g, lead.company)
       .replace(/\$\{name\}/g, lead.name);
 
-    console.log(
-      `📧 Enviando ${emailConfig.template} a ${lead.email} (día ${emailConfig.day})`
-    );
+    console.log(`📧 Enviando ${emailConfig.template} a ${lead.email} (día ${emailConfig.day})`);
 
-    return this.emailService.sendWithTemplate(
-      templateData,
-      templateFunction,
-      personalizedSubject,
-      {
-        priority: emailConfig.priority,
-        campaign: sequence.id,
-        leadId: lead.id,
-      }
-    );
+    return this.emailService.sendWithTemplate(templateData, templateFunction, personalizedSubject, {
+      priority: emailConfig.priority,
+      campaign: sequence.id,
+      leadId: lead.id,
+    });
   }
 
   private async markEmailSent(
     lead: Lead,
     emailConfig: EmailConfig,
-    sequence: SequenceConfig
+    sequence: SequenceConfig,
   ): Promise<void> {
     const emailKey = `${sequence.id}_day_${emailConfig.day}`;
     lead.emailsSent.push(emailKey);
 
     // En producción, actualizar en base de datos
-    console.log(
-      `✅ Email marcado como enviado: ${emailKey} para ${lead.email}`
-    );
+    console.log(`✅ Email marcado como enviado: ${emailKey} para ${lead.email}`);
   }
 
   // Métodos de gestión de leads
   async pauseSequenceForLead(leadId: string, reason: string): Promise<boolean> {
     try {
       if (this.isPostgres) {
-        await (this.database as LeadDatabasePostgres).pauseSequenceAsync(
-          leadId,
-          reason
-        );
+        await (this.database as LeadDatabasePostgres).pauseSequenceAsync(leadId, reason);
       } else {
         (this.database as LeadDatabase).pauseSequence(leadId, reason);
       }
@@ -395,9 +373,7 @@ export class SequenceManager {
   async resumeSequenceForLead(leadId: string): Promise<boolean> {
     try {
       if (this.isPostgres) {
-        await (this.database as LeadDatabasePostgres).resumeSequenceAsync(
-          leadId
-        );
+        await (this.database as LeadDatabasePostgres).resumeSequenceAsync(leadId);
       } else {
         (this.database as LeadDatabase).resumeSequence(leadId);
       }
@@ -409,14 +385,11 @@ export class SequenceManager {
     }
   }
 
-  async markLeadAsResponded(
-    leadId: string,
-    responseType: string = "email"
-  ): Promise<boolean> {
+  async markLeadAsResponded(leadId: string, responseType: string = 'email'): Promise<boolean> {
     try {
       this.metrics.responsesReceived++;
 
-      if (responseType === "meeting") {
+      if (responseType === 'meeting') {
         this.metrics.meetingsScheduled++;
       }
 
@@ -424,13 +397,10 @@ export class SequenceManager {
       if (this.isPostgres) {
         await (this.database as LeadDatabasePostgres).pauseSequenceAsync(
           leadId,
-          `Lead responded via ${responseType}`
+          `Lead responded via ${responseType}`,
         );
       } else {
-        (this.database as LeadDatabase).pauseSequence(
-          leadId,
-          `Lead responded via ${responseType}`
-        );
+        (this.database as LeadDatabase).pauseSequence(leadId, `Lead responded via ${responseType}`);
       }
 
       console.log(`✅ Lead ${leadId} marcado como respondido: ${responseType}`);
@@ -469,7 +439,7 @@ export class SequenceManager {
           id: ld.id,
           email: ld.email,
           name: ld.name,
-          company: ld.company || "",
+          company: ld.company || '',
           diagnosticDate: new Date(ld.diagnosticDate),
           meetingScheduled: false,
           meetingAttended: false,
@@ -479,10 +449,10 @@ export class SequenceManager {
           diagnosticData: {
             score: ld.diagnosticData.score,
             level: ld.diagnosticData.level,
-            primaryChallenge: ld.diagnosticData.recommendations[0] || "",
+            primaryChallenge: ld.diagnosticData.recommendations[0] || '',
             quickWins: ld.diagnosticData.recommendations.map((r) => ({
               action: r,
-              description: "",
+              description: '',
             })),
             estimatedROI: {
               timeToValue: 0,
@@ -501,7 +471,7 @@ export class SequenceManager {
         id: ld.id,
         email: ld.email,
         name: ld.name,
-        company: ld.company || "",
+        company: ld.company || '',
         diagnosticDate: new Date(ld.diagnosticDate),
         meetingScheduled: false,
         meetingAttended: false,
@@ -511,10 +481,10 @@ export class SequenceManager {
         diagnosticData: {
           score: ld.diagnosticData.score,
           level: ld.diagnosticData.level,
-          primaryChallenge: ld.diagnosticData.recommendations[0] || "",
+          primaryChallenge: ld.diagnosticData.recommendations[0] || '',
           quickWins: ld.diagnosticData.recommendations.map((r) => ({
             action: r,
-            description: "",
+            description: '',
           })),
           estimatedROI: {
             timeToValue: 0,
@@ -544,16 +514,15 @@ export class SequenceManager {
 
     await this.emailService.sendEmail({
       to: getInternalEmail(),
-      subject: "📈 Reporte Diario - Sistema de Secuencias",
+      subject: '📈 Reporte Diario - Sistema de Secuencias',
       html: reportHtml,
-      campaign: "daily_report",
+      campaign: 'daily_report',
     });
   }
 
   private async sendErrorAlert(error: unknown): Promise<void> {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorStack =
-      error instanceof Error ? error.stack : "No stack trace available";
+    const errorStack = error instanceof Error ? error.stack : 'No stack trace available';
 
     const errorHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -571,10 +540,10 @@ ${errorStack}
 
     await this.emailService.sendEmail({
       to: getInternalEmail(),
-      subject: "🚨 Error Crítico - Sistema de Secuencias",
+      subject: '🚨 Error Crítico - Sistema de Secuencias',
       html: errorHtml,
-      priority: "high",
-      campaign: "error_alert",
+      priority: 'high',
+      campaign: 'error_alert',
     });
   }
 
@@ -584,11 +553,9 @@ ${errorStack}
   }
 
   private calculateSuccessRate(): string {
-    if (this.metrics.emailsSent === 0) return "0";
+    if (this.metrics.emailsSent === 0) return '0';
     const rate =
-      ((this.metrics.emailsSent - this.metrics.emailsFailed) /
-        this.metrics.emailsSent) *
-      100;
+      ((this.metrics.emailsSent - this.metrics.emailsFailed) / this.metrics.emailsSent) * 100;
     return rate.toFixed(1);
   }
 
@@ -607,13 +574,13 @@ ${errorStack}
   // Testing
   async testSequence(
     testEmail: string,
-    sequenceId: string = "diagnostic_followup"
+    sequenceId: string = 'diagnostic_followup',
   ): Promise<boolean> {
     const testLead: Lead = {
-      id: "test_lead_" + Date.now(),
+      id: 'test_lead_' + Date.now(),
       email: testEmail,
-      name: "Usuario de Prueba",
-      company: "Empresa Test",
+      name: 'Usuario de Prueba',
+      company: 'Empresa Test',
       diagnosticDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 días atrás
       meetingScheduled: false,
       meetingAttended: false,
@@ -621,11 +588,9 @@ ${errorStack}
       sequencePaused: false,
       diagnosticData: {
         score: 3,
-        level: "Inicial",
-        primaryChallenge: "Organización de datos",
-        quickWins: [
-          { action: "Dashboard básico", description: "Test quick win" },
-        ],
+        level: 'Inicial',
+        primaryChallenge: 'Organización de datos',
+        quickWins: [{ action: 'Dashboard básico', description: 'Test quick win' }],
         estimatedROI: {
           timeToValue: 30,
           expectedReturn: 200,
@@ -636,9 +601,7 @@ ${errorStack}
     console.log(`🧪 Testing secuencia ${sequenceId} para ${testEmail}`);
 
     const results = await this.processLeadSequences(testLead);
-    console.log(
-      `✅ Test completado: ${results.sent} enviados, ${results.failed} fallidos`
-    );
+    console.log(`✅ Test completado: ${results.sent} enviados, ${results.failed} fallidos`);
 
     return results.sent > 0;
   }
@@ -658,8 +621,6 @@ export const getSequenceManager = (): SequenceManager => {
   return sequenceManagerInstance;
 };
 
-export const createSequenceManager = (
-  emailService?: EmailService
-): SequenceManager => {
+export const createSequenceManager = (emailService?: EmailService): SequenceManager => {
   return new SequenceManager(emailService);
 };

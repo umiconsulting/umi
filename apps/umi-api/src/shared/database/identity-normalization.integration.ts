@@ -57,10 +57,10 @@ afterAll(async () => {
 describe('umi.e164 — phone normalization pinned to real data', () => {
   it('never prepends a country code to a string that already carries one', async () => {
     // The whole ruling in one assertion: a +1 number stays a +1 number.
-    const { rows } = await pool.query(
-      `select umi.e164($1) AS a, umi.e164($2) AS b`,
-      ['+14804016182', '+15005550006'],
-    );
+    const { rows } = await pool.query(`select umi.e164($1) AS a, umi.e164($2) AS b`, [
+      '+14804016182',
+      '+15005550006',
+    ]);
     expect(rows[0].a).toBe('+14804016182');
     expect(rows[0].b).toBe('+15005550006');
   });

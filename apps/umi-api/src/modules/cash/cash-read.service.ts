@@ -53,11 +53,14 @@ export class CashReadService {
     if (d.promoStartsAt !== undefined) brandingPatch.promo_starts_at = d.promoStartsAt || null;
     if (d.promoEndsAt !== undefined) brandingPatch.promo_ends_at = d.promoEndsAt || null;
     if (d.promoDays !== undefined) brandingPatch.promo_days = d.promoDays || null;
-    if (d.birthdayRewardEnabled !== undefined) brandingPatch.birthday_reward_enabled = d.birthdayRewardEnabled;
-    if (d.birthdayRewardName !== undefined) brandingPatch.birthday_reward_name = d.birthdayRewardName;
+    if (d.birthdayRewardEnabled !== undefined)
+      brandingPatch.birthday_reward_enabled = d.birthdayRewardEnabled;
+    if (d.birthdayRewardName !== undefined)
+      brandingPatch.birthday_reward_name = d.birthdayRewardName;
 
     const updatesProgram =
-      d.cardPrefix !== undefined || d.passStyle !== undefined ||
+      d.cardPrefix !== undefined ||
+      d.passStyle !== undefined ||
       Object.keys(brandingPatch).length > 0;
     if (updatesProgram) {
       await this.repo.updateProgram(tenantId, {
@@ -82,8 +85,12 @@ export class CashReadService {
 
   async getAnalytics(tenantId: string): Promise<Row> {
     const now = new Date();
-    const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30); thirtyDaysAgo.setHours(0, 0, 0, 0);
-    const eightWeeksAgo = new Date(now); eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 56); eightWeeksAgo.setHours(0, 0, 0, 0);
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+    const eightWeeksAgo = new Date(now);
+    eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 56);
+    eightWeeksAgo.setHours(0, 0, 0, 0);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const d = await this.repo.analytics(tenantId, { thirtyDaysAgo, eightWeeksAgo, monthStart });
@@ -95,28 +102,40 @@ export class CashReadService {
     }
     const visitsByDay: { date: string; count: number }[] = [];
     for (let i = 29; i >= 0; i--) {
-      const dt = new Date(now); dt.setDate(dt.getDate() - i);
+      const dt = new Date(now);
+      dt.setDate(dt.getDate() - i);
       const ds = dt.toISOString().slice(0, 10);
       visitsByDay.push({ date: ds, count: visitCountByDay[ds] ?? 0 });
     }
 
     const topCustomers = (d.topCards as Row[]).map((c) => ({
-      id: c.userId, name: c.name ?? 'Sin nombre', cardNumber: c.cardNumber,
-      totalVisits: Number(c.totalVisits ?? 0), balanceMXN: formatMxn(Number(c.balanceCentavos ?? 0)),
+      id: c.userId,
+      name: c.name ?? 'Sin nombre',
+      cardNumber: c.cardNumber,
+      totalVisits: Number(c.totalVisits ?? 0),
+      balanceMXN: formatMxn(Number(c.balanceCentavos ?? 0)),
     }));
 
     const todayDow = now.getDay();
     const daysToMon = todayDow === 0 ? 6 : todayDow - 1;
-    const thisWeekMon = new Date(now); thisWeekMon.setDate(now.getDate() - daysToMon); thisWeekMon.setHours(0, 0, 0, 0);
+    const thisWeekMon = new Date(now);
+    thisWeekMon.setDate(now.getDate() - daysToMon);
+    thisWeekMon.setHours(0, 0, 0, 0);
     const weekBuckets: { weekStart: Date; label: string }[] = [];
     for (let i = 7; i >= 0; i--) {
-      const ws = new Date(thisWeekMon); ws.setDate(thisWeekMon.getDate() - i * 7);
+      const ws = new Date(thisWeekMon);
+      ws.setDate(thisWeekMon.getDate() - i * 7);
       weekBuckets.push({ weekStart: ws, label: `${MONTHS[ws.getMonth()]} ${ws.getDate()}` });
     }
     const recentUsers = d.recentUsers as Row[];
     const newCustomersByWeek = weekBuckets.map(({ weekStart, label }, idx) => {
-      const next = idx < weekBuckets.length - 1 ? weekBuckets[idx + 1].weekStart : new Date(now.getTime() + 86400000);
-      const count = recentUsers.filter((u) => new Date(u.createdAt) >= weekStart && new Date(u.createdAt) < next).length;
+      const next =
+        idx < weekBuckets.length - 1
+          ? weekBuckets[idx + 1].weekStart
+          : new Date(now.getTime() + 86400000);
+      const count = recentUsers.filter(
+        (u) => new Date(u.createdAt) >= weekStart && new Date(u.createdAt) < next,
+      ).length;
       return { week: label, count };
     });
 
@@ -125,28 +144,38 @@ export class CashReadService {
     const totalBalanceCentavos = Number((d.balanceRow as Row[])[0]?.sum ?? 0);
     const totalAllTimeVisits = Number(totalsRow?.totalAllTimeVisits ?? 0);
     const activeCustomersLast30 = Number((d.activeRow as Row[])[0]?.n ?? 0);
-    const trueAvg = totalCustomers > 0 ? Math.round((totalAllTimeVisits / totalCustomers) * 10) / 10 : 0;
-    const retentionRate = totalCustomers > 0 ? Math.round((activeCustomersLast30 / totalCustomers) * 100) : 0;
+    const trueAvg =
+      totalCustomers > 0 ? Math.round((totalAllTimeVisits / totalCustomers) * 10) / 10 : 0;
+    const retentionRate =
+      totalCustomers > 0 ? Math.round((activeCustomersLast30 / totalCustomers) * 100) : 0;
     const totalRevenueCentavos = Math.abs(Number(totalsRow?.totalRevenueCentavos ?? 0));
-    const avgTicketCentavos = totalAllTimeVisits > 0 ? Math.round(totalRevenueCentavos / totalAllTimeVisits) : 0;
+    const avgTicketCentavos =
+      totalAllTimeVisits > 0 ? Math.round(totalRevenueCentavos / totalAllTimeVisits) : 0;
     const cfg = (d.activeRewardConfigRow as Row[])[0];
     const visitsRequired = Number(cfg?.visitsRequired ?? 10);
     const rewardCostCentavos = Number(cfg?.rewardCostCentavos ?? 0);
     const revenuePerCycle = avgTicketCentavos * visitsRequired;
     const marginPerCycle = revenuePerCycle - rewardCostCentavos;
-    const marginPercent = revenuePerCycle > 0 ? Math.round((marginPerCycle / revenuePerCycle) * 100) : null;
+    const marginPercent =
+      revenuePerCycle > 0 ? Math.round((marginPerCycle / revenuePerCycle) * 100) : null;
 
     return {
-      visitsByDay, topCustomers, newCustomersByWeek,
+      visitsByDay,
+      topCustomers,
+      newCustomersByWeek,
       totalBalance: formatMxn(totalBalanceCentavos),
       topupsThisMonth: formatMxn(Number((d.topupsRow as Row[])[0]?.sum ?? 0)),
       rewardsRedeemedThisMonth: Number((d.rewardsRow as Row[])[0]?.n ?? 0),
       avgVisitsPerCustomer: trueAvg,
       retentionRate,
       profitability: {
-        avgTicketMXN: formatMxn(avgTicketCentavos), revenuePerCycleMXN: formatMxn(revenuePerCycle),
-        rewardCostMXN: formatMxn(rewardCostCentavos), marginPerCycleMXN: formatMxn(marginPerCycle),
-        marginPercent, visitsRequired, rewardCostConfigured: rewardCostCentavos > 0,
+        avgTicketMXN: formatMxn(avgTicketCentavos),
+        revenuePerCycleMXN: formatMxn(revenuePerCycle),
+        rewardCostMXN: formatMxn(rewardCostCentavos),
+        marginPerCycleMXN: formatMxn(marginPerCycle),
+        marginPercent,
+        visitsRequired,
+        rewardCostConfigured: rewardCostCentavos > 0,
       },
     };
   }
@@ -154,20 +183,29 @@ export class CashReadService {
   async getCustomers(tenantId: string, query: Row): Promise<Row> {
     const page = Math.max(1, parseInt(query.page || '1') || 1);
     const limit = Math.max(1, Math.min(parseInt(query.limit || '20') || 20, 100));
-    const search = String(query.search || '').trim().slice(0, 50);
+    const search = String(query.search || '')
+      .trim()
+      .slice(0, 50);
     const sort = query.sort || 'recent';
     const skip = (page - 1) * limit;
 
     const { rows, total } = await this.repo.adminCustomers(tenantId, { search, sort, limit, skip });
     const customers = rows.map((r) => ({
-      id: r.id, name: r.name, phone: r.phone, email: r.email,
-      cardNumber: r.cardNumber ?? '', cardId: r.cardId ?? '',
-      balanceMXN: formatMxn(Number(r.balanceCentavos ?? 0)), balanceCentavos: Number(r.balanceCentavos ?? 0),
-      totalVisits: Number(r.totalVisits ?? 0), visitsThisCycle: Number(r.visitsThisCycle ?? 0),
+      id: r.id,
+      name: r.name,
+      phone: r.phone,
+      email: r.email,
+      cardNumber: r.cardNumber ?? '',
+      cardId: r.cardId ?? '',
+      balanceMXN: formatMxn(Number(r.balanceCentavos ?? 0)),
+      balanceCentavos: Number(r.balanceCentavos ?? 0),
+      totalVisits: Number(r.totalVisits ?? 0),
+      visitsThisCycle: Number(r.visitsThisCycle ?? 0),
       pendingRewards: Number(r.pendingRewards ?? 0),
       lastVisit: r.lastVisit ? new Date(r.lastVisit).toISOString() : null,
       createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
-      ltvCentavos: Number(r.ltvCentavos ?? 0), ltvMXN: formatMxn(Number(r.ltvCentavos ?? 0)),
+      ltvCentavos: Number(r.ltvCentavos ?? 0),
+      ltvMXN: formatMxn(Number(r.ltvCentavos ?? 0)),
     }));
     return { customers, total, page, totalPages: Math.max(1, Math.ceil(total / limit)) };
   }
@@ -205,10 +243,16 @@ export class CashReadService {
     const skip = (page - 1) * limit;
     const { rows, total } = await this.repo.giftCards(tenantId, limit, skip);
     const giftCards = rows.map((g) => ({
-      id: g.id, code: g.code,
-      amountCentavos: Number(g.amountCentavos ?? 0), amountMXN: formatMxn(Number(g.amountCentavos ?? 0)),
-      senderName: g.senderName, recipientName: g.recipientName, recipientEmail: g.recipientEmail,
-      recipientPhone: g.recipientPhone, message: g.message, isRedeemed: g.isRedeemed,
+      id: g.id,
+      code: g.code,
+      amountCentavos: Number(g.amountCentavos ?? 0),
+      amountMXN: formatMxn(Number(g.amountCentavos ?? 0)),
+      senderName: g.senderName,
+      recipientName: g.recipientName,
+      recipientEmail: g.recipientEmail,
+      recipientPhone: g.recipientPhone,
+      message: g.message,
+      isRedeemed: g.isRedeemed,
       redeemedAt: g.redeemedAt ? new Date(g.redeemedAt).toISOString() : null,
       expiresAt: g.expiresAt ? new Date(g.expiresAt).toISOString() : null,
       createdAt: g.createdAt ? new Date(g.createdAt).toISOString() : null,

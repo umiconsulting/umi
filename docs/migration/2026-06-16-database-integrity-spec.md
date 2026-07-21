@@ -13,24 +13,25 @@ migration plan DDL — affirms what is implemented and names what is not.
 
 ## Integrity scorecard (audit of current DDL)
 
-| Class | Mechanism | Status |
-|---|---|---|
-| Referential / cross-tenant write | `UNIQUE(tenant_id,id)` + composite FK `(tenant_id,ref_id)` | ✅ **Implemented** (plan §5.5) |
-| Financial — append-only | `block_append_only_mutation()` trigger on `points_ledger`, `gift_card_ledger`, `wallet_transactions` | ⚠️ Implemented but **marked "optional"** (§5.4) — **G3** |
-| Financial — conservation | `SUM(source) == SUM(ledger.delta) == SUM(balances)` gates | ✅ Implemented (§6.6, §10.2) |
-| Financial — idempotency | `idempotency_key text unique` on ledgers | ✅ Implemented |
-| Tenant isolation — flag | `tenant_id NOT NULL` on tenant-scoped tables | ✅ Implemented |
-| Tenant isolation — RLS on | `ENABLE` + `FORCE` on every tenant-scoped table, all six schemas incl. `core` | ✅ **Closed — `050_rls_tenant_isolation.sql` (was G2)** |
-| Tenant isolation — **policies** | `tenant_isolation` `FOR ALL` policy (USING + WITH CHECK) per table | ✅ **Closed — `050_rls_tenant_isolation.sql` (was G1)** |
-| Identity — uniqueness | partial unique on **verified** `(tenant,kind,normalized_value)` | ⚠️ Verified-only; dedup of unverified relies on `resolve_contact()` — **G4** |
-| Identity — account grain | one `loyalty.accounts` per person per program | ⚠️ Plan creates per **card** — **G5** |
-| Deletion / GDPR | ledger deletes blocked; people anonymizable | ⚠️ PII partly in opaque JSONB — **G6** |
+| Class                            | Mechanism                                                                                            | Status                                                                       |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Referential / cross-tenant write | `UNIQUE(tenant_id,id)` + composite FK `(tenant_id,ref_id)`                                           | ✅ **Implemented** (plan §5.5)                                               |
+| Financial — append-only          | `block_append_only_mutation()` trigger on `points_ledger`, `gift_card_ledger`, `wallet_transactions` | ⚠️ Implemented but **marked "optional"** (§5.4) — **G3**                     |
+| Financial — conservation         | `SUM(source) == SUM(ledger.delta) == SUM(balances)` gates                                            | ✅ Implemented (§6.6, §10.2)                                                 |
+| Financial — idempotency          | `idempotency_key text unique` on ledgers                                                             | ✅ Implemented                                                               |
+| Tenant isolation — flag          | `tenant_id NOT NULL` on tenant-scoped tables                                                         | ✅ Implemented                                                               |
+| Tenant isolation — RLS on        | `ENABLE` + `FORCE` on every tenant-scoped table, all six schemas incl. `core`                        | ✅ **Closed — `050_rls_tenant_isolation.sql` (was G2)**                      |
+| Tenant isolation — **policies**  | `tenant_isolation` `FOR ALL` policy (USING + WITH CHECK) per table                                   | ✅ **Closed — `050_rls_tenant_isolation.sql` (was G1)**                      |
+| Identity — uniqueness            | partial unique on **verified** `(tenant,kind,normalized_value)`                                      | ⚠️ Verified-only; dedup of unverified relies on `resolve_contact()` — **G4** |
+| Identity — account grain         | one `loyalty.accounts` per person per program                                                        | ⚠️ Plan creates per **card** — **G5**                                        |
+| Deletion / GDPR                  | ledger deletes blocked; people anonymizable                                                          | ⚠️ PII partly in opaque JSONB — **G6**                                       |
 
 ---
 
 ## Must-close gaps (priority order)
 
 ### G1 — Tenant-isolation policies — ✅ CLOSED by `050_rls_tenant_isolation.sql`
+
 **Was:** §5.7 ran `ENABLE ROW LEVEL SECURITY` but defined **no policies**, and
 `001_platform_core.sql` defined only `FOR SELECT` membership policies with no
 `FORCE`. Result: zero write-side isolation, owner bypass, and deny-all (or no
@@ -38,14 +39,15 @@ isolation) on `cash/commerce/comms/device/kitchen`.
 
 **Reconciliation that mattered:** the repo already had a tenant-context
 convention in shipped SQL — `app.user_id` + `platform.can_access_tenant()`
-(a `SECURITY DEFINER` membership lookup) — which is *stronger* than the raw
+(a `SECURITY DEFINER` membership lookup) — which is _stronger_ than the raw
 `app.current_tenant` GUC this spec originally proposed: the app asserts **who**,
 the database derives **which tenants**, so the app cannot scope itself into a
 tenant the principal does not belong to. The fix standardizes on that and adds
 the missing request-scoping layer.
 
 **Tenant-context contract (the app sets BOTH, per request, with `set local`):**
-- `app.user_id`   — the authenticated principal (`core.users.id`)
+
+- `app.user_id` — the authenticated principal (`core.users.id`)
 - `app.tenant_id` — the single active tenant for this request
 
 The canonical predicate `core.rls_tenant_check(tenant_id)` =
@@ -64,6 +66,7 @@ DEFINER` service functions that run cross-tenant (`resolve_contact`,
 starve them of rows — verify function ownership after creating them.
 
 ### G2 — `core` excluded from RLS — ✅ CLOSED by `050_rls_tenant_isolation.sql`
+
 `core`/`platform` is now in scope. `core.people`, `core.contact_methods`,
 `staff_members`, etc. get the tenant policy; `core.tenants` keys on `id`;
 `core.tenant_memberships` additionally lets a principal read their **own**
@@ -73,20 +76,24 @@ tenant-wide one. The migration self-verifies (gate checks 2 & 3 run inline and
 `RAISE EXCEPTION` if any tenant-scoped table lacks RLS + FORCE + policy).
 
 ### G3 — Append-only must be mandatory, not "optional"
+
 §5.4 adds ledger triggers only "if live cash does not already have ledger
 protections." For financial integrity this must be a **verified invariant**:
 assert the trigger exists on all three ledger tables; fail the gate if absent.
 
 ### G4 — One normalizer (identity integrity)
+
 Migration dedup and runtime `resolve_contact()` must both call
 `core.normalize_phone()`. Inline `regexp_replace` produces different keys → split
 people → split loyalty/memory. (Runbook D4.)
 
 ### G5 — Account grain
+
 One `loyalty.accounts` per **person per program**, not per card. Preflight asserts
 cards-per-user; dedupe accounts where a user holds >1 card. (Runbook D5.)
 
 ### G6 — PII reachable for GDPR
+
 Gift-card recipient phone/email and any PII must live in typed columns or a
 documented JSONB path the anonymization routine explicitly covers. Ledger rows are
 never deleted (financial audit) — only anonymize the person + contact_methods.

@@ -38,10 +38,7 @@ export class IdentityRepository {
   }
 
   /** Fetch a customer's display name (for prompt context). */
-  async getPersonName(
-    tenantId: string,
-    customerId: string,
-  ): Promise<string | null> {
+  async getPersonName(tenantId: string, customerId: string): Promise<string | null> {
     const ctx = await this.resolver.getReplyContext(tenantId, customerId);
     return ctx?.name ?? null;
   }

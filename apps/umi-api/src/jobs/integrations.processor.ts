@@ -49,7 +49,10 @@ export class IntegrationsProcessor extends BaseProcessor {
         }));
         const firstVariantCents = product.variants?.[0]?.price?.amount;
         const priceCents = firstVariantCents ?? product.price?.amount ?? 0; // centavos
-        const categoryId = await this.products.getOrCreateCategory(tenantId, product.category?.name ?? null);
+        const categoryId = await this.products.getOrCreateCategory(
+          tenantId,
+          product.category?.name ?? null,
+        );
         await this.products.upsertFromZettle(tenantId, {
           zettleUuid: product.uuid,
           name: product.name,

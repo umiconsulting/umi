@@ -66,7 +66,8 @@ export class LifecycleService {
             date: formatDateLabel(r.expiresAt, tz),
           },
         );
-        if (await this.dispatch(tenant, r.cardId, `reward_expiring_${r.year}`, r.phone, message)) sent++;
+        if (await this.dispatch(tenant, r.cardId, `reward_expiring_${r.year}`, r.phone, message))
+          sent++;
       }
     }
     this.logger.log(`reward_expiring complete candidates=${candidates} sent=${sent}`);
@@ -85,7 +86,11 @@ export class LifecycleService {
         for (const c of cards) {
           const message = renderTemplate(
             resolveCronJourneyTemplate(cfg.lifecycleCopy, tier.journey),
-            { name: c.name || DEFAULT_CUSTOMER_NAME, tenant: tenant.name, rewardName: cfg.rewardName },
+            {
+              name: c.name || DEFAULT_CUSTOMER_NAME,
+              tenant: tenant.name,
+              rewardName: cfg.rewardName,
+            },
           );
           if (await this.dispatch(tenant, c.cardId, tier.journey, c.phone, message)) sent++;
         }

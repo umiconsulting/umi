@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  BadRequestException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
 function make() {
@@ -63,16 +60,12 @@ describe('AuthService.login', () => {
   it('401s on wrong password', async () => {
     h.repo.findCredentialByEmail.mockResolvedValue(CRED);
     h.passwords.verify.mockReturnValue(false);
-    await expect(h.svc.login('owner@kala.co', 'bad')).rejects.toBeInstanceOf(
-      UnauthorizedException,
-    );
+    await expect(h.svc.login('owner@kala.co', 'bad')).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('401s (no enumeration) on unknown user', async () => {
     h.repo.findCredentialByEmail.mockResolvedValue(null);
-    await expect(h.svc.login('nobody@x.co', 'pw')).rejects.toBeInstanceOf(
-      UnauthorizedException,
-    );
+    await expect(h.svc.login('nobody@x.co', 'pw')).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });
 

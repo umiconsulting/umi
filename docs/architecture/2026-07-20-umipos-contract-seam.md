@@ -23,7 +23,7 @@ Lo **único** que crea el repo separado es un problema de frontera que el monore
 
 **Una sola fuente de verdad: `@umi/contract` (TypeScript + zod).** El cliente Dart **consume un artefacto GENERADO** a partir de esa fuente; **nunca teclea tipos a mano.**
 
-La trampa a evitar: si alguien escribe en Dart un modelo que «refleja» la respuesta del servidor, ese modelo **ya es una segunda definición** y **divergirá** en el primer cambio de campo. La regla es la misma que la de los datos (§8): **un tipo, un autor.** El autor es el zod; Dart es *derivado*.
+La trampa a evitar: si alguien escribe en Dart un modelo que «refleja» la respuesta del servidor, ese modelo **ya es una segunda definición** y **divergirá** en el primer cambio de campo. La regla es la misma que la de los datos (§8): **un tipo, un autor.** El autor es el zod; Dart es _derivado_.
 
 ```
 packages/contract/src/*.ts   (zod + rutas)   ← ÚNICA fuente, editable
@@ -39,11 +39,11 @@ lib/umi_contract/*.dart      (modelos + rutas)   ← GENERADO, nunca a mano
 
 ## 2. Qué hay hoy en `@umi/contract`
 
-| Módulo | Contenido | Dependencia |
-|---|---|---|
-| `routes.ts` | Constructores de path (`/api/tenants/:id/...`), byte-exactos a los controladores NestJS. | **Zero-dep** |
-| `schemas.ts` | Esquemas **zod** de request/response (`z.object`, `z.infer`). | zod v3 |
-| `entitlements.ts` | Vocabulario de productos — **`pos` ya está en `PRODUCT_KEYS`** (este PR). | **Zero-dep** |
+| Módulo            | Contenido                                                                                | Dependencia  |
+| ----------------- | ---------------------------------------------------------------------------------------- | ------------ |
+| `routes.ts`       | Constructores de path (`/api/tenants/:id/...`), byte-exactos a los controladores NestJS. | **Zero-dep** |
+| `schemas.ts`      | Esquemas **zod** de request/response (`z.object`, `z.infer`).                            | zod v3       |
+| `entitlements.ts` | Vocabulario de productos — **`pos` ya está en `PRODUCT_KEYS`** (este PR).                | **Zero-dep** |
 
 Consumo actual: monorepo (`workspace:*` → `dist/`). Correcto para umi-api/dashboard; **inalcanzable para un repo Dart externo.**
 
@@ -54,6 +54,7 @@ Consumo actual: monorepo (`workspace:*` → `dist/`). Correcto para umi-api/dash
 Emitir desde `@umi/contract` un solo archivo, neutral al lenguaje:
 
 **`umi-contract-<semver>.json`**
+
 ```jsonc
 {
   "version": "1.0.0",
@@ -166,13 +167,13 @@ El POS y el KDS **no se actualizan a voluntad** (están en mostradores). Por eso
 
 **El repo POS escribe CERO en la base de datos.** Solo llama endpoints. Aquí es donde `modules/pos/` es el único autor:
 
-| Entidad | Autor (escritor) | El repo POS |
-|---|---|---|
-| `tenant.customer_order` / `order_item` | `modules/pos/` (vía `POST /orders`) | lo **pide**, no lo escribe |
-| `tenant.order_event` | `modules/pos/` (misma transacción que la orden) | lo consume por proyección |
-| `tenant.payment` / `refund` | `modules/pos/` (writer del POS) | lo **pide** |
-| `tenant.loyalty_visit` (+`order_id`) / `_ledger` | módulo `cash` del API | lo **dispara** vía endpoint |
-| catálogo (`tenant.product` …) | Dashboard · POS-como-autor según `menu_source` | escribe **vía API**, no vía DB |
+| Entidad                                          | Autor (escritor)                                | El repo POS                    |
+| ------------------------------------------------ | ----------------------------------------------- | ------------------------------ |
+| `tenant.customer_order` / `order_item`           | `modules/pos/` (vía `POST /orders`)             | lo **pide**, no lo escribe     |
+| `tenant.order_event`                             | `modules/pos/` (misma transacción que la orden) | lo consume por proyección      |
+| `tenant.payment` / `refund`                      | `modules/pos/` (writer del POS)                 | lo **pide**                    |
+| `tenant.loyalty_visit` (+`order_id`) / `_ledger` | módulo `cash` del API                           | lo **dispara** vía endpoint    |
+| catálogo (`tenant.product` …)                    | Dashboard · POS-como-autor según `menu_source`  | escribe **vía API**, no vía DB |
 
 **Regla:** un dato tiene exactamente un autor, y el autor es un módulo del API — nunca el cliente. El cliente no tiene credenciales de base de datos; tiene un **token de dispositivo enrolado** y habla HTTP. Esa es, por construcción, la garantía de que no hay segunda fuente de verdad.
 
@@ -180,14 +181,14 @@ El POS y el KDS **no se actualizan a voluntad** (están en mostradores). Por eso
 
 ## 6. Reparto entre los dos repos
 
-| | Repo `umi` (este) | Repo UmiPOS (Flutter, otro dev) |
-|---|---|---|
-| Fuente del contrato | `@umi/contract` (zod + rutas) — **edita aquí** | consume el artefacto (pin) |
-| Artefacto | **emite y publica** `umi-contract-<semver>.json` por tag | descarga el asset fijado |
-| Backend | `modules/pos/` — endpoints + escritor | — |
-| Tipos Dart | — | **genera** con quicktype/codegen (no a mano) |
-| Auth de dispositivo | endpoints de pairing (precedente KDS) | device-side (captura PIN, guarda token) |
-| Base de datos | única, de Umi | **ninguna** (cola offline ≠ base, §10-C) |
+|                     | Repo `umi` (este)                                        | Repo UmiPOS (Flutter, otro dev)              |
+| ------------------- | -------------------------------------------------------- | -------------------------------------------- |
+| Fuente del contrato | `@umi/contract` (zod + rutas) — **edita aquí**           | consume el artefacto (pin)                   |
+| Artefacto           | **emite y publica** `umi-contract-<semver>.json` por tag | descarga el asset fijado                     |
+| Backend             | `modules/pos/` — endpoints + escritor                    | —                                            |
+| Tipos Dart          | —                                                        | **genera** con quicktype/codegen (no a mano) |
+| Auth de dispositivo | endpoints de pairing (precedente KDS)                    | device-side (captura PIN, guarda token)      |
+| Base de datos       | única, de Umi                                            | **ninguna** (cola offline ≠ base, §10-C)     |
 
 ---
 
@@ -196,6 +197,6 @@ El POS y el KDS **no se actualizan a voluntad** (están en mostradores). Por eso
 1. **`pos` en `PRODUCT_KEYS` + `umi.feature`** — ✅ **hecho en este PR** (sin esto UmiPOS no se puede contratar/facturar; H-4/H-8).
 2. **Cablear el emisor** — añadir `zod-to-json-schema` (devDep), el script `emit-contract.mjs` y `npm run emit`; un job de CI que publique el artefacto al crear un tag `contract-v*`.
 3. **`POST /orders` + `CreateOrderRequest` (zod)** — al aterrizar (H-1), el primer artefacto **útil para el POS** sale solo del emisor; no hay trabajo extra de contrato.
-4. **El repo POS integra el codegen** contra el primer artefacto versionado y valida el hito: *una orden creada por el POS aparece en el KDS sin una línea de código de integración.*
+4. **El repo POS integra el codegen** contra el primer artefacto versionado y valida el hito: _una orden creada por el POS aparece en el KDS sin una línea de código de integración._
 
 **Lo que este documento fija hoy:** la frontera (§5) y el mecanismo (§3–4). Con eso, el otro dev puede empezar el cliente sabiendo que **nunca** va a teclear un tipo del servidor a mano ni tocar la base — y nosotros sabemos que el contrato es la única superficie que exponemos.

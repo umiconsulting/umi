@@ -83,7 +83,9 @@ export class EnrichmentProcessor extends BaseProcessor {
     const model = this.voyage.embeddingModel;
     await Promise.all(
       targets.map((t, i) =>
-        embeddings[i] ? this.messages.updateEmbedding(t.id, embeddings[i], model) : Promise.resolve(),
+        embeddings[i]
+          ? this.messages.updateEmbedding(t.id, embeddings[i], model)
+          : Promise.resolve(),
       ),
     );
   }
@@ -111,12 +113,17 @@ export class EnrichmentProcessor extends BaseProcessor {
     const recent = await this.messages.getRecentMessages(conversationId, 12);
     if (!recent.length) return;
     const chronological = [...recent].reverse();
-    const existing = (await this.memoryRepo.getCustomerFacts(tenantId, personId)) as
-      | CustomerFacts
-      | null;
+    const existing = (await this.memoryRepo.getCustomerFacts(
+      tenantId,
+      personId,
+    )) as CustomerFacts | null;
     const facts = await this.memory.extractCustomerFacts(chronological, existing);
     if (!facts) return;
-    await this.memoryRepo.upsertCustomerFacts(tenantId, personId, facts as unknown as Record<string, unknown>);
+    await this.memoryRepo.upsertCustomerFacts(
+      tenantId,
+      personId,
+      facts as unknown as Record<string, unknown>,
+    );
   }
 
   private async productEmbed(p: Record<string, unknown>): Promise<void> {
@@ -130,7 +137,9 @@ export class EnrichmentProcessor extends BaseProcessor {
     const model = this.voyage.embeddingModel;
     await Promise.all(
       rows.map((row, i) =>
-        embeddings[i] ? this.products.updateNameEmbedding(row.id, embeddings[i], model) : Promise.resolve(),
+        embeddings[i]
+          ? this.products.updateNameEmbedding(row.id, embeddings[i], model)
+          : Promise.resolve(),
       ),
     );
     if (rows.length === batchSize) {
@@ -150,7 +159,9 @@ export class EnrichmentProcessor extends BaseProcessor {
     const model = this.voyage.embeddingModel;
     await Promise.all(
       msgs.map((m, i) =>
-        embeddings[i] ? this.messages.updateEmbedding(m.id, embeddings[i], model) : Promise.resolve(),
+        embeddings[i]
+          ? this.messages.updateEmbedding(m.id, embeddings[i], model)
+          : Promise.resolve(),
       ),
     );
     if (msgs.length === batchSize) {

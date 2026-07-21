@@ -7,20 +7,20 @@ secrets; everything else is a thin client. This is a pnpm + Turborepo monorepo.
 
 ### `apps/` — independently deployed units
 
-| Directory | Package | What it is | Deploys to |
-| --- | --- | --- | --- |
-| `apps/umi-api` | `@umi/api` | The backend. NestJS + Fastify, one image / two processes (web + BullMQ worker). **The only thing that touches the database or secrets.** | VPS (Docker, via GitHub Actions → GHCR) |
-| `apps/umi-dashboard` | `@umi/dashboard` | Operator / owner console (Vite + React SPA). | Vercel |
-| `apps/umi-landing-page` | `@umi/landing` | Marketing site (Next.js). | Vercel |
-| `apps/umi-cash` | `umi-cash` | Customer wallet / loyalty. **FROZEN** — being absorbed into the dashboard; excluded from the workspace, keeps its own npm lockfile. Don't touch until the cutover. | Vercel |
-| `apps/umi-kds` | — | Kitchen Display System — a native iPad app (Swift). Not a JS workspace member. | App Store |
+| Directory               | Package          | What it is                                                                                                                                                         | Deploys to                              |
+| ----------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------- |
+| `apps/umi-api`          | `@umi/api`       | The backend. NestJS + Fastify, one image / two processes (web + BullMQ worker). **The only thing that touches the database or secrets.**                           | VPS (Docker, via GitHub Actions → GHCR) |
+| `apps/umi-dashboard`    | `@umi/dashboard` | Operator / owner console (Vite + React SPA).                                                                                                                       | Vercel                                  |
+| `apps/umi-landing-page` | `@umi/landing`   | Marketing site (Next.js).                                                                                                                                          | Vercel                                  |
+| `apps/umi-cash`         | `umi-cash`       | Customer wallet / loyalty. **FROZEN** — being absorbed into the dashboard; excluded from the workspace, keeps its own npm lockfile. Don't touch until the cutover. | Vercel                                  |
+| `apps/umi-kds`          | —                | Kitchen Display System — a native iPad app (Swift). Not a JS workspace member.                                                                                     | App Store                               |
 
 ### `packages/` — shared code
 
-| Directory | Package | What it is | Consumed by |
-| --- | --- | --- | --- |
-| `packages/contract` | `@umi/contract` | Typed HTTP contract (route paths + zod schemas + inferred types) for the API surface. | `@umi/api` + `@umi/dashboard` |
-| `packages/tokens` | `@umi/tokens` | Design tokens → CSS variables + a Tailwind theme. | `@umi/dashboard` + `@umi/landing` |
+| Directory           | Package         | What it is                                                                            | Consumed by                       |
+| ------------------- | --------------- | ------------------------------------------------------------------------------------- | --------------------------------- |
+| `packages/contract` | `@umi/contract` | Typed HTTP contract (route paths + zod schemas + inferred types) for the API surface. | `@umi/api` + `@umi/dashboard`     |
+| `packages/tokens`   | `@umi/tokens`   | Design tokens → CSS variables + a Tailwind theme.                                     | `@umi/dashboard` + `@umi/landing` |
 
 ## Quick start
 

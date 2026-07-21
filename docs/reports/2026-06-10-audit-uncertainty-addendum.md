@@ -11,15 +11,15 @@ Ran the Phase-3 inventory (row counts) against live production (Umi Platform pro
 
 Drift vs the 2026-05-15 snapshot (`supabase-local-row-counts.csv`), 26 days:
 
-| table | 2026-05-15 | 2026-06-10 live | delta |
-|---|---|---|---|
-| conversaflow.messages | 3948 | 3980 | +32 |
-| conversaflow.jobs | 3332 | 3412 | +80 |
-| conversaflow.outbox | 390 | 412 | +22 |
-| conversaflow.customers / conversations | 536 / 535 | 536 / 535 | 0 |
-| kds.tickets | 48 | 51 | +3 |
-| umi_cash.User (platform project schema) | 64 | 64 | 0 |
-| public.* (legacy) | — | identical to FDW source (859 messages, 382 jobs…) | frozen |
+| table                                   | 2026-05-15 | 2026-06-10 live                                   | delta  |
+| --------------------------------------- | ---------- | ------------------------------------------------- | ------ |
+| conversaflow.messages                   | 3948       | 3980                                              | +32    |
+| conversaflow.jobs                       | 3332       | 3412                                              | +80    |
+| conversaflow.outbox                     | 390        | 412                                               | +22    |
+| conversaflow.customers / conversations  | 536 / 535  | 536 / 535                                         | 0      |
+| kds.tickets                             | 48         | 51                                                | +3     |
+| umi_cash.User (platform project schema) | 64         | 64                                                | 0      |
+| public.* (legacy)                       | —          | identical to FDW source (859 messages, 382 jobs…) | frozen |
 
 Also confirmed: production `platform` schema exists but is **empty** — the 7-schema model
 is local-only; staging (S3.1) will be its first hosted reproduction. Implication: a cheap

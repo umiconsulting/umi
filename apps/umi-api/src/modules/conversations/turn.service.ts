@@ -15,11 +15,7 @@ import { TurnCommitRepository } from './turn-commit.repository';
 import { createToolOutcomeState, type ToolOutcomeState } from './tool-outcomes';
 import { getActivePendingClarification } from './pending-clarification';
 import { shapeTurnMemory } from './turn-memory';
-import {
-  buildHarnessSystemPrompt,
-  PROMPT_VERSION,
-  type BranchPromptContext,
-} from './prompts';
+import { buildHarnessSystemPrompt, PROMPT_VERSION, type BranchPromptContext } from './prompts';
 import { sanitizeOutput } from './security.service';
 import {
   blockUnverifiedOrderConfirmation,
@@ -120,18 +116,19 @@ export class TurnService {
 
     // resolveBranchContext depends only on `payload`, so it rides along in this
     // batch instead of adding its own round trip to the turn's critical path.
-    const [turn, conversation, person, businessRow, messageCount, branchContext] = await Promise.all([
-      this.turns.loadTurn(payload.turn_id),
-      this.conversations.loadById(payload.conversation_id),
-      this.identity.getPerson(payload.business_id, payload.person_id),
-      this.businessConfig.fetchConfigRow(payload.business_id),
-      this.messages.countMessages(payload.conversation_id),
-      this.resolveBranchContext(
-        payload.business_id,
-        payload.conversation_id,
-        payload.location_id ?? null,
-      ),
-    ]);
+    const [turn, conversation, person, businessRow, messageCount, branchContext] =
+      await Promise.all([
+        this.turns.loadTurn(payload.turn_id),
+        this.conversations.loadById(payload.conversation_id),
+        this.identity.getPerson(payload.business_id, payload.person_id),
+        this.businessConfig.fetchConfigRow(payload.business_id),
+        this.messages.countMessages(payload.conversation_id),
+        this.resolveBranchContext(
+          payload.business_id,
+          payload.conversation_id,
+          payload.location_id ?? null,
+        ),
+      ]);
 
     if (!turn || !conversation || !person?.phone) {
       throw new Error(`turn.process missing turn/conversation/person for turn ${payload.turn_id}`);
@@ -145,7 +142,12 @@ export class TurnService {
         turn.sourceMessageIds ?? [],
       )
     ) {
-      await this.supersedeAndRequeue(payload, turn, 'newer_user_messages_arrived_before_processing', traceId);
+      await this.supersedeAndRequeue(
+        payload,
+        turn,
+        'newer_user_messages_arrived_before_processing',
+        traceId,
+      );
       return;
     }
 
@@ -178,7 +180,9 @@ export class TurnService {
     // Partial-cancellation context is Phase 4 (KDS); inert here.
     const partialCancelledOrder = null;
     const currentState = conversation.currentState ?? 'initial';
-    const activePendingClarification = getActivePendingClarification(conversation.pendingClarification);
+    const activePendingClarification = getActivePendingClarification(
+      conversation.pendingClarification,
+    );
     const voice = resolveVoiceConfig(
       businessRow?.config ?? null,
       businessRow?.name ?? null,
@@ -229,8 +233,7 @@ export class TurnService {
       fallbackState: currentState,
     });
 
-    const lastUserMessageId =
-      turn.sourceMessageIds[turn.sourceMessageIds.length - 1] ?? turn.id;
+    const lastUserMessageId = turn.sourceMessageIds[turn.sourceMessageIds.length - 1] ?? turn.id;
     const reconciledAction = {
       processor_version: PROCESSOR_VERSION,
       stop_reason: loopResult.stopReason,
@@ -261,7 +264,13 @@ export class TurnService {
     });
 
     if (!committed.committed) {
-      await this.supersedeAndRequeue(payload, turn, 'conversation_changed_before_commit', traceId, reconciledAction);
+      await this.supersedeAndRequeue(
+        payload,
+        turn,
+        'conversation_changed_before_commit',
+        traceId,
+        reconciledAction,
+      );
       return;
     }
 
@@ -296,7 +305,10 @@ export class TurnService {
       releasedAt: turn.releasedAt,
       processedAt: new Date().toISOString(),
       assistantMessageId: committed.assistantMessageId,
-      extractedIntent: { processor_version: PROCESSOR_VERSION, current_state: nextConversationState },
+      extractedIntent: {
+        processor_version: PROCESSOR_VERSION,
+        current_state: nextConversationState,
+      },
       reconciledAction,
     });
 
@@ -338,7 +350,10 @@ export class TurnService {
         state: conversation.currentState,
         turn_id: payload.turn_id,
       },
-      metadata: truncateBytes({ ...metadata, metrics }, MAX_METADATA_BYTES) as Record<string, unknown>,
+      metadata: truncateBytes({ ...metadata, metrics }, MAX_METADATA_BYTES) as Record<
+        string,
+        unknown
+      >,
       request_id: payload.request_id,
     });
 

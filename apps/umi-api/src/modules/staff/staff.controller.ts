@@ -54,10 +54,7 @@ export class StaffController {
   }
 
   @Delete(':staffId')
-  async remove(
-    @Tenant() tenant: TenantAccess,
-    @Param('staffId') staffId: string,
-  ) {
+  async remove(@Tenant() tenant: TenantAccess, @Param('staffId') staffId: string) {
     await this.staff.remove(tenant.tenantId, staffId);
     return { ok: true };
   }

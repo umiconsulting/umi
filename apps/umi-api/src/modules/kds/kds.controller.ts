@@ -1,13 +1,9 @@
 import { Controller, Logger, Options, Post, Req, Res } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { KdsService } from './kds.service';
-import {
-  KdsHttpError,
-  KDS_DEVICE_TOKEN_HEADER,
-} from './dto/kds-contract';
+import { KdsHttpError, KDS_DEVICE_TOKEN_HEADER } from './dto/kds-contract';
 
-const PAIRING_ALLOW_HEADERS =
-  'authorization, x-client-info, apikey, content-type, x-umi-user-id';
+const PAIRING_ALLOW_HEADERS = 'authorization, x-client-info, apikey, content-type, x-umi-user-id';
 const DEVICE_ALLOW_HEADERS =
   'authorization, x-client-info, apikey, content-type, x-kds-device-token';
 
@@ -35,10 +31,7 @@ export class KdsController {
   }
 
   @Post(['kds/pairing', 'functions/v1/kds-pairing'])
-  async pairing(
-    @Req() req: FastifyRequest,
-    @Res() reply: FastifyReply,
-  ): Promise<void> {
+  async pairing(@Req() req: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
     cors(reply, PAIRING_ALLOW_HEADERS);
     const body = readJson(req);
     if (!body) return send(reply, 400, { error: 'invalid_json' });
@@ -64,10 +57,7 @@ export class KdsController {
   }
 
   @Post(['kds/board', 'functions/v1/kds-board'])
-  async board(
-    @Req() req: FastifyRequest,
-    @Res() reply: FastifyReply,
-  ): Promise<void> {
+  async board(@Req() req: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
     cors(reply, DEVICE_ALLOW_HEADERS);
     const body = readJson(req);
     if (!body) return send(reply, 400, { error: 'invalid_json' });
@@ -93,10 +83,7 @@ export class KdsController {
   }
 
   @Post(['kds/command', 'functions/v1/kds-command'])
-  async command(
-    @Req() req: FastifyRequest,
-    @Res() reply: FastifyReply,
-  ): Promise<void> {
+  async command(@Req() req: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
     cors(reply, DEVICE_ALLOW_HEADERS);
     const body = readJson(req);
     if (!body) return send(reply, 400, { error: 'invalid_json' });
@@ -117,10 +104,7 @@ export class KdsController {
   // ── heartbeat (unauth; device_id is the credential) ───────────────────────
 
   @Post('api/kds/heartbeat')
-  async heartbeat(
-    @Req() req: FastifyRequest,
-    @Res() reply: FastifyReply,
-  ): Promise<void> {
+  async heartbeat(@Req() req: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
     cors(reply, DEVICE_ALLOW_HEADERS);
     const body = readJson(req) ?? {};
     const r = await this.kds.heartbeat(body, req.ip ?? null);
@@ -147,9 +131,7 @@ function send(reply: FastifyReply, status: number, body: unknown): void {
 
 function readJson(req: FastifyRequest): Record<string, unknown> | null {
   const b = req.body;
-  return b && typeof b === 'object' && !Array.isArray(b)
-    ? (b as Record<string, unknown>)
-    : null;
+  return b && typeof b === 'object' && !Array.isArray(b) ? (b as Record<string, unknown>) : null;
 }
 
 function deviceToken(req: FastifyRequest): string | undefined {

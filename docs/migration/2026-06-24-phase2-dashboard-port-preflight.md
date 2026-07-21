@@ -21,32 +21,33 @@
 
 KDS/devices/orders routes in `server.js` (`/api/kds/*`, `/api/:slug/orders*`, `/api/:slug/admin/devices*`, `/stations`, `/ticker`) are **Phase 4**, not ported here. `/api/:slug/admin/conversations` (list, reads `comms.*`) lands in `customers` per spec §7.2.
 
-| `server.js` route | Module | Notes |
-|---|---|---|
-| `POST /api/auth/local/login` | `auth` | scrypt verify → issue JWT cookies + return `{user, tenants}` body |
-| `POST /api/auth/local/forgot-password` | `auth` | Brevo reset email; always 200 (no enumeration) |
-| `POST /api/auth/local/reset-password` | `auth` | token_hash lookup, scrypt rehash |
-| `GET /api/me/tenants` | `tenants` | memberships + roles for the JWT user |
-| `GET /api/tenants/:id/capabilities` | `tenants` | product_instances + module-registry |
-| `GET/PATCH /api/tenants/:id/settings` | `tenants` | core.tenants + loyalty.programs.branding |
-| `GET /api/tenants/:id/locations`, `PATCH .../locations/:lid` | `tenants` | core.locations |
-| `GET /api/tenants/:id/customers[...]` (detail/timeline/conversations/orders/cash/identity) | `customers` | Customer 360 composite — **decompose** the lateral-join into per-domain loaders |
-| `GET /api/tenants/:id/insights/customer-platform` | `customers` | platform customer list (the 120-line lateral join) |
-| `GET /api/:slug/admin/settings`, `PATCH` | `cash` (or `tenants`) | reads loyalty.programs branding; gated on `cash` product |
-| `GET /api/:slug/admin/stats` | `cash` (read) | loyalty.visit_events / wallet_transactions / cards |
-| `GET /api/:slug/admin/analytics` | `cash` (read) | loyalty + core.people aggregates |
-| `GET /api/:slug/admin/customers` | `cash` (read) | loyalty card-centric customer list |
-| `GET /api/:slug/admin/reward-config`, `PUT/PATCH` | `cash` | **admin-config write** (not the inert customer-facing path) — see §4 |
-| `GET /api/:slug/admin/gift-cards` | `cash` (read) | loyalty.gift_cards (read) |
-| `GET /api/:slug/admin/staff`, `POST/PATCH/DELETE .../:id` | `staff` | core.staff_members |
-| `GET/PATCH /api/:slug/admin/hours` | `hours` | ops.business_hours (per-day rows) |
-| `GET /api/:slug/admin/conversations` | `customers` | comms.* list view |
+| `server.js` route                                                                          | Module                | Notes                                                                           |
+| ------------------------------------------------------------------------------------------ | --------------------- | ------------------------------------------------------------------------------- |
+| `POST /api/auth/local/login`                                                               | `auth`                | scrypt verify → issue JWT cookies + return `{user, tenants}` body               |
+| `POST /api/auth/local/forgot-password`                                                     | `auth`                | Brevo reset email; always 200 (no enumeration)                                  |
+| `POST /api/auth/local/reset-password`                                                      | `auth`                | token_hash lookup, scrypt rehash                                                |
+| `GET /api/me/tenants`                                                                      | `tenants`             | memberships + roles for the JWT user                                            |
+| `GET /api/tenants/:id/capabilities`                                                        | `tenants`             | product_instances + module-registry                                             |
+| `GET/PATCH /api/tenants/:id/settings`                                                      | `tenants`             | core.tenants + loyalty.programs.branding                                        |
+| `GET /api/tenants/:id/locations`, `PATCH .../locations/:lid`                               | `tenants`             | core.locations                                                                  |
+| `GET /api/tenants/:id/customers[...]` (detail/timeline/conversations/orders/cash/identity) | `customers`           | Customer 360 composite — **decompose** the lateral-join into per-domain loaders |
+| `GET /api/tenants/:id/insights/customer-platform`                                          | `customers`           | platform customer list (the 120-line lateral join)                              |
+| `GET /api/:slug/admin/settings`, `PATCH`                                                   | `cash` (or `tenants`) | reads loyalty.programs branding; gated on `cash` product                        |
+| `GET /api/:slug/admin/stats`                                                               | `cash` (read)         | loyalty.visit_events / wallet_transactions / cards                              |
+| `GET /api/:slug/admin/analytics`                                                           | `cash` (read)         | loyalty + core.people aggregates                                                |
+| `GET /api/:slug/admin/customers`                                                           | `cash` (read)         | loyalty card-centric customer list                                              |
+| `GET /api/:slug/admin/reward-config`, `PUT/PATCH`                                          | `cash`                | **admin-config write** (not the inert customer-facing path) — see §4            |
+| `GET /api/:slug/admin/gift-cards`                                                          | `cash` (read)         | loyalty.gift_cards (read)                                                       |
+| `GET /api/:slug/admin/staff`, `POST/PATCH/DELETE .../:id`                                  | `staff`               | core.staff_members                                                              |
+| `GET/PATCH /api/:slug/admin/hours`                                                         | `hours`               | ops.business_hours (per-day rows)                                               |
+| `GET /api/:slug/admin/conversations`                                                       | `customers`           | comms.* list view                                                               |
 
 ---
 
 ## 2. Confirmed live-schema binding (column-exact, from working source)
 
 ### Auth (`core`)
+
 - `core.users`: `id`, `email`, `display_name`, `password_salt`, `password_hash` (scrypt, `scryptSync(pw, salt, 64)` hex; nullable → only rows with `password_hash IS NOT NULL` can log in), `updated_at`.
 - `core.password_reset_tokens`: `id`, `user_id`, `token_hash` (sha256 hex), `expires_at`, `used_at`.
 - `core.tenant_memberships`: `id`, `user_id`, `tenant_id`, `status` (`active`).
@@ -58,16 +59,20 @@ KDS/devices/orders routes in `server.js` (`/api/kds/*`, `/api/:slug/orders*`, `/
 - `core.locations`: `id`, `slug`, `name`, `tenant_id`, `status` (`active`), `created_at` (no `timezone` column — fall back to tenant timezone).
 
 ### Tenants composite (`getTenant`)
+
 - `loyalty.programs` (LEFT JOIN on `tenant_id`): `id` (programId), `card_prefix`, `pass_style`, `self_registration`, `topup_enabled`, `birthday_reward_enabled`, `birthday_reward_name`, `branding` jsonb (`primary_color`, `secondary_color`, `logo_url`, `strip_image_url`, `promo_message`, `promo_starts_at`, `promo_ends_at`, `promo_days`).
 - `ops.businesses` (LEFT JOIN on `tenant_id`): `city`.
 
 ### Staff (`core.staff_members`)
+
 - `id`, `tenant_id`, `location_id`, `name`, `phone`, `email`, `status` (`active|invited|disabled`), `created_at`, `updated_at`. Role is **derived** (`lower(name)='admin' → ADMIN else STAFF`); `permissions/invitedAt/disabledAt` are DTO-synthesized (columns are `NULL::jsonb`/`NULL::timestamptz` projections today). Delete = soft (`status='disabled'`).
 
 ### Hours (`ops.business_hours`)
+
 - `tenant_id`, `location_id` (nullable; matched `IS NOT DISTINCT FROM`), `day_of_week` (0=Sun..6=Sat), `opens_at`/`closes_at` (`time`), `is_closed`. One row per day; PATCH replaces all rows atomically (DELETE + INSERT in a tx).
 
 ### Customer 360 / cash reads (`core` + `loyalty` + `comms` + `ops` + `observability`)
+
 - `core.people`: `id`, `display_name`, `normalized_phone`, `normalized_email`, `tenant_id`, `created_at`, `updated_at`.
 - `core.contact_methods`: `id`, `person_id`, `kind` (`phone|whatsapp|email|…`), `display_value`, `normalized_value`, `verified_at`, `created_at`.
 - `loyalty.accounts`: `id`, `person_id`, `tenant_id`, `updated_at`. `loyalty.cards`: `id`, `account_id`, `tenant_id`, `card_number`, `balance_cents`, `total_visits`, `visits_this_cycle`, `pending_rewards`, `updated_at`.
@@ -86,14 +91,14 @@ All money is integer **centavos**; format with `es-MX` MXN, 0 fraction digits (t
 
 ## 3. Auth model (D9) — the one behavioral change
 
-| Concern | Dashboard today | umi-api (D9) |
-|---|---|---|
-| Credential | `X-UMI-User-ID` header, frontend-stored | **JWT access + refresh in httpOnly cookies** (`jose`) |
-| Password | scrypt(pw, salt, 64) hex + `timingSafeEqual` | **preserve byte-for-byte** in `password.service` (no forced reset; optional upgrade-on-login) |
-| Tenant access | `requireTenantAccess` per request (membership join) | `TenantAccessGuard`/service → sets `ctx.tenantId` (RLS context) |
-| Entitlement | `requireProduct`/`requireLegacyProduct` → 403 `product_not_active` | `EntitlementGuard` (same 403 shape) |
-| Roles/perms | `normalizeRoleKey` + permission array | `@Roles`/`@RequirePermission` + `RolesGuard` (same precedence) |
-| CSRF | none (header scheme) | SameSite cookies + double-submit CSRF token on mutations (spec §11.2) |
+| Concern       | Dashboard today                                                    | umi-api (D9)                                                                                  |
+| ------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| Credential    | `X-UMI-User-ID` header, frontend-stored                            | **JWT access + refresh in httpOnly cookies** (`jose`)                                         |
+| Password      | scrypt(pw, salt, 64) hex + `timingSafeEqual`                       | **preserve byte-for-byte** in `password.service` (no forced reset; optional upgrade-on-login) |
+| Tenant access | `requireTenantAccess` per request (membership join)                | `TenantAccessGuard`/service → sets `ctx.tenantId` (RLS context)                               |
+| Entitlement   | `requireProduct`/`requireLegacyProduct` → 403 `product_not_active` | `EntitlementGuard` (same 403 shape)                                                           |
+| Roles/perms   | `normalizeRoleKey` + permission array                              | `@Roles`/`@RequirePermission` + `RolesGuard` (same precedence)                                |
+| CSRF          | none (header scheme)                                               | SameSite cookies + double-submit CSRF token on mutations (spec §11.2)                         |
 
 **Cookie scheme:** `umi_access` (httpOnly, short TTL ~15m), `umi_refresh` (httpOnly, ~30d, used at `POST /auth/local/refresh`), `umi_csrf` (readable, double-submit). Login still returns `{ user, tenants }` in the body so the frontend renders unchanged; the cookies carry auth.
 
@@ -106,6 +111,7 @@ All money is integer **centavos**; format with `es-MX` MXN, 0 fraction digits (t
 Per D11 / §11.5, the **customer-facing wallet/loyalty ledger** is the inert surface: wallet topup/purchase, scan/visit, reward **redemption**, gift-card **issue/redeem**, account/card creation. These are built in `cash-write.service.ts`, tested against staging, but the `cash-write.controller` is **unmounted** while `CASH_WRITE_ENABLED=false`, and DB-side `umi_app` gets no `EXECUTE` on the loyalty write RPCs.
 
 **Admin-config writes are NOT the inert path** and stay live (the dashboard already performs them; `umi-cash` does not write these — no dual-writer hazard):
+
 - `PATCH /admin/settings` → `core.tenants.name` + `loyalty.programs.branding`/`card_prefix`/`pass_style`.
 - `PUT/PATCH /admin/reward-config` → `loyalty.reward_configs` (deactivate-then-insert in a tx).
 - `staff` CRUD → `core.staff_members`. `hours` PATCH → `ops.business_hours`.

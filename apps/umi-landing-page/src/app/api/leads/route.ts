@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getSequenceManager } from "@/lib/email/sequence-manager";
+import { NextRequest, NextResponse } from 'next/server';
+import { getSequenceManager } from '@/lib/email/sequence-manager';
 
 // Interfaces para type safety
 interface LeadData {
@@ -44,32 +44,24 @@ export async function POST(request: NextRequest) {
     const leadData: LeadData = await request.json();
 
     // Validar datos requeridos
-    const requiredFields: (keyof LeadData)[] = [
-      "email",
-      "name",
-      "company",
-      "diagnosticData",
-    ];
+    const requiredFields: (keyof LeadData)[] = ['email', 'name', 'company', 'diagnosticData'];
     const missingFields = requiredFields.filter((field) => !leadData[field]);
 
     if (missingFields.length > 0) {
       return NextResponse.json(
-        { error: `Campos requeridos faltantes: ${missingFields.join(", ")}` },
-        { status: 400 }
+        { error: `Campos requeridos faltantes: ${missingFields.join(', ')}` },
+        { status: 400 },
       );
     }
 
     // Validar formato de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(leadData.email)) {
-      return NextResponse.json(
-        { error: "Formato de email inválido" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Formato de email inválido' }, { status: 400 });
     }
 
     // En producción, guardar en base de datos
-    console.log("💾 Nuevo lead agregado:", leadData.email);
+    console.log('💾 Nuevo lead agregado:', leadData.email);
 
     // Iniciar secuencia automáticamente si es nuevo diagnóstico
     if (leadData.triggerSequence) {
@@ -93,7 +85,7 @@ export async function POST(request: NextRequest) {
         await sequenceManager.processLeadSequences(leadForManager);
         console.log(`✅ Secuencia iniciada para ${leadData.email}`);
       } catch (sequenceError) {
-        console.error("❌ Error iniciando secuencia:", sequenceError);
+        console.error('❌ Error iniciando secuencia:', sequenceError);
         // No fallar la creación del lead por error en secuencia
       }
     }
@@ -102,19 +94,18 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Lead agregado exitosamente",
+      message: 'Lead agregado exitosamente',
       leadId,
       sequenceStarted: leadData.triggerSequence || false,
     });
   } catch (error) {
-    console.error("❌ Error agregando lead:", error);
+    console.error('❌ Error agregando lead:', error);
     return NextResponse.json(
       {
-        error: "Error agregando lead",
-        details:
-          process.env.NODE_ENV === "development" ? String(error) : undefined,
+        error: 'Error agregando lead',
+        details: process.env.NODE_ENV === 'development' ? String(error) : undefined,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -141,11 +132,8 @@ export async function GET() {
       lastUpdated: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("❌ Error obteniendo estadísticas de leads:", error);
-    return NextResponse.json(
-      { error: "Error obteniendo estadísticas" },
-      { status: 500 }
-    );
+    console.error('❌ Error obteniendo estadísticas de leads:', error);
+    return NextResponse.json({ error: 'Error obteniendo estadísticas' }, { status: 500 });
   }
 }
 
@@ -155,65 +143,54 @@ export async function PUT(request: NextRequest) {
     const { leadId, action, data } = await request.json();
 
     if (!leadId) {
-      return NextResponse.json(
-        { error: "leadId es requerido" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'leadId es requerido' }, { status: 400 });
     }
 
     const sequenceManager = getSequenceManager();
 
     switch (action) {
-      case "pause_sequence":
+      case 'pause_sequence':
         const pauseResult = await sequenceManager.pauseSequenceForLead(
           leadId,
-          data?.reason || "manual_pause"
+          data?.reason || 'manual_pause',
         );
         return NextResponse.json({
           success: pauseResult,
-          message: "Secuencia pausada",
+          message: 'Secuencia pausada',
           leadId,
         });
 
-      case "resume_sequence":
-        const resumeResult =
-          await sequenceManager.resumeSequenceForLead(leadId);
+      case 'resume_sequence':
+        const resumeResult = await sequenceManager.resumeSequenceForLead(leadId);
         return NextResponse.json({
           success: resumeResult,
-          message: "Secuencia reanudada",
+          message: 'Secuencia reanudada',
           leadId,
         });
 
-      case "mark_responded":
+      case 'mark_responded':
         const respondResult = await sequenceManager.markLeadAsResponded(
           leadId,
-          data?.responseType || "email"
+          data?.responseType || 'email',
         );
         return NextResponse.json({
           success: respondResult,
-          message: "Lead marcado como respondido",
+          message: 'Lead marcado como respondido',
           leadId,
         });
 
       default:
         return NextResponse.json(
           {
-            error: "Acción no válida",
-            validActions: [
-              "pause_sequence",
-              "resume_sequence",
-              "mark_responded",
-            ],
+            error: 'Acción no válida',
+            validActions: ['pause_sequence', 'resume_sequence', 'mark_responded'],
           },
-          { status: 400 }
+          { status: 400 },
         );
     }
   } catch (error) {
-    console.error("❌ Error actualizando lead:", error);
-    return NextResponse.json(
-      { error: "Error actualizando lead" },
-      { status: 500 }
-    );
+    console.error('❌ Error actualizando lead:', error);
+    return NextResponse.json({ error: 'Error actualizando lead' }, { status: 500 });
   }
 }
 
@@ -227,7 +204,7 @@ function calculateActiveSequences(metrics: SequenceMetrics): number {
 
 function calculateConversionRate(metrics: SequenceMetrics): string {
   if (!metrics.totalLeads || metrics.totalLeads === 0) {
-    return "0%";
+    return '0%';
   }
 
   const rate = (metrics.conversions / metrics.totalLeads) * 100;

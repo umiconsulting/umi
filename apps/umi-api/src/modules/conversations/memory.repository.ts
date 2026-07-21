@@ -136,12 +136,7 @@ export class MemoryRepository {
           AND m.id NOT IN (SELECT id FROM recent)
         ORDER BY m.body_embedding <=> $2::vector
         LIMIT $4`,
-      [
-        params.conversationId,
-        JSON.stringify(params.embedding),
-        params.excludeRecent,
-        params.limit,
-      ],
+      [params.conversationId, JSON.stringify(params.embedding), params.excludeRecent, params.limit],
     );
     return rows;
   }
@@ -166,8 +161,7 @@ export class MemoryRepository {
         [tenantId, personId, PREFERENCES_SOURCE],
       );
       for (const [key, value] of Object.entries(facts)) {
-        const valueText =
-          typeof value === 'string' ? value : JSON.stringify(value);
+        const valueText = typeof value === 'string' ? value : JSON.stringify(value);
         await client.query(
           `INSERT INTO tenant.customer_note
              (business_id, customer_id, fact, source, metadata)

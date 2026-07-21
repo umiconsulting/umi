@@ -18,14 +18,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const reply = host.switchToHttp().getResponse<FastifyReply>();
 
     const status =
-      exception instanceof HttpException
-        ? exception.getStatus()
-        : HttpStatus.INTERNAL_SERVER_ERROR;
+      exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const payload =
-      exception instanceof HttpException
-        ? exception.getResponse()
-        : 'Internal server error';
+      exception instanceof HttpException ? exception.getResponse() : 'Internal server error';
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
       let payloadStr: string;

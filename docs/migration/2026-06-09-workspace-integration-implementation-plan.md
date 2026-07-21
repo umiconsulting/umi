@@ -28,11 +28,11 @@ Every step in this plan iterates through `scientific-research-check` at **three 
 
 ### Lens definitions
 
-| Lens | Question | Who the "customer" is per surface | Evidence types |
-|---|---|---|---|
-| **Customer** | Does the end user's experience stay intact or improve? | ConversaFlow/Cash/KDS-tickets: Café Kalala's diners and loyalty members. Dashboard/Logs: the tenant owner/operator. Landing: prospective business clients. | Production traces, soak comparisons, replayed conversation flows, wallet pass round-trips, screen walkthroughs |
-| **Company/brand** | Does this advance Umi's position as a connected restaurant-operations suite and protect tenant trust? | Umi the business + the tenant's brand voice (see `feedback_no_hardcoded_user_messages`: all customer-visible text in business voice). | Positioning docs, owner-workflow review, multi-tenant readiness check, data-integrity claims that marketing can stand behind |
-| **Code** | Is the implementation correct per primary sources, and does it pass the workspace's validation gates? | Future maintainers and agents. | Official platform docs, validation SQL, builds/tests, schema diffs, the research-check output format (documented fact / source-backed tradeoff / Umi-specific inference) |
+| Lens              | Question                                                                                              | Who the "customer" is per surface                                                                                                                          | Evidence types                                                                                                                                                           |
+| ----------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Customer**      | Does the end user's experience stay intact or improve?                                                | ConversaFlow/Cash/KDS-tickets: Café Kalala's diners and loyalty members. Dashboard/Logs: the tenant owner/operator. Landing: prospective business clients. | Production traces, soak comparisons, replayed conversation flows, wallet pass round-trips, screen walkthroughs                                                           |
+| **Company/brand** | Does this advance Umi's position as a connected restaurant-operations suite and protect tenant trust? | Umi the business + the tenant's brand voice (see `feedback_no_hardcoded_user_messages`: all customer-visible text in business voice).                      | Positioning docs, owner-workflow review, multi-tenant readiness check, data-integrity claims that marketing can stand behind                                             |
+| **Code**          | Is the implementation correct per primary sources, and does it pass the workspace's validation gates? | Future maintainers and agents.                                                                                                                             | Official platform docs, validation SQL, builds/tests, schema diffs, the research-check output format (documented fact / source-backed tradeoff / Umi-specific inference) |
 
 ### Iteration loop per step
 
@@ -55,6 +55,7 @@ Every step in this plan iterates through `scientific-research-check` at **three 
 Goal: stop knowledge and data bleeding. All steps additive, low risk.
 
 ### S1.1 Version-control the workspace root (audit C1)
+
 - Actions: `git init` at `/Umi`; `.gitignore` for `.DS_Store`, `apps/*` (six independent repos for now), `backups/`, `prod-db-handoff-2026-05-13/`, `artifacts/` screenshots, build outputs; initial commit of root docs, skills, migration SQL; private remote under the single org chosen in S2.1 (remote push can wait for S2.1).
 - Research check (code lens): confirm ignore-vs-exclude strategy for nested repos against official git docs; decide nothing about subtrees yet (that is Phase 5).
 - Customer lens: indirect — institutional memory that explains production behavior becomes loss-proof.
@@ -62,6 +63,7 @@ Goal: stop knowledge and data bleeding. All steps additive, low risk.
 - Exit: `git log` shows the initial commit; encrypted dumps and app repos excluded; no decrypted data tracked.
 
 ### S1.2 Execute migration Phase 4F + core validation (audit C2)
+
 - Actions: run Phase 4F as the audit/no-import gate per the 05-23 checklist Phase 1, using `docs/migration/audit-output/2026-05-16-public-compatibility-legacy-audit.md` as the source checklist; run `docs/migration/validation/001_core_validation.sql`; record final local row counts.
 - Customer lens: confirms zero synthetic rows can surface in customer-facing loyalty/order data.
 - Brand lens: "production-verified data only" becomes a defensible claim for the platform.
@@ -69,6 +71,7 @@ Goal: stop knowledge and data bleeding. All steps additive, low risk.
 - Exit: 05-23 checklist Phase 1 boxes checked; local transition DB ready to reproduce in staging.
 
 ### S1.3 Restore semantic search (audit C5)
+
 - Actions: set `VOYAGE_API_KEY` in the Supabase dashboard (manual); verify `embed-backfill`; confirm the semantic stage executes in a real product-search trace.
 - Customer lens: a diner asking ConversaFlow for "algo dulce sin gluten" gets semantic matches over 136 embedded products instead of degraded lexical fallback. Validate with a real WhatsApp query trace before/after.
 - Brand lens: the AI-assistant quality promise is the core of the suite's positioning; silent degradation contradicts it.
@@ -76,6 +79,7 @@ Goal: stop knowledge and data bleeding. All steps additive, low risk.
 - Exit: one production trace showing the semantic stage active.
 
 ### S1.4 Cron-vault key rotation (audit H8)
+
 - Actions: execute the manual key rotation noted in workspace memory; verify the assumptions of `20260512220000_replace_cron_vault_auth.sql`.
 - Customer lens: kitchen command surface stays authenticated → order flow reliability.
 - Brand lens: closes the last open item of the KDS security refactor story.
@@ -83,6 +87,7 @@ Goal: stop knowledge and data bleeding. All steps additive, low risk.
 - Exit: rotation done; one scheduled invocation verified post-rotation.
 
 ### S1.5 Adapter re-convergence (audit H1) — **requires owner decision**
+
 - Decision needed: canonical procedure layer — `.claude/` (named by `CLAUDE.md`) vs `.agents/` (newer content: 15 ledger entries, 6 registered skills). Recommendation: declare `.agents/` (neutral, multi-vendor) the source and make `.claude/` a generated mirror, then fix `CLAUDE.md` wording; reverse is also workable — what matters is one source plus a sync check.
 - Actions: copy the newer registry/ledger/skills into the lagging layer; fix the phantom `.Codex/` reference in the `.agents` task-router; add a sync step to the maintenance rule in `agent-operating-system.md`.
 - Customer/brand lens: indirect — agents acting on consistent rules stop re-deriving context and mis-routing customer-affecting work.
@@ -90,39 +95,44 @@ Goal: stop knowledge and data bleeding. All steps additive, low risk.
 - Exit: one source declared in writing; mirrors verified identical; sync rule documented.
 
 ### S1.6 Cheap uncertainty burn-down (audit §Uncertainties)
+
 - Actions: set `UMI_CURRENT_DATABASE_URL` and run the Phase-3 inventory queries against live production (uncertainty 1); trace one dashboard pairing action to learn which path executes (uncertainty 2); check the landing page's Vercel project state (uncertainty 4); check whether `umi-conversaflow` pre-reset history exists on the remote (uncertainty 5).
 - Exit: each answer recorded in the audit doc or a dated addendum; surprises become new debt-register items before Phase 3 locks scope.
 
-**Phase 1 skill checkpoint:** ledger review; expected promotion candidate: *adapter-sync-check* (drift observed twice: audit + this program setup). Expected new seeds: see initial seed list in `skill-seeds.md`.
+**Phase 1 skill checkpoint:** ledger review; expected promotion candidate: _adapter-sync-check_ (drift observed twice: audit + this program setup). Expected new seeds: see initial seed list in `skill-seeds.md`.
 
 ---
 
 ## Phase 2 — Standardization (target: ≈2–3 weeks)
 
 ### S2.1 One GitHub identity
+
 - Actions: pick one org (recommend `umiconsulting`); normalize the six remotes and ssh aliases; document the push matrix in root docs.
 - Brand lens: one public-facing engineering identity.
 - Code lens: every repo pushes/pulls with the same credentials; documented.
 - Exit: `git remote -v` across all repos shows one org, one alias scheme.
 
 ### S2.2 Index hygiene and historical marking
+
 - Actions: update `docs/reports/latest.md` to point at this plan as the active driver; mark 2026-04-15 and 2026-05-14 migration plans historical per `cognitive-lifecycle.md`; add "superseded" annotations to stale ledger references (`umi-landing-page-1`, `platform/conversaflow/docs`) (audit M3, M5).
 - Customer lens: n/a. Brand lens: n/a (internal).
 - Code lens: a fresh agent loading `latest.md` lands on current truth in one hop.
 - Exit: no index points at a dead path.
 
 ### S2.3 Skill deduplication
+
 - Actions: collapse the three `task-router` copies to one canonical + generated mirrors (root, per S1.5 decision; evaluate whether the KDS-local copy should become a thin pointer to root); deduplicate KDS `.claude`/`.agents` skill sets the same way.
 - Code lens: one routing rule edit propagates everywhere.
 - Exit: zero divergent copies of any skill.
 
-**Phase 2 skill checkpoint:** ledger review; evaluate seed *ledger-mirroring* for promotion (it will have ≥2 traces by now if S1.5 and S2.3 both exercised it).
+**Phase 2 skill checkpoint:** ledger review; evaluate seed _ledger-mirroring_ for promotion (it will have ≥2 traces by now if S1.5 and S2.3 both exercised it).
 
 ---
 
 ## Phase 3 — Shared Foundations (target: ≈3–4 weeks)
 
 ### S3.1 Staging 7-schema database (05-23 checklist Phase 2)
+
 - Actions: create staging PostgreSQL (Supabase staging or standalone — run `scientific-research-check` on this choice against current Supabase branching/staging docs before committing); apply `001`–`007` schema scripts, `010`–`044` backfills; apply the Phase 4F exclusion; run validation; compare counts to local.
 - Customer lens: none yet (staging) — but this is the gate that protects every later customer-facing cutover.
 - Brand lens: staging discipline is what makes the Cash cutover (S4.3) defensible to the tenant.
@@ -130,6 +140,7 @@ Goal: stop knowledge and data bleeding. All steps additive, low risk.
 - Exit: 05-23 checklist Phase 2 boxes checked.
 
 ### S3.2 Dashboard backend deployable (05-23 checklist Phase 3; audit C3)
+
 - Actions: choose the deployment shape — audit recommendation: API routes co-located with the dashboard app on Vercel-class hosting. Run `scientific-research-check` (official Vercel/Express/Next docs) on: Express-in-serverless constraints, function duration limits for the heaviest dashboard reads, env/secret handling outside local (the audit's named risk). Then add deploy config, build check, and frontend API base URL config.
 - Customer lens (= tenant owner): the owner can finally reach their dashboard from outside the developer's machine.
 - Brand lens: an undeployable owner product is the suite's biggest credibility gap; this closes it.
@@ -137,13 +148,14 @@ Goal: stop knowledge and data bleeding. All steps additive, low risk.
 - Exit: 05-23 checklist Phase 3 boxes checked.
 
 ### S3.3 Tenant/capability API (first shared contract)
+
 - Actions: implement `GET /api/me/tenants` and `GET /api/tenants/:id/capabilities` against staging (transition plan Phase 5); consume from the dashboard.
 - Customer lens (= tenant owner): tenant switching resolved by membership, not env vars.
 - Brand lens: first concrete multi-tenant artifact — the suite stops being single-tenant in shape.
 - Code lens: contract documented; dashboard consumes it in `PLATFORM_TRANSITION_SCHEMA=true` mode.
 - Exit: both endpoints live against staging with the dashboard as consumer.
 
-**Phase 3 skill checkpoint:** expected seed maturation: *staging-validation-runner* (validation procedure now run twice: local + staging). Promote if the procedure held stable.
+**Phase 3 skill checkpoint:** expected seed maturation: _staging-validation-runner_ (validation procedure now run twice: local + staging). Promote if the procedure held stable.
 
 ---
 
@@ -152,6 +164,7 @@ Goal: stop knowledge and data bleeding. All steps additive, low risk.
 Order within this phase is deliberate: dashboard (internal-facing) cuts over before Cash (customer-facing), so the cutover procedure is rehearsed where the blast radius is small.
 
 ### S4.1 Dashboard schema cutover + dual-path deletion (05-23 checklist Phase 4; audit H2)
+
 - Actions: point the deployed backend at staging; verify all 13 screen flows in `PLATFORM_TRANSITION_SCHEMA=true`; delete `false` branches route-group-by-route-group **after** verification; remove the duplicate Cash Prisma schema (audit C4 partial).
 - Customer lens (= tenant owner): every screen walkthrough recorded — orders, members, customers, conversations, devices, staff, hours, gift cards.
 - Brand lens: owner sees live platform truth, not a stale `umi_cash` copy.
@@ -159,12 +172,14 @@ Order within this phase is deliberate: dashboard (internal-facing) cuts over bef
 - Exit: 05-23 checklist Phase 4 boxes checked.
 
 ### S4.2 KDS pairing deduplication (05-23 checklist Phase 5; audit H3)
+
 - Actions: remove `callKdsPairingLocal`; route pairing through canonical `kds-pairing`; local dev via `supabase functions serve`.
 - Customer lens: kitchen iPad pairing still works end-to-end (PIN, approval, token, session) — verify on the physical device.
 - Code lens: one implementation; security fixes propagate.
 - Exit: 05-23 checklist Phase 5 boxes checked.
 
 ### S4.3 Cash schema cutover with soak (05-23 checklist Phase 6; audit C4) — **highest customer risk in the program**
+
 - Actions: per the 05-23 checklist Phase 6 mapping table; run all API routes against staging; verify card lookup, points, redemption, gift cards, QR, Apple/Google Wallet, push, auth; **re-dump production before cutover** (audit uncertainty 6 — the 2026-05-15 snapshot is stale); soak-compare old vs new responses; deprecate `rrkzhisnadfrgnhntkiz` to read-only only after counts and core operations match.
 - Customer lens: loyalty members' balances, passes, and gift cards are the most tangible thing customers hold; the soak comparison is the customer lens, executed as engineering.
 - Brand lens: a wrong loyalty balance is a direct tenant-brand injury; do not rush the soak window.
@@ -172,6 +187,7 @@ Order within this phase is deliberate: dashboard (internal-facing) cuts over bef
 - Exit: 05-23 checklist Phase 6 boxes checked.
 
 ### S4.4 Crons → observable job queue (05-23 checklist Phase 7; audit H4)
+
 - Actions: `job-worker` processors for birthday/expiry/goal-proximity; `pg_cron` schedules into `conversaflow.workflow_jobs`; per-tenant timezone via `AT TIME ZONE`; delete Vercel cron routes.
 - Customer lens: birthday rewards arrive on the customer's birthday in their timezone — test the timezone path explicitly.
 - Brand lens: a missed or duplicated birthday reward is a visible brand failure; retryability fixes the failure mode.
@@ -179,29 +195,36 @@ Order within this phase is deliberate: dashboard (internal-facing) cuts over bef
 - Exit: 05-23 checklist Phase 7 boxes checked.
 
 ### S4.5 Adapter cleanup + legacy removal (05-23 checklist Phase 8; audit H7)
+
 - Actions: per the 05-23 checklist Phase 8 — canonical email/Twilio adapters, synthetic row-family deletion (only where cleanly identifiable end-to-end), `legacy.*` deletion after soak, `public.*` removal after confirming no reads.
 - Customer lens: message delivery paths unchanged from the customer's view (verify one gift-card WhatsApp delivery through the canonical adapter).
 - Code lens: no duplicate write paths; compatibility schemas gone.
 - Exit: 05-23 checklist Phase 8 boxes checked.
 
 ### S4.6 Landing leads → PostgreSQL (05-23 checklist Phase 9; audit H5)
+
 - Actions: `platform.leads` + `lead_events` per the checklist's field list; migrate from SQLite before any production deploy of the landing app.
 - Customer lens (= prospective client): a submitted diagnostic/contact form is never silently lost to an ephemeral serverless disk.
 - Brand lens: losing a sales lead at first contact is the worst possible first impression for a company selling operational reliability.
 - Code lens: SQLite is local/test only; attribution fields durable.
 - Exit: 05-23 checklist Phase 9 boxes checked.
 
-**Phase 4 skill checkpoint:** expected promotion candidate: *cutover-soak-comparison* (executed for dashboard and Cash). Review whether `customer-identity-resolution` needs updates after the Cash `User` → `platform.contacts`/`platform.users` mapping (audit M4).
+**Phase 4 skill checkpoint:** expected promotion candidate: _cutover-soak-comparison_ (executed for dashboard and Cash). Review whether `customer-identity-resolution` needs updates after the Cash `User` → `platform.contacts`/`platform.users` mapping (audit M4).
 
 ---
 
 ## Phase 5 — Monorepo Migration (target: ≈1–2 weeks; only after Phase 4)
 
 ### S5.1 Workspace tooling
+
 - Actions: pnpm workspaces + Turborepo at root (audit §7.2); run `scientific-research-check` against current pnpm/Turborepo docs at execution time (the audit's tool recommendation is dated 2026-06-09 — re-verify before acting).
+
 ### S5.2 History-preserving imports
+
 - Actions: subtree/filter-repo imports of all six repos (Cash's 218 commits are the ones worth the care); preserve `umi-conversaflow` pre-reset history if S1.6 found it.
+
 ### S5.3 Renames and CI/deploy repointing
+
 - Actions: `375` → umi-kds, `supabase-edge-functions` → umi-conversaflow, package `umi-consultoria` → umi-landing (audit M2); repoint Vercel `rootDirectory` per app; Supabase `--workdir` deploys already monorepo-friendly.
 - Customer lens: zero production behavior change — deploys verified per app post-move.
 - Brand lens: repo names finally match product names.

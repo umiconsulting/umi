@@ -28,12 +28,15 @@ export class RateLimitService {
   constructor() {
     // Sweep expired entries every 5 min. unref() so it never keeps the process
     // (or a test runner) alive.
-    setInterval(() => {
-      const now = Date.now();
-      this.store.forEach((entry, key) => {
-        if (entry.resetAt < now) this.store.delete(key);
-      });
-    }, 5 * 60 * 1000).unref();
+    setInterval(
+      () => {
+        const now = Date.now();
+        this.store.forEach((entry, key) => {
+          if (entry.resetAt < now) this.store.delete(key);
+        });
+      },
+      5 * 60 * 1000,
+    ).unref();
   }
 
   private setEntry(key: string, entry: RateLimitEntry): void {

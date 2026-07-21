@@ -1,10 +1,7 @@
 import 'reflect-metadata';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import {
-  FastifyAdapter,
-  NestFastifyApplication,
-} from '@nestjs/platform-fastify';
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { ConfigService } from '@nestjs/config';
 import fastifyCookie from '@fastify/cookie';
 import { AppModule } from './app.module';
@@ -25,9 +22,7 @@ async function bootstrap(): Promise<void> {
   // and enables `reply.setCookie`/`clearCookie` used by AuthController.
   await app.register(fastifyCookie);
 
-  app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, transform: true }),
-  );
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.enableShutdownHooks();
 
   // Read validated/coerced config, not raw process.env.
@@ -68,11 +63,8 @@ async function bootstrap(): Promise<void> {
   httpInstance.addContentTypeParser(
     'application/x-www-form-urlencoded',
     { parseAs: 'string' },
-    (
-      _req: unknown,
-      body: string,
-      done: (err: Error | null, body?: unknown) => void,
-    ) => done(null, body),
+    (_req: unknown, body: string, done: (err: Error | null, body?: unknown) => void) =>
+      done(null, body),
   );
 
   const port = config.get('PORT', { infer: true });

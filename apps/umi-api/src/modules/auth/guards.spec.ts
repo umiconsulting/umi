@@ -36,9 +36,7 @@ describe('AuthGuard', () => {
   });
 
   it('401s when no access cookie is present', async () => {
-    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(
-      undefined,
-    );
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     const guard = new AuthGuard({ verifyAccess: vi.fn() } as never, reflector);
     await expect(guard.canActivate(ctxFor({ cookies: {} }))).rejects.toBeInstanceOf(
       UnauthorizedException,
@@ -46,9 +44,7 @@ describe('AuthGuard', () => {
   });
 
   it('attaches the principal from a valid cookie', async () => {
-    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(
-      undefined,
-    );
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     const jwt = {
       verifyAccess: vi.fn().mockResolvedValue({ sub: 'u1', email: 'a@b.co' }),
     };
@@ -67,9 +63,7 @@ describe('TenantAccessGuard', () => {
     };
     const guard = new TenantAccessGuard(repo as never);
     const req = { authUser: { id: 'u1' }, params: { tenantId: ACCESS } };
-    await expect(guard.canActivate(ctxFor(req))).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(guard.canActivate(ctxFor(req))).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('resolves a slug → tenant and attaches membership access', async () => {
@@ -100,34 +94,28 @@ describe('EntitlementGuard', () => {
   const reflector = { getAllAndOverride: vi.fn() } as unknown as Reflector;
 
   it('passes through when no @RequireProduct is set', async () => {
-    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(
-      undefined,
-    );
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     const guard = new EntitlementGuard(reflector, { productStatus: vi.fn() } as never);
     expect(await guard.canActivate(ctxFor({}))).toBe(true);
   });
 
   it('403 product_not_active when the entitlement is inactive', async () => {
-    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation(
-      (k: string) => (k === REQUIRE_PRODUCT ? 'cash' : undefined),
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation((k: string) =>
+      k === REQUIRE_PRODUCT ? 'cash' : undefined,
     );
     const repo = { productStatus: vi.fn().mockResolvedValue('canceled') };
     const guard = new EntitlementGuard(reflector, repo as never);
     const req = { tenantAccess: { tenantId: ACCESS } };
-    await expect(guard.canActivate(ctxFor(req))).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(guard.canActivate(ctxFor(req))).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('allows active/trialing entitlements', async () => {
-    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation(
-      (k: string) => (k === REQUIRE_PRODUCT ? 'cash' : undefined),
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation((k: string) =>
+      k === REQUIRE_PRODUCT ? 'cash' : undefined,
     );
     const repo = { productStatus: vi.fn().mockResolvedValue('trialing') };
     const guard = new EntitlementGuard(reflector, repo as never);
-    expect(
-      await guard.canActivate(ctxFor({ tenantAccess: { tenantId: ACCESS } })),
-    ).toBe(true);
+    expect(await guard.canActivate(ctxFor({ tenantAccess: { tenantId: ACCESS } }))).toBe(true);
   });
 });
 
@@ -135,8 +123,8 @@ describe('RolesGuard', () => {
   const reflector = { getAllAndOverride: vi.fn() } as unknown as Reflector;
 
   it('403s when the membership lacks the required role', () => {
-    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation(
-      (k: string) => (k === ROLES_KEY ? ['owner'] : undefined),
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation((k: string) =>
+      k === ROLES_KEY ? ['owner'] : undefined,
     );
     const guard = new RolesGuard(reflector);
     const req = { tenantAccess: { roles: ['staff'], permissions: [] } };
@@ -144,8 +132,8 @@ describe('RolesGuard', () => {
   });
 
   it('allows when a required role is present', () => {
-    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation(
-      (k: string) => (k === ROLES_KEY ? ['owner', 'admin'] : undefined),
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation((k: string) =>
+      k === ROLES_KEY ? ['owner', 'admin'] : undefined,
     );
     const guard = new RolesGuard(reflector);
     const req = { tenantAccess: { roles: ['admin'], permissions: [] } };

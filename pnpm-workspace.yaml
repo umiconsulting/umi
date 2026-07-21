@@ -8,9 +8,9 @@
 # Excluded on purpose (keeps its own npm lockfile — do NOT pull into the workspace):
 #   - umi-cash: FROZEN until the dashboard cutover.
 packages:
-  - "apps/*"
-  - "!apps/umi-cash"
-  - "packages/*"
+  - 'apps/*'
+  - '!apps/umi-cash'
+  - 'packages/*'
 
 # pnpm 10 blocks dependency install-scripts by default. These native deps
 # legitimately need theirs (esbuild → vite binary, sharp → Next image opt,

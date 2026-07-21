@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { StaffService } from './staff.service';
 
 function make() {
@@ -65,9 +61,9 @@ describe('StaffService.create', () => {
 
   it('maps a unique violation to 409', async () => {
     h.repo.insert.mockRejectedValue({ code: '23505' });
-    await expect(
-      h.svc.create('t1', null, { name: 'Ana', email: 'a@b.co' }),
-    ).rejects.toBeInstanceOf(ConflictException);
+    await expect(h.svc.create('t1', null, { name: 'Ana', email: 'a@b.co' })).rejects.toBeInstanceOf(
+      ConflictException,
+    );
   });
 });
 
@@ -85,15 +81,11 @@ describe('StaffService.update / remove', () => {
 
   it('404s when updating a missing staff member', async () => {
     h.repo.update.mockResolvedValue(null);
-    await expect(h.svc.update('t1', 'sX', { name: 'X' })).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(h.svc.update('t1', 'sX', { name: 'X' })).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('404s when removing a missing staff member', async () => {
     h.repo.softDelete.mockResolvedValue(false);
-    await expect(h.svc.remove('t1', 'sX')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(h.svc.remove('t1', 'sX')).rejects.toBeInstanceOf(NotFoundException);
   });
 });

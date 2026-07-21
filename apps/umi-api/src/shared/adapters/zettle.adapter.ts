@@ -11,8 +11,7 @@ import type { AppConfig } from '../config/config.schema';
 // against the `organizations/self` (single-account) endpoint. Per-tenant OAuth
 // token exchange (`zettle-oauth-setup` — no live source to port) is deferred
 // until multi-account Zettle is needed (port analysis §5).
-const ZETTLE_PRODUCTS_API =
-  'https://products.izettle.com/organizations/self/products/v2';
+const ZETTLE_PRODUCTS_API = 'https://products.izettle.com/organizations/self/products/v2';
 
 export interface ZettlePrice {
   amount?: number; // minor units (cents)

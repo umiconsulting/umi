@@ -74,9 +74,7 @@ const brandBase = (content: string, title = ''): string => `
 
 const actionList = (data: LeadTemplateData): string =>
   data.diagnostic.recommendations.length
-    ? data.diagnostic.recommendations
-        .map((r) => `<li><strong>${esc(r)}</strong></li>`)
-        .join('')
+    ? data.diagnostic.recommendations.map((r) => `<li><strong>${esc(r)}</strong></li>`).join('')
     : '<li>Definir el primer producto Umi a activar según tu operación actual.</li>';
 
 // ── Diagnostic follow-up sequence (day 0/2/5/10/30) ──────────────────────────

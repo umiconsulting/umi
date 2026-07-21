@@ -11,15 +11,8 @@ import { QrService } from '../../shared/auth/qr.service';
 import { WalletPassAdapter } from '../../shared/adapters/wallet-pass.adapter';
 import { EmailAdapter } from '../../shared/adapters/email.adapter';
 import { CashWriteRepository } from './cash-write.repository';
-import {
-  CashScanRepository,
-  type ScannedCard,
-} from './cash-scan.repository';
-import {
-  resolveJourneyTemplate,
-  renderTemplate,
-  type LifecycleJourneyKey,
-} from './lifecycle-copy';
+import { CashScanRepository, type ScannedCard } from './cash-scan.repository';
+import { resolveJourneyTemplate, renderTemplate, type LifecycleJourneyKey } from './lifecycle-copy';
 
 const VISIT = 'VISIT';
 const REDEEM = 'REDEEM';
@@ -59,9 +52,7 @@ export class CashScanService {
   ) {}
 
   async scan(tenantId: string, userId: string, input: ScanInput) {
-    const requested = new Set<string>(
-      input.actions ?? (input.action ? [input.action] : []),
-    );
+    const requested = new Set<string>(input.actions ?? (input.action ? [input.action] : []));
     if (requested.size === 0) {
       throw new BadRequestException('action or actions required');
     }
@@ -102,8 +93,7 @@ export class CashScanService {
     }
 
     const tz = cfg?.timezone || DEFAULT_TZ;
-    const afterHours =
-      includesVisit && (await this.repo.isAfterHours(tenantId, tz));
+    const afterHours = includesVisit && (await this.repo.isAfterHours(tenantId, tz));
 
     if (includesVisit) {
       if (await this.repo.visitedToday(tenantId, card.id, tz)) {
@@ -149,16 +139,13 @@ export class CashScanService {
         journey = 'milestone_halfway';
       }
       if (journey) {
-        momentMessage = renderTemplate(
-          resolveJourneyTemplate(cfg?.lifecycleCopy, journey),
-          {
-            name: customerName || DEFAULT_CUSTOMER_NAME,
-            tenant: cfg?.name ?? '',
-            rewardName,
-            visitsThisCycle: earnedReward ? visitsRequired : newVisitsThisCycle,
-            visitsRequired,
-          },
-        );
+        momentMessage = renderTemplate(resolveJourneyTemplate(cfg?.lifecycleCopy, journey), {
+          name: customerName || DEFAULT_CUSTOMER_NAME,
+          tenant: cfg?.name ?? '',
+          rewardName,
+          visitsThisCycle: earnedReward ? visitsRequired : newVisitsThisCycle,
+          visitsRequired,
+        });
       }
     }
 

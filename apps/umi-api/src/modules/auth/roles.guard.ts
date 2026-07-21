@@ -24,10 +24,10 @@ export class RolesGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    const requiredPermission = this.reflector.getAllAndOverride<string>(
-      PERMISSION_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    const requiredPermission = this.reflector.getAllAndOverride<string>(PERMISSION_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
     if (!requiredRoles?.length && !requiredPermission) return true;
 
     const req = context.switchToHttp().getRequest<AuthedRequest>();
@@ -38,10 +38,7 @@ export class RolesGuard implements CanActivate {
       const ok = access.roles.some((r) => requiredRoles.includes(r));
       if (!ok) throw new ForbiddenException({ error: 'insufficient_role' });
     }
-    if (
-      requiredPermission &&
-      !hasPermission(access.permissions, requiredPermission)
-    ) {
+    if (requiredPermission && !hasPermission(access.permissions, requiredPermission)) {
       throw new ForbiddenException({ error: 'insufficient_permission' });
     }
     return true;

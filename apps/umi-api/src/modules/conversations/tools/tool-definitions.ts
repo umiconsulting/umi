@@ -56,7 +56,11 @@ export const TOOL_DEFINITIONS: ToolDefinitions = [
       type: 'object',
       properties: {
         query: { type: 'string' },
-        quantity: { type: 'integer', minimum: 1, description: 'Cantidad entera de unidades (por ejemplo, 2).' },
+        quantity: {
+          type: 'integer',
+          minimum: 1,
+          description: 'Cantidad entera de unidades (por ejemplo, 2).',
+        },
         size: { type: 'string' },
         temp: { type: 'string' },
         milk: { type: 'string' },
@@ -83,14 +87,19 @@ export const TOOL_DEFINITIONS: ToolDefinitions = [
           description:
             'Tipo de edición. Usa update_options para cambiar leche, tamaño o temperatura de un producto ya presente.',
         },
-        remove_query: { type: 'string', description: 'Producto o línea que se debe quitar del carrito.' },
+        remove_query: {
+          type: 'string',
+          description: 'Producto o línea que se debe quitar del carrito.',
+        },
         keep_query: {
           type: 'string',
-          description: 'Producto que el cliente quiere conservar como único item, si ya está en carrito.',
+          description:
+            'Producto que el cliente quiere conservar como único item, si ya está en carrito.',
         },
         target_query: {
           type: 'string',
-          description: 'Producto ya presente cuyas opciones se deben cambiar, por ejemplo Latte Regular.',
+          description:
+            'Producto ya presente cuyas opciones se deben cambiar, por ejemplo Latte Regular.',
         },
         size: { type: 'string' },
         temp: { type: 'string' },

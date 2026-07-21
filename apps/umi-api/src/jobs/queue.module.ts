@@ -12,8 +12,7 @@ import { OutboxRouter } from './outbox-relay.service';
 /** Parse REDIS_URL into BullMQ-compatible RedisOptions (no ioredis instance). */
 function redisOptionsFromUrl(url: string): RedisOptions {
   const u = new URL(url);
-  const db =
-    u.pathname && u.pathname !== '/' ? Number(u.pathname.slice(1)) : 0;
+  const db = u.pathname && u.pathname !== '/' ? Number(u.pathname.slice(1)) : 0;
   if (!Number.isInteger(db) || db < 0) {
     throw new Error(`Invalid REDIS_URL database index: "${u.pathname}"`);
   }
@@ -44,9 +43,7 @@ function redisOptionsFromUrl(url: string): RedisOptions {
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService<AppConfig, true>) => ({
-        connection: redisOptionsFromUrl(
-          config.get('REDIS_URL', { infer: true }),
-        ),
+        connection: redisOptionsFromUrl(config.get('REDIS_URL', { infer: true })),
       }),
     }),
     // Register every queue with a non-zero default priority so a raw

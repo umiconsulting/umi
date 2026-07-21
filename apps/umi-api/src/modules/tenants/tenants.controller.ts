@@ -1,12 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { TenantAccessGuard } from '../auth/tenant-access.guard';
 import { EntitlementGuard } from '../auth/entitlement.guard';
@@ -35,20 +27,14 @@ export class TenantsController {
 
   @Get('tenants/:tenantId/capabilities')
   @UseGuards(TenantAccessGuard)
-  async capabilities(
-    @Tenant() tenant: TenantAccess,
-    @Query('locationId') locationId?: string,
-  ) {
+  async capabilities(@Tenant() tenant: TenantAccess, @Query('locationId') locationId?: string) {
     return this.tenants.buildCapabilities(tenant, locationId ?? null);
   }
 
   @Get('tenants/:tenantId/settings')
   @UseGuards(TenantAccessGuard, EntitlementGuard)
   @RequireProduct('dashboard')
-  async getSettings(
-    @Tenant() tenant: TenantAccess,
-    @Query('locationId') locationId?: string,
-  ) {
+  async getSettings(@Tenant() tenant: TenantAccess, @Query('locationId') locationId?: string) {
     const caps = await this.tenants.buildCapabilities(tenant, locationId ?? null);
     return this.tenants.buildSettings(caps);
   }
@@ -56,10 +42,7 @@ export class TenantsController {
   @Patch('tenants/:tenantId/settings')
   @UseGuards(TenantAccessGuard, EntitlementGuard)
   @RequireProduct('dashboard')
-  async updateSettings(
-    @Tenant() tenant: TenantAccess,
-    @Body() dto: UpdateSettingsDto,
-  ) {
+  async updateSettings(@Tenant() tenant: TenantAccess, @Body() dto: UpdateSettingsDto) {
     await this.tenants.updateSettings(tenant.tenantId, dto);
     return { ok: true };
   }
@@ -67,10 +50,7 @@ export class TenantsController {
   @Get('tenants/:tenantId/locations')
   @UseGuards(TenantAccessGuard, EntitlementGuard)
   @RequireProduct('dashboard')
-  async getLocations(
-    @Tenant() tenant: TenantAccess,
-    @Query('locationId') locationId?: string,
-  ) {
+  async getLocations(@Tenant() tenant: TenantAccess, @Query('locationId') locationId?: string) {
     const caps = await this.tenants.buildCapabilities(tenant, locationId ?? null);
     return { locations: caps.locations };
   }
@@ -90,11 +70,7 @@ export class TenantsController {
     @Param('locationId') locationId: string,
     @Body() dto: UpdateLocationDto,
   ) {
-    const location = await this.tenants.updateLocation(
-      tenant.tenantId,
-      locationId,
-      dto,
-    );
+    const location = await this.tenants.updateLocation(tenant.tenantId, locationId, dto);
     return { location };
   }
 }

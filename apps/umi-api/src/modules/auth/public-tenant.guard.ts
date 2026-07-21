@@ -1,9 +1,4 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, NotFoundException } from '@nestjs/common';
 import { getRequestContext } from '../../shared/database/request-context';
 import { AuthRepository } from './auth.repository';
 import type { AuthedRequest } from './auth.types';

@@ -1,0 +1,27 @@
+# Commits that changed formatting ONLY. `git blame` skips these so it still shows
+# who last changed the LOGIC of a line, not who ran the formatter.
+#
+# Enable locally (once):
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub's blame view honours this file automatically.
+#
+# Only add a commit here if it is genuinely formatting-only. A commit that also
+# changes behaviour must NOT be listed — it would hide a real author from blame.
+
+# 2026-07-21 — repo-wide Prettier pass (306 files), landed as one PR in
+# per-package commits. Verified per package: umi-api 359/359 tests + typecheck,
+# landing tests unchanged, dashboard build + lint unchanged, contract 18/18,
+# tokens dist byte-identical + 5/5.
+ecab379  # style(umi-api)
+42db616  # style(landing)
+192ee0e  # style(dashboard)
+8d766eb  # style(packages)
+f459680  # style(ci,config)
+89fd4ba  # style(umi-api) second pass — Prettier is not idempotent
+
+# DELIBERATELY NOT LISTED: 102b690 ("style(docs): format Markdown…"). It reformats
+# the docs, but it also pins prettier, adds the Markdown `embeddedLanguageFormatting`
+# override, and rewrites two sentences whose prose "+" had been misparsed as a bullet.
+# Those are real authored changes, so hiding the commit from blame would hide a real
+# author. Blame on docs/*.md therefore lands here — that is the correct trade, not an
+# oversight. Do not "fix" it by adding the SHA.

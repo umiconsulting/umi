@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from 'react';
 
 function useCounter(target: number, duration: number, start: boolean): number {
   const [v, setV] = useState(0);
@@ -32,7 +32,7 @@ export default function Stats() {
           if (e.isIntersecting) setInView(true);
         });
       },
-      { threshold: 0.25 }
+      { threshold: 0.25 },
     );
     io.observe(ref.current);
     return () => io.disconnect();
@@ -61,18 +61,21 @@ export default function Stats() {
             <em className="font-serif not-italic text-umi-blue-dark">Es una suite viva.</em>
           </h2>
           <p className="text-[16px] leading-[1.7] text-[rgba(10,20,48,0.7)] max-w-[580px]">
-            El diseño cuenta lo que el código ya dice: clientes delgados, contratos
-            normalizados, verdad operacional en backend y productos especializados por rol.
+            El diseño cuenta lo que el código ya dice: clientes delgados, contratos normalizados,
+            verdad operacional en backend y productos especializados por rol.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           {[
-            { num: products, unit: "", lbl: "productos conectados" },
-            { num: schemas, unit: "", lbl: "esquemas de dominio" },
-            { num: channels, unit: "+", lbl: "canales de experiencia" },
-            { num: loop, unit: "", lbl: "operación de punta a punta" },
+            { num: products, unit: '', lbl: 'productos conectados' },
+            { num: schemas, unit: '', lbl: 'esquemas de dominio' },
+            { num: channels, unit: '+', lbl: 'canales de experiencia' },
+            { num: loop, unit: '', lbl: 'operación de punta a punta' },
           ].map((s, i) => (
-            <div key={s.lbl} className="rounded-[24px] border border-[var(--stroke)] bg-[#fffdf8] p-6 sm:p-8 min-h-[150px] shadow-[0_18px_60px_rgba(34,57,121,0.06)]">
+            <div
+              key={s.lbl}
+              className="rounded-[24px] border border-[var(--stroke)] bg-[#fffdf8] p-6 sm:p-8 min-h-[150px] shadow-[0_18px_60px_rgba(34,57,121,0.06)]"
+            >
               <div className="font-sans text-[clamp(44px,6vw,74px)] font-extrabold leading-none text-umi-blue-dark mb-4">
                 {s.num}
                 {s.unit && <span className="text-[0.42em] ml-1">{s.unit}</span>}

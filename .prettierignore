@@ -13,6 +13,18 @@ pnpm-lock.yaml
 **/*.tsbuildinfo
 **/next-env.d.ts
 
+# Captured evidence + generated diagrams. These are ARTIFACTS of a run, kept so a
+# past result stays auditable. Reformatting them edits the evidence, and the raw
+# audit log is a 309K single-line-heavy JSON dump nobody reads as source.
+docs/migration/build-v3/security-audit-2026-07-12.raw.json
+docs/migration/build-v3/schema_diagram.html
+
+# Per-developer local files. Untracked, so CI never sees them — but without this
+# `pnpm format:check` is red on a clean checkout for whoever has them, and a gate
+# that is red for reasons the repo cannot fix teaches people to ignore it.
+**/.claude/settings.local.json
+.mcp.json
+
 # Native app (Swift toolchain owns its formatting)
 apps/umi-kds/
 
@@ -27,3 +39,7 @@ apps/umi-cash/
 # adapter-sync-check guards. Skills are edited as prose; leave them as written.
 # (.claude/skills is a symlink INTO this directory, so one rule covers both.)
 .agents/skills/
+
+# NOTE: Markdown IS formatted. `docs/` and the root .md files are covered by
+# Prettier like any other source. The one carve-out is `.agents/skills/` above,
+# which is excluded for the symlink invariant, not for being prose.

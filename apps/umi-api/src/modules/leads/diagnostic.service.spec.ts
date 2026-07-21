@@ -39,11 +39,23 @@ describe('DiagnosticService.score', () => {
     // Every area key answered 'siempre' (=5) → each area 5 → total 5.
     const responses: Record<string, string> = {};
     for (const k of [
-      'analytics_stage', 'data_challenge', 'data_sources', 'data_quality', 'data_integration',
-      'decision_basis', 'analysis_tools', 'analysis_frequency', 'analysis_depth',
-      'visualization_tools', 'dashboard_usage', 'report_creation',
-      'decision_speed', 'data_driven_decisions', 'kpi_tracking',
-    ]) responses[k] = 'siempre';
+      'analytics_stage',
+      'data_challenge',
+      'data_sources',
+      'data_quality',
+      'data_integration',
+      'decision_basis',
+      'analysis_tools',
+      'analysis_frequency',
+      'analysis_depth',
+      'visualization_tools',
+      'dashboard_usage',
+      'report_creation',
+      'decision_speed',
+      'data_driven_decisions',
+      'kpi_tracking',
+    ])
+      responses[k] = 'siempre';
     const r = svc.score(responses);
     expect(r.score).toBe(5);
     expect(r.level).toBe('Intermedio');
@@ -52,11 +64,23 @@ describe('DiagnosticService.score', () => {
   it('reaches Avanzado when numeric answers push the average ≥ 8', () => {
     const responses: Record<string, number> = {};
     for (const k of [
-      'analytics_stage', 'data_challenge', 'data_sources', 'data_quality', 'data_integration',
-      'decision_basis', 'analysis_tools', 'analysis_frequency', 'analysis_depth',
-      'visualization_tools', 'dashboard_usage', 'report_creation',
-      'decision_speed', 'data_driven_decisions', 'kpi_tracking',
-    ]) responses[k] = 9;
+      'analytics_stage',
+      'data_challenge',
+      'data_sources',
+      'data_quality',
+      'data_integration',
+      'decision_basis',
+      'analysis_tools',
+      'analysis_frequency',
+      'analysis_depth',
+      'visualization_tools',
+      'dashboard_usage',
+      'report_creation',
+      'decision_speed',
+      'data_driven_decisions',
+      'kpi_tracking',
+    ])
+      responses[k] = 9;
     const r = svc.score(responses);
     expect(r.score).toBe(9);
     expect(r.level).toBe('Avanzado');

@@ -31,6 +31,7 @@
 ---
 
 ### (original open checklist — now answered above except the variants unit)
+
 **Status (original):** OPEN — blocks the checkout/order-write tools (`confirm_order`, `reorder_last_order`, `cancel_order`). The read/cart tools (`search_menu`, `add_to_cart`, `edit_cart`, `get_business_info`, `get_business_hours`, `get_recent_customer_orders`) are unblocked (bind to confirmed `ops.products` + `comms.conversations.draft_cart` + `ops.orders` reads).
 **Why this exists:** the source `tools.ts` checkout path is built on three objects that **do not exist in the canonical schema** — a `transactions` table, a `transactions → kds.tickets` AFTER-INSERT projection trigger, and the `kds.confirm_partial_cancellation` RPC. Porting order/money writes onto canonical is an architectural rebind, not a column rename, and must be pinned against the live prod-schema replica before any money code is written.
 
@@ -39,6 +40,7 @@
 ## 0. The legacy order-write path (what we're replacing)
 
 `whatsapp-handler/tools.ts`:
+
 - `createTransactionFromItems()` → `INSERT INTO transactions (transaction_type='order', details jsonb {items, customer_note, pickup_person, personal_message}, total_amount, status='pending')`. **Money in PESOS** (`total_amount` decimal; `product.price` decimal).
 - `confirmOrder()` → creates the transaction, then **verifies a `kds.tickets` row exists** for `source_transaction_id` (a synchronous AFTER-INSERT trigger projected it), then clears the draft cart.
 - `getRecentCustomerOrders()` / `getLastReusableOrder()` / `reorderLastOrder()` → read `transactions` where `transaction_type='order'`; reconstruct cart items from `details.items`.
@@ -52,12 +54,12 @@ Canonical (confirmed live, preflight 2026-06-25 §3): orders live in **`ops.orde
 
 ## 1. Architectural decisions the owner must make
 
-| # | Decision | Recommendation |
-|---|---|---|
-| A1 | **Where does a confirmed WhatsApp order land?** (a) bot writes `ops.orders` + `ops.order_items` directly on the worker pool; (b) bot writes a `queue.outbox_events` `order.submitted` and a consumer creates the order. | **(a) direct write.** Orders are the `ops` domain; the dashboard already reads `ops.orders`, and KDS reads `ops.order_items` via `v_kds_tickets`. The customer-notify side effect already flows through the turn-reply outbox. A single direct `ops` write (worker pool, BYPASSRLS) is simplest (KISS) and matches how cash writes `loyalty.*` directly. Confirm no architectural objection. |
-| A2 | **How does the order reach KDS?** Legacy relied on a `transactions→kds.tickets` trigger. Canonical KDS reads `v_kds_tickets` over `ops.order_items.kitchen_status`. | The bot inserts `ops.order_items` **with `kitchen_status` set to the "new ticket" value** → it appears in `v_kds_tickets` automatically (no trigger, no ticket table). **Confirm the kitchen_status value that = a fresh ticket** (see Q2). Drop the legacy post-insert "verify kds ticket" check (replace with "verify order_items inserted"). |
-| A3 | **Idempotency key** for confirm/reorder (the bug fix). | Use `source_transaction_id = 'conversaflow:turn:<turn_id>'` (the turn is the natural idempotency unit) **and** a `UNIQUE(tenant_id, source, source_transaction_id)` guard (or `queue.idempotency_keys` claim) so a retried turn can't double-create. Confirm the unique constraint exists (Q1). |
-| A4 | **Partial-cancellation** (`confirm_order_changes`, the partial branch of `cancel_order`, `getActivePartialCancelledOrder`). | **DEFER to Phase 4 (KDS).** These depend on `kds.tickets` + `kds.confirm_partial_cancellation` (KDS-owned). In 3c, `confirm_order_changes` returns a safe "no pending changes" terminal error and `cancel_order` handles only the plain `pending`-order path. |
+| #   | Decision                                                                                                                                                                                                                | Recommendation                                                                                                                                                                                                                                                                                                                                                                               |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A1  | **Where does a confirmed WhatsApp order land?** (a) bot writes `ops.orders` + `ops.order_items` directly on the worker pool; (b) bot writes a `queue.outbox_events` `order.submitted` and a consumer creates the order. | **(a) direct write.** Orders are the `ops` domain; the dashboard already reads `ops.orders`, and KDS reads `ops.order_items` via `v_kds_tickets`. The customer-notify side effect already flows through the turn-reply outbox. A single direct `ops` write (worker pool, BYPASSRLS) is simplest (KISS) and matches how cash writes `loyalty.*` directly. Confirm no architectural objection. |
+| A2  | **How does the order reach KDS?** Legacy relied on a `transactions→kds.tickets` trigger. Canonical KDS reads `v_kds_tickets` over `ops.order_items.kitchen_status`.                                                     | The bot inserts `ops.order_items` **with `kitchen_status` set to the "new ticket" value** → it appears in `v_kds_tickets` automatically (no trigger, no ticket table). **Confirm the kitchen_status value that = a fresh ticket** (see Q2). Drop the legacy post-insert "verify kds ticket" check (replace with "verify order_items inserted").                                              |
+| A3  | **Idempotency key** for confirm/reorder (the bug fix).                                                                                                                                                                  | Use `source_transaction_id = 'conversaflow:turn:<turn_id>'` (the turn is the natural idempotency unit) **and** a `UNIQUE(tenant_id, source, source_transaction_id)` guard (or `queue.idempotency_keys` claim) so a retried turn can't double-create. Confirm the unique constraint exists (Q1).                                                                                              |
+| A4  | **Partial-cancellation** (`confirm_order_changes`, the partial branch of `cancel_order`, `getActivePartialCancelledOrder`).                                                                                             | **DEFER to Phase 4 (KDS).** These depend on `kds.tickets` + `kds.confirm_partial_cancellation` (KDS-owned). In 3c, `confirm_order_changes` returns a safe "no pending changes" terminal error and `cancel_order` handles only the plain `pending`-order path.                                                                                                                                |
 
 ---
 
@@ -66,6 +68,7 @@ Canonical (confirmed live, preflight 2026-06-25 §3): orders live in **`ops.orde
 Run these and paste results back; the checkout port binds to whatever they return.
 
 **Q1 — `ops.orders` write contract**
+
 ```sql
 SELECT column_name, data_type, is_nullable, column_default
 FROM information_schema.columns
@@ -76,9 +79,11 @@ WHERE conrelid='ops.orders'::regclass AND contype='c';
 -- uniqueness for idempotency:
 SELECT indexdef FROM pg_indexes WHERE schemaname='ops' AND tablename='orders';
 ```
+
 Confirm: NOT-NULL columns w/o defaults (must be supplied on INSERT); `status` allowed values + the value for a fresh WhatsApp order (`'pending'`?); is `location_id` required (→ resolve via the channel account / `resolveLocationIdWorker`)? `channel`/`source` allowed values (`'whatsapp'`/`'conversaflow'`?); is `total_cents` or `subtotal_cents`+`total_cents`; is there `UNIQUE(tenant_id, source, source_transaction_id)`?
 
 **Q2 — `ops.order_items` write contract + kitchen_status**
+
 ```sql
 SELECT column_name, data_type, is_nullable, column_default
 FROM information_schema.columns
@@ -86,29 +91,36 @@ WHERE table_schema='ops' AND table_name='order_items' ORDER BY ordinal_position;
 SELECT pg_get_constraintdef(oid) FROM pg_constraint
 WHERE conrelid='ops.order_items'::regclass AND contype='c';
 ```
+
 Confirm: line columns (`order_id`, `tenant_id?`, `product_id`, product name column, `variant_name?`, `quantity`, unit price column + unit, line total column, `display_order?`, `metadata?`); **`kitchen_status` allowed values + the "new ticket" value**; any NOT-NULLs.
 
 **Q3 — `ops.v_kds_tickets` projection (sanity, Phase 4 owns it)**
+
 ```sql
 SELECT pg_get_viewdef('ops.v_kds_tickets'::regclass, true);
 ```
+
 Confirm it derives tickets from `ops.order_items.kitchen_status` (so inserting items with the right status surfaces a ticket) and which `kitchen_status` values it treats as active.
 
 **Q4 — `ops.order_events` (append-only) + any order triggers**
+
 ```sql
 SELECT column_name, is_nullable FROM information_schema.columns
 WHERE table_schema='ops' AND table_name='order_events' ORDER BY ordinal_position;
 SELECT tgname, pg_get_triggerdef(oid) FROM pg_trigger
 WHERE tgrelid IN ('ops.orders'::regclass,'ops.order_items'::regclass) AND NOT tgisinternal;
 ```
+
 Confirm: is an `order_events` row expected on create (and its `event_type`)? Is there any trigger that auto-sets `kitchen_status`/creates events (so the bot must NOT)? Append-only guard `ops.block_order_event_mutation` confirmed (events insert-only).
 
 **Q5 — `ops.products` read shape (also affects `add_to_cart` pricing)**
+
 ```sql
 SELECT column_name, data_type FROM information_schema.columns
 WHERE table_schema='ops' AND table_name='products' ORDER BY ordinal_position;
 SELECT variants FROM ops.products WHERE variants IS NOT NULL AND jsonb_array_length(variants) > 0 LIMIT 3;
 ```
+
 Confirm: **`variants` jsonb element shape** (legacy is `{sku, name, price}` in PESOS — canonical keys + price unit?) and that `price_cents` is **centavos**. This pins the unit conversion for cart `unit_price` and order line prices.
 
 **Q6 — money unit end-to-end**
@@ -119,6 +131,7 @@ Confirm the unit stored in `comms.conversations.draft_cart.items[].unit_price` g
 ## 3. What unblocks immediately (no order-write binding needed)
 
 These bind only to confirmed objects and can be ported now (the bot can browse the menu + build/edit a draft cart; checkout returns a safe "ordering not available yet" until §2 is confirmed):
+
 - `search_menu` → `ops.products` cosine (`name_embedding`) + ILIKE waterfall + `ops.product_categories` (read-only). Pure scoring/variant-resolution helpers port verbatim.
 - `add_to_cart` / `edit_cart` → read `ops.products` (price/variants), write `comms.conversations.draft_cart` (CAS on `draft_cart_version`, already in `ConversationsRepository.updateDraftCartCas`).
 - `get_business_info` / `get_business_hours` → delegate to the existing `BusinessHoursService` (3a/hours-unification).

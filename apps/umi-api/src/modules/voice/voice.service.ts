@@ -34,10 +34,7 @@ export class VoiceService {
           typeof v.assistant_name === 'string' && v.assistant_name.trim()
             ? v.assistant_name.trim()
             : null,
-        locale:
-          typeof v.locale === 'string' && v.locale.trim()
-            ? v.locale.trim()
-            : DEFAULT_LOCALE,
+        locale: typeof v.locale === 'string' && v.locale.trim() ? v.locale.trim() : DEFAULT_LOCALE,
         tone_preset: presetKey,
         tone: typeof v.tone === 'string' && v.tone.trim() ? v.tone.trim() : null,
         style_notes: Array.isArray(v.style_notes)

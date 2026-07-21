@@ -19,10 +19,7 @@ export class HealthService {
   ) {}
 
   async check(): Promise<HealthResult> {
-    const [db, redis] = await Promise.all([
-      this.checkDb(),
-      this.checkRedis(),
-    ]);
+    const [db, redis] = await Promise.all([this.checkDb(), this.checkRedis()]);
     return {
       status: db && redis ? 'ok' : 'degraded',
       db,

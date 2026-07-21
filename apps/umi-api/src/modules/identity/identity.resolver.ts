@@ -39,9 +39,7 @@ export class IdentityResolver {
    * The canonical global channel catalog. Normalization rules live HERE (code-side):
    * the flat model keeps no normalization_rule column on umi.channel_type.
    */
-  static readonly CANONICAL_CHANNELS: ReadonlyArray<
-    [key: string, rule: NormalizationRule]
-  > = [
+  static readonly CANONICAL_CHANNELS: ReadonlyArray<[key: string, rule: NormalizationRule]> = [
     ['phone', 'e164'],
     ['whatsapp', 'e164'],
     ['sms', 'e164'],
@@ -53,8 +51,9 @@ export class IdentityResolver {
     ['manual', 'none'],
   ];
 
-  private static readonly RULE_BY_KEY: ReadonlyMap<string, NormalizationRule> =
-    new Map(IdentityResolver.CANONICAL_CHANNELS);
+  private static readonly RULE_BY_KEY: ReadonlyMap<string, NormalizationRule> = new Map(
+    IdentityResolver.CANONICAL_CHANNELS,
+  );
 
   private static readonly PHONE_FAMILY_KEYS: readonly string[] =
     IdentityResolver.CANONICAL_CHANNELS.filter(([, r]) => r === 'e164').map(([k]) => k);
@@ -88,9 +87,7 @@ export class IdentityResolver {
     );
     const row = rows[0];
     if (!row) {
-      throw new Error(
-        `identity: unknown channel '${channelKey}' — is umi.channel_type seeded?`,
-      );
+      throw new Error(`identity: unknown channel '${channelKey}' — is umi.channel_type seeded?`);
     }
     const channel: ChannelRow = {
       id: row.id,
@@ -112,10 +109,7 @@ export class IdentityResolver {
     return this.pg.workerTx((c) => this.resolveWithin(c, input));
   }
 
-  private async resolveWithin(
-    c: PoolClient,
-    input: ResolveInput,
-  ): Promise<ResolvedIdentity> {
+  private async resolveWithin(c: PoolClient, input: ResolveInput): Promise<ResolvedIdentity> {
     const { tenantId, channelKey } = input;
     const channel = await this.resolveChannel(channelKey, c);
     const normalized = await this.normalize(c, channelKey, input.rawValue);
@@ -124,9 +118,7 @@ export class IdentityResolver {
     // Phone-family lookups search the whole family (phone/whatsapp/sms) so a shared
     // E.164 unifies; other channels dedup within themselves. A NULL normalized value
     // cannot unify — it always mints a fresh reachability row (soft-key model).
-    const lookupChannelIds = isPhoneFamily
-      ? await this.getPhoneFamily(c)
-      : [channel.id];
+    const lookupChannelIds = isPhoneFamily ? await this.getPhoneFamily(c) : [channel.id];
 
     // Serialize the WHOLE resolve under one advisory lock keyed on the identity:
     // createCustomer AND ensureContact both do find-then-write, and tenant.contact
@@ -147,8 +139,7 @@ export class IdentityResolver {
     if (found == null) {
       found = await this.findCustomerByRaw(c, tenantId, lookupChannelIds, input.rawValue);
     }
-    const customerId =
-      found ?? (await this.createCustomer(c, tenantId, input.displayName ?? null));
+    const customerId = found ?? (await this.createCustomer(c, tenantId, input.displayName ?? null));
     const created = found == null;
 
     // Ensure THIS channel's reachability row exists on the customer (idempotent). For
@@ -178,9 +169,7 @@ export class IdentityResolver {
         : null);
     if (normalized == null) return null;
     const isPhoneFamily = channel.normalizationRule === 'e164';
-    const lookupChannelIds = isPhoneFamily
-      ? await this.getPhoneFamily(null)
-      : [channel.id];
+    const lookupChannelIds = isPhoneFamily ? await this.getPhoneFamily(null) : [channel.id];
 
     const { rows } = await this.run<{ contactId: string; customerId: string }>(
       null,

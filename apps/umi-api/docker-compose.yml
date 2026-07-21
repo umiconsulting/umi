@@ -18,7 +18,7 @@ services:
     environment:
       - NODE_ENV=production
     expose:
-      - "3000"
+      - '3000'
     depends_on:
       redis:
         condition: service_healthy
@@ -41,11 +41,11 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ['redis-server', '--appendonly', 'yes']
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 3s
       retries: 5
@@ -54,8 +54,8 @@ services:
   caddy:
     image: caddy:2-alpine
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     environment:
       # Set API_DOMAIN in .env to a real hostname on the VPS for automatic TLS.
       - API_DOMAIN=${API_DOMAIN:-:80}

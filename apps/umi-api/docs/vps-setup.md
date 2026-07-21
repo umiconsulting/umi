@@ -11,8 +11,9 @@ Prereqs already done: VPS provisioned, a non-root user created, Docker + Docker
 Compose installed.
 
 The whole stack runs from `apps/umi-api/docker-compose.yml`: **web** + **worker**
-+ **redis** + **caddy** (TLS). You only manage two external things: the Postgres
-connection string and a `.env`.
+
+- **redis** + **caddy** (TLS). You only manage two external things: the Postgres
+  connection string and a `.env`.
 
 ---
 
@@ -79,7 +80,7 @@ curl http://localhost/health            # on the box, through Caddy
 Expected:
 
 ```json
-{"status":"ok","db":true,"redis":true,"ts":"..."}
+{ "status": "ok", "db": true, "redis": true, "ts": "..." }
 ```
 
 `200 ok` = Phase 0 deploy done. `503 degraded` → check `db`/`redis` in the body
@@ -141,9 +142,9 @@ The remote `.env` is gitignored and preserved across pulls.
 Supabase will **not** let a non-superuser grant `BYPASSRLS` to a custom role from
 SQL (the SQL Editor role isn't a true superuser). So:
 
-| Pool | Role | Why |
-|---|---|---|
-| `DATABASE_URL_APP` | **`umi_app`** (NOBYPASSRLS) | The request path. RLS `tenant_isolation` enforces tenant scoping; the app sets `app.tenant_id`/`app.user_id` per request. |
+| Pool                  | Role                                                                        | Why                                                                                                                                                                                 |
+| --------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL_APP`    | **`umi_app`** (NOBYPASSRLS)                                                 | The request path. RLS `tenant_isolation` enforces tenant scoping; the app sets `app.tenant_id`/`app.user_id` per request.                                                           |
 | `DATABASE_URL_WORKER` | **`postgres`** (the Supabase pooler role — it already has `rolbypassrls=t`) | The service/worker + public-customer (no-member) path needs to bypass RLS. `umi_worker` exists with grants but is **unused** until BYPASSRLS can be granted (superuser / SET ROLE). |
 
 `umi_app` connects through the Supavisor pooler with the **dotted** username

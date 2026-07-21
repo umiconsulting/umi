@@ -24,12 +24,9 @@ export const CRON_LIFECYCLE_COPY: Record<CronJourneyKey, string> = {
     '¡Hola {name}! Tu tarjeta de {tenant} te espera ☕ — visítanos para tu primer sello.',
   winback_14:
     'Te extrañamos en {tenant}. Tienes {visitsThisCycle}/{visitsRequired} sellos esperándote.',
-  winback_30:
-    'Han pasado 30 días, {name}. Vuelve y sigue acumulando sellos para tu {rewardName}.',
-  winback_60:
-    '{name}, queremos volver a verte en {tenant}. Tu tarjeta sigue activa.',
-  reward_expiring:
-    '⏰ Tu {rewardName} expira el {date} — pasa por {tenant} antes de que se acabe.',
+  winback_30: 'Han pasado 30 días, {name}. Vuelve y sigue acumulando sellos para tu {rewardName}.',
+  winback_60: '{name}, queremos volver a verte en {tenant}. Tu tarjeta sigue activa.',
+  reward_expiring: '⏰ Tu {rewardName} expira el {date} — pasa por {tenant} antes de que se acabe.',
   streak_3w: '🔥 ¡3 semanas seguidas visitando {tenant}! Sigue así, {name}.',
   streak_6w: '🔥 ¡6 semanas seguidas! {name}, eres parte de la familia de {tenant}.',
   streak_12w: '🏆 ¡12 semanas seguidas! Gracias por tu fidelidad, {name}.',

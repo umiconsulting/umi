@@ -13,12 +13,8 @@ import { runWithRequestContext } from './request-context';
 export class RequestContextMiddleware implements NestMiddleware {
   use(req: { headers?: Record<string, unknown> }, _res: unknown, next: () => void): void {
     const headerRequestId = req?.headers?.['x-request-id'];
-    const requestId =
-      typeof headerRequestId === 'string' ? headerRequestId : randomUUID();
+    const requestId = typeof headerRequestId === 'string' ? headerRequestId : randomUUID();
 
-    runWithRequestContext(
-      { tenantId: null, userId: null, requestId },
-      () => next(),
-    );
+    runWithRequestContext({ tenantId: null, userId: null, requestId }, () => next());
   }
 }

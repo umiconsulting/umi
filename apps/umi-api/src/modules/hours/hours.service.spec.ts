@@ -81,9 +81,7 @@ describe('HoursService.updateHours', () => {
   });
 
   it('rejects a missing hours payload', async () => {
-    await expect(h.svc.updateHours('t1', null, null)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(h.svc.updateHours('t1', null, null)).rejects.toBeInstanceOf(BadRequestException);
   });
 });
 

@@ -19,7 +19,7 @@ Keep these consistent so tooling stays predictable and the repo stays legible.
 
 ## Directory naming — the `umi-` prefix stays
 
-The `umi-` prefix on `apps/*` is redundant *as a name* but is **load-bearing**:
+The `umi-` prefix on `apps/*` is redundant _as a name_ but is **load-bearing**:
 it's wired into CI trigger paths, Vercel root directories, the GHCR image name,
 `apps/$APP_NAME` on the VPS, and `deploy.sh`. Renaming a directory is a
 coordinated, prod-touching migration — **not** a cleanup. Don't do it casually.
@@ -38,10 +38,10 @@ not arbitrary):
    checkout.
 2. **The output type decides source-vs-prebuilt:**
 
-   | Package | Output | Frontend consumers | API consumes |
-   | --- | --- | --- | --- |
-   | `@umi/contract` | TypeScript | **dashboard** only — the **source**, via Vite alias `@umi/contract` → `packages/contract/src` (the bundler transpiles it); `dist/` is git-ignored | the **built** `dist` (Node can't `require` `.ts`); built in-workspace during the Docker/CI build |
-   | `@umi/tokens` | CSS + a Tailwind JS object | **dashboard + landing** — the **committed** `dist/` (a bundler can't generate CSS from token JSON, and Vercel won't run the generator) via a Vite alias / relative `require` | n/a |
+   | Package         | Output                     | Frontend consumers                                                                                                                                                           | API consumes                                                                                     |
+   | --------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+   | `@umi/contract` | TypeScript                 | **dashboard** only — the **source**, via Vite alias `@umi/contract` → `packages/contract/src` (the bundler transpiles it); `dist/` is git-ignored                            | the **built** `dist` (Node can't `require` `.ts`); built in-workspace during the Docker/CI build |
+   | `@umi/tokens`   | CSS + a Tailwind JS object | **dashboard + landing** — the **committed** `dist/` (a bundler can't generate CSS from token JSON, and Vercel won't run the generator) via a Vite alias / relative `require` | n/a                                                                                              |
 
    So: **bundler-transpilable source → consume the source; outputs a consumer can't
    generate itself → commit the built `dist/` and gate its freshness in CI**
@@ -58,15 +58,49 @@ current — treat them as history unless linked from `README.md` or `AGENTS.md`.
 **Prettier formats; ESLint finds bugs.** They are not competitors here — Prettier owns
 style, ESLint owns correctness, and no ESLint stylistic rules are configured.
 
-- **Prettier scope.** `.prettierignore` excludes build outputs, the frozen `apps/umi-cash`,
-  the Swift app, and **`.agents/skills/`** — that last one is authored prose (the procedure
-  layer, mirrored to `.claude/skills` by symlink), not generated code, and it was 53% of the
-  formatting debt. Reformatting prose to satisfy a formatter that never ran on it is churn.
+- **Prettier covers Markdown too.** `docs/` and the root `.md` files are formatted like any
+  other source, so tables, list markers and emphasis stay uniform across a doc set that is
+  read by people outside the team. `.prettierignore` excludes only build outputs, the frozen
+  `apps/umi-cash`, the Swift app, captured run artifacts, per-developer local files, and
+  **`.agents/skills/`** — that last one for the `.agents` → `.claude/skills` symlink invariant
+  `adapter-sync-check` guards, not for being prose. Expect the first pass over a doc to be
+  large (`*emphasis*` → `_emphasis_`, table-pipe padding); that is one-time, and
+  `.git-blame-ignore-revs` keeps it out of blame. **It is rendering-safe, and that was
+  measured, not assumed:** every changed file was rendered through CommonMark before and
+  after and the HTML diffed — 44 of 54 byte-identical, the rest whitespace or spec-equivalent
+  soft breaks. Emphasis, bullet and table normalisation cannot be configured off (Prettier
+  has exactly one Markdown option, `proseWrap`); the measurement is what makes that fine.
+- **`embeddedLanguageFormatting: "off"` for Markdown — do not remove it.** By default Prettier
+  formats code _inside_ fenced blocks, which rewrites the samples a reader copies. It rewrote 4
+  of our 113 fences, and added a **trailing comma** to a ` ```jsonc ` sample in the UmiPOS
+  contract seam — whose prose says the artifact ships as `.json`, where a trailing comma is
+  invalid (RFC 8259). It is scoped to `*.md` via `overrides` on purpose: set globally it would
+  also stop `.ts` files getting their embedded CSS/GraphQL formatted.
+- **Prettier is pinned exactly (`3.9.4`), not `^`.** 3.9.0 replaced the whole Markdown parser
+  (remark → micromark) and shipped a meaning-corrupting regression fixed only in 3.9.3. A
+  caret range silently moves the formatter under a repo whose docs are now formatter-owned.
+- **When Prettier "changes meaning" in Markdown, suspect the document first.** Every case we
+  investigated was a latent defect it surfaced, not damage it caused: a line starting `+ ` mid
+  paragraph was already a `<li>` (CommonMark §5.2/§5.3 — bullets interrupt paragraphs), a list
+  starting at `4.` was never a list at all (only `1.` may interrupt), and an unclosed fence
+  already ran to EOF. Fix the prose; do not configure the formatter around it.
+  Full evidence: `docs/reports/2026-07-21-prettier-markdown-research.md`.
+- **Prettier is not always idempotent — `format` then `format:check` can still be red.**
+  Three `umi-api` spec files were still reported unformatted _after_ `prettier --write` had
+  rewritten them; a second pass changed them again and only then did `--check` agree. The
+  trigger is method-chain breaking (`vi.fn().mockResolvedValue({ ... })`) that pass 1 explodes
+  and pass 2 collapses. If `format:check` fails on a tree you just formatted, run `pnpm format`
+  again before assuming CI is wrong. It converged in 2 passes; the 3rd was a no-op.
+- **Formatting-only commits belong in `.git-blame-ignore-revs`.** A 306-file reformat would
+  otherwise make `git blame` attribute every touched line to whoever ran the formatter.
+  GitHub honours the file automatically; locally run
+  `git config blame.ignoreRevsFile .git-blame-ignore-revs` once. Only list commits that are
+  genuinely formatting-only — listing a behaviour change would hide a real author.
 - **ESLint 10, flat config, per package.** Not v9: it reaches EOL 2026-08-06. Config lives in
   each package's `eslint.config.js`; there is no root config, because the packages genuinely
   differ (a NestJS service and a plain-JSX SPA want different rules).
 - **Type-aware rules only where there are types.** Everywhere `tsc --noEmit` runs, the
-  compiler is the safety net and linting earns its keep mainly through *type-aware* rules
+  compiler is the safety net and linting earns its keep mainly through _type-aware_ rules
   (floating promises, misused promises). `apps/umi-dashboard` has no TypeScript at all, so
   plain rules carry the whole load there.
 - **Adopt with a ratchet, not a big-bang fix.** New surfaces land via
@@ -83,9 +117,9 @@ style, ESLint owns correctness, and no ESLint stylistic rules are configured.
   gate everyone learns to ignore — keep ESLint's `ignores` in step with `.prettierignore`.
 - **A gate nobody runs is not a gate.** `.github/workflows/lint.yml` runs `pnpm lint` on every
   PR and on pushes to `build-v3`. It calls `turbo run lint`, not a per-package filter, so a
-  package is covered the day it adds a `lint` script. `pnpm format:check` is deliberately NOT
-  in CI yet — 307 files still fail Prettier, so it would be red on arrival; it lands with the
-  format pass.
+  package is covered the day it adds a `lint` script. `pnpm format:check` runs in the same job
+  as a second step — held back until the format pass landed so it went green on arrival, and
+  added as a _step_ rather than a job so the required check name `lint` does not change.
 - **A required check must never be path-filtered.** GitHub does not treat a required check
   that got skipped as passed — it leaves it Pending, forever, and the PR cannot merge. There
   is no failing check to fix, and with protection enforced for admins there is nobody who can
@@ -100,7 +134,7 @@ style, ESLint owns correctness, and no ESLint stylistic rules are configured.
   decoration. Add a violation, confirm exit 1, remove it, confirm exit 0 — via `pnpm lint`, not
   just the package script, since the root command adds turbo (caching, exit-code propagation).
 - **Declare every ESLint plugin in the package that lints with it.** An undeclared plugin
-  resolves through pnpm's hoisted store, so its version is an accident of what some *other*
+  resolves through pnpm's hoisted store, so its version is an accident of what some _other_
   package installed. Adding `eslint-plugin-react-hooks@7` to the dashboard silently changed how
   `apps/umi-landing-page` lints — it needs `^5` and got v7's React Compiler rules in CI. A lint
   result you cannot reproduce is not a result.

@@ -1,11 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { AnthropicAdapter } from '../../shared/adapters/anthropic.adapter';
-import {
-  MILK_SYNONYMS,
-  normalizeSynonymText,
-  SIZE_SYNONYMS,
-  TEMP_SYNONYMS,
-} from './synonyms';
+import { MILK_SYNONYMS, normalizeSynonymText, SIZE_SYNONYMS, TEMP_SYNONYMS } from './synonyms';
 import { sanitizeOutput } from './security.service';
 
 /**
@@ -38,13 +33,7 @@ export interface ExtractedIntent {
   is_revision: boolean;
   references_prior_state: boolean;
   clarification_target:
-    | 'product'
-    | 'variant'
-    | 'pickup_person'
-    | 'confirmation'
-    | 'cancel_reason'
-    | 'unknown'
-    | null;
+    'product' | 'variant' | 'pickup_person' | 'confirmation' | 'cancel_reason' | 'unknown' | null;
   tool_hint:
     | 'search_menu'
     | 'add_to_cart'
@@ -98,19 +87,14 @@ function levenshteinDistance(a: string, b: string): number {
   for (let i = 0; i < a.length; i++) {
     const curr = [i + 1];
     for (let j = 0; j < b.length; j++) {
-      curr.push(
-        a[i] === b[j] ? prev[j] : 1 + Math.min(prev[j], prev[j + 1], curr[j]),
-      );
+      curr.push(a[i] === b[j] ? prev[j] : 1 + Math.min(prev[j], prev[j + 1], curr[j]));
     }
     prev.splice(0, prev.length, ...curr);
   }
   return prev[b.length];
 }
 
-function fuzzyLookup<T extends string>(
-  dict: Record<string, T>,
-  value: string,
-): T | null {
+function fuzzyLookup<T extends string>(dict: Record<string, T>, value: string): T | null {
   const normalized = normalizeText(value);
   if (!normalized) return null;
   if (dict[normalized]) return dict[normalized];
@@ -183,12 +167,9 @@ export function shouldTreatAsConfirmationContext(params: {
   draftCartSummary: string | null;
 }): boolean {
   return (
-    [
-      'awaiting_confirmation',
-      'confirming',
-      'awaiting_order_changes_confirmation',
-    ].includes(params.currentState) ||
-    params.pendingClarification?.target === 'confirmation'
+    ['awaiting_confirmation', 'confirming', 'awaiting_order_changes_confirmation'].includes(
+      params.currentState,
+    ) || params.pendingClarification?.target === 'confirmation'
   );
 }
 
@@ -200,9 +181,7 @@ export function applyClarificationHeuristics(
   },
 ): void {
   const slot = String(
-    params.pendingClarification?.slot ??
-      params.pendingClarification?.target ??
-      '',
+    params.pendingClarification?.slot ?? params.pendingClarification?.target ?? '',
   );
   if (!slot) return;
 
@@ -330,20 +309,14 @@ export class IntentService {
         `Cliente: ${params.customerName ?? 'desconocido'}`,
         `Estado actual: ${params.currentState}`,
         `Clarificación pendiente: ${
-          params.pendingClarification
-            ? JSON.stringify(params.pendingClarification)
-            : 'null'
+          params.pendingClarification ? JSON.stringify(params.pendingClarification) : 'null'
         }`,
         `Resumen carrito: ${params.draftCartSummary ?? 'null'}`,
-        `Facts cliente: ${
-          params.customerFacts ? JSON.stringify(params.customerFacts) : 'null'
-        }`,
+        `Facts cliente: ${params.customerFacts ? JSON.stringify(params.customerFacts) : 'null'}`,
         `Resumen conversación: ${params.conversationSummary ?? 'null'}`,
         `Contexto semántico: ${
           params.semanticContext?.length
-            ? params.semanticContext
-                .map((msg) => `[${msg.role}] ${msg.content}`)
-                .join('\n')
+            ? params.semanticContext.map((msg) => `[${msg.role}] ${msg.content}`).join('\n')
             : 'null'
         }`,
         `Turno del usuario: ${params.turnText}`,

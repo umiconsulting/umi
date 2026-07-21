@@ -22,16 +22,80 @@ export interface CapabilitiesShape {
 }
 
 export const MODULES: Record<string, ModuleConfig> = {
-  overview: { id: 'overview', label: 'Overview', icon: 'Home', section: 'OPERATIONS', product: 'dashboard' },
-  orders: { id: 'orders', label: 'Pedidos', icon: 'Receipt', section: 'OPERATIONS', product: 'kds', locationScoped: true },
-  devices: { id: 'devices', label: 'Devices', icon: 'Tablet', section: 'OPERATIONS', product: 'kds', locationScoped: true },
-  staff: { id: 'staff', label: 'Staff & Access', icon: 'Users', section: 'OPERATIONS', product: 'dashboard' },
-  customers: { id: 'customers', label: 'Customers', icon: 'Users2', section: 'OPERATIONS', product: 'dashboard' },
-  members: { id: 'members', label: 'Loyalty', icon: 'CreditCard', section: 'GROWTH', product: 'cash' },
-  'gift-cards': { id: 'gift-cards', label: 'Gift Cards', icon: 'Gift', section: 'GROWTH', product: 'cash' },
-  hours: { id: 'hours', label: 'Hours & Availability', icon: 'Clock', section: 'CONFIGURATION', product: 'conversaflow', locationScoped: true },
-  settings: { id: 'settings', label: 'Settings', icon: 'Settings', section: 'CONFIGURATION', product: 'dashboard' },
-  'products-billing': { id: 'products-billing', label: 'Products & Billing', icon: 'Sparkles', section: 'CONFIGURATION', product: 'dashboard', role: 'super_admin' },
+  overview: {
+    id: 'overview',
+    label: 'Overview',
+    icon: 'Home',
+    section: 'OPERATIONS',
+    product: 'dashboard',
+  },
+  orders: {
+    id: 'orders',
+    label: 'Pedidos',
+    icon: 'Receipt',
+    section: 'OPERATIONS',
+    product: 'kds',
+    locationScoped: true,
+  },
+  devices: {
+    id: 'devices',
+    label: 'Devices',
+    icon: 'Tablet',
+    section: 'OPERATIONS',
+    product: 'kds',
+    locationScoped: true,
+  },
+  staff: {
+    id: 'staff',
+    label: 'Staff & Access',
+    icon: 'Users',
+    section: 'OPERATIONS',
+    product: 'dashboard',
+  },
+  customers: {
+    id: 'customers',
+    label: 'Customers',
+    icon: 'Users2',
+    section: 'OPERATIONS',
+    product: 'dashboard',
+  },
+  members: {
+    id: 'members',
+    label: 'Loyalty',
+    icon: 'CreditCard',
+    section: 'GROWTH',
+    product: 'cash',
+  },
+  'gift-cards': {
+    id: 'gift-cards',
+    label: 'Gift Cards',
+    icon: 'Gift',
+    section: 'GROWTH',
+    product: 'cash',
+  },
+  hours: {
+    id: 'hours',
+    label: 'Hours & Availability',
+    icon: 'Clock',
+    section: 'CONFIGURATION',
+    product: 'conversaflow',
+    locationScoped: true,
+  },
+  settings: {
+    id: 'settings',
+    label: 'Settings',
+    icon: 'Settings',
+    section: 'CONFIGURATION',
+    product: 'dashboard',
+  },
+  'products-billing': {
+    id: 'products-billing',
+    label: 'Products & Billing',
+    icon: 'Sparkles',
+    section: 'CONFIGURATION',
+    product: 'dashboard',
+    role: 'super_admin',
+  },
 };
 
 export const MODULE_ORDER = [
@@ -59,10 +123,7 @@ function isProductActive(productKey: string, cap: CapabilitiesShape): boolean {
 function hasRequiredRole(moduleConfig: ModuleConfig, cap: CapabilitiesShape): boolean {
   if (!moduleConfig.role) return true;
   const membership = cap.membership;
-  return (
-    membership?.role === moduleConfig.role ||
-    !!membership?.permissions?.includes('*')
-  );
+  return membership?.role === moduleConfig.role || !!membership?.permissions?.includes('*');
 }
 
 export function getModuleAvailability(
@@ -93,7 +154,5 @@ export function getModuleAvailability(
 export function buildModuleAvailability(
   cap: CapabilitiesShape,
 ): Record<string, ModuleAvailability> {
-  return Object.fromEntries(
-    MODULE_ORDER.map((key) => [key, getModuleAvailability(key, cap)]),
-  );
+  return Object.fromEntries(MODULE_ORDER.map((key) => [key, getModuleAvailability(key, cap)]));
 }

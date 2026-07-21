@@ -80,28 +80,21 @@ export class AuthController {
 
   @Public()
   @Post('local/forgot-password')
-  async forgotPassword(
-    @Body() dto: ForgotPasswordDto,
-  ): Promise<{ ok: true }> {
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<{ ok: true }> {
     await this.auth.forgotPassword(dto.email);
     return { ok: true };
   }
 
   @Public()
   @Post('local/reset-password')
-  async resetPassword(
-    @Body() dto: ResetPasswordDto,
-  ): Promise<{ ok: true }> {
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ ok: true }> {
     await this.auth.resetPassword(dto.token, dto.password);
     return { ok: true };
   }
 
   /** Cookie-based session bootstrap for the SPA (authed). */
   @Get('me')
-  async me(
-    @Req() req: FastifyRequest,
-    @CurrentUser() user: AuthUser,
-  ): Promise<SessionResponse> {
+  async me(@Req() req: FastifyRequest, @CurrentUser() user: AuthUser): Promise<SessionResponse> {
     const session = await this.auth.session(user.id);
     return {
       session: {
@@ -143,11 +136,7 @@ export class AuthController {
     return this.accessExpiresIn();
   }
 
-  private setAuthCookies(
-    reply: FastifyReply,
-    result: LoginResult,
-    remember: boolean,
-  ): void {
+  private setAuthCookies(reply: FastifyReply, result: LoginResult, remember: boolean): void {
     reply.setCookie(
       ACCESS_COOKIE,
       result.accessToken,
@@ -174,10 +163,7 @@ export class AuthController {
   }
 }
 
-function toSession(
-  result: LoginResult,
-  accessExpiresIn: number,
-): SessionEnvelope {
+function toSession(result: LoginResult, accessExpiresIn: number): SessionEnvelope {
   return {
     user: result.user,
     tenants: result.tenants,

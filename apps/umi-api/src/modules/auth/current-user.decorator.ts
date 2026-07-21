@@ -19,8 +19,7 @@ export const Tenant = createParamDecorator(
 /** Injects the public tenant (set by PublicTenantGuard) for no-login routes. */
 export const PubTenant = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): PublicTenant | undefined => {
-    return ctx
-      .switchToHttp()
-      .getRequest<AuthedRequest & { publicTenant?: PublicTenant }>().publicTenant;
+    return ctx.switchToHttp().getRequest<AuthedRequest & { publicTenant?: PublicTenant }>()
+      .publicTenant;
   },
 );

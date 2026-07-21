@@ -96,10 +96,7 @@ export class ConversationTurnsRepository {
   constructor(private readonly pg: PgService) {}
 
   /** Trailing run of consecutive user messages (stops at the first assistant). */
-  async getTrailingUserRun(
-    conversationId: string,
-    limit = 20,
-  ): Promise<MessageRunItem[]> {
+  async getTrailingUserRun(conversationId: string, limit = 20): Promise<MessageRunItem[]> {
     const { rows } = await this.pg.query<MessageRunItem>(
       `SELECT id::text,
               CASE sender WHEN 'customer' THEN 'user' WHEN 'bot' THEN 'assistant'
@@ -201,7 +198,8 @@ export class ConversationTurnsRepository {
           RETURNING ${TURN_COLUMNS}`,
         [...cols, params.existingTurnId],
       );
-      if (!rows[0]) throw new Error(`update conversation_turn failed (id ${params.existingTurnId})`);
+      if (!rows[0])
+        throw new Error(`update conversation_turn failed (id ${params.existingTurnId})`);
       return mapTurn(rows[0]);
     }
 

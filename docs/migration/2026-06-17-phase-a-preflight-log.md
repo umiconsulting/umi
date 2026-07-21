@@ -5,11 +5,12 @@ Execution log for the Phase A restore + baseline. Cluster: **Homebrew
 on 5432 is the unrelated POS8 app stack).
 
 ## Dumps
-| File | Source | Format | Status |
-|---|---|---|---|
-| `apps/umi-cash/cash_prod_20260617.dump` | direct `pg_dump` of Cash prod `rrkzhisnadfrgnhntkiz` | custom v1.16 | ✅ full data (2,252 data lines) |
-| `apps/umi-cash/platform_prod_20260617.dump` | "converted" via CLI pooler → temp PG → re-dump | custom v1.16 | ❌ schema-only — data lost (102 data lines). **Superseded.** |
-| `apps/umi-cash/platform_prod_20260617_full.dump` | raw `pg_dump` over Session pooler (IPv4) | custom v1.16, 7.5 MB | ✅ full data (18,347 data lines) |
+
+| File                                             | Source                                               | Format               | Status                                                       |
+| ------------------------------------------------ | ---------------------------------------------------- | -------------------- | ------------------------------------------------------------ |
+| `apps/umi-cash/cash_prod_20260617.dump`          | direct `pg_dump` of Cash prod `rrkzhisnadfrgnhntkiz` | custom v1.16         | ✅ full data (2,252 data lines)                              |
+| `apps/umi-cash/platform_prod_20260617.dump`      | "converted" via CLI pooler → temp PG → re-dump       | custom v1.16         | ❌ schema-only — data lost (102 data lines). **Superseded.** |
+| `apps/umi-cash/platform_prod_20260617_full.dump` | raw `pg_dump` over Session pooler (IPv4)             | custom v1.16, 7.5 MB | ✅ full data (18,347 data lines)                             |
 
 ## Cash — restored ✅ → `umi_cash_production_local_20260617` (public-only, clean, exit 0)
 
@@ -19,16 +20,18 @@ RewardRedemption 16 · Tenant 5 · Location 4 · Transaction 7 · GiftCard 1 ·
 BirthdayReward 0 · _prisma_migrations 18.
 
 ### MONEY BASELINE (guardrail #3 reference — conservation must preserve these)
-| Metric | Rows | Centavos |
-|---|---|---|
-| `LoyaltyCard.balanceCentavos` (wallet balances) | 344 | **95,000** |
-| `Transaction.amountCentavos` net (+115,000 TOPUP / −20,101 PURCHASE) | 7 | 94,899 |
-| `GiftCard.amountCentavos` | 1 | 10,000 |
+
+| Metric                                                               | Rows | Centavos   |
+| -------------------------------------------------------------------- | ---- | ---------- |
+| `LoyaltyCard.balanceCentavos` (wallet balances)                      | 344  | **95,000** |
+| `Transaction.amountCentavos` net (+115,000 TOPUP / −20,101 PURCHASE) | 7    | 94,899     |
+| `GiftCard.amountCentavos`                                            | 1    | 10,000     |
 
 → Migration must conserve **95,000 centavos across 344 cards** into
 `loyalty.points_ledger` (reason `migration_initial_balance`) and `loyalty.balances`.
 
 ## Inventory findings (feed §10.1 "every source table accounted for")
+
 - **Data grew since May:** LoyaltyCard 208 (May doc) → **344** today. Confirms why
   guardrail #3 demands a fresh dump; any plan numbers from May are stale.
 - **`public."LifecycleEvent"` (170 rows)** is NOT in the movement map or the FDW
@@ -52,6 +55,7 @@ cleanup, not a truncated dump — referential check is clean (0 orphan messages;
 internally consistent and complete.
 
 ## Done this pass
+
 - ✅ Cash restored + money baseline captured (95,000¢ / 344 cards).
 - ✅ Platform re-dumped **with data** (Session pooler) + restored + verified consistent.
 - ✅ `020_local_source_fdw.sql` repointed to port **5233** + dated names `20260617`.
@@ -62,7 +66,7 @@ internally consistent and complete.
 
 ## Fresh Cash re-dump (2026-06-18) — supersedes the 0617 Cash source
 
-The 0617 Cash dump *file* was no longer on disk (only the local restore remained).
+The 0617 Cash dump _file_ was no longer on disk (only the local restore remained).
 Took a new read-only dump straight from live Cash prod `rrkzhisnadfrgnhntkiz`
 (`.env.local` `DATABASE_URL`, Session pooler — **not** the stale
 `xbudknbimkgjjgohnjgp …?schema=umi_cash` copy).
@@ -74,19 +78,21 @@ Took a new read-only dump straight from live Cash prod `rrkzhisnadfrgnhntkiz`
   (4 refs); platform server left at `_20260617` (6 refs).
 
 ### Row deltas vs 0617 — all growth is zero-balance
-| Table | 0617 | 0618 | Δ |
-|---|---|---|---|
-| LoyaltyCard | 344 | 348 | +4 |
-| User | 352 | 356 | +4 |
-| Visit | 378 | 385 | +7 |
-| LifecycleEvent | 170 | 170 | — |
+
+| Table          | 0617 | 0618 | Δ   |
+| -------------- | ---- | ---- | --- |
+| LoyaltyCard    | 344  | 348  | +4  |
+| User           | 352  | 356  | +4  |
+| Visit          | 378  | 385  | +7  |
+| LifecycleEvent | 170  | 170  | —   |
 
 ### MONEY BASELINE — unchanged (conservation target holds)
-| Metric | Rows | Centavos |
-|---|---|---|
-| `LoyaltyCard.balanceCentavos` (4 cards carry balance) | 348 | **95,000** |
-| `Transaction.amountCentavos` net (+115,000 TOPUP / −20,101 PURCHASE) | 7 | 94,899 |
-| `GiftCard.amountCentavos` | 1 | 10,000 |
+
+| Metric                                                               | Rows | Centavos   |
+| -------------------------------------------------------------------- | ---- | ---------- |
+| `LoyaltyCard.balanceCentavos` (4 cards carry balance)                | 348  | **95,000** |
+| `Transaction.amountCentavos` net (+115,000 TOPUP / −20,101 PURCHASE) | 7    | 94,899     |
+| `GiftCard.amountCentavos`                                            | 1    | 10,000     |
 
 → Phase C conservation gate target stays **95,000¢ across 344→348 cards**. The 4
 new cards / 4 users / 7 visits since 0617 are all zero-balance.
@@ -97,13 +103,14 @@ new cards / 4 users / 7 visits since 0617 are all zero-balance.
 > final source for the Phase C / K conservation re-run.
 
 ### `public."LifecycleEvent"` — characterized (disposition pending)
+
 Cash lifecycle-nudge log (`id`, `cardId`→`LoyaltyCard`, `journey`, `sentAt`,
 `body`). 170 sends across 147 cards, 2026-05-17 → 06-13: `welcome_no_visit` 71 ·
 `winback_14` 46 · `winback_30` 42 · `winback_60` 7 · `streak_6w` 2 · `streak_3w` 2.
 
 **Not exhaust — it is the campaign's at-most-once idempotency ledger.**
 `apps/umi-cash/src/lib/lifecycle.ts` enforces `UNIQUE(cardId, journey)` and uses
-*insert-first* dedup: the cron inserts the `LifecycleEvent` and treats a `P2002`
+_insert-first_ dedup: the cron inserts the `LifecycleEvent` and treats a `P2002`
 unique-violation as "already sent → skip." The row's existence is the send guard
 (`reward_expiring_${year}` is year-suffixed so it re-nudges annually — journey is
 the intended dedup grain).
@@ -111,11 +118,12 @@ the intended dedup grain).
 **Consequence:** if the lifecycle cron is ported to the new platform and this
 table is **dropped**, every migrated card reads as never-messaged → the guard is
 empty → **mass re-send** (71 second-welcomes, all winbacks re-nudged). So drop is
-*not* a clean no-op.
+_not_ a clean no-op.
 
 **Disposition rule:**
+
 - Lifecycle feature **ported** → **migrate the `(card→person/account, journey,
-  sentAt)` dedup keys** into the new automation's send-guard (`body` optional, for
+sentAt)` dedup keys** into the new automation's send-guard (`body` optional, for
   customer-360). Add to the movement map + FDW import (currently in neither).
 - Feature **retired / rebuilt without historical dedup** → document-as-dropped.
 

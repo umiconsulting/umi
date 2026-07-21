@@ -4,7 +4,7 @@
 **Driver:** `docs/migration/2026-06-09-workspace-integration-implementation-plan.md` (Phase 5)
 **Mode:** S5.1 executed; S5.2 executed as an isolated rehearsal (full import gated); S5.3 assessed, not executed. All stoppers below.
 
-Program rule 1 (sequencing invariant: database → backend → monorepo) gates the *cutover* of Phase 5, not its rehearsal. Everything executed here is additive at the workspace root or isolated in `/tmp`; no app repo behavior, deploy, or remote layout changed (one exception: umi-kds received the commit of already-executed S2.3 work — see F2).
+Program rule 1 (sequencing invariant: database → backend → monorepo) gates the _cutover_ of Phase 5, not its rehearsal. Everything executed here is additive at the workspace root or isolated in `/tmp`; no app repo behavior, deploy, or remote layout changed (one exception: umi-kds received the commit of already-executed S2.3 work — see F2).
 
 ---
 
@@ -28,19 +28,20 @@ Mechanic proven in `/tmp/umi-phase5-rehearsal` (clone of the root repo): per app
 
 Evidence:
 
-| Repo | Branch imported | Commits preserved |
-|---|---|---|
-| umi-cash | main | 218/218 |
-| umi-conversaflow | architecture-v2 | 7/7 |
-| umi-dashboard | main | 4/4 |
-| umi-kds | main | 11/11 (incl. new `789bae5`) |
-| umi-landing-page | staging | 21/21 |
-| umi-logs | main | 5/5 |
+| Repo             | Branch imported | Commits preserved           |
+| ---------------- | --------------- | --------------------------- |
+| umi-cash         | main            | 218/218                     |
+| umi-conversaflow | architecture-v2 | 7/7                         |
+| umi-dashboard    | main            | 4/4                         |
+| umi-kds          | main            | 11/11 (incl. new `789bae5`) |
+| umi-landing-page | staging         | 21/21                       |
+| umi-logs         | main            | 5/5                         |
 
 Rehearsal total: 279 commits = 7 root + 266 imported + 6 merge commits — exact. History appears natively under `apps/<name>` (no `--follow` needed) because filter-repo rewrites paths; this is why filter-repo beats `git subtree` here (subtree keeps original root paths in old commits, so per-path log/blame degrade).
 
 Two mechanics lessons captured for the final run:
-1. `git clone` of a local path uses hardlinks and **filter-repo refuses to run on it** — the first rehearsal attempt merged *unrewritten* trees and collided at root paths (`AGENTS.md`, `CLAUDE.md`, `package.json`). Always `--no-local`.
+
+1. `git clone` of a local path uses hardlinks and **filter-repo refuses to run on it** — the first rehearsal attempt merged _unrewritten_ trees and collided at root paths (`AGENTS.md`, `CLAUDE.md`, `package.json`). Always `--no-local`.
 2. `git-filter-repo` is not preinstalled; installed via Homebrew (pip is PEP-668-blocked on this machine).
 
 ## S5.3 — Renames + deploy repointing: ASSESSED, blocked

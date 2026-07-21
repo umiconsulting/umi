@@ -1,39 +1,58 @@
-import React, { useState, useEffect } from 'react'
-import { I } from '@/icons.jsx'
-import { XSep } from '@/shell.jsx'
-import { useTenantData, saveTenantSettings, saveRewardConfig, useVoiceConfig, saveTenantVoice, getBranchProfiles, saveBranchProfile } from '@/data.jsx'
-import { useTenant } from '@/lib/tenant-context.jsx'
+import React, { useState, useEffect } from 'react';
+import { I } from '@/icons.jsx';
+import { XSep } from '@/shell.jsx';
+import {
+  useTenantData,
+  saveTenantSettings,
+  saveRewardConfig,
+  useVoiceConfig,
+  saveTenantVoice,
+  getBranchProfiles,
+  saveBranchProfile,
+} from '@/data.jsx';
+import { useTenant } from '@/lib/tenant-context.jsx';
 
 // Screen 5 — Settings (Branding + Loyalty + Promotions)
 // Data: useTenantData() → umi-cash GET /api/[slug]/admin/settings + reward-config
 // Save: saveTenantSettings(patch) → PATCH /api/[slug]/admin/settings
 //       saveRewardConfig(patch)   → PATCH /api/[slug]/admin/reward-config
 
-
 const DOW = [
-  { id: 'dom', l: 'Dom' }, { id: 'lun', l: 'Lun' }, { id: 'mar', l: 'Mar' },
-  { id: 'mie', l: 'Mié' }, { id: 'jue', l: 'Jue' }, { id: 'vie', l: 'Vie' }, { id: 'sab', l: 'Sáb' },
+  { id: 'dom', l: 'Dom' },
+  { id: 'lun', l: 'Lun' },
+  { id: 'mar', l: 'Mar' },
+  { id: 'mie', l: 'Mié' },
+  { id: 'jue', l: 'Jue' },
+  { id: 'vie', l: 'Vie' },
+  { id: 'sab', l: 'Sáb' },
 ];
 
 // promoDays stored as "0,2,4" (getDay() values). Map DOW ids ↔ day numbers.
 const DOW_NUM = { dom: '0', lun: '1', mar: '2', mie: '3', jue: '4', vie: '5', sab: '6' };
 
-const PRESET_COLORS = ['#B5605A', '#223979', '#7692CB', '#5B7A4C', '#B5812A', '#1F1410', '#A8463F', '#2D5F8F'];
+const PRESET_COLORS = [
+  '#B5605A',
+  '#223979',
+  '#7692CB',
+  '#5B7A4C',
+  '#B5812A',
+  '#1F1410',
+  '#A8463F',
+  '#2D5F8F',
+];
 
 // Mirror of umi-api TONE_PRESETS labels — used only until the live GET resolves.
 const VOICE_PRESET_FALLBACK = [
-  { key: 'casual',   label: 'Casual' },
+  { key: 'casual', label: 'Casual' },
   { key: 'friendly', label: 'Amigable' },
-  { key: 'formal',   label: 'Formal' },
+  { key: 'formal', label: 'Formal' },
 ];
 const MIN_STAMP_TARGET = 1;
 const MAX_STAMP_TARGET = 10;
 const MAX_REWARD_NAME_LENGTH = 30;
 
-const clampStampTarget = value => Math.max(
-  MIN_STAMP_TARGET,
-  Math.min(MAX_STAMP_TARGET, parseInt(value, 10) || MIN_STAMP_TARGET)
-);
+const clampStampTarget = (value) =>
+  Math.max(MIN_STAMP_TARGET, Math.min(MAX_STAMP_TARGET, parseInt(value, 10) || MIN_STAMP_TARGET));
 
 const SettingsScreen = () => {
   const { data: tenant, loading } = useTenantData();
@@ -54,49 +73,56 @@ const SettingsScreen = () => {
   const [bizName, setBizName] = useState('');
 
   const [saving, setSaving] = useState(false);
-  const [saved,  setSaved]  = useState(false);
+  const [saved, setSaved] = useState(false);
 
   // Populate state from fetched tenant once it arrives
   useEffect(() => {
     if (!tenant) return;
     setBiz({
-      name:               tenant.name,
-      city:               tenant.city,
-      slug:               tenant.slug,
-      cardPrefix:         tenant.cardPrefix,
-      subscription:       tenant.subscriptionStatus,
+      name: tenant.name,
+      city: tenant.city,
+      slug: tenant.slug,
+      cardPrefix: tenant.cardPrefix,
+      subscription: tenant.subscriptionStatus,
     });
     setBrand({
-      primary:   tenant.primaryColor   || '#B5605A',
+      primary: tenant.primaryColor || '#B5605A',
       secondary: tenant.secondaryColor || '#E8C9A3',
       logoUrl: tenant.logoUrl || '',
     });
     setSelfReg(tenant.selfRegistration !== false);
     setBirthday({
-      on:          tenant.birthdayRewardEnabled !== false,
-      rewardName:  tenant.birthdayRewardName || 'Regalo de cumpleaños',
+      on: tenant.birthdayRewardEnabled !== false,
+      rewardName: tenant.birthdayRewardName || 'Regalo de cumpleaños',
     });
     const visitsRequired = clampStampTarget(tenant.rewardConfig?.visitsRequired ?? 10);
-    setLoyalty(tenant.rewardConfig ? {
-      rewardName:     (tenant.rewardConfig.rewardName || '').slice(0, MAX_REWARD_NAME_LENGTH),
-      visitsRequired,
-      rewardCost:     Math.round(tenant.rewardConfig.rewardCostCentavos / 100),
-    } : {
-      rewardName:     'Recompensa de temporada',
-      visitsRequired,
-      rewardCost:     0,
-    });
-    setStamps(s => Math.min(s, visitsRequired));
+    setLoyalty(
+      tenant.rewardConfig
+        ? {
+            rewardName: (tenant.rewardConfig.rewardName || '').slice(0, MAX_REWARD_NAME_LENGTH),
+            visitsRequired,
+            rewardCost: Math.round(tenant.rewardConfig.rewardCostCentavos / 100),
+          }
+        : {
+            rewardName: 'Recompensa de temporada',
+            visitsRequired,
+            rewardCost: 0,
+          },
+    );
+    setStamps((s) => Math.min(s, visitsRequired));
     // Parse promoDays "2,3,4" → ['mar','mie','jue']
     const promoNumToId = Object.fromEntries(Object.entries(DOW_NUM).map(([id, n]) => [n, id]));
     const days = tenant.promoDays
-      ? tenant.promoDays.split(',').map(n => promoNumToId[n.trim()]).filter(Boolean)
+      ? tenant.promoDays
+          .split(',')
+          .map((n) => promoNumToId[n.trim()])
+          .filter(Boolean)
       : ['mar', 'mie', 'jue'];
     setPromo({
       message: tenant.promoMessage || '',
-      from:    tenant.promoStartsAt ? tenant.promoStartsAt.slice(0,10) : '2026-05-15',
-      to:      tenant.promoEndsAt   ? tenant.promoEndsAt.slice(0,10)   : '2026-06-30',
-      days:    days,
+      from: tenant.promoStartsAt ? tenant.promoStartsAt.slice(0, 10) : '2026-05-15',
+      to: tenant.promoEndsAt ? tenant.promoEndsAt.slice(0, 10) : '2026-06-30',
+      days: days,
     });
   }, [tenant]);
 
@@ -105,56 +131,68 @@ const SettingsScreen = () => {
   useEffect(() => {
     if (!voiceData?.voice) return;
     setVoice({
-      tonePreset:    voiceData.voice.tone_preset || 'friendly',
+      tonePreset: voiceData.voice.tone_preset || 'friendly',
       assistantName: voiceData.voice.assistant_name || '',
-      customTone:    voiceData.voice.tone || '',
-      styleNotes:    (voiceData.voice.style_notes || []).join('\n'),
+      customTone: voiceData.voice.tone || '',
+      styleNotes: (voiceData.voice.style_notes || []).join('\n'),
     });
     setBizName(voiceData.businessName || voiceData.defaults?.assistant_name || '');
   }, [voiceData]);
 
-  const toggleDay = id => setPromo(p => ({
-    ...p, days: p.days.includes(id) ? p.days.filter(d => d !== id) : [...p.days, id],
-  }));
+  const toggleDay = (id) =>
+    setPromo((p) => ({
+      ...p,
+      days: p.days.includes(id) ? p.days.filter((d) => d !== id) : [...p.days, id],
+    }));
 
-  const setStampTarget = value => {
+  const setStampTarget = (value) => {
     const visitsRequired = clampStampTarget(value);
-    setLoyalty(l => l ? ({...l, visitsRequired}) : l);
-    setStamps(s => Math.min(s, visitsRequired));
+    setLoyalty((l) => (l ? { ...l, visitsRequired } : l));
+    setStamps((s) => Math.min(s, visitsRequired));
   };
 
   async function handleSave() {
     if (!biz || !brand || !promo) return;
     setSaving(true);
-    const promoDayNums = promo.days.map(id => DOW_NUM[id]).filter(Boolean).join(',');
+    const promoDayNums = promo.days
+      .map((id) => DOW_NUM[id])
+      .filter(Boolean)
+      .join(',');
     const saveResults = await Promise.allSettled([
       saveTenantSettings({
-        name:               biz.name,
-        city:               biz.city,
-        primaryColor:       brand.primary,
-        secondaryColor:     brand.secondary,
-        passStyle:          'stamps',
-        promoMessage:       promo.message,
-        promoStartsAt:      promo.from ? promo.from + 'T00:00:00.000Z' : null,
-        promoEndsAt:        promo.to   ? promo.to   + 'T23:59:59.000Z' : null,
-        promoDays:          promoDayNums || null,
-        selfRegistration:   selfReg,
+        name: biz.name,
+        city: biz.city,
+        primaryColor: brand.primary,
+        secondaryColor: brand.secondary,
+        passStyle: 'stamps',
+        promoMessage: promo.message,
+        promoStartsAt: promo.from ? promo.from + 'T00:00:00.000Z' : null,
+        promoEndsAt: promo.to ? promo.to + 'T23:59:59.000Z' : null,
+        promoDays: promoDayNums || null,
+        selfRegistration: selfReg,
         birthdayRewardEnabled: birthday.on,
-        birthdayRewardName:    birthday.rewardName,
+        birthdayRewardName: birthday.rewardName,
       }),
-      cashActive && loyalty && saveRewardConfig({
-        rewardName:          loyalty.rewardName.slice(0, MAX_REWARD_NAME_LENGTH),
-        visitsRequired:      loyalty.visitsRequired,
-        rewardCostCentavos:  Math.round((loyalty.rewardCost || 0) * 100),
-      }),
+      cashActive &&
+        loyalty &&
+        saveRewardConfig({
+          rewardName: loyalty.rewardName.slice(0, MAX_REWARD_NAME_LENGTH),
+          visitsRequired: loyalty.visitsRequired,
+          rewardCostCentavos: Math.round((loyalty.rewardCost || 0) * 100),
+        }),
       // Always send tone + assistant_name together: picking a chip with an empty
       // custom-tone field clears any stale freeform override (preset wins again).
-      conversaflowActive && voice && saveTenantVoice({
-        tone_preset:    voice.tonePreset,
-        assistant_name: voice.assistantName,
-        tone:           voice.customTone,
-        style_notes:    voice.styleNotes.split('\n').map(s => s.trim()).filter(Boolean),
-      }),
+      conversaflowActive &&
+        voice &&
+        saveTenantVoice({
+          tone_preset: voice.tonePreset,
+          assistant_name: voice.assistantName,
+          tone: voice.customTone,
+          style_notes: voice.styleNotes
+            .split('\n')
+            .map((s) => s.trim())
+            .filter(Boolean),
+        }),
     ]);
     const [settingsResult] = saveResults;
     if (settingsResult.status === 'fulfilled') {
@@ -164,9 +202,12 @@ const SettingsScreen = () => {
     // Don't flash "Cambios guardados" if any section's save rejected — the user
     // would otherwise lose those edits silently. (Gated `false`/`null` array
     // entries settle as fulfilled, so only real rejections are counted.)
-    const failed = saveResults.filter(r => r.status === 'rejected');
+    const failed = saveResults.filter((r) => r.status === 'rejected');
     if (failed.length) {
-      console.error('settings save: one or more sections failed', failed.map(r => r.reason));
+      console.error(
+        'settings save: one or more sections failed',
+        failed.map((r) => r.reason),
+      );
       return;
     }
     setSaved(true);
@@ -176,8 +217,11 @@ const SettingsScreen = () => {
   // Guard — show skeleton until state is seeded
   if (!biz || !brand || !promo || !birthday || (cashActive && !loyalty)) {
     return (
-      <div style={{display:'flex', flexDirection:'column', gap:24}}>
-        <div className="card fade-up d1" style={{padding:'40px 26px', textAlign:'center', color:'var(--ink-3)'}}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <div
+          className="card fade-up d1"
+          style={{ padding: '40px 26px', textAlign: 'center', color: 'var(--ink-3)' }}
+        >
           {loading ? 'Cargando ajustes…' : 'Sin datos de configuración.'}
         </div>
       </div>
@@ -185,95 +229,153 @@ const SettingsScreen = () => {
   }
 
   return (
-    <div style={{display:'flex', flexDirection:'column', gap:24}}>
-
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Save bar */}
-      <div className="card fade-up" style={{padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:16}}>
-        <div style={{fontSize:13, color:'var(--ink-2)'}}>
-          {saved
-            ? <span style={{color:'var(--success)', fontWeight:600}}>✓ Cambios guardados</span>
-            : cashActive
-              ? 'Los cambios de Cash se guardan solo porque Umi Cash está activo.'
-              : 'Cash no está activo: solo se guardan ajustes de negocio y operación.'
-          }
+      <div
+        className="card fade-up"
+        style={{
+          padding: '12px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+        }}
+      >
+        <div style={{ fontSize: 13, color: 'var(--ink-2)' }}>
+          {saved ? (
+            <span style={{ color: 'var(--success)', fontWeight: 600 }}>✓ Cambios guardados</span>
+          ) : cashActive ? (
+            'Los cambios de Cash se guardan solo porque Umi Cash está activo.'
+          ) : (
+            'Cash no está activo: solo se guardan ajustes de negocio y operación.'
+          )}
         </div>
         <button
           className="btn btn-primary focusable"
           onClick={handleSave}
           disabled={saving}
-          style={{opacity: saving ? 0.7 : 1, minWidth:120}}
+          style={{ opacity: saving ? 0.7 : 1, minWidth: 120 }}
         >
-          {saving ? 'Guardando…' : saved ? <><I.Check size={15}/> Guardado</> : 'Guardar cambios'}
+          {saving ? (
+            'Guardando…'
+          ) : saved ? (
+            <>
+              <I.Check size={15} /> Guardado
+            </>
+          ) : (
+            'Guardar cambios'
+          )}
         </button>
       </div>
 
       {/* Sucursales — branch aliases/descriptor (multi-branch, ConversaFlow only) */}
-      {conversaflowActive && <BranchProfilesCard/>}
+      {conversaflowActive && <BranchProfilesCard />}
 
       {/* Business info */}
-      <div className="card fade-up d1" style={{padding:'24px 26px'}}>
-        <div className="ed-head" style={{marginBottom:18}}>
+      <div className="card fade-up d1" style={{ padding: '24px 26px' }}>
+        <div className="ed-head" style={{ marginBottom: 18 }}>
           <div className="titles">
-            <div className="sec-index"><span className="nn">A</span><span>/</span><span>NEGOCIO</span></div>
+            <div className="sec-index">
+              <span className="nn">A</span>
+              <span>/</span>
+              <span>NEGOCIO</span>
+            </div>
             <h2>Información del negocio</h2>
             <div className="en">Business information</div>
           </div>
           <span className="sub-pill">
-            <span className="sd"/>
-            {biz.subscription} <XSep/> UMI DASH
+            <span className="sd" />
+            {biz.subscription} <XSep /> UMI DASH
           </span>
         </div>
-        <div className="grid grid-3" style={{gap:18}}>
+        <div className="grid grid-3" style={{ gap: 18 }}>
           <div className="field">
             <label>Business name</label>
-            <input className="input tall" value={biz.name} onChange={e => setBiz(b => ({...b, name: e.target.value}))}/>
+            <input
+              className="input tall"
+              value={biz.name}
+              onChange={(e) => setBiz((b) => ({ ...b, name: e.target.value }))}
+            />
           </div>
           <div className="field">
             <label>City</label>
-            <input className="input tall" value={biz.city || ''} onChange={e => setBiz(b => ({...b, city: e.target.value}))}/>
+            <input
+              className="input tall"
+              value={biz.city || ''}
+              onChange={(e) => setBiz((b) => ({ ...b, city: e.target.value }))}
+            />
           </div>
           <div className="field">
             <label>Account status</label>
-            <span className="chip read" style={{height:52, fontSize:13, alignSelf:'stretch', justifyContent:'flex-start'}}>
+            <span
+              className="chip read"
+              style={{
+                height: 52,
+                fontSize: 13,
+                alignSelf: 'stretch',
+                justifyContent: 'flex-start',
+              }}
+            >
               {(biz.subscription || 'ACTIVE').toUpperCase()} · Managed from Products & Billing
             </span>
           </div>
           <div className="field">
             <label>Slug</label>
-            <div style={{display:'flex', alignItems:'center', gap:8}}>
-              <span className="chip read" style={{height:44, fontSize:13}}>umi.app/{biz.slug}</span>
-              <button className="btn-icon" aria-label="Copy"><I.Refresh size={14}/></button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="chip read" style={{ height: 44, fontSize: 13 }}>
+                umi.app/{biz.slug}
+              </span>
+              <button className="btn-icon" aria-label="Copy">
+                <I.Refresh size={14} />
+              </button>
             </div>
           </div>
           <div className="field">
             <label>Card prefix</label>
-            <span className="chip read" style={{height:44, fontSize:13}}>
+            <span className="chip read" style={{ height: 44, fontSize: 13 }}>
               {cashActive ? `${biz.cardPrefix} · • • • •` : 'Unavailable without Umi Cash'}
             </span>
           </div>
           <div className="field">
             <label>Account ID</label>
-            <span className="chip read" style={{height:44, fontSize:12, alignSelf:'flex-start', paddingLeft:14, paddingRight:14}}>biz_8a2c4f9e1b6d</span>
+            <span
+              className="chip read"
+              style={{
+                height: 44,
+                fontSize: 12,
+                alignSelf: 'flex-start',
+                paddingLeft: 14,
+                paddingRight: 14,
+              }}
+            >
+              biz_8a2c4f9e1b6d
+            </span>
           </div>
         </div>
       </div>
 
       {/* Voice & tone — WhatsApp assistant (ConversaFlow) */}
       {conversaflowActive && voice && (
-        <div className="card fade-up d2" style={{padding:'24px 26px'}}>
-          <div className="ed-head" style={{marginBottom:18}}>
+        <div className="card fade-up d2" style={{ padding: '24px 26px' }}>
+          <div className="ed-head" style={{ marginBottom: 18 }}>
             <div className="titles">
-              <div className="sec-index"><span className="nn">V</span><span>/</span><span>VOZ <XSep/> CONVERSAFLOW</span></div>
+              <div className="sec-index">
+                <span className="nn">V</span>
+                <span>/</span>
+                <span>
+                  VOZ <XSep /> CONVERSAFLOW
+                </span>
+              </div>
               <h2>Voz y tono del asistente</h2>
               <div className="en">WhatsApp assistant voice &amp; tone</div>
             </div>
           </div>
 
           {/* Tone chips — single select */}
-          <div className="field" style={{marginBottom:18}}>
+          <div className="field" style={{ marginBottom: 18 }}>
             <label>Tono · cómo le habla el asistente a tus clientes</label>
-            <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
-              {(voiceData?.presets?.length ? voiceData.presets : VOICE_PRESET_FALLBACK).map(p => (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {(voiceData?.presets?.length ? voiceData.presets : VOICE_PRESET_FALLBACK).map((p) => (
                 <button
                   key={p.key}
                   className={'day-pill focusable' + (voice.tonePreset === p.key ? ' on' : '')}
@@ -281,252 +383,404 @@ const SettingsScreen = () => {
                   // actually takes effect — the engine gives freeform `tone`
                   // precedence over `tone_preset`, so a stale custom tone would
                   // otherwise make the chip inert.
-                  onClick={() => setVoice(v => ({...v, tonePreset: p.key, customTone: ''}))}
-                >{p.label}</button>
+                  onClick={() => setVoice((v) => ({ ...v, tonePreset: p.key, customTone: '' }))}
+                >
+                  {p.label}
+                </button>
               ))}
             </div>
             {voice.customTone.trim() ? (
-              <div style={{fontSize:12.5, color:'var(--ink-3)', marginTop:8, fontStyle:'italic'}}>
+              <div
+                style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 8, fontStyle: 'italic' }}
+              >
                 Usando tono personalizado — anula el chip seleccionado.
               </div>
-            ) : voiceData?.presets?.find(p => p.key === voice.tonePreset)?.description && (
-              <div style={{fontSize:12.5, color:'var(--ink-3)', marginTop:8}}>
-                {voiceData.presets.find(p => p.key === voice.tonePreset).description}
-              </div>
+            ) : (
+              voiceData?.presets?.find((p) => p.key === voice.tonePreset)?.description && (
+                <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 8 }}>
+                  {voiceData.presets.find((p) => p.key === voice.tonePreset).description}
+                </div>
+              )
             )}
           </div>
 
           {/* Advanced */}
-          <div className="grid grid-2" style={{gap:14}}>
+          <div className="grid grid-2" style={{ gap: 14 }}>
             <div className="field">
               <label>Nombre del asistente · opcional</label>
-              <input className="input tall"
+              <input
+                className="input tall"
                 value={voice.assistantName}
                 placeholder={bizName || 'Asistente'}
-                onChange={e => setVoice(v => ({...v, assistantName: e.target.value.slice(0,60)}))}/>
+                onChange={(e) =>
+                  setVoice((v) => ({ ...v, assistantName: e.target.value.slice(0, 60) }))
+                }
+              />
             </div>
             <div className="field">
               <label>Tono personalizado · opcional (anula el chip)</label>
-              <input className="input tall"
+              <input
+                className="input tall"
                 value={voice.customTone}
                 placeholder="Ej. relajado, con modismos del norte"
-                onChange={e => setVoice(v => ({...v, customTone: e.target.value.slice(0,280)}))}/>
+                onChange={(e) =>
+                  setVoice((v) => ({ ...v, customTone: e.target.value.slice(0, 280) }))
+                }
+              />
             </div>
-            <div className="field" style={{gridColumn:'1 / -1'}}>
+            <div className="field" style={{ gridColumn: '1 / -1' }}>
               <label>Notas de estilo · una por línea (máx. 8)</label>
-              <textarea className="input"
+              <textarea
+                className="input"
                 value={voice.styleNotes}
-                onChange={e => setVoice(v => ({...v, styleNotes: e.target.value}))}
-                style={{minHeight:80}}/>
+                onChange={(e) => setVoice((v) => ({ ...v, styleNotes: e.target.value }))}
+                style={{ minHeight: 80 }}
+              />
             </div>
           </div>
         </div>
       )}
 
       {!cashActive && (
-        <div className="card fade-up d2" style={{padding:'24px 26px'}}>
-          <div className="ed-head" style={{marginBottom:14}}>
+        <div className="card fade-up d2" style={{ padding: '24px 26px' }}>
+          <div className="ed-head" style={{ marginBottom: 14 }}>
             <div className="titles">
-              <div className="sec-index"><span className="nn">B</span><span>/</span><span>PRODUCTOS <XSep/> BILLING</span></div>
+              <div className="sec-index">
+                <span className="nn">B</span>
+                <span>/</span>
+                <span>
+                  PRODUCTOS <XSep /> BILLING
+                </span>
+              </div>
               <h2>Umi Cash no está activo</h2>
-              <div className="en">Wallet, loyalty, gift cards, and pass personalization are unavailable</div>
+              <div className="en">
+                Wallet, loyalty, gift cards, and pass personalization are unavailable
+              </div>
             </div>
-            <span className="sub-pill"><span className="sd"/> NOT ACTIVE</span>
+            <span className="sub-pill">
+              <span className="sd" /> NOT ACTIVE
+            </span>
           </div>
-          <div style={{fontSize:14, color:'var(--ink-3)', maxWidth:760}}>
-            Kalala tiene activos ConversaFlow y KDS. La configuración de wallet pass, sellos, recompensas, miembros y gift cards queda oculta hasta activar Umi Cash.
+          <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 760 }}>
+            Kalala tiene activos ConversaFlow y KDS. La configuración de wallet pass, sellos,
+            recompensas, miembros y gift cards queda oculta hasta activar Umi Cash.
           </div>
         </div>
       )}
 
       {/* Branding + wallet preview */}
-      {cashActive && <div className="grid fade-up d2" style={{gridTemplateColumns:'1fr 0.85fr', gap:24}}>
-        <div className="card" style={{padding:'24px 26px'}}>
-          <div className="ed-head" style={{marginBottom:18}}>
-            <div className="titles">
-              <div className="sec-index"><span className="nn">B</span><span>/</span><span>MARCA <XSep/> WALLET PASS</span></div>
-              <h2>Apariencia de la tarjeta</h2>
-              <div className="en">Wallet pass appearance</div>
+      {cashActive && (
+        <div className="grid fade-up d2" style={{ gridTemplateColumns: '1fr 0.85fr', gap: 24 }}>
+          <div className="card" style={{ padding: '24px 26px' }}>
+            <div className="ed-head" style={{ marginBottom: 18 }}>
+              <div className="titles">
+                <div className="sec-index">
+                  <span className="nn">B</span>
+                  <span>/</span>
+                  <span>
+                    MARCA <XSep /> WALLET PASS
+                  </span>
+                </div>
+                <h2>Apariencia de la tarjeta</h2>
+                <div className="en">Wallet pass appearance</div>
+              </div>
             </div>
-          </div>
 
-          <div className="field" style={{marginBottom:18}}>
-            <label>Primary color · card background</label>
-            <div style={{display:'flex', alignItems:'center', gap:14}}>
-              <input type="color" value={brand.primary} onChange={e => {
-                setBrand(b => ({...b, primary: e.target.value}));
-                document.documentElement.style.setProperty('--tenant-brand', e.target.value);
-              }}/>
-              <span className="chip read" style={{height:44, fontFamily:'var(--font-mono)', fontSize:13}}>{brand.primary.toUpperCase()}</span>
-              <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
-                {PRESET_COLORS.map(c => (
-                  <button
-                    key={c}
-                    className={'swatch focusable' + (brand.primary.toLowerCase() === c.toLowerCase() ? ' on' : '')}
-                    style={{background:c, width:28, height:28, borderRadius:8}}
-                    onClick={() => { setBrand(b => ({...b, primary: c})); document.documentElement.style.setProperty('--tenant-brand', c); }}
-                    aria-label={c}
+            <div className="field" style={{ marginBottom: 18 }}>
+              <label>Primary color · card background</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <input
+                  type="color"
+                  value={brand.primary}
+                  onChange={(e) => {
+                    setBrand((b) => ({ ...b, primary: e.target.value }));
+                    document.documentElement.style.setProperty('--tenant-brand', e.target.value);
+                  }}
+                />
+                <span
+                  className="chip read"
+                  style={{ height: 44, fontFamily: 'var(--font-mono)', fontSize: 13 }}
+                >
+                  {brand.primary.toUpperCase()}
+                </span>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {PRESET_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      className={
+                        'swatch focusable' +
+                        (brand.primary.toLowerCase() === c.toLowerCase() ? ' on' : '')
+                      }
+                      style={{ background: c, width: 28, height: 28, borderRadius: 8 }}
+                      onClick={() => {
+                        setBrand((b) => ({ ...b, primary: c }));
+                        document.documentElement.style.setProperty('--tenant-brand', c);
+                      }}
+                      aria-label={c}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="field" style={{ marginBottom: 18 }}>
+              <label>Secondary color · accents & details</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <input
+                  type="color"
+                  value={brand.secondary}
+                  onChange={(e) => setBrand((b) => ({ ...b, secondary: e.target.value }))}
+                />
+                <span
+                  className="chip read"
+                  style={{ height: 44, fontFamily: 'var(--font-mono)', fontSize: 13 }}
+                >
+                  {brand.secondary.toUpperCase()}
+                </span>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {['#E8C9A3', '#FFFFFF', '#7692CB', '#FAF4EC', '#C4A882', '#1F1410'].map((c) => (
+                    <button
+                      key={c}
+                      className={
+                        'swatch focusable' +
+                        (brand.secondary.toLowerCase() === c.toLowerCase() ? ' on' : '')
+                      }
+                      style={{ background: c, width: 28, height: 28, borderRadius: 8 }}
+                      onClick={() => setBrand((b) => ({ ...b, secondary: c }))}
+                      aria-label={c}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--line)', paddingTop: 18, marginTop: 4 }}>
+              <div className="sec-index" style={{ marginBottom: 12 }}>
+                <span className="nn">C</span>
+                <span>/</span>
+                <span>
+                  SELLOS <XSep /> REWARDCONFIG
+                </span>
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <h3 style={{ margin: '0 0 4px', fontSize: 16, lineHeight: 1.1 }}>
+                  Recompensas por sellos
+                </h3>
+                <div
+                  className="en"
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: '0.18em',
+                    textTransform: 'uppercase',
+                    color: 'var(--ink-3)',
+                    fontWeight: 600,
+                  }}
+                >
+                  Stamp rewards · RewardConfig
+                </div>
+              </div>
+              <div className="grid grid-2" style={{ gap: 14 }}>
+                <div className="field" style={{ gridColumn: '1 / -1' }}>
+                  <label>Reward name · shown to the customer</label>
+                  <input
+                    className="input tall"
+                    value={loyalty.rewardName}
+                    maxLength={MAX_REWARD_NAME_LENGTH}
+                    onChange={(e) =>
+                      setLoyalty((l) => ({
+                        ...l,
+                        rewardName: e.target.value.slice(0, MAX_REWARD_NAME_LENGTH),
+                      }))
+                    }
                   />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="field" style={{marginBottom:18}}>
-            <label>Secondary color · accents & details</label>
-            <div style={{display:'flex', alignItems:'center', gap:14}}>
-              <input type="color" value={brand.secondary} onChange={e => setBrand(b => ({...b, secondary: e.target.value}))}/>
-              <span className="chip read" style={{height:44, fontFamily:'var(--font-mono)', fontSize:13}}>{brand.secondary.toUpperCase()}</span>
-              <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
-                {['#E8C9A3','#FFFFFF','#7692CB','#FAF4EC','#C4A882','#1F1410'].map(c => (
-                  <button
-                    key={c}
-                    className={'swatch focusable' + (brand.secondary.toLowerCase() === c.toLowerCase() ? ' on' : '')}
-                    style={{background:c, width:28, height:28, borderRadius:8}}
-                    onClick={() => setBrand(b => ({...b, secondary: c}))}
-                    aria-label={c}
+                  <div style={{ fontSize: 11.5, color: 'var(--ink-3)', textAlign: 'right' }}>
+                    {loyalty.rewardName.length} / {MAX_REWARD_NAME_LENGTH}
+                  </div>
+                </div>
+                <div className="field">
+                  <label>Visits required</label>
+                  <input
+                    type="number"
+                    min={MIN_STAMP_TARGET}
+                    max={MAX_STAMP_TARGET}
+                    className="input tall"
+                    value={loyalty.visitsRequired}
+                    onChange={(e) => setStampTarget(e.target.value)}
                   />
-                ))}
+                </div>
+                <div className="field">
+                  <label>Reward cost · MXN</label>
+                  <input
+                    type="number"
+                    min={0}
+                    className="input tall"
+                    value={loyalty.rewardCost}
+                    onChange={(e) =>
+                      setLoyalty((l) => ({ ...l, rewardCost: parseInt(e.target.value) || 0 }))
+                    }
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          <div style={{borderTop:'1px solid var(--line)', paddingTop:18, marginTop:4}}>
-            <div className="sec-index" style={{marginBottom:12}}>
-              <span className="nn">C</span><span>/</span><span>SELLOS <XSep/> REWARDCONFIG</span>
-            </div>
-            <div style={{marginBottom:14}}>
-              <h3 style={{margin:'0 0 4px', fontSize:16, lineHeight:1.1}}>Recompensas por sellos</h3>
-              <div className="en" style={{fontSize:11, letterSpacing:'0.18em', textTransform:'uppercase', color:'var(--ink-3)', fontWeight:600}}>Stamp rewards · RewardConfig</div>
-            </div>
-            <div className="grid grid-2" style={{gap:14}}>
-              <div className="field" style={{gridColumn:'1 / -1'}}>
-                <label>Reward name · shown to the customer</label>
-                <input
-                  className="input tall"
-                  value={loyalty.rewardName}
-                  maxLength={MAX_REWARD_NAME_LENGTH}
-                  onChange={e => setLoyalty(l => ({...l, rewardName: e.target.value.slice(0, MAX_REWARD_NAME_LENGTH)}))}
-                />
-                <div style={{fontSize:11.5, color:'var(--ink-3)', textAlign:'right'}}>{loyalty.rewardName.length} / {MAX_REWARD_NAME_LENGTH}</div>
-              </div>
-              <div className="field">
-                <label>Visits required</label>
-                <input
-                  type="number" min={MIN_STAMP_TARGET} max={MAX_STAMP_TARGET}
-                  className="input tall"
-                  value={loyalty.visitsRequired}
-                  onChange={e => setStampTarget(e.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label>Reward cost · MXN</label>
-                <input
-                  type="number" min={0}
-                  className="input tall"
-                  value={loyalty.rewardCost}
-                  onChange={e => setLoyalty(l => ({...l, rewardCost: parseInt(e.target.value) || 0}))}
-                />
+          {/* Wallet pass live preview */}
+          <div
+            className="card-warm"
+            style={{
+              padding: '26px 22px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 18,
+              position: 'relative',
+            }}
+          >
+            <div style={{ position: 'absolute', top: 18, left: 22 }}>
+              <div className="eyebrow on-warm">Live preview</div>
+              <div
+                style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink-warm)', marginTop: 2 }}
+              >
+                iOS wallet pass
               </div>
             </div>
-          </div>
-
-        </div>
-
-        {/* Wallet pass live preview */}
-        <div className="card-warm" style={{padding:'26px 22px', display:'flex', flexDirection:'column', alignItems:'center', gap:18, position:'relative'}}>
-          <div style={{position:'absolute', top:18, left:22}}>
-            <div className="eyebrow on-warm">Live preview</div>
-            <div style={{fontWeight:600, fontSize:13, color:'var(--ink-warm)', marginTop:2}}>iOS wallet pass</div>
-          </div>
-          <div style={{paddingTop:28}}/>
-          <WalletPass
-            brand={brand}
-            biz={biz}
-            stamps={stamps}
-            loyalty={loyalty}
-            birthday={birthday}
-            topupEnabled={tenant.topupEnabled !== false}
-          />
-          <div style={{display:'flex', alignItems:'center', gap:12, marginTop:6}}>
-            <span style={{fontSize:12, color:'var(--ink-warm-soft)'}}>Max stamps</span>
-            <input
-              type="range" min={MIN_STAMP_TARGET} max={MAX_STAMP_TARGET} step={1}
-              value={loyalty.visitsRequired}
-              onChange={e => setStampTarget(e.target.value)}
-              style={{width:140, accentColor:'var(--umi-navy)'}}
+            <div style={{ paddingTop: 28 }} />
+            <WalletPass
+              brand={brand}
+              biz={biz}
+              stamps={stamps}
+              loyalty={loyalty}
+              birthday={birthday}
+              topupEnabled={tenant.topupEnabled !== false}
             />
-            <span style={{fontSize:12, fontWeight:600, color:'var(--ink-warm)', fontFamily:'var(--font-mono)'}}>{loyalty.visitsRequired} / {MAX_STAMP_TARGET}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
+              <span style={{ fontSize: 12, color: 'var(--ink-warm-soft)' }}>Max stamps</span>
+              <input
+                type="range"
+                min={MIN_STAMP_TARGET}
+                max={MAX_STAMP_TARGET}
+                step={1}
+                value={loyalty.visitsRequired}
+                onChange={(e) => setStampTarget(e.target.value)}
+                style={{ width: 140, accentColor: 'var(--umi-navy)' }}
+              />
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: 'var(--ink-warm)',
+                  fontFamily: 'var(--font-mono)',
+                }}
+              >
+                {loyalty.visitsRequired} / {MAX_STAMP_TARGET}
+              </span>
+            </div>
           </div>
         </div>
-      </div>}
+      )}
 
       {/* Birthday config */}
       {cashActive && (
-        <div className="card fade-up d3" style={{padding:'24px 26px'}}>
-          <div className="ed-head" style={{marginBottom:18}}>
+        <div className="card fade-up d3" style={{ padding: '24px 26px' }}>
+          <div className="ed-head" style={{ marginBottom: 18 }}>
             <div className="titles">
-              <div className="sec-index"><span className="nn">D</span><span>/</span><span>CUMPLEAÑOS <XSep/> AUTO</span></div>
+              <div className="sec-index">
+                <span className="nn">D</span>
+                <span>/</span>
+                <span>
+                  CUMPLEAÑOS <XSep /> AUTO
+                </span>
+              </div>
               <h2>Boost de cumpleaños</h2>
               <div className="en">Birthday rewards</div>
             </div>
-            <div className={'switch lg ' + (birthday.on ? 'on' : '')} onClick={() => setBirthday(b => ({...b, on: !b.on}))}/>
+            <div
+              className={'switch lg ' + (birthday.on ? 'on' : '')}
+              onClick={() => setBirthday((b) => ({ ...b, on: !b.on }))}
+            />
           </div>
           <div className="field">
             <label>Reward name · auto-issued on the customer's birthday</label>
             <input
               className="input tall"
               value={birthday.rewardName}
-              onChange={e => setBirthday(b => ({...b, rewardName: e.target.value}))}
+              onChange={(e) => setBirthday((b) => ({ ...b, rewardName: e.target.value }))}
               disabled={!birthday.on}
             />
           </div>
-          <p style={{fontSize:13, color:'var(--ink-3)', marginTop:10, marginBottom:0}}>
-            Sent automatically at 09:00 (local). Valid 7 days. Customers see a notification in WhatsApp.
+          <p style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 10, marginBottom: 0 }}>
+            Sent automatically at 09:00 (local). Valid 7 days. Customers see a notification in
+            WhatsApp.
           </p>
         </div>
       )}
 
       {/* Promotions */}
-      <div className="card fade-up d4" style={{padding:'24px 26px'}}>
-        <div className="ed-head" style={{marginBottom:18}}>
+      <div className="card fade-up d4" style={{ padding: '24px 26px' }}>
+        <div className="ed-head" style={{ marginBottom: 18 }}>
           <div className="titles">
-            <div className="sec-index"><span className="nn">E</span><span>/</span><span>PROMOCIONES <XSep/> ACTIVA</span></div>
+            <div className="sec-index">
+              <span className="nn">E</span>
+              <span>/</span>
+              <span>
+                PROMOCIONES <XSep /> ACTIVA
+              </span>
+            </div>
             <h2>Promoción del momento</h2>
             <div className="en">Active promo · Tenant.promoMessage</div>
           </div>
-          <button className="btn btn-secondary btn-sm focusable"><I.Plus size={14}/> Nueva</button>
+          <button className="btn btn-secondary btn-sm focusable">
+            <I.Plus size={14} /> Nueva
+          </button>
         </div>
-        <div className="grid" style={{gridTemplateColumns:'1.4fr 1fr', gap:18}}>
+        <div className="grid" style={{ gridTemplateColumns: '1.4fr 1fr', gap: 18 }}>
           <div className="field">
             <label>Message · sent on WhatsApp · max 200 chars</label>
             <textarea
               className="input"
               value={promo.message}
-              onChange={e => setPromo(p => ({...p, message: e.target.value.slice(0,200)}))}
-              style={{minHeight:100}}
+              onChange={(e) => setPromo((p) => ({ ...p, message: e.target.value.slice(0, 200) }))}
+              style={{ minHeight: 100 }}
               maxLength={200}
             />
-            <div style={{fontSize:11.5, color:'var(--ink-3)', textAlign:'right', marginTop:4}}>{promo.message.length} / 200</div>
+            <div
+              style={{ fontSize: 11.5, color: 'var(--ink-3)', textAlign: 'right', marginTop: 4 }}
+            >
+              {promo.message.length} / 200
+            </div>
           </div>
-          <div style={{display:'flex', flexDirection:'column', gap:14}}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div className="field">
               <label>Active range · Tenant.promoStartsAt → promoEndsAt</label>
-              <div style={{display:'flex', gap:8, alignItems:'center'}}>
-                <input type="date" className="input" style={{flex:1}} value={promo.from} onChange={e => setPromo(p => ({...p, from: e.target.value}))}/>
-                <span style={{color:'var(--ink-4)'}}>→</span>
-                <input type="date" className="input" style={{flex:1}} value={promo.to}   onChange={e => setPromo(p => ({...p, to: e.target.value}))}/>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="date"
+                  className="input"
+                  style={{ flex: 1 }}
+                  value={promo.from}
+                  onChange={(e) => setPromo((p) => ({ ...p, from: e.target.value }))}
+                />
+                <span style={{ color: 'var(--ink-4)' }}>→</span>
+                <input
+                  type="date"
+                  className="input"
+                  style={{ flex: 1 }}
+                  value={promo.to}
+                  onChange={(e) => setPromo((p) => ({ ...p, to: e.target.value }))}
+                />
               </div>
             </div>
             <div className="field">
               <label>Days of week · Tenant.promoDays</label>
-              <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
-                {DOW.map(d => (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {DOW.map((d) => (
                   <button
                     key={d.id}
                     className={'day-pill focusable' + (promo.days.includes(d.id) ? ' on' : '')}
                     onClick={() => toggleDay(d.id)}
-                  >{d.l}</button>
+                  >
+                    {d.l}
+                  </button>
                 ))}
               </div>
             </div>
@@ -535,19 +789,39 @@ const SettingsScreen = () => {
       </div>
 
       {/* Self-registration */}
-      {cashActive && <div className="card fade-up d5" style={{padding:'22px 26px', display:'flex', alignItems:'center', gap:20}}>
-        <div style={{width:48, height:48, borderRadius:14, background:'var(--canvas-2)', color:'var(--umi-navy)', display:'flex', alignItems:'center', justifyContent:'center'}}>
-          <I.Users size={20}/>
-        </div>
-        <div style={{flex:1}}>
-          <div className="eyebrow">Customer onboarding · Tenant.selfRegistration</div>
-          <div style={{fontWeight:600, fontSize:16, marginTop:4}}>Self-registration</div>
-          <div style={{fontSize:13, color:'var(--ink-3)', marginTop:2}}>
-            Customers can join the loyalty program by scanning a QR code at the table, without staff assistance.
+      {cashActive && (
+        <div
+          className="card fade-up d5"
+          style={{ padding: '22px 26px', display: 'flex', alignItems: 'center', gap: 20 }}
+        >
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 14,
+              background: 'var(--canvas-2)',
+              color: 'var(--umi-navy)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <I.Users size={20} />
           </div>
+          <div style={{ flex: 1 }}>
+            <div className="eyebrow">Customer onboarding · Tenant.selfRegistration</div>
+            <div style={{ fontWeight: 600, fontSize: 16, marginTop: 4 }}>Self-registration</div>
+            <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 2 }}>
+              Customers can join the loyalty program by scanning a QR code at the table, without
+              staff assistance.
+            </div>
+          </div>
+          <div
+            className={'switch lg ' + (selfReg ? 'on' : '')}
+            onClick={() => setSelfReg((s) => !s)}
+          />
         </div>
-        <div className={'switch lg ' + (selfReg ? 'on' : '')} onClick={() => setSelfReg(s => !s)}/>
-      </div>}
+      )}
     </div>
   );
 };
@@ -563,11 +837,14 @@ const WalletPass = ({ brand, biz, stamps, loyalty, birthday, topupEnabled }) => 
 
   return (
     <div className="wallet-device" aria-label="iOS Wallet pass preview">
-      <div className="wallet-pass" style={{'--wallet-bg': brand.primary, '--wallet-label': brand.secondary || '#FAEBDC'}}>
-        <div className="wallet-shine"/>
+      <div
+        className="wallet-pass"
+        style={{ '--wallet-bg': brand.primary, '--wallet-label': brand.secondary || '#FAEBDC' }}
+      >
+        <div className="wallet-shine" />
         <div className="wallet-top">
           <div className="wallet-logo">
-            <img src={logo} alt={biz.name} onError={hideBrokenImage}/>
+            <img src={logo} alt={biz.name} onError={hideBrokenImage} />
             <span>{biz.name}</span>
           </div>
           {topupEnabled && (
@@ -578,9 +855,12 @@ const WalletPass = ({ brand, biz, stamps, loyalty, birthday, topupEnabled }) => 
           )}
         </div>
 
-        <div className="wallet-strip" style={{background: brand.secondary || '#EFE0CC'}}>
-          <div className="wallet-stamp-grid" style={{gridTemplateColumns: `repeat(${stampCols}, 1fr)`}}>
-            {Array.from({length: loyalty.visitsRequired}).map((_, i) => (
+        <div className="wallet-strip" style={{ background: brand.secondary || '#EFE0CC' }}>
+          <div
+            className="wallet-stamp-grid"
+            style={{ gridTemplateColumns: `repeat(${stampCols}, 1fr)` }}
+          >
+            {Array.from({ length: loyalty.visitsRequired }).map((_, i) => (
               <img
                 key={i}
                 src={i < stamps ? filledStamp : emptyStamp}
@@ -592,13 +872,16 @@ const WalletPass = ({ brand, biz, stamps, loyalty, birthday, topupEnabled }) => 
         </div>
 
         <div className="wallet-fields">
-          <PassField label="VISITAS FALTANTES" value={`${remaining} visita${remaining === 1 ? '' : 's'}`}/>
-          <PassField label="TIPO DE RECOMPENSA" value={loyalty.rewardName}/>
-          {birthday?.on && <PassField label="REGALO DE CUMPLEANOS" value={birthday.rewardName}/>}
+          <PassField
+            label="VISITAS FALTANTES"
+            value={`${remaining} visita${remaining === 1 ? '' : 's'}`}
+          />
+          <PassField label="TIPO DE RECOMPENSA" value={loyalty.rewardName} />
+          {birthday?.on && <PassField label="REGALO DE CUMPLEANOS" value={birthday.rewardName} />}
         </div>
 
         <div className="wallet-barcode">
-          <FakeQr/>
+          <FakeQr />
           <div>{barcode}</div>
         </div>
       </div>
@@ -615,22 +898,23 @@ const PassField = ({ label, value }) => (
 
 const FakeQr = () => {
   const cells = [
-    0,1,2,3,4,6,7,10,12,14,15,16,17,18,
-    21,25,28,30,32,35,39,42,43,44,46,48,49,
-    51,54,56,57,60,62,64,67,69,70,72,75,77,
-    80,81,84,86,88,91,92,94,96,99,101,103,104,
-    106,108,111,114,116,118,120,121,123,126,128,
-    130,132,134,136,137,138,140,142,144,145,146,147,148,
+    0, 1, 2, 3, 4, 6, 7, 10, 12, 14, 15, 16, 17, 18, 21, 25, 28, 30, 32, 35, 39, 42, 43, 44, 46, 48,
+    49, 51, 54, 56, 57, 60, 62, 64, 67, 69, 70, 72, 75, 77, 80, 81, 84, 86, 88, 91, 92, 94, 96, 99,
+    101, 103, 104, 106, 108, 111, 114, 116, 118, 120, 121, 123, 126, 128, 130, 132, 134, 136, 137,
+    138, 140, 142, 144, 145, 146, 147, 148,
   ];
   return (
     <svg className="wallet-qr" viewBox="0 0 13 13" aria-hidden="true">
-      <rect width="13" height="13" fill="#fff"/>
-      {cells.map(cell => (
-        <rect key={cell} x={cell % 13} y={Math.floor(cell / 13)} width="1" height="1" fill="#111"/>
+      <rect width="13" height="13" fill="#fff" />
+      {cells.map((cell) => (
+        <rect key={cell} x={cell % 13} y={Math.floor(cell / 13)} width="1" height="1" fill="#111" />
       ))}
-      <rect x="1" y="1" width="3" height="3" fill="#111"/><rect x="2" y="2" width="1" height="1" fill="#fff"/>
-      <rect x="9" y="1" width="3" height="3" fill="#111"/><rect x="10" y="2" width="1" height="1" fill="#fff"/>
-      <rect x="1" y="9" width="3" height="3" fill="#111"/><rect x="2" y="10" width="1" height="1" fill="#fff"/>
+      <rect x="1" y="1" width="3" height="3" fill="#111" />
+      <rect x="2" y="2" width="1" height="1" fill="#fff" />
+      <rect x="9" y="1" width="3" height="3" fill="#111" />
+      <rect x="10" y="2" width="1" height="1" fill="#fff" />
+      <rect x="1" y="9" width="3" height="3" fill="#111" />
+      <rect x="2" y="10" width="1" height="1" fill="#fff" />
     </svg>
   );
 };
@@ -654,23 +938,37 @@ function BranchProfilesCard() {
   useEffect(() => {
     let active = true;
     getBranchProfiles()
-      .then((rows) => { if (active) setProfiles(rows); })
-      .catch(() => { if (active) setProfiles([]); });
-    return () => { active = false; };
+      .then((rows) => {
+        if (active) setProfiles(rows);
+      })
+      .catch(() => {
+        if (active) setProfiles([]);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
   // Aliases only matter when there is more than one branch to disambiguate.
   if (!profiles || profiles.length <= 1) return null;
   return (
-    <div className="card fade-up d2" style={{padding:'24px 26px'}}>
-      <div className="ed-head" style={{marginBottom:18}}>
+    <div className="card fade-up d2" style={{ padding: '24px 26px' }}>
+      <div className="ed-head" style={{ marginBottom: 18 }}>
         <div className="titles">
-          <div className="sec-index"><span className="nn">S</span><span>/</span><span>SUCURSALES</span></div>
+          <div className="sec-index">
+            <span className="nn">S</span>
+            <span>/</span>
+            <span>SUCURSALES</span>
+          </div>
           <h2>Sucursales y apodos</h2>
-          <div className="en">Cómo el bot reconoce a qué sucursal se refiere el cliente por WhatsApp</div>
+          <div className="en">
+            Cómo el bot reconoce a qué sucursal se refiere el cliente por WhatsApp
+          </div>
         </div>
       </div>
-      <div style={{display:'flex', flexDirection:'column', gap:14}}>
-        {profiles.map((p) => <BranchProfileRow key={p.id} profile={p}/>)}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {profiles.map((p) => (
+          <BranchProfileRow key={p.id} profile={p} />
+        ))}
       </div>
     </div>
   );
@@ -684,8 +982,9 @@ function BranchProfileRow({ profile }) {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
 
-  const dirty = JSON.stringify(aliases) !== JSON.stringify(profile.aliases || [])
-    || descriptor !== (profile.descriptor || '');
+  const dirty =
+    JSON.stringify(aliases) !== JSON.stringify(profile.aliases || []) ||
+    descriptor !== (profile.descriptor || '');
 
   function addAlias(v) {
     const t = (v || '').trim();
@@ -693,13 +992,18 @@ function BranchProfileRow({ profile }) {
     if (!t || aliases.some((a) => a.toLowerCase() === t.toLowerCase())) return;
     setAliases(aliases.concat(t).slice(0, 24));
   }
-  function removeAlias(i) { setAliases(aliases.filter((_, idx) => idx !== i)); }
+  function removeAlias(i) {
+    setAliases(aliases.filter((_, idx) => idx !== i));
+  }
 
   async function save() {
-    setSaving(true); setSaved(false); setError(null);
+    setSaving(true);
+    setSaved(false);
+    setError(null);
     try {
       await saveBranchProfile(profile.id, { aliases, descriptor: descriptor.trim() });
-      setSaved(true); setTimeout(() => setSaved(false), 2000);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     } catch (e) {
       console.error('branch profile save failed', e);
       setError('No se pudo guardar. Reintenta.');
@@ -709,44 +1013,86 @@ function BranchProfileRow({ profile }) {
   }
 
   return (
-    <div style={{border:'1px solid var(--line)', borderRadius:12, padding:16, display:'flex', flexDirection:'column', gap:12}}>
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:12}}>
-        <div style={{fontWeight:600, fontSize:14}}>{profile.name}</div>
-        <div style={{display:'flex', alignItems:'center', gap:10}}>
-          {error && <span role="alert" style={{color:'#c0392b', fontSize:12}}>{error}</span>}
+    <div
+      style={{
+        border: '1px solid var(--line)',
+        borderRadius: 12,
+        padding: 16,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+      }}
+    >
+      <div
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}
+      >
+        <div style={{ fontWeight: 600, fontSize: 14 }}>{profile.name}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {error && (
+            <span role="alert" style={{ color: '#c0392b', fontSize: 12 }}>
+              {error}
+            </span>
+          )}
           <button className="btn btn-secondary btn-sm" onClick={save} disabled={!dirty || saving}>
             {saving ? 'Guardando…' : saved ? '✓ Guardado' : error ? 'Reintentar' : 'Guardar'}
           </button>
         </div>
       </div>
-      <div className="field" style={{margin:0}}>
+      <div className="field" style={{ margin: 0 }}>
         <label>Apodos (cómo la llaman los clientes)</label>
-        <div style={{display:'flex', flexWrap:'wrap', gap:6, alignItems:'center'}}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
           {aliases.map((a, i) => (
-            <span key={i} className="chip" style={{display:'inline-flex', alignItems:'center', gap:6}}>
+            <span
+              key={i}
+              className="chip"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
               {a}
-              <button onClick={() => removeAlias(i)} aria-label={'Quitar ' + a}
-                style={{border:'none', background:'none', cursor:'pointer', color:'var(--ink-3)', fontSize:15, lineHeight:1, padding:0}}>×</button>
+              <button
+                onClick={() => removeAlias(i)}
+                aria-label={'Quitar ' + a}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--ink-3)',
+                  fontSize: 15,
+                  lineHeight: 1,
+                  padding: 0,
+                }}
+              >
+                ×
+              </button>
             </span>
           ))}
-          <input className="input" value={draft}
+          <input
+            className="input"
+            value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addAlias(draft); } }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ',') {
+                e.preventDefault();
+                addAlias(draft);
+              }
+            }}
             onBlur={() => addAlias(draft)}
             placeholder="+ apodo"
             maxLength={40}
-            style={{width:150, height:32, fontSize:12.5}}/>
+            style={{ width: 150, height: 32, fontSize: 12.5 }}
+          />
         </div>
       </div>
-      <div className="field" style={{margin:0}}>
+      <div className="field" style={{ margin: 0 }}>
         <label>Descripción (zona / referencia)</label>
-        <input className="input tall" value={descriptor}
+        <input
+          className="input tall"
+          value={descriptor}
           onChange={(e) => setDescriptor(e.target.value.slice(0, 160))}
-          placeholder="p. ej. la del centro, junto al parque"/>
+          placeholder="p. ej. la del centro, junto al parque"
+        />
       </div>
     </div>
   );
 }
 
-export default SettingsScreen
-
+export default SettingsScreen;

@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getSequenceManager } from "@/lib/email/sequence-manager";
-import { getEmailService } from "@/lib/email/email-service";
+import { NextRequest, NextResponse } from 'next/server';
+import { getSequenceManager } from '@/lib/email/sequence-manager';
+import { getEmailService } from '@/lib/email/email-service';
 
 // Interfaces para type safety
 interface RecentActivity {
@@ -49,15 +49,12 @@ export async function GET() {
         emailsFailed: metrics.emailsFailed,
         responseRate:
           metrics.totalLeads > 0
-            ? ((metrics.responsesReceived / metrics.totalLeads) * 100).toFixed(
-                1
-              ) + "%"
-            : "0%",
+            ? ((metrics.responsesReceived / metrics.totalLeads) * 100).toFixed(1) + '%'
+            : '0%',
         conversionRate:
           metrics.totalLeads > 0
-            ? ((metrics.conversions / metrics.totalLeads) * 100).toFixed(1) +
-              "%"
-            : "0%",
+            ? ((metrics.conversions / metrics.totalLeads) * 100).toFixed(1) + '%'
+            : '0%',
       },
       sequences: {
         active: await getActiveSequencesCount(),
@@ -67,13 +64,10 @@ export async function GET() {
       performance: {
         deliveryRate:
           emailMetrics.sent > 0
-            ? (
-                ((emailMetrics.sent - emailMetrics.failed) /
-                  emailMetrics.sent) *
-                100
-              ).toFixed(1) + "%"
-            : "0%",
-        avgResponseTime: "4.2 horas", // Calcular dinámicamente
+            ? (((emailMetrics.sent - emailMetrics.failed) / emailMetrics.sent) * 100).toFixed(1) +
+              '%'
+            : '0%',
+        avgResponseTime: '4.2 horas', // Calcular dinámicamente
         bestPerformingDay: getDayWithMostResponses(),
       },
       recentActivity: await getRecentActivity(),
@@ -85,11 +79,8 @@ export async function GET() {
       lastUpdated: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("❌ Error obteniendo dashboard:", error);
-    return NextResponse.json(
-      { error: "Error cargando dashboard" },
-      { status: 500 }
-    );
+    console.error('❌ Error obteniendo dashboard:', error);
+    return NextResponse.json({ error: 'Error cargando dashboard' }, { status: 500 });
   }
 }
 
@@ -99,7 +90,7 @@ export async function POST(request: NextRequest) {
     const { action } = await request.json();
 
     switch (action) {
-      case "reset_metrics":
+      case 'reset_metrics':
         const sequenceManager = getSequenceManager();
         const emailService = getEmailService();
 
@@ -108,21 +99,18 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
           success: true,
-          message: "Métricas reiniciadas exitosamente",
+          message: 'Métricas reiniciadas exitosamente',
         });
 
       default:
         return NextResponse.json(
-          { error: "Acción no válida", validActions: ["reset_metrics"] },
-          { status: 400 }
+          { error: 'Acción no válida', validActions: ['reset_metrics'] },
+          { status: 400 },
         );
     }
   } catch (error) {
-    console.error("❌ Error en acción del dashboard:", error);
-    return NextResponse.json(
-      { error: "Error procesando acción" },
-      { status: 500 }
-    );
+    console.error('❌ Error en acción del dashboard:', error);
+    return NextResponse.json({ error: 'Error procesando acción' }, { status: 500 });
   }
 }
 
@@ -139,22 +127,22 @@ async function getPausedSequencesCount(): Promise<number> {
 
 function getDayWithMostResponses(): string {
   // Calcular el día de la semana con más respuestas
-  return "Martes"; // Mock data
+  return 'Martes'; // Mock data
 }
 
 async function getRecentActivity(): Promise<RecentActivity[]> {
   // En producción, obtener actividad reciente de la base de datos
   return [
     {
-      type: "email_sent",
-      email: "ejemplo@empresa.com",
-      subject: "Día 2: Ventana cerrándose",
+      type: 'email_sent',
+      email: 'ejemplo@empresa.com',
+      subject: 'Día 2: Ventana cerrándose',
       timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     },
     {
-      type: "lead_responded",
-      email: "cliente@pyme.com",
-      responseType: "meeting_scheduled",
+      type: 'lead_responded',
+      email: 'cliente@pyme.com',
+      responseType: 'meeting_scheduled',
       timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
     },
   ];

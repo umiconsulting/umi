@@ -30,8 +30,7 @@ describe('KDS frozen contract', () => {
   it('device_revoked body is byte-exact (used for both 401 and 403)', () => {
     expect(DEVICE_REVOKED_BODY).toEqual({
       error: 'device_revoked',
-      message:
-        'This KDS device has been removed. Pair it again from the dashboard.',
+      message: 'This KDS device has been removed. Pair it again from the dashboard.',
     });
   });
 
@@ -113,15 +112,9 @@ describe('KDS notification copy (ported byte-for-byte)', () => {
     expect(statusNotificationBody('accepted')).toBe(
       'Tu pedido fue aceptado y está en cola en cocina.',
     );
-    expect(statusNotificationBody('preparing')).toBe(
-      'Tu pedido se está preparando.',
-    );
-    expect(statusNotificationBody('ready')).toBe(
-      'Tu pedido está listo para recoger.',
-    );
-    expect(statusNotificationBody('completed')).toBe(
-      'Tu pedido fue completado. ¡Gracias!',
-    );
+    expect(statusNotificationBody('preparing')).toBe('Tu pedido se está preparando.');
+    expect(statusNotificationBody('ready')).toBe('Tu pedido está listo para recoger.');
+    expect(statusNotificationBody('completed')).toBe('Tu pedido fue completado. ¡Gracias!');
     expect(statusNotificationBody('cancelled')).toBe('Tu pedido fue cancelado.');
     expect(statusNotificationBody('new')).toBeNull();
   });

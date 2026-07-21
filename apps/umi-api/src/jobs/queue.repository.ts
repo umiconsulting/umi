@@ -131,10 +131,7 @@ export class QueueRepository {
    * 'delivering' by a crashed relay is reclaimed instead of stranded. FOR UPDATE
    * SKIP LOCKED makes it safe to run multiple relay workers concurrently.
    */
-  async claimPendingOutbox(
-    limit: number,
-    leaseSeconds: number,
-  ): Promise<OutboxEventRow[]> {
+  async claimPendingOutbox(limit: number, leaseSeconds: number): Promise<OutboxEventRow[]> {
     const res = await this.pg.query<{
       id: string;
       business_id: string;

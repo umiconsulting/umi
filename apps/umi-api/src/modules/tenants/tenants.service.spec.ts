@@ -8,9 +8,7 @@ function make() {
     tenantsForUser: vi.fn(),
     loadProducts: vi.fn(),
     loadLocations: vi.fn(),
-    loadBranding: vi
-      .fn()
-      .mockResolvedValue({ brandColor: null, secondaryColor: null }),
+    loadBranding: vi.fn().mockResolvedValue({ brandColor: null, secondaryColor: null }),
     findActiveLocation: vi.fn(),
     updateTenantSettings: vi.fn().mockResolvedValue(undefined),
     updateLocation: vi.fn(),
@@ -119,9 +117,9 @@ describe('TenantsService.updateLocation', () => {
     // No active-status pre-check: 404 comes from updateLocation returning null,
     // which lets inactive locations be patched/reactivated.
     h.repo.updateLocation.mockResolvedValue(null);
-    await expect(
-      h.svc.updateLocation('t1', 'lX', { name: 'x' }),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(h.svc.updateLocation('t1', 'lX', { name: 'x' })).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('updates and returns the location when valid', async () => {

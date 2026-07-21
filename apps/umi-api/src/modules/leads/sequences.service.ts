@@ -36,11 +36,36 @@ const SEQUENCE_ID = 'diagnostic_followup';
 
 // Ported from sequenceManager.initializeSequences (diagnostic_followup).
 const STEPS: SequenceStep[] = [
-  { day: 0, name: 'day0Urgency', subject: '⚡ ¡Momento clave para ${company}!', template: day0UrgencyTemplate },
-  { day: 2, name: 'day2Pressure', subject: '⏰ ${company}: Ventana cerrándose', template: day2PressureTemplate },
-  { day: 5, name: 'day5CaseStudy', subject: '📊 Caso real: Empresa como ${company}', template: day5CaseStudyTemplate },
-  { day: 10, name: 'day10FreeOffer', subject: '🎁 Última oportunidad: Implementación gratuita', template: day10FreeOfferTemplate },
-  { day: 30, name: 'day30Reactivation', subject: '📈 Actualización del mercado: Nuevas tendencias BI', template: day30ReactivationTemplate },
+  {
+    day: 0,
+    name: 'day0Urgency',
+    subject: '⚡ ¡Momento clave para ${company}!',
+    template: day0UrgencyTemplate,
+  },
+  {
+    day: 2,
+    name: 'day2Pressure',
+    subject: '⏰ ${company}: Ventana cerrándose',
+    template: day2PressureTemplate,
+  },
+  {
+    day: 5,
+    name: 'day5CaseStudy',
+    subject: '📊 Caso real: Empresa como ${company}',
+    template: day5CaseStudyTemplate,
+  },
+  {
+    day: 10,
+    name: 'day10FreeOffer',
+    subject: '🎁 Última oportunidad: Implementación gratuita',
+    template: day10FreeOfferTemplate,
+  },
+  {
+    day: 30,
+    name: 'day30Reactivation',
+    subject: '📈 Actualización del mercado: Nuevas tendencias BI',
+    template: day30ReactivationTemplate,
+  },
 ];
 
 export interface SequenceRunResult {
@@ -106,9 +131,7 @@ export class SequencesService {
       }
       if (touched) processed++;
     }
-    this.logger.log(
-      `email sequence: ${processed} leads processed, ${sent} sent, ${failed} failed`,
-    );
+    this.logger.log(`email sequence: ${processed} leads processed, ${sent} sent, ${failed} failed`);
     return { processed, sent, failed, skipped: false };
   }
 
@@ -125,10 +148,7 @@ export class SequencesService {
    * web `sendWelcome` + worker `sendDueEmails` can't both send day 0. On a send
    * failure the reservation is released so a later tick retries.
    */
-  private async sendStepToLead(
-    lead: LeadRecord,
-    step: SequenceStep,
-  ): Promise<boolean> {
+  private async sendStepToLead(lead: LeadRecord, step: SequenceStep): Promise<boolean> {
     const key = stepKey(step.day);
     if (lead.emailsSent.includes(key)) return false; // fast path (DB snapshot)
 
@@ -212,13 +232,9 @@ export class SequencesService {
 
   /** Lead replied — pause follow-ups and record the response. */
   async markResponded(leadId: string, responseType = 'email'): Promise<boolean> {
-    return this.repo.setPaused(
-      leadId,
-      true,
-      `Lead responded via ${responseType}`,
-      'responded',
-      { response_type: responseType },
-    );
+    return this.repo.setPaused(leadId, true, `Lead responded via ${responseType}`, 'responded', {
+      response_type: responseType,
+    });
   }
 
   async unsubscribe(leadId: string): Promise<boolean> {

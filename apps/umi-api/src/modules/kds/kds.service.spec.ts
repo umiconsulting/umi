@@ -1,11 +1,6 @@
 import { ConflictException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  deviceStatus,
-  KdsService,
-  stationKeyFromName,
-  ticketBelongsToDevice,
-} from './kds.service';
+import { deviceStatus, KdsService, stationKeyFromName, ticketBelongsToDevice } from './kds.service';
 import {
   DEVICE_REVOKED_BODY,
   hashPin,
@@ -39,9 +34,7 @@ function make(notifyEnabled = true) {
     ticketEvents: vi.fn().mockResolvedValue([]),
     loadOrderForScope: vi.fn(),
     transitionTicket: vi.fn().mockResolvedValue({ sequence: 5 }),
-    partialCancelItems: vi
-      .fn()
-      .mockResolvedValue({ sequence: 6, newStatus: 'partial_cancelled' }),
+    partialCancelItems: vi.fn().mockResolvedValue({ sequence: 6, newStatus: 'partial_cancelled' }),
     heartbeatTouch: vi.fn().mockResolvedValue(true),
   };
   const config = { get: vi.fn().mockReturnValue(notifyEnabled) };
@@ -200,7 +193,10 @@ describe('KdsService.pairing — kds_status', () => {
     });
     repo.claimPairing.mockResolvedValue(true);
 
-    const r = await svc.pairing({ action: 'kds_status', pairing_id: '3f2504e0-4f89-41d3-9a0c-0305e82c3301' });
+    const r = await svc.pairing({
+      action: 'kds_status',
+      pairing_id: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
+    });
     expect(r.status).toBe(200);
     expect(r.body).toMatchObject({
       status: 'approved',
@@ -218,10 +214,20 @@ describe('KdsService.pairing — kds_status', () => {
     const { svc, repo } = make();
     repo.getPairing.mockResolvedValue(approved);
     repo.loadStation.mockResolvedValue({ id: 'st1', name: 'Expo', business_id: 't1' });
-    repo.createDeviceSession.mockResolvedValue({ id: 'sess-1', business_id: 't1', station_id: 'st1', device_name: 'x', token: 't', device_registry_id: 'reg-1' });
+    repo.createDeviceSession.mockResolvedValue({
+      id: 'sess-1',
+      business_id: 't1',
+      station_id: 'st1',
+      device_name: 'x',
+      token: 't',
+      device_registry_id: 'reg-1',
+    });
     repo.claimPairing.mockResolvedValue(false);
 
-    const r = await svc.pairing({ action: 'kds_status', pairing_id: '3f2504e0-4f89-41d3-9a0c-0305e82c3301' });
+    const r = await svc.pairing({
+      action: 'kds_status',
+      pairing_id: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
+    });
     expect(r).toEqual({ status: 409, body: { status: 'used' } });
     expect(repo.deleteDevice).toHaveBeenCalledWith('reg-1');
   });
@@ -233,7 +239,10 @@ describe('KdsService.pairing — kds_status', () => {
       status: 'pending',
       expires_at: '2000-01-01T00:00:00Z',
     });
-    const r = await svc.pairing({ action: 'kds_status', pairing_id: '3f2504e0-4f89-41d3-9a0c-0305e82c3301' });
+    const r = await svc.pairing({
+      action: 'kds_status',
+      pairing_id: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
+    });
     expect(r).toEqual({ status: 200, body: { status: 'expired' } });
     expect(repo.expirePairing).toHaveBeenCalled();
   });
@@ -260,13 +269,23 @@ describe('KdsService.board', () => {
         updated_at: 'now',
         last_event_sequence: '3',
         items: [
-          { ticket_item_id: 'i1', name: 'Latte', quantity: 1, unit_price_cents: 4500, display_order: 0 },
+          {
+            ticket_item_id: 'i1',
+            name: 'Latte',
+            quantity: 1,
+            unit_price_cents: 4500,
+            display_order: 0,
+          },
         ],
       },
     ]);
     const r = await svc.board(SESSION, { action: 'snapshot' });
     expect(r.status).toBe(200);
-    const data = (r.body as { data: Array<{ items: Array<{ unit_price: number }>; last_event_sequence: number }> }).data;
+    const data = (
+      r.body as {
+        data: Array<{ items: Array<{ unit_price: number }>; last_event_sequence: number }>;
+      }
+    ).data;
     expect(data[0].items[0].unit_price).toBe(45);
     expect(data[0].last_event_sequence).toBe(3);
   });
@@ -390,13 +409,29 @@ describe('pure helpers', () => {
   it('ticketBelongsToDevice honors tenant/location/station scope', () => {
     expect(
       ticketBelongsToDevice(
-        { id: 'o', business_id: 't1', location_id: null, station_id: null, kitchen_status: 'new', person_id: null, source_transaction_id: null },
+        {
+          id: 'o',
+          business_id: 't1',
+          location_id: null,
+          station_id: null,
+          kitchen_status: 'new',
+          person_id: null,
+          source_transaction_id: null,
+        },
         SESSION,
       ),
     ).toBe(true);
     expect(
       ticketBelongsToDevice(
-        { id: 'o', business_id: 'other', location_id: null, station_id: null, kitchen_status: 'new', person_id: null, source_transaction_id: null },
+        {
+          id: 'o',
+          business_id: 'other',
+          location_id: null,
+          station_id: null,
+          kitchen_status: 'new',
+          person_id: null,
+          source_transaction_id: null,
+        },
         SESSION,
       ),
     ).toBe(false);
@@ -415,14 +450,30 @@ describe('pure helpers', () => {
     };
     expect(
       ticketBelongsToDevice(
-        { id: 'o', business_id: 't1', location_id: null, station_id: null, kitchen_status: 'new', person_id: null, source_transaction_id: null },
+        {
+          id: 'o',
+          business_id: 't1',
+          location_id: null,
+          station_id: null,
+          kitchen_status: 'new',
+          person_id: null,
+          source_transaction_id: null,
+        },
         boundSession,
       ),
     ).toBe(true);
     // A different, explicit location on the order is still rejected (tenant-scoped, not global).
     expect(
       ticketBelongsToDevice(
-        { id: 'o', business_id: 't1', location_id: 'loc-2', station_id: null, kitchen_status: 'new', person_id: null, source_transaction_id: null },
+        {
+          id: 'o',
+          business_id: 't1',
+          location_id: 'loc-2',
+          station_id: null,
+          kitchen_status: 'new',
+          person_id: null,
+          source_transaction_id: null,
+        },
         boundSession,
       ),
     ).toBe(false);
@@ -431,14 +482,10 @@ describe('pure helpers', () => {
   it('createStation blocks a duplicate active key before inserting (NULL-safe)', async () => {
     const { svc, repo } = make();
     repo.findActiveStationByKey.mockResolvedValue({ id: 'existing' });
-    await expect(
-      svc.createStation('t1', null, { name: 'Estación Fría' }),
-    ).rejects.toBeInstanceOf(ConflictException);
-    expect(repo.findActiveStationByKey).toHaveBeenCalledWith(
-      't1',
-      null,
-      'estacion_fria',
+    await expect(svc.createStation('t1', null, { name: 'Estación Fría' })).rejects.toBeInstanceOf(
+      ConflictException,
     );
+    expect(repo.findActiveStationByKey).toHaveBeenCalledWith('t1', null, 'estacion_fria');
     expect(repo.createStation).not.toHaveBeenCalled();
   });
 
