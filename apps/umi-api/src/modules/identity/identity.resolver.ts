@@ -381,9 +381,12 @@ export class IdentityResolver {
         LIMIT 1`,
       [i.tenantId, i.customerId, i.channelId, i.normalized],
     );
-    const verifiedVia = i.verified && i.channelKey === 'whatsapp'
-      ? 'whatsapp_inbound'
-      : 'self_asserted';
+    // `verified` means PROVEN, and the only proof we hold is an inbound WhatsApp message
+    // from that number. Deriving BOTH columns from this one boolean makes the
+    // contradictory pair (verified=true, self_asserted) unrepresentable in code, the way
+    // constraint contact_verified_needs_proof makes it unrepresentable in the DB.
+    // It gates proactive messaging, so "verified" must never mean "the customer typed it".
+    const proven = (i.verified ?? false) && i.channelKey === 'whatsapp';
     if (existing[0]) {
       // Refresh; only ever upgrade verified false→true (whatsapp_inbound proves it).
       await c.query(
@@ -391,9 +394,9 @@ export class IdentityResolver {
             SET updated_at = now(),
                 verified = tenant.contact.verified OR $2,
                 verified_via = CASE WHEN $2 AND NOT tenant.contact.verified
-                                    THEN $3 ELSE tenant.contact.verified_via END
+                                    THEN 'whatsapp_inbound' ELSE tenant.contact.verified_via END
           WHERE id = $1::uuid`,
-        [existing[0].id, i.verified, verifiedVia],
+        [existing[0].id, proven],
       );
       return existing[0].id;
     }
@@ -422,8 +425,8 @@ export class IdentityResolver {
         i.isPhoneFamily ? i.rawValue : null,
         i.isPhoneFamily ? null : i.rawValue,
         isPrimary,
-        i.verified,
-        i.verified ? verifiedVia : 'self_asserted',
+        proven,
+        proven ? 'whatsapp_inbound' : 'self_asserted',
       ],
     );
     return rows[0].id;

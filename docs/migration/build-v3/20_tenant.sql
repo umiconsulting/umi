@@ -170,7 +170,13 @@ create table tenant.contact (
   verified          boolean not null default false,
   verified_via      text check (verified_via in ('self_asserted','whatsapp_inbound')),
   created_at        timestamptz not null default now(),
-  updated_at        timestamptz not null default now()
+  updated_at        timestamptz not null default now(),
+  -- verified means PROVEN, and inbound WhatsApp is the only proof we have. Without
+  -- this, (verified=true, verified_via='self_asserted') is representable and directly
+  -- contradicts the column comment below — and `verified` gates who we may proactively
+  -- message, so a self-asserted number could be messaged as if it were consented.
+  constraint contact_verified_needs_proof
+    check (not verified or verified_via = 'whatsapp_inbound')
 );
 comment on table  tenant.contact is
   'Reachability per channel. NOT uniquely keyed on phone — umi-cash collects an UNVERIFIED '
