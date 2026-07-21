@@ -68,15 +68,27 @@
   },
   "shadow": {
     "$description": "Shadows",
-    "shadow-card": { "$type": "shadow", "$value": "0 1px 0 rgba(19, 31, 68, 0.04), 0 8px 32px -16px rgba(19, 31, 68, 0.18)" },
+    "shadow-card": {
+      "$type": "shadow",
+      "$value": "0 1px 0 rgba(19, 31, 68, 0.04), 0 8px 32px -16px rgba(19, 31, 68, 0.18)"
+    },
     "shadow-pop": { "$type": "shadow", "$value": "0 12px 40px -12px rgba(19, 31, 68, 0.25)" },
     "shadow-inner": { "$type": "shadow", "$value": "inset 0 0 0 1px rgba(19, 31, 68, 0.05)" }
   },
   "typography": {
     "$description": "Typography",
-    "font-display": { "$type": "fontFamily", "$value": "\"Source Sans 3\", \"Domus\", Georgia, serif" },
-    "font-body": { "$type": "fontFamily", "$value": "\"Source Sans 3\", \"Source Sans Pro\", system-ui, sans-serif" },
-    "font-mono": { "$type": "fontFamily", "$value": "\"JetBrains Mono\", ui-monospace, \"SF Mono\", monospace" }
+    "font-display": {
+      "$type": "fontFamily",
+      "$value": "\"Source Sans 3\", \"Domus\", Georgia, serif"
+    },
+    "font-body": {
+      "$type": "fontFamily",
+      "$value": "\"Source Sans 3\", \"Source Sans Pro\", system-ui, sans-serif"
+    },
+    "font-mono": {
+      "$type": "fontFamily",
+      "$value": "\"JetBrains Mono\", ui-monospace, \"SF Mono\", monospace"
+    }
   },
   "motion": {
     "$description": "Motion",

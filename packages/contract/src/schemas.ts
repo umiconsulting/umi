@@ -134,7 +134,11 @@ export const GiftCardCreateRequest = z
       return;
     }
     // @ValidateIf(o => !o.recipientPhone) @IsEmail
-    if (!v.recipientPhone && v.recipientEmail && !z.string().email().safeParse(v.recipientEmail).success) {
+    if (
+      !v.recipientPhone &&
+      v.recipientEmail &&
+      !z.string().email().safeParse(v.recipientEmail).success
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['recipientEmail'],

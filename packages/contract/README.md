@@ -6,10 +6,10 @@ surface can't drift between the two sides.
 
 ## Entry points
 
-| Import | Contains | Runtime deps |
-| --- | --- | --- |
-| `@umi/contract/routes` | route path constants + builders | **none** (safe for the dashboard bundle) |
-| `@umi/contract` | routes **+** zod schemas + inferred types | `zod` |
+| Import                 | Contains                                  | Runtime deps                             |
+| ---------------------- | ----------------------------------------- | ---------------------------------------- |
+| `@umi/contract/routes` | route path constants + builders           | **none** (safe for the dashboard bundle) |
+| `@umi/contract`        | routes **+** zod schemas + inferred types | `zod`                                    |
 
 `z.infer` means each schema is simultaneously a runtime validator and a TS type —
 one definition, both uses.
