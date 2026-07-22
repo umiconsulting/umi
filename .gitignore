@@ -45,3 +45,13 @@ build/
 .turbo/
 .vercel
 .env*
+
+# Supabase CLI scratch. Written by `supabase link`/`db` commands; holds the linked
+# project ref and a pooler URL. Machine-local state, not source — and umi-cash is
+# frozen, so nothing here should ever be committed.
+apps/*/supabase/.temp/
+
+# Python bytecode caches. Build artifacts of whatever interpreter last ran; they
+# are unreviewable binaries and version-specific (cpython-314 here).
+__pycache__/
+*.pyc

@@ -17,7 +17,17 @@ ecab379  # style(umi-api)
 192ee0e  # style(dashboard)
 8d766eb  # style(packages)
 f459680  # style(ci,config)
-89fd4ba  # style(umi-api) second pass — Prettier is not idempotent
+
+# REMOVED: 89fd4ba. It was listed here as "formatting-only" and it is NOT. Its message
+# says "second Prettier pass" (3 spec files), but a `git add -A` also swept in 384
+# untracked files that were sitting in the working tree — 376 third-party skill files
+# under .agents/skills/design/, .mcp.json, and 7 Supabase CLI scratch files. The real
+# commit is 388 files / 68,913 insertions.
+#
+# Ignoring it would have made `git blame` skip a commit that introduced 68k lines of
+# real content — exactly the failure this file's header warns about. The lesson is in
+# the header for a reason: verify a commit is formatting-only before listing it, and
+# stage formatting passes with explicit paths, never `git add -A`.
 
 # DELIBERATELY NOT LISTED: 102b690 ("style(docs): format Markdown…"). It reformats
 # the docs, but it also pins prettier, adds the Markdown `embeddedLanguageFormatting`
