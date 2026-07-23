@@ -30,10 +30,6 @@ const DEFAULT_PERMISSIONS: Record<string, Record<string, boolean>> = {
   },
 };
 
-function normalizeRole(role: unknown): 'ADMIN' | 'STAFF' {
-  return role === 'ADMIN' ? 'ADMIN' : 'STAFF';
-}
-
 export interface StaffDto {
   id: string;
   name: string;

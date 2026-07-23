@@ -15,6 +15,7 @@
     "start:worker": "node dist/worker.js",
     "dev": "nest start --watch",
     "dev:worker": "nest start --watch --entryFile worker",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts"
@@ -40,12 +41,16 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@types/node": "^22.10.0",
     "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.11.10",
+    "eslint": "^10.7.0",
+    "globals": "^17.7.0",
     "typescript": "^5.7.2",
+    "typescript-eslint": "^8.65.0",
     "vitest": "^2.1.8"
   }
 }

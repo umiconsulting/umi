@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VoiceService } from './voice.service';
-import type { UpdateVoiceDto } from './dto/update-voice.dto';
 
 function make() {
   const repo = {
@@ -15,7 +14,7 @@ describe('VoiceService.updateVoice', () => {
   beforeEach(() => (h = make()));
 
   it('clears a freeform override (empty tone → null) while keeping the preset', async () => {
-    await h.svc.updateVoice('t1', { tone_preset: 'casual', tone: '' } as UpdateVoiceDto);
+    await h.svc.updateVoice('t1', { tone_preset: 'casual', tone: '' });
     expect(h.repo.write).toHaveBeenCalledWith('t1', {
       tone_preset: 'casual',
       tone: null,
@@ -23,17 +22,17 @@ describe('VoiceService.updateVoice', () => {
   });
 
   it('maps a blank assistant_name to null', async () => {
-    await h.svc.updateVoice('t1', { assistant_name: '  ' } as UpdateVoiceDto);
+    await h.svc.updateVoice('t1', { assistant_name: '  ' });
     expect(h.repo.write).toHaveBeenCalledWith('t1', { assistant_name: null });
   });
 
   it('trims + drops blank style notes', async () => {
-    await h.svc.updateVoice('t1', { style_notes: ['a', '  ', 'b'] } as UpdateVoiceDto);
+    await h.svc.updateVoice('t1', { style_notes: ['a', '  ', 'b'] });
     expect(h.repo.write).toHaveBeenCalledWith('t1', { style_notes: ['a', 'b'] });
   });
 
   it('does not write for an empty dto', async () => {
-    await h.svc.updateVoice('t1', {} as UpdateVoiceDto);
+    await h.svc.updateVoice('t1', {});
     expect(h.repo.write).not.toHaveBeenCalled();
   });
 });

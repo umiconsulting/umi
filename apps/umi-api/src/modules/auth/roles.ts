@@ -17,7 +17,10 @@ export const ROLE_PRECEDENCE = [
   'viewer',
 ] as const;
 
-export type RoleKey = (typeof ROLE_PRECEDENCE)[number] | string;
+// `| string` would collapse the whole union to `string` and lose the literals.
+// `(string & {})` keeps custom roles assignable — `normalizeRoleKey(['custom_role'])`
+// is a supported case — while the known keys still surface in autocomplete.
+export type RoleKey = (typeof ROLE_PRECEDENCE)[number] | (string & {});
 
 /** The single most-privileged role from a membership's role set. */
 export function normalizeRoleKey(roles: string[] | null | undefined): string | null {

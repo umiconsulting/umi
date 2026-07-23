@@ -362,7 +362,7 @@ export class KdsRepository {
         LIMIT ${limitParam}`,
       params,
     );
-    return rows as Record<string, unknown>[];
+    return rows;
   }
 
   /** Set a pairing pending→approved/denied. Returns null if not still pending. */

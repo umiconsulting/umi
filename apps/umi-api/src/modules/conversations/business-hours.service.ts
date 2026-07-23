@@ -173,8 +173,8 @@ export class BusinessHoursService {
       };
     }
 
-    const openMinutes = day!.openMinutes!;
-    const closeMinutes = day!.closeMinutes!;
+    const openMinutes = day.openMinutes!;
+    const closeMinutes = day.closeMinutes!;
     const buffer = bot.ordering.orderCutoffMinutes ?? ORDER_CUTOFF_BUFFER_MINUTES;
     const orderCutoffMinutes = closeMinutes - buffer;
     const isAcceptingOrders =

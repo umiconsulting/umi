@@ -1,5 +1,5 @@
 import { ConflictException } from '@nestjs/common';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { deviceStatus, KdsService, stationKeyFromName, ticketBelongsToDevice } from './kds.service';
 import {
   DEVICE_REVOKED_BODY,
