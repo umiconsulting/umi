@@ -849,23 +849,6 @@ export class KdsRepository {
     return { ...row, kitchen_status: mapOrderToKitchenStatus(row.status) };
   }
 
-  /** Next per-tenant kitchen_sequence (no sequence object exists — MAX+1 in-tx). */
-  private async nextKitchenSequence(client: PoolClient, tenantId: string): Promise<number> {
-    // Serialize per-tenant sequence allocation: MAX+1 under default isolation can
-    // hand the same number to concurrent transitions (cursor consumers using
-    // `> after_sequence` would then miss one). The xact-scoped advisory lock is
-    // released automatically at COMMIT/ROLLBACK.
-    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, [
-      `kds:kitchen_sequence:${tenantId}`,
-    ]);
-    const { rows } = await client.query<{ seq: string }>(
-      `SELECT COALESCE(MAX(kitchen_sequence), 0) + 1 AS seq
-         FROM tenant.order_event WHERE business_id = $1`,
-      [tenantId],
-    );
-    return Number(rows[0]?.seq ?? 1);
-  }
-
   /**
    * Lock the order row (FOR UPDATE, serializing concurrent transitions) and derive
    * its current kitchen status from the latest journal event. Returns null when the
@@ -945,63 +928,39 @@ export class KdsRepository {
       const invalid = validateTransition(currentStatus, targetStatus);
       if (invalid) throw new KdsHttpError(422, { error: invalid });
 
-      const seq = await this.nextKitchenSequence(client, order.business_id);
       const orderStatus = mapKitchenToOrderStatus(targetStatus);
       const isCancel = targetStatus === 'cancelled';
 
-      // The order keeps only its coarse business status; the fine kitchen lifecycle
-      // lives in the journal (below).
+      // ONE status, not two. build-v3 collapsed the commercial and kitchen axes onto
+      // customer_order.status, so there is no per-line kitchen_status to propagate — the
+      // old second UPDATE is gone, and with it the window where the two could disagree.
       await client.query(
-        `UPDATE tenant."order"
-            SET status = $3, updated_at = now()
+        `UPDATE tenant.customer_order
+            SET status = $3,
+                cancel_reason = CASE WHEN $4::text IS NOT NULL THEN $4 ELSE cancel_reason END,
+                updated_at = now()
           WHERE id = $1 AND business_id = $2`,
-        [order.id, order.business_id, orderStatus],
+        [order.id, order.business_id, orderStatus, isCancel ? input.cancellationReasonCode : null],
       );
 
-      // Propagate to non-cancelled line items (cancelled lines keep their state).
-      await client.query(
-        `UPDATE tenant.order_item
-            SET kitchen_status = $3, updated_at = now()
-          WHERE order_id = $1 AND business_id = $2 AND is_cancelled = false`,
-        [order.id, order.business_id, targetStatus],
+      // The spine. `sequence` is an identity column, so the old MAX+1-under-advisory-lock
+      // allocation is gone: Postgres hands out the number, and it cannot collide.
+      const ev = await client.query<{ sequence: string }>(
+        `INSERT INTO tenant.order_event (order_id, kind, status)
+         VALUES ($1::uuid, 'status_changed', $2)
+         RETURNING sequence`,
+        [order.id, orderStatus],
       );
-
-      await client.query(
-        `INSERT INTO tenant.order_event
-           (business_id, order_id, event_kind, old_status, new_status, kitchen_status,
-            reason, reason_code, reason_note, kitchen_sequence, source,
-            idempotency_key, payload, occurred_at)
-         VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9, 'kds', $10, $11::jsonb, now())
-         ON CONFLICT (business_id, idempotency_key)
-           WHERE idempotency_key IS NOT NULL DO NOTHING`,
-        [
-          order.business_id,
-          order.id,
-          isCancel ? 'cancellation' : 'kitchen',
-          currentStatus,
-          targetStatus,
-          isCancel ? input.cancellationReasonCode : null,
-          input.cancellationReasonCode,
-          input.cancellationReasonNote,
-          seq,
-          `kds:transition:${order.id}:${seq}`,
-          JSON.stringify({
-            actor_source: 'kds_app',
-            actor_id: input.actorId,
-            actor_channel: input.actorChannel,
-            target_status: targetStatus,
-          }),
-        ],
-      );
+      const seq = Number(ev.rows[0]?.sequence ?? 0);
 
       if (input.notifyBody) {
         const phone = await this.customerPhone(client, order.business_id, order.person_id);
         if (phone) {
           await client.query(
             `INSERT INTO runtime.outbox_event
-               (business_id, event_type, aggregate_id, idempotency_key, payload)
+               (business_id, topic, aggregate_id, idempotency_key, payload)
              VALUES ($1, 'twilio.status_notification', $2, $3, $4::jsonb)
-             ON CONFLICT (idempotency_key) DO NOTHING`,
+             ON CONFLICT (business_id, idempotency_key) DO NOTHING`,
             [
               order.business_id,
               order.id,
@@ -1058,14 +1017,18 @@ export class KdsRepository {
         });
       }
 
-      // Flag the targeted items as cancelled.
+      // VOID the targeted lines. `voided_at` is the tombstone — the line stays on the
+      // ticket struck through so the barista stops pouring, and falls out of the derived
+      // total on its own. The order_item trigger appends the `order_upserted` event and
+      // bumps the order's version, so this loop does not have to remember to.
       const cancelled = await client.query<{ quantity: number; name: string }>(
         `UPDATE tenant.order_item
-            SET is_cancelled = true, kitchen_status = 'cancelled', updated_at = now()
-          WHERE order_id = $1 AND business_id = $2 AND id = ANY($3::uuid[])
-            AND is_cancelled = false
+            SET voided_at = now(), void_reason = $4
+          WHERE order_id = $1::uuid AND id = ANY($3::uuid[]) AND voided_at IS NULL
+            AND EXISTS (SELECT 1 FROM tenant.customer_order o
+                         WHERE o.id = order_id AND o.business_id = $2::uuid)
         RETURNING quantity, name`,
-        [order.id, order.business_id, input.itemIds],
+        [order.id, order.business_id, input.itemIds, input.reasonCode],
       );
       // Every requested id must have matched an active line on this order;
       // otherwise roll back rather than mutate the order / notify the customer.
@@ -1075,55 +1038,32 @@ export class KdsRepository {
 
       // Remaining (non-cancelled) items → drives total + whole-order status.
       const remaining = await client.query<{ quantity: number; name: string }>(
-        `SELECT quantity, name FROM tenant.order_item
-          WHERE order_id = $1 AND business_id = $2 AND is_cancelled = false`,
+        `SELECT i.quantity, i.name FROM tenant.order_item i
+           JOIN tenant.customer_order o ON o.id = i.order_id
+          WHERE i.order_id = $1::uuid AND o.business_id = $2::uuid AND i.voided_at IS NULL`,
         [order.id, order.business_id],
       );
 
       const newStatus: KitchenStatus =
         remaining.rows.length === 0 ? 'cancelled' : 'partial_cancelled';
-      const seq = await this.nextKitchenSequence(client, order.business_id);
 
+      // NO total recompute. The total is derived (tenant.order_total sums live lines), so
+      // voiding the lines above already moved it — recomputing a stored copy is what this
+      // model removed.
       await client.query(
-        `UPDATE tenant."order"
-            SET status = $3,
-                total_cents = COALESCE((
-                  SELECT SUM(unit_price_cents * quantity)
-                    FROM tenant.order_item
-                   WHERE order_id = $1 AND business_id = $2 AND is_cancelled = false
-                ), 0),
-                updated_at = now()
-          WHERE id = $1 AND business_id = $2`,
+        `UPDATE tenant.customer_order
+            SET status = $3, updated_at = now()
+          WHERE id = $1::uuid AND business_id = $2::uuid`,
         [order.id, order.business_id, mapKitchenToOrderStatus(newStatus)],
       );
 
-      await client.query(
-        `INSERT INTO tenant.order_event
-           (business_id, order_id, event_kind, old_status, new_status, kitchen_status,
-            reason, reason_code, reason_note, kitchen_sequence, source,
-            idempotency_key, payload, occurred_at)
-         VALUES ($1, $2, 'partial_cancellation', $3, $4, $4, $5, $5, $6, $7, 'kds',
-                 $8, $9::jsonb, now())
-         ON CONFLICT (business_id, idempotency_key)
-           WHERE idempotency_key IS NOT NULL DO NOTHING`,
-        [
-          order.business_id,
-          order.id,
-          currentStatus,
-          newStatus,
-          input.reasonCode,
-          input.reasonNote,
-          seq,
-          `kds:partial_cancel:${order.id}:${seq}`,
-          JSON.stringify({
-            actor_source: 'kds_app',
-            actor_id: input.actorId,
-            actor_channel: input.actorChannel,
-            reason_code: input.reasonCode,
-            cancelled_item_ids: input.itemIds,
-          }),
-        ],
+      const ev = await client.query<{ sequence: string }>(
+        `INSERT INTO tenant.order_event (order_id, kind, status)
+         VALUES ($1::uuid, 'status_changed', $2)
+         RETURNING sequence`,
+        [order.id, mapKitchenToOrderStatus(newStatus)],
       );
+      const seq = Number(ev.rows[0]?.sequence ?? 0);
 
       const phone = await this.customerPhone(client, order.business_id, order.person_id);
       // Only emit when notifications are enabled (buildNotifyBody returns null
@@ -1132,9 +1072,9 @@ export class KdsRepository {
       if (phone && body) {
         await client.query(
           `INSERT INTO runtime.outbox_event
-             (business_id, event_type, aggregate_id, idempotency_key, payload)
+             (business_id, topic, aggregate_id, idempotency_key, payload)
            VALUES ($1, 'twilio.cancel_notification', $2, $3, $4::jsonb)
-           ON CONFLICT (idempotency_key) DO NOTHING`,
+           ON CONFLICT (business_id, idempotency_key) DO NOTHING`,
           [
             order.business_id,
             order.id,
