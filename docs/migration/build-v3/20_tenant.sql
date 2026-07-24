@@ -487,6 +487,15 @@ create table tenant.customer_order (
   fulfillment_type text check (fulfillment_type in ('pickup','dine_in','delivery')),
   status           text not null default 'placed'
                      check (status in ('placed','preparing','ready','completed','canceled')),
+  -- The aggregate's change marker. Bumped by tg_customer_order_version on EVERY update
+  -- of this row, and the order_item trigger touches the parent so a LINE change bumps it
+  -- too. Two uses: (1) optimistic concurrency — `UPDATE ... WHERE id=$1 AND version=$2`
+  -- replaces holding a FOR UPDATE lock across a whole transaction; (2) a cheap "has this
+  -- order changed" check for any consumer that does not want to read the event feed.
+  -- Square's Order.version is the same idea. It is the ORDER's truth; order_event is the
+  -- ordered FEED of changes — they answer different questions and neither replaces the
+  -- other (a version alone cannot tell a puller what it missed, in what order).
+  version          bigint not null default 1,
   cancel_reason    text,                          -- codes/notes for a void; contaminated free-text history NOT carried
   notes            text,                          -- order-level note the customer gave at checkout
   pickup_person    text,                          -- who collects the order, when not the buyer
@@ -611,16 +620,83 @@ create trigger order_item_void_only
   before update or delete on tenant.order_item
   for each row execute function tenant.tg_order_item_void_only();
 
+-- ONE place increments the version: any update of the order row, whatever caused it.
+-- The order_item trigger below therefore does not increment directly — it touches the
+-- parent and lets this fire, so a line change cannot double-bump.
+create or replace function tenant.tg_customer_order_version() returns trigger
+  language plpgsql
+  set search_path = pg_catalog as $$
+begin
+  new.version := old.version + 1;
+  return new;
+end $$;
+create trigger customer_order_version
+  before update on tenant.customer_order
+  for each row execute function tenant.tg_customer_order_version();
+
+-- A LINE change is a change to the ticket, and the kitchen has to learn about it. This
+-- is a trigger rather than app code on purpose: the order has FOUR writers today or soon
+-- (WhatsApp bot, POS, dashboard, KDS) and a signal every one of them must remember to
+-- emit is a signal one of them will forget. ORDER_MODEL §1 says the status and its event
+-- "must be written together, never one without the other" — this makes that structural
+-- for the line half.
+--
+-- The INSERT guard: during order CREATION the lines are written before the opening
+-- `placed` event, so an order with no events yet is still being assembled and its lines
+-- are not amendments. Once the ticket exists for the kitchen, an added line IS one. That
+-- test is intrinsic ("is this order visible to a consumer yet"), not a dependency on
+-- which statement the application happens to run first.
+create or replace function tenant.tg_order_item_signal_change() returns trigger
+  language plpgsql
+  set search_path = pg_catalog as $$
+declare
+  has_events boolean;
+begin
+  select exists (select 1 from tenant.order_event e where e.order_id = new.order_id)
+    into has_events;
+  if not has_events then
+    return null;                      -- initial assembly, not an amendment
+  end if;
+  -- Touch the parent: bumps version via customer_order_version, and updated_at via the
+  -- shared touch trigger. Not an increment here — see above.
+  update tenant.customer_order set updated_at = now() where id = new.order_id;
+  insert into tenant.order_event (order_id, kind) values (new.order_id, 'order_upserted');
+  return null;                        -- AFTER trigger; return value is ignored
+end $$;
+create trigger order_item_signal_change
+  after insert or update on tenant.order_item
+  for each row execute function tenant.tg_order_item_signal_change();
+
 create table tenant.order_event (
   id          uuid primary key default gen_random_uuid(),
   sequence    bigint generated always as identity,
   order_id    uuid not null references tenant.customer_order(id) on delete cascade,
-  status      text not null
+  -- What KIND of change this row records. Two, and deliberately only two:
+  --   status_changed — the order advanced along its lifecycle. Carries `status`.
+  --   order_upserted — the order's LINES changed (a void, or an added line on an
+  --     amendment). Carries no status, because none happened.
+  -- The second one exists because a puller cannot see a line void otherwise: voiding one
+  -- line of five does not change the order's status, so a status-only feed never advances
+  -- and the barista keeps making a cancelled drink. Toast and Square both push line
+  -- changes to the kitchen in real time for exactly this reason.
+  kind        text not null default 'status_changed'
+                check (kind in ('status_changed','order_upserted')),
+  status      text
                 check (status in ('placed','preparing','ready','completed','canceled')),
   staff_id    uuid references tenant.staff(id),
-  occurred_at timestamptz not null default now()
+  occurred_at timestamptz not null default now(),
+  -- A transition without a status is meaningless; an upsert with one is a lie. Making
+  -- the pairing a constraint means a consumer can trust `kind` without re-checking.
+  constraint order_event_status_matches_kind
+    check ((kind = 'status_changed') = (status is not null))
 );
-comment on table tenant.order_event is 'Real status transitions only — not a catch-all event log.';
+comment on table tenant.order_event is
+  'The ordered change FEED for pullers: status transitions plus line-level upserts. Still '
+  'not a catch-all log — two kinds, both real changes to what a consumer sees. The four '
+  'kinds the source table carried were three parts sync-ingestion noise (order_upserted / '
+  'status_change / snapshot_reconciled all duplicated the real transitions), which is what '
+  'the "transitions only" rule was written against; this widening is the opposite — a '
+  'change that WAS invisible becoming visible.';
 -- The status spine has TWO consumer shapes, and this column serves the second one.
 -- PUSH (ORDER_MODEL.md §1): a new row fires a "listo" notification — needs no cursor.
 -- PULL: the FROZEN iPad KDS polls incrementally — `after_sequence` in the request,

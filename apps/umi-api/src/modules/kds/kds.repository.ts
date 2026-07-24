@@ -162,11 +162,11 @@ const CUSTOMER_NAME_PHONE_JOIN = `LEFT JOIN tenant.customer cu
  * Three of these columns are SYNTHESISED because build-v3's `order_event` is a thin
  * status spine — "real status transitions only, not a catch-all event log" — while the
  * Swift model declares all three NON-OPTIONAL:
- *   kind    -> `KitchenEventKind(kdsValue:)` accepts exactly four values and `throw`s
- *              on anything else. The backfill kept only `status_changed` (78 rows,
- *              having dropped order_upserted / status_change / snapshot_reconciled as
- *              sync-ingestion duplicates), so that is the honest constant: every row
- *              this table now holds IS a status change.
+ *   kind    -> REAL COLUMN now, no longer a synthesised constant. order_event carries
+ *              status_changed | order_upserted, and both are values
+ *              `KitchenEventKind(kdsValue:)` already accepts — the frozen client routes
+ *              order_upserted straight to refreshSnapshot(), which is exactly what a
+ *              line-level void needs and required no app change.
  *   source  -> the old `order_event.source` free-text is gone; a KDS-visible transition
  *              is written by the KDS.
  *   payload -> the old actor/reason blob is gone. Empty object, not null: Swift decodes
@@ -179,7 +179,7 @@ const EVENT_SELECT = `e.sequence,
               e.order_id                           AS ticket_id,
               o.business_id                        AS business_id,
               COALESCE(o.external_ref, o.id::text) AS source_transaction_id,
-              'status_changed'                     AS kind,
+              e.kind,
               e.status,
               e.occurred_at,
               'kds'                                AS source,

@@ -70,6 +70,34 @@ consumers subscribe to that stream (a new row → a "listo" push). The ticket re
 snapshot; the spine drives the change. They must be written together, never one without
 the other.
 
+> **Amendment (2026-07-24) — the feed carries LINE changes too, and the order carries a
+> version.** As written above, `order_event` recorded only status transitions. That leaves
+> a puller blind to the most safety-critical change there is: voiding one line of five does
+> not change the order's status, so a status-only feed never advances and **the barista
+> keeps making a cancelled drink**. Toast and Square both push line changes to the kitchen
+> in real time, and Toast is explicit that a void stays on screen struck through and
+> labelled `VOIDED` rather than disappearing. Two things follow:
+>
+> - `order_event.kind` ∈ `status_changed · order_upserted`, with a CHECK making the
+>   pairing structural (`status` present exactly when the kind is a transition). A line
+>   void or an amendment's added line appends `order_upserted`.
+> - `customer_order.version` — the aggregate's own change marker, bumped by trigger on
+>   every update, including a parent-touch from a line change. It buys optimistic
+>   concurrency (`WHERE id=$1 AND version=$2`) in place of holding a `FOR UPDATE` lock,
+>   and answers "did this change" without reading the feed. Square's `Order.version`.
+>
+> The two are not redundant: a version cannot tell a puller **what** it missed or in what
+> order, and a feed is a poor place to ask "is my copy current". Both are written by
+> trigger rather than by application code, because the order already has four writers
+> (WhatsApp, POS, dashboard, KDS) and a signal each must remember to emit is one that will
+> be forgotten.
+>
+> This widens the "real status transitions only" rule above, with the owner's agreement.
+> The rule was written against the SOURCE table, whose four kinds were three parts
+> sync-ingestion noise (`order_upserted`/`status_change`/`snapshot_reconciled` all
+> duplicated the real transitions, and the backfill drops all three). That rule targeted
+> noise. This is its opposite — a real change that was invisible becoming visible.
+
 ### The flow, end to end — and where the station actually lives
 
 Three things this makes concrete, because all three get asked: an order is written
@@ -90,7 +118,7 @@ flowchart TB
     direction TB
     ORD["<b>customer_order</b><br/>status='placed'<br/>external_ref = idempotency key"]
     ITEM["<b>order_item</b> · one row per line<br/>immutable snapshot:<br/>name · variant_name · unit_price · display_order"]
-    EV["<b>order_event</b><br/>status='placed' · sequence (identity)"]
+    EV["<b>order_event</b> · the change FEED<br/>kind=status_changed · sequence (identity)"]
     ORD --- ITEM
     ORD --- EV
   end
