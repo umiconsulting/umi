@@ -216,7 +216,9 @@ export class KdsService {
     if (!action) return { status: 400, body: { error: 'missing_action' } };
 
     if (action === 'snapshot') {
-      const rows = await this.repo.boardSnapshot(session.tenantId, session.stationId);
+      // No station argument: the order carries no station, so the old filter matched
+      // every row — see KdsRepository.boardSnapshot.
+      const rows = await this.repo.boardSnapshot(session.tenantId);
       return { status: 200, body: { ok: true, data: rows.map(toSnapshotRow) } };
     }
 

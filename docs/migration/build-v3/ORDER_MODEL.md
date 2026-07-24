@@ -70,6 +70,17 @@ consumers subscribe to that stream (a new row → a "listo" push). The ticket re
 snapshot; the spine drives the change. They must be written together, never one without
 the other.
 
+> **Amendment (2026-07-24) — ONE live projection.** There were briefly two ticket views: a
+> line-grain `order_ticket` and an order-grain `kds_ticket`. That was a defect inside the
+> database, not a client concern — two renderings of one concept drift, which is the exact
+> thing this section argues against. They are collapsed into a single `tenant.order_ticket`
+> (order-grain, lines nested, **no status filter** — "live" is a WHERE clause, not a schema
+> fact) and it carries **no order total**, because a total is a money question with two
+> different answers (§4). Anything a specific client needs in a specific shape — a
+> non-optional field coalesced, a null column it expects to exist — now lives in that
+> client's adapter in the backend. The truth is hierarchical: domain → database → backend
+> → client, and a client never reaches back up it.
+>
 > **Amendment (2026-07-24) — the feed carries LINE changes too, and the order carries a
 > version.** As written above, `order_event` recorded only status transitions. That leaves
 > a puller blind to the most safety-critical change there is: voiding one line of five does
@@ -123,15 +134,15 @@ flowchart TB
     ORD --- EV
   end
 
-  TX --> TOTAL["<b>order_total</b> (view)<br/>Σ live lines"]
-  TX --> TICKET["<b>order_ticket</b> (view)<br/>line-grain · in-flight only"]
-  TX --> KDS["<b>kds_ticket</b> (view)<br/>order-grain · lines nested · all statuses"]
+  TX --> TICKET["<b>order_ticket</b> (view)<br/>ONE live projection<br/>order-grain · lines nested · no money"]
+  TX --> TOTAL["<b>order_total</b> (view)<br/>Σ live lines = owed now"]
+  PAY["<b>payment</b> / <b>refund</b><br/>frozen money facts"] --> RCPT["receipt<br/>(stored ON the payment)"]
 
-  TOTAL --> MONEY["owed now<br/>(settled money → payment)"]
+  TICKET --> IPAD["frozen iPad KDS<br/>(shims in the backend adapter)"]
   TICKET --> NOTIF["customer 'listo' push"]
   TICKET --> BOARD["pickup / in-flight board"]
-  KDS --> IPAD["frozen iPad KDS"]
-  KDS --> LIST["dashboard order list<br/>(history: status + window)"]
+  TICKET --> LIST["dashboard order list<br/>+ order_total for the money"]
+  TOTAL --> LIST
 ```
 
 **2 · The station is a property of the device, not the order.** This is the part that
@@ -145,7 +156,8 @@ flowchart LR
   OWNER -->|"issues pairing<br/>(carries station_id)"| PAIR["runtime.pairing"]
   IPAD["iPad"] -->|claims with PIN| PAIR
   PAIR -->|"creates"| SESS["runtime.session<br/><b>station_id</b>"]
-  SESS -->|"boardSnapshot(tenant, session.stationId)"| KDS["kds_ticket"]
+  SESS -.->|"station_id carried, NOT yet used to filter"| KDS["<b>order_ticket</b>"]
+  SESS -->|"boardSnapshot(tenant)"| KDS
   ST -.->|referenced by| PAIR
   ST -.->|referenced by| SESS
 ```
@@ -537,9 +549,12 @@ locally** against the prod snapshot (port 5233) — **not** on prod:
 - `20_tenant.sql` — `customer_order` drops stored `total`, adds `cancel_reason`;
   `order_item` drops `station_id`, adds `voided_at` + `void_reason` + a `CHECK
 (quantity>0, unit_price>=0)` + an `(order_id)` index + the `tg_order_item_void_only`
-  immutability trigger; two new `security_invoker` views `tenant.order_total` (Σ live
-  lines, with its meaning-by-status contract) and `tenant.order_ticket` (live line-grain
-  projection that **includes** voided lines so the KDS renders VOID).
+  immutability trigger; two `security_invoker` views `tenant.order_total` (Σ live lines,
+  with its meaning-by-status contract) and `tenant.order_ticket` — **one** live projection,
+  order-grain with its lines nested, no status filter and no order total, which
+  **includes** voided lines so the KDS renders VOID. (It was briefly line-grain and
+  in-flight-only, with a second `kds_ticket` beside it; see the §1 amendment for why the
+  two collapsed.)
 - `backfill/backfill_commerce.sql` — stops carrying `total_cents` (derived instead),
   carries `is_cancelled → voided_at` (source has only the boolean → `updated_at` stands
   in), leaves `cancel_reason` / `void_reason` NULL (contaminated free-text not imported).

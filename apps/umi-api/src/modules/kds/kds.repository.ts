@@ -28,11 +28,11 @@ import {
  * build-v2 mapping: stations `kitchen.stations`→`tenant.station`, devices
  * `device.devices`→`tenant.device`, sessions `device.sessions`→`runtime.session`
  * (`device_id`→`principal_id`, `principal_type='device'`), pairing
- * `device.pairing_requests`→`runtime.pairing`. Tickets are the
- * `runtime.v_kds_tickets` projection over `tenant."order"`/`order_item`; the
- * kitchen lifecycle is DE-OVERLOADED — the order's former `kitchen_status` is now
- * the latest `tenant.order_event` row, so a transition appends an event (carrying
- * `kitchen_status`) rather than mutating a column, and current status is derived.
+ * `device.pairing_requests`→`runtime.pairing`. Tickets are the `tenant.order_ticket`
+ * projection over `customer_order`/`order_item` — ONE live projection, read here with
+ * the frozen iPad's shape applied on top (see TICKET_SELECT). The kitchen lifecycle is
+ * COLLAPSED onto `customer_order.status`; `tenant.order_event` is the ordered change
+ * FEED a puller reads, carrying status transitions AND line-level upserts.
  */
 
 export interface StationRow {
@@ -94,7 +94,7 @@ export interface OrderScopeRow {
   source_transaction_id: string | null;
 }
 
-/** A raw v_kds_tickets row (+ joined name/phone/last-seq). Remapped in the service. */
+/** A tenant.order_ticket row shaped for the frozen contract. Remapped in the service. */
 export interface TicketRow {
   ticket_id: string;
   source_transaction_id: string | null;
@@ -175,6 +175,36 @@ const CUSTOMER_NAME_PHONE_JOIN = `LEFT JOIN tenant.customer cu
  * business_id (RLS reaches it through customer_order), which is also why every query
  * here filters on `o.business_id`, not `e.business_id`.
  */
+/**
+ * The frozen `KDSSnapshotRow` projection over tenant.order_ticket.
+ *
+ * These four columns are the ADAPTER — they exist because of what the iPad's Swift model
+ * declares, and for no other reason, so they live here rather than in the schema:
+ *   source_transaction_id -> coalesced to the order id. `external_ref` is nullable (a
+ *       pos/web/dashboard order has none) while Swift declares it NON-optional, and a
+ *       null fails the decode of the whole payload, not one ticket.
+ *   station_id / station_name -> always null. The order carries no station; the KDS
+ *       scopes by the device's paired station at query time. The frozen contract has the
+ *       keys, so they are emitted as nulls (both are optional in Swift).
+ *   total_amount -> the ticket carries NO money (ORDER_MODEL §4). Callers that legitimately
+ *       need a total join tenant.order_total themselves; the board passes null, which is
+ *       what a kitchen ticket is.
+ */
+const TICKET_SELECT = `t.ticket_id,
+              COALESCE(t.external_ref, t.ticket_id::text) AS source_transaction_id,
+              t.business_id        AS business_id,
+              t.source             AS source_channel,
+              t.status,
+              NULL::uuid           AS station_id,
+              NULL::text           AS station_name,
+              cu.name              AS customer_name,
+              ph.phone             AS customer_phone,
+              t.pickup_person,
+              t.notes              AS customer_note,
+              t.created_at,
+              t.updated_at,
+              t.items`;
+
 const EVENT_SELECT = `e.sequence,
               e.order_id                           AS ticket_id,
               o.business_id                        AS business_id,
@@ -665,45 +695,33 @@ export class KdsRepository {
     });
   }
 
-  // ── Board reads (runtime.v_kds_tickets + tenant.order_event) ────────────────
+  // ── Board reads (tenant.order_ticket + tenant.order_event) ──────────────────
 
   /**
-   * Board snapshot for a device. Reads the canonical projection, resolves
-   * customer name (`tenant.customer`) + reply phone (`tenant.contact`),
-   * derives `last_event_sequence`, and scopes by tenant + station (NULL station =
-   * broadcast, matching the legacy `get_board_snapshot`). Only on-board
-   * (non-terminal) statuses are returned. The service remaps items to the frozen
-   * shape (`unit_price` in currency units).
+   * Board snapshot for a device: tenant.order_ticket filtered to the on-board
+   * (non-terminal) statuses, plus the customer's name and reply phone.
+   *
+   * No station argument, for the same reason ticketEvents has none: the order carries no
+   * station (ORDER_MODEL §5), so the old `station_id IS NULL OR = $n` predicate matched
+   * every row. It returns with per-line routing, on the LINE.
+   *
+   * The caller filters in the iPad's vocabulary and this translates on the way in — the
+   * view stores build-v3's.
    */
   async boardSnapshot(
     tenantId: string,
-    stationId: string | null,
     statuses: KitchenStatus[] = BOARD_ACTIVE_STATUSES,
   ): Promise<TicketRow[]> {
     const { rows } = await this.pg.query<TicketRow>(
-      `SELECT t.ticket_id,
-              t.source_transaction_id,
-              t.business_id        AS business_id,
-              t.source_channel,
-              t.status,
-              t.station_id,
-              t.station_name,
-              cu.name            AS customer_name,
-              ph.phone           AS customer_phone,
-              t.pickup_person,
-              t.customer_note,
-              (t.total_cents::numeric / 100) AS total_amount,
-              t.created_at,
-              t.updated_at,
-              t.last_event_sequence,
-              t.items
-         FROM tenant.kds_ticket t
+      `SELECT ${TICKET_SELECT},
+              NULL::numeric        AS total_amount,
+              t.last_event_sequence
+         FROM tenant.order_ticket t
          ${CUSTOMER_NAME_PHONE_JOIN}
         WHERE t.business_id = $1
-          AND ($2::text IS NULL OR t.station_id IS NULL OR t.station_id = $2::uuid)
-          AND t.status = ANY($3::text[])
+          AND t.status = ANY($2::text[])
         ORDER BY t.created_at ASC`,
-      [tenantId, stationId, statuses.map(mapKitchenToOrderStatus)],
+      [tenantId, statuses.map(mapKitchenToOrderStatus)],
     );
     return rows;
   }
@@ -777,25 +795,16 @@ export class KdsRepository {
       // location filter at all.
       locClause = `AND (o.branch_id = $${params.length} OR o.branch_id IS NULL)`;
     }
+    // This one is the HISTORY consumer, so it is the one that legitimately wants money —
+    // and it joins tenant.order_total itself rather than the ticket carrying a total for
+    // everyone. When the settled projection exists this moves to payment/refund (§4).
     const { rows } = await this.pg.query<TicketRow>(
-      `SELECT t.ticket_id,
-              t.source_transaction_id,
-              t.business_id        AS business_id,
-              t.source_channel,
-              t.status,
-              t.station_id,
-              t.station_name,
-              cu.name            AS customer_name,
-              ph.phone           AS customer_phone,
-              t.pickup_person,
-              t.customer_note,
-              (t.total_cents::numeric / 100) AS total_amount,
-              t.created_at,
-              t.updated_at,
-              0 AS last_event_sequence,
-              t.items
-         FROM tenant.kds_ticket t
+      `SELECT ${TICKET_SELECT},
+              (tot.total::numeric / 100) AS total_amount,
+              t.last_event_sequence
+         FROM tenant.order_ticket t
          JOIN tenant.customer_order o ON o.id = t.ticket_id
+         LEFT JOIN tenant.order_total tot ON tot.order_id = t.ticket_id
          ${CUSTOMER_NAME_PHONE_JOIN}
         WHERE t.business_id = $1
           AND t.created_at >= now() - make_interval(hours => $2)

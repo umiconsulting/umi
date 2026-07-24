@@ -9,7 +9,7 @@ import { createHash, randomBytes, randomInt } from 'node:crypto';
  * keys off these strings (e.g. it clears Keychain on `device_revoked`).
  *
  * Underneath the frozen JSON the module reads/writes the build-v2 model
- * (`runtime.v_kds_tickets` over `tenant."order"`, `tenant.station`,
+ * (`tenant.order_ticket` over `customer_order`/`order_item`, `tenant.station`,
  * `tenant.device` + `runtime.session`) — there is no `kds.*` schema and no
  * canonical transition RPC, so the logic lives in `KdsService`/`KdsRepository`,
  * not in the database.
