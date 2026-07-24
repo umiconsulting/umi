@@ -70,6 +70,99 @@ consumers subscribe to that stream (a new row → a "listo" push). The ticket re
 snapshot; the spine drives the change. They must be written together, never one without
 the other.
 
+### The flow, end to end — and where the station actually lives
+
+Three things this makes concrete, because all three get asked: an order is written
+**once** and read as **projections**; the **station belongs to the device, not to the
+order**; and the two status vocabularies meet in **one** place.
+
+**1 · Write once, project many.** A checkout writes three tables in one transaction. No
+consumer reads them directly — each reads a projection, so there is one definition of
+"total" and one of "ticket" and neither can drift.
+
+```mermaid
+flowchart TB
+  WA["WhatsApp bot"] --> TX
+  POS["POS"] --> TX
+  WEB["web · dashboard"] --> TX
+
+  subgraph TX["ONE transaction"]
+    direction TB
+    ORD["<b>customer_order</b><br/>status='placed'<br/>external_ref = idempotency key"]
+    ITEM["<b>order_item</b> · one row per line<br/>immutable snapshot:<br/>name · variant_name · unit_price · display_order"]
+    EV["<b>order_event</b><br/>status='placed' · sequence (identity)"]
+    ORD --- ITEM
+    ORD --- EV
+  end
+
+  TX --> TOTAL["<b>order_total</b> (view)<br/>Σ live lines"]
+  TX --> TICKET["<b>order_ticket</b> (view)<br/>line-grain · in-flight only"]
+  TX --> KDS["<b>kds_ticket</b> (view)<br/>order-grain · lines nested · all statuses"]
+
+  TOTAL --> MONEY["owed now<br/>(settled money → payment)"]
+  TICKET --> NOTIF["customer 'listo' push"]
+  TICKET --> BOARD["pickup / in-flight board"]
+  KDS --> IPAD["frozen iPad KDS"]
+  KDS --> LIST["dashboard order list<br/>(history: status + window)"]
+```
+
+**2 · The station is a property of the device, not the order.** This is the part that
+surprises people. Nothing on `customer_order` names a station. The owner creates
+stations, pairs a device to one, and the board is scoped by **the session the device
+logged in with**.
+
+```mermaid
+flowchart LR
+  OWNER["owner<br/>(dashboard)"] -->|creates| ST["<b>tenant.station</b><br/>key · name · status · sort_order<br/>branch_id NULL = every branch"]
+  OWNER -->|"issues pairing<br/>(carries station_id)"| PAIR["runtime.pairing"]
+  IPAD["iPad"] -->|claims with PIN| PAIR
+  PAIR -->|"creates"| SESS["runtime.session<br/><b>station_id</b>"]
+  SESS -->|"boardSnapshot(tenant, session.stationId)"| KDS["kds_ticket"]
+  ST -.->|referenced by| PAIR
+  ST -.->|referenced by| SESS
+```
+
+So a ticket's station is **derived at query time** from who is asking. Two consequences
+worth stating plainly:
+
+- **Today every ticket broadcasts to every station.** The board predicate is
+  `ticket.station_id IS NULL OR = :session_station`, and an order carries no station, so
+  it always matches. That is correct for one café with one station — and it is why the
+  event cursor no longer pretends to filter by station (a predicate that cannot exclude
+  anything should not read like a security boundary).
+- **When routing is earned, it goes on the LINE, not the order** (§2). A salad and a
+  grill item on one order belong to different stations; the order does not. That is why
+  `order_item.station_id` is the deferred column and `customer_order.station_id` is not
+  a thing. Measured: `station_groups` and `station_assignments` are both **0 rows**.
+
+**3 · One spine, two vocabularies, one translator.** Every status change advances
+`customer_order.status` _and_ appends an `order_event`. The iPad polls the spine
+incrementally by `sequence`; the customer notification subscribes to the same rows.
+
+```mermaid
+stateDiagram-v2
+  [*] --> placed
+  placed --> preparing
+  placed --> canceled
+  preparing --> ready
+  preparing --> canceled
+  ready --> completed
+  ready --> canceled
+  completed --> [*]
+  canceled --> [*]
+```
+
+The iPad's frozen enum spells two of these differently (`new`, `cancelled`) and adds two
+build-v3 does not model (`accepted`, `partial_cancelled` → both collapse onto
+`preparing`). That translation lives **only** in `kds-contract.ts` and is guarded by
+`kds-status-map.spec.ts`, because a Postgres `CHECK` and a Swift enum share no type
+system and no gate reads both. Getting it wrong does not degrade the board — it blanks
+it, since `try rows.map { try $0.asKitchenOrder() }` propagates the first failure.
+
+Amendments never edit a line: void the old (`order_item.voided_at`), add a new one. The
+voided line stays on the ticket so the barista sees it struck through and stops pouring,
+and falls out of `order_total` automatically.
+
 ---
 
 ## 2. Grain evidence (why station is per-line, lifecycle is per-order)
