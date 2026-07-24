@@ -116,7 +116,7 @@ function enclosingScope(node: ts.Node, sf: ts.SourceFile): ts.Node {
     ) {
       return n;
     }
-    n = n.parent as ts.Node | undefined;
+    n = n.parent;
   }
   return sf;
 }

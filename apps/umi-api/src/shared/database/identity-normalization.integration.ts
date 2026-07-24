@@ -46,6 +46,7 @@ beforeAll(async () => {
         'cannot run. Schema grants do not survive a backfill rebuild — re-apply them:\n' +
         '  psql -p 5233 -d umi_backfill_v3 -f apps/umi-api/test/integration/harness-roles.sql\n' +
         `Underlying error: ${err instanceof Error ? err.message : String(err)}`,
+      { cause: err },
     );
   }
 });

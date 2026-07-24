@@ -426,12 +426,7 @@ export class IdentityResolver {
     text: string,
     params: unknown[],
   ): Promise<{ rows: T[]; rowCount: number | null }> {
-    return c
-      ? (c.query<T>(text, params as unknown[]) as Promise<{
-          rows: T[];
-          rowCount: number | null;
-        }>)
-      : this.pg.query<T>(text, params);
+    return c ? c.query<T>(text, params) : this.pg.query<T>(text, params);
   }
 }
 

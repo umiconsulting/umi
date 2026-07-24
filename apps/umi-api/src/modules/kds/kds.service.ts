@@ -88,8 +88,7 @@ export class KdsService {
       deviceId: row.id,
       tenantId: row.business_id,
       businessId: row.business_id,
-      locationId:
-        typeof row.metadata?.location_id === 'string' ? (row.metadata.location_id as string) : null,
+      locationId: typeof row.metadata?.location_id === 'string' ? row.metadata.location_id : null,
       stationId: row.station_id,
       deviceName: row.device_name,
     };
@@ -253,11 +252,11 @@ export class KdsService {
       if (!ticketBelongsToDevice(order, session)) {
         return { status: 404, body: { error: 'ticket_not_found' } };
       }
-      const err = validateTransition(order!.kitchen_status, target);
+      const err = validateTransition(order.kitchen_status, target);
       if (err) return { status: 422, body: { error: err } };
 
       const result = await this.repo.transitionTicket({
-        order: order!,
+        order: order,
         targetStatus: target,
         actorId: session.deviceId,
         actorChannel: session.stationId,
@@ -269,7 +268,7 @@ export class KdsService {
         status: 200,
         body: {
           ok: true,
-          data: { ticket_id: order!.id, status: target, sequence: result.sequence },
+          data: { ticket_id: order.id, status: target, sequence: result.sequence },
         },
       };
     }
@@ -291,7 +290,7 @@ export class KdsService {
       }
 
       const result = await this.repo.partialCancelItems({
-        order: order!,
+        order: order,
         itemIds,
         reasonCode,
         reasonNote: optText(body.reason_note),
@@ -305,7 +304,7 @@ export class KdsService {
         body: {
           ok: true,
           data: {
-            ticket_id: order!.id,
+            ticket_id: order.id,
             status: result.newStatus,
             sequence: result.sequence,
           },

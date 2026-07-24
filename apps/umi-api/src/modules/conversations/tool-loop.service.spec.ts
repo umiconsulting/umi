@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ToolLoopService } from './tool-loop.service';
 import { createToolOutcomeState } from './tool-outcomes';
 import type { ToolContext } from './turn.types';
@@ -32,7 +32,7 @@ function make(responses: ReturnType<typeof msg>[]) {
     execute: vi.fn().mockResolvedValue({ success: true, summary_text: 'ok' }),
   };
   return {
-    svc: new ToolLoopService(anthropic as never, tools as never),
+    svc: new ToolLoopService(anthropic as never, tools),
     anthropic,
     tools,
   };

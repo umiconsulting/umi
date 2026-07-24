@@ -84,7 +84,7 @@ export class CatalogTools {
         message: categories.length
           ? categories.map((c) => `${c.category}: ${c.examples.join(', ')}`).join('; ')
           : 'Sin productos disponibles en esa categoría.',
-      } as ToolResult;
+      };
     }
 
     const products = await this.products.searchByQuery(ctx.tenantId, input.query, 5);
@@ -119,7 +119,7 @@ export class CatalogTools {
         candidates: formattedCandidates,
         suggestions,
         message: messageParts.join(' '),
-      } as ToolResult;
+      };
     }
 
     const formattedProducts = products.map((product) => ({
@@ -139,6 +139,6 @@ export class CatalogTools {
       match_type: 'exact',
       products: formattedProducts,
       message: formattedProducts.map((product) => product.display_text).join('\n\n'),
-    } as ToolResult;
+    };
   }
 }

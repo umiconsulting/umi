@@ -117,7 +117,7 @@ export class LeadsRepository {
       `SELECT ${SELECT_COLS} FROM umi.prospect
         WHERE email = $1 AND lifecycle_status = ANY($2::text[])
         ORDER BY created_at DESC LIMIT 1`,
-      [email, ACTIVE_STATUSES as unknown as string[]],
+      [email, ACTIVE_STATUSES],
     );
     return rows[0] ? toRecord(rows[0]) : null;
   }
@@ -280,7 +280,7 @@ export class LeadsRepository {
       `SELECT ${SELECT_COLS} FROM umi.prospect
         WHERE sequence_paused = false AND lifecycle_status = ANY($1::text[])
         ORDER BY diagnostic_date ASC`,
-      [ACTIVE_STATUSES as unknown as string[]],
+      [ACTIVE_STATUSES],
     );
     return rows.map(toRecord);
   }

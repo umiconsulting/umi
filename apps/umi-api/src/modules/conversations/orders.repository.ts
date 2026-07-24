@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
-import type { DraftCartItem } from './conversation.types';
 
 /**
  * `tenant."order"` + `tenant.order_item` writes/reads for the bot checkout
@@ -187,7 +186,7 @@ export class OrdersRepository {
       [tenantId, personId, safeLimit],
     );
     return rows.map((r) => {
-      const details = (r.details ?? {}) as Record<string, unknown>;
+      const details = r.details ?? {};
       const rawItems = Array.isArray(details.items) ? (details.items as unknown[]) : [];
       const items: OrderItemSnapshot[] = rawItems
         .map((raw) => {

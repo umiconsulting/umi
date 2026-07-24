@@ -21,7 +21,7 @@ function make() {
   const config = { get: vi.fn().mockReturnValue('https://app.test') };
   const svc = new AuthService(
     repo as never,
-    passwords as never,
+    passwords,
     jwt as never,
     email as never,
     config as never,

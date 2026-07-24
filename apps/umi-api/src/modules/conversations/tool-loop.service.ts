@@ -662,7 +662,7 @@ export class ToolLoopService {
         };
       }
 
-      messages.push({ role: 'assistant', content: content as Anthropic.ContentBlockParam[] });
+      messages.push({ role: 'assistant', content: content });
       const toolResultBlocks: Anthropic.ContentBlockParam[] = [];
 
       for (const rawToolUse of toolUses) {

@@ -190,7 +190,7 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
     text: string,
     params: unknown[] = [],
   ): Promise<{ rows: T[]; rowCount: number | null }> {
-    return this.worker.query<T>(text, params as unknown[]);
+    return this.worker.query<T>(text, params);
   }
 
   /**

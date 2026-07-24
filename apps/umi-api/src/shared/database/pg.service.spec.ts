@@ -48,8 +48,15 @@ function pgWith(
     /pg_has_role/i.test(text)
       ? { rows: attrs ? [attrs] : [], rowCount: attrs ? 1 : 0 }
       : { rows: [{ ok: 1 }], rowCount: 1 };
-  vi.spyOn(pg.app, 'query').mockImplementation(route(app) as never);
-  vi.spyOn(pg.worker, 'query').mockImplementation(route(worker) as never);
+  // `pg.query` is overloaded and one overload takes a callback returning `void`,
+  // which is the signature TS resolves here — so an async mock reads as a promise
+  // returned into a void position. It is not: vitest hands the promise straight
+  // back to PgService, which awaits it. Suppressed narrowly rather than turning
+  // the rule off, because elsewhere it catches genuinely dropped async work.
+  /* eslint-disable @typescript-eslint/no-misused-promises */
+  vi.spyOn(pg.app, 'query').mockImplementation(route(app));
+  vi.spyOn(pg.worker, 'query').mockImplementation(route(worker));
+  /* eslint-enable @typescript-eslint/no-misused-promises */
   created.push(pg);
   return pg;
 }
