@@ -139,8 +139,13 @@ end $$;
 do $$
 declare r record;
 begin
+  -- `station` was HERE, scoped via branch. It moved out when it gained business_id, and
+  -- it had to move in the same change: the loop above is a dynamic sweep over every
+  -- tenant table with a business_id, so leaving this row would create a SECOND
+  -- tenant_isolation policy on station and abort the whole RLS rebuild with 42710.
+  -- Scoping via branch was also wrong on its own terms — a station with branch_id NULL
+  -- ("every branch") joins to nothing and would have been invisible to its owner.
   for r in select * from (values
-    ('station',                     'branch',            'branch_id',       'id'),
     ('customer_note',               'customer',          'customer_id',     'id'),
     ('loyalty_wallet_pass',         'loyalty_card',      'card_id',         'id'),
     ('product_option_group',        'product',           'product_id',      'id'),

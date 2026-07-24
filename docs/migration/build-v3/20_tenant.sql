@@ -73,12 +73,48 @@ create table tenant.branch (
 -- Search via expression index, NOT a stored search_text column.
 create index branch_name_lower on tenant.branch (lower(name));
 
+-- A KDS station: the board a device pairs to. CONFIG — the owner creates and renames
+-- these at business cadence, never by migration (ORDER_MODEL.md §5). The order itself
+-- carries no station; the KDS scopes by the device's paired station at query time.
+--
+-- This table was built with only (branch_id, name) and the backfill dropped the rest as
+-- "no target col". That was wrong on all four counts — every dropped column has a live
+-- consumer in kds.repository.ts, and the shape was wrong besides:
+--   business_id -> the repository scopes EVERY station query by tenant, and without the
+--     column the only isolation was a join through branch, which cannot express a
+--     station that belongs to no branch (below).
+--   branch_id is NULLABLE -> NULL means "every branch". listStations/loadStation treat a
+--     missing location as unscoped, and findActiveStationByKey matches the branch with
+--     `IS NOT DISTINCT FROM` precisely to reach these. NOT NULL made them unrepresentable.
+--   key -> the stable config handle the dashboard creates and looks stations up by
+--     (findActiveStationByKey). Named `key`, not `station_key`: no stutter inside its own
+--     table, matching umi.channel_type.key.
+--   status -> archiveStation is a soft delete, and it must be: a device pairing and an
+--     order both reference a station, so a hard delete would erase history. 'disabled' is
+--     distinct from 'archived' — the repository lets a rename touch a disabled station
+--     but not an archived one.
+--   sort_order -> the board order the owner sets; listStations orders by it.
+-- `metadata` is deliberately NOT carried (the one source row's is empty, and a jsonb junk
+-- drawer is exactly what the naming rules forbid).
 create table tenant.station (
-  id         uuid primary key default gen_random_uuid(),
-  branch_id  uuid not null references tenant.branch(id) on delete cascade,
-  name       text not null,
-  created_at timestamptz not null default now()
+  id          uuid primary key default gen_random_uuid(),
+  business_id uuid not null references tenant.business(id) on delete cascade,
+  branch_id   uuid references tenant.branch(id) on delete cascade,  -- NULL = every branch
+  key         text not null,
+  name        text not null,
+  status      text not null default 'active'
+                check (status in ('active','disabled','archived')),
+  sort_order  integer not null default 0,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
 );
+-- One live station per key per branch scope. NULLS NOT DISTINCT (pg15+) is what makes
+-- the tenant-wide scope work: with default NULL semantics two branch-less stations could
+-- both claim key 'cafe', and findActiveStationByKey would return an arbitrary one.
+-- Archived rows are excluded so a key can be reused after the station is retired.
+create unique index station_business_branch_key_uidx
+  on tenant.station (business_id, branch_id, key) nulls not distinct
+  where status <> 'archived';
 
 create table tenant.integration (
   id                  uuid primary key default gen_random_uuid(),

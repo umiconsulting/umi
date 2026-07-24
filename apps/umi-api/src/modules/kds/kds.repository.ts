@@ -228,7 +228,7 @@ export class KdsRepository {
     const locClause = locationId ? 'AND branch_id = $2' : '';
     const params = locationId ? [tenantId, locationId] : [tenantId];
     const { rows } = await this.pg.query(
-      `SELECT id, station_key, name, status, sort_order, branch_id AS location_id
+      `SELECT id, key AS station_key, name, status, sort_order, branch_id AS location_id
          FROM tenant.station
         WHERE business_id = $1 AND status = 'active' ${locClause}
         ORDER BY sort_order ASC, name ASC`,
@@ -259,7 +259,7 @@ export class KdsRepository {
       `SELECT id
          FROM tenant.station
         WHERE business_id = $1
-          AND station_key = $2
+          AND key = $2
           AND branch_id IS NOT DISTINCT FROM $3
           AND status <> 'archived'
         LIMIT 1`,
@@ -283,9 +283,9 @@ export class KdsRepository {
     location_id: string | null;
   }> {
     const { rows } = await this.pg.query(
-      `INSERT INTO tenant.station (business_id, branch_id, station_key, name)
+      `INSERT INTO tenant.station (business_id, branch_id, key, name)
          VALUES ($1, $2, $3, $4)
-       RETURNING id, station_key, name, status, sort_order, branch_id AS location_id`,
+       RETURNING id, key AS station_key, name, status, sort_order, branch_id AS location_id`,
       [input.tenantId, input.locationId, input.stationKey, input.name],
     );
     return rows[0] as {
@@ -311,7 +311,7 @@ export class KdsRepository {
       `UPDATE tenant.station
           SET name = $3, updated_at = now()
         WHERE id = $1 AND business_id = $2 AND status <> 'archived'
-      RETURNING id, station_key, name, status, sort_order, branch_id AS location_id`,
+      RETURNING id, key AS station_key, name, status, sort_order, branch_id AS location_id`,
       [input.stationId, input.tenantId, input.name],
     );
     return (
