@@ -44,8 +44,12 @@ from ops.product_categories pc;
 -- ----------------------------------------------------------------------------
 -- 2. ops.products  ->  tenant.product   (MAP)
 --    price_cents -> price (bigint centavos). external_ref <- metadata.zettle_uuid.
---    DROPPED: name_embedding/embedding_model (-> runtime.product_embedding),
---    synced_at (sync cursor -> runtime.integration_sync), metadata (source_*
+--    MOVED (not dropped): name_embedding/embedding_model -> runtime.product_embedding
+--    in step 2c below. This comment previously said "DROPPED ... (-> runtime.
+--    product_embedding)" and named a destination that no statement ever wrote to, so
+--    all 136 vectors were silently discarded while backfill_comms.sql carried its
+--    1342 message embeddings correctly. The comment was right; the code was missing.
+--    DROPPED: synced_at (sync cursor -> runtime.integration_sync), metadata (source_*
 --    provenance = telemetry), variants (exploded below). description '' -> null.
 -- ----------------------------------------------------------------------------
 insert into tenant.product
@@ -82,6 +86,19 @@ from og
 join ops.products p on p.id = og.product_id
 cross join lateral jsonb_array_elements(p.variants) v
 where coalesce(btrim(v->>'name'), '') <> '';
+
+-- 2c. ops.products.name_embedding -> runtime.product_embedding            (136 rows)
+--     Same rule and same reason as runtime.message_embedding in backfill_comms.sql:
+--     the vector's honest home is the semantic index, and it is CARRIED rather than
+--     regenerated so cutover does not start with product search returning nothing
+--     and a bill for 136 Voyage calls.
+--     Provenance labelled honestly from the source: all 136 are 'voyage-3' (note this
+--     differs from messages, which are 'voyage-4-lite') and all are 1024-dim, matching
+--     runtime.product_embedding.embedding extensions.vector(1024).
+insert into runtime.product_embedding (product_id, embedding, model, created_at)
+select p.id, p.name_embedding, coalesce(p.embedding_model, 'voyage-3'), p.created_at
+from ops.products p
+where p.name_embedding is not null;
 
 -- ----------------------------------------------------------------------------
 -- 3. ops.businesses + ops.business_hours  ->  tenant.business COLUMNS  (MAP/fold)
@@ -152,10 +169,17 @@ where b.id = oh.tenant_id;
 --    location_id all null -> branch_id null. no conversation link -> null.
 --    fulfillment_type NULL: source order_type ∈ {'order',''} is NOT a
 --      pickup/dine_in/delivery value.
+--    notes -> notes and pickup_person -> pickup_person: now CARRIED, not dropped.
+--      Both are named columns (see 20_tenant.sql) because both ends exist today —
+--      the WhatsApp checkout writes them and the frozen iPad KDS ticket renders
+--      them. The 7 populated notes are per-line drink specs plus one customer
+--      preference; they carry as-is rather than being re-routed, because these
+--      orders are known TEST data (the tenant never used ordering) and inventing a
+--      line-attribution for a test string would be fabrication, not fidelity.
 --    DROPPED: metadata (source_*/kds_* = telemetry), details.items (denormalized
---      cache of order_items), channel (dup of source), notes / details.customer_note
---      (order-level free text, unmodeled), kitchen_status (derived from latest
---      order_event), station_id/name/pickup_person (KDS routing scratch),
+--      cache of order_items), channel (dup of source), details.customer_note
+--      (the blob copy — the typed column is carried instead), kitchen_status
+--      (derived from latest order_event), station_id/name (KDS routing scratch),
 --      cancellation_reason* (contaminated free text; canceled fact is in status).
 --    total_cents: NOT carried as a stored column. build-v3 DERIVES the order total
 --      (Σ live lines, tenant.order_total). PROVEN lossless on this snapshot:
@@ -165,7 +189,8 @@ where b.id = oh.tenant_id;
 -- ----------------------------------------------------------------------------
 insert into tenant.customer_order
   (id, business_id, branch_id, customer_id, conversation_id, source,
-   fulfillment_type, status, external_ref, placed_at, created_at, updated_at)
+   fulfillment_type, status, notes, pickup_person, external_ref,
+   placed_at, created_at, updated_at)
 select o.id,
        o.tenant_id,
        null::uuid,
@@ -178,6 +203,8 @@ select o.id,
          when 'completed' then 'completed'
          when 'cancelled' then 'canceled'
        end,
+       nullif(btrim(o.notes), ''),                 -- 7 populated; '' would be a fake note
+       nullif(btrim(o.pickup_person), ''),         -- 0 populated in this snapshot
        o.source_transaction_id,
        o.placed_at,
        o.created_at,
@@ -186,30 +213,35 @@ from ops.orders o;
 
 -- ----------------------------------------------------------------------------
 -- 5. ops.order_items  ->  tenant.order_item   (MAP)
---    68 non-null product_id all resolve. variant_name (63) folded into notes.
---    name = order-time snapshot.
+--    68 non-null product_id all resolve. name = order-time snapshot.
+--    variant_name (63) + display_order CARRIED as their own columns. They used to be
+--      folded into notes / dropped as cosmetic; both were wrong and both broke a live
+--      reader (see 20_tenant.sql). notes now carries ONLY the customer's note, which is
+--      what it means — and no source row has both, so nothing about this run changes
+--      except that the two facts stay separable.
 --    is_cancelled (3 lines / 2 orders) -> voided_at (the void tombstone). The
 --      source carries only the boolean, so updated_at stands in for the unknown
 --      exact void time — what matters is non-null, so the line leaves the
 --      derived total (this is what makes tenant.order_total reconcile to 590300).
 --    void_reason left NULL — the source has no reason (and these are known tests),
 --      so we do not fabricate one; same rule as customer_order.cancel_reason.
---    DROPPED: display_order (cosmetic), kitchen_status (derived), metadata.
+--    DROPPED: kitchen_status (derived), metadata.
 --    station_id DEFERRED (source has no per-line station; column not built — see
 --      20_tenant.sql / ORDER_MODEL.md §5).
 -- ----------------------------------------------------------------------------
 insert into tenant.order_item
-  (id, order_id, product_id, name, quantity, unit_price, voided_at, notes, created_at)
+  (id, order_id, product_id, name, variant_name, quantity, unit_price,
+   display_order, voided_at, notes, created_at)
 select oi.id,
        oi.order_id,
        oi.product_id,
        oi.name,
+       nullif(btrim(oi.variant_name), ''),
        oi.quantity,
        oi.unit_price_cents::bigint,
+       coalesce(oi.display_order, 0),
        case when oi.is_cancelled then oi.updated_at end,
-       nullif(btrim(concat_ws(' · ',
-              nullif(btrim(oi.variant_name), ''),
-              nullif(btrim(oi.notes), ''))), ''),
+       nullif(btrim(oi.notes), ''),
        oi.created_at
 from ops.order_items oi;
 
@@ -225,6 +257,12 @@ from ops.order_items oi;
 --    status_changed new_status ∈ {accepted,preparing,ready,completed,cancelled}
 --      (no 'new'/'in_progress'/'partial_cancelled' in this stream).
 -- ----------------------------------------------------------------------------
+--    sequence is NOT carried: it is `generated always as identity`, so the database
+--      assigns it. The source kitchen_sequence is not reproduced on purpose — its
+--      values only have to ORDER events, and carrying them would leave the identity
+--      counter behind the highest carried value, so the first live event after
+--      cutover would collide. The ORDER BY below makes the generated sequence agree
+--      with source time order; kitchen_sequence itself is a cursor, not a fact.
 insert into tenant.order_event (id, order_id, status, staff_id, occurred_at)
 select e.id,
        e.order_id,
@@ -238,7 +276,10 @@ select e.id,
        null::uuid,
        e.occurred_at
 from ops.order_events e
-where e.event_kind = 'status_changed';
+where e.event_kind = 'status_changed'
+-- Deterministic: 63 occurred_at values are tied in the source, so time alone does
+-- not order them. kitchen_sequence breaks the tie, id breaks the remaining one.
+order by e.occurred_at, e.kitchen_sequence nulls last, e.id;
 
 commit;
 

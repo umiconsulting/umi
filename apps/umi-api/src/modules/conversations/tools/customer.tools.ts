@@ -3,9 +3,10 @@ import { OrdersRepository } from '../orders.repository';
 import type { ToolContext, ToolResult } from '../turn.types';
 
 /**
- * Customer tools: get_recent_customer_orders. Ported from `tools.ts`; rebound
- * from the legacy `transactions` read to `tenant."order"` (OrdersRepository). Money
- * surfaced to the LLM in pesos (the `details` items snapshot unit).
+ * Customer tools: get_recent_customer_orders. Ported from `tools.ts`; rebound from
+ * the legacy `transactions` read to `tenant.customer_order` (OrdersRepository). Money
+ * surfaced to the LLM in pesos; the lines now come from `tenant.order_item` rather
+ * than the dropped `details` snapshot, so they are the order's only copy.
  */
 @Injectable()
 export class CustomerTools {
@@ -33,7 +34,6 @@ export class CustomerTools {
       })),
       customer_note: order.customerNote,
       pickup_person: order.pickupPerson,
-      personal_message: order.personalMessage,
     }));
     return {
       found: normalized.length,

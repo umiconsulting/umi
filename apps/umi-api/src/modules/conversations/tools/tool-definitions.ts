@@ -115,7 +115,6 @@ export const TOOL_DEFINITIONS: ToolDefinitions = [
       type: 'object',
       properties: {
         pickup_person: { type: 'string' },
-        personal_message: { type: 'string' },
         customer_note: { type: 'string' },
       },
     },

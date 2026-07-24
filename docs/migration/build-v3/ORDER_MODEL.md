@@ -251,20 +251,26 @@ matter how tempting the blob.
 ```
 customer_order   id · business_id · branch_id · customer_id · conversation_id
                  source⟨check⟩ · fulfillment_type⟨check⟩ · status⟨check⟩
-                 cancel_reason · external_ref
+                 cancel_reason · notes · pickup_person · external_ref
                  placed_at · created_at · updated_at
                  total  →  DERIVED (Σ live lines), not a stored column
-                 (no order-level notes — deferred; order_item.notes covers per-line)
+                 UNIQUE (business_id, external_ref) WHERE NOT NULL — injection idempotency
+                 (notes/pickup_person are the NAMED columns this section sanctions —
+                  frozen KDS ticket fields with a live writer and reader. The untyped
+                  details/metadata blobs stay dead. personal_message is deferred.)
 
 order_item       id · order_id · product_id
                  name · unit_price   (snapshot — final, incl. chosen modifiers)
                  quantity · voided_at · void_reason · notes · created_at
                  (immutable except the one-time void — enforced by trigger)
 
-order_event      id · order_id · status⟨check⟩ · staff_id · occurred_at
+order_event      id · sequence · order_id · status⟨check⟩ · staff_id · occurred_at
                  the STATUS SPINE — every live consumer subscribes (KDS,
                  customer "listo", pickup board, outbound sync). Thin:
                  real transitions only, not a catch-all log.
+                 `sequence` (bigint identity) is the PULL cursor: the frozen iPad
+                 polls `after_sequence`. occurred_at cannot serve — 63 source
+                 timestamps are TIED, so a `> timestamp` cursor skips or replays.
 
 payment          already right — money in, method⟨check⟩, reconciled
 ```
@@ -297,14 +303,15 @@ in `unit_price`, so a customization rides as a value, **not** a column-per-varia
 
 ### The collapse — what the 28 source columns become
 
-| source                                              | ruling   | build-v3                                                                                                                                                                                                                            |
-| --------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cancellation_reason/_code/_note` + `partial_*` (6) | 6 → 2    | `customer_order.cancel_reason` (order) + `order_item.voided_at` (line; partial split used **0×**). Line-level `void_reason` is added as new structure, carried **NULL** — the source reasons are contaminated                       |
-| `kitchen_status` (order + line)                     | collapse | `status` field (0/51 ever diverged)                                                                                                                                                                                                 |
-| `ops.orders.station_id` · `station_name`            | drop     | the _order_ carries no station; the KDS ticket derives it from the device login. Both were null on all 51 orders anyway. (`tenant.station` the table is kept — see Config.)                                                         |
-| `metadata` · `details` · `notes` (order blobs)      | 3 → 0    | dropped — order-level free text is unmodeled (contaminated, like `cancellation_reason`); per-line `order_item.notes` covers customization. Add a named `customer_order.notes` when a real consumer (delivery instructions) earns it |
-| `order_item.metadata jsonb` · `variant_name`        | fold     | into `name` / `notes`                                                                                                                                                                                                               |
-| `slack_message_ts` · `source_transaction_id`        | →        | `external_ref`; rest dropped (machinery, not order truth)                                                                                                                                                                           |
+| source                                              | ruling   | build-v3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cancellation_reason/_code/_note` + `partial_*` (6) | 6 → 2    | `customer_order.cancel_reason` (order) + `order_item.voided_at` (line; partial split used **0×**). Line-level `void_reason` is added as new structure, carried **NULL** — the source reasons are contaminated                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `kitchen_status` (order + line)                     | collapse | `status` field (0/51 ever diverged)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `ops.orders.station_id` · `station_name`            | drop     | the _order_ carries no station; the KDS ticket derives it from the device login. Both were null on all 51 orders anyway. (`tenant.station` the table is kept — see Config.)                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `metadata` · `details` (order blobs)                | 2 → 0    | dropped — untyped junk drawers. `details.items` is a denormalized cache of `order_items`; `details.customer_note` is a duplicate of the `notes` column                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `notes` · `pickup_person`                           | 2 → 2    | **kept as NAMED columns** (2026-07-21). This row previously read "dropped, order-level free text is unmodeled" and called the notes contaminated. Both were wrong: the frozen iPad ticket **renders both** (`kds.service.ts:730-731`) and the checkout **writes both**, so a real consumer had already earned them under this section's own rule; and the 7 populated notes are clean (5 drink specs, 1 size, 1 preference), not contaminated. Carried as-is rather than re-routed to `order_item.notes` / `customer_note`, because these 51 orders are **test data** — inventing a line attribution for a test string is fabrication, not fidelity |
+| `order_item.metadata jsonb` · `variant_name`        | fold     | into `name` / `notes`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `slack_message_ts` · `source_transaction_id`        | →        | `external_ref`; rest dropped (machinery, not order truth)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ### Deferred — earned later, decision recorded, table not built
 
@@ -318,6 +325,15 @@ in `unit_price`, so a customization rides as a value, **not** a column-per-varia
   needs "$4 latte + $0.50 oat" split out. Until then the delta is folded into `unit_price`.
 - **`replaces_id`** (line supersession) — no consumer (`partial_cancellation_reason` 0×);
   add only for substitution analytics. A per-line amendment saga is **refused** at 2/51.
+- **`customer_order.personal_message`** (the gift message that accompanies `pickup_person`)
+  — it never had a column (it lived in the `details` blob), it appears on **0 of 51** source
+  orders, and the only thing that ever displayed it was a **Slack controller that no longer
+  exists** — whose remaining trace, `slack_message_ts`, this same section already drops as
+  machinery. `confirm_order` still collected it, so the tool contract is trimmed to stop
+  accepting input nothing can show. **The KDS will earn it back** (owner, 2026-07-21); re-add
+  as a plain nullable text column then. Nothing to retrofit, precisely because there is no
+  history. ⚠️ Contrast `pickup_person` + `notes`, which are **not** deferred: both are frozen
+  KDS ticket fields with a live reader, and `notes` carries 7 real rows.
 - **discount / comp cluster** (an order-/line-level discount entity, of which a _comp_ is the
   100 %-off case) — build-v3 has **no** discount mechanism yet (only `product_modifier.price_delta`).
   Discounts, comps and promos are a whole feature, Phase-3+. Interim: a service recovery is a
@@ -334,9 +350,23 @@ in `unit_price`, so a customization rides as a value, **not** a column-per-varia
 `tg_order_item_void_only` immutability trigger; **derive** `total` (view); **keep**
 `order_event` (status spine — customer status notifications consume it, earned independent
 of the KDS roadmap), `tenant.station` (KDS config), `payment`; **defer** the per-line
-`order_item.station_id` FK, `order_item_modifier`, `replaces_id`, and the **discount/comp
-cluster**; **add** the `order_total` + `order_ticket` views over order + live lines. The
-delta is small and drops **no** live consumer.
+`order_item.station_id` FK, `order_item_modifier`, `replaces_id`, `personal_message`, and
+the **discount/comp cluster**; **add** the `order_total` + `order_ticket` views over order +
+live lines. The delta is small and drops **no** live consumer.
+
+**Amendment (2026-07-21) — three deltas this document missed.** They were found by reading
+the KDS/checkout code against the DDL before rewriting it, and none was visible to any gate:
+`sql-preflight` proves a statement _resolves_, and all three resolve while behaving wrongly.
+
+1. **`order_event.sequence`.** §1 specified the spine as a **push** stream ("a new row → a
+   listo push"), which needs no cursor. The frozen iPad **pulls** — `after_sequence` in, `WHERE
+sequence > $n` out. `occurred_at` cannot substitute: **63 source timestamps are tied**, so a
+   `> timestamp` cursor silently skips or replays events.
+2. **`UNIQUE (business_id, external_ref)`.** §6 deferred an idempotency key to "when the
+   injection path is built" — the WhatsApp checkout **is** one, and it is live. Its
+   `ON CONFLICT` had no constraint to land on, so a retried turn would create a duplicate order.
+3. **`notes` + `pickup_person` kept, `personal_message` deferred** — see the collapse table
+   and the Deferred list above.
 
 ### Implementation status (2026-07-19)
 

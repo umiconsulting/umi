@@ -24,6 +24,34 @@ create schema if not exists extensions;
 create extension if not exists vector schema extensions;   -- pgvector -> runtime.*_embedding
 -- gen_random_uuid() is core in PG13+ (pg_catalog); no extension needed.
 
+-- Putting pgvector in its own schema is right, but it is only half the job: with no
+-- USAGE grant and `extensions` off the search_path, EVERY vector operation in the
+-- backend fails for api/worker — `$1::vector` is 42704 "type does not exist", and even
+-- fully qualified, `embedding <=> embedding` is "operator does not exist" because an
+-- OPERATOR is resolved through the search_path, not by schema-qualifying its operands.
+-- That silently killed all semantic search: product search, conversation memory, and
+-- the message-embedding writes.
+--
+-- Fixed here rather than by qualifying casts in the backend, because no amount of
+-- `::extensions.vector` makes `<=>` resolve — the alternative is OPERATOR(extensions.<=>)
+-- at every call site, which is noise nobody will maintain.
+--
+-- `extensions` goes LAST on the path, after the app schemas, so an extension can never
+-- shadow a umi/tenant/runtime object. SECURITY DEFINER functions are unaffected: they
+-- pin `search_path = pg_catalog` individually.
+--
+-- Set on the DATABASE, not on the roles. `alter role ... set search_path` applies to the
+-- role you LOG IN as and does NOT inherit, so setting it on api/worker would miss the
+-- actual login roles entirely (the harness connects as api_login/worker_login, members
+-- of those roles; prod's login-role naming is still an open deploy-gate item). The
+-- database-level default covers every login role and needs no name to be known here.
+grant usage on schema extensions to api, worker, readonly;
+do $$
+begin
+  execute format('alter database %I set search_path = %s',
+                 current_database(), '"$user", public, extensions');
+end $$;
+
 -- Shared: touch updated_at (attached to every updated_at table in 60_triggers)
 create or replace function public.tg_touch_updated_at() returns trigger
   language plpgsql

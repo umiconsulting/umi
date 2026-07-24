@@ -54,7 +54,6 @@ export interface ExtractedIntent {
     temp?: 'CALIENTE' | 'ROCAS' | 'FRAPPE';
     milk?: 'DESLACTOSADA' | 'ALMENDRA' | 'COCO' | 'AVENA' | 'SOYA';
     pickup_person?: string;
-    personal_message?: string;
     customer_note?: string;
     cancel_reason?: string;
     confirmation?: 'yes' | 'no';
@@ -262,7 +261,6 @@ Return ONLY valid JSON with this exact shape:
     "temp": "CALIENTE | ROCAS | FRAPPE",
     "milk": "DESLACTOSADA | ALMENDRA | COCO | AVENA | SOYA",
     "pickup_person": "string optional",
-    "personal_message": "string optional",
     "customer_note": "string optional",
     "cancel_reason": "string optional",
     "confirmation": "yes | no"

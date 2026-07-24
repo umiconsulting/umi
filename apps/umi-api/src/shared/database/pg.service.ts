@@ -185,12 +185,53 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
     await Promise.allSettled([this.app.end(), this.worker.end()]);
   }
 
-  /** Service/background query on the BYPASSRLS worker pool. */
+  /**
+   * Service/background query on the BYPASSRLS worker pool.
+   *
+   * ⚠️ RLS DOES NOT APPLY HERE. The only thing separating tenants on this pool is
+   * the `business_id` predicate you remember to write, and nothing in the database
+   * will catch you if you forget — an omitted predicate returns every tenant's rows
+   * rather than none. Prefer `tquery` whenever the business is known at the call
+   * site (it almost always is: it is usually the method's first argument).
+   *
+   * Legitimate uses are narrow: work that RESOLVES which tenant a request belongs
+   * to (business-by-slug at login, inbound WhatsApp number -> business), work that
+   * is genuinely cross-tenant (outbox draining, cron enumerating active businesses,
+   * reconciliation), and the sealed auth substrate.
+   */
   query<T extends QueryResultRow = QueryResultRow>(
     text: string,
     params: unknown[] = [],
   ): Promise<{ rows: T[]; rowCount: number | null }> {
     return this.worker.query<T>(text, params);
+  }
+
+  /**
+   * Tenant-scoped query on the RLS-ENFORCED app pool — the default for anything
+   * that already knows its business.
+   *
+   * This is the structural half of tenant isolation, as opposed to the remembered
+   * half. The business id becomes the transaction's RLS scope (`SET LOCAL`, so it
+   * cannot leak across pooled reuse), which means a query that forgets its
+   * `business_id` predicate returns ZERO rows instead of another tenant's — and an
+   * id-keyed statement like `UPDATE tenant.customer ... WHERE id = $1` stops
+   * trusting an unguessable uuid as its security boundary, because the row is not
+   * visible in the first place unless it belongs to this business.
+   *
+   * Keep the explicit predicate anyway (defence in depth, per OWASP's multi-tenant
+   * guidance); the difference is that forgetting it now fails closed.
+   */
+  tquery<T extends QueryResultRow = QueryResultRow>(
+    tenantId: string,
+    text: string,
+    params: unknown[] = [],
+  ): Promise<{ rows: T[]; rowCount: number | null }> {
+    return this.runWithTenant(tenantId, null, async (client) => {
+      // No `as unknown[]` here, unlike `query` above: PoolClient.query resolves to the
+      // overload that already accepts unknown[], so the assertion would be a no-op.
+      const r = await client.query<T>(text, params);
+      return { rows: r.rows, rowCount: r.rowCount };
+    });
   }
 
   /**

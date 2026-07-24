@@ -198,7 +198,6 @@ describe('CheckoutTools.reorderLastOrder', () => {
         {
           id: 'o-prev',
           status: 'completed',
-          kitchenStatus: 'completed',
           items: [
             {
               product_id: 'p-latte',
@@ -210,7 +209,6 @@ describe('CheckoutTools.reorderLastOrder', () => {
           ],
           customerNote: null,
           pickupPerson: null,
-          personalMessage: null,
         },
       ]),
     };
@@ -317,9 +315,7 @@ describe('CheckoutTools.cancelOrder', () => {
 
   it('falls back to cancelling a confirmed, not-yet-started order when no draft cart', async () => {
     const orders = {
-      recentOrders: vi
-        .fn()
-        .mockResolvedValue([{ id: 'o-9', status: 'pending', kitchenStatus: 'new', items: [{}] }]),
+      recentOrders: vi.fn().mockResolvedValue([{ id: 'o-9', status: 'placed', items: [{}] }]),
       markCancelled: vi.fn().mockResolvedValue(undefined),
     };
     const conversations = {

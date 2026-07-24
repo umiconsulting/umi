@@ -331,6 +331,12 @@ create table tenant.product_category (
   display_order integer not null default 0,
   created_at    timestamptz not null default now()
 );
+-- The catalog sync gets-or-creates a category BY NAME on every run. build-v2 keyed
+-- that on a slug column (`key`) which build-v3 correctly does not have — the name is
+-- the identity. Without this, the upsert has no conflict target and a re-sync forks
+-- a second "Bebidas". 0 duplicate (business_id, name) pairs in the source.
+create unique index product_category_business_name_uidx
+  on tenant.product_category (business_id, name);
 
 create table tenant.product (
   id           uuid primary key default gen_random_uuid(),
@@ -344,6 +350,14 @@ create table tenant.product (
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
+-- The Zettle sync identifies a product by its external id. build-v2 kept that in
+-- `metadata->>'zettle_uuid'` with no constraint, so the sync had to SELECT-then-write
+-- and two concurrent runs could both miss and both INSERT. external_ref is the typed
+-- home; this makes the upsert atomic. Partial: hand-created products have no ref.
+-- 136/136 source products carry one, with 0 duplicates.
+create unique index product_external_ref_uidx
+  on tenant.product (business_id, external_ref)
+  where external_ref is not null;
 comment on column tenant.product.price is
   'Centavos. Name embeddings live in runtime.product_embedding, not here.';
 
@@ -438,7 +452,9 @@ create table tenant.customer_order (
   status           text not null default 'placed'
                      check (status in ('placed','preparing','ready','completed','canceled')),
   cancel_reason    text,                          -- codes/notes for a void; contaminated free-text history NOT carried
-  external_ref     text,                          -- Zettle order id when synced
+  notes            text,                          -- order-level note the customer gave at checkout
+  pickup_person    text,                          -- who collects the order, when not the buyer
+  external_ref     text,                          -- Zettle order id when synced; also the bot's idempotency key
   placed_at        timestamptz not null default now(),
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
@@ -446,18 +462,46 @@ create table tenant.customer_order (
   -- lines) via tenant.order_total below — it cannot drift and self-heals on a
   -- void. Money-truth for a settled order lives on tenant.payment, not here.
 );
+comment on column tenant.customer_order.notes is
+  'Order-level note captured at checkout. This is the NAMED column ORDER_MODEL.md §5 sanctions '
+  '("add a named customer_order.notes when a real consumer earns it") — NOT a revived free-text '
+  'blob. Both ends exist today: the WhatsApp checkout writes it, and the FROZEN iPad KDS ticket '
+  'renders it to the barista as `customer_note`. Per-line customization belongs on '
+  'order_item.notes; a lasting customer preference belongs on tenant.customer_note.';
+comment on column tenant.customer_order.pickup_person is
+  'Who collects the order, when that is not the buyer. Also a frozen KDS ticket field. Never '
+  'populated in the source (0/51) but written by the WhatsApp checkout, so it gets a real column '
+  'rather than a hard-coded null in the contract.';
+-- NOTE: personal_message (the gift message that accompanies pickup_person) is
+-- DEFERRED, not forgotten — see ORDER_MODEL.md §5 Deferred. It never had a column
+-- (it lived in the details blob), it is written on 0 of 51 source orders, and the
+-- only thing that ever displayed it was a Slack controller that no longer exists.
+-- The KDS will earn it back. Re-add as a plain nullable text column then; there is
+-- no history to retrofit precisely because there is none.
+
+-- Idempotency for order INJECTION (ORDER_MODEL.md §6 planned this as "when the
+-- injection path is built" — it already is: the WhatsApp checkout is one).
+-- conversations/orders.repository.ts retries a turn with the SAME external_ref and
+-- relies on ON CONFLICT to return the existing order; without this index the
+-- conflict target does not exist and a retried turn creates a DUPLICATE order.
+-- Partial, so the many orders with no external ref are unconstrained.
+create unique index customer_order_external_ref_uidx
+  on tenant.customer_order (business_id, external_ref)
+  where external_ref is not null;
 
 create table tenant.order_item (
   id           uuid primary key default gen_random_uuid(),
   order_id     uuid not null references tenant.customer_order(id) on delete cascade,
   product_id   uuid references tenant.product(id),
-  name         text not null,               -- snapshot at order time
-  quantity     integer not null default 1 check (quantity > 0),
-  unit_price   bigint not null default 0 check (unit_price >= 0),   -- centavos, snapshot (final, incl. chosen modifiers)
-  voided_at    timestamptz,                 -- void tombstone; a live line = voided_at IS NULL
-  void_reason  text,                        -- why: mistake · duplicate · customer_changed · comp (service recovery) · test
-  notes        text,
-  created_at   timestamptz not null default now(),
+  name          text not null,              -- snapshot at order time
+  variant_name  text,                       -- the CHOSEN variant, snapshot ("Grande", "Oat milk")
+  quantity      integer not null default 1 check (quantity > 0),
+  unit_price    bigint not null default 0 check (unit_price >= 0),  -- centavos, snapshot (final, incl. chosen modifiers)
+  display_order integer not null default 0, -- the line's position on the ticket
+  voided_at     timestamptz,                -- void tombstone; a live line = voided_at IS NULL
+  void_reason   text,                       -- why: mistake · duplicate · customer_changed · comp (service recovery) · test
+  notes         text,
+  created_at    timestamptz not null default now(),
   -- a reason is meaningless without a void (the reverse is allowed: a historical/
   -- unattributed void may have no reason — the backfill carries exactly that).
   constraint order_item_reason_needs_void check (void_reason is null or voided_at is not null)
@@ -465,6 +509,30 @@ create table tenant.order_item (
 create index tenant_order_item_order_idx on tenant.order_item (order_id);
 comment on column tenant.order_item.name is
   'Snapshot at order time — a line must not change if the product is later renamed.';
+-- variant_name + display_order are NAMED columns for the same reason customer_order
+-- gained notes/pickup_person (2026-07-21): a live reader had already earned them.
+-- ORDER_MODEL.md §5 folded variant_name into notes and dropped display_order as
+-- "cosmetic". Both were wrong, and neither is visible to sql-preflight — a folded
+-- column still resolves.
+--   variant_name: TWO readers. The frozen iPad decodes it as its own field
+--     (KDSAPIModels.swift `variantName`), and checkout re-prices a REORDER by
+--     matching it against the live catalog (`product.variants[].name`). Folded into
+--     notes as `variant · note` it is unrecoverable — there is no marker saying which
+--     half is which, and a variant name may itself contain the separator. Measured on
+--     the source: 63 of 73 lines carry one, so a fold breaks most reorders.
+--   display_order: NOT derivable, measured — `row_number() over (order by created_at, id)`
+--     disagrees with the source on 63 of 73 lines, because every line of an order shares
+--     one insert timestamp and the tie then breaks on random uuid. Deriving it renders
+--     the ticket SCRAMBLED. It is also the harder failure: the frozen Swift model decodes
+--     it as a NON-OPTIONAL Int, so a missing value fails the whole payload and the KDS
+--     goes BLANK rather than mis-ordered.
+comment on column tenant.order_item.variant_name is
+  'The chosen variant, snapshot at order time. Read by the frozen iPad ticket and by the '
+  'reorder re-pricer, which matches it against the live catalog — so it is its own column, '
+  'never folded into notes.';
+comment on column tenant.order_item.display_order is
+  'Line position on the ticket, 0-based. Carried, not derived: source insert timestamps tie '
+  'within an order, so any derived ordinal falls back to random uuid order.';
 comment on column tenant.order_item.voided_at is
   'A line is a void (Toast/Square term), not an order cancel. Amendments never edit a line: '
   'void the old (set this), add a new line. NULL = live. Voided lines survive as waste/history '
@@ -490,13 +558,15 @@ begin
   if old.voided_at is not null then
     raise exception 'order_item % is voided and frozen; amend by adding a new line, not editing', old.id;
   end if;
-  if new.id         is distinct from old.id
-  or new.order_id   is distinct from old.order_id
-  or new.product_id is distinct from old.product_id
-  or new.name       is distinct from old.name
-  or new.quantity   is distinct from old.quantity
-  or new.unit_price is distinct from old.unit_price
-  or new.created_at is distinct from old.created_at then
+  if new.id            is distinct from old.id
+  or new.order_id      is distinct from old.order_id
+  or new.product_id    is distinct from old.product_id
+  or new.name          is distinct from old.name
+  or new.variant_name  is distinct from old.variant_name
+  or new.quantity      is distinct from old.quantity
+  or new.unit_price    is distinct from old.unit_price
+  or new.display_order is distinct from old.display_order
+  or new.created_at    is distinct from old.created_at then
     raise exception 'order_item % is an immutable snapshot; change an order by voiding the line and adding a new one', old.id;
   end if;
   return new;   -- permitted: set voided_at / void_reason (the void), or edit notes
@@ -507,6 +577,7 @@ create trigger order_item_void_only
 
 create table tenant.order_event (
   id          uuid primary key default gen_random_uuid(),
+  sequence    bigint generated always as identity,
   order_id    uuid not null references tenant.customer_order(id) on delete cascade,
   status      text not null
                 check (status in ('placed','preparing','ready','completed','canceled')),
@@ -514,6 +585,18 @@ create table tenant.order_event (
   occurred_at timestamptz not null default now()
 );
 comment on table tenant.order_event is 'Real status transitions only — not a catch-all event log.';
+-- The status spine has TWO consumer shapes, and this column serves the second one.
+-- PUSH (ORDER_MODEL.md §1): a new row fires a "listo" notification — needs no cursor.
+-- PULL: the FROZEN iPad KDS polls incrementally — `after_sequence` in the request,
+-- `WHERE sequence > $n ORDER BY sequence` in the query, `last_event_sequence` on
+-- every ticket. That needs a TOTAL ORDER, and occurred_at cannot supply one: in the
+-- source events, 63 occurred_at values are TIED, so a `> timestamp` cursor silently
+-- skips or replays events at every tie — the KDS would drop ticket transitions with
+-- nothing raising an error. Monotonic bigint, assigned by the database, never reused.
+create index tenant_order_event_sequence_idx on tenant.order_event (sequence);
+comment on column tenant.order_event.sequence is
+  'Monotonic cursor for incremental polling (frozen KDS `after_sequence`). Ordering only — '
+  'gaps are expected and meaningless; never treat it as a count.';
 
 create table tenant.payment (
   id           uuid primary key default gen_random_uuid(),
@@ -581,8 +664,10 @@ create view tenant.order_ticket with (security_invoker = true) as
          o.placed_at,
          i.id           as item_id,
          i.name         as item_name,
+         i.variant_name,
          i.quantity,
          i.unit_price,
+         i.display_order,
          i.voided_at,
          i.void_reason,
          i.notes
