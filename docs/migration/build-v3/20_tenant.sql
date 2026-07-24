@@ -493,13 +493,15 @@ create table tenant.order_item (
   id           uuid primary key default gen_random_uuid(),
   order_id     uuid not null references tenant.customer_order(id) on delete cascade,
   product_id   uuid references tenant.product(id),
-  name         text not null,               -- snapshot at order time
-  quantity     integer not null default 1 check (quantity > 0),
-  unit_price   bigint not null default 0 check (unit_price >= 0),   -- centavos, snapshot (final, incl. chosen modifiers)
-  voided_at    timestamptz,                 -- void tombstone; a live line = voided_at IS NULL
-  void_reason  text,                        -- why: mistake · duplicate · customer_changed · comp (service recovery) · test
-  notes        text,
-  created_at   timestamptz not null default now(),
+  name          text not null,              -- snapshot at order time
+  variant_name  text,                       -- the CHOSEN variant, snapshot ("Grande", "Oat milk")
+  quantity      integer not null default 1 check (quantity > 0),
+  unit_price    bigint not null default 0 check (unit_price >= 0),  -- centavos, snapshot (final, incl. chosen modifiers)
+  display_order integer not null default 0, -- the line's position on the ticket
+  voided_at     timestamptz,                -- void tombstone; a live line = voided_at IS NULL
+  void_reason   text,                       -- why: mistake · duplicate · customer_changed · comp (service recovery) · test
+  notes         text,
+  created_at    timestamptz not null default now(),
   -- a reason is meaningless without a void (the reverse is allowed: a historical/
   -- unattributed void may have no reason — the backfill carries exactly that).
   constraint order_item_reason_needs_void check (void_reason is null or voided_at is not null)
@@ -507,6 +509,30 @@ create table tenant.order_item (
 create index tenant_order_item_order_idx on tenant.order_item (order_id);
 comment on column tenant.order_item.name is
   'Snapshot at order time — a line must not change if the product is later renamed.';
+-- variant_name + display_order are NAMED columns for the same reason customer_order
+-- gained notes/pickup_person (2026-07-21): a live reader had already earned them.
+-- ORDER_MODEL.md §5 folded variant_name into notes and dropped display_order as
+-- "cosmetic". Both were wrong, and neither is visible to sql-preflight — a folded
+-- column still resolves.
+--   variant_name: TWO readers. The frozen iPad decodes it as its own field
+--     (KDSAPIModels.swift `variantName`), and checkout re-prices a REORDER by
+--     matching it against the live catalog (`product.variants[].name`). Folded into
+--     notes as `variant · note` it is unrecoverable — there is no marker saying which
+--     half is which, and a variant name may itself contain the separator. Measured on
+--     the source: 63 of 73 lines carry one, so a fold breaks most reorders.
+--   display_order: NOT derivable, measured — `row_number() over (order by created_at, id)`
+--     disagrees with the source on 63 of 73 lines, because every line of an order shares
+--     one insert timestamp and the tie then breaks on random uuid. Deriving it renders
+--     the ticket SCRAMBLED. It is also the harder failure: the frozen Swift model decodes
+--     it as a NON-OPTIONAL Int, so a missing value fails the whole payload and the KDS
+--     goes BLANK rather than mis-ordered.
+comment on column tenant.order_item.variant_name is
+  'The chosen variant, snapshot at order time. Read by the frozen iPad ticket and by the '
+  'reorder re-pricer, which matches it against the live catalog — so it is its own column, '
+  'never folded into notes.';
+comment on column tenant.order_item.display_order is
+  'Line position on the ticket, 0-based. Carried, not derived: source insert timestamps tie '
+  'within an order, so any derived ordinal falls back to random uuid order.';
 comment on column tenant.order_item.voided_at is
   'A line is a void (Toast/Square term), not an order cancel. Amendments never edit a line: '
   'void the old (set this), add a new line. NULL = live. Voided lines survive as waste/history '
@@ -532,13 +558,15 @@ begin
   if old.voided_at is not null then
     raise exception 'order_item % is voided and frozen; amend by adding a new line, not editing', old.id;
   end if;
-  if new.id         is distinct from old.id
-  or new.order_id   is distinct from old.order_id
-  or new.product_id is distinct from old.product_id
-  or new.name       is distinct from old.name
-  or new.quantity   is distinct from old.quantity
-  or new.unit_price is distinct from old.unit_price
-  or new.created_at is distinct from old.created_at then
+  if new.id            is distinct from old.id
+  or new.order_id      is distinct from old.order_id
+  or new.product_id    is distinct from old.product_id
+  or new.name          is distinct from old.name
+  or new.variant_name  is distinct from old.variant_name
+  or new.quantity      is distinct from old.quantity
+  or new.unit_price    is distinct from old.unit_price
+  or new.display_order is distinct from old.display_order
+  or new.created_at    is distinct from old.created_at then
     raise exception 'order_item % is an immutable snapshot; change an order by voiding the line and adding a new one', old.id;
   end if;
   return new;   -- permitted: set voided_at / void_reason (the void), or edit notes
@@ -636,8 +664,10 @@ create view tenant.order_ticket with (security_invoker = true) as
          o.placed_at,
          i.id           as item_id,
          i.name         as item_name,
+         i.variant_name,
          i.quantity,
          i.unit_price,
+         i.display_order,
          i.voided_at,
          i.void_reason,
          i.notes

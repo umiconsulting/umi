@@ -213,30 +213,35 @@ from ops.orders o;
 
 -- ----------------------------------------------------------------------------
 -- 5. ops.order_items  ->  tenant.order_item   (MAP)
---    68 non-null product_id all resolve. variant_name (63) folded into notes.
---    name = order-time snapshot.
+--    68 non-null product_id all resolve. name = order-time snapshot.
+--    variant_name (63) + display_order CARRIED as their own columns. They used to be
+--      folded into notes / dropped as cosmetic; both were wrong and both broke a live
+--      reader (see 20_tenant.sql). notes now carries ONLY the customer's note, which is
+--      what it means — and no source row has both, so nothing about this run changes
+--      except that the two facts stay separable.
 --    is_cancelled (3 lines / 2 orders) -> voided_at (the void tombstone). The
 --      source carries only the boolean, so updated_at stands in for the unknown
 --      exact void time — what matters is non-null, so the line leaves the
 --      derived total (this is what makes tenant.order_total reconcile to 590300).
 --    void_reason left NULL — the source has no reason (and these are known tests),
 --      so we do not fabricate one; same rule as customer_order.cancel_reason.
---    DROPPED: display_order (cosmetic), kitchen_status (derived), metadata.
+--    DROPPED: kitchen_status (derived), metadata.
 --    station_id DEFERRED (source has no per-line station; column not built — see
 --      20_tenant.sql / ORDER_MODEL.md §5).
 -- ----------------------------------------------------------------------------
 insert into tenant.order_item
-  (id, order_id, product_id, name, quantity, unit_price, voided_at, notes, created_at)
+  (id, order_id, product_id, name, variant_name, quantity, unit_price,
+   display_order, voided_at, notes, created_at)
 select oi.id,
        oi.order_id,
        oi.product_id,
        oi.name,
+       nullif(btrim(oi.variant_name), ''),
        oi.quantity,
        oi.unit_price_cents::bigint,
+       coalesce(oi.display_order, 0),
        case when oi.is_cancelled then oi.updated_at end,
-       nullif(btrim(concat_ws(' · ',
-              nullif(btrim(oi.variant_name), ''),
-              nullif(btrim(oi.notes), ''))), ''),
+       nullif(btrim(oi.notes), ''),
        oi.created_at
 from ops.order_items oi;
 
