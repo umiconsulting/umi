@@ -2,22 +2,33 @@ import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
 
 /**
- * `tenant."order"` + `tenant.order_item` writes/reads for the bot checkout
- * (build-v2; was `ops.orders`/`ops.order_items`). Worker pool (unauthenticated
- * WhatsApp path).
+ * `tenant.customer_order` + `tenant.order_item` + `tenant.order_event` reads/writes
+ * for the bot checkout (build-v3; was `tenant."order"`, and `ops.orders` before that).
  *
- * De-overload: the order's former `kitchen_status` and cancellation columns MOVED
- * to the `tenant.order_event` lifecycle journal. Creating an order therefore also
- * appends a `kitchen`/`new` event (so the KDS projection surfaces the ticket), and
- * cancelling appends a `cancellation` event; per-line `kitchen_status` stays on
- * `order_item`. `person_id → customer_id`, `location_id → branch_id`, and the
- * free-form `channel`/`source` collapse onto `channel_id → umi.channel_type`.
+ * What the build-v3 order model changed here (see ORDER_MODEL.md):
  *
- * Money boundary: the tool layer is in PESOS; this is where it converts to
- * CENTAVOS (`total_cents`, `unit_price_cents`). The `details` jsonb keeps a
- * PESOS items snapshot (legacy shape) so recent/reorder reads reconstruct the
- * cart directly. Idempotency: `source_transaction_id` (UNIQUE per tenant) — a
- * retried turn returns the same order instead of creating a duplicate.
+ * - **The order is no longer overloaded.** `kitchen_status` is gone: the commercial and
+ *   operational axes collapsed into ONE `status`
+ *   (`placed·preparing·ready·completed·canceled` — note the single-l spelling; the old
+ *   code wrote `'cancelled'`, which this CHECK rejects). `order_event` is the status
+ *   spine, a thin `(order_id, status)` transition journal with a monotonic `sequence`
+ *   for the polling KDS — not the former catch-all event log.
+ * - **The total is DERIVED**, not stored: `tenant.order_total` sums the live lines, so
+ *   it cannot drift and self-heals when a line is voided.
+ * - **The `details` jsonb is gone.** It held a denormalized copy of the lines plus a
+ *   duplicate of the customer note. Lines now come from `order_item` (the only copy),
+ *   and the note / `pickup_person` are named columns.
+ * - **`source_transaction_id` → `external_ref`**, still the bot's idempotency key: the
+ *   partial unique index on `(business_id, external_ref)` is what makes a retried turn
+ *   return the same order instead of creating a duplicate.
+ *
+ * Money boundary: the tool layer is in PESOS; this is where it converts to CENTAVOS
+ * (`order_item.unit_price`, `order_total.total`) and back.
+ *
+ * Pool: the RLS-ENFORCED app pool, scoped by an explicit tenant id. The WhatsApp path is
+ * unauthenticated, so there is no request context to inherit — `runWithTenant` takes the
+ * business the turn already resolved. A forgotten `business_id` predicate then returns
+ * zero rows instead of another café's order.
  */
 
 export interface OrderItemSnapshot {
@@ -25,7 +36,7 @@ export interface OrderItemSnapshot {
   product_name: string;
   variant_name: string | null;
   quantity: number;
-  /** PESOS (legacy snapshot unit). */
+  /** PESOS (the tool-layer unit). */
   unit_price: number;
 }
 
@@ -36,7 +47,6 @@ export interface CreateOrderParams {
   items: OrderItemSnapshot[]; // unit_price in PESOS
   customerNote?: string | null;
   pickupPerson?: string | null;
-  personalMessage?: string | null;
   /** Deterministic idempotency key, e.g. `conversaflow:turn:<turn_id>`. */
   sourceTransactionId: string;
 }
@@ -51,76 +61,98 @@ export interface CreateOrderResult {
 export interface OrderSummary {
   id: string;
   status: string;
-  kitchenStatus: string | null;
-  /** PESOS. */
+  /** PESOS — derived from the live lines, never a stored column. */
   total: number;
   createdAt: string;
   items: OrderItemSnapshot[];
   customerNote: string | null;
   pickupPerson: string | null;
-  personalMessage: string | null;
 }
 
-const round = (n: number) => Math.round(n);
+/**
+ * The status an order is still cancellable in — the kitchen has not started it.
+ * This replaces the old `kitchen_status IS NULL || 'new'` test, which read a column
+ * that no longer exists now that the two status axes are one.
+ */
+export const CANCELLABLE_STATUS = 'placed';
+
+const toCents = (pesos: number) => Math.round(pesos * 100);
+
+/**
+ * An order's live lines, as the tool layer's PESOS snapshot. Voided lines are excluded
+ * (they are waste history, not something to re-order), and so are lines with no
+ * `product_id` — a reorder re-prices against the live catalog by that id, so such a
+ * line cannot survive the round trip anyway.
+ */
+const ITEMS_JSON = `COALESCE(
+  (SELECT jsonb_agg(jsonb_build_object(
+            'product_id',   i.product_id::text,
+            'product_name', i.name,
+            'variant_name', i.variant_name,
+            'quantity',     i.quantity,
+            'unit_price',   i.unit_price / 100.0)
+          ORDER BY i.display_order, i.created_at)
+     FROM tenant.order_item i
+    WHERE i.order_id = o.id
+      AND i.voided_at IS NULL
+      AND i.product_id IS NOT NULL),
+  '[]'::jsonb) AS items`;
 
 @Injectable()
 export class OrdersRepository {
   constructor(private readonly pg: PgService) {}
 
   /**
-   * Create a confirmed WhatsApp order: `tenant."order"` (status='pending') +
-   * `tenant.order_item` + a `tenant.order_event` (`kitchen`/`new` → surfaces in the
-   * KDS projection), in one transaction. Idempotent on `source_transaction_id`: a
-   * retried turn returns the existing order (no duplicate items or events).
+   * Create a confirmed WhatsApp order: `tenant.customer_order` (status='placed') + its
+   * `order_item` lines + the opening `order_event`, in one transaction.
+   *
+   * Idempotent on `external_ref`: a retried turn conflicts on the partial unique index,
+   * inserts nothing, and returns the existing order. The old code needed a second
+   * idempotency key on the event to survive a partial commit; it no longer does, because
+   * the lines and the event are written only on the branch where the ORDER was created,
+   * inside that same transaction.
    */
   async createOrder(params: CreateOrderParams): Promise<CreateOrderResult> {
-    // Compute each line's cents ONCE, then sum for the header total — so
-    // "order".total_cents always equals SUM(quantity * order_item.unit_price_cents)
-    // (deriving the header from rounded pesos could drift by a centavo).
-    const itemCents = params.items.map((it) => round(it.unit_price * 100));
+    // Each line's cents computed ONCE, then summed — so the number the customer is told
+    // matches what tenant.order_total will derive from the rows just written.
+    const itemCents = params.items.map((it) => toCents(it.unit_price));
     const totalCents = params.items.reduce((s, it, i) => s + it.quantity * itemCents[i], 0);
-    const details = {
-      items: params.items, // PESOS snapshot
-      ...(params.customerNote ? { customer_note: params.customerNote } : {}),
-      ...(params.pickupPerson ? { pickup_person: params.pickupPerson } : {}),
-      ...(params.personalMessage ? { personal_message: params.personalMessage } : {}),
-    };
 
-    return this.pg.workerTx(async (client) => {
+    return this.pg.runWithTenant(params.tenantId, null, async (client) => {
       const ins = await client.query<{ id: string }>(
-        `INSERT INTO tenant."order"
-           (business_id, customer_id, branch_id, channel_id, order_type, status,
-            total_cents, details, pickup_person, notes, source_transaction_id, placed_at)
-         VALUES ($1::uuid, $2::uuid, $3::uuid,
-                 (SELECT id FROM tenant.channel WHERE key = 'whatsapp'),
-                 'whatsapp', 'pending',
-                 $4, $5::jsonb, $6, $7, $8, now())
-         ON CONFLICT (business_id, source_transaction_id) WHERE source_transaction_id IS NOT NULL
+        `INSERT INTO tenant.customer_order
+           (business_id, customer_id, branch_id, source, fulfillment_type, status,
+            notes, pickup_person, external_ref, placed_at)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, 'whatsapp', 'pickup', 'placed',
+                 $4, $5, $6, now())
+         ON CONFLICT (business_id, external_ref) WHERE external_ref IS NOT NULL
            DO NOTHING
          RETURNING id::text`,
         [
           params.tenantId,
           params.personId,
           params.locationId,
-          totalCents,
-          JSON.stringify(details),
-          params.pickupPerson ?? null,
           params.customerNote ?? null,
+          params.pickupPerson ?? null,
           params.sourceTransactionId,
         ],
       );
 
       if (!ins.rows.length) {
-        // Idempotent hit: the order already exists for this turn.
-        const existing = await client.query<{ id: string; total_cents: number }>(
-          `SELECT id::text, total_cents FROM tenant."order"
-            WHERE business_id = $1::uuid AND source_transaction_id = $2`,
+        // Idempotent hit: this turn already produced an order. Report ITS derived total
+        // rather than the one just computed — the two differ if the order was amended
+        // (a line voided) between the original turn and this retry.
+        const existing = await client.query<{ id: string; total: string | number }>(
+          `SELECT o.id::text, t.total
+             FROM tenant.customer_order o
+             JOIN tenant.order_total t ON t.order_id = o.id
+            WHERE o.business_id = $1::uuid AND o.external_ref = $2`,
           [params.tenantId, params.sourceTransactionId],
         );
         const row = existing.rows[0];
         return {
           orderId: row?.id ?? '',
-          total: (row?.total_cents ?? totalCents) / 100,
+          total: (row ? Number(row.total) : totalCents) / 100,
           created: false,
         };
       }
@@ -130,110 +162,88 @@ export class OrdersRepository {
         const it = params.items[i];
         await client.query(
           `INSERT INTO tenant.order_item
-             (business_id, order_id, product_id, display_order, name, variant_name,
-              quantity, unit_price_cents, kitchen_status)
-           VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, 'new')`,
+             (order_id, product_id, name, variant_name, quantity, unit_price, display_order)
+           VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7)`,
           [
-            params.tenantId,
             orderId,
             it.product_id,
-            i,
             it.product_name,
             it.variant_name,
             it.quantity,
             itemCents[i],
+            i, // cart order IS ticket order — the KDS renders lines by display_order
           ],
         );
       }
 
-      // Open the kitchen lifecycle in the journal (the former ops.orders.kitchen_status
-      // = 'new'). idempotency_key makes a partial-commit replay a no-op.
+      // Open the status spine. This row is what an incremental (`after_sequence`) KDS
+      // poll sees; the ticket itself projects from the order's current status.
       await client.query(
-        `INSERT INTO tenant.order_event
-           (business_id, order_id, event_kind, new_status, kitchen_status, source, idempotency_key)
-         VALUES ($1::uuid, $2::uuid, 'kitchen', 'pending', 'new', 'conversaflow', $3)
-         ON CONFLICT (business_id, idempotency_key) WHERE idempotency_key IS NOT NULL
-           DO NOTHING`,
-        [params.tenantId, orderId, `${params.sourceTransactionId}:new`],
+        `INSERT INTO tenant.order_event (order_id, status) VALUES ($1::uuid, 'placed')`,
+        [orderId],
       );
 
       return { orderId, total: totalCents / 100, created: true };
     });
   }
 
-  /** Recent orders for a customer (newest first), with the PESOS items snapshot. */
+  /** Recent orders for a customer (newest first), with their live lines in PESOS. */
   async recentOrders(tenantId: string, personId: string, limit: number): Promise<OrderSummary[]> {
     const safeLimit = Math.max(1, Math.min(Number(limit) || 3, 10));
-    const { rows } = await this.pg.query<{
+    const { rows } = await this.pg.tquery<{
       id: string;
       status: string;
-      kitchen_status: string | null;
-      total_cents: number;
-      details: Record<string, unknown> | null;
-      created_at: string;
+      total: string | number;
+      notes: string | null;
+      pickup_person: string | null;
+      ordered_at: string;
+      items: OrderItemSnapshot[] | null;
     }>(
-      `SELECT o.id::text, o.status, o.total_cents, o.details, o.created_at,
-              (SELECT oe.kitchen_status
-                 FROM tenant.order_event oe
-                WHERE oe.business_id = o.business_id AND oe.order_id = o.id
-                  AND oe.kitchen_status IS NOT NULL
-                ORDER BY oe.occurred_at DESC
-                LIMIT 1) AS kitchen_status
-         FROM tenant."order" o
+      tenantId,
+      `SELECT o.id::text,
+              o.status,
+              t.total,
+              o.notes,
+              o.pickup_person,
+              COALESCE(o.placed_at, o.created_at) AS ordered_at,
+              ${ITEMS_JSON}
+         FROM tenant.customer_order o
+         JOIN tenant.order_total t ON t.order_id = o.id
         WHERE o.business_id = $1::uuid AND o.customer_id = $2::uuid
         ORDER BY COALESCE(o.placed_at, o.created_at) DESC
         LIMIT $3`,
       [tenantId, personId, safeLimit],
     );
-    return rows.map((r) => {
-      const details = r.details ?? {};
-      const rawItems = Array.isArray(details.items) ? (details.items as unknown[]) : [];
-      const items: OrderItemSnapshot[] = rawItems
-        .map((raw) => {
-          const it = raw as Record<string, unknown>;
-          if (!it?.product_id || !it?.product_name) return null;
-          return {
-            product_id: String(it.product_id),
-            product_name: String(it.product_name),
-            variant_name: it.variant_name ? String(it.variant_name) : null,
-            quantity: Math.max(1, Number(it.quantity) || 1),
-            unit_price: Number(it.unit_price) || 0,
-          };
-        })
-        .filter((it): it is OrderItemSnapshot => it !== null);
-      return {
-        id: r.id,
-        status: r.status,
-        kitchenStatus: r.kitchen_status,
-        total: (r.total_cents ?? 0) / 100,
-        createdAt: r.created_at,
-        items,
-        customerNote: (details.customer_note as string) ?? null,
-        pickupPerson: (details.pickup_person as string) ?? null,
-        personalMessage: (details.personal_message as string) ?? null,
-      };
-    });
+    return rows.map((r) => ({
+      id: r.id,
+      status: r.status,
+      total: Number(r.total ?? 0) / 100,
+      // When the order was PLACED — what "your recent orders" means to a customer,
+      // rather than when the row happened to be written.
+      createdAt: r.ordered_at,
+      items: Array.isArray(r.items) ? r.items : [],
+      customerNote: r.notes,
+      pickupPerson: r.pickup_person,
+    }));
   }
 
   /**
-   * Cancel an order: flip `tenant."order".status` and append a `cancellation`
-   * event (`kitchen_status='cancelled'` + reason) to the journal. One transaction.
+   * Cancel an order: set `status='canceled'` + the reason, and append the matching
+   * transition to the spine. One transaction.
    */
   async markCancelled(tenantId: string, orderId: string, reason: string): Promise<boolean> {
-    return this.pg.workerTx(async (client) => {
+    return this.pg.runWithTenant(tenantId, null, async (client) => {
       const res = await client.query(
-        `UPDATE tenant."order"
-            SET status = 'cancelled', updated_at = now()
+        `UPDATE tenant.customer_order
+            SET status = 'canceled', cancel_reason = $3, updated_at = now()
           WHERE business_id = $1::uuid AND id = $2::uuid`,
-        [tenantId, orderId],
+        [tenantId, orderId, reason?.trim() || null],
       );
       if ((res.rowCount ?? 0) === 0) return false;
 
       await client.query(
-        `INSERT INTO tenant.order_event
-           (business_id, order_id, event_kind, new_status, kitchen_status, reason, source)
-         VALUES ($1::uuid, $2::uuid, 'cancellation', 'cancelled', 'cancelled', $3, 'conversaflow')`,
-        [tenantId, orderId, reason],
+        `INSERT INTO tenant.order_event (order_id, status) VALUES ($1::uuid, 'canceled')`,
+        [orderId],
       );
       return true;
     });

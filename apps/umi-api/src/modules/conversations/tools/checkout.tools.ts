@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { OrdersRepository, type OrderItemSnapshot } from '../orders.repository';
+import { CANCELLABLE_STATUS, OrdersRepository, type OrderItemSnapshot } from '../orders.repository';
 import { ProductsRepository } from '../products.repository';
 import { ConversationsRepository } from '../conversations.repository';
 import { BusinessHoursService } from '../business-hours.service';
@@ -17,10 +17,16 @@ import { needsInputToolError, retryableToolError, terminalToolError } from './to
 /**
  * Checkout tools: confirm_order, reorder_last_order, cancel_order. Ported from
  * `tools.ts`; orders rebound from the legacy `transactions` table to
- * `tenant."order"`+`tenant.order_item` (OrdersRepository). Idempotent on
+ * `tenant.customer_order`+`tenant.order_item` (OrdersRepository). Idempotent on
  * `conversaflow:turn:<turn_id>` (the bug fix — a retried turn never duplicates an
  * order). Partial-cancellation (`confirm_order_changes`, the partial cancel
  * branch) is KDS-owned → deferred to Phase 4 (inert here).
+ *
+ * `personal_message` is no longer collected: it never had a column (it rode in the
+ * dropped `details` blob), appears on 0 of 51 source orders, and its only display was
+ * a Slack controller that no longer exists. Accepting input nothing can show is worse
+ * than not accepting it — the LLM asks the customer for a gift message that then
+ * silently vanishes. The KDS is expected to earn it back (ORDER_MODEL.md §5 Deferred).
  */
 @Injectable()
 export class CheckoutTools {
@@ -142,7 +148,7 @@ export class CheckoutTools {
 
   async confirmOrder(
     ctx: ToolContext,
-    input: { pickup_person?: string; personal_message?: string; customer_note?: string },
+    input: { pickup_person?: string; customer_note?: string },
   ): Promise<ToolResult> {
     const conv = await this.conversations.loadById(ctx.conversationId);
     const cart = (conv?.draftCart as DraftCart | null) ?? null;
@@ -175,7 +181,6 @@ export class CheckoutTools {
       items: validation.items,
       customerNote: input.customer_note ?? cart.customer_note ?? null,
       pickupPerson: input.pickup_person ?? null,
-      personalMessage: input.personal_message ?? null,
       sourceTransactionId: this.idempotencyKey(ctx),
     });
 
@@ -198,7 +203,7 @@ export class CheckoutTools {
     if (closed) return closed;
 
     const recent = await this.orders.recentOrders(ctx.tenantId, ctx.personId, 5);
-    const last = recent.find((o) => o.status !== 'cancelled' && o.items.length > 0);
+    const last = recent.find((o) => o.status !== 'canceled' && o.items.length > 0);
     if (!last) {
       return terminalToolError('No encontré una orden previa reutilizable para repetir.');
     }
@@ -219,7 +224,6 @@ export class CheckoutTools {
       items: revalidated.items,
       customerNote: input.customer_note ?? last.customerNote ?? null,
       pickupPerson: last.pickupPerson ?? null,
-      personalMessage: last.pickupPerson ? (last.personalMessage ?? null) : null,
       sourceTransactionId: this.idempotencyKey(ctx),
     });
 
@@ -263,17 +267,18 @@ export class CheckoutTools {
     if (!recent.length) {
       return terminalToolError('No encontré ningún pedido activo para tu cuenta.');
     }
-    // Cancellable while the kitchen hasn't started (kitchen_status new / unset).
-    const cancellable = recent.find((o) => !o.kitchenStatus || o.kitchenStatus === 'new');
+    // Cancellable while the kitchen hasn't started. build-v3 collapsed the commercial
+    // and operational status onto ONE column, so this is a single test against `status`
+    // rather than the old kitchen_status new/unset pair.
+    const cancellable = recent.find((o) => o.status === CANCELLABLE_STATUS);
     if (!cancellable) {
       const statusMap: Record<string, string> = {
-        accepted: 'ya está siendo preparado y no puede cancelarse',
         preparing: 'ya está siendo preparado y no puede cancelarse',
         ready: 'ya está listo para recoger',
         completed: 'ya fue entregado',
-        cancelled: 'ya estaba cancelado',
+        canceled: 'ya estaba cancelado',
       };
-      const latest = recent[0].kitchenStatus ?? recent[0].status;
+      const latest = recent[0].status;
       const statusMsg = statusMap[latest] ?? `está en estado "${latest}"`;
       return terminalToolError(
         `Tu pedido ${statusMsg}. Si necesitas ayuda, comunícate directamente con el café.`,

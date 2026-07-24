@@ -72,7 +72,6 @@ export class RealToolsService extends ToolsService {
       case 'confirm_order':
         return this.checkout.confirmOrder(ctx, {
           pickup_person: input.pickup_person as string | undefined,
-          personal_message: input.personal_message as string | undefined,
           customer_note: input.customer_note as string | undefined,
         });
       case 'confirm_order_changes':
