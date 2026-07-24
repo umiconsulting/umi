@@ -490,9 +490,9 @@ create unique index customer_order_external_ref_uidx
   where external_ref is not null;
 
 create table tenant.order_item (
-  id           uuid primary key default gen_random_uuid(),
-  order_id     uuid not null references tenant.customer_order(id) on delete cascade,
-  product_id   uuid references tenant.product(id),
+  id            uuid primary key default gen_random_uuid(),
+  order_id      uuid not null references tenant.customer_order(id) on delete cascade,
+  product_id    uuid references tenant.product(id),
   name          text not null,              -- snapshot at order time
   variant_name  text,                       -- the CHOSEN variant, snapshot ("Grande", "Oat milk")
   quantity      integer not null default 1 check (quantity > 0),
@@ -674,6 +674,72 @@ create view tenant.order_ticket with (security_invoker = true) as
     from tenant.customer_order o
     join tenant.order_item i on i.order_id = o.id
    where o.status in ('placed','preparing','ready');
+
+-- The KDS ticket: ORDER-grain, with its lines nested, shaped for the FROZEN iPad
+-- contract (apps/umi-kds KDSSnapshotRow / KDSSnapshotItem). It is separate from
+-- order_ticket on purpose — order_ticket is the line-grain LIVE projection every
+-- in-flight consumer shares, while this one is the adapter for a single client we
+-- cannot change, and it must serve HISTORY too (the dashboard order list filters by
+-- status over a window), so it carries no status filter.
+--
+-- Vocabulary is NOT translated here. The view speaks build-v3
+-- (placed·preparing·ready·completed·canceled); the service maps to the iPad's
+-- (new·accepted·preparing·ready·completed·cancelled·partial_cancelled) at the
+-- boundary, in one typed bidirectional place — see kds-contract.ts. Doing it in SQL
+-- would put a client's words in the schema and leave the WHERE clauses speaking a
+-- different language than the SELECT.
+--
+-- Two shapes exist only to satisfy non-optional fields in the Swift model, where a
+-- null fails the decode of the WHOLE payload rather than one ticket:
+--   source_transaction_id -> coalesced to the order id. external_ref is nullable
+--     (a pos/web/dashboard order has none; 51/51 whatsapp orders do), but Swift
+--     declares it non-optional.
+--   items[].display_order -> not null in order_item, for the same reason.
+-- Station is NULL by construction: the order carries no station (ORDER_MODEL §5) and
+-- the KDS scopes by the device's paired station at query time. The board's
+-- `station_id IS NULL OR station_id = $n` predicate therefore broadcasts, which is
+-- what the source data did anyway (0 of 51 orders had a station).
+create view tenant.kds_ticket with (security_invoker = true) as
+  select o.id                                    as ticket_id,
+         o.business_id,
+         o.branch_id,
+         coalesce(o.external_ref, o.id::text)    as source_transaction_id,
+         o.source                                as source_channel,
+         o.status,
+         null::uuid                              as station_id,
+         null::text                              as station_name,
+         o.customer_id,
+         o.pickup_person,
+         o.notes                                 as customer_note,
+         o.cancel_reason                         as cancellation_reason,
+         o.placed_at,
+         o.created_at,
+         o.updated_at,
+         coalesce(tot.total, 0)                  as total_cents,
+         coalesce(ev.last_seq, 0)                as last_event_sequence,
+         coalesce(
+           (select jsonb_agg(jsonb_build_object(
+                     'ticket_item_id',   i.id,
+                     'name',             i.name,
+                     'variant_name',     i.variant_name,
+                     'quantity',         i.quantity,
+                     'notes',            i.notes,
+                     -- a voided line is the iPad's `is_cancelled`; it stays ON the
+                     -- ticket so the barista sees it struck through and stops pouring
+                     'is_cancelled',     (i.voided_at is not null),
+                     'unit_price_cents', i.unit_price,
+                     'display_order',    i.display_order)
+                   order by i.display_order, i.created_at)
+              from tenant.order_item i
+             where i.order_id = o.id),
+           '[]'::jsonb)                          as items
+    from tenant.customer_order o
+    left join tenant.order_total tot on tot.order_id = o.id
+    left join lateral (
+      select max(e.sequence) as last_seq
+        from tenant.order_event e
+       where e.order_id = o.id
+    ) ev on true;
 
 -- ----------------------------------------------------------------------------
 -- DEVICES (the physical KDS iPad; sessions/pairing are runtime machinery)

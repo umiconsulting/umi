@@ -49,9 +49,22 @@ grant select on umi.subscription, umi.subscription_item, umi.invoice,
 --     umi.audit_log (sealed). Left ungranted = unreadable by the request path.
 --   umi.effective_entitlement VIEW (security_invoker) — SELECT only:
 grant select on umi.effective_entitlement to api;
---   Views are read-only for api (the tenant grant-all handed it DML on the views too):
-revoke insert, update, delete on
-  tenant.conversation_analytics, tenant.order_total, tenant.order_ticket from api;
+--   Views are read-only for api (the tenant grant-all handed it DML on the views too).
+--   SWEPT, not listed: security_gate.sql asserts "api holds no DML on ANY view", and a
+--   hand-maintained list cannot satisfy a universal assertion — it goes stale the first
+--   time someone adds a view. It did: tenant.kds_ticket landed and the gate went red.
+--   The sweep is the dual of the check, so the two cannot drift apart again. Views are
+--   all created upstream of this file (10_umi / 20_tenant), so they are all visible here.
+do $$
+declare v record;
+begin
+  for v in select schemaname, viewname
+             from pg_views
+            where schemaname in ('umi', 'tenant', 'runtime')
+  loop
+    execute format('revoke insert, update, delete on %I.%I from api', v.schemaname, v.viewname);
+  end loop;
+end $$;
 
 --   tenant.contact.normalized_value is DERIVED by tenant.tg_contact_normalize (60_triggers),
 --   never supplied. Revoking the column makes it UNFORGEABLE: an app can no longer write a
