@@ -317,6 +317,46 @@ have different homes and different mutability:
 | **charged**              | "what we actually took from the customer" | `payment.amount` (captured at pay time) | **no** — frozen fact                      |
 | **revenue**              | "what did we make last week"              | aggregate over `payment`                | **no** — reads frozen facts               |
 
+### The receipt is an artifact of a PAYMENT, not a document about an order (2026-07-24)
+
+Decided after checking how Square models it, because "make the receipt a live view of the
+order" is the intuitive answer and it is wrong.
+
+**Square has no `Receipt` object.** `receipt_number` and `receipt_url` are read-only
+fields on **`Payment`**, and the URL is _"only populated for COMPLETED payments"_. That
+placement is the whole design: a receipt cannot exist before settlement, and it cannot
+move after — which is exactly what makes it evidence.
+
+The failure it prevents: if a receipt re-derived its total from live lines, then paying
+$145 and later voiding a line would silently change the customer's receipt to $90 when
+$145 is what was actually taken. That is not a display bug, it is the document
+misrepresenting a transaction. Money on any settled surface comes from `payment` (charged)
+and `refund` (returned) — **never** from the working total above.
+
+So three documents, not two, and only the middle one is frozen:
+
+| document               | grain       | mutable | money                         |
+| ---------------------- | ----------- | ------- | ----------------------------- |
+| kitchen ticket         | order       | live    | none — a KOT carries no price |
+| **receipt**            | **payment** | **no**  | what was charged              |
+| order detail / history | order       | live    | payments − refunds, net now   |
+
+Consequences already implied elsewhere and now stated: an order paid at the counter and
+then amended does **not** get its payment edited — the payment stands and a `refund` row is
+added (§3's "settled → refund, it is timing not reason"). An UNPAID order (the WhatsApp
+pay-on-pickup case) has no receipt at all; it has a quote. And a PRINTED receipt should
+stamp `customer_order.version`, so paper and screen are reconcilable rather than merely
+different.
+
+**Not built, deliberately.** `payment` and `refund` are referenced by **zero** backend code
+today and by no gate invariant, so there is nothing to hang receipt fields off yet. The
+column shape is also not obvious: receipt NUMBERING is a business policy (per-business
+sequence? per-day? per-branch?) and in Mexico it sits next to the separate question of
+whether a customer wants a **factura/CFDI**, which is a different document from a sales
+receipt with different legal requirements. Deciding numbering before that question is
+answered would be guessing. Recorded here so the placement decision is not re-litigated;
+the columns land with the money axis.
+
 **Working total → derived, operational for the _open_ order.** Drop the stored
 `customer_order.total`; compute `SUM(unit_price * quantity) WHERE voided_at IS NULL`
 at read time — a **view now**, a trigger-cached column _only_ if the dashboard ever sorts
