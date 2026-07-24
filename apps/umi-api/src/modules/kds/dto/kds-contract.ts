@@ -9,7 +9,7 @@ import { createHash, randomBytes, randomInt } from 'node:crypto';
  * keys off these strings (e.g. it clears Keychain on `device_revoked`).
  *
  * Underneath the frozen JSON the module reads/writes the build-v2 model
- * (`runtime.v_kds_tickets` over `tenant."order"`, `tenant.station`,
+ * (`tenant.order_ticket` over `customer_order`/`order_item`, `tenant.station`,
  * `tenant.device` + `runtime.session`) — there is no `kds.*` schema and no
  * canonical transition RPC, so the logic lives in `KdsService`/`KdsRepository`,
  * not in the database.
@@ -76,21 +76,78 @@ export const STATUS_TRANSITIONS: Record<KitchenStatus, KitchenStatus[]> = {
   cancelled: [],
 };
 
-/** Map a KDS `kitchen_status` to the `tenant."order".status` lifecycle value. */
-export function mapKitchenToOrderStatus(k: KitchenStatus): string {
+/**
+ * The two status vocabularies, and the only place they meet.
+ *
+ * The iPad app is FROZEN: `KitchenStatus` in apps/umi-kds is a Swift enum with seven
+ * raw values, and `KDSSnapshotRow.asKitchenOrder()` does `guard let … else { throw }`
+ * on it. The call site is `try rows.map { try $0.asKitchenOrder() }`, so `try` inside
+ * `map` propagates on the FIRST failure — one unmappable ticket blanks the WHOLE board.
+ *
+ * build-v3 speaks a different, business-neutral vocabulary
+ * (`placed·preparing·ready·completed·canceled`), and the two disagree on exactly the
+ * states that matter: `placed` (the default for every new order) and `canceled` (the
+ * iPad spells it with two l's). Measured on the prod snapshot: 27 of 51 orders carry a
+ * status the iPad cannot map, and going forward every newly-placed order would.
+ *
+ * No gate can see this. `o.status` resolves fine under sql-preflight — it is a Postgres
+ * CHECK disagreeing with a Swift enum, and nothing in the repo reads both. So the
+ * mapping is pinned here, in one typed bidirectional place, and unit-tested.
+ */
+
+/** Statuses `tenant.customer_order.status` may hold (the CHECK, in code). */
+export type OrderStatus = 'placed' | 'preparing' | 'ready' | 'completed' | 'canceled';
+
+/**
+ * KDS → build-v3, for the write path.
+ *
+ * `accepted` and `partial_cancelled` COLLAPSE onto `preparing`: build-v3 models one
+ * status axis, not two (ORDER_MODEL.md §5 — the order-level and line-level
+ * kitchen_status never once diverged across all 51 source orders), and neither state
+ * was ever used in production (0 of 51; `partial_*` used 0×). The visible cost is that
+ * a barista's "accept" tap round-trips as `preparing`, so the ticket settles one column
+ * over on the next poll. Accepted deliberately (owner, 2026-07-24) rather than adding a
+ * status to the schema whose only consumer is one screen of one frozen client.
+ */
+export function mapKitchenToOrderStatus(k: KitchenStatus): OrderStatus {
   switch (k) {
     case 'new':
-      return 'pending';
+      return 'placed';
     case 'accepted':
     case 'preparing':
     case 'partial_cancelled':
-      return 'in_progress';
+      return 'preparing';
     case 'ready':
       return 'ready';
     case 'completed':
       return 'completed';
     case 'cancelled':
+      return 'canceled';
+  }
+}
+
+/**
+ * build-v3 → KDS, for the read path. Total: every value the CHECK permits maps to
+ * something the frozen Swift enum accepts, which is the property that keeps the board
+ * alive. `accepted` and `partial_cancelled` are never produced — they have no build-v3
+ * counterpart to come back from (see the collapse above).
+ */
+export function mapOrderToKitchenStatus(s: string): KitchenStatus {
+  switch (s) {
+    case 'placed':
+      return 'new';
+    case 'preparing':
+      return 'preparing';
+    case 'ready':
+      return 'ready';
+    case 'completed':
+      return 'completed';
+    case 'canceled':
       return 'cancelled';
+    default:
+      // Unreachable while the CHECK and this switch agree. Falling back to a value the
+      // iPad CAN decode is the safe failure: a mislabelled ticket beats a blank board.
+      return 'new';
   }
 }
 

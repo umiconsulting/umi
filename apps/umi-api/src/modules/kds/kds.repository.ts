@@ -6,6 +6,7 @@ import {
   KdsHttpError,
   type KitchenStatus,
   mapKitchenToOrderStatus,
+  mapOrderToKitchenStatus,
   randomHex,
   sha256Hex,
   TERMINAL_STATUSES,
@@ -27,11 +28,11 @@ import {
  * build-v2 mapping: stations `kitchen.stations`→`tenant.station`, devices
  * `device.devices`→`tenant.device`, sessions `device.sessions`→`runtime.session`
  * (`device_id`→`principal_id`, `principal_type='device'`), pairing
- * `device.pairing_requests`→`runtime.pairing`. Tickets are the
- * `runtime.v_kds_tickets` projection over `tenant."order"`/`order_item`; the
- * kitchen lifecycle is DE-OVERLOADED — the order's former `kitchen_status` is now
- * the latest `tenant.order_event` row, so a transition appends an event (carrying
- * `kitchen_status`) rather than mutating a column, and current status is derived.
+ * `device.pairing_requests`→`runtime.pairing`. Tickets are the `tenant.order_ticket`
+ * projection over `customer_order`/`order_item` — ONE live projection, read here with
+ * the frozen iPad's shape applied on top (see TICKET_SELECT). The kitchen lifecycle is
+ * COLLAPSED onto `customer_order.status`; `tenant.order_event` is the ordered change
+ * FEED a puller reads, carrying status transitions AND line-level upserts.
  */
 
 export interface StationRow {
@@ -93,7 +94,7 @@ export interface OrderScopeRow {
   source_transaction_id: string | null;
 }
 
-/** A raw v_kds_tickets row (+ joined name/phone/last-seq). Remapped in the service. */
+/** A tenant.order_ticket row shaped for the frozen contract. Remapped in the service. */
 export interface TicketRow {
   ticket_id: string;
   source_transaction_id: string | null;
@@ -143,7 +144,7 @@ export interface DeviceListRow {
 // REPLY channels are ('whatsapp','phone') — deliberately NOT the identity dedup family
 // ('phone','whatsapp','sms'): we never reply over SMS.
 const CUSTOMER_NAME_PHONE_JOIN = `LEFT JOIN tenant.customer cu
-    ON cu.business_id = t.business_id AND cu.id = t.customer_person_id
+    ON cu.business_id = t.business_id AND cu.id = t.customer_id
   LEFT JOIN LATERAL (
     SELECT COALESCE(ct.raw_phone_number, ct.normalized_value) AS phone
       FROM tenant.contact ct
@@ -153,6 +154,66 @@ const CUSTOMER_NAME_PHONE_JOIN = `LEFT JOIN tenant.customer cu
      ORDER BY (pch.key = 'whatsapp') DESC, ct.is_primary DESC, ct.updated_at DESC
      LIMIT 1
   ) ph ON true`;
+
+/**
+ * The frozen `KDSEventRow` projection, shared by the cursor and the ticker so the two
+ * cannot drift.
+ *
+ * Three of these columns are SYNTHESISED because build-v3's `order_event` is a thin
+ * status spine — "real status transitions only, not a catch-all event log" — while the
+ * Swift model declares all three NON-OPTIONAL:
+ *   kind    -> REAL COLUMN now, no longer a synthesised constant. order_event carries
+ *              status_changed | order_upserted, and both are values
+ *              `KitchenEventKind(kdsValue:)` already accepts — the frozen client routes
+ *              order_upserted straight to refreshSnapshot(), which is exactly what a
+ *              line-level void needs and required no app change.
+ *   source  -> the old `order_event.source` free-text is gone; a KDS-visible transition
+ *              is written by the KDS.
+ *   payload -> the old actor/reason blob is gone. Empty object, not null: Swift decodes
+ *              a dictionary, and null fails the whole payload.
+ * `business_id` comes from the parent order — `order_event` deliberately has no
+ * business_id (RLS reaches it through customer_order), which is also why every query
+ * here filters on `o.business_id`, not `e.business_id`.
+ */
+/**
+ * The frozen `KDSSnapshotRow` projection over tenant.order_ticket.
+ *
+ * These four columns are the ADAPTER — they exist because of what the iPad's Swift model
+ * declares, and for no other reason, so they live here rather than in the schema:
+ *   source_transaction_id -> coalesced to the order id. `external_ref` is nullable (a
+ *       pos/web/dashboard order has none) while Swift declares it NON-optional, and a
+ *       null fails the decode of the whole payload, not one ticket.
+ *   station_id / station_name -> always null. The order carries no station; the KDS
+ *       scopes by the device's paired station at query time. The frozen contract has the
+ *       keys, so they are emitted as nulls (both are optional in Swift).
+ *   total_amount -> the ticket carries NO money (ORDER_MODEL §4). Callers that legitimately
+ *       need a total join tenant.order_total themselves; the board passes null, which is
+ *       what a kitchen ticket is.
+ */
+const TICKET_SELECT = `t.ticket_id,
+              COALESCE(t.external_ref, t.ticket_id::text) AS source_transaction_id,
+              t.business_id        AS business_id,
+              t.source             AS source_channel,
+              t.status,
+              NULL::uuid           AS station_id,
+              NULL::text           AS station_name,
+              cu.name              AS customer_name,
+              ph.phone             AS customer_phone,
+              t.pickup_person,
+              t.notes              AS customer_note,
+              t.created_at,
+              t.updated_at,
+              t.items`;
+
+const EVENT_SELECT = `e.sequence,
+              e.order_id                           AS ticket_id,
+              o.business_id                        AS business_id,
+              COALESCE(o.external_ref, o.id::text) AS source_transaction_id,
+              e.kind,
+              e.status,
+              e.occurred_at,
+              'kds'                                AS source,
+              '{}'::jsonb                          AS payload`;
 
 @Injectable()
 export class KdsRepository {
@@ -197,7 +258,7 @@ export class KdsRepository {
     const locClause = locationId ? 'AND branch_id = $2' : '';
     const params = locationId ? [tenantId, locationId] : [tenantId];
     const { rows } = await this.pg.query(
-      `SELECT id, station_key, name, status, sort_order, branch_id AS location_id
+      `SELECT id, key AS station_key, name, status, sort_order, branch_id AS location_id
          FROM tenant.station
         WHERE business_id = $1 AND status = 'active' ${locClause}
         ORDER BY sort_order ASC, name ASC`,
@@ -228,7 +289,7 @@ export class KdsRepository {
       `SELECT id
          FROM tenant.station
         WHERE business_id = $1
-          AND station_key = $2
+          AND key = $2
           AND branch_id IS NOT DISTINCT FROM $3
           AND status <> 'archived'
         LIMIT 1`,
@@ -252,9 +313,9 @@ export class KdsRepository {
     location_id: string | null;
   }> {
     const { rows } = await this.pg.query(
-      `INSERT INTO tenant.station (business_id, branch_id, station_key, name)
+      `INSERT INTO tenant.station (business_id, branch_id, key, name)
          VALUES ($1, $2, $3, $4)
-       RETURNING id, station_key, name, status, sort_order, branch_id AS location_id`,
+       RETURNING id, key AS station_key, name, status, sort_order, branch_id AS location_id`,
       [input.tenantId, input.locationId, input.stationKey, input.name],
     );
     return rows[0] as {
@@ -280,7 +341,7 @@ export class KdsRepository {
       `UPDATE tenant.station
           SET name = $3, updated_at = now()
         WHERE id = $1 AND business_id = $2 AND status <> 'archived'
-      RETURNING id, station_key, name, status, sort_order, branch_id AS location_id`,
+      RETURNING id, key AS station_key, name, status, sort_order, branch_id AS location_id`,
       [input.stationId, input.tenantId, input.name],
     );
     return (
@@ -634,86 +695,60 @@ export class KdsRepository {
     });
   }
 
-  // ── Board reads (runtime.v_kds_tickets + tenant.order_event) ────────────────
+  // ── Board reads (tenant.order_ticket + tenant.order_event) ──────────────────
 
   /**
-   * Board snapshot for a device. Reads the canonical projection, resolves
-   * customer name (`tenant.customer`) + reply phone (`tenant.contact`),
-   * derives `last_event_sequence`, and scopes by tenant + station (NULL station =
-   * broadcast, matching the legacy `get_board_snapshot`). Only on-board
-   * (non-terminal) statuses are returned. The service remaps items to the frozen
-   * shape (`unit_price` in currency units).
+   * Board snapshot for a device: tenant.order_ticket filtered to the on-board
+   * (non-terminal) statuses, plus the customer's name and reply phone.
+   *
+   * No station argument, for the same reason ticketEvents has none: the order carries no
+   * station (ORDER_MODEL §5), so the old `station_id IS NULL OR = $n` predicate matched
+   * every row. It returns with per-line routing, on the LINE.
+   *
+   * The caller filters in the iPad's vocabulary and this translates on the way in — the
+   * view stores build-v3's.
    */
   async boardSnapshot(
     tenantId: string,
-    stationId: string | null,
     statuses: KitchenStatus[] = BOARD_ACTIVE_STATUSES,
   ): Promise<TicketRow[]> {
     const { rows } = await this.pg.query<TicketRow>(
-      `SELECT t.ticket_id,
-              t.source_transaction_id,
-              t.business_id        AS business_id,
-              t.source_channel,
-              t.status,
-              t.station_id,
-              t.station_name,
-              cu.name            AS customer_name,
-              ph.phone           AS customer_phone,
-              t.pickup_person,
-              t.customer_note,
-              (t.total_cents::numeric / 100) AS total_amount,
-              t.created_at,
-              t.updated_at,
-              COALESCE(ev.last_seq, 0) AS last_event_sequence,
-              t.items
-         FROM runtime.v_kds_tickets t
+      `SELECT ${TICKET_SELECT},
+              NULL::numeric        AS total_amount,
+              t.last_event_sequence
+         FROM tenant.order_ticket t
          ${CUSTOMER_NAME_PHONE_JOIN}
-         LEFT JOIN LATERAL (
-           SELECT MAX(oe.kitchen_sequence) AS last_seq
-             FROM tenant.order_event oe
-            WHERE oe.business_id = t.business_id AND oe.order_id = t.ticket_id
-         ) ev ON true
         WHERE t.business_id = $1
-          AND ($2::text IS NULL OR t.station_id IS NULL OR t.station_id = $2)
-          AND t.status = ANY($3::text[])
+          AND t.status = ANY($2::text[])
         ORDER BY t.created_at ASC`,
-      [tenantId, stationId, statuses],
+      [tenantId, statuses.map(mapKitchenToOrderStatus)],
     );
     return rows;
   }
 
   /**
-   * Event stream cursor (tenant.order_event ordered by kitchen_sequence), scoped
-   * to the device's station the same way the board snapshot is (NULL-station
-   * orders broadcast to every board) so a station-bound iPad can't read other
-   * stations' events through the cursor.
+   * Event stream cursor (`tenant.order_event` ordered by its identity `sequence`).
+   *
+   * The station filter is GONE, not forgotten. It used to read `o.station_id`, and in
+   * build-v3 an order carries no station at all (ORDER_MODEL §5 — the KDS derives a
+   * ticket's station from the device login instead, and the column was null on 100% of
+   * source orders). The old predicate was `station_id IS NULL OR station_id = $n`, so
+   * with every order null it already matched everything: this is the same broadcast
+   * behaviour the board snapshot has, now stated instead of simulated. `stationId` is
+   * therefore no longer a parameter — a filter that cannot filter is worse than none,
+   * because it reads like a security boundary. It returns when per-line routing lands
+   * (deferred `order_item.station_id`), and then it belongs on the LINE, not the order.
    */
-  async ticketEvents(
-    tenantId: string,
-    stationId: string | null,
-    afterSequence: number,
-    limit: number,
-  ): Promise<EventRow[]> {
+  async ticketEvents(tenantId: string, afterSequence: number, limit: number): Promise<EventRow[]> {
     const { rows } = await this.pg.query<EventRow>(
-      `SELECT e.kitchen_sequence       AS sequence,
-              e.order_id                AS ticket_id,
-              e.business_id               AS business_id,
-              o.source_transaction_id,
-              e.event_kind              AS kind,
-              e.new_status              AS status,
-              e.occurred_at,
-              e.source,
-              e.payload
+      `SELECT ${EVENT_SELECT}
          FROM tenant.order_event e
-         JOIN tenant."order" o
-           ON o.business_id = e.business_id AND o.id = e.order_id
-        WHERE e.business_id = $1
-          AND e.kitchen_sequence IS NOT NULL
-          AND e.kitchen_sequence > $3
-          AND ($2::text IS NULL OR o.station_id IS NULL OR o.station_id = $2)
-        ORDER BY e.kitchen_sequence ASC
-        LIMIT LEAST(GREATEST($4, 1), 1000)`,
-      [tenantId, stationId, afterSequence, limit],
+         JOIN tenant.customer_order o ON o.id = e.order_id
+        WHERE o.business_id = $1
+          AND e.sequence > $2
+        ORDER BY e.sequence ASC
+        LIMIT LEAST(GREATEST($3, 1), 1000)`,
+      [tenantId, afterSequence, limit],
     );
     return rows;
   }
@@ -721,20 +756,11 @@ export class KdsRepository {
   /** Most-recent events for the dashboard ticker. */
   async recentEvents(tenantId: string, limit: number): Promise<EventRow[]> {
     const { rows } = await this.pg.query<EventRow>(
-      `SELECT e.kitchen_sequence       AS sequence,
-              e.order_id                AS ticket_id,
-              e.business_id               AS business_id,
-              o.source_transaction_id,
-              e.event_kind              AS kind,
-              e.new_status              AS status,
-              e.occurred_at,
-              e.source,
-              e.payload
+      `SELECT ${EVENT_SELECT}
          FROM tenant.order_event e
-         JOIN tenant."order" o
-           ON o.business_id = e.business_id AND o.id = e.order_id
-        WHERE e.business_id = $1 AND e.kitchen_sequence IS NOT NULL
-        ORDER BY e.kitchen_sequence DESC
+         JOIN tenant.customer_order o ON o.id = e.order_id
+        WHERE o.business_id = $1
+        ORDER BY e.sequence DESC
         LIMIT LEAST(GREATEST($2, 1), 200)`,
       [tenantId, limit],
     );
@@ -751,7 +777,10 @@ export class KdsRepository {
     const params: unknown[] = [tenantId, sinceHours];
     let statusClause = '';
     if (statuses && statuses.length) {
-      params.push(statuses);
+      // The caller filters in the iPad's vocabulary; the view speaks build-v3's.
+      // Deduplicated because accepted/partial_cancelled/preparing all collapse onto
+      // `preparing` — without it, asking for two of them repeats the value in ANY().
+      params.push([...new Set(statuses.map(mapKitchenToOrderStatus))]);
       statusClause = `AND t.status = ANY($${params.length}::text[])`;
     }
     let locClause = '';
@@ -766,25 +795,16 @@ export class KdsRepository {
       // location filter at all.
       locClause = `AND (o.branch_id = $${params.length} OR o.branch_id IS NULL)`;
     }
+    // This one is the HISTORY consumer, so it is the one that legitimately wants money —
+    // and it joins tenant.order_total itself rather than the ticket carrying a total for
+    // everyone. When the settled projection exists this moves to payment/refund (§4).
     const { rows } = await this.pg.query<TicketRow>(
-      `SELECT t.ticket_id,
-              t.source_transaction_id,
-              t.business_id        AS business_id,
-              t.source_channel,
-              t.status,
-              t.station_id,
-              t.station_name,
-              cu.name            AS customer_name,
-              ph.phone           AS customer_phone,
-              t.pickup_person,
-              t.customer_note,
-              (t.total_cents::numeric / 100) AS total_amount,
-              t.created_at,
-              t.updated_at,
-              0 AS last_event_sequence,
-              t.items
-         FROM runtime.v_kds_tickets t
-         JOIN tenant."order" o ON o.business_id = t.business_id AND o.id = t.ticket_id
+      `SELECT ${TICKET_SELECT},
+              (tot.total::numeric / 100) AS total_amount,
+              t.last_event_sequence
+         FROM tenant.order_ticket t
+         JOIN tenant.customer_order o ON o.id = t.ticket_id
+         LEFT JOIN tenant.order_total tot ON tot.order_id = t.ticket_id
          ${CUSTOMER_NAME_PHONE_JOIN}
         WHERE t.business_id = $1
           AND t.created_at >= now() - make_interval(hours => $2)
@@ -804,43 +824,29 @@ export class KdsRepository {
     ticketId: string,
     ticketUuid: string | null,
   ): Promise<OrderScopeRow | null> {
-    const { rows } = await this.pg.query<OrderScopeRow>(
-      `SELECT o.id, o.business_id, o.branch_id AS location_id, o.station_id,
-              (SELECT oe.kitchen_status
-                 FROM tenant.order_event oe
-                WHERE oe.business_id = o.business_id AND oe.order_id = o.id
-                  AND oe.kitchen_status IS NOT NULL
-                ORDER BY oe.occurred_at DESC, oe.kitchen_sequence DESC NULLS LAST
-                LIMIT 1) AS kitchen_status,
-              o.customer_id AS person_id, o.source_transaction_id
-         FROM tenant."order" o
+    const { rows } = await this.pg.query<OrderScopeRow & { status: string }>(
+      `SELECT o.id, o.business_id, o.branch_id AS location_id,
+              NULL::uuid AS station_id,
+              o.status,
+              o.customer_id AS person_id,
+              COALESCE(o.external_ref, o.id::text) AS source_transaction_id
+         FROM tenant.customer_order o
         WHERE o.business_id = $3
           AND (($2::uuid IS NOT NULL AND o.id = $2::uuid)
-               OR o.source_transaction_id = $1)
+               OR o.external_ref = $1)
         ORDER BY CASE
           WHEN $2::uuid IS NOT NULL AND o.id = $2::uuid THEN 0 ELSE 1
         END
         LIMIT 1`,
       [ticketId, ticketUuid, tenantId],
     );
-    return rows[0] ?? null;
-  }
-
-  /** Next per-tenant kitchen_sequence (no sequence object exists — MAX+1 in-tx). */
-  private async nextKitchenSequence(client: PoolClient, tenantId: string): Promise<number> {
-    // Serialize per-tenant sequence allocation: MAX+1 under default isolation can
-    // hand the same number to concurrent transitions (cursor consumers using
-    // `> after_sequence` would then miss one). The xact-scoped advisory lock is
-    // released automatically at COMMIT/ROLLBACK.
-    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, [
-      `kds:kitchen_sequence:${tenantId}`,
-    ]);
-    const { rows } = await client.query<{ seq: string }>(
-      `SELECT COALESCE(MAX(kitchen_sequence), 0) + 1 AS seq
-         FROM tenant.order_event WHERE business_id = $1`,
-      [tenantId],
-    );
-    return Number(rows[0]?.seq ?? 1);
+    const row = rows[0];
+    if (!row) return null;
+    // The kitchen status is no longer derived from the journal: build-v3 collapsed the
+    // two status axes onto customer_order.status, and order_event is the transition
+    // stream rather than the place the current value lives (ORDER_MODEL §1 — "the
+    // ticket reads the snapshot; the spine drives the change").
+    return { ...row, kitchen_status: mapOrderToKitchenStatus(row.status) };
   }
 
   /**
@@ -854,20 +860,18 @@ export class KdsRepository {
     orderId: string,
     tenantId: string,
   ): Promise<{ kitchenStatus: KitchenStatus | null } | null> {
-    const locked = await client.query(
-      `SELECT id FROM tenant."order"
+    const locked = await client.query<{ status: string }>(
+      `SELECT status FROM tenant.customer_order
         WHERE id = $1 AND business_id = $2 FOR UPDATE`,
       [orderId, tenantId],
     );
-    if (locked.rowCount === 0) return null;
-    const status = await client.query<{ kitchen_status: KitchenStatus | null }>(
-      `SELECT kitchen_status FROM tenant.order_event
-        WHERE business_id = $2 AND order_id = $1 AND kitchen_status IS NOT NULL
-        ORDER BY occurred_at DESC, kitchen_sequence DESC NULLS LAST
-        LIMIT 1`,
-      [orderId, tenantId],
-    );
-    return { kitchenStatus: status.rows[0]?.kitchen_status ?? null };
+    const row = locked.rows[0];
+    if (!row) return null;
+    // One query, not two: the lock and the current status now come from the same row.
+    // The old pair existed because kitchen status lived in the journal while the lock
+    // was on the order — build-v3 collapsed the axes, so the locked row already holds
+    // the authoritative value and there is no window between reading them.
+    return { kitchenStatus: mapOrderToKitchenStatus(row.status) };
   }
 
   private async customerPhone(
@@ -924,63 +928,39 @@ export class KdsRepository {
       const invalid = validateTransition(currentStatus, targetStatus);
       if (invalid) throw new KdsHttpError(422, { error: invalid });
 
-      const seq = await this.nextKitchenSequence(client, order.business_id);
       const orderStatus = mapKitchenToOrderStatus(targetStatus);
       const isCancel = targetStatus === 'cancelled';
 
-      // The order keeps only its coarse business status; the fine kitchen lifecycle
-      // lives in the journal (below).
+      // ONE status, not two. build-v3 collapsed the commercial and kitchen axes onto
+      // customer_order.status, so there is no per-line kitchen_status to propagate — the
+      // old second UPDATE is gone, and with it the window where the two could disagree.
       await client.query(
-        `UPDATE tenant."order"
-            SET status = $3, updated_at = now()
+        `UPDATE tenant.customer_order
+            SET status = $3,
+                cancel_reason = CASE WHEN $4::text IS NOT NULL THEN $4 ELSE cancel_reason END,
+                updated_at = now()
           WHERE id = $1 AND business_id = $2`,
-        [order.id, order.business_id, orderStatus],
+        [order.id, order.business_id, orderStatus, isCancel ? input.cancellationReasonCode : null],
       );
 
-      // Propagate to non-cancelled line items (cancelled lines keep their state).
-      await client.query(
-        `UPDATE tenant.order_item
-            SET kitchen_status = $3, updated_at = now()
-          WHERE order_id = $1 AND business_id = $2 AND is_cancelled = false`,
-        [order.id, order.business_id, targetStatus],
+      // The spine. `sequence` is an identity column, so the old MAX+1-under-advisory-lock
+      // allocation is gone: Postgres hands out the number, and it cannot collide.
+      const ev = await client.query<{ sequence: string }>(
+        `INSERT INTO tenant.order_event (order_id, kind, status)
+         VALUES ($1::uuid, 'status_changed', $2)
+         RETURNING sequence`,
+        [order.id, orderStatus],
       );
-
-      await client.query(
-        `INSERT INTO tenant.order_event
-           (business_id, order_id, event_kind, old_status, new_status, kitchen_status,
-            reason, reason_code, reason_note, kitchen_sequence, source,
-            idempotency_key, payload, occurred_at)
-         VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9, 'kds', $10, $11::jsonb, now())
-         ON CONFLICT (business_id, idempotency_key)
-           WHERE idempotency_key IS NOT NULL DO NOTHING`,
-        [
-          order.business_id,
-          order.id,
-          isCancel ? 'cancellation' : 'kitchen',
-          currentStatus,
-          targetStatus,
-          isCancel ? input.cancellationReasonCode : null,
-          input.cancellationReasonCode,
-          input.cancellationReasonNote,
-          seq,
-          `kds:transition:${order.id}:${seq}`,
-          JSON.stringify({
-            actor_source: 'kds_app',
-            actor_id: input.actorId,
-            actor_channel: input.actorChannel,
-            target_status: targetStatus,
-          }),
-        ],
-      );
+      const seq = Number(ev.rows[0]?.sequence ?? 0);
 
       if (input.notifyBody) {
         const phone = await this.customerPhone(client, order.business_id, order.person_id);
         if (phone) {
           await client.query(
             `INSERT INTO runtime.outbox_event
-               (business_id, event_type, aggregate_id, idempotency_key, payload)
+               (business_id, topic, aggregate_id, idempotency_key, payload)
              VALUES ($1, 'twilio.status_notification', $2, $3, $4::jsonb)
-             ON CONFLICT (idempotency_key) DO NOTHING`,
+             ON CONFLICT (business_id, idempotency_key) DO NOTHING`,
             [
               order.business_id,
               order.id,
@@ -1037,14 +1017,18 @@ export class KdsRepository {
         });
       }
 
-      // Flag the targeted items as cancelled.
+      // VOID the targeted lines. `voided_at` is the tombstone — the line stays on the
+      // ticket struck through so the barista stops pouring, and falls out of the derived
+      // total on its own. The order_item trigger appends the `order_upserted` event and
+      // bumps the order's version, so this loop does not have to remember to.
       const cancelled = await client.query<{ quantity: number; name: string }>(
         `UPDATE tenant.order_item
-            SET is_cancelled = true, kitchen_status = 'cancelled', updated_at = now()
-          WHERE order_id = $1 AND business_id = $2 AND id = ANY($3::uuid[])
-            AND is_cancelled = false
+            SET voided_at = now(), void_reason = $4
+          WHERE order_id = $1::uuid AND id = ANY($3::uuid[]) AND voided_at IS NULL
+            AND EXISTS (SELECT 1 FROM tenant.customer_order o
+                         WHERE o.id = order_id AND o.business_id = $2::uuid)
         RETURNING quantity, name`,
-        [order.id, order.business_id, input.itemIds],
+        [order.id, order.business_id, input.itemIds, input.reasonCode],
       );
       // Every requested id must have matched an active line on this order;
       // otherwise roll back rather than mutate the order / notify the customer.
@@ -1054,55 +1038,32 @@ export class KdsRepository {
 
       // Remaining (non-cancelled) items → drives total + whole-order status.
       const remaining = await client.query<{ quantity: number; name: string }>(
-        `SELECT quantity, name FROM tenant.order_item
-          WHERE order_id = $1 AND business_id = $2 AND is_cancelled = false`,
+        `SELECT i.quantity, i.name FROM tenant.order_item i
+           JOIN tenant.customer_order o ON o.id = i.order_id
+          WHERE i.order_id = $1::uuid AND o.business_id = $2::uuid AND i.voided_at IS NULL`,
         [order.id, order.business_id],
       );
 
       const newStatus: KitchenStatus =
         remaining.rows.length === 0 ? 'cancelled' : 'partial_cancelled';
-      const seq = await this.nextKitchenSequence(client, order.business_id);
 
+      // NO total recompute. The total is derived (tenant.order_total sums live lines), so
+      // voiding the lines above already moved it — recomputing a stored copy is what this
+      // model removed.
       await client.query(
-        `UPDATE tenant."order"
-            SET status = $3,
-                total_cents = COALESCE((
-                  SELECT SUM(unit_price_cents * quantity)
-                    FROM tenant.order_item
-                   WHERE order_id = $1 AND business_id = $2 AND is_cancelled = false
-                ), 0),
-                updated_at = now()
-          WHERE id = $1 AND business_id = $2`,
+        `UPDATE tenant.customer_order
+            SET status = $3, updated_at = now()
+          WHERE id = $1::uuid AND business_id = $2::uuid`,
         [order.id, order.business_id, mapKitchenToOrderStatus(newStatus)],
       );
 
-      await client.query(
-        `INSERT INTO tenant.order_event
-           (business_id, order_id, event_kind, old_status, new_status, kitchen_status,
-            reason, reason_code, reason_note, kitchen_sequence, source,
-            idempotency_key, payload, occurred_at)
-         VALUES ($1, $2, 'partial_cancellation', $3, $4, $4, $5, $5, $6, $7, 'kds',
-                 $8, $9::jsonb, now())
-         ON CONFLICT (business_id, idempotency_key)
-           WHERE idempotency_key IS NOT NULL DO NOTHING`,
-        [
-          order.business_id,
-          order.id,
-          currentStatus,
-          newStatus,
-          input.reasonCode,
-          input.reasonNote,
-          seq,
-          `kds:partial_cancel:${order.id}:${seq}`,
-          JSON.stringify({
-            actor_source: 'kds_app',
-            actor_id: input.actorId,
-            actor_channel: input.actorChannel,
-            reason_code: input.reasonCode,
-            cancelled_item_ids: input.itemIds,
-          }),
-        ],
+      const ev = await client.query<{ sequence: string }>(
+        `INSERT INTO tenant.order_event (order_id, kind, status)
+         VALUES ($1::uuid, 'status_changed', $2)
+         RETURNING sequence`,
+        [order.id, mapKitchenToOrderStatus(newStatus)],
       );
+      const seq = Number(ev.rows[0]?.sequence ?? 0);
 
       const phone = await this.customerPhone(client, order.business_id, order.person_id);
       // Only emit when notifications are enabled (buildNotifyBody returns null
@@ -1111,9 +1072,9 @@ export class KdsRepository {
       if (phone && body) {
         await client.query(
           `INSERT INTO runtime.outbox_event
-             (business_id, event_type, aggregate_id, idempotency_key, payload)
+             (business_id, topic, aggregate_id, idempotency_key, payload)
            VALUES ($1, 'twilio.cancel_notification', $2, $3, $4::jsonb)
-           ON CONFLICT (idempotency_key) DO NOTHING`,
+           ON CONFLICT (business_id, idempotency_key) DO NOTHING`,
           [
             order.business_id,
             order.id,

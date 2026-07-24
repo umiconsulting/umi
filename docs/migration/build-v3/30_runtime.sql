@@ -80,19 +80,48 @@ create table runtime.pairing (
 -- WORK QUEUE & DELIVERY   → read by the WORKER to deliver / dedup / retry
 -- ----------------------------------------------------------------------------
 
+-- The TRANSACTIONAL OUTBOX. A status change must both commit and be announced, and
+-- those cannot be made atomic across two systems: deliver after the commit and a crash
+-- loses the message; deliver before and you may announce something that never happened.
+-- So the message is written HERE, in the same transaction as the business change, and a
+-- relay drains it. The table is the atomicity.
+--
+-- The rename to build-v3 had shrunk this table and, with it, dropped EXACTLY-ONCE
+-- delivery: idempotency_key and its unique index were gone, so a retried relay could
+-- send a customer the same "tu pedido está listo" twice. It is restored here as a
+-- constraint, not a convention — the writer does ON CONFLICT DO NOTHING and the database
+-- decides, so no code path can opt out of it.
+--
+-- Free to be shaped correctly because it carries NO data across the cutover: the 417
+-- historical rows are deliberately dropped (security audit 2026-07-12 — past work whose
+-- payloads carry raw customer phone/message PII into a sealed schema). Runtime starts
+-- clean; the live queue regenerates.
 create table runtime.outbox_event (
   id              uuid primary key default gen_random_uuid(),
-  topic           text not null,
-  payload         jsonb not null,          -- honest jsonb: the message to deliver
+  business_id     uuid not null references tenant.business(id) on delete cascade,
+  topic           text not null,          -- 'twilio.status_notification', 'twilio.reply', ...
+  aggregate_id    uuid,                   -- the row this is about (an order, a conversation)
+  -- EXACTLY-ONCE. Deterministic at the call site (e.g. kds:notify:<order>:<status>:<seq>),
+  -- so a replayed transaction collides instead of duplicating. Scoped per business: one
+  -- café's key space cannot collide with another's.
+  idempotency_key text not null,
+  payload         jsonb not null,         -- the message to deliver
   status          text not null default 'pending'
-                    check (status in ('pending','sent','failed')),
+                    check (status in ('pending','delivering','delivered','dead')),
   attempts        integer not null default 0,
-  next_attempt_at timestamptz,
-  sent_at         timestamptz,
-  created_at      timestamptz not null default now()
+  max_attempts    integer not null default 5,
+  -- TWO times, not one. The relay used a single `run_at` for both "not before this" and
+  -- "the lease started here", so claiming a row overwrote its backoff schedule with the
+  -- lease start. They are different facts with different lifetimes.
+  available_at    timestamptz not null default now(),  -- do not deliver before this
+  leased_at       timestamptz,                         -- when a relay claimed it
+  delivered_at    timestamptz,
+  error           text,                   -- last failure, so a 'dead' row is debuggable
+  created_at      timestamptz not null default now(),
+  constraint outbox_event_business_key_uq unique (business_id, idempotency_key)
 );
-create index outbox_event_pending_idx on runtime.outbox_event (next_attempt_at)
-  where status = 'pending';
+-- The relay's claim query: ready rows oldest-first, plus stale leases to reclaim.
+create index outbox_event_claim_idx on runtime.outbox_event (status, available_at, created_at);
 
 create table runtime.inbound_event (
   id           uuid primary key default gen_random_uuid(),

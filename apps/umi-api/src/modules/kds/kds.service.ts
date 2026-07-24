@@ -216,7 +216,9 @@ export class KdsService {
     if (!action) return { status: 400, body: { error: 'missing_action' } };
 
     if (action === 'snapshot') {
-      const rows = await this.repo.boardSnapshot(session.tenantId, session.stationId);
+      // No station argument: the order carries no station, so the old filter matched
+      // every row — see KdsRepository.boardSnapshot.
+      const rows = await this.repo.boardSnapshot(session.tenantId);
       return { status: 200, body: { ok: true, data: rows.map(toSnapshotRow) } };
     }
 
@@ -225,7 +227,9 @@ export class KdsService {
       const limit = Number.isFinite(Number(body.limit))
         ? Math.min(Math.max(Number(body.limit), 1), 500)
         : 200;
-      const rows = await this.repo.ticketEvents(session.tenantId, session.stationId, after, limit);
+      // No station argument: build-v3 orders carry no station, so the old filter
+      // matched everything anyway — see KdsRepository.ticketEvents.
+      const rows = await this.repo.ticketEvents(session.tenantId, after, limit);
       return { status: 200, body: { ok: true, data: rows.map(toEventRow) } };
     }
 

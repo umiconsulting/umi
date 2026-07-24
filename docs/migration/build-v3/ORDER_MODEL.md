@@ -70,6 +70,139 @@ consumers subscribe to that stream (a new row → a "listo" push). The ticket re
 snapshot; the spine drives the change. They must be written together, never one without
 the other.
 
+> **Amendment (2026-07-24) — ONE live projection.** There were briefly two ticket views: a
+> line-grain `order_ticket` and an order-grain `kds_ticket`. That was a defect inside the
+> database, not a client concern — two renderings of one concept drift, which is the exact
+> thing this section argues against. They are collapsed into a single `tenant.order_ticket`
+> (order-grain, lines nested, **no status filter** — "live" is a WHERE clause, not a schema
+> fact) and it carries **no order total**, because a total is a money question with two
+> different answers (§4). Anything a specific client needs in a specific shape — a
+> non-optional field coalesced, a null column it expects to exist — now lives in that
+> client's adapter in the backend. The truth is hierarchical: domain → database → backend
+> → client, and a client never reaches back up it.
+>
+> **Amendment (2026-07-24) — the feed carries LINE changes too, and the order carries a
+> version.** As written above, `order_event` recorded only status transitions. That leaves
+> a puller blind to the most safety-critical change there is: voiding one line of five does
+> not change the order's status, so a status-only feed never advances and **the barista
+> keeps making a cancelled drink**. Toast and Square both push line changes to the kitchen
+> in real time, and Toast is explicit that a void stays on screen struck through and
+> labelled `VOIDED` rather than disappearing. Two things follow:
+>
+> - `order_event.kind` ∈ `status_changed · order_upserted`, with a CHECK making the
+>   pairing structural (`status` present exactly when the kind is a transition). A line
+>   void or an amendment's added line appends `order_upserted`.
+> - `customer_order.version` — the aggregate's own change marker, bumped by trigger on
+>   every update, including a parent-touch from a line change. It buys optimistic
+>   concurrency (`WHERE id=$1 AND version=$2`) in place of holding a `FOR UPDATE` lock,
+>   and answers "did this change" without reading the feed. Square's `Order.version`.
+>
+> The two are not redundant: a version cannot tell a puller **what** it missed or in what
+> order, and a feed is a poor place to ask "is my copy current". Both are written by
+> trigger rather than by application code, because the order already has four writers
+> (WhatsApp, POS, dashboard, KDS) and a signal each must remember to emit is one that will
+> be forgotten.
+>
+> This widens the "real status transitions only" rule above, with the owner's agreement.
+> The rule was written against the SOURCE table, whose four kinds were three parts
+> sync-ingestion noise (`order_upserted`/`status_change`/`snapshot_reconciled` all
+> duplicated the real transitions, and the backfill drops all three). That rule targeted
+> noise. This is its opposite — a real change that was invisible becoming visible.
+
+### The flow, end to end — and where the station actually lives
+
+Three things this makes concrete, because all three get asked: an order is written
+**once** and read as **projections**; the **station belongs to the device, not to the
+order**; and the two status vocabularies meet in **one** place.
+
+**1 · Write once, project many.** A checkout writes three tables in one transaction. No
+consumer reads them directly — each reads a projection, so there is one definition of
+"total" and one of "ticket" and neither can drift.
+
+```mermaid
+flowchart TB
+  WA["WhatsApp bot"] --> TX
+  POS["POS"] --> TX
+  WEB["web · dashboard"] --> TX
+
+  subgraph TX["ONE transaction"]
+    direction TB
+    ORD["<b>customer_order</b><br/>status='placed'<br/>external_ref = idempotency key"]
+    ITEM["<b>order_item</b> · one row per line<br/>immutable snapshot:<br/>name · variant_name · unit_price · display_order"]
+    EV["<b>order_event</b> · the change FEED<br/>kind=status_changed · sequence (identity)"]
+    ORD --- ITEM
+    ORD --- EV
+  end
+
+  TX --> TICKET["<b>order_ticket</b> (view)<br/>ONE live projection<br/>order-grain · lines nested · no money"]
+  TX --> TOTAL["<b>order_total</b> (view)<br/>Σ live lines = owed now"]
+  PAY["<b>payment</b> / <b>refund</b><br/>frozen money facts"] --> RCPT["receipt<br/>(stored ON the payment)"]
+
+  TICKET --> IPAD["frozen iPad KDS<br/>(shims in the backend adapter)"]
+  TICKET --> NOTIF["customer 'listo' push"]
+  TICKET --> BOARD["pickup / in-flight board"]
+  TICKET --> LIST["dashboard order list<br/>+ order_total for the money"]
+  TOTAL --> LIST
+```
+
+**2 · The station is a property of the device, not the order.** This is the part that
+surprises people. Nothing on `customer_order` names a station. The owner creates
+stations, pairs a device to one, and the board is scoped by **the session the device
+logged in with**.
+
+```mermaid
+flowchart LR
+  OWNER["owner<br/>(dashboard)"] -->|creates| ST["<b>tenant.station</b><br/>key · name · status · sort_order<br/>branch_id NULL = every branch"]
+  OWNER -->|"issues pairing<br/>(carries station_id)"| PAIR["runtime.pairing"]
+  IPAD["iPad"] -->|claims with PIN| PAIR
+  PAIR -->|"creates"| SESS["runtime.session<br/><b>station_id</b>"]
+  SESS -.->|"station_id carried, NOT yet used to filter"| KDS["<b>order_ticket</b>"]
+  SESS -->|"boardSnapshot(tenant)"| KDS
+  ST -.->|referenced by| PAIR
+  ST -.->|referenced by| SESS
+```
+
+So a ticket's station is **derived at query time** from who is asking. Two consequences
+worth stating plainly:
+
+- **Today every ticket broadcasts to every station.** The board predicate is
+  `ticket.station_id IS NULL OR = :session_station`, and an order carries no station, so
+  it always matches. That is correct for one café with one station — and it is why the
+  event cursor no longer pretends to filter by station (a predicate that cannot exclude
+  anything should not read like a security boundary).
+- **When routing is earned, it goes on the LINE, not the order** (§2). A salad and a
+  grill item on one order belong to different stations; the order does not. That is why
+  `order_item.station_id` is the deferred column and `customer_order.station_id` is not
+  a thing. Measured: `station_groups` and `station_assignments` are both **0 rows**.
+
+**3 · One spine, two vocabularies, one translator.** Every status change advances
+`customer_order.status` _and_ appends an `order_event`. The iPad polls the spine
+incrementally by `sequence`; the customer notification subscribes to the same rows.
+
+```mermaid
+stateDiagram-v2
+  [*] --> placed
+  placed --> preparing
+  placed --> canceled
+  preparing --> ready
+  preparing --> canceled
+  ready --> completed
+  ready --> canceled
+  completed --> [*]
+  canceled --> [*]
+```
+
+The iPad's frozen enum spells two of these differently (`new`, `cancelled`) and adds two
+build-v3 does not model (`accepted`, `partial_cancelled` → both collapse onto
+`preparing`). That translation lives **only** in `kds-contract.ts` and is guarded by
+`kds-status-map.spec.ts`, because a Postgres `CHECK` and a Swift enum share no type
+system and no gate reads both. Getting it wrong does not degrade the board — it blanks
+it, since `try rows.map { try $0.asKitchenOrder() }` propagates the first failure.
+
+Amendments never edit a line: void the old (`order_item.voided_at`), add a new one. The
+voided line stays on the ticket so the barista sees it struck through and stops pouring,
+and falls out of `order_total` automatically.
+
 ---
 
 ## 2. Grain evidence (why station is per-line, lifecycle is per-order)
@@ -195,6 +328,46 @@ have different homes and different mutability:
 | **working / owed total** | "what does this order cost _right now_"   | `Σ live lines` (derived)                | **yes** — moves as lines are added/voided |
 | **charged**              | "what we actually took from the customer" | `payment.amount` (captured at pay time) | **no** — frozen fact                      |
 | **revenue**              | "what did we make last week"              | aggregate over `payment`                | **no** — reads frozen facts               |
+
+### The receipt is an artifact of a PAYMENT, not a document about an order (2026-07-24)
+
+Decided after checking how Square models it, because "make the receipt a live view of the
+order" is the intuitive answer and it is wrong.
+
+**Square has no `Receipt` object.** `receipt_number` and `receipt_url` are read-only
+fields on **`Payment`**, and the URL is _"only populated for COMPLETED payments"_. That
+placement is the whole design: a receipt cannot exist before settlement, and it cannot
+move after — which is exactly what makes it evidence.
+
+The failure it prevents: if a receipt re-derived its total from live lines, then paying
+$145 and later voiding a line would silently change the customer's receipt to $90 when
+$145 is what was actually taken. That is not a display bug, it is the document
+misrepresenting a transaction. Money on any settled surface comes from `payment` (charged)
+and `refund` (returned) — **never** from the working total above.
+
+So three documents, not two, and only the middle one is frozen:
+
+| document               | grain       | mutable | money                         |
+| ---------------------- | ----------- | ------- | ----------------------------- |
+| kitchen ticket         | order       | live    | none — a KOT carries no price |
+| **receipt**            | **payment** | **no**  | what was charged              |
+| order detail / history | order       | live    | payments − refunds, net now   |
+
+Consequences already implied elsewhere and now stated: an order paid at the counter and
+then amended does **not** get its payment edited — the payment stands and a `refund` row is
+added (§3's "settled → refund, it is timing not reason"). An UNPAID order (the WhatsApp
+pay-on-pickup case) has no receipt at all; it has a quote. And a PRINTED receipt should
+stamp `customer_order.version`, so paper and screen are reconcilable rather than merely
+different.
+
+**Not built, deliberately.** `payment` and `refund` are referenced by **zero** backend code
+today and by no gate invariant, so there is nothing to hang receipt fields off yet. The
+column shape is also not obvious: receipt NUMBERING is a business policy (per-business
+sequence? per-day? per-branch?) and in Mexico it sits next to the separate question of
+whether a customer wants a **factura/CFDI**, which is a different document from a sales
+receipt with different legal requirements. Deciding numbering before that question is
+answered would be guessing. Recorded here so the placement decision is not re-litigated;
+the columns land with the money axis.
 
 **Working total → derived, operational for the _open_ order.** Drop the stored
 `customer_order.total`; compute `SUM(unit_price * quantity) WHERE voided_at IS NULL`
@@ -376,9 +549,12 @@ locally** against the prod snapshot (port 5233) — **not** on prod:
 - `20_tenant.sql` — `customer_order` drops stored `total`, adds `cancel_reason`;
   `order_item` drops `station_id`, adds `voided_at` + `void_reason` + a `CHECK
 (quantity>0, unit_price>=0)` + an `(order_id)` index + the `tg_order_item_void_only`
-  immutability trigger; two new `security_invoker` views `tenant.order_total` (Σ live
-  lines, with its meaning-by-status contract) and `tenant.order_ticket` (live line-grain
-  projection that **includes** voided lines so the KDS renders VOID).
+  immutability trigger; two `security_invoker` views `tenant.order_total` (Σ live lines,
+  with its meaning-by-status contract) and `tenant.order_ticket` — **one** live projection,
+  order-grain with its lines nested, no status filter and no order total, which
+  **includes** voided lines so the KDS renders VOID. (It was briefly line-grain and
+  in-flight-only, with a second `kds_ticket` beside it; see the §1 amendment for why the
+  two collapsed.)
 - `backfill/backfill_commerce.sql` — stops carrying `total_cents` (derived instead),
   carries `is_cancelled → voided_at` (source has only the boolean → `updated_at` stands
   in), leaves `cancel_reason` / `void_reason` NULL (contaminated free-text not imported).

@@ -49,9 +49,22 @@ grant select on umi.subscription, umi.subscription_item, umi.invoice,
 --     umi.audit_log (sealed). Left ungranted = unreadable by the request path.
 --   umi.effective_entitlement VIEW (security_invoker) — SELECT only:
 grant select on umi.effective_entitlement to api;
---   Views are read-only for api (the tenant grant-all handed it DML on the views too):
-revoke insert, update, delete on
-  tenant.conversation_analytics, tenant.order_total, tenant.order_ticket from api;
+--   Views are read-only for api (the tenant grant-all handed it DML on the views too).
+--   SWEPT, not listed: security_gate.sql asserts "api holds no DML on ANY view", and a
+--   hand-maintained list cannot satisfy a universal assertion — it goes stale the first
+--   time someone adds a view. It did: tenant.kds_ticket landed and the gate went red.
+--   The sweep is the dual of the check, so the two cannot drift apart again. Views are
+--   all created upstream of this file (10_umi / 20_tenant), so they are all visible here.
+do $$
+declare v record;
+begin
+  for v in select schemaname, viewname
+             from pg_views
+            where schemaname in ('umi', 'tenant', 'runtime')
+  loop
+    execute format('revoke insert, update, delete on %I.%I from api', v.schemaname, v.viewname);
+  end loop;
+end $$;
 
 --   tenant.contact.normalized_value is DERIVED by tenant.tg_contact_normalize (60_triggers),
 --   never supplied. Revoking the column makes it UNFORGEABLE: an app can no longer write a
@@ -126,8 +139,13 @@ end $$;
 do $$
 declare r record;
 begin
+  -- `station` was HERE, scoped via branch. It moved out when it gained business_id, and
+  -- it had to move in the same change: the loop above is a dynamic sweep over every
+  -- tenant table with a business_id, so leaving this row would create a SECOND
+  -- tenant_isolation policy on station and abort the whole RLS rebuild with 42710.
+  -- Scoping via branch was also wrong on its own terms — a station with branch_id NULL
+  -- ("every branch") joins to nothing and would have been invisible to its owner.
   for r in select * from (values
-    ('station',                     'branch',            'branch_id',       'id'),
     ('customer_note',               'customer',          'customer_id',     'id'),
     ('loyalty_wallet_pass',         'loyalty_card',      'card_id',         'id'),
     ('product_option_group',        'product',           'product_id',      'id'),

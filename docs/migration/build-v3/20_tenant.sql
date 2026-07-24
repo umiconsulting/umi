@@ -73,12 +73,48 @@ create table tenant.branch (
 -- Search via expression index, NOT a stored search_text column.
 create index branch_name_lower on tenant.branch (lower(name));
 
+-- A KDS station: the board a device pairs to. CONFIG — the owner creates and renames
+-- these at business cadence, never by migration (ORDER_MODEL.md §5). The order itself
+-- carries no station; the KDS scopes by the device's paired station at query time.
+--
+-- This table was built with only (branch_id, name) and the backfill dropped the rest as
+-- "no target col". That was wrong on all four counts — every dropped column has a live
+-- consumer in kds.repository.ts, and the shape was wrong besides:
+--   business_id -> the repository scopes EVERY station query by tenant, and without the
+--     column the only isolation was a join through branch, which cannot express a
+--     station that belongs to no branch (below).
+--   branch_id is NULLABLE -> NULL means "every branch". listStations/loadStation treat a
+--     missing location as unscoped, and findActiveStationByKey matches the branch with
+--     `IS NOT DISTINCT FROM` precisely to reach these. NOT NULL made them unrepresentable.
+--   key -> the stable config handle the dashboard creates and looks stations up by
+--     (findActiveStationByKey). Named `key`, not `station_key`: no stutter inside its own
+--     table, matching umi.channel_type.key.
+--   status -> archiveStation is a soft delete, and it must be: a device pairing and an
+--     order both reference a station, so a hard delete would erase history. 'disabled' is
+--     distinct from 'archived' — the repository lets a rename touch a disabled station
+--     but not an archived one.
+--   sort_order -> the board order the owner sets; listStations orders by it.
+-- `metadata` is deliberately NOT carried (the one source row's is empty, and a jsonb junk
+-- drawer is exactly what the naming rules forbid).
 create table tenant.station (
-  id         uuid primary key default gen_random_uuid(),
-  branch_id  uuid not null references tenant.branch(id) on delete cascade,
-  name       text not null,
-  created_at timestamptz not null default now()
+  id          uuid primary key default gen_random_uuid(),
+  business_id uuid not null references tenant.business(id) on delete cascade,
+  branch_id   uuid references tenant.branch(id) on delete cascade,  -- NULL = every branch
+  key         text not null,
+  name        text not null,
+  status      text not null default 'active'
+                check (status in ('active','disabled','archived')),
+  sort_order  integer not null default 0,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
 );
+-- One live station per key per branch scope. NULLS NOT DISTINCT (pg15+) is what makes
+-- the tenant-wide scope work: with default NULL semantics two branch-less stations could
+-- both claim key 'cafe', and findActiveStationByKey would return an arbitrary one.
+-- Archived rows are excluded so a key can be reused after the station is retired.
+create unique index station_business_branch_key_uidx
+  on tenant.station (business_id, branch_id, key) nulls not distinct
+  where status <> 'archived';
 
 create table tenant.integration (
   id                  uuid primary key default gen_random_uuid(),
@@ -451,6 +487,15 @@ create table tenant.customer_order (
   fulfillment_type text check (fulfillment_type in ('pickup','dine_in','delivery')),
   status           text not null default 'placed'
                      check (status in ('placed','preparing','ready','completed','canceled')),
+  -- The aggregate's change marker. Bumped by tg_customer_order_version on EVERY update
+  -- of this row, and the order_item trigger touches the parent so a LINE change bumps it
+  -- too. Two uses: (1) optimistic concurrency — `UPDATE ... WHERE id=$1 AND version=$2`
+  -- replaces holding a FOR UPDATE lock across a whole transaction; (2) a cheap "has this
+  -- order changed" check for any consumer that does not want to read the event feed.
+  -- Square's Order.version is the same idea. It is the ORDER's truth; order_event is the
+  -- ordered FEED of changes — they answer different questions and neither replaces the
+  -- other (a version alone cannot tell a puller what it missed, in what order).
+  version          bigint not null default 1,
   cancel_reason    text,                          -- codes/notes for a void; contaminated free-text history NOT carried
   notes            text,                          -- order-level note the customer gave at checkout
   pickup_person    text,                          -- who collects the order, when not the buyer
@@ -490,9 +535,9 @@ create unique index customer_order_external_ref_uidx
   where external_ref is not null;
 
 create table tenant.order_item (
-  id           uuid primary key default gen_random_uuid(),
-  order_id     uuid not null references tenant.customer_order(id) on delete cascade,
-  product_id   uuid references tenant.product(id),
+  id            uuid primary key default gen_random_uuid(),
+  order_id      uuid not null references tenant.customer_order(id) on delete cascade,
+  product_id    uuid references tenant.product(id),
   name          text not null,              -- snapshot at order time
   variant_name  text,                       -- the CHOSEN variant, snapshot ("Grande", "Oat milk")
   quantity      integer not null default 1 check (quantity > 0),
@@ -575,16 +620,83 @@ create trigger order_item_void_only
   before update or delete on tenant.order_item
   for each row execute function tenant.tg_order_item_void_only();
 
+-- ONE place increments the version: any update of the order row, whatever caused it.
+-- The order_item trigger below therefore does not increment directly — it touches the
+-- parent and lets this fire, so a line change cannot double-bump.
+create or replace function tenant.tg_customer_order_version() returns trigger
+  language plpgsql
+  set search_path = pg_catalog as $$
+begin
+  new.version := old.version + 1;
+  return new;
+end $$;
+create trigger customer_order_version
+  before update on tenant.customer_order
+  for each row execute function tenant.tg_customer_order_version();
+
+-- A LINE change is a change to the ticket, and the kitchen has to learn about it. This
+-- is a trigger rather than app code on purpose: the order has FOUR writers today or soon
+-- (WhatsApp bot, POS, dashboard, KDS) and a signal every one of them must remember to
+-- emit is a signal one of them will forget. ORDER_MODEL §1 says the status and its event
+-- "must be written together, never one without the other" — this makes that structural
+-- for the line half.
+--
+-- The INSERT guard: during order CREATION the lines are written before the opening
+-- `placed` event, so an order with no events yet is still being assembled and its lines
+-- are not amendments. Once the ticket exists for the kitchen, an added line IS one. That
+-- test is intrinsic ("is this order visible to a consumer yet"), not a dependency on
+-- which statement the application happens to run first.
+create or replace function tenant.tg_order_item_signal_change() returns trigger
+  language plpgsql
+  set search_path = pg_catalog as $$
+declare
+  has_events boolean;
+begin
+  select exists (select 1 from tenant.order_event e where e.order_id = new.order_id)
+    into has_events;
+  if not has_events then
+    return null;                      -- initial assembly, not an amendment
+  end if;
+  -- Touch the parent: bumps version via customer_order_version, and updated_at via the
+  -- shared touch trigger. Not an increment here — see above.
+  update tenant.customer_order set updated_at = now() where id = new.order_id;
+  insert into tenant.order_event (order_id, kind) values (new.order_id, 'order_upserted');
+  return null;                        -- AFTER trigger; return value is ignored
+end $$;
+create trigger order_item_signal_change
+  after insert or update on tenant.order_item
+  for each row execute function tenant.tg_order_item_signal_change();
+
 create table tenant.order_event (
   id          uuid primary key default gen_random_uuid(),
   sequence    bigint generated always as identity,
   order_id    uuid not null references tenant.customer_order(id) on delete cascade,
-  status      text not null
+  -- What KIND of change this row records. Two, and deliberately only two:
+  --   status_changed — the order advanced along its lifecycle. Carries `status`.
+  --   order_upserted — the order's LINES changed (a void, or an added line on an
+  --     amendment). Carries no status, because none happened.
+  -- The second one exists because a puller cannot see a line void otherwise: voiding one
+  -- line of five does not change the order's status, so a status-only feed never advances
+  -- and the barista keeps making a cancelled drink. Toast and Square both push line
+  -- changes to the kitchen in real time for exactly this reason.
+  kind        text not null default 'status_changed'
+                check (kind in ('status_changed','order_upserted')),
+  status      text
                 check (status in ('placed','preparing','ready','completed','canceled')),
   staff_id    uuid references tenant.staff(id),
-  occurred_at timestamptz not null default now()
+  occurred_at timestamptz not null default now(),
+  -- A transition without a status is meaningless; an upsert with one is a lie. Making
+  -- the pairing a constraint means a consumer can trust `kind` without re-checking.
+  constraint order_event_status_matches_kind
+    check ((kind = 'status_changed') = (status is not null))
 );
-comment on table tenant.order_event is 'Real status transitions only — not a catch-all event log.';
+comment on table tenant.order_event is
+  'The ordered change FEED for pullers: status transitions plus line-level upserts. Still '
+  'not a catch-all log — two kinds, both real changes to what a consumer sees. The four '
+  'kinds the source table carried were three parts sync-ingestion noise (order_upserted / '
+  'status_change / snapshot_reconciled all duplicated the real transitions), which is what '
+  'the "transitions only" rule was written against; this widening is the opposite — a '
+  'change that WAS invisible becoming visible.';
 -- The status spine has TWO consumer shapes, and this column serves the second one.
 -- PUSH (ORDER_MODEL.md §1): a new row fires a "listo" notification — needs no cursor.
 -- PULL: the FROZEN iPad KDS polls incrementally — `after_sequence` in the request,
@@ -645,35 +757,74 @@ create view tenant.order_total with (security_invoker = true) as
     left join tenant.order_item i on i.order_id = o.id
    group by o.id, o.business_id;
 
--- The ticket: the LIVE projection every in-flight consumer shares (KDS, customer
--- status "listo", pickup board, dashboard orders-in-flight). One line per row for
--- each in-flight order, carrying the order's current status; group by order_id to
--- render one ticket. Voided lines are INCLUDED (voided_at set) so the KDS renders
--- them as VOID — a fired-then-voided line must be seen, not vanish, so the barista
--- stops pouring (ORDER_MODEL §3). Money consumers filter live lines via
--- tenant.order_total, not here. Station is NOT here — the KDS scopes by the
--- device's paired station at query time.
+-- THE TICKET — one live projection of an order, and the only one.
+--
+-- There were briefly two (a line-grain `order_ticket` and an order-grain `kds_ticket`).
+-- That was a defect inside the database, not a client concern: two renderings of ONE
+-- concept drift, and §1's whole argument is that the ticket is defined once. The shape
+-- kept is the one the domain calls for and consumers actually need — ORDER grain with
+-- its lines nested, because a ticket IS an order with its lines.
+--
+-- No status filter. "Live" is a WHERE clause, not a schema fact: the KDS board asks for
+-- in-flight statuses, the dashboard's history list asks for a status + window, and both
+-- are the same projection read with different predicates. Baking the filter in is what
+-- forced a second view.
+--
+-- Voided lines are INCLUDED (`voided_at` set) so the KDS renders them struck through —
+-- a fired-then-voided line must be SEEN, not vanish, or the barista keeps pouring
+-- (ORDER_MODEL §3; Toast marks them VOIDED for the same reason).
+--
+-- NO ORDER TOTAL. A total is a money question, and money has two different answers:
+-- `order_total` for what is owed right now, `payment`/`refund` for what was charged.
+-- Putting either on the ticket invites a settled surface to re-derive its money from
+-- live lines, which silently rewrites what a customer was charged (§4). The LINE keeps
+-- its `unit_price` — that is a snapshot FACT of the order_item row, and whether a screen
+-- renders it is the client's decision, not the schema's.
+--
+-- NO STATION, NO FROZEN-CLIENT PADDING. The order carries no station (§5) and the KDS
+-- scopes by the device's paired station at query time. Anything a specific client needs
+-- in a specific shape — a non-optional field coalesced, a null column it expects to
+-- exist — belongs in that client's adapter in the backend, never here.
+--
+-- Both derived columns are SCALAR SUBQUERIES, not joins, and that is measured: Postgres
+-- prunes an unused subquery from the target list (a header-only read plans with no
+-- SubPlan at all) but does NOT prune a LEFT JOIN to an aggregating view. So a consumer
+-- that wants only the header pays nothing for the lines.
 create view tenant.order_ticket with (security_invoker = true) as
-  select o.id           as order_id,
+  select o.id            as ticket_id,
          o.business_id,
          o.branch_id,
          o.customer_id,
+         o.conversation_id,
          o.source,
          o.fulfillment_type,
-         o.status       as order_status,
+         o.status,
+         o.cancel_reason,
+         o.notes,
+         o.pickup_person,
+         o.external_ref,
+         o.version,
          o.placed_at,
-         i.id           as item_id,
-         i.name         as item_name,
-         i.variant_name,
-         i.quantity,
-         i.unit_price,
-         i.display_order,
-         i.voided_at,
-         i.void_reason,
-         i.notes
-    from tenant.customer_order o
-    join tenant.order_item i on i.order_id = o.id
-   where o.status in ('placed','preparing','ready');
+         o.created_at,
+         o.updated_at,
+         -- The puller's cursor: the highest change this ticket has emitted.
+         coalesce((select max(e.sequence)
+                     from tenant.order_event e
+                    where e.order_id = o.id), 0)          as last_event_sequence,
+         coalesce((select jsonb_agg(jsonb_build_object(
+                            'item_id',       i.id,
+                            'name',          i.name,
+                            'variant_name',  i.variant_name,
+                            'quantity',      i.quantity,
+                            'unit_price',    i.unit_price,
+                            'display_order', i.display_order,
+                            'voided_at',     i.voided_at,
+                            'void_reason',   i.void_reason,
+                            'notes',         i.notes)
+                          order by i.display_order, i.created_at)
+                     from tenant.order_item i
+                    where i.order_id = o.id), '[]'::jsonb) as items
+    from tenant.customer_order o;
 
 -- ----------------------------------------------------------------------------
 -- DEVICES (the physical KDS iPad; sessions/pairing are runtime machinery)

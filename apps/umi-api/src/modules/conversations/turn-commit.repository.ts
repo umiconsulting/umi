@@ -48,9 +48,9 @@ export class TurnCommitRepository {
       //    (or will be) delivered exactly once.
       const ob = await client.query<{ id: string }>(
         `INSERT INTO runtime.outbox_event
-           (business_id, event_type, aggregate_id, idempotency_key, payload)
+           (business_id, topic, aggregate_id, idempotency_key, payload)
          VALUES ($1, $2, $3, $4, $5::jsonb)
-         ON CONFLICT (idempotency_key) DO NOTHING
+         ON CONFLICT (business_id, idempotency_key) DO NOTHING
          RETURNING id`,
         [
           params.tenantId,
