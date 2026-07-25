@@ -500,14 +500,20 @@ export class KdsRepository {
     );
   }
 
-  /** Atomically claim an approved pairing (guards concurrent device claims). */
-  async claimPairing(pairingId: string): Promise<boolean> {
+  /**
+   * Atomically claim an approved pairing (guards concurrent device claims) and
+   * stamp the device it produced. The device row is created first (createDeviceSession),
+   * so its id is in hand here; writing it in the SAME update that flips status to
+   * 'used' is what satisfies runtime.pairing's `pairing_device_is_outcome` CHECK —
+   * a 'used' pairing must carry the device it minted.
+   */
+  async claimPairing(pairingId: string, deviceRegistryId: string): Promise<boolean> {
     const { rows } = await this.pg.query<{ id: string }>(
       `UPDATE runtime.pairing
-          SET status = 'used', used_at = now(), updated_at = now()
+          SET status = 'used', used_at = now(), device_id = $2, updated_at = now()
         WHERE id = $1 AND status = 'approved' AND used_at IS NULL
         RETURNING id`,
-      [pairingId],
+      [pairingId, deviceRegistryId],
     );
     return rows.length > 0;
   }
@@ -541,7 +547,7 @@ export class KdsRepository {
     return this.pg.workerTx(async (client) => {
       const dev = await client.query<{ id: string }>(
         `INSERT INTO tenant.device
-           (business_id, branch_id, station_id, name, device_type, status)
+           (business_id, branch_id, station_id, name, kind, status)
          VALUES ($1, $2, $3, $4, 'kds', 'active')
          RETURNING id`,
         [input.tenantId, input.locationId, input.stationId, input.deviceName],
@@ -624,7 +630,7 @@ export class KdsRepository {
     const params = locationId ? [tenantId, locationId] : [tenantId];
     const { rows } = await this.pg.query<DeviceListRow>(
       `SELECT s.id AS device_id, s.principal_id AS device_registry_id,
-              dv.device_type, s.station_id, st.name AS station_name,
+              dv.kind AS device_type, s.station_id, st.name AS station_name,
               s.device_name, s.last_used_at, s.is_active, s.metadata
          FROM runtime.session s
          LEFT JOIN tenant.device dv
@@ -652,7 +658,7 @@ export class KdsRepository {
       const registryId = sess.rows[0]?.principal_id;
       if (registryId) {
         await client.query(
-          `UPDATE tenant.device SET status = 'archived', updated_at = now()
+          `UPDATE tenant.device SET status = 'retired', updated_at = now()
             WHERE id = $1 AND business_id = $2`,
           [registryId, tenantId],
         );

@@ -63,7 +63,7 @@ select * from (values
   ('api has ZERO privilege on runtime auth tables',
     (select case when bool_or(p) then 'FAIL' else 'PASS' end from (
        select has_table_privilege('api','runtime.'||t, 'select,insert,update,delete') p
-       from unnest(array['session','otp','password_reset_token','device_session','pairing']) t) x)),
+       from unnest(array['session','otp','password_reset_token','pairing']) t) x)),
   ('readonly CANNOT read runtime auth tables',
     (select case when bool_or(p) then 'FAIL' else 'PASS' end from (
        select has_table_privilege('readonly','runtime.'||t,'select') p

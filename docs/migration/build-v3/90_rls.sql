@@ -33,7 +33,7 @@ grant select, insert, update, delete on all tables in schema umi, tenant, runtim
 grant select on all tables in schema umi, tenant, runtime to readonly;
 revoke select on umi.audit_log from readonly;                       -- sealed Umi-internal
 revoke select on runtime.session, runtime.otp, runtime.password_reset_token,
-                 runtime.device_session, runtime.pairing from readonly;   -- auth substrate
+                 runtime.pairing from readonly;   -- auth substrate
 
 -- api (the café REQUEST-PATH role): full DML on tenant (RLS-bound); umi limited to
 -- global catalogs + per-café tables (RLS-scoped); minimal, scoped runtime.
@@ -83,7 +83,7 @@ grant select, insert          on runtime.idempotency_key  to api;    -- request 
 -- comes from the join to tenant.product, which IS under RLS. No write: only the
 -- worker's enrichment pass produces embeddings.
 grant select                  on runtime.product_embedding to api;   -- RAG read path
---   NOT granted to api: session/otp/password_reset_token/device_session/pairing (auth
+--   NOT granted to api: session/otp/password_reset_token/pairing (auth
 --     substrate -> auth definer/worker only), outbox/inbound/dead_letter (queue -> worker),
 --     message/knowledge_embedding (RAG -> worker), integration_sync/pass_device.
 

@@ -181,9 +181,10 @@ export class KdsService {
       deviceName: pairing.requested_name || pairing.device_name,
     });
 
-    // Atomically mark the pairing used; lose the race ⇒ drop the new device
-    // (cascades the session) so no orphan registry row is left behind.
-    const claimed = await this.repo.claimPairing(pairingId);
+    // Atomically mark the pairing used, stamping the device it just produced (the
+    // pairing's CHECK requires it). Lose the race ⇒ drop the new device and its
+    // session so no orphan registry row is left behind.
+    const claimed = await this.repo.claimPairing(pairingId, session.device_registry_id);
     if (!claimed) {
       await this.repo.deleteDevice(session.device_registry_id);
       return { status: 409, body: { status: 'used' } };
