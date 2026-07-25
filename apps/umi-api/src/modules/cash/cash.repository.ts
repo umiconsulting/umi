@@ -106,9 +106,9 @@ export class CashRepository {
         // pending rewards across all active cards = Σ max(visits/n − redemptions, 0)
         c.query<Row>(
           `WITH vr AS (
-             SELECT COALESCE((SELECT visits_required FROM tenant.loyalty_reward
-               WHERE business_id = $1::uuid AND is_active
-               ORDER BY activated_at DESC NULLS LAST LIMIT 1), 10) AS n
+             SELECT COALESCE((SELECT stamps_required FROM tenant.loyalty_reward
+               WHERE business_id = $1::uuid AND active AND type = 'stamps_free_item'
+               ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
            )
            SELECT COALESCE(sum(pend), 0)::int AS sum FROM (
              SELECT (
@@ -184,7 +184,7 @@ export class CashRepository {
         ),
         c.query<Row>(
           `SELECT count(*)::int AS n FROM tenant.loyalty_redemption
-           WHERE business_id = $1::uuid AND redeemed_at >= $2`,
+           WHERE business_id = $1::uuid AND occurred_at >= $2`,
           [tenantId, w.monthStart],
         ),
         c.query<Row>(
@@ -202,10 +202,10 @@ export class CashRepository {
           [tenantId],
         ),
         c.query<Row>(
-          `SELECT visits_required AS "visitsRequired", reward_cost_cents AS "rewardCostCentavos"
+          `SELECT stamps_required AS "visitsRequired", value AS "rewardCostCentavos"
            FROM tenant.loyalty_reward
-           WHERE business_id = $1::uuid AND is_active = true
-           ORDER BY activated_at DESC NULLS LAST LIMIT 1`,
+           WHERE business_id = $1::uuid AND active = true AND type = 'stamps_free_item'
+           ORDER BY created_at DESC NULLS LAST LIMIT 1`,
           [tenantId],
         ),
       ]);
@@ -242,13 +242,13 @@ export class CashRepository {
     // ledgers; phone/email from the identity spine). One active card per customer.
     const CUST_CTE = `
       vr AS (
-        SELECT COALESCE((SELECT visits_required FROM tenant.loyalty_reward
-          WHERE business_id = $1::uuid AND is_active
-          ORDER BY activated_at DESC NULLS LAST LIMIT 1), 10) AS n
+        SELECT COALESCE((SELECT stamps_required FROM tenant.loyalty_reward
+          WHERE business_id = $1::uuid AND active AND type = 'stamps_free_item'
+          ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
       ),
       cust AS (
         SELECT
-          cu.id, cu.name, cu.created_at, cu.contact_id,
+          cu.id, cu.name, cu.created_at,
           c.id AS card_id, c.card_number,
           COALESCE((SELECT sum(l.delta) FROM tenant.loyalty_stored_value_ledger l
             WHERE l.business_id = cu.business_id AND l.card_id = c.id), 0)::bigint          AS balance_cents,
@@ -305,23 +305,26 @@ export class CashRepository {
   }
 
   async rewardConfig(tenantId: string): Promise<{ active: Row[]; history: Row[] }> {
+    // Maps build-v3's loyalty_reward onto the frozen umi-cash response names.
+    // activated_at was dropped — each config save inserts a NEW row, so created_at
+    // IS the activation moment; both "activatedAt" and "createdAt" read from it.
     const select = `
       id::text, business_id::text AS "tenantId", NULL::text AS "programId",
-      visits_required AS "visitsRequired", reward_name AS "rewardName",
-      reward_description AS "rewardDescription", reward_cost_cents AS "rewardCostCentavos",
-      is_active AS "isActive", activated_at AS "activatedAt", created_at AS "createdAt"`;
+      stamps_required AS "visitsRequired", name AS "rewardName",
+      description AS "rewardDescription", value AS "rewardCostCentavos",
+      active AS "isActive", created_at AS "activatedAt", created_at AS "createdAt"`;
     return this.pg.withTenant(async (c) => {
       const [active, history] = await Promise.all([
         c.query<Row>(
           `SELECT ${select} FROM tenant.loyalty_reward
-           WHERE business_id = $1::uuid AND is_active = true
-           ORDER BY activated_at DESC NULLS LAST LIMIT 1`,
+           WHERE business_id = $1::uuid AND active = true AND type = 'stamps_free_item'
+           ORDER BY created_at DESC NULLS LAST LIMIT 1`,
           [tenantId],
         ),
         c.query<Row>(
           `SELECT ${select} FROM tenant.loyalty_reward
-           WHERE business_id = $1::uuid AND is_active = false
-           ORDER BY activated_at DESC NULLS LAST LIMIT 10`,
+           WHERE business_id = $1::uuid AND active = false AND type = 'stamps_free_item'
+           ORDER BY created_at DESC NULLS LAST LIMIT 10`,
           [tenantId],
         ),
       ]);
@@ -345,18 +348,18 @@ export class CashRepository {
       // deactivate-then-insert can't interleave into two is_active=true rows.
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`reward_config:${tenantId}`]);
       await c.query(
-        `UPDATE tenant.loyalty_reward SET is_active = false
-         WHERE business_id = $1::uuid AND is_active = true`,
+        `UPDATE tenant.loyalty_reward SET active = false
+         WHERE business_id = $1::uuid AND active = true AND type = 'stamps_free_item'`,
         [tenantId],
       );
       const { rows } = await c.query<Row>(
         `INSERT INTO tenant.loyalty_reward
-           (business_id, visits_required, reward_name, reward_description, reward_cost_cents, is_active, activated_at)
-         VALUES ($1::uuid, $2, $3, $4, $5, true, now())
+           (business_id, type, stamps_required, name, description, value, active)
+         VALUES ($1::uuid, 'stamps_free_item', $2, $3, $4, $5, true)
          RETURNING id::text, business_id::text AS "tenantId", NULL::text AS "programId",
-                   visits_required AS "visitsRequired", reward_name AS "rewardName",
-                   reward_description AS "rewardDescription", reward_cost_cents AS "rewardCostCentavos",
-                   is_active AS "isActive", activated_at AS "activatedAt"`,
+                   stamps_required AS "visitsRequired", name AS "rewardName",
+                   description AS "rewardDescription", value AS "rewardCostCentavos",
+                   active AS "isActive", created_at AS "activatedAt"`,
         [
           tenantId,
           data.visitsRequired,

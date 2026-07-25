@@ -296,6 +296,7 @@ create table tenant.loyalty_reward (
   id               uuid primary key default gen_random_uuid(),
   business_id      uuid not null references tenant.business(id) on delete cascade,
   name             text not null,
+  description      text,      -- café-authored copy for the reward (umi-cash reward config)
   type             text not null
                      check (type in ('stamps_free_item','spend_cashback','birthday','manual')),
   stamps_required  integer,   -- for type='stamps_free_item'

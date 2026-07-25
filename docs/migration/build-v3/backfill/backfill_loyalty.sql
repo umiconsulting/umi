@@ -66,12 +66,13 @@ from loyalty.programs p;
 --    DROP: reward_description (no column; name-dupe/empty).
 -- ----------------------------------------------------------------------------
 insert into tenant.loyalty_reward
-  (id, business_id, name, type, stamps_required, spend_required, value,
+  (id, business_id, name, description, type, stamps_required, spend_required, value,
    active, created_at, updated_at)
 select
   rc.id,
   p.tenant_id                                  as business_id,
   rc.reward_name                               as name,
+  rc.reward_description                         as description,
   'stamps_free_item'                           as type,
   rc.visits_required                           as stamps_required,
   null::bigint                                 as spend_required,

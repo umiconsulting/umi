@@ -54,7 +54,7 @@ export class CashWriteRepository {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<{ id: string }>(
         `SELECT id::text AS id FROM tenant.staff
-         WHERE business_id = $1::uuid AND login_id = $2::uuid AND status = 'active'
+         WHERE business_id = $1::uuid AND user_id = $2::uuid AND status = 'active'
          LIMIT 1`,
         [tenantId, userId],
       ),
@@ -63,20 +63,20 @@ export class CashWriteRepository {
   }
 
   /**
-   * The contact linked to the authed customer principal (self-card guard). In
-   * build-v3 the umi-cash session `sub` IS the `tenant.customer.id`
-   * (customer-session.service: principal_type='person'), and `tenant.customer`
-   * carries `contact_id` directly — so we resolve the person here exactly as
-   * `findCard` exposes the card owner's contact as `person_id`. A staff userId
-   * (a `umi.user.id`) matches no customer row → null → not-self (staff path),
-   * matching the old behavior where staff logins had no contact_id.
+   * The customer id behind the authed principal (self-card guard). In build-v3 the
+   * umi-cash session `sub` IS the `tenant.customer.id` (customer-session.service:
+   * principal_type='person'), so "the person" is just that id — there is no
+   * `contact_id` indirection (build-v2 had one; build-v3's customer does not, which
+   * is why the earlier `customer.contact_id` guard could never resolve). `findCard`
+   * exposes the card owner as the same `customer_id`, and the guard compares the two.
+   * A staff `userId` (a `umi.user.id`) matches no customer row → null → not-self.
    */
   async getUserPersonId(userId: string): Promise<string | null> {
-    const { rows } = await this.pg.query<{ contact_id: string | null }>(
-      `SELECT contact_id::text AS contact_id FROM tenant.customer WHERE id = $1::uuid LIMIT 1`,
+    const { rows } = await this.pg.query<{ id: string }>(
+      `SELECT id::text AS id FROM tenant.customer WHERE id = $1::uuid LIMIT 1`,
       [userId],
     );
-    return rows[0]?.contact_id ?? null;
+    return rows[0]?.id ?? null;
   }
 
   /**
@@ -166,8 +166,8 @@ export class CashWriteRepository {
   private async applyWalletDelta(c: PoolClient, d: WalletDelta): Promise<number> {
     const ledger = await c.query(
       `INSERT INTO tenant.loyalty_stored_value_ledger
-         (business_id, card_id, staff_id, delta, reason, source_type, source_id, idempotency_key)
-       VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8)
+         (business_id, card_id, staff_id, delta, reason, external_ref, idempotency_key)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7)
        ON CONFLICT (business_id, idempotency_key) DO NOTHING`,
       [
         d.tenantId,
@@ -175,7 +175,9 @@ export class CashWriteRepository {
         d.staffMemberId ?? null,
         d.deltaCents,
         d.reason ?? d.type,
-        d.sourceType ?? d.type,
+        // external_ref = the payment ref (e.g. Zettle uuid). The old source_type
+        // discriminator is dropped: 'zettle' vs 'manual' is implied by whether
+        // external_ref is present, and `reason` already carries topup/purchase/etc.
         d.sourceId ?? null,
         d.idempotencyKey,
       ],

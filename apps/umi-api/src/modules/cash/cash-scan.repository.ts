@@ -64,10 +64,10 @@ export class CashScanRepository {
   async activeRewardConfig(tenantId: string): Promise<RewardConfig | null> {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<RewardConfig>(
-        `SELECT id::text, visits_required, reward_name
+        `SELECT id::text, stamps_required AS visits_required, name AS reward_name
          FROM tenant.loyalty_reward
-         WHERE business_id = $1::uuid AND is_active = true
-         ORDER BY activated_at DESC NULLS LAST LIMIT 1`,
+         WHERE business_id = $1::uuid AND active = true AND type = 'stamps_free_item'
+         ORDER BY created_at DESC NULLS LAST LIMIT 1`,
         [tenantId],
       ),
     );
@@ -133,7 +133,7 @@ export class CashScanRepository {
       c.query(
         `SELECT 1 FROM tenant.loyalty_redemption
          WHERE business_id=$1::uuid AND card_id=$2::uuid
-           AND redeemed_at >= now() - ($3 || ' seconds')::interval
+           AND occurred_at >= now() - ($3 || ' seconds')::interval
          LIMIT 1`,
         [tenantId, cardId, String(seconds)],
       ),
@@ -202,8 +202,8 @@ export class CashScanRepository {
       if (input.doRedeem && input.rewardConfigId) {
         await c.query(
           `INSERT INTO tenant.loyalty_redemption
-             (business_id, card_id, reward_rule_id, staff_id)
-           VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid)`,
+             (business_id, card_id, reward_id, reason, staff_id)
+           VALUES ($1::uuid, $2::uuid, $3::uuid, 'stamps', $4::uuid)`,
           [input.tenantId, input.cardId, input.rewardConfigId, input.staffMemberId],
         );
       }
@@ -241,13 +241,13 @@ export class CashScanRepository {
 
       // Derived summary (identity-only card): visits_this_cycle = visits % threshold;
       // pending = floor(visits/threshold) − redemptions; balance = SUM(ledger).
-      // reward_rule.visits_required has CHECK (> 0), default 10 → no div-by-zero.
+      // loyalty_reward.stamps_required COALESCEs to 10 when unset → no div-by-zero.
       const { rows } = await c.query<ScannedCard>(
         `WITH vr AS (
            SELECT COALESCE((
-             SELECT visits_required FROM tenant.loyalty_reward
-             WHERE business_id=$1::uuid AND is_active
-             ORDER BY activated_at DESC NULLS LAST LIMIT 1), 10) AS n
+             SELECT stamps_required FROM tenant.loyalty_reward
+             WHERE business_id=$1::uuid AND active AND type='stamps_free_item'
+             ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
          ),
          tv  AS (SELECT COUNT(*)::int AS n FROM tenant.loyalty_visit
                   WHERE business_id=$1::uuid AND card_id=$2::uuid),
