@@ -37,9 +37,30 @@ export class TenantAccessGuard implements CanActivate {
     const access = await this.repo.findMembershipAccess(user.id, tenantId);
     if (!access) throw new NotFoundException({ error: 'tenant_not_found' });
 
+    const requestedBranch = this.header(req, 'x-umi-branch-id');
+    let branchId: string | null = requestedBranch;
+    if (requestedBranch) {
+      const permitted = access.allBranches || access.branchIds.includes(requestedBranch);
+      if (
+        !UUID_RE.test(requestedBranch) ||
+        !permitted ||
+        !(await this.repo.branchBelongsToTenant(requestedBranch, access.tenantId))
+      ) {
+        throw new NotFoundException({ error: 'branch_not_found' });
+      }
+    } else if (!access.allBranches) {
+      if (access.branchIds.length !== 1) {
+        throw new NotFoundException({ error: 'branch_required' });
+      }
+      branchId = access.branchIds[0];
+    }
+
     const role = normalizeRoleKey(access.roles);
     const tenantAccess: TenantAccess = {
       tenantId: access.tenantId,
+      branchId,
+      branchIds: access.branchIds,
+      allBranches: access.allBranches,
       slug: access.slug,
       name: access.name,
       timezone: access.timezone,
@@ -51,9 +72,18 @@ export class TenantAccessGuard implements CanActivate {
     req.tenantAccess = tenantAccess;
 
     const ctx = getRequestContext();
-    if (ctx) ctx.tenantId = access.tenantId;
+    if (ctx) {
+      ctx.tenantId = access.tenantId;
+      ctx.branchId = branchId;
+    }
 
     return true;
+  }
+
+  private header(req: AuthedRequest, name: string): string | null {
+    const value = req.headers?.[name];
+    if (Array.isArray(value)) return value[0] ?? null;
+    return typeof value === 'string' && value.length > 0 ? value : null;
   }
 
   private async resolveTenantId(params: Record<string, string>): Promise<string | null> {

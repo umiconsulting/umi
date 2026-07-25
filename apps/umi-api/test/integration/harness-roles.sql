@@ -2,7 +2,8 @@
 -- Local integration-harness login roles (one-time, cluster-global).
 --
 -- build-v3 ships `api` / `worker` / `readonly` as NOLOGIN GROUP roles
--- (docs/migration/build-v3/00_foundation.sql). Nothing can *connect* as them.
+-- (supabase/migrations/20260725000100_build_v3_foundation.sql). Nothing can
+-- *connect* as them.
 -- The live-DB harness (src/shared/database/rls.integration.ts) needs real LOGIN
 -- roles that carry the group privileges, mirroring how prod provisions them
 -- (SECURITY_GATE.md D5). Run ONCE as a superuser against the local cluster:

@@ -1,5 +1,5 @@
 -- ============================================================================
--- build-v3 · schema: runtime
+-- Canonical Supabase migration · build-v3 schema: runtime
 -- The machine's WORKING MEMORY. Every table here is READ BACK by running code to
 -- decide its next action (the read-back test). Nothing here is a business fact.
 -- SEALED (grants in 90_rls). Built AFTER umi + tenant, so all FKs are inline.

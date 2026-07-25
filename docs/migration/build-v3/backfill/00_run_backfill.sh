@@ -21,7 +21,8 @@
 set -euo pipefail
 DB="${1:-umi_backfill_v3}"
 TEMPLATE="${2:-umi_prod_snapshot}"
-DDL="$(cd "$(dirname "$0")/.." && pwd)"     # docs/migration/build-v3
+ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+DDL="$ROOT/supabase/migrations"
 BF="$(cd "$(dirname "$0")" && pwd)"         # .../backfill
 
 echo "== (re)create $DB from template $TEMPLATE =="
@@ -30,7 +31,12 @@ psql -d postgres -c "drop database if exists $DB"
 psql -d postgres -c "create database $DB template $TEMPLATE"
 
 echo "== schema: tables + touch triggers (NO cross-FK yet) =="
-for f in 00_foundation 10_umi 20_tenant 30_runtime 60_triggers; do
+for f in \
+  20260725000100_build_v3_foundation \
+  20260725000200_build_v3_umi \
+  20260725000300_build_v3_tenant \
+  20260725000400_build_v3_runtime \
+  20260725000600_build_v3_triggers; do
   psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$DDL/$f.sql"
 done
 
@@ -44,7 +50,9 @@ echo "== seed: RBAC role -> permission grants (source had none) =="
 psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$BF/seed_rbac.sql"
 
 echo "== cross-schema FKs + RLS (data now present) =="
-for f in 50_cross_schema_fk 90_rls; do
+for f in \
+  20260725000500_build_v3_cross_schema_fk \
+  20260725000700_build_v3_rls; do
   psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$DDL/$f.sql"
 done
 

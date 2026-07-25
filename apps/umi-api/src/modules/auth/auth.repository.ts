@@ -34,6 +34,8 @@ export interface MembershipAccess {
   timezone: string | null;
   roles: string[];
   permissions: string[];
+  branchIds: string[];
+  allBranches: boolean;
 }
 
 export interface ResetTokenRecord {
@@ -144,7 +146,7 @@ export class AuthRepository {
          -- platform-wide grant (superadmin)'), so it applies to every business —
          -- otherwise a super_admin would be capped by whatever lesser role they happen
          -- to hold on a given café, or locked out of one they hold no grant on.
-         SELECT ur.id, r.key AS role_key
+         SELECT ur.id, ur.branch_id, r.key AS role_key
          FROM umi.user_role AS ur
          JOIN umi.role AS r ON r.id = ur.role_id
          WHERE ur.user_id = $1::uuid
@@ -158,6 +160,13 @@ export class AuthRepository {
          t.timezone  AS "timezone",
          COALESCE((SELECT array_agg(role_key) FROM grants),
                   ARRAY['super_admin']) AS "roles",
+         COALESCE(
+           (SELECT array_agg(DISTINCT branch_id::text)
+              FROM grants WHERE branch_id IS NOT NULL),
+           '{}'
+         ) AS "branchIds",
+         COALESCE((SELECT bool_or(branch_id IS NULL) FROM grants), (SELECT is_sa FROM sa))
+           AS "allBranches",
          COALESCE(
            (SELECT array_agg(DISTINCT p.key)
               FROM umi.role_permission AS rp
@@ -174,6 +183,18 @@ export class AuthRepository {
       [userId, tenantId],
     );
     return rows[0] ?? null;
+  }
+
+  async branchBelongsToTenant(branchId: string, tenantId: string): Promise<boolean> {
+    const { rows } = await this.pg.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1
+         FROM tenant.branch
+         WHERE id = $1::uuid AND business_id = $2::uuid
+       ) AS "exists"`,
+      [branchId, tenantId],
+    );
+    return rows[0]?.exists === true;
   }
 
   /** Resolve a tenant id from its slug (for the legacy `/:slug/...` routes). */

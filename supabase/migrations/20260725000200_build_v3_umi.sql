@@ -1,5 +1,5 @@
 -- ============================================================================
--- build-v3 · schema: umi
+-- Canonical Supabase migration · build-v3 schema: umi
 -- Umi's OWN SaaS business + identity + entitlement.
 -- SEALED: no café ever writes here; Umi owns every fact in this schema.
 -- ----------------------------------------------------------------------------

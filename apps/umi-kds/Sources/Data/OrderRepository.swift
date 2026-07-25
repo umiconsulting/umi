@@ -96,7 +96,7 @@ final class OrderRepository: ObservableObject {
         }
     }
 
-    /// When the app is pointed at Supabase, we show live data only — not demo tickets mixed with real connection state.
+    /// When the app is pointed at UMI API, show live data only, never mixed with demo tickets.
     var isDemoMode: Bool {
         KDSBackendConfiguration.load() == nil
     }

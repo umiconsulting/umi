@@ -259,7 +259,7 @@ function DashboardLayout() {
 }
 
 function RequireAuth({ children }) {
-  const { session, loading, needsPasswordReset } = useAuth();
+  const { session, loading } = useAuth();
   if (loading)
     return (
       <div
@@ -275,7 +275,6 @@ function RequireAuth({ children }) {
         Cargando…
       </div>
     );
-  if (needsPasswordReset) return <ResetPasswordScreen />;
   return session ? children : <Navigate to="/login" replace />;
 }
 

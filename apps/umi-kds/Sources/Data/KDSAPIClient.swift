@@ -123,7 +123,7 @@ struct KDSAPIClient {
         return try await responseData(for: request)
     }
 
-    /// Sends first-pairing requests to the backend-owned kds-pairing edge function.
+    /// Sends first-pairing requests to the authoritative UMI API.
     private func pairingData(body: [String: Any]) async throws -> Data {
         guard let configuration else {
             throw KDSDataError.notConfigured

@@ -1,5 +1,5 @@
 -- ============================================================================
--- build-v3 · schema: tenant
+-- Canonical Supabase migration · build-v3 schema: tenant
 -- The café's business. RLS-scoped per business (policies in 90_rls.sql).
 -- Conventions: see 10_umi.sql header.
 -- tenant->umi FKs are INLINE here (umi is built first). Only the circular

@@ -1,5 +1,5 @@
 -- ============================================================================
--- build-v3 · 90_rls  — Grants + Row-Level Security   (HARDENED 2026-07-12)
+-- Canonical Supabase migration · build-v3 grants and RLS
 -- Boundary: `api` is RLS-confined to one business per request; `worker` has
 -- BYPASSRLS; `readonly` reads only (never secrets). Per request the API sets:
 --     set local app.current_business = '<uuid>'   -- transaction-scoped
@@ -16,6 +16,14 @@ create or replace function umi.current_business() returns uuid
 $$;
 comment on function umi.current_business() is
   'The request''s tenant scope. NULL when unset/empty so RLS fails CLOSED (0 rows), never errors.';
+
+create or replace function umi.current_branch() returns uuid
+  language sql stable
+  set search_path = pg_catalog as $$
+  select nullif(current_setting('app.current_branch', true), '')::uuid
+$$;
+comment on function umi.current_branch() is
+  'Optional request branch scope. NULL permits tenant-wide operations; a value confines branch-bearing facts.';
 
 -- ---- No ambient authority: lock schema public (CVE-2018-1058) and our schemas ----
 revoke create on schema public from public;
@@ -104,6 +112,7 @@ create policy tenant_isolation on tenant.business
 -- Tables carrying business_id directly: one uniform policy + FORCE.
 do $$
 declare r record;
+declare branch_clause text;
 begin
   for r in
     select c.table_name
@@ -113,11 +122,20 @@ begin
     where c.table_schema='tenant' and c.column_name='business_id'
       and t.table_type='BASE TABLE'
   loop
+    select case when exists (
+      select 1 from information_schema.columns bc
+      where bc.table_schema='tenant'
+        and bc.table_name=r.table_name
+        and bc.column_name='branch_id'
+    ) then
+      ' and (umi.current_branch() is null or branch_id = umi.current_branch())'
+    else '' end into branch_clause;
     execute format('alter table tenant.%I enable row level security', r.table_name);
     execute format('alter table tenant.%I force  row level security', r.table_name);
     execute format($f$create policy tenant_isolation on tenant.%I
-      using      (business_id = umi.current_business())
-      with check (business_id = umi.current_business())$f$, r.table_name);
+      using      (business_id = umi.current_business()%s)
+      with check (business_id = umi.current_business()%s)$f$,
+      r.table_name, branch_clause, branch_clause);
   end loop;
 end $$;
 
@@ -147,6 +165,29 @@ begin
       with check (exists (select 1 from tenant.%I p where p.%I = tenant.%I.%I
                        and p.business_id = umi.current_business()))$f$,
       r.child, r.parent, r.pk, r.child, r.fk, r.parent, r.pk, r.child, r.fk);
+  end loop;
+end $$;
+
+-- Child facts that carry branch_id must match the selected request branch too.
+-- The tenant predicate remains in the parent policy; this additional policy is
+-- combined with it using AND because both are restrictive.
+do $$
+declare r record;
+begin
+  for r in
+    select table_name
+    from information_schema.columns
+    where table_schema='tenant' and column_name='branch_id'
+      and table_name not in (
+        select table_name from information_schema.columns
+        where table_schema='tenant' and column_name='business_id'
+      )
+  loop
+    execute format($f$create policy branch_isolation on tenant.%I
+      as restrictive
+      using      (umi.current_branch() is null or branch_id = umi.current_branch())
+      with check (umi.current_branch() is null or branch_id = umi.current_branch())$f$,
+      r.table_name);
   end loop;
 end $$;
 

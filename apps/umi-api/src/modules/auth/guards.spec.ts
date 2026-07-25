@@ -23,6 +23,8 @@ function ctxFor(req: Record<string, unknown>): ExecutionContext {
 }
 
 const ACCESS = '00000000-0000-4000-8000-000000000000';
+const BRANCH = '10000000-0000-4000-8000-000000000000';
+const OTHER_BRANCH = '20000000-0000-4000-8000-000000000000';
 
 describe('AuthGuard', () => {
   const reflector = { getAllAndOverride: vi.fn() } as unknown as Reflector;
@@ -77,6 +79,8 @@ describe('TenantAccessGuard', () => {
         timezone: 'America/Mexico_City',
         roles: ['owner'],
         permissions: ['cash.read'],
+        branchIds: [],
+        allBranches: true,
       }),
     };
     const guard = new TenantAccessGuard(repo as never);
@@ -87,6 +91,63 @@ describe('TenantAccessGuard', () => {
     expect(await guard.canActivate(ctxFor(req))).toBe(true);
     expect(repo.tenantIdForSlug).toHaveBeenCalledWith('kala');
     expect((req.tenantAccess as { role: string }).role).toBe('owner');
+  });
+
+  it('attaches a validated branch scope for an all-branch membership', async () => {
+    const repo = {
+      tenantIdForSlug: vi.fn(),
+      branchBelongsToTenant: vi.fn().mockResolvedValue(true),
+      findMembershipAccess: vi.fn().mockResolvedValue({
+        membershipId: 'm1',
+        tenantId: ACCESS,
+        slug: 'kala',
+        name: 'Kala',
+        timezone: 'America/Mexico_City',
+        roles: ['owner'],
+        permissions: [],
+        branchIds: [],
+        allBranches: true,
+      }),
+    };
+    const guard = new TenantAccessGuard(repo as never);
+    const req: Record<string, unknown> = {
+      authUser: { id: 'u1' },
+      params: { tenantId: ACCESS },
+      headers: { 'x-umi-branch-id': BRANCH },
+    };
+
+    expect(await guard.canActivate(ctxFor(req))).toBe(true);
+    expect(repo.branchBelongsToTenant).toHaveBeenCalledWith(BRANCH, ACCESS);
+    expect((req.tenantAccess as { branchId: string }).branchId).toBe(BRANCH);
+  });
+
+  it('fails closed when a restricted membership requests another branch', async () => {
+    const repo = {
+      tenantIdForSlug: vi.fn(),
+      branchBelongsToTenant: vi.fn(),
+      findMembershipAccess: vi.fn().mockResolvedValue({
+        membershipId: 'm1',
+        tenantId: ACCESS,
+        slug: 'kala',
+        name: 'Kala',
+        timezone: 'America/Mexico_City',
+        roles: ['staff'],
+        permissions: [],
+        branchIds: [BRANCH],
+        allBranches: false,
+      }),
+    };
+    const guard = new TenantAccessGuard(repo as never);
+    const req = {
+      authUser: { id: 'u1' },
+      params: { tenantId: ACCESS },
+      headers: { 'x-umi-branch-id': OTHER_BRANCH },
+    };
+
+    await expect(guard.canActivate(ctxFor(req))).rejects.toMatchObject({
+      response: { error: 'branch_not_found' },
+    });
+    expect(repo.branchBelongsToTenant).not.toHaveBeenCalled();
   });
 });
 

@@ -1,5 +1,5 @@
 -- ============================================================================
--- build-v3 · 60_triggers
+-- Canonical Supabase migration · build-v3 triggers
 -- Attach the shared touch-updated_at trigger to every base table that has an
 -- updated_at column (dynamic — no per-table maintenance).
 -- ============================================================================

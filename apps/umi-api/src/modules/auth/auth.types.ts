@@ -7,6 +7,9 @@ export interface AuthUser {
 /** Resolved tenant membership attached by TenantAccessGuard. */
 export interface TenantAccess {
   tenantId: string;
+  branchId: string | null;
+  branchIds: string[];
+  allBranches: boolean;
   slug: string;
   name: string;
   timezone: string | null;
@@ -25,6 +28,7 @@ export interface TenantAccess {
  */
 export interface AuthedRequest {
   cookies?: Record<string, string | undefined>;
+  headers?: Record<string, string | string[] | undefined>;
   params?: Record<string, string>;
   authUser?: AuthUser;
   tenantAccess?: TenantAccess;

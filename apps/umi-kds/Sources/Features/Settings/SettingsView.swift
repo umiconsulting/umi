@@ -26,7 +26,7 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 LabeledContent("Data") {
-                    Text((environment.orderRepository?.isDemoMode ?? true) ? "Demo preview (no backend keys)" : "Live (Supabase kds RPCs)")
+                    Text((environment.orderRepository?.isDemoMode ?? true) ? "Demo preview (no backend keys)" : "Live (UMI API)")
                         .foregroundStyle(.secondary)
                 }
             }

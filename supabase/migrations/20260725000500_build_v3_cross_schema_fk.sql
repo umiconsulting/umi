@@ -1,5 +1,5 @@
 -- ============================================================================
--- build-v3 · 50_cross_schema_fk
+-- Canonical Supabase migration · build-v3 cross-schema foreign keys
 -- The circular umi->tenant FKs, deferred from 10_umi (tenant did not exist yet).
 -- (tenant->umi FKs are inline in 20_tenant; umi is built first.)
 -- NOTE: umi.audit_log.business_id stays a SOFT ref (no FK) by design — audit

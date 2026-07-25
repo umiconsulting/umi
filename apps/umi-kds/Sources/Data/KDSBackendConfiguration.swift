@@ -30,20 +30,19 @@ struct KDSBackendConfiguration: Sendable {
         self.heartbeatURL = heartbeatURL
     }
 
-    /// URL of the kds-command edge function.
+    /// UMI API command endpoint. KDS never calls Supabase functions directly.
     var commandURL: URL {
-        commandURLOverride ?? projectURL.appending(path: "functions/v1/kds-command")
+        commandURLOverride ?? projectURL.appending(path: "api/kds/command")
     }
 
     /// URL of the device-aware KDS board read endpoint.
     var boardURL: URL {
-        boardURLOverride ?? projectURL.appending(path: "functions/v1/kds-board")
+        boardURLOverride ?? projectURL.appending(path: "api/kds/board")
     }
 
-    /// Pairing endpoint. Reads KDSLocalBaseURL or KDSPairingURL from Info.plist when set —
-    /// used to point at the local dashboard server during development without Supabase.
+    /// Pairing endpoint on the authoritative UMI API.
     var pairingURL: URL {
-        pairingURLOverride ?? projectURL.appending(path: "functions/v1/kds-pairing")
+        pairingURLOverride ?? projectURL.appending(path: "api/kds/pairing")
     }
 
     static func load(bundle: Bundle = .main) -> KDSBackendConfiguration? {

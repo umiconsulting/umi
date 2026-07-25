@@ -23,11 +23,11 @@
 	<key>KDSBackendURL</key>
 	<string>https://api.umiconsulting.co</string>
 	<key>KDSPairingURL</key>
-	<string>https://api.umiconsulting.co/kds/pairing</string>
+	<string>https://api.umiconsulting.co/api/kds/pairing</string>
 	<key>KDSBoardURL</key>
-	<string>https://api.umiconsulting.co/kds/board</string>
+	<string>https://api.umiconsulting.co/api/kds/board</string>
 	<key>KDSCommandURL</key>
-	<string>https://api.umiconsulting.co/kds/command</string>
+	<string>https://api.umiconsulting.co/api/kds/command</string>
 	<key>KDSBusinessID</key>
 	<string>ef9005a2-efe1-45bf-9da0-313b5902d9b4</string>
 	<key>KDSStationID</key>

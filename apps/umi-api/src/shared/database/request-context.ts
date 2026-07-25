@@ -8,6 +8,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
  */
 export interface RequestContext {
   tenantId: string | null;
+  branchId: string | null;
   userId: string | null;
   requestId: string;
 }

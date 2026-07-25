@@ -226,12 +226,19 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
     text: string,
     params: unknown[] = [],
   ): Promise<{ rows: T[]; rowCount: number | null }> {
-    return this.runWithTenant(tenantId, null, async (client) => {
-      // No `as unknown[]` here, unlike `query` above: PoolClient.query resolves to the
-      // overload that already accepts unknown[], so the assertion would be a no-op.
-      const r = await client.query<T>(text, params);
-      return { rows: r.rows, rowCount: r.rowCount };
-    });
+    const ctx = getRequestContext();
+    const branchId = ctx?.tenantId === tenantId ? ctx.branchId : null;
+    return this.runWithTenant(
+      tenantId,
+      null,
+      async (client) => {
+        // No `as unknown[]` here, unlike `query` above: PoolClient.query resolves to the
+        // overload that already accepts unknown[], so the assertion would be a no-op.
+        const r = await client.query<T>(text, params);
+        return { rows: r.rows, rowCount: r.rowCount };
+      },
+      branchId,
+    );
   }
 
   /**
@@ -244,7 +251,7 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
     if (!ctx?.tenantId) {
       throw new Error('withTenant() requires a request tenant context (set by AuthGuard).');
     }
-    return this.runWithTenant(ctx.tenantId, ctx.userId, work);
+    return this.runWithTenant(ctx.tenantId, ctx.userId, work, ctx.branchId);
   }
 
   /** Explicit-tenant variant (for jobs/tests that aren't on the request path). */
@@ -252,6 +259,7 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
     tenantId: string,
     userId: string | null,
     work: (client: PoolClient) => Promise<T>,
+    branchId: string | null = null,
   ): Promise<T> {
     const client = await this.app.connect();
     try {
@@ -267,6 +275,7 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
         [tenantId],
       );
       await client.query('SELECT set_config($1, $2, true)', ['app.user_id', userId ?? '']);
+      await client.query('SELECT set_config($1, $2, true)', ['app.current_branch', branchId ?? '']);
       const result = await work(client);
       await client.query('COMMIT');
       return result;

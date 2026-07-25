@@ -753,8 +753,7 @@ function useKdsConnection() {
         const ctrl = new AbortController();
         const timeout = setTimeout(() => ctrl.abort(), 5000);
         try {
-          // umi-api exposes /health; server.js exposes /api/health.
-          const res = await fetch(apiUrl(COOKIE_AUTH ? '/health' : '/api/health'), {
+          const res = await fetch(apiUrl('/health'), {
             cache: 'no-store',
             signal: ctrl.signal,
           });

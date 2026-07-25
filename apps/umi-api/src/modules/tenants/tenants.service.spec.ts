@@ -18,6 +18,9 @@ function make() {
 
 const ACCESS: TenantAccess = {
   tenantId: 't1',
+  branchId: null,
+  branchIds: [],
+  allBranches: true,
   slug: 'kala',
   name: 'Kala',
   timezone: 'America/Mexico_City',

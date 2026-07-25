@@ -15,6 +15,8 @@ export class RequestContextMiddleware implements NestMiddleware {
     const headerRequestId = req?.headers?.['x-request-id'];
     const requestId = typeof headerRequestId === 'string' ? headerRequestId : randomUUID();
 
-    runWithRequestContext({ tenantId: null, userId: null, requestId }, () => next());
+    runWithRequestContext({ tenantId: null, branchId: null, userId: null, requestId }, () =>
+      next(),
+    );
   }
 }

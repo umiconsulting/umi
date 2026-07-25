@@ -1,5 +1,5 @@
 -- ============================================================================
--- build-v3 · 00_foundation  — run FIRST
+-- Canonical Supabase migration · build-v3 foundation
 -- Roles, schemas, extensions, shared functions.
 -- ============================================================================
 
