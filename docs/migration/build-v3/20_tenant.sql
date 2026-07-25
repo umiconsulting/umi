@@ -239,23 +239,48 @@ create table tenant.loyalty_program (
   topup_enabled           boolean not null default false,  -- does this café sell stored value (Saldo)?
   stamps_per_reward       integer,                          -- e.g. 8 visits -> 1 reward
   birthday_reward_enabled boolean not null default false,
+  birthday_reward_name    text,
+  self_registration       boolean not null default false,  -- may a customer self-enrol (no staff)?
+  -- Wallet-pass presentation (read by the Apple/Google pass renderer + the registration page).
+  -- Typed, not a branding jsonb junk-drawer (owner call, 2026-07-25).
+  pass_style              text,
+  primary_color           text,
+  secondary_color         text,
+  logo_url                text,
+  strip_image_url         text,
+  promo_message           text,
+  promo_starts_at         timestamptz,
+  promo_ends_at           timestamptz,
+  promo_days              text,        -- e.g. 'mon,tue,wed' (the days a promo shows)
+  -- Nested per-moment copy templates (escalating reward reminders), keyed by lifecycle
+  -- journey. Honest jsonb — genuinely variable structured config, not a flat field.
+  lifecycle_copy          jsonb,
   created_at              timestamptz not null default now(),
   updated_at              timestamptz not null default now()
 );
-comment on table tenant.loyalty_program is '1:1 loyalty config for a café (was loyalty_settings).';
+comment on table tenant.loyalty_program is
+  '1:1 loyalty config + wallet-pass presentation for a café (was loyalty_settings).';
 
 create table tenant.loyalty_card (
-  id           uuid primary key default gen_random_uuid(),
-  business_id  uuid not null references tenant.business(id) on delete cascade,
-  customer_id  uuid not null references tenant.customer(id) on delete cascade,
-  card_number  text,
-  status       text not null default 'active' check (status in ('active','blocked')),
-  issued_at    timestamptz not null default now(),
-  created_at   timestamptz not null default now(),
-  unique (business_id, card_number)
+  id                   uuid primary key default gen_random_uuid(),
+  business_id          uuid not null references tenant.business(id) on delete cascade,
+  customer_id          uuid not null references tenant.customer(id) on delete cascade,
+  card_number          text,          -- human-facing loyalty number (displayed)
+  qr_token             text,          -- rotatable SCAN secret; distinct from card_number (a scan re-rolls it)
+  qr_issued_at         timestamptz,
+  lifecycle_message    text,          -- the wallet "moment" copy (reward reminders) shown on the pass
+  lifecycle_message_at timestamptz,
+  status               text not null default 'active' check (status in ('active','blocked')),
+  issued_at            timestamptz not null default now(),
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now(),
+  unique (business_id, card_number),
+  unique (business_id, qr_token)
 );
 comment on table tenant.loyalty_card is
-  'IDENTITY ONLY. No cached balance or visit count — both DERIVE from the ledger/visits below.';
+  'IDENTITY + scan/pass state. No cached BALANCE or VISIT count — those DERIVE from the '
+  'ledger/visits. qr_token is the rotatable scan secret; lifecycle_message is the last '
+  'wallet moment copy (written on scan, read by the pass).';
 
 create table tenant.loyalty_stored_value_ledger (
   id               uuid primary key default gen_random_uuid(),
@@ -296,6 +321,7 @@ create table tenant.loyalty_reward (
   id               uuid primary key default gen_random_uuid(),
   business_id      uuid not null references tenant.business(id) on delete cascade,
   name             text not null,
+  description      text,      -- café-authored copy for the reward (umi-cash reward config)
   type             text not null
                      check (type in ('stamps_free_item','spend_cashback','birthday','manual')),
   stamps_required  integer,   -- for type='stamps_free_item'

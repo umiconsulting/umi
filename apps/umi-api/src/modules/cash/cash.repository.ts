@@ -67,24 +67,31 @@ export class CashRepository {
     );
   }
 
-  async updateProgram(
-    tenantId: string,
-    patch: { cardPrefix?: string; passStyle?: string; brandingPatch: Record<string, unknown> },
-  ): Promise<void> {
+  async updateProgram(tenantId: string, patch: Record<string, unknown>): Promise<void> {
+    // One column-keyed jsonb patch, fixed columns: a key PRESENT in the patch is written
+    // (present-but-null clears the column), an ABSENT key is left untouched. The statement
+    // stays STATIC (preflight can PREPARE it) while preserving the settings form's
+    // partial-update + clear-a-field semantics the old branding jsonb merge had.
     await this.pg.withTenant((c) =>
       c.query(
-        `UPDATE tenant.loyalty_program
-         SET card_prefix = COALESCE($2, card_prefix),
-             pass_style  = COALESCE($3, pass_style),
-             branding    = COALESCE(branding, '{}'::jsonb) || $4::jsonb,
-             updated_at  = now()
-         WHERE business_id = $1::uuid`,
-        [
-          tenantId,
-          patch.cardPrefix ?? null,
-          patch.passStyle ?? null,
-          JSON.stringify(patch.brandingPatch),
-        ],
+        `UPDATE tenant.loyalty_program p SET
+           card_prefix             = CASE WHEN pt.j ? 'card_prefix'             THEN pt.j->>'card_prefix'                     ELSE p.card_prefix END,
+           pass_style              = CASE WHEN pt.j ? 'pass_style'              THEN pt.j->>'pass_style'                      ELSE p.pass_style END,
+           birthday_reward_enabled = CASE WHEN pt.j ? 'birthday_reward_enabled' THEN (pt.j->>'birthday_reward_enabled')::boolean ELSE p.birthday_reward_enabled END,
+           birthday_reward_name    = CASE WHEN pt.j ? 'birthday_reward_name'    THEN pt.j->>'birthday_reward_name'            ELSE p.birthday_reward_name END,
+           primary_color           = CASE WHEN pt.j ? 'primary_color'           THEN pt.j->>'primary_color'                   ELSE p.primary_color END,
+           secondary_color         = CASE WHEN pt.j ? 'secondary_color'         THEN pt.j->>'secondary_color'                 ELSE p.secondary_color END,
+           logo_url                = CASE WHEN pt.j ? 'logo_url'                THEN pt.j->>'logo_url'                        ELSE p.logo_url END,
+           strip_image_url         = CASE WHEN pt.j ? 'strip_image_url'         THEN pt.j->>'strip_image_url'                 ELSE p.strip_image_url END,
+           promo_message           = CASE WHEN pt.j ? 'promo_message'           THEN pt.j->>'promo_message'                   ELSE p.promo_message END,
+           promo_starts_at         = CASE WHEN pt.j ? 'promo_starts_at'         THEN (pt.j->>'promo_starts_at')::timestamptz  ELSE p.promo_starts_at END,
+           promo_ends_at           = CASE WHEN pt.j ? 'promo_ends_at'           THEN (pt.j->>'promo_ends_at')::timestamptz    ELSE p.promo_ends_at END,
+           promo_days              = CASE WHEN pt.j ? 'promo_days'              THEN pt.j->>'promo_days'                      ELSE p.promo_days END,
+           lifecycle_copy          = CASE WHEN pt.j ? 'lifecycle_copy'          THEN pt.j->'lifecycle_copy'                   ELSE p.lifecycle_copy END,
+           updated_at              = now()
+         FROM (SELECT $2::jsonb AS j) pt
+         WHERE p.business_id = $1::uuid`,
+        [tenantId, JSON.stringify(patch)],
       ),
     );
   }
@@ -106,9 +113,9 @@ export class CashRepository {
         // pending rewards across all active cards = Σ max(visits/n − redemptions, 0)
         c.query<Row>(
           `WITH vr AS (
-             SELECT COALESCE((SELECT visits_required FROM tenant.loyalty_reward
-               WHERE business_id = $1::uuid AND is_active
-               ORDER BY activated_at DESC NULLS LAST LIMIT 1), 10) AS n
+             SELECT COALESCE((SELECT stamps_required FROM tenant.loyalty_reward
+               WHERE business_id = $1::uuid AND active AND type = 'stamps_free_item'
+               ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
            )
            SELECT COALESCE(sum(pend), 0)::int AS sum FROM (
              SELECT (
@@ -184,7 +191,7 @@ export class CashRepository {
         ),
         c.query<Row>(
           `SELECT count(*)::int AS n FROM tenant.loyalty_redemption
-           WHERE business_id = $1::uuid AND redeemed_at >= $2`,
+           WHERE business_id = $1::uuid AND occurred_at >= $2`,
           [tenantId, w.monthStart],
         ),
         c.query<Row>(
@@ -202,10 +209,10 @@ export class CashRepository {
           [tenantId],
         ),
         c.query<Row>(
-          `SELECT visits_required AS "visitsRequired", reward_cost_cents AS "rewardCostCentavos"
+          `SELECT stamps_required AS "visitsRequired", value AS "rewardCostCentavos"
            FROM tenant.loyalty_reward
-           WHERE business_id = $1::uuid AND is_active = true
-           ORDER BY activated_at DESC NULLS LAST LIMIT 1`,
+           WHERE business_id = $1::uuid AND active = true AND type = 'stamps_free_item'
+           ORDER BY created_at DESC NULLS LAST LIMIT 1`,
           [tenantId],
         ),
       ]);
@@ -242,13 +249,13 @@ export class CashRepository {
     // ledgers; phone/email from the identity spine). One active card per customer.
     const CUST_CTE = `
       vr AS (
-        SELECT COALESCE((SELECT visits_required FROM tenant.loyalty_reward
-          WHERE business_id = $1::uuid AND is_active
-          ORDER BY activated_at DESC NULLS LAST LIMIT 1), 10) AS n
+        SELECT COALESCE((SELECT stamps_required FROM tenant.loyalty_reward
+          WHERE business_id = $1::uuid AND active AND type = 'stamps_free_item'
+          ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
       ),
       cust AS (
         SELECT
-          cu.id, cu.name, cu.created_at, cu.contact_id,
+          cu.id, cu.name, cu.created_at,
           c.id AS card_id, c.card_number,
           COALESCE((SELECT sum(l.delta) FROM tenant.loyalty_stored_value_ledger l
             WHERE l.business_id = cu.business_id AND l.card_id = c.id), 0)::bigint          AS balance_cents,
@@ -305,23 +312,26 @@ export class CashRepository {
   }
 
   async rewardConfig(tenantId: string): Promise<{ active: Row[]; history: Row[] }> {
+    // Maps build-v3's loyalty_reward onto the frozen umi-cash response names.
+    // activated_at was dropped — each config save inserts a NEW row, so created_at
+    // IS the activation moment; both "activatedAt" and "createdAt" read from it.
     const select = `
       id::text, business_id::text AS "tenantId", NULL::text AS "programId",
-      visits_required AS "visitsRequired", reward_name AS "rewardName",
-      reward_description AS "rewardDescription", reward_cost_cents AS "rewardCostCentavos",
-      is_active AS "isActive", activated_at AS "activatedAt", created_at AS "createdAt"`;
+      stamps_required AS "visitsRequired", name AS "rewardName",
+      description AS "rewardDescription", value AS "rewardCostCentavos",
+      active AS "isActive", created_at AS "activatedAt", created_at AS "createdAt"`;
     return this.pg.withTenant(async (c) => {
       const [active, history] = await Promise.all([
         c.query<Row>(
           `SELECT ${select} FROM tenant.loyalty_reward
-           WHERE business_id = $1::uuid AND is_active = true
-           ORDER BY activated_at DESC NULLS LAST LIMIT 1`,
+           WHERE business_id = $1::uuid AND active = true AND type = 'stamps_free_item'
+           ORDER BY created_at DESC NULLS LAST LIMIT 1`,
           [tenantId],
         ),
         c.query<Row>(
           `SELECT ${select} FROM tenant.loyalty_reward
-           WHERE business_id = $1::uuid AND is_active = false
-           ORDER BY activated_at DESC NULLS LAST LIMIT 10`,
+           WHERE business_id = $1::uuid AND active = false AND type = 'stamps_free_item'
+           ORDER BY created_at DESC NULLS LAST LIMIT 10`,
           [tenantId],
         ),
       ]);
@@ -345,18 +355,18 @@ export class CashRepository {
       // deactivate-then-insert can't interleave into two is_active=true rows.
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`reward_config:${tenantId}`]);
       await c.query(
-        `UPDATE tenant.loyalty_reward SET is_active = false
-         WHERE business_id = $1::uuid AND is_active = true`,
+        `UPDATE tenant.loyalty_reward SET active = false
+         WHERE business_id = $1::uuid AND active = true AND type = 'stamps_free_item'`,
         [tenantId],
       );
       const { rows } = await c.query<Row>(
         `INSERT INTO tenant.loyalty_reward
-           (business_id, visits_required, reward_name, reward_description, reward_cost_cents, is_active, activated_at)
-         VALUES ($1::uuid, $2, $3, $4, $5, true, now())
+           (business_id, type, stamps_required, name, description, value, active)
+         VALUES ($1::uuid, 'stamps_free_item', $2, $3, $4, $5, true)
          RETURNING id::text, business_id::text AS "tenantId", NULL::text AS "programId",
-                   visits_required AS "visitsRequired", reward_name AS "rewardName",
-                   reward_description AS "rewardDescription", reward_cost_cents AS "rewardCostCentavos",
-                   is_active AS "isActive", activated_at AS "activatedAt"`,
+                   stamps_required AS "visitsRequired", name AS "rewardName",
+                   description AS "rewardDescription", value AS "rewardCostCentavos",
+                   active AS "isActive", created_at AS "activatedAt"`,
         [
           tenantId,
           data.visitsRequired,

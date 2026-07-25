@@ -35,7 +35,7 @@ export class CashRegisterRepository {
         `SELECT t.name,
                 ls.card_prefix       AS card_prefix,
                 ls.self_registration AS self_registration,
-                (ls.id IS NOT NULL)  AS loyalty_configured
+                (ls.business_id IS NOT NULL) AS loyalty_configured
          FROM tenant.business AS t
          LEFT JOIN tenant.loyalty_program AS ls ON ls.business_id = t.id
          WHERE t.id = $1::uuid LIMIT 1`,
@@ -104,17 +104,12 @@ export class CashRegisterRepository {
     return resolved.customerId;
   }
 
-  async updatePerson(
-    personId: string,
-    name: string,
-    birthDate: string,
-    metadata: Record<string, unknown>,
-  ): Promise<void> {
+  async updatePerson(personId: string, name: string, birthDate: string): Promise<void> {
     await this.pg.query(
       `UPDATE tenant.customer
-          SET name = $2, born_at = $3::date, metadata = $4::jsonb, updated_at = now()
+          SET name = $2, birthday = $3::date, updated_at = now()
         WHERE id = $1::uuid`,
-      [personId, name, birthDate, JSON.stringify(metadata)],
+      [personId, name, birthDate],
     );
   }
 

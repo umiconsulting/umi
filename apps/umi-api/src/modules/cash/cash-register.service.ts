@@ -40,7 +40,7 @@ export class CashRegisterService {
     tenantId: string,
     tenantName: string,
     input: RegisterInput,
-    userAgent: string | null,
+    _userAgent: string | null,
   ) {
     const cfg = await this.repo.tenantConfig(tenantId);
     if (!cfg) throw new NotFoundException({ error: 'Tenant no encontrado' });
@@ -73,9 +73,7 @@ export class CashRegisterService {
     }
 
     const personId = await this.repo.resolveContact(tenantId, input.phone, input.name);
-    await this.repo.updatePerson(personId, input.name, input.birthDate, {
-      ua: userAgent ?? null,
-    });
+    await this.repo.updatePerson(personId, input.name, input.birthDate);
 
     let created: { cardId: string; cardNumber: string } | null = null;
     for (let attempt = 0; attempt < 5 && !created; attempt++) {
