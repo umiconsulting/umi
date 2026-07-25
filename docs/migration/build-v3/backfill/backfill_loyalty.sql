@@ -44,7 +44,10 @@
 -- ----------------------------------------------------------------------------
 insert into tenant.loyalty_program
   (business_id, card_prefix, topup_enabled, stamps_per_reward,
-   birthday_reward_enabled, created_at, updated_at)
+   birthday_reward_enabled, birthday_reward_name, self_registration, pass_style,
+   primary_color, secondary_color, logo_url, strip_image_url,
+   promo_message, promo_starts_at, promo_ends_at, promo_days,
+   created_at, updated_at)
 select
   p.tenant_id,
   p.card_prefix,
@@ -53,8 +56,21 @@ select
      from loyalty.reward_configs rc
     where rc.program_id = p.id and rc.is_active
     order by rc.created_at
-    limit 1)                                   as stamps_per_reward,
+    limit 1)                                    as stamps_per_reward,
   p.birthday_reward_enabled,
+  p.birthday_reward_name,
+  coalesce(p.self_registration, false)          as self_registration,
+  p.pass_style,
+  -- flat presentation fields lifted out of the source branding jsonb into typed columns.
+  -- business_hours (hours track) and lifecycle_copy (deferred) are deliberately NOT carried.
+  p.branding->>'primary_color'                  as primary_color,
+  p.branding->>'secondary_color'                as secondary_color,
+  p.branding->>'logo_url'                       as logo_url,
+  p.branding->>'strip_image_url'                as strip_image_url,
+  p.branding->>'promo_message'                  as promo_message,
+  (p.branding->>'promo_starts_at')::timestamptz as promo_starts_at,
+  (p.branding->>'promo_ends_at')::timestamptz   as promo_ends_at,
+  p.branding->>'promo_days'                     as promo_days,
   p.created_at,
   p.updated_at
 from loyalty.programs p;

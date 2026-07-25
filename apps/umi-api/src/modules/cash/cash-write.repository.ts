@@ -90,16 +90,16 @@ export class CashWriteRepository {
       c.query<CardRow>(
         `WITH vr AS (
            SELECT COALESCE((
-             SELECT visits_required FROM tenant.loyalty_reward
-             WHERE business_id = $1::uuid AND is_active
-             ORDER BY activated_at DESC NULLS LAST LIMIT 1), 10) AS n
+             SELECT stamps_required FROM tenant.loyalty_reward
+             WHERE business_id = $1::uuid AND active AND type = 'stamps_free_item'
+             ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
          )
          SELECT c.id::text, c.customer_id::text, c.card_number, c.qr_token,
                 agg.balance_cents::int                                   AS balance_cents,
                 agg.total_visits::int                                    AS total_visits,
                 (agg.total_visits % vr.n)::int                           AS visits_this_cycle,
                 (agg.total_visits / vr.n - agg.redemptions)::int         AS pending_rewards,
-                cu.contact_id::text                                      AS person_id,
+                cu.id::text                                              AS person_id,
                 cu.name                                                  AS display_name,
                 NULL::text                                               AS normalized_email
                 -- email reachability lives in tenant.contact (channel_type 'email')

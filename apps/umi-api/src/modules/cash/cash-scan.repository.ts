@@ -218,22 +218,12 @@ export class CashScanRepository {
       // cache columns to touch — visit/reward counts + balance are derived below.
       const upd = await c.query<{ card_number: string }>(
         `UPDATE tenant.loyalty_card SET
-           metadata = CASE WHEN $3
-             THEN COALESCE(metadata,'{}'::jsonb) || jsonb_build_object(
-               'lifecycle_message', $4::text,
-               'lifecycle_message_updated_at', $5::text)
-             ELSE metadata END,
-           qr_token = $6, qr_issued_at = now(), updated_at = now()
+           lifecycle_message    = CASE WHEN $3 THEN $4::text ELSE lifecycle_message END,
+           lifecycle_message_at = CASE WHEN $3 THEN now()    ELSE lifecycle_message_at END,
+           qr_token = $5, qr_issued_at = now(), updated_at = now()
          WHERE business_id=$1::uuid AND id=$2::uuid
          RETURNING card_number`,
-        [
-          input.tenantId,
-          input.cardId,
-          input.doVisit,
-          input.momentMessage,
-          input.momentMessage ? new Date().toISOString() : null,
-          input.newQrToken,
-        ],
+        [input.tenantId, input.cardId, input.doVisit, input.momentMessage, input.newQrToken],
       );
       // No row → card vanished mid-scan or is RLS-filtered; surface a clear 404
       // instead of returning undefined (which callers read as ScannedCard).

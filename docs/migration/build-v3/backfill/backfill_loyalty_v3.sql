@@ -34,10 +34,18 @@ from core.contact_methods cm
 join umi.channel_type ch on ch.key = cm.kind;
 
 -- 4. loyalty_card <- loyalty.cards  (identity only; customer via account->person)
-insert into tenant.loyalty_card (id, business_id, customer_id, card_number, status, issued_at, created_at)
+insert into tenant.loyalty_card
+  (id, business_id, customer_id, card_number, qr_token, qr_issued_at,
+   lifecycle_message, lifecycle_message_at, status, issued_at, created_at, updated_at)
 select c.id, c.tenant_id, a.person_id, c.card_number,
-       case when c.status='blocked' then 'blocked' else 'active' end,
-       coalesce(c.qr_issued_at, c.created_at), c.created_at
+       c.qr_token,                                                    -- CARRIED: the incumbent card's scan secret
+       c.qr_issued_at,
+       c.metadata->>'lifecycle_message'                              as lifecycle_message,
+       (c.metadata->>'lifecycle_message_updated_at')::timestamptz    as lifecycle_message_at,
+       case when c.status='blocked' then 'blocked' else 'active' end as status,
+       coalesce(c.qr_issued_at, c.created_at)                        as issued_at,
+       c.created_at,
+       c.updated_at
 from loyalty.cards c
 join loyalty.accounts a on a.id = c.account_id;
 
