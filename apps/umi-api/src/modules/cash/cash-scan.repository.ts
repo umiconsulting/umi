@@ -144,7 +144,7 @@ export class CashScanRepository {
   async activeBirthdayReward(tenantId: string, cardId: string): Promise<{ id: string } | null> {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<{ id: string }>(
-        `SELECT id::text FROM tenant.birthday_reward
+        `SELECT id::text FROM tenant.loyalty_birthday_grant
          WHERE business_id=$1::uuid AND card_id=$2::uuid
            AND status='active' AND expires_at >= now()
          ORDER BY issued_at DESC LIMIT 1`,
@@ -194,7 +194,7 @@ export class CashScanRepository {
     return this.pg.withTenant(async (c) => {
       if (input.doBirthday && input.birthdayRewardId) {
         await c.query(
-          `UPDATE tenant.birthday_reward SET status='redeemed', redeemed_at=now()
+          `UPDATE tenant.loyalty_birthday_grant SET status='redeemed', redeemed_at=now()
            WHERE business_id=$1::uuid AND id=$2::uuid`,
           [input.tenantId, input.birthdayRewardId],
         );
