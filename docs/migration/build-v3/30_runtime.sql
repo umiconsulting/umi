@@ -15,21 +15,33 @@ create schema if not exists runtime;
 -- AUTH & SESSION   → read to authenticate/authorize the NEXT request
 -- ----------------------------------------------------------------------------
 
+-- ONE session table for every principal that holds a token: a STAFF user
+-- (dashboard/POS login), a CUSTOMER 'person' (umi-cash refresh token), and a
+-- DEVICE (a KDS iPad). The principal is (principal_type, principal_id) — a SOFT
+-- ref, deliberately no FK, because principal_id points into three different
+-- tables by type: umi.user, tenant.customer, tenant.device. Two live writers
+-- already depend on exactly this shape — cash/customer-session.service.ts
+-- ('person'/'user') and kds.repository.ts ('device') — so a user_id-only table
+-- could represent neither a device nor a customer session. token_hash is UNIQUE:
+-- the cash path relies on it to 409 a double-submit instead of 500.
+--   Worker-only (90_rls): api gets NO grant, so no RLS policy is needed;
+--   business_id is still carried, to scope the worker's own reads.
 create table runtime.session (
-  id           uuid primary key default gen_random_uuid(),
-  user_id      uuid not null references umi.user(id) on delete cascade,
-  device_id    uuid references tenant.device(id),        -- a KDS login = a user acting THROUGH a device
-  app          text not null check (app in ('kds','dashboard','pos')),
-  token_hash   text not null,
-  issued_at    timestamptz not null default now(),
-  expires_at   timestamptz not null,
-  last_seen_at timestamptz,
-  revoked_at   timestamptz,
-  ip           text,
-  user_agent   text,
-  created_at   timestamptz not null default now()
+  id             uuid primary key default gen_random_uuid(),
+  business_id    uuid not null references tenant.business(id) on delete cascade,
+  principal_type text not null check (principal_type in ('user','device','person')),
+  principal_id   uuid not null,                        -- soft ref, resolved by principal_type
+  token_hash     text not null,
+  station_id     uuid references tenant.station(id),   -- device sessions: current station
+  device_name    text,                                 -- device sessions: display name
+  is_active      boolean not null default true,
+  metadata       jsonb not null default '{}'::jsonb,   -- device sessions park location_id + last ip
+  expires_at     timestamptz,                          -- cash sets 30d; a device token does not expire
+  last_used_at   timestamptz,                          -- liveness heartbeat (KDS board/command polls)
+  created_at     timestamptz not null default now()
 );
-create index session_user_idx on runtime.session (user_id) where revoked_at is null;
+create unique index session_token_hash_uidx on runtime.session (token_hash);
+create index session_live_idx on runtime.session (business_id, principal_type) where is_active;
 
 create table runtime.otp (
   id           uuid primary key default gen_random_uuid(),
@@ -53,28 +65,45 @@ create table runtime.password_reset_token (
 );
 
 -- ----------------------------------------------------------------------------
--- DEVICE CONNECTIVITY   → read to authorize a device / complete pairing
+-- DEVICE PAIRING   → read to complete pairing. A device's LIVE credential is a
+-- runtime.session row (principal_type='device'); this table is the REQUEST that
+-- mints it. There is no separate device-session table — the earlier
+-- runtime.device_session was speculative, had no code reader, and is deleted.
 -- ----------------------------------------------------------------------------
 
-create table runtime.device_session (
-  id           uuid primary key default gen_random_uuid(),
-  device_id    uuid not null references tenant.device(id) on delete cascade,
-  token_hash   text not null,
-  paired_at    timestamptz not null default now(),
-  expires_at   timestamptz,
-  last_seen_at timestamptz,
-  revoked_at   timestamptz,
-  created_at   timestamptz not null default now()
-);
-
+-- A KDS device asks to be paired: it presents a salted-hashed PIN, an operator
+-- approves it from the dashboard, and only THEN is a device + session provisioned.
+-- The PIN is never stored in the clear (pin_hash/pin_salt — the source table's
+-- plaintext `code` was the only unhashed secret in this schema); attempt_count/
+-- max_attempts bound brute force. A device_id would be premature at request time —
+-- the device row does not exist until approval — so the request carries where the
+-- device WILL live (business_id/location_id/station_id/device_name). The device_id
+-- is filled in the instant the pairing is claimed, and the CHECK makes that
+-- structural: a 'used' pairing HAS produced a device, any other status has not.
 create table runtime.pairing (
-  id           uuid primary key default gen_random_uuid(),
-  device_id    uuid not null references tenant.device(id) on delete cascade,
-  code         text not null,
-  expires_at   timestamptz not null,
-  consumed_at  timestamptz,
-  created_at   timestamptz not null default now()
+  id             uuid primary key default gen_random_uuid(),
+  business_id    uuid not null references tenant.business(id) on delete cascade,
+  location_id    uuid references tenant.branch(id),
+  station_id     uuid references tenant.station(id),
+  device_id      uuid references tenant.device(id) on delete cascade,   -- the outcome (see CHECK)
+  device_name    text not null,
+  requested_name text,
+  pin_hash       text not null,
+  pin_salt       text not null,
+  status         text not null default 'pending'
+                   check (status in ('pending','approved','denied','expired','used')),
+  attempt_count  integer not null default 0,
+  max_attempts   integer not null default 5,
+  expires_at     timestamptz not null,
+  approved_by    uuid references umi.user(id),
+  approved_at    timestamptz,
+  denied_at      timestamptz,
+  used_at        timestamptz,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now(),
+  constraint pairing_device_is_outcome check ((status = 'used') = (device_id is not null))
 );
+create index pairing_pending_idx on runtime.pairing (status, expires_at) where status = 'pending';
 
 -- ----------------------------------------------------------------------------
 -- WORK QUEUE & DELIVERY   → read by the WORKER to deliver / dedup / retry

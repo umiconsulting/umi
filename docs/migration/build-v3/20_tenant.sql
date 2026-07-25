@@ -834,11 +834,13 @@ create table tenant.device (
   id            uuid primary key default gen_random_uuid(),
   business_id   uuid not null references tenant.business(id) on delete cascade,
   branch_id     uuid references tenant.branch(id),
+  station_id    uuid references tenant.station(id),   -- the station this device serves (re-assignable)
   name          text not null,
   kind          text not null default 'kds' check (kind in ('kds','pos_terminal')),
   status        text not null default 'active' check (status in ('active','retired')),
   registered_at timestamptz not null default now(),
-  created_at    timestamptz not null default now()
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
 );
 
 -- ----------------------------------------------------------------------------

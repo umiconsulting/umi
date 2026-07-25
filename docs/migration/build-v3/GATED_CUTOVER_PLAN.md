@@ -165,6 +165,9 @@ identity/entitlement failures; gate stays green.
 per-business rule; **KDS** reproduce the frozen iPad JSON over the redesigned ops tables (+ pairing
 `code` → `pin_hash`/`pin_salt`); **order repos** (`kds`/`orders`/`customers`) rewritten to
 `tenant.customer_order` (retires the 11 `tenant.order` failures).
+**KDS is DONE** (#63 board-killer/stations/line-change/exactly-once + this branch's auth substrate —
+`kds/kds.repository.ts` is off the rollup). Remaining P4: conversation pipeline, hours, birthday, cash,
+leads, customers.
 **DoD.** Preflight → **0 unresolved**; conversation/hours/KDS/order behavioral checks green; gate green.
 
 ### P5 — 4-repo lockstep slug release ⏳ PENDING
@@ -198,27 +201,28 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
 
 ---
 
-## 5 · Current baseline (2026-07-23)
+## 5 · Current baseline (2026-07-25)
 
-- **`build-v3` HEAD:** `b280802` (PR #60). Merged in order: **#49** order cluster → **#50** mechanical
-  sweep → **#51** D1/D11 gate → **#54** P3 (identity/RBAC/WhatsApp/entitlement/POS) → **#55** lint baseline
-  → **#56** post-merge CI + lint gate → **#58** required checks → **#59** format pass → **#60** skill audit.
-- **In flight:** `chore/umi-api-lint` (PR #61, green) — type-aware lint for umi-api ·
-  `feat/p4-order-repos` — P4 order track: DDL delta + catalog + `tquery` + the bot checkout landed,
-  **KDS next**.
-- **Preflight:** **124** unresolved · 221 PREPAREd verbatim + **32 of 47 interpolated
+- **`build-v3` HEAD:** `5fe9cd3` (PR #64). Merged since #60: **#61** type-aware lint → **#62** P4 order
+  track (catalog + `tquery` + the bot checkout) → **#63** P4 KDS (the board-killer, stations, the
+  line-change signal, exactly-once) → **#64** platform-architecture presentation.
+- **In flight:** `feat/p4-kds-pairing` — the KDS AUTH SUBSTRATE. `runtime.session` reshaped to the
+  polymorphic principal model two live writers already depend on (KDS `'device'`, cash `'person'`/`'user'`);
+  `runtime.pairing` rebuilt as the pairing-request lifecycle (`pin_hash`/`pin_salt`, approval workflow,
+  `device_id`-as-outcome CHECK); the speculative reader-less `runtime.device_session` dropped;
+  `tenant.device` given the `station_id`/`updated_at` its writers already set.
+- **Preflight:** **106** unresolved · 215 PREPAREd verbatim + **34 of 49 interpolated
   RECONSTRUCTED** · **15** still uncovered (named in the coverage line) · **0** `42883`.
-  Measured against `umi_backfill_v3_p4`, which carries the P4 DDL deltas.
-  ⚠️ **The earlier jump 140 → 171 was not a regression — it was the gate no longer under-reporting.**
-  The 46 interpolated statements were "counted, not hidden", but nobody looked inside, and
-  `products.repository.ts` was failing every one of its statements in there (it read
-  `p.price_cents` + `p.variants`; build-v3 has `price`, and variants are relational). The
-  detail report also caps each error code at 40, so with 116 `42703` the printed list was a
-  SAMPLE that read like a worklist — there is now an untruncated per-file rollup.
-  From 171: the catalog fix retired 13, the checkout rewrite 7 (both files are now gone from
-  the rollup entirely), and the reconstruction gained one more statement to check.
+  Measured against `umi_backfill_v3` rebuilt with the device-cluster deltas.
+  ⚠️ **The earlier jump 140 → 171 was the gate no longer under-reporting, not a regression** — the 46
+  interpolated statements were counted but unlooked-at, and `products.repository.ts` was failing every
+  one (it read `p.price_cents`/`p.variants` where build-v3 has `price` and relational variants); the
+  detail report also caps each error code at 40, so a sample read like a worklist. From 171: catalog
+  −13, checkout −7 (both files gone from the rollup), then **#63 retired the KDS read/write half and this
+  branch the auth half — `kds/kds.repository.ts` is now absent from the rollup entirely (40 → 0).**
 
-- **Units:** 359 · **Gate:** `security_gate.sql` PASS · `reconcile_v3.sql` PASS on the snapshot backfill.
+- **Units:** 366 · **Gate:** `security_gate.sql` PASS (25 structural + 3 behavioral) ·
+  `reconcile_v3.sql` PASS on the snapshot backfill.
 - **Branch protection (2026-07-21):** `build-v3` requires a branch to be UP TO DATE with base before
   merging (`strict: true`), enforced for admins. Closes the stale-base hole: the tree CI tested is the
   tree that lands.
@@ -262,28 +266,48 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
   sequence engine is dormant behind `LEADS_SEQUENCE_ENABLED` — but it is unowned and invisible, because
   `lint` is the only gate covering that package. Fix or delete the test before the leads cutover.
 
-### The 124 remaining, BY FILE (the real worklist)
+### The 106 remaining, BY FILE (the real worklist)
 
 This replaces the by-error-code table, which was built from the capped detail report and
 therefore under-counted. `npm run test:integration` now prints this rollup untruncated.
 
-| File                                                            | Unresolved | Owning track                        |
-| --------------------------------------------------------------- | ---------: | ----------------------------------- |
-| `kds/kds.repository.ts`                                         |     **27** | P4 — outbox delta + pairing/session |
-| `cash/cash-write.repository.ts`                                 |         11 | cash columns                        |
-| `cash/cash.repository.ts`                                       |         11 | cash columns                        |
-| `conversations/conversations.repository.ts`                     |         10 | conversation pipeline               |
-| `leads/leads.repository.ts`                                     |     **10** | growth — previously invisible       |
-| `cash/cash-scan.repository.ts`                                  |          9 | birthday + hours                    |
-| `customers/customers.repository.ts`                             |          9 | Customer 360 (identity-entangled)   |
-| `jobs/queue.repository.ts`                                      |          8 | outbox exactly-once (P1 DDL)        |
-| `conversation-turns` · `memory` · `tenants`                     |     5 each | pipeline / P5                       |
-| `hours` · `lifecycle`                                           |     4 each | P4 hours / lifecycle                |
-| `cash-register` · `turn-commit` · `ordering-settings` · `staff` |     3 each | —                                   |
-| `auth` · `messages` · `voice-settings`                          |     2 each | P5 slug / pipeline                  |
-| `customer-session` · `business-config`                          |     1 each | —                                   |
+| File                                                         | Unresolved | Owning track                       |
+| ------------------------------------------------------------ | ---------: | ---------------------------------- |
+| `cash/cash-write.repository.ts`                              |         11 | cash columns                       |
+| `cash/cash.repository.ts`                                    |         11 | cash columns                       |
+| `conversations/conversations.repository.ts`                  |         10 | conversation pipeline              |
+| `leads/leads.repository.ts`                                  |     **10** | growth — previously invisible      |
+| `cash/cash-scan.repository.ts`                               |          9 | birthday + hours                   |
+| `customers/customers.repository.ts`                          |          9 | Customer 360 (identity-entangled)  |
+| `conversation-turns` · `memory` · `tenants`                  |     5 each | pipeline / P5                      |
+| `jobs/queue.repository.ts` · `hours` · `lifecycle`           |     4 each | outbox tail / P4 hours / lifecycle |
+| `cash-register` · `messages` · `ordering-settings` · `staff` |     3 each | —                                  |
+| `auth` · `turn-commit` · `voice-settings`                    |     2 each | P5 slug / pipeline                 |
+| `business-config`                                            |          1 | —                                  |
 
-**`42883` remains 0** (`umi.e164` resolved the normalize functions).
+**`kds/kds.repository.ts` is now absent from the rollup** — the read/write half (#63) and the auth half
+(this branch) retired all 40; the only KDS residue is the 2 dynamic-`locClause` statements the gate
+cannot reconstruct (uncovered, not failing). **`42883` remains 0** (`umi.e164` resolved the normalize functions).
+
+> ### ✅ RESOLVED: the KDS auth substrate was three thin tables, not a rename
+>
+> The pairing/session/device cluster looked like a column rename but was the same "built to the
+> wrong guess" defect as `tenant.station`, on the sealed auth substrate:
+>
+> - **`runtime.session`** shipped `user_id NOT NULL` + `app` — a login model NOTHING uses. The
+>   live writers (`kds.repository.ts` `'device'`, `cash/customer-session.service.ts` `'person'`/`'user'`)
+>   need a polymorphic `(principal_type, principal_id)` session with a UNIQUE `token_hash`. Reshaped.
+> - **`runtime.pairing`** shipped `(device_id NOT NULL, code text)` — plaintext, and structurally
+>   backwards (the device is the pairing's OUTCOME, created on approval). Rebuilt with `pin_hash`/`pin_salt`,
+>   the approval workflow, and `device_id` NULLABLE under `CHECK ((status='used') = (device_id IS NOT NULL))`.
+> - **`runtime.device_session`** had zero code readers — a speculative device home the code never used
+>   (device sessions live in `runtime.session`). Dropped, and removed from the `90_rls`/`security_gate` seal.
+> - **`tenant.device`** lacked `station_id`/`updated_at` its writers set, and used `kind`/`retired`
+>   where the code said `device_type`/`archived` — adapted at the query boundary (backend, not schema).
+>
+> The auth substrate stayed sealed throughout (`security_gate.sql` 25+3 PASS: `api` has zero privilege
+> on the runtime auth tables). The backfill now carries the incumbent iPad's `token_hash` into
+> `runtime.session`, so Kalala's live device rides through cutover instead of going dark on next reinstall.
 
 > ### ✅ RESOLVED: the product catalog was an untracked cluster
 >
