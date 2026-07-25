@@ -78,7 +78,7 @@ export class CashScanRepository {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<Row>(
         `SELECT t.name, t.timezone,
-                s.branding->'lifecycle_copy' AS lifecycle_copy,
+                s.lifecycle_copy AS lifecycle_copy,
                 s.birthday_reward_name AS birthday_reward_name
          FROM tenant.business AS t
          LEFT JOIN tenant.loyalty_program AS s ON s.business_id = t.id

@@ -67,24 +67,31 @@ export class CashRepository {
     );
   }
 
-  async updateProgram(
-    tenantId: string,
-    patch: { cardPrefix?: string; passStyle?: string; brandingPatch: Record<string, unknown> },
-  ): Promise<void> {
+  async updateProgram(tenantId: string, patch: Record<string, unknown>): Promise<void> {
+    // One column-keyed jsonb patch, fixed columns: a key PRESENT in the patch is written
+    // (present-but-null clears the column), an ABSENT key is left untouched. The statement
+    // stays STATIC (preflight can PREPARE it) while preserving the settings form's
+    // partial-update + clear-a-field semantics the old branding jsonb merge had.
     await this.pg.withTenant((c) =>
       c.query(
-        `UPDATE tenant.loyalty_program
-         SET card_prefix = COALESCE($2, card_prefix),
-             pass_style  = COALESCE($3, pass_style),
-             branding    = COALESCE(branding, '{}'::jsonb) || $4::jsonb,
-             updated_at  = now()
-         WHERE business_id = $1::uuid`,
-        [
-          tenantId,
-          patch.cardPrefix ?? null,
-          patch.passStyle ?? null,
-          JSON.stringify(patch.brandingPatch),
-        ],
+        `UPDATE tenant.loyalty_program p SET
+           card_prefix             = CASE WHEN pt.j ? 'card_prefix'             THEN pt.j->>'card_prefix'                     ELSE p.card_prefix END,
+           pass_style              = CASE WHEN pt.j ? 'pass_style'              THEN pt.j->>'pass_style'                      ELSE p.pass_style END,
+           birthday_reward_enabled = CASE WHEN pt.j ? 'birthday_reward_enabled' THEN (pt.j->>'birthday_reward_enabled')::boolean ELSE p.birthday_reward_enabled END,
+           birthday_reward_name    = CASE WHEN pt.j ? 'birthday_reward_name'    THEN pt.j->>'birthday_reward_name'            ELSE p.birthday_reward_name END,
+           primary_color           = CASE WHEN pt.j ? 'primary_color'           THEN pt.j->>'primary_color'                   ELSE p.primary_color END,
+           secondary_color         = CASE WHEN pt.j ? 'secondary_color'         THEN pt.j->>'secondary_color'                 ELSE p.secondary_color END,
+           logo_url                = CASE WHEN pt.j ? 'logo_url'                THEN pt.j->>'logo_url'                        ELSE p.logo_url END,
+           strip_image_url         = CASE WHEN pt.j ? 'strip_image_url'         THEN pt.j->>'strip_image_url'                 ELSE p.strip_image_url END,
+           promo_message           = CASE WHEN pt.j ? 'promo_message'           THEN pt.j->>'promo_message'                   ELSE p.promo_message END,
+           promo_starts_at         = CASE WHEN pt.j ? 'promo_starts_at'         THEN (pt.j->>'promo_starts_at')::timestamptz  ELSE p.promo_starts_at END,
+           promo_ends_at           = CASE WHEN pt.j ? 'promo_ends_at'           THEN (pt.j->>'promo_ends_at')::timestamptz    ELSE p.promo_ends_at END,
+           promo_days              = CASE WHEN pt.j ? 'promo_days'              THEN pt.j->>'promo_days'                      ELSE p.promo_days END,
+           lifecycle_copy          = CASE WHEN pt.j ? 'lifecycle_copy'          THEN pt.j->'lifecycle_copy'                   ELSE p.lifecycle_copy END,
+           updated_at              = now()
+         FROM (SELECT $2::jsonb AS j) pt
+         WHERE p.business_id = $1::uuid`,
+        [tenantId, JSON.stringify(patch)],
       ),
     );
   }

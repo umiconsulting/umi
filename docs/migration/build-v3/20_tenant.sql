@@ -252,6 +252,9 @@ create table tenant.loyalty_program (
   promo_starts_at         timestamptz,
   promo_ends_at           timestamptz,
   promo_days              text,        -- e.g. 'mon,tue,wed' (the days a promo shows)
+  -- Nested per-moment copy templates (escalating reward reminders), keyed by lifecycle
+  -- journey. Honest jsonb — genuinely variable structured config, not a flat field.
+  lifecycle_copy          jsonb,
   created_at              timestamptz not null default now(),
   updated_at              timestamptz not null default now()
 );

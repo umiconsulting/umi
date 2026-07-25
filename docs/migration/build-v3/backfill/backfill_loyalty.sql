@@ -46,7 +46,7 @@ insert into tenant.loyalty_program
   (business_id, card_prefix, topup_enabled, stamps_per_reward,
    birthday_reward_enabled, birthday_reward_name, self_registration, pass_style,
    primary_color, secondary_color, logo_url, strip_image_url,
-   promo_message, promo_starts_at, promo_ends_at, promo_days,
+   promo_message, promo_starts_at, promo_ends_at, promo_days, lifecycle_copy,
    created_at, updated_at)
 select
   p.tenant_id,
@@ -71,6 +71,7 @@ select
   (p.branding->>'promo_starts_at')::timestamptz as promo_starts_at,
   (p.branding->>'promo_ends_at')::timestamptz   as promo_ends_at,
   p.branding->>'promo_days'                     as promo_days,
+  p.branding->'lifecycle_copy'                  as lifecycle_copy,   -- nested copy templates (jsonb)
   p.created_at,
   p.updated_at
 from loyalty.programs p;
