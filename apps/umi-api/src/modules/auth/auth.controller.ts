@@ -25,10 +25,14 @@ import {
   REMEMBER_COOKIE,
   type AuthUser,
 } from './auth.types';
-import type { SessionEnvelope, SessionResponse } from '@umi/contract';
-import { LoginDto } from './dto/login.dto';
-import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
+import {
+  ForgotPasswordRequest,
+  LoginRequest,
+  ResetPasswordRequest,
+  type SessionEnvelope,
+  type SessionResponse,
+} from '@umi/contract';
+import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 
 /**
  * Auth ingress (D9). Issues/clears the httpOnly JWT cookies and returns the
@@ -46,7 +50,7 @@ export class AuthController {
   @Public()
   @Post('local/login')
   async login(
-    @Body() dto: LoginDto,
+    @Body(new ZodValidationPipe(LoginRequest)) dto: LoginRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<SessionResponse> {
     const result = await this.auth.login(dto.username, dto.password);
@@ -80,14 +84,18 @@ export class AuthController {
 
   @Public()
   @Post('local/forgot-password')
-  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<{ ok: true }> {
+  async forgotPassword(
+    @Body(new ZodValidationPipe(ForgotPasswordRequest)) dto: ForgotPasswordRequest,
+  ): Promise<{ ok: true }> {
     await this.auth.forgotPassword(dto.email);
     return { ok: true };
   }
 
   @Public()
   @Post('local/reset-password')
-  async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ ok: true }> {
+  async resetPassword(
+    @Body(new ZodValidationPipe(ResetPasswordRequest)) dto: ResetPasswordRequest,
+  ): Promise<{ ok: true }> {
     await this.auth.resetPassword(dto.token, dto.password);
     return { ok: true };
   }

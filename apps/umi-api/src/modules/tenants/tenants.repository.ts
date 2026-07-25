@@ -1,14 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import type { TenantSummary } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
 import { SUPER_ADMIN_SA_CTE } from '../auth/rbac.sql';
-
-export interface TenantSummary {
-  id: string;
-  slug: string;
-  name: string;
-  timezone: string | null;
-  roles: string[];
-}
 
 export interface ProductInstance {
   status: string;

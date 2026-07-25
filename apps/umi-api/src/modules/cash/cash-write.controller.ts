@@ -7,8 +7,9 @@ import { RequireProduct } from '../auth/require-product.decorator';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser, Tenant } from '../auth/current-user.decorator';
 import type { AuthUser, TenantAccess } from '../auth/auth.types';
+import { GiftCardCreateRequest, PurchaseRequest, TopupRequest } from '@umi/contract';
+import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { CashWriteService } from './cash-write.service';
-import { GiftCardCreateDto, PurchaseDto, TopupDto } from './dto/cash-write.dto';
 
 // Staff-capable roles authorized to operate the register (umi-cash STAFF|ADMIN).
 const STAFF_ROLES = ['super_admin', 'owner', 'admin', 'staff'];
@@ -27,12 +28,20 @@ export class CashWriteController {
   constructor(private readonly cash: CashWriteService) {}
 
   @Post('topup')
-  topup(@Tenant() t: TenantAccess, @CurrentUser() user: AuthUser, @Body() dto: TopupDto) {
+  topup(
+    @Tenant() t: TenantAccess,
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodValidationPipe(TopupRequest)) dto: TopupRequest,
+  ) {
     return this.cash.topup(t.tenantId, user.id, dto);
   }
 
   @Post('purchase')
-  purchase(@Tenant() t: TenantAccess, @CurrentUser() user: AuthUser, @Body() dto: PurchaseDto) {
+  purchase(
+    @Tenant() t: TenantAccess,
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodValidationPipe(PurchaseRequest)) dto: PurchaseRequest,
+  ) {
     return this.cash.purchase(t.tenantId, user.id, dto);
   }
 
@@ -40,7 +49,7 @@ export class CashWriteController {
   issueGiftCard(
     @Tenant() t: TenantAccess,
     @CurrentUser() user: AuthUser,
-    @Body() dto: GiftCardCreateDto,
+    @Body(new ZodValidationPipe(GiftCardCreateRequest)) dto: GiftCardCreateRequest,
   ) {
     return this.cash.issueGiftCard(t.tenantId, user.id, dto);
   }

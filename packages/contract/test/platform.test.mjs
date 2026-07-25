@@ -1,0 +1,110 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const {
+  ApiErrorEnvelope,
+  Money,
+  OfflineCommandEnvelope,
+  PaymentAmbiguity,
+  ReceiptSnapshot,
+} = require('../dist/index.cjs');
+
+test('Money uses integer minor units and explicit currency', () => {
+  assert.ok(Money.safeParse({ minorUnits: 1099, currency: 'MXN' }).success);
+  assert.equal(Money.safeParse({ minorUnits: 10.5, currency: 'MXN' }).success, false);
+  assert.equal(Money.safeParse({ minorUnits: 1099, currency: 'mxn' }).success, false);
+});
+
+test('PaymentAmbiguity prevents a new retry for an unknown outcome', () => {
+  const base = {
+    paymentRef: 'opaque-payment',
+    status: 'unknown',
+    queryAfter: '2026-07-25T12:00:00Z',
+    correlationId: 'request-1',
+  };
+  assert.ok(PaymentAmbiguity.safeParse({ ...base, queryOnly: true, canRetryAsNew: false }).success);
+  assert.equal(
+    PaymentAmbiguity.safeParse({ ...base, queryOnly: false, canRetryAsNew: true }).success,
+    false,
+  );
+});
+
+test('OfflineCommandEnvelope rejects unbounded identity and invalid fingerprints', () => {
+  const command = {
+    commandId: '00000000-0000-4000-8000-000000000001',
+    deviceId: '00000000-0000-4000-8000-000000000002',
+    tenantId: '00000000-0000-4000-8000-000000000003',
+    branchId: '00000000-0000-4000-8000-000000000004',
+    operatorSessionId: '00000000-0000-4000-8000-000000000005',
+    sequence: 1,
+    issuedAt: '2026-07-25T12:00:00Z',
+    commandType: 'example.command',
+    payload: {},
+    fingerprint: 'a'.repeat(64),
+  };
+  assert.ok(OfflineCommandEnvelope.safeParse(command).success);
+  assert.equal(OfflineCommandEnvelope.safeParse({ ...command, sequence: 0 }).success, false);
+  assert.equal(OfflineCommandEnvelope.safeParse({ ...command, fingerprint: 'bad' }).success, false);
+});
+
+test('receipt and error envelopes validate public-safe shapes', () => {
+  const money = { minorUnits: 100, currency: 'MXN' };
+  assert.ok(
+    ReceiptSnapshot.safeParse({
+      receiptRef: 'receipt-public-ref',
+      tenantId: '00000000-0000-4000-8000-000000000003',
+      branchId: '00000000-0000-4000-8000-000000000004',
+      issuedAt: '2026-07-25T12:00:00Z',
+      businessDate: '2026-07-25',
+      lines: [
+        {
+          lineRef: 'line-1',
+          description: 'Coffee',
+          quantity: 1,
+          unitPrice: money,
+          lineTotal: money,
+        },
+      ],
+      subtotal: money,
+      taxTotal: { minorUnits: 0, currency: 'MXN' },
+      grandTotal: money,
+      currency: 'MXN',
+      version: 1,
+    }).success,
+  );
+  assert.ok(
+    ApiErrorEnvelope.safeParse({
+      error: {
+        code: 'PERMISSION_DENIED',
+        message: 'Permission denied',
+        retryable: false,
+        correlationId: 'request-1',
+      },
+    }).success,
+  );
+});
+
+test('neutral artifact has required models and a valid checksum', async () => {
+  const artifactBytes = await readFile(new URL('../generated/contract.json', import.meta.url));
+  const manifest = JSON.parse(artifactBytes);
+  for (const name of [
+    'ApiError',
+    'Money',
+    'PageInfo',
+    'OperatorContext',
+    'OfflineCommandEnvelope',
+    'ReconciliationResponse',
+    'ReceiptSnapshot',
+    'PaymentAmbiguity',
+  ]) {
+    assert.ok(manifest.definitions[name], `missing ${name}`);
+  }
+  const checksum = (
+    await readFile(new URL('../generated/contract.sha256', import.meta.url), 'utf8')
+  ).split(/\s+/)[0];
+  assert.equal(createHash('sha256').update(artifactBytes).digest('hex'), checksum);
+});

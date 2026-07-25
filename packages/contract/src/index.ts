@@ -4,6 +4,8 @@
 export { routes } from './routes';
 export type { Routes } from './routes';
 export * from './schemas';
+export * from './platform';
+export * from './catalog';
 // Zero-dep entitlement vocabulary. Also published as '@umi/contract/entitlements'
 // so the zod-free dashboard bundle can import it without pulling zod.
 export * from './entitlements';

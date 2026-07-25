@@ -7,8 +7,9 @@ import { RequireProduct } from '../auth/require-product.decorator';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser, Tenant } from '../auth/current-user.decorator';
 import type { AuthUser, TenantAccess } from '../auth/auth.types';
+import { ScanRequest } from '@umi/contract';
+import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { CashScanService } from './cash-scan.service';
-import { ScanDto } from './dto/scan.dto';
 
 const STAFF_ROLES = ['super_admin', 'owner', 'admin', 'staff'];
 
@@ -24,7 +25,11 @@ export class CashScanController {
   constructor(private readonly scan: CashScanService) {}
 
   @Post()
-  run(@Tenant() t: TenantAccess, @CurrentUser() user: AuthUser, @Body() dto: ScanDto) {
+  run(
+    @Tenant() t: TenantAccess,
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodValidationPipe(ScanRequest)) dto: ScanRequest,
+  ) {
     return this.scan.scan(t.tenantId, user.id, dto);
   }
 }

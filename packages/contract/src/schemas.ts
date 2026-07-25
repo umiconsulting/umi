@@ -6,13 +6,24 @@ import { z } from 'zod';
 
 // ── Request bodies ────────────────────────────────────────────────────────
 
-/** POST /api/auth/local/login — mirrors umi-api LoginDto. */
+/** POST /api/auth/local/login. */
 export const LoginRequest = z.object({
   username: z.string().min(1),
   password: z.string().min(1),
   remember: z.boolean().optional(),
 });
 export type LoginRequest = z.infer<typeof LoginRequest>;
+
+export const ForgotPasswordRequest = z.object({
+  email: z.string().email(),
+});
+export type ForgotPasswordRequest = z.infer<typeof ForgotPasswordRequest>;
+
+export const ResetPasswordRequest = z.object({
+  token: z.string().min(1),
+  password: z.string().min(8),
+});
+export type ResetPasswordRequest = z.infer<typeof ResetPasswordRequest>;
 
 // ── Shared shapes ─────────────────────────────────────────────────────────
 
@@ -83,7 +94,7 @@ const isCalendarDate = (s: string): boolean => {
 /** Scan actions — mirrors cash/dto/scan.dto.ts `ACTIONS`. */
 export const CASH_SCAN_ACTIONS = ['VISIT', 'REDEEM', 'BIRTHDAY_REDEEM'] as const;
 
-/** POST /api/:slug/admin/scan — mirrors ScanDto. */
+/** POST /api/:slug/admin/scan. */
 export const ScanRequest = z.object({
   qrPayload: z.string(),
   action: z.enum(CASH_SCAN_ACTIONS).optional(),
@@ -91,7 +102,7 @@ export const ScanRequest = z.object({
 });
 export type ScanRequest = z.infer<typeof ScanRequest>;
 
-/** POST /api/:slug/admin/topup — mirrors TopupDto (min $1.00). */
+/** POST /api/:slug/admin/topup (min $1.00). */
 export const TopupRequest = z.object({
   cardId: z.string(),
   amountCentavos: z.number().int().min(100),
@@ -100,7 +111,7 @@ export const TopupRequest = z.object({
 });
 export type TopupRequest = z.infer<typeof TopupRequest>;
 
-/** POST /api/:slug/admin/purchase — mirrors PurchaseDto (min $0.01). */
+/** POST /api/:slug/admin/purchase (min $0.01). */
 export const PurchaseRequest = z.object({
   cardId: z.string(),
   amountCentavos: z.number().int().min(1),
@@ -109,12 +120,8 @@ export const PurchaseRequest = z.object({
 });
 export type PurchaseRequest = z.infer<typeof PurchaseRequest>;
 
-/** POST /api/:slug/admin/gift-cards — mirrors GiftCardCreateDto. The two
- *  `@ValidateIf` rules mean each recipient field is validated *only when it is the
- *  sole channel*: email must be a valid email when no phone is given, phone must be
- *  ≤20 chars when no email is given, and at least one is required. When both are
- *  present the DTO validates neither — reproduced here so the contract accepts
- *  exactly what the server accepts. */
+/** POST /api/:slug/admin/gift-cards. Each recipient field is validated only
+ *  when it is the sole channel. This preserves the existing v1 behavior. */
 export const GiftCardCreateRequest = z
   .object({
     amountCentavos: z.number().int().min(100),
@@ -156,7 +163,7 @@ export const GiftCardCreateRequest = z
   });
 export type GiftCardCreateRequest = z.infer<typeof GiftCardCreateRequest>;
 
-/** POST /api/:slug/customers — mirrors RegisterDto (member registration). */
+/** POST /api/:slug/customers (member registration). */
 export const RegisterMemberRequest = z.object({
   name: z.string().min(2).max(100),
   phone: z.string().min(7).max(20),
@@ -167,9 +174,28 @@ export const RegisterMemberRequest = z.object({
 });
 export type RegisterMemberRequest = z.infer<typeof RegisterMemberRequest>;
 
-/** POST /api/:slug/gift/:code — mirrors GiftRedeemDto (public gift redemption). */
+/** POST /api/:slug/gift/:code (public gift redemption). */
 export const GiftRedeemRequest = z.object({
   phone: z.string().optional(),
   email: z.string().optional(),
 });
 export type GiftRedeemRequest = z.infer<typeof GiftRedeemRequest>;
+
+export const httpModels = {
+  LoginRequest,
+  ForgotPasswordRequest,
+  ResetPasswordRequest,
+  SessionUser,
+  TenantMembership,
+  TenantSummary,
+  SessionEnvelope,
+  SessionResponse,
+  MeTenantsResponse,
+  OkResponse,
+  ScanRequest,
+  TopupRequest,
+  PurchaseRequest,
+  GiftCardCreateRequest,
+  RegisterMemberRequest,
+  GiftRedeemRequest,
+} as const;

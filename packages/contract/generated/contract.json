@@ -1,0 +1,1737 @@
+{
+  "apiMajorVersion": 1,
+  "contentHash": "cc11cfd51d2a9bc12b3ccf59fcc9a9db203e73cdbb2297e62bc13cc3822fd2cc",
+  "contractVersion": "1.0.0",
+  "definitions": {
+    "ApiError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "VALIDATION_FAILED",
+            "AUTHENTICATION_REQUIRED",
+            "PERMISSION_DENIED",
+            "TENANT_NOT_FOUND",
+            "BRANCH_NOT_FOUND",
+            "BRANCH_REQUIRED",
+            "CONFLICT",
+            "IDEMPOTENCY_CONFLICT",
+            "OPTIMISTIC_VERSION_CONFLICT",
+            "RATE_LIMITED",
+            "DEVICE_REVOKED",
+            "PAYMENT_OUTCOME_UNKNOWN",
+            "RESOURCE_NOT_FOUND",
+            "INTERNAL_ERROR"
+          ],
+          "type": "string"
+        },
+        "correlationId": {
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+          "type": "string"
+        },
+        "fieldErrors": {
+          "additionalProperties": {
+            "items": {
+              "maxLength": 300,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "message": {
+          "maxLength": 500,
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "retryable",
+        "correlationId"
+      ],
+      "type": "object"
+    },
+    "ApiErrorEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "VALIDATION_FAILED",
+                "AUTHENTICATION_REQUIRED",
+                "PERMISSION_DENIED",
+                "TENANT_NOT_FOUND",
+                "BRANCH_NOT_FOUND",
+                "BRANCH_REQUIRED",
+                "CONFLICT",
+                "IDEMPOTENCY_CONFLICT",
+                "OPTIMISTIC_VERSION_CONFLICT",
+                "RATE_LIMITED",
+                "DEVICE_REVOKED",
+                "PAYMENT_OUTCOME_UNKNOWN",
+                "RESOURCE_NOT_FOUND",
+                "INTERNAL_ERROR"
+              ],
+              "type": "string"
+            },
+            "correlationId": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            },
+            "fieldErrors": {
+              "additionalProperties": {
+                "items": {
+                  "maxLength": 300,
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              "type": "object"
+            },
+            "message": {
+              "maxLength": 500,
+              "minLength": 1,
+              "type": "string"
+            },
+            "retryable": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "retryable",
+            "correlationId"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "type": "object"
+    },
+    "AuditMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "actorId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "actorType": {
+          "enum": [
+            "operator",
+            "manager",
+            "device",
+            "service"
+          ],
+          "type": "string"
+        },
+        "correlationId": {
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+          "type": "string"
+        },
+        "occurredAt": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "actorType",
+        "actorId",
+        "occurredAt",
+        "correlationId"
+      ],
+      "type": "object"
+    },
+    "BranchContext": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenantId",
+        "branchId"
+      ],
+      "type": "object"
+    },
+    "BranchSummaryModel": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "closed"
+          ],
+          "type": "string"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "timezone": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "tenantId",
+        "name",
+        "timezone",
+        "status"
+      ],
+      "type": "object"
+    },
+    "CorrelationMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "correlationId": {
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+          "type": "string"
+        },
+        "requestId": {
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "correlationId",
+        "requestId"
+      ],
+      "type": "object"
+    },
+    "ForgotPasswordRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "email": {
+          "format": "email",
+          "type": "string"
+        }
+      },
+      "required": [
+        "email"
+      ],
+      "type": "object"
+    },
+    "GiftCardCreateRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "amountCentavos": {
+          "minimum": 100,
+          "type": "integer"
+        },
+        "message": {
+          "maxLength": 300,
+          "type": "string"
+        },
+        "recipientEmail": {
+          "type": "string"
+        },
+        "recipientName": {
+          "maxLength": 100,
+          "type": "string"
+        },
+        "recipientPhone": {
+          "type": "string"
+        },
+        "senderName": {
+          "maxLength": 100,
+          "type": "string"
+        }
+      },
+      "required": [
+        "amountCentavos"
+      ],
+      "type": "object"
+    },
+    "GiftRedeemRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "IdempotencyMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "fingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "maxLength": 128,
+          "minLength": 8,
+          "type": "string"
+        }
+      },
+      "required": [
+        "commandId",
+        "idempotencyKey",
+        "fingerprint"
+      ],
+      "type": "object"
+    },
+    "Identity": {
+      "additionalProperties": false,
+      "properties": {
+        "displayName": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "email": {
+          "format": "email",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "displayName"
+      ],
+      "type": "object"
+    },
+    "LoginRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "password": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "remember": {
+          "type": "boolean"
+        },
+        "username": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "type": "object"
+    },
+    "MeTenantsResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "tenants": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "roles": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "timezone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "roles",
+              "timezone"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "tenants"
+      ],
+      "type": "object"
+    },
+    "Money": {
+      "additionalProperties": false,
+      "properties": {
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "minorUnits": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "minorUnits",
+        "currency"
+      ],
+      "type": "object"
+    },
+    "OfflineCommandEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "commandType": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "deviceId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "fingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "issuedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "optimisticVersion": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "sequence": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "commandId",
+        "deviceId",
+        "tenantId",
+        "branchId",
+        "operatorSessionId",
+        "sequence",
+        "issuedAt",
+        "commandType",
+        "payload",
+        "fingerprint"
+      ],
+      "type": "object"
+    },
+    "OkResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "const": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "type": "object"
+    },
+    "OperatorContext": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "permissions": {
+          "items": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 200,
+          "type": "array"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenantId",
+        "branchId",
+        "operatorId",
+        "operatorSessionId",
+        "permissions"
+      ],
+      "type": "object"
+    },
+    "OptimisticVersion": {
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "type": "object"
+    },
+    "PageInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "hasMore": {
+          "type": "boolean"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "limit",
+        "hasMore",
+        "nextCursor"
+      ],
+      "type": "object"
+    },
+    "PageRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "limit": {
+          "default": 25,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "PaymentAmbiguity": {
+      "additionalProperties": false,
+      "properties": {
+        "canRetryAsNew": {
+          "type": "boolean"
+        },
+        "correlationId": {
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+          "type": "string"
+        },
+        "paymentRef": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "queryAfter": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "queryOnly": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "confirmed",
+            "declined",
+            "unknown"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "paymentRef",
+        "status",
+        "queryOnly",
+        "canRetryAsNew",
+        "queryAfter",
+        "correlationId"
+      ],
+      "type": "object"
+    },
+    "PurchaseRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "amountCentavos": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "cardId": {
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "maxLength": 80,
+          "type": "string"
+        },
+        "note": {
+          "maxLength": 200,
+          "type": "string"
+        }
+      },
+      "required": [
+        "cardId",
+        "amountCentavos"
+      ],
+      "type": "object"
+    },
+    "ReceiptLineSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        },
+        "lineRef": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "lineTotal": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "quantity": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "unitPrice": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "lineRef",
+        "description",
+        "quantity",
+        "unitPrice",
+        "lineTotal"
+      ],
+      "type": "object"
+    },
+    "ReceiptSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "businessDate": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "grandTotal": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "issuedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "lines": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "description": {
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string"
+              },
+              "lineRef": {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              "lineTotal": {
+                "additionalProperties": false,
+                "properties": {
+                  "currency": {
+                    "pattern": "^[A-Z]{3}$",
+                    "type": "string"
+                  },
+                  "minorUnits": {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "minorUnits",
+                  "currency"
+                ],
+                "type": "object"
+              },
+              "quantity": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "unitPrice": {
+                "additionalProperties": false,
+                "properties": {
+                  "currency": {
+                    "pattern": "^[A-Z]{3}$",
+                    "type": "string"
+                  },
+                  "minorUnits": {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "minorUnits",
+                  "currency"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "lineRef",
+              "description",
+              "quantity",
+              "unitPrice",
+              "lineTotal"
+            ],
+            "type": "object"
+          },
+          "maxItems": 500,
+          "minItems": 1,
+          "type": "array"
+        },
+        "receiptRef": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "subtotal": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "taxTotal": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "version": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "receiptRef",
+        "tenantId",
+        "branchId",
+        "issuedAt",
+        "businessDate",
+        "lines",
+        "subtotal",
+        "taxTotal",
+        "grandTotal",
+        "currency",
+        "version"
+      ],
+      "type": "object"
+    },
+    "ReconciliationItem": {
+      "additionalProperties": false,
+      "properties": {
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "errorCode": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resultRef": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "accepted",
+            "duplicate",
+            "rejected",
+            "conflict",
+            "pending"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "commandId",
+        "status",
+        "resultRef",
+        "errorCode"
+      ],
+      "type": "object"
+    },
+    "ReconciliationResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptedThroughSequence": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "batchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "commandId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "errorCode": {
+                "anyOf": [
+                  {
+                    "maxLength": 100,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "resultRef": {
+                "anyOf": [
+                  {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "enum": [
+                  "accepted",
+                  "duplicate",
+                  "rejected",
+                  "conflict",
+                  "pending"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "commandId",
+              "status",
+              "resultRef",
+              "errorCode"
+            ],
+            "type": "object"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "batchId",
+        "acceptedThroughSequence",
+        "items",
+        "nextCursor"
+      ],
+      "type": "object"
+    },
+    "RegisterMemberRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "birthDate": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 100,
+          "minLength": 2,
+          "type": "string"
+        },
+        "phone": {
+          "maxLength": 20,
+          "minLength": 7,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "phone",
+        "birthDate"
+      ],
+      "type": "object"
+    },
+    "ResetPasswordRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "password": {
+          "minLength": 8,
+          "type": "string"
+        },
+        "token": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "token",
+        "password"
+      ],
+      "type": "object"
+    },
+    "ScanRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "VISIT",
+            "REDEEM",
+            "BIRTHDAY_REDEEM"
+          ],
+          "type": "string"
+        },
+        "actions": {
+          "items": {
+            "enum": [
+              "VISIT",
+              "REDEEM",
+              "BIRTHDAY_REDEEM"
+            ],
+            "type": "string"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "type": "array"
+        },
+        "qrPayload": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "qrPayload"
+      ],
+      "type": "object"
+    },
+    "SessionEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "accessExpiresIn": {
+          "type": "number"
+        },
+        "provider": {
+          "const": "local",
+          "type": "string"
+        },
+        "tenants": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "roles": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "slug": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "roles"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "user": {
+          "additionalProperties": false,
+          "properties": {
+            "displayName": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "email": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "email",
+            "displayName"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "user",
+        "tenants",
+        "provider",
+        "accessExpiresIn"
+      ],
+      "type": "object"
+    },
+    "SessionResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "session": {
+          "additionalProperties": false,
+          "properties": {
+            "accessExpiresIn": {
+              "type": "number"
+            },
+            "provider": {
+              "const": "local",
+              "type": "string"
+            },
+            "tenants": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "roles": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "slug": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "slug",
+                  "name",
+                  "roles"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "user": {
+              "additionalProperties": false,
+              "properties": {
+                "displayName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "email": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "email",
+                "displayName"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "user",
+            "tenants",
+            "provider",
+            "accessExpiresIn"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "type": "object"
+    },
+    "SessionUser": {
+      "additionalProperties": false,
+      "properties": {
+        "displayName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "email": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "displayName"
+      ],
+      "type": "object"
+    },
+    "TenantContext": {
+      "additionalProperties": false,
+      "properties": {
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenantId"
+      ],
+      "type": "object"
+    },
+    "TenantMembership": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "roles": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "slug": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "slug",
+        "name",
+        "roles"
+      ],
+      "type": "object"
+    },
+    "TenantSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "roles": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "slug",
+        "name",
+        "roles",
+        "timezone"
+      ],
+      "type": "object"
+    },
+    "TenantSummaryModel": {
+      "additionalProperties": false,
+      "properties": {
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locale": {
+          "maxLength": 20,
+          "minLength": 2,
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "timezone": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "timezone",
+        "locale",
+        "currency"
+      ],
+      "type": "object"
+    },
+    "TopupRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "amountCentavos": {
+          "minimum": 100,
+          "type": "integer"
+        },
+        "cardId": {
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "maxLength": 80,
+          "type": "string"
+        },
+        "note": {
+          "maxLength": 200,
+          "type": "string"
+        }
+      },
+      "required": [
+        "cardId",
+        "amountCentavos"
+      ],
+      "type": "object"
+    }
+  },
+  "errors": {
+    "AUTHENTICATION_REQUIRED": {
+      "public": true,
+      "retryable": false
+    },
+    "BRANCH_NOT_FOUND": {
+      "public": true,
+      "retryable": false
+    },
+    "BRANCH_REQUIRED": {
+      "public": true,
+      "retryable": false
+    },
+    "CONFLICT": {
+      "public": true,
+      "retryable": false
+    },
+    "DEVICE_REVOKED": {
+      "public": true,
+      "retryable": false
+    },
+    "IDEMPOTENCY_CONFLICT": {
+      "public": true,
+      "retryable": false
+    },
+    "INTERNAL_ERROR": {
+      "public": true,
+      "retryable": true
+    },
+    "OPTIMISTIC_VERSION_CONFLICT": {
+      "public": true,
+      "retryable": false
+    },
+    "PAYMENT_OUTCOME_UNKNOWN": {
+      "public": true,
+      "retryable": true
+    },
+    "PERMISSION_DENIED": {
+      "public": true,
+      "retryable": false
+    },
+    "RATE_LIMITED": {
+      "public": true,
+      "retryable": true
+    },
+    "RESOURCE_NOT_FOUND": {
+      "public": true,
+      "retryable": false
+    },
+    "TENANT_NOT_FOUND": {
+      "public": true,
+      "retryable": false
+    },
+    "VALIDATION_FAILED": {
+      "public": true,
+      "retryable": false
+    }
+  },
+  "invariants": {
+    "Money": "minorUnits is an integer and currency is an uppercase ISO 4217 code.",
+    "OfflineCommandEnvelope": "sequence is positive and fingerprint is a SHA-256 hexadecimal value.",
+    "PaymentAmbiguity": "When status is unknown, queryOnly must be true and canRetryAsNew must be false."
+  },
+  "manifestVersion": 1,
+  "routes": {
+    "GET /api/auth/me": {
+      "approval": false,
+      "auth": "session",
+      "branchContext": false,
+      "errors": [
+        "AUTHENTICATION_REQUIRED"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": null,
+      "response": "SessionResponse",
+      "tenantContext": false
+    },
+    "GET /api/me/tenants": {
+      "approval": false,
+      "auth": "session",
+      "branchContext": false,
+      "errors": [
+        "AUTHENTICATION_REQUIRED"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": null,
+      "response": "MeTenantsResponse",
+      "tenantContext": false
+    },
+    "POST /api/:slug/admin/gift-cards": {
+      "approval": false,
+      "auth": "session",
+      "branchContext": false,
+      "errors": [
+        "VALIDATION_FAILED",
+        "PERMISSION_DENIED",
+        "RATE_LIMITED"
+      ],
+      "idempotent": false,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "GiftCardCreateRequest",
+      "response": null,
+      "tenantContext": true
+    },
+    "POST /api/:slug/admin/purchase": {
+      "approval": false,
+      "auth": "session",
+      "branchContext": false,
+      "errors": [
+        "VALIDATION_FAILED",
+        "PERMISSION_DENIED",
+        "IDEMPOTENCY_CONFLICT"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "PurchaseRequest",
+      "response": null,
+      "tenantContext": true
+    },
+    "POST /api/:slug/admin/scan": {
+      "approval": false,
+      "auth": "session",
+      "branchContext": false,
+      "errors": [
+        "VALIDATION_FAILED",
+        "PERMISSION_DENIED",
+        "TENANT_NOT_FOUND"
+      ],
+      "idempotent": false,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "ScanRequest",
+      "response": null,
+      "tenantContext": true
+    },
+    "POST /api/:slug/admin/topup": {
+      "approval": false,
+      "auth": "session",
+      "branchContext": false,
+      "errors": [
+        "VALIDATION_FAILED",
+        "PERMISSION_DENIED",
+        "IDEMPOTENCY_CONFLICT"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "TopupRequest",
+      "response": null,
+      "tenantContext": true
+    },
+    "POST /api/:slug/customers": {
+      "approval": false,
+      "auth": "public",
+      "branchContext": false,
+      "errors": [
+        "VALIDATION_FAILED",
+        "CONFLICT",
+        "RATE_LIMITED"
+      ],
+      "idempotent": false,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "RegisterMemberRequest",
+      "response": null,
+      "tenantContext": true
+    },
+    "POST /api/:slug/gift/:code": {
+      "approval": false,
+      "auth": "public",
+      "branchContext": false,
+      "errors": [
+        "VALIDATION_FAILED",
+        "RESOURCE_NOT_FOUND",
+        "RATE_LIMITED"
+      ],
+      "idempotent": false,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "GiftRedeemRequest",
+      "response": null,
+      "tenantContext": true
+    },
+    "POST /api/auth/local/forgot-password": {
+      "approval": false,
+      "auth": "public",
+      "branchContext": false,
+      "errors": [
+        "VALIDATION_FAILED",
+        "RATE_LIMITED"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "ForgotPasswordRequest",
+      "response": "OkResponse",
+      "tenantContext": false
+    },
+    "POST /api/auth/local/login": {
+      "approval": false,
+      "auth": "public",
+      "branchContext": false,
+      "errors": [
+        "VALIDATION_FAILED",
+        "AUTHENTICATION_REQUIRED",
+        "RATE_LIMITED"
+      ],
+      "idempotent": false,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "LoginRequest",
+      "response": "SessionResponse",
+      "tenantContext": false
+    },
+    "POST /api/auth/local/logout": {
+      "approval": false,
+      "auth": "session",
+      "branchContext": false,
+      "errors": [],
+      "idempotent": true,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": null,
+      "response": "OkResponse",
+      "tenantContext": false
+    },
+    "POST /api/auth/local/refresh": {
+      "approval": false,
+      "auth": "refresh-cookie",
+      "branchContext": false,
+      "errors": [
+        "AUTHENTICATION_REQUIRED",
+        "RATE_LIMITED"
+      ],
+      "idempotent": false,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": null,
+      "response": "SessionResponse",
+      "tenantContext": false
+    },
+    "POST /api/auth/local/reset-password": {
+      "approval": false,
+      "auth": "public",
+      "branchContext": false,
+      "errors": [
+        "VALIDATION_FAILED",
+        "AUTHENTICATION_REQUIRED",
+        "RATE_LIMITED"
+      ],
+      "idempotent": false,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "ResetPasswordRequest",
+      "response": "OkResponse",
+      "tenantContext": false
+    }
+  },
+  "security": {
+    "branchContextValidatedByApi": true,
+    "internalIdsExposed": false,
+    "serviceRoleExposed": false,
+    "tenantContextRequiredForTenantRoutes": true
+  }
+}

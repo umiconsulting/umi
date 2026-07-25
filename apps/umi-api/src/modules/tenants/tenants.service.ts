@@ -1,11 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { TenantSummary } from '@umi/contract';
 import type { TenantAccess } from '../auth/auth.types';
 import {
   TenantsRepository,
   type LocationRow,
   type LocationProfileRow,
   type ProductInstance,
-  type TenantSummary,
 } from './tenants.repository';
 import { buildModuleAvailability, type ModuleAvailability } from './module-registry';
 

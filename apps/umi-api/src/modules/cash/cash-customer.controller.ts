@@ -14,6 +14,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { GiftRedeemRequest, RegisterMemberRequest } from '@umi/contract';
+import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { PublicTenantGuard } from '../auth/public-tenant.guard';
 import { PubTenant } from '../auth/current-user.decorator';
 import type { PublicTenant } from '../auth/public-tenant.guard';
@@ -21,7 +23,6 @@ import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 import { CashRegisterService } from './cash-register.service';
 import { CashWriteService } from './cash-write.service';
 import { CashWriteRepository } from './cash-write.repository';
-import { GiftRedeemDto, RegisterDto } from './dto/register.dto';
 
 const WINDOW = 15 * 60 * 1000; // 15 min, all gift limits
 
@@ -46,7 +47,7 @@ export class CashCustomerController {
   @HttpCode(201)
   registerCustomer(
     @PubTenant() t: PublicTenant,
-    @Body() dto: RegisterDto,
+    @Body(new ZodValidationPipe(RegisterMemberRequest)) dto: RegisterMemberRequest,
     @Headers('user-agent') ua?: string,
   ) {
     return this.register.register(t.tenantId, t.name, dto, ua ?? null);
@@ -72,7 +73,7 @@ export class CashCustomerController {
   async giftRedeem(
     @PubTenant() t: PublicTenant,
     @Param('code') code: string,
-    @Body() dto: GiftRedeemDto,
+    @Body(new ZodValidationPipe(GiftRedeemRequest)) dto: GiftRedeemRequest,
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
