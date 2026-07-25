@@ -8,7 +8,7 @@ import { PgService } from '../../shared/database/pg.service';
  *   loyalty.cards          → tenant.loyalty_card           (customer_id — no account layer)
  *   core.people            → tenant.customer       (name; phone via contact_identity)
  *   loyalty.visit_events   → tenant.loyalty_visit          (card_id, occurred_at)
- *   loyalty.birthday_rewards → tenant.birthday_reward (card_id, status 'active')
+ *   loyalty.birthday_rewards → tenant.loyalty_birthday_grant (card_id, status 'active')
  *   core.tenants           → tenant.business         (status 'active')
  *   loyalty.programs       → tenant.loyalty_program (branding.lifecycle_copy)
  *   loyalty.reward_configs → tenant.loyalty_reward    (is_active, latest activated_at)
@@ -131,7 +131,7 @@ export class LifecycleRepository {
     }>(
       `SELECT c.id::text AS card_id, pe.name AS name, ph.phone AS phone,
               ${VISITS_THIS_CYCLE} AS visits_this_cycle, br.year, br.expires_at
-         FROM tenant.birthday_reward br
+         FROM tenant.loyalty_birthday_grant br
          JOIN tenant.loyalty_card c ON c.business_id = br.business_id AND c.id = br.card_id ${CARD_PERSON_JOIN}
         WHERE br.business_id = $1::uuid
           AND br.status = 'active'

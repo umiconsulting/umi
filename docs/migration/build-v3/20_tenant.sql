@@ -348,6 +348,30 @@ create table tenant.loyalty_redemption (
 comment on table tenant.loyalty_redemption is
   'A reward was consumed (the event). Birthday once-per-year is enforced by the app/a partial unique.';
 
+-- A per-card BIRTHDAY entitlement, distinct from loyalty_reward (the rule) and from
+-- loyalty_redemption (the stamp-claim event): it has a PENDING state (issued, unclaimed,
+-- with an expiry window) that an event cannot hold. The scan checks for an active grant
+-- (a cheap card_id lookup — it never reads the birthday), the lifecycle journey reminds
+-- on grants about to expire, and a claim flips status -> 'redeemed'. Deliberately NOT a
+-- loyalty_redemption row: birthday claims would corrupt the stamp-reward count (pending =
+-- floor(visits/n) - COUNT(redemption)). ISSUANCE (reading the birthday, once/day) is the
+-- legacy umi-cash wallet-push cron, not yet ported — this table is only read/redeemed here.
+create table tenant.loyalty_birthday_grant (
+  id          uuid primary key default gen_random_uuid(),
+  business_id uuid not null references tenant.business(id) on delete cascade,
+  card_id     uuid not null references tenant.loyalty_card(id) on delete cascade,
+  year        integer not null,          -- the birthday year this grant is for
+  status      text not null default 'active' check (status in ('active','redeemed','expired')),
+  issued_at   timestamptz not null default now(),
+  expires_at  timestamptz not null,
+  redeemed_at timestamptz,
+  created_at  timestamptz not null default now(),
+  unique (business_id, card_id, year)     -- one birthday grant per card per year
+);
+create index loyalty_birthday_grant_active_idx
+  on tenant.loyalty_birthday_grant (business_id, card_id)
+  where status = 'active';
+
 create table tenant.loyalty_gift_card (
   id           uuid primary key default gen_random_uuid(),
   business_id  uuid not null references tenant.business(id) on delete cascade,

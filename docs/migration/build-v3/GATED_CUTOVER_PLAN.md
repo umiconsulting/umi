@@ -61,7 +61,7 @@ Two consequences shape this roadmap:
 
 | Instrument                         | What it proves                                                                                      | Command                                                                                                | Current                          |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------- |
-| **`sql-preflight.integration.ts`** | Every backend SQL statement resolves against live build-v3 (schema validity)                        | `cd apps/umi-api && npm run test:integration`                                                          | **83 unresolved** (as of PR #66) |
+| **`sql-preflight.integration.ts`** | Every backend SQL statement resolves against live build-v3 (schema validity)                        | `cd apps/umi-api && npm run test:integration`                                                          | **81 unresolved** (as of PR #67) |
 | **`security_gate.sql`**            | RLS+FORCE, least-privilege grants, credential lockdown, data hygiene (24 structural + 3 behavioral) | `PGPORT=5233 psql -v ON_ERROR_STOP=1 -d umi_backfill_v3 -f security_gate.sql` → `SECURITY GATE PASSED` | **PASS**                         |
 | **`reconcile_v3.sql`**             | Backfill fidelity — counts + money invariants + **per-order / per-item** field-level equality       | `PGPORT=5233 psql -v ON_ERROR_STOP=1 -d umi_backfill_v3 -f backfill/reconcile_v3.sql`                  | **PASS**                         |
 
@@ -207,13 +207,14 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
   track (catalog + `tquery` + the bot checkout) → **#63** P4 KDS (the board-killer, stations, the
   line-change signal, exactly-once) → **#64** platform-architecture presentation → **#65** KDS auth
   substrate (`runtime.session` polymorphic, `runtime.pairing` lifecycle, `runtime.device_session` dropped).
-- **In flight:** `feat/p4-cash` — the umi-cash loyalty convergence, in groups: (1) the loyalty
-  vocabulary renames (`loyalty_settings`/`reward_rule` → build-v3), (2) the card scan/pass layer
-  (`loyalty_card` gains `qr_token`/`lifecycle_message`; incumbent scan secrets carried), (3) the
-  `loyalty_program` branding layer as typed columns + `lifecycle_copy` jsonb + the partial/clear write.
-  Deferred by decision: gift-card gifting model, the birthday remap onto `loyalty_redemption`,
-  `open_hours` (hours track), the branding read (P5 slug).
-- **Preflight:** **83** unresolved · **0** `42883`. Measured against `umi_backfill_v3` rebuilt with the
+- **In flight:** `feat/p4-cash-birthday` — the per-card birthday grant. `tenant.loyalty_birthday_grant`
+  (a PENDING entitlement an event can't hold — grant, not `loyalty_redemption`); the scan checks a cheap
+  `card_id` lookup, never the birthday. Prior cash work (merged #66): (1) loyalty vocabulary renames,
+  (2) the card scan/pass layer (`qr_token`/`lifecycle_message`; incumbent scan secrets carried), (3) the
+  `loyalty_program` branding layer (typed columns + `lifecycle_copy` jsonb + the partial/clear write).
+  Deferred by decision: gift-card gifting model, `open_hours` (hours track), the branding read (P5 slug),
+  and the birthday ISSUANCE cron (a wallet-push journey still in legacy umi-cash, not yet ported).
+- **Preflight:** **81** unresolved · **0** `42883`. Measured against `umi_backfill_v3` rebuilt with the
   device- and loyalty-cluster deltas.
   ⚠️ **The earlier jump 140 → 171 was the gate no longer under-reporting, not a regression** — the 46
   interpolated statements were counted but unlooked-at, and `products.repository.ts` was failing every
@@ -267,7 +268,7 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
   sequence engine is dormant behind `LEADS_SEQUENCE_ENABLED` — but it is unowned and invisible, because
   `lint` is the only gate covering that package. Fix or delete the test before the leads cutover.
 
-### The 83 remaining, BY FILE (the real worklist)
+### The 81 remaining, BY FILE (the real worklist)
 
 This replaces the by-error-code table, which was built from the capped detail report and
 therefore under-counted. `npm run test:integration` now prints this rollup untruncated.
@@ -280,16 +281,17 @@ therefore under-counted. `npm run test:integration` now prints this rollup untru
 | `cash/cash-write.repository.ts`                    |          6 | gift-card gifting (deferred)       |
 | `conversation-turns` · `memory` · `tenants`        |     5 each | pipeline / P5                      |
 | `jobs/queue.repository.ts` · `hours` · `lifecycle` |     4 each | outbox tail / P4 hours / lifecycle |
-| `cash/cash-scan.repository.ts`                     |          3 | birthday (2) + open_hours (hours)  |
 | `messages` · `ordering-settings` · `staff`         |     3 each | pipeline / hours                   |
 | `cash/cash.repository.ts`                          |          2 | branding read (P5 slug) + gift     |
 | `auth` · `turn-commit` · `voice-settings`          |     2 each | P5 slug / pipeline                 |
+| `cash/cash-scan.repository.ts`                     |          1 | `open_hours` (hours track)         |
 | `business-config`                                  |          1 | —                                  |
 
 **`kds/kds.repository.ts` (whole KDS) and `cash-register` are absent from the rollup.** The KDS
 read/write half (#63) + auth half (#65) retired all 40; the cash vocabulary + card + branding groups
-(`feat/p4-cash`) took cash **34 → 11**, all 11 remaining deferred by decision (gift cards, birthday
-remap, `open_hours`, P5 slug). **`42883` remains 0** (`umi.e164` resolved the normalize functions).
+(#66) + the birthday grant (`feat/p4-cash-birthday`) took cash **34 → 9**, all 9 remaining deferred by
+decision (gift cards, `open_hours`, P5 slug — the birthday ISSUANCE cron is un-ported, tracked
+separately). **`42883` remains 0** (`umi.e164` resolved the normalize functions).
 
 > ### ✅ RESOLVED: the KDS auth substrate was three thin tables, not a rename
 >

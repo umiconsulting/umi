@@ -121,6 +121,24 @@ select
 from loyalty.reward_redemptions r
 join loyalty.reward_configs rc on rc.id = r.reward_config_id;   -- reward_config_id NOT NULL, 23/23 resolve
 
+-- birthday_rewards → tenant.loyalty_birthday_grant (per-card birthday entitlement).
+--   loyalty_card_id → card_id, tenant_id → business_id, year/issued_at/expires_at/redeemed_at carried.
+--   status defensively mapped onto ('active','redeemed','expired'). ISSUANCE (the cron that
+--   reads the birthday) is NOT ported — it stays in legacy umi-cash; this only carries grants.
+insert into tenant.loyalty_birthday_grant
+  (id, business_id, card_id, year, status, issued_at, expires_at, redeemed_at, created_at)
+select
+  b.id,
+  b.tenant_id                                  as business_id,
+  b.loyalty_card_id                            as card_id,
+  b.year,
+  case b.status when 'redeemed' then 'redeemed' when 'active' then 'active' else 'expired' end as status,
+  b.issued_at,
+  b.expires_at,
+  b.redeemed_at,
+  b.created_at
+from loyalty.birthday_rewards b;
+
 -- ----------------------------------------------------------------------------
 -- 4. gift_cards → tenant.loyalty_gift_card   (PRESERVE id; ledger FKs to it)
 --    status: derived (redeemed_at null → 'active', else 'redeemed').
