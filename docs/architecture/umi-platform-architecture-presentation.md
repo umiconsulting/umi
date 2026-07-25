@@ -85,18 +85,18 @@ They consume one API and one data model. The POS and KDS also have a local resil
 
 ## 2. Product ownership
 
-| Product or package | Owns | Does not own | Main communication |
-| --- | --- | --- | --- |
-| `apps/umi-api` | Business rules, writes, authorization, queues, adapters, and projections | Product UI and device hardware | HTTPS, PostgreSQL, BullMQ, provider APIs |
-| `apps/umi-dashboard` | Owner and manager workflows | Business data or financial rules | Cookie-authenticated API calls |
-| Umi Cash experience | Customer registration, QR, loyalty display, and wallet delivery | Loyalty balance truth or ledger rules | Public and authenticated API calls |
-| `apps/umi-landing-page` | Marketing, lead capture, and diagnostics | Prospect storage and email workflow state | Public API calls |
-| `apps/umi-pos` | Terminal UI, hardware ports, encrypted local state, and offline journal | Authoritative prices, money, orders, or loyalty | Versioned API and paired-KDS LAN |
-| `apps/umi-kds` | Kitchen board, ticket actions, and local ticket journal | Order truth, payment truth, or customer messaging | Versioned API, event cursor, and POS LAN |
-| Operations UI | Trace search, health, incidents, and reconciliation | Business facts | OpenTelemetry, Sentry, and read-only diagnostics |
-| `packages/contract` | Routes, payload schemas, errors, versions, and product keys | Business logic | TypeScript package and neutral JSON artifact |
-| `packages/tokens` | Shared brand primitives and generated app tokens | Product layout decisions | Generated CSS, JavaScript, and JSON |
-| root `supabase/` | Ordered database migrations | Runtime business logic | Supabase CLI and PostgreSQL |
+| Product or package      | Owns                                                                     | Does not own                                      | Main communication                               |
+| ----------------------- | ------------------------------------------------------------------------ | ------------------------------------------------- | ------------------------------------------------ |
+| `apps/umi-api`          | Business rules, writes, authorization, queues, adapters, and projections | Product UI and device hardware                    | HTTPS, PostgreSQL, BullMQ, provider APIs         |
+| `apps/umi-dashboard`    | Owner and manager workflows                                              | Business data or financial rules                  | Cookie-authenticated API calls                   |
+| Umi Cash experience     | Customer registration, QR, loyalty display, and wallet delivery          | Loyalty balance truth or ledger rules             | Public and authenticated API calls               |
+| `apps/umi-landing-page` | Marketing, lead capture, and diagnostics                                 | Prospect storage and email workflow state         | Public API calls                                 |
+| `apps/umi-pos`          | Terminal UI, hardware ports, encrypted local state, and offline journal  | Authoritative prices, money, orders, or loyalty   | Versioned API and paired-KDS LAN                 |
+| `apps/umi-kds`          | Kitchen board, ticket actions, and local ticket journal                  | Order truth, payment truth, or customer messaging | Versioned API, event cursor, and POS LAN         |
+| Operations UI           | Trace search, health, incidents, and reconciliation                      | Business facts                                    | OpenTelemetry, Sentry, and read-only diagnostics |
+| `packages/contract`     | Routes, payload schemas, errors, versions, and product keys              | Business logic                                    | TypeScript package and neutral JSON artifact     |
+| `packages/tokens`       | Shared brand primitives and generated app tokens                         | Product layout decisions                          | Generated CSS, JavaScript, and JSON              |
+| root `supabase/`        | Ordered database migrations                                              | Runtime business logic                            | Supabase CLI and PostgreSQL                      |
 
 The Umi Cash capability can change its repository shape. Its business owner stays `umi-api`.
 The public wallet URL must remain stable because printed QR codes depend on it.
@@ -236,14 +236,14 @@ flowchart TB
 
 ### Domain modules
 
-| Module group | Modules | Purpose |
-| --- | --- | --- |
-| Platform access | `auth`, `identity`, `tenants`, `staff` | Login, role grants, business scope, and staff employment |
-| Customer platform | `customers`, `cash`, `lifecycle` | Customer 360, loyalty, stored value, rewards, and lifecycle messages |
-| Conversation | `conversations`, `voice`, `hours` | WhatsApp ingress, AI turns, tools, voice, and availability |
-| Operations | `kds`, `pos`, `leads` | Kitchen, point of sale, prospects, and lead workflows |
-| Async work | `turns`, `enrichment`, `outbound`, `integrations`, `lifecycle` | Queue consumers, schedules, retries, and provider delivery |
-| Shared infrastructure | `database`, `adapters`, `auth`, `config`, `logging`, `ratelimit` | One implementation for each cross-cutting concern |
+| Module group          | Modules                                                          | Purpose                                                              |
+| --------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Platform access       | `auth`, `identity`, `tenants`, `staff`                           | Login, role grants, business scope, and staff employment             |
+| Customer platform     | `customers`, `cash`, `lifecycle`                                 | Customer 360, loyalty, stored value, rewards, and lifecycle messages |
+| Conversation          | `conversations`, `voice`, `hours`                                | WhatsApp ingress, AI turns, tools, voice, and availability           |
+| Operations            | `kds`, `pos`, `leads`                                            | Kitchen, point of sale, prospects, and lead workflows                |
+| Async work            | `turns`, `enrichment`, `outbound`, `integrations`, `lifecycle`   | Queue consumers, schedules, retries, and provider delivery           |
+| Shared infrastructure | `database`, `adapters`, `auth`, `config`, `logging`, `ratelimit` | One implementation for each cross-cutting concern                    |
 
 ### Layer rule
 
@@ -319,12 +319,12 @@ flowchart LR
 
 ### Schema meaning
 
-| Schema | Question it answers | Access rule |
-| --- | --- | --- |
-| `umi` | What does Umi know and grant? | Umi controls writes. Selected business rows use RLS. |
-| `tenant` | What happened inside a café? | Every business fact uses business scope and RLS. |
-| `runtime` | What must the machine read to continue? | The backend and worker control access. |
-| `extensions` | Which PostgreSQL capabilities support the model? | Application roles receive usage only. |
+| Schema       | Question it answers                              | Access rule                                          |
+| ------------ | ------------------------------------------------ | ---------------------------------------------------- |
+| `umi`        | What does Umi know and grant?                    | Umi controls writes. Selected business rows use RLS. |
+| `tenant`     | What happened inside a café?                     | Every business fact uses business scope and RLS.     |
+| `runtime`    | What must the machine read to continue?          | The backend and worker control access.               |
+| `extensions` | Which PostgreSQL capabilities support the model? | Application roles receive usage only.                |
 
 Telemetry does not belong in these schemas. OpenTelemetry and Sentry receive operational signals.
 
@@ -388,28 +388,28 @@ No developer writes a parallel Dart model. Generated output stays immutable and 
 
 The token package centralizes stable brand values. It keeps product-specific typography and surfaces separate.
 
-| Output | Consumer | Purpose |
-| --- | --- | --- |
-| `dashboard.css` | Dashboard | CSS custom properties |
-| `landing.cjs` and `landing.mjs` | Landing | Tailwind theme input |
-| `tokens.json` | Tooling and future clients | Resolved neutral values |
+| Output                          | Consumer                   | Purpose                 |
+| ------------------------------- | -------------------------- | ----------------------- |
+| `dashboard.css`                 | Dashboard                  | CSS custom properties   |
+| `landing.cjs` and `landing.mjs` | Landing                    | Tailwind theme input    |
+| `tokens.json`                   | Tooling and future clients | Resolved neutral values |
 
 The package shares real brand facts only. It does not force all products to look identical.
 
 ## 8. Business channels
 
-| Channel | User intent | Trust proof | Durable entry | Main result |
-| --- | --- | --- | --- | --- |
-| WhatsApp | Ask, order, or receive status | Twilio signature and sender resolution | `runtime.inbound_event` | Conversation, order, or outbound reply |
-| Dashboard | Configure and inspect the business | User cookie, role, business scope, entitlement | API transaction | Config, audit fact, or report |
-| Landing | Submit interest or a diagnostic | Public validation and abuse controls | `umi.prospect` and `prospect_event` | Sales follow-up |
-| Wallet | Register, scan, top up, redeem, or receive a pass | Customer flow or staff authorization | Loyalty facts and ledgers | Updated loyalty state |
-| POS | Sell, tender, refund, or manage a shift | Device proof, operator session, role, branch, entitlement | Idempotent POS command | Atomic sale and receipt |
-| KDS | Read and advance kitchen work | Enrolled device and station scope | Ordered event command | Fulfillment change and notification |
-| POS ↔ KDS LAN | Continue kitchen work offline | Branch certificate, mTLS, signature, sequence | Local durable journals | Ticket delivery and signed ACK |
-| Email | Send lead, reset, or lifecycle messages | Server-held provider credentials | Outbox or scheduled job | Provider delivery result |
-| Wallet provider | Create and update passes | Server-held signing material | Wallet pass and device state | Apple or Google pass update |
-| Telemetry | Explain behavior and failures | Service identity and redaction | OTel/Sentry event | Trace, metric, log, or alert |
+| Channel         | User intent                                       | Trust proof                                               | Durable entry                       | Main result                            |
+| --------------- | ------------------------------------------------- | --------------------------------------------------------- | ----------------------------------- | -------------------------------------- |
+| WhatsApp        | Ask, order, or receive status                     | Twilio signature and sender resolution                    | `runtime.inbound_event`             | Conversation, order, or outbound reply |
+| Dashboard       | Configure and inspect the business                | User cookie, role, business scope, entitlement            | API transaction                     | Config, audit fact, or report          |
+| Landing         | Submit interest or a diagnostic                   | Public validation and abuse controls                      | `umi.prospect` and `prospect_event` | Sales follow-up                        |
+| Wallet          | Register, scan, top up, redeem, or receive a pass | Customer flow or staff authorization                      | Loyalty facts and ledgers           | Updated loyalty state                  |
+| POS             | Sell, tender, refund, or manage a shift           | Device proof, operator session, role, branch, entitlement | Idempotent POS command              | Atomic sale and receipt                |
+| KDS             | Read and advance kitchen work                     | Enrolled device and station scope                         | Ordered event command               | Fulfillment change and notification    |
+| POS ↔ KDS LAN   | Continue kitchen work offline                     | Branch certificate, mTLS, signature, sequence             | Local durable journals              | Ticket delivery and signed ACK         |
+| Email           | Send lead, reset, or lifecycle messages           | Server-held provider credentials                          | Outbox or scheduled job             | Provider delivery result               |
+| Wallet provider | Create and update passes                          | Server-held signing material                              | Wallet pass and device state        | Apple or Google pass update            |
+| Telemetry       | Explain behavior and failures                     | Service identity and redaction                            | OTel/Sentry event                   | Trace, metric, log, or alert           |
 
 ### Catalog and menu flow
 
@@ -563,13 +563,13 @@ stateDiagram-v2
 
 ### Ticket and money are separate views
 
-| Question | Source |
-| --- | --- |
-| What must the kitchen prepare? | `tenant.order_ticket` |
-| What do the current live lines cost? | `tenant.order_total` |
-| What did the customer pay? | `tenant.payment` |
-| What money returned later? | `tenant.refund` |
-| What appears on the receipt? | Immutable receipt snapshot linked to payment |
+| Question                             | Source                                       |
+| ------------------------------------ | -------------------------------------------- |
+| What must the kitchen prepare?       | `tenant.order_ticket`                        |
+| What do the current live lines cost? | `tenant.order_total`                         |
+| What did the customer pay?           | `tenant.payment`                             |
+| What money returned later?           | `tenant.refund`                              |
+| What appears on the receipt?         | Immutable receipt snapshot linked to payment |
 
 This split prevents a later line void from rewriting historical revenue.
 
@@ -714,14 +714,14 @@ flowchart TB
 
 ### Trust by surface
 
-| Surface | Proof | Scope |
-| --- | --- | --- |
-| Dashboard | Rotating httpOnly session cookies and CSRF protection | User roles and business |
-| POS | Device signature plus short operator session | One device, business, branch, and shift |
-| KDS | Enrolled device proof and paired station | One device, business, branch, and station |
-| WhatsApp | Twilio signature and sender account | Resolved business and customer channel |
-| Worker | Trusted worker role | Explicit cross-business job scope |
-| Read-only tools | Restricted diagnostic role | Non-secret reporting data |
+| Surface         | Proof                                                 | Scope                                     |
+| --------------- | ----------------------------------------------------- | ----------------------------------------- |
+| Dashboard       | Rotating httpOnly session cookies and CSRF protection | User roles and business                   |
+| POS             | Device signature plus short operator session          | One device, business, branch, and shift   |
+| KDS             | Enrolled device proof and paired station              | One device, business, branch, and station |
+| WhatsApp        | Twilio signature and sender account                   | Resolved business and customer channel    |
+| Worker          | Trusted worker role                                   | Explicit cross-business job scope         |
+| Read-only tools | Restricted diagnostic role                            | Non-secret reporting data                 |
 
 No client receives database credentials. A device revocation fails the next online command.
 
@@ -729,59 +729,59 @@ No client receives database credentials. A device revocation fails the next onli
 
 ### Backend and data
 
-| Library or service | Job | Why Umi uses it |
-| --- | --- | --- |
-| Node.js | Backend runtime | It supports the TypeScript service, workers, and shared package tools. |
-| NestJS | Module, dependency, guard, and lifecycle structure | It gives each business domain an explicit module boundary. |
-| Fastify | HTTP transport | It provides a small, fast server and exact webhook body control. |
-| `@fastify/cookie` | Cookie parsing and response helpers | Dashboard sessions use signed httpOnly cookies. |
-| BullMQ | Queue workers, retries, priorities, and schedules | Slow work cannot block inbound HTTP requests. |
-| Redis | BullMQ execution state | It provides fast queue coordination and worker locks. |
-| `pg` | PostgreSQL pools and parameterized SQL | Repositories keep SQL explicit and preserve PostgreSQL features. |
-| PostgreSQL | Transactions, constraints, views, RLS, and ledgers | The database enforces core platform invariants. |
-| Supabase | Managed PostgreSQL host, migration tooling, backup, and recovery | It keeps PostgreSQL canonical while Umi owns the API. |
-| pgvector | Vector search | It stores product, message, and knowledge embeddings in `runtime`. |
-| Zod | Contract schemas and type inference | One definition validates data and generates client types. |
-| `class-validator` and `class-transformer` | Nest request DTO validation | They protect the HTTP boundary while contract adapters remain explicit. |
-| `jose` | JWT and JOSE primitives | It supports secure web sessions and signed token work. |
+| Library or service                        | Job                                                              | Why Umi uses it                                                         |
+| ----------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Node.js                                   | Backend runtime                                                  | It supports the TypeScript service, workers, and shared package tools.  |
+| NestJS                                    | Module, dependency, guard, and lifecycle structure               | It gives each business domain an explicit module boundary.              |
+| Fastify                                   | HTTP transport                                                   | It provides a small, fast server and exact webhook body control.        |
+| `@fastify/cookie`                         | Cookie parsing and response helpers                              | Dashboard sessions use signed httpOnly cookies.                         |
+| BullMQ                                    | Queue workers, retries, priorities, and schedules                | Slow work cannot block inbound HTTP requests.                           |
+| Redis                                     | BullMQ execution state                                           | It provides fast queue coordination and worker locks.                   |
+| `pg`                                      | PostgreSQL pools and parameterized SQL                           | Repositories keep SQL explicit and preserve PostgreSQL features.        |
+| PostgreSQL                                | Transactions, constraints, views, RLS, and ledgers               | The database enforces core platform invariants.                         |
+| Supabase                                  | Managed PostgreSQL host, migration tooling, backup, and recovery | It keeps PostgreSQL canonical while Umi owns the API.                   |
+| pgvector                                  | Vector search                                                    | It stores product, message, and knowledge embeddings in `runtime`.      |
+| Zod                                       | Contract schemas and type inference                              | One definition validates data and generates client types.               |
+| `class-validator` and `class-transformer` | Nest request DTO validation                                      | They protect the HTTP boundary while contract adapters remain explicit. |
+| `jose`                                    | JWT and JOSE primitives                                          | It supports secure web sessions and signed token work.                  |
 
 ### Product clients
 
-| Library or service | Job | Why Umi uses it |
-| --- | --- | --- |
-| React | Dashboard, landing, and wallet UI | It provides component-based web product surfaces. |
-| Vite | Dashboard build and development server | It gives the SPA a fast and direct build path. |
-| React Router | Dashboard navigation | It maps product modules to clear routes. |
-| Next.js | Landing and public wallet routes | It combines public pages with server routes where required. |
-| Flutter | POS and KDS clients | It supports Android terminals and the iPad KDS from one client stack. |
-| SQLCipher | Encrypted device database | POS recovery data stays encrypted at rest. |
-| Android Keystore and Apple Keychain | Non-exportable keys | A copied file cannot copy the device identity. |
-| PassKit and Google Wallet APIs | Loyalty passes | Umi can issue and update platform-native wallet passes. |
-| QR libraries | Customer and loyalty lookup | A scan resolves a Umi customer or card without manual search. |
+| Library or service                  | Job                                    | Why Umi uses it                                                       |
+| ----------------------------------- | -------------------------------------- | --------------------------------------------------------------------- |
+| React                               | Dashboard, landing, and wallet UI      | It provides component-based web product surfaces.                     |
+| Vite                                | Dashboard build and development server | It gives the SPA a fast and direct build path.                        |
+| React Router                        | Dashboard navigation                   | It maps product modules to clear routes.                              |
+| Next.js                             | Landing and public wallet routes       | It combines public pages with server routes where required.           |
+| Flutter                             | POS and KDS clients                    | It supports Android terminals and the iPad KDS from one client stack. |
+| SQLCipher                           | Encrypted device database              | POS recovery data stays encrypted at rest.                            |
+| Android Keystore and Apple Keychain | Non-exportable keys                    | A copied file cannot copy the device identity.                        |
+| PassKit and Google Wallet APIs      | Loyalty passes                         | Umi can issue and update platform-native wallet passes.               |
+| QR libraries                        | Customer and loyalty lookup            | A scan resolves a Umi customer or card without manual search.         |
 
 ### Channels and operations
 
-| Library or service | Job | Why Umi uses it |
-| --- | --- | --- |
-| Twilio | WhatsApp ingress and delivery | It connects the customer conversation channel to the API. |
-| Anthropic SDK | Model calls and tool selection | It powers the conversational order assistant. |
-| Voyage AI | Embeddings | It supports semantic product, memory, and knowledge retrieval. |
-| Nodemailer | SMTP email | One adapter sends reset, lead, and lifecycle email. |
-| Zettle adapter | Catalog integration | It imports an external menu source when a business selects it. |
-| OpenTelemetry | Traces, metrics, and logs | It keeps telemetry outside the business database. |
-| Sentry | Client and service failures | It adds crash context and release correlation. |
-| Docker Compose | Runtime packaging | One image runs the web and worker commands. |
-| Caddy | TLS and reverse proxy | It terminates public HTTPS for the API. |
+| Library or service | Job                            | Why Umi uses it                                                |
+| ------------------ | ------------------------------ | -------------------------------------------------------------- |
+| Twilio             | WhatsApp ingress and delivery  | It connects the customer conversation channel to the API.      |
+| Anthropic SDK      | Model calls and tool selection | It powers the conversational order assistant.                  |
+| Voyage AI          | Embeddings                     | It supports semantic product, memory, and knowledge retrieval. |
+| Nodemailer         | SMTP email                     | One adapter sends reset, lead, and lifecycle email.            |
+| Zettle adapter     | Catalog integration            | It imports an external menu source when a business selects it. |
+| OpenTelemetry      | Traces, metrics, and logs      | It keeps telemetry outside the business database.              |
+| Sentry             | Client and service failures    | It adds crash context and release correlation.                 |
+| Docker Compose     | Runtime packaging              | One image runs the web and worker commands.                    |
+| Caddy              | TLS and reverse proxy          | It terminates public HTTPS for the API.                        |
 
 ### Workspace and quality
 
-| Tool | Job | Why Umi uses it |
-| --- | --- | --- |
-| pnpm | Workspace dependency management | It links shared packages with one lockfile. |
-| Turborepo | Task graph and cache | It orders package builds and runs checks across apps. |
-| tsup | Contract package build | It emits ESM, CommonJS, and type declarations. |
-| Vitest and Jest | Unit and integration tests | They verify services, contracts, and web behavior. |
-| Swift test fixtures | KDS behavior reference | They preserve the kitchen contract during the Flutter implementation. |
+| Tool                | Job                             | Why Umi uses it                                                       |
+| ------------------- | ------------------------------- | --------------------------------------------------------------------- |
+| pnpm                | Workspace dependency management | It links shared packages with one lockfile.                           |
+| Turborepo           | Task graph and cache            | It orders package builds and runs checks across apps.                 |
+| tsup                | Contract package build          | It emits ESM, CommonJS, and type declarations.                        |
+| Vitest and Jest     | Unit and integration tests      | They verify services, contracts, and web behavior.                    |
+| Swift test fixtures | KDS behavior reference          | They preserve the kitchen contract during the Flutter implementation. |
 
 The dependency principle is narrow. One library has one main job.
 Umi avoids a second framework for a problem that the existing stack already solves.
