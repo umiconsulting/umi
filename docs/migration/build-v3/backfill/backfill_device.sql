@@ -9,9 +9,11 @@
 --
 -- PREREQUISITE (out of scope of this file, MUST run first):
 --   tenant.branch <- core.locations  (ID-PRESERVING, like tenant.business<-core.tenants).
---   tenant.station.branch_id is NOT NULL and tenant.device.branch_id references
---   tenant.branch, so location_id -> branch_id direct-copy requires branch rows
---   with the SAME uuid as core.locations.id. tenant.branch is currently EMPTY.
+--   tenant.station.branch_id and tenant.device.branch_id both reference tenant.branch,
+--   so location_id -> branch_id direct-copy requires branch rows with the SAME uuid as
+--   core.locations.id. tenant.branch is currently EMPTY. (station.branch_id is now
+--   NULLABLE — NULL means "every branch" — but the source row carries a location, so
+--   the prerequisite still stands for it.)
 --
 -- IDs are PRESERVED so FKs resolve (device.id -> tenant.device.id, referenced by
 -- runtime.device_session.device_id).
@@ -20,14 +22,24 @@
 
 -- ----------------------------------------------------------------------------
 -- 1) tenant.station  <-  kitchen.stations   (1 row, status='active')
---    DROP: station_key ('cafe', config key), status (no target col), sort_order,
---          metadata ({}), tenant_id (business reached via branch).
+--    station_key -> key, and status / sort_order / tenant_id are CARRIED. They were
+--    dropped here as "no target col", which was true and was the bug: the target
+--    columns were missing, and every one of them has a live consumer in
+--    kds.repository.ts (lookup by key, soft delete by status, board order by
+--    sort_order, and a tenant scope that no longer has to go through branch).
+--    DROP: metadata ({}) — an empty jsonb junk drawer the naming rules forbid.
 -- ----------------------------------------------------------------------------
-insert into tenant.station (id, branch_id, name, created_at)
+insert into tenant.station (id, business_id, branch_id, key, name, status, sort_order,
+                            created_at, updated_at)
 select s.id,
-       s.location_id            as branch_id,   -- requires tenant.branch(id=location_id)
+       s.tenant_id              as business_id,  -- business id preserved from core.tenants
+       s.location_id            as branch_id,    -- requires tenant.branch(id=location_id)
+       s.station_key            as key,
        s.name,
-       s.created_at
+       s.status,
+       s.sort_order,
+       s.created_at,
+       s.updated_at
 from kitchen.stations s;
 
 -- ----------------------------------------------------------------------------

@@ -371,15 +371,35 @@ traces are pruned on schedule, not on demand.
 
 ## 7. Naming Conventions
 
+> ⚠️ **This section describes the SUPERSEDED `core`/`ops`/`comms`/`loyalty` schema.**
+> build-v3 (`umi`/`tenant`/`runtime`) reverses two of these rules — see the note under
+> **Tables** and **Views**. It is left in place because it documents the schema the
+> migration reads FROM, not the one it writes to.
+
 - **Schemas**: singular, short, lowercase nouns. `core`, `ops`, `comms`, `loyalty`.
 - **Tables**: plural snake_case. `people`, `orders`, `loyalty_cards`.
+  - **build-v3 uses SINGULAR** — `customer`, `order_item`, `loyalty_card` — and is
+    consistent across all 65 tables. A table names the TYPE of one row, not the
+    collection. The practical reason is that English plurals are irregular and the
+    schema pays for it: `person`/`people`, `status`/`statuses`, `business`/`businesses`.
+    Singular also matches the FK rule below (`order_item.order_id` → `customer_order`),
+    where plural would mix the two forms in every join, and maps 1:1 to a generated
+    class name with no inflection library. Both conventions are defensible; mixing them
+    is what costs.
 - **Columns**: snake_case. `tenant_id`, `created_at`, `display_name`.
+  - **build-v3 uses `business_id`**, never `tenant_id` — name the concept, not the
+    multitenancy mechanism. (The 20-agent audit found 488 `tenant_id` references against
+    a schema with zero such columns; this rule is why.)
 - **PK**: `id uuid primary key default gen_random_uuid()`.
 - **Timestamps**: `created_at timestamptz`, `updated_at timestamptz`.
 - **Money**: `*_cents integer` (minor units). Never float.
 - **Status**: `text` with `CHECK` constraint. Not native enum.
 - **Foreign keys**: `<singular>_id`. `person_id`, `order_id`, `account_id`.
 - **Views**: `v_` prefix. `v_customer_360`, `v_kds_tickets`.
+  - **build-v3 drops the prefix**: `tenant.order_total`, `tenant.order_ticket`,
+    `tenant.kds_ticket`. A consumer should not have to care whether a projection is a
+    view or a table — that is the point of a projection — and the prefix leaks the
+    storage decision into every call site, making it expensive to change later.
 - **Functions**: `verb_noun`. `award_points`, `place_order`, `resolve_contact`.
 - **No**: CamelCase, product prefixes, soft-delete booleans, generic `transactions`.
 

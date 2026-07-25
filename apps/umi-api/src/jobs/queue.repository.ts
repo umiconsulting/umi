@@ -125,8 +125,8 @@ export class QueueRepository {
 
   /**
    * Atomically claim a batch of deliverable outbox rows, flipping them to
-   * 'delivering' and stamping `run_at = now()` as the lease start. Claims both
-   * fresh rows (`status='pending'`, `run_at<=now()`) AND stale leases
+   * 'delivering' and stamping `leased_at = now()`. Claims both fresh rows
+   * (`status='pending'`, `available_at<=now()`) AND stale leases
    * (`status='delivering'` older than `leaseSeconds`) — so a row left
    * 'delivering' by a crashed relay is reclaimed instead of stranded. FOR UPDATE
    * SKIP LOCKED makes it safe to run multiple relay workers concurrently.
@@ -135,33 +135,36 @@ export class QueueRepository {
     const res = await this.pg.query<{
       id: string;
       business_id: string;
-      event_type: string;
+      topic: string;
       aggregate_id: string | null;
       idempotency_key: string;
       payload: Record<string, unknown>;
       attempts: number;
       max_attempts: number;
     }>(
+      // `available_at` (do not deliver before) and `leased_at` (a relay holds it) are two
+      // columns now. They used to be one, so claiming a row overwrote its backoff with the
+      // lease start — the reclaim predicate below then read as if a lease were a schedule.
       `UPDATE runtime.outbox_event o
-          SET status = 'delivering', run_at = now()
+          SET status = 'delivering', leased_at = now()
         FROM (
           SELECT id FROM runtime.outbox_event
-           WHERE (status = 'pending' AND run_at <= now())
+           WHERE (status = 'pending' AND available_at <= now())
               OR (status = 'delivering'
-                  AND run_at < now() - make_interval(secs => $2))
+                  AND leased_at < now() - make_interval(secs => $2))
            ORDER BY created_at
            FOR UPDATE SKIP LOCKED
            LIMIT $1
         ) c
        WHERE o.id = c.id
-       RETURNING o.id, o.business_id, o.event_type, o.aggregate_id,
+       RETURNING o.id, o.business_id, o.topic, o.aggregate_id,
                  o.idempotency_key, o.payload, o.attempts, o.max_attempts`,
       [limit, leaseSeconds],
     );
     return res.rows.map((r) => ({
       id: r.id,
       tenantId: r.business_id,
-      eventType: r.event_type,
+      eventType: r.topic,
       aggregateId: r.aggregate_id,
       idempotencyKey: r.idempotency_key,
       payload: r.payload ?? {},
@@ -173,7 +176,7 @@ export class QueueRepository {
   async markOutboxDelivered(id: string): Promise<void> {
     await this.pg.query(
       `UPDATE runtime.outbox_event
-          SET status = 'delivered', published_at = now(), error = NULL
+          SET status = 'delivered', delivered_at = now(), leased_at = NULL, error = NULL
         WHERE id = $1`,
       [id],
     );
@@ -188,7 +191,8 @@ export class QueueRepository {
       `UPDATE runtime.outbox_event
           SET attempts = attempts + 1,
               status = CASE WHEN attempts + 1 >= max_attempts THEN 'dead' ELSE 'pending' END,
-              run_at = now() + (interval '5 seconds' * power(2, attempts)),
+              available_at = now() + (interval '5 seconds' * power(2, attempts)),
+              leased_at = NULL,
               error = $2
         WHERE id = $1`,
       [id, error],
@@ -198,13 +202,15 @@ export class QueueRepository {
   /**
    * No consumer is registered for this event_type yet — defer it WITHOUT
    * counting an attempt (a missing route is an infra gap, not a delivery
-   * failure, so it must never exhaust attempts → 'dead'). Pushes run_at forward
+   * failure, so it must never exhaust attempts → 'dead'). Pushes available_at forward
    * so the relay doesn't hot-loop.
    */
   async deferOutbox(id: string, deferSeconds: number): Promise<void> {
     await this.pg.query(
       `UPDATE runtime.outbox_event
-          SET status = 'pending', run_at = now() + make_interval(secs => $2)
+          SET status = 'pending',
+              available_at = now() + make_interval(secs => $2),
+              leased_at = NULL
         WHERE id = $1`,
       [id, deferSeconds],
     );

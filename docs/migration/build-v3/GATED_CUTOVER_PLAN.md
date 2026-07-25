@@ -61,7 +61,7 @@ Two consequences shape this roadmap:
 
 | Instrument                         | What it proves                                                                                      | Command                                                                                                | Current                            |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------- |
-| **`sql-preflight.integration.ts`** | Every backend SQL statement resolves against live build-v3 (schema validity)                        | `cd apps/umi-api && npm run test:integration`                                                          | **152 unresolved** (as of PR #61+) |
+| **`sql-preflight.integration.ts`** | Every backend SQL statement resolves against live build-v3 (schema validity)                        | `cd apps/umi-api && npm run test:integration`                                                          | **124 unresolved** (as of PR #62+) |
 | **`security_gate.sql`**            | RLS+FORCE, least-privilege grants, credential lockdown, data hygiene (24 structural + 3 behavioral) | `PGPORT=5233 psql -v ON_ERROR_STOP=1 -d umi_backfill_v3 -f security_gate.sql` → `SECURITY GATE PASSED` | **PASS**                           |
 | **`reconcile_v3.sql`**             | Backfill fidelity — counts + money invariants + **per-order / per-item** field-level equality       | `PGPORT=5233 psql -v ON_ERROR_STOP=1 -d umi_backfill_v3 -f backfill/reconcile_v3.sql`                  | **PASS**                           |
 
@@ -95,8 +95,9 @@ Legend: ✅ done · 🔄 in flight · ⏳ pending · ◑ partial
   immutability trigger), `order_total` / `order_ticket` views. See `ORDER_MODEL.md`.
 - ⏳ **DB functions** `tenant.normalize_phone` / `normalize_identity` (3 × `42883` today).
 - ⏳ **`tenant.contact` unique constraint** (resolver `ON CONFLICT` = `42P10`; 0 data violations).
-- ⏳ **`runtime.outbox_event` exactly-once columns** (`event_type`/`aggregate_id`/`idempotency_key` +
-  unique index — the rename dropped exactly-once delivery).
+- ✅ **`runtime.outbox_event` exactly-once RESTORED** — `business_id`/`topic`/`aggregate_id`/
+  `idempotency_key` + `UNIQUE (business_id, idempotency_key)`, and `available_at`/`leased_at`
+  split apart (one column was serving as both backoff and lease).
 - ⏳ **`runtime.conversation_turn` RESTORE** (5 live read paths; it is load-bearing, not telemetry).
 - ⏳ **customer-session home** (`runtime.session` has no place for a `tenant.customer`; `app` CHECK
   excludes `'cash'`).
@@ -205,7 +206,7 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
 - **In flight:** `chore/umi-api-lint` (PR #61, green) — type-aware lint for umi-api ·
   `feat/p4-order-repos` — P4 order track: DDL delta + catalog + `tquery` + the bot checkout landed,
   **KDS next**.
-- **Preflight:** **152** unresolved · 221 PREPAREd verbatim + **32 of 47 interpolated
+- **Preflight:** **124** unresolved · 221 PREPAREd verbatim + **32 of 47 interpolated
   RECONSTRUCTED** · **15** still uncovered (named in the coverage line) · **0** `42883`.
   Measured against `umi_backfill_v3_p4`, which carries the P4 DDL deltas.
   ⚠️ **The earlier jump 140 → 171 was not a regression — it was the gate no longer under-reporting.**
@@ -261,26 +262,26 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
   sequence engine is dormant behind `LEADS_SEQUENCE_ENABLED` — but it is unowned and invisible, because
   `lint` is the only gate covering that package. Fix or delete the test before the leads cutover.
 
-### The 152 remaining, BY FILE (the real worklist)
+### The 124 remaining, BY FILE (the real worklist)
 
 This replaces the by-error-code table, which was built from the capped detail report and
 therefore under-counted. `npm run test:integration` now prints this rollup untruncated.
 
-| File                                                            | Unresolved | Owning track                      |
-| --------------------------------------------------------------- | ---------: | --------------------------------- |
-| `kds/kds.repository.ts`                                         |     **40** | P4 order + `v_kds_tickets`        |
-| `cash/cash-write.repository.ts`                                 |         11 | cash columns                      |
-| `cash/cash.repository.ts`                                       |         11 | cash columns                      |
-| `conversations/conversations.repository.ts`                     |         10 | conversation pipeline             |
-| `leads/leads.repository.ts`                                     |     **10** | growth — previously invisible     |
-| `cash/cash-scan.repository.ts`                                  |          9 | birthday + hours                  |
-| `customers/customers.repository.ts`                             |          9 | Customer 360 (identity-entangled) |
-| `jobs/queue.repository.ts`                                      |          8 | outbox exactly-once (P1 DDL)      |
-| `conversation-turns` · `memory` · `tenants`                     |     5 each | pipeline / P5                     |
-| `hours` · `lifecycle`                                           |     4 each | P4 hours / lifecycle              |
-| `cash-register` · `turn-commit` · `ordering-settings` · `staff` |     3 each | —                                 |
-| `auth` · `messages` · `voice-settings`                          |     2 each | P5 slug / pipeline                |
-| `customer-session` · `business-config`                          |     1 each | —                                 |
+| File                                                            | Unresolved | Owning track                        |
+| --------------------------------------------------------------- | ---------: | ----------------------------------- |
+| `kds/kds.repository.ts`                                         |     **27** | P4 — outbox delta + pairing/session |
+| `cash/cash-write.repository.ts`                                 |         11 | cash columns                        |
+| `cash/cash.repository.ts`                                       |         11 | cash columns                        |
+| `conversations/conversations.repository.ts`                     |         10 | conversation pipeline               |
+| `leads/leads.repository.ts`                                     |     **10** | growth — previously invisible       |
+| `cash/cash-scan.repository.ts`                                  |          9 | birthday + hours                    |
+| `customers/customers.repository.ts`                             |          9 | Customer 360 (identity-entangled)   |
+| `jobs/queue.repository.ts`                                      |          8 | outbox exactly-once (P1 DDL)        |
+| `conversation-turns` · `memory` · `tenants`                     |     5 each | pipeline / P5                       |
+| `hours` · `lifecycle`                                           |     4 each | P4 hours / lifecycle                |
+| `cash-register` · `turn-commit` · `ordering-settings` · `staff` |     3 each | —                                   |
+| `auth` · `messages` · `voice-settings`                          |     2 each | P5 slug / pipeline                  |
+| `customer-session` · `business-config`                          |     1 each | —                                   |
 
 **`42883` remains 0** (`umi.e164` resolved the normalize functions).
 
