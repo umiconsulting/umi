@@ -3,10 +3,11 @@ import { PgService } from '../../shared/database/pg.service';
 
 /**
  * Per-business voice + operating config. Ported from `_shared/business-config.ts`
- * and rebound to the `tenant.business` row (`config` jsonb) — legacy
- * `businesses.config.voice` is the same shape. Read on the
- * worker pool: the WhatsApp path is unauthenticated (no member user → no RLS
- * tenant context), and every query carries an explicit `business_id` predicate.
+ * and rebound to the TYPED `tenant.business` columns (`assistant_name` /
+ * `assistant_tone` / `locale`) — the legacy `config.voice` jsonb blob was dissolved
+ * in build-v3. `fetchConfigRow` re-inflates the old BusinessConfig shape the resolver
+ * and consumers expect. Read on the worker pool: the WhatsApp path is unauthenticated
+ * (no member user → no RLS tenant context), and the query keys on the business `id`.
  *
  * `resolveVoiceConfig` NEVER throws: it fills sane defaults (assistant name from
  * the business name, locale `es-MX`, tone from the tenant's preset or a friendly
@@ -153,15 +154,32 @@ export class BusinessConfigService {
     const { rows } = await this.pg.query<{
       id: string;
       name: string | null;
-      config: BusinessConfig | null;
+      assistant_name: string | null;
+      assistant_tone: string | null;
+      locale: string | null;
     }>(
-      `SELECT id::text, name, config
+      `SELECT id::text, name, assistant_name, assistant_tone, locale
          FROM tenant.business
-        WHERE business_id = $1
-        ORDER BY created_at ASC
+        WHERE id = $1
         LIMIT 1`,
       [tenantId],
     );
-    return rows[0] ?? null;
+    const r = rows[0];
+    if (!r) return null;
+    // Re-inflate the legacy BusinessConfig shape from the typed columns. Only the voice
+    // sub-object has typed homes today; the ordering/contact scalars (address, whatsapp,
+    // payment_methods, …) have no column yet → left undefined, and the consumers default
+    // safely (voice never-throws, business-hours fail-closed).
+    return {
+      id: r.id,
+      name: r.name,
+      config: {
+        voice: {
+          assistant_name: r.assistant_name ?? undefined,
+          tone_preset: (r.assistant_tone ?? undefined) as TonePreset | undefined,
+          locale: r.locale ?? undefined,
+        },
+      },
+    };
   }
 }

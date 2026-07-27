@@ -160,15 +160,18 @@ identity/entitlement failures; gate stays green.
 ### P4 — Conversation pipeline / hours / birthday / KDS / order repos ⏳ PENDING
 
 **Goal.** The remaining domain rewrites onto the new shapes.
-**Scope.** `conversation_turn` read paths (replay/crash guard, `merged_user_text`, debounce, supersede);
-`GET /hours` off typed `business_hours`; birthday_reward as a per-card **entitlement**, not a
-per-business rule; **KDS** reproduce the frozen iPad JSON over the redesigned ops tables (+ pairing
-`code` → `pin_hash`/`pin_salt`); **order repos** (`kds`/`orders`/`customers`) rewritten to
-`tenant.customer_order` (retires the 11 `tenant.order` failures).
-**KDS is DONE** (#63 board-killer/stations/line-change/exactly-once + this branch's auth substrate —
-`kds/kds.repository.ts` is off the rollup). Remaining P4: conversation pipeline, hours, birthday, cash,
-leads, customers.
-**DoD.** Preflight → **0 unresolved**; conversation/hours/KDS/order behavioral checks green; gate green.
+**Scope.** **Conversation pipeline** — a deliberate retreat from the agentic-AI over-engineering,
+recorded in [`CONVERSATION_MODEL.md`](./CONVERSATION_MODEL.md): **delete `conversation_state`** (no FSM —
+a cheap-but-capable LLM + recent messages _is_ the state), **slim `conversation_turn` to a merge buffer**
+(the fragmented-WhatsApp-message problem is real; the integrity/reconcile machinery is not), **dissolve
+`business.config`** into the typed `business.bot_*` / `open_hours` columns it already became, point
+message embeddings at `runtime.message_embedding`, and elevate customer facts into the CDP (read as
+Customer 360). `GET /hours` off `business.open_hours` jsonb; **order repos** rewritten to
+`tenant.customer_order`.
+**KDS DONE** (#63/#65) · **cash DONE** (#66 vocabulary/card/branding + #67 birthday grant — cash 34→9;
+the 9 remaining deferred: gift cards, `open_hours`, P5 slug). Remaining P4: **conversation pipeline**
+(per `CONVERSATION_MODEL.md`), **hours**, **Customer 360** (`customers`), **growth** (`leads`).
+**DoD.** Preflight → **0 unresolved**; conversation/hours/order behavioral checks green; gate green.
 
 ### P5 — 4-repo lockstep slug release ⏳ PENDING
 

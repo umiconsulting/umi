@@ -73,7 +73,7 @@ end $$;
 revoke update (normalized_value) on tenant.contact from api;
 
 --   runtime — only the machinery the request path legitimately serves, scoped:
-grant select, insert, update on runtime.conversation_state to api;   -- live convo FSM
+grant select, insert, update, delete on runtime.conversation_cart to api;  -- live in-flight cart
 grant select, insert          on runtime.reminder_sent    to api;    -- nudge dedup
 grant select, insert          on runtime.idempotency_key  to api;    -- request dedup
 -- product_embedding: SELECT only. Semantic product search is a REQUEST-path read
@@ -146,7 +146,6 @@ begin
   -- Scoping via branch was also wrong on its own terms — a station with branch_id NULL
   -- ("every branch") joins to nothing and would have been invisible to its owner.
   for r in select * from (values
-    ('customer_note',               'customer',          'customer_id',     'id'),
     ('loyalty_wallet_pass',         'loyalty_card',      'card_id',         'id'),
     ('product_option_group',        'product',           'product_id',      'id'),
     ('product_branch_availability', 'product',           'product_id',      'id'),
@@ -241,10 +240,18 @@ create policy tenant_isolation on runtime.reminder_sent
   using      (business_id = umi.current_business())
   with check (business_id = umi.current_business());
 
-alter table runtime.conversation_state enable row level security;
-alter table runtime.conversation_state force  row level security;
-create policy tenant_isolation on runtime.conversation_state
-  using (exists (select 1 from tenant.conversation cv where cv.id = conversation_state.conversation_id
+alter table runtime.conversation_cart enable row level security;
+alter table runtime.conversation_cart force  row level security;
+create policy tenant_isolation on runtime.conversation_cart
+  using (exists (select 1 from tenant.conversation cv where cv.id = conversation_cart.conversation_id
                    and cv.business_id = umi.current_business()))
-  with check (exists (select 1 from tenant.conversation cv where cv.id = conversation_state.conversation_id
+  with check (exists (select 1 from tenant.conversation cv where cv.id = conversation_cart.conversation_id
+                   and cv.business_id = umi.current_business()));
+
+alter table runtime.conversation_turn enable row level security;
+alter table runtime.conversation_turn force  row level security;
+create policy tenant_isolation on runtime.conversation_turn
+  using (exists (select 1 from tenant.conversation cv where cv.id = conversation_turn.conversation_id
+                   and cv.business_id = umi.current_business()))
+  with check (exists (select 1 from tenant.conversation cv where cv.id = conversation_turn.conversation_id
                    and cv.business_id = umi.current_business()));

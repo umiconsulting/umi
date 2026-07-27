@@ -152,7 +152,6 @@ export class CheckoutTools {
   ): Promise<ToolResult> {
     const conv = await this.conversations.loadById(ctx.conversationId);
     const cart = (conv?.draftCart as DraftCart | null) ?? null;
-    const version = conv?.draftCartVersion ?? 0;
     if (!cart || cart.items.length === 0) {
       return retryableToolError(
         'No hay productos en el carrito.',
@@ -184,8 +183,8 @@ export class CheckoutTools {
       sourceTransactionId: this.idempotencyKey(ctx),
     });
 
-    // Clear the draft cart (idempotent: a stale CAS just means another turn moved on).
-    await this.conversations.updateDraftCartCas(ctx.conversationId, version, null);
+    // Clear the draft cart now that it has materialized into a customer_order.
+    await this.conversations.setDraftCart(ctx.conversationId, null);
 
     return {
       success: true,
@@ -248,13 +247,8 @@ export class CheckoutTools {
     const conv = await this.conversations.loadById(ctx.conversationId);
     const draftCart = (conv?.draftCart as DraftCart | null) ?? null;
     if (draftCart && draftCart.items.length > 0) {
-      // Idempotent clear at the read version (a stale CAS just means another turn
-      // already moved the cart on).
-      await this.conversations.updateDraftCartCas(
-        ctx.conversationId,
-        conv?.draftCartVersion ?? 0,
-        null,
-      );
+      // Clear the in-progress cart (last-write-wins).
+      await this.conversations.setDraftCart(ctx.conversationId, null);
       const trimmed = reason?.trim();
       const replyBody = trimmed
         ? `Listo, cancelé tu pedido.\nMotivo: ${trimmed}`

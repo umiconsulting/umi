@@ -1,79 +1,75 @@
 import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
 
-/** The voice sub-object as stored in `tenant.business.config.voice` (jsonb). */
+/** The voice knobs stored as typed `tenant.business` columns. */
 export interface StoredVoice {
   assistant_name?: string;
-  locale?: string;
   tone_preset?: string;
-  tone?: string;
-  style_notes?: string[];
 }
 
 /**
- * The single accessor for the tenant VOICE config that lives under
- * `tenant.business.config.voice` (one business per tenant). Sibling of
- * OrderingSettingsRepository — same nested-jsonb-merge upsert, but it writes
- * UNDER `config.voice` so the hours/ordering keys in `config` are untouched.
- *
- * Both the dashboard read and write run on the RLS app pool (`withTenant`): a
- * voice save is an authenticated staff action with a member user. The bot/worker
- * path reads voice through BusinessConfigService.fetchConfigRow, not this repo.
+ * The single accessor for the tenant VOICE config, now the typed
+ * `tenant.business.assistant_name` / `assistant_tone` columns (was the dissolved
+ * `config.voice` jsonb). One business per tenant. Both the dashboard read and write
+ * run on the RLS app pool (`withTenant`): a voice save is an authenticated staff
+ * action with a member user. The bot/worker path reads voice through
+ * BusinessConfigService.fetchConfigRow, not this repo.
  */
 @Injectable()
 export class VoiceSettingsRepository {
   constructor(private readonly pg: PgService) {}
 
-  /** RLS app-pool read (dashboard GET). Returns the stored voice sub-object (or
-   *  null) plus the business-name fallback for the assistant_name default. */
+  /** RLS app-pool read (dashboard GET). Returns the stored voice knobs (or null)
+   *  plus the business-name fallback for the assistant_name default. */
   async read(
     tenantId: string,
   ): Promise<{ businessName: string | null; voice: StoredVoice | null }> {
     const rows = await this.pg.withTenant((c) =>
       c
-        .query<{ business_name: string | null; voice: StoredVoice | null }>(
-          `SELECT COALESCE(b.name, t.name) AS business_name,
-                  b.config -> 'voice'      AS voice
-             FROM tenant.business t
-             LEFT JOIN LATERAL (
-               SELECT name, config FROM tenant.business
-                WHERE business_id = t.id ORDER BY created_at ASC LIMIT 1
-             ) b ON true
-            WHERE t.id = $1::uuid`,
+        .query<{
+          business_name: string | null;
+          assistant_name: string | null;
+          assistant_tone: string | null;
+        }>(
+          `SELECT name AS business_name, assistant_name, assistant_tone
+             FROM tenant.business
+            WHERE id = $1::uuid`,
           [tenantId],
         )
         .then((r) => r.rows),
     );
+    const r = rows[0];
+    if (!r) return { businessName: null, voice: null };
+    const voice: StoredVoice = {};
+    if (r.assistant_name != null) voice.assistant_name = r.assistant_name;
+    if (r.assistant_tone != null) voice.tone_preset = r.assistant_tone;
     return {
-      businessName: rows[0]?.business_name ?? null,
-      voice: rows[0]?.voice ?? null,
+      businessName: r.business_name ?? null,
+      voice: Object.keys(voice).length > 0 ? voice : null,
     };
   }
 
   /**
-   * Nested merge-write into `tenant.business.config.voice`. Single atomic upsert on
-   * the `businesses_business_id_key` UNIQUE(business_id) (same as
-   * OrderingSettingsRepository) — no UPDATE-then-INSERT race. Creates the business
-   * row with the tenant's real name when absent. The `||` jsonb operator shallow-
-   * merges the patch into the existing `voice` object, so a `tone: null` in the
-   * patch OVERWRITES a stale freeform override (the clear-override mechanism).
+   * Partial-update write into the typed columns. A key present in the patch is
+   * written (a `null` clears it back to the default — business name / friendly
+   * preset); a key absent is left untouched (static-CASE partial update, same idiom
+   * as loyalty_program.updateProgram). The tenant business row always exists (the
+   * tenant root), so this is a plain UPDATE — no upsert.
    */
-  async write(tenantId: string, voicePatch: Record<string, unknown>): Promise<void> {
-    const json = JSON.stringify(voicePatch);
+  async write(
+    tenantId: string,
+    patch: { assistant_name?: string | null; tone_preset?: string | null },
+  ): Promise<void> {
+    const hasName = 'assistant_name' in patch;
+    const hasTone = 'tone_preset' in patch;
     await this.pg.withTenant((c) =>
       c.query(
-        `INSERT INTO tenant.business (business_id, name, config)
-         VALUES ($1::uuid,
-                 COALESCE((SELECT name FROM tenant.business WHERE id = $1::uuid), 'Negocio'),
-                 jsonb_build_object('voice', $2::jsonb))
-         ON CONFLICT (business_id) DO UPDATE
-           SET config = jsonb_set(
-                 COALESCE(tenant.business.config, '{}'::jsonb),
-                 '{voice}',
-                 COALESCE(tenant.business.config -> 'voice', '{}'::jsonb) || (EXCLUDED.config -> 'voice')
-               ),
-               updated_at = now()`,
-        [tenantId, json],
+        `UPDATE tenant.business SET
+           assistant_name = CASE WHEN $2 THEN $3 ELSE assistant_name END,
+           assistant_tone = CASE WHEN $4 THEN $5 ELSE assistant_tone END,
+           updated_at = now()
+         WHERE id = $1::uuid`,
+        [tenantId, hasName, patch.assistant_name ?? null, hasTone, patch.tone_preset ?? null],
       ),
     );
   }

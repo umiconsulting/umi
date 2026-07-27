@@ -7,7 +7,7 @@
  * `business_id → business_id`, `body → content`.
  */
 
-/** A single line item in the conversation's draft cart (`runtime.conversation_state.draft_cart`). */
+/** A single line item in the conversation's draft cart (`runtime.conversation_cart.cart`). */
 export interface DraftCartItem {
   product_id: string;
   product_name: string;
@@ -23,22 +23,18 @@ export interface DraftCart {
 }
 
 /**
- * The per-conversation state machine row, mapped to canonical column names.
- * `stateVersion` / `draftCartVersion` are the optimistic-lock (CAS) cursors the
- * turn loop and cart writes increment (preflight §2).
+ * The conversation, as the turn engine reads it: the durable thread
+ * (`tenant.conversation`) plus its in-flight cart (`runtime.conversation_cart`).
+ * The FSM is gone — there is no `currentState` / `stateVersion` / `pendingClarification`;
+ * the dialog-state label is DERIVED from cart-presence, and the cart is last-write-wins.
  */
 export interface ConversationRecord {
   id: string;
   tenantId: string;
   personId: string;
-  orderId: string | null;
   status: string;
-  currentState: string;
   summary: string | null;
   draftCart: DraftCart | null;
-  draftCartVersion: number;
-  pendingClarification: Record<string, unknown> | null;
-  stateVersion: number;
 }
 
 export interface PartialCancelledItemContext {

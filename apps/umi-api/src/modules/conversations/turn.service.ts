@@ -13,16 +13,10 @@ import { MemoryService } from './memory.service';
 import { ToolLoopService } from './tool-loop.service';
 import { TurnCommitRepository } from './turn-commit.repository';
 import { createToolOutcomeState, type ToolOutcomeState } from './tool-outcomes';
-import { getActivePendingClarification } from './pending-clarification';
 import { shapeTurnMemory } from './turn-memory';
 import { buildHarnessSystemPrompt, PROMPT_VERSION, type BranchPromptContext } from './prompts';
 import { sanitizeOutput } from './security.service';
-import {
-  blockUnverifiedOrderConfirmation,
-  deriveNextConversationState,
-  jsonByteLength,
-  truncateBytes,
-} from './turn-safety';
+import { blockUnverifiedOrderConfirmation, jsonByteLength, truncateBytes } from './turn-safety';
 import type { TurnProcessPayload } from './turn-integrity.service';
 
 const PROCESSOR_VERSION = 'mini_harness';
@@ -155,13 +149,9 @@ export class TurnService {
       existingTurnId: turn.id,
       tenantId: payload.business_id,
       conversationId: payload.conversation_id,
-      personId: payload.person_id,
       status: 'processing',
       sourceMessageIds: turn.sourceMessageIds,
       mergedUserText: turn.mergedUserText,
-      integrityDecision: turn.integrityDecision ?? '',
-      integrityReason: turn.integrityReason ?? '',
-      baseStateVersion: turn.baseStateVersion,
       firstMessageAt: turn.firstMessageAt,
       lastMessageAt: turn.lastMessageAt,
       releasedAt: turn.releasedAt ?? new Date().toISOString(),
@@ -179,10 +169,11 @@ export class TurnService {
 
     // Partial-cancellation context is Phase 4 (KDS); inert here.
     const partialCancelledOrder = null;
-    const currentState = conversation.currentState ?? 'initial';
-    const activePendingClarification = getActivePendingClarification(
-      conversation.pendingClarification,
-    );
+    // The dialog-state label is DERIVED from cart-presence (no stored FSM). The open
+    // question is not a stored slot — the LLM infers it from the recent-message buffer.
+    const hasCart = !!conversation.draftCart?.items?.length;
+    const currentState = hasCart ? 'awaiting_confirmation' : 'initial';
+    const activePendingClarification = null;
     const voice = resolveVoiceConfig(
       businessRow?.config ?? null,
       businessRow?.name ?? null,
@@ -223,32 +214,26 @@ export class TurnService {
       orderConfirmed: toolOutcomes.orderConfirmed,
     });
     const pendingClarification = loopResult.pendingClarification;
-    const nextConversationState = deriveNextConversationState({
-      pendingClarification,
-      orderConfirmed: toolOutcomes.orderConfirmed,
-      orderCancelled: toolOutcomes.orderCancelled,
-      orderChangesConfirmed: toolOutcomes.orderChangesConfirmed,
-      cartUpdated: toolOutcomes.cartUpdated,
-      searchPerformed: toolOutcomes.searchPerformed,
-      fallbackState: currentState,
-    });
-
     const lastUserMessageId = turn.sourceMessageIds[turn.sourceMessageIds.length - 1] ?? turn.id;
-    const reconciledAction = {
-      processor_version: PROCESSOR_VERSION,
-      stop_reason: loopResult.stopReason,
-      tool_calls: loopResult.toolCallCount,
-      tool_chain: truncateBytes(loopResult.toolChain, 5000),
-      pending_clarification: pendingClarification,
-    };
 
-    // Transactional outbox commit: CAS state + assistant message + reply outbox row.
+    // Guard: if a newer user message arrived while we were computing the reply, the
+    // conversation has moved on — supersede and let the newer turn win. This replaces
+    // the old state-version CAS; exactly-once delivery is carried by the outbox key.
+    if (
+      await this.turns.hasNewerUserMessages(
+        payload.conversation_id,
+        turn.lastMessageAt ?? '',
+        turn.sourceMessageIds ?? [],
+      )
+    ) {
+      await this.supersedeAndRequeue(payload, turn, 'conversation_changed_before_commit', traceId);
+      return;
+    }
+
+    // Transactional outbox commit: assistant message + reply outbox row.
     const committed = await this.commit.commitTurnReply({
       tenantId: payload.business_id,
       conversationId: payload.conversation_id,
-      expectedStateVersion: conversation.stateVersion,
-      nextState: nextConversationState,
-      pendingClarification,
       replyBody: finalResponse,
       eventType: 'twilio.reply',
       idempotencyKey: `twilio_reply_turn:${lastUserMessageId}`,
@@ -262,17 +247,6 @@ export class TurnService {
         conversation_id: payload.conversation_id,
       },
     });
-
-    if (!committed.committed) {
-      await this.supersedeAndRequeue(
-        payload,
-        turn,
-        'conversation_changed_before_commit',
-        traceId,
-        reconciledAction,
-      );
-      return;
-    }
 
     await this.trace.logPipelineTrace({
       trace_id: traceId,
@@ -293,23 +267,12 @@ export class TurnService {
       existingTurnId: turn.id,
       tenantId: payload.business_id,
       conversationId: payload.conversation_id,
-      personId: payload.person_id,
       status: 'completed',
       sourceMessageIds: turn.sourceMessageIds,
       mergedUserText: turn.mergedUserText,
-      integrityDecision: turn.integrityDecision ?? '',
-      integrityReason: turn.integrityReason ?? '',
-      baseStateVersion: turn.baseStateVersion,
       firstMessageAt: turn.firstMessageAt,
       lastMessageAt: turn.lastMessageAt,
       releasedAt: turn.releasedAt,
-      processedAt: new Date().toISOString(),
-      assistantMessageId: committed.assistantMessageId,
-      extractedIntent: {
-        processor_version: PROCESSOR_VERSION,
-        current_state: nextConversationState,
-      },
-      reconciledAction,
     });
 
     const metadata = {
@@ -320,7 +283,7 @@ export class TurnService {
       tool_chain: truncateBytes(loopResult.toolChain, 5000),
       pending_clarification: pendingClarification,
       max_tool_calls: MAX_TOOL_CALLS_PER_TURN,
-      next_state: nextConversationState,
+      dialog_state: currentState,
     };
     const metrics = {
       processor_version: PROCESSOR_VERSION,
@@ -347,7 +310,7 @@ export class TurnService {
       response_type: responseType(toolOutcomes),
       customer_context: {
         name: person.displayName,
-        state: conversation.currentState,
+        state: currentState,
         turn_id: payload.turn_id,
       },
       metadata: truncateBytes({ ...metadata, metrics }, MAX_METADATA_BYTES) as Record<
@@ -413,23 +376,17 @@ export class TurnService {
     turn: TurnRecord,
     reason: string,
     traceId: string,
-    reconciledAction?: Record<string, unknown>,
   ): Promise<void> {
     await this.turns.upsertTurn({
       existingTurnId: turn.id,
       tenantId: payload.business_id,
       conversationId: payload.conversation_id,
-      personId: payload.person_id,
       status: 'superseded',
       sourceMessageIds: turn.sourceMessageIds,
       mergedUserText: turn.mergedUserText,
-      integrityDecision: 'cancel',
-      integrityReason: reason,
-      baseStateVersion: turn.baseStateVersion,
       firstMessageAt: turn.firstMessageAt,
       lastMessageAt: turn.lastMessageAt,
       supersededAt: new Date().toISOString(),
-      reconciledAction: reconciledAction ?? { processor_version: PROCESSOR_VERSION, reason },
     });
 
     await this.trace.logPipelineTrace({

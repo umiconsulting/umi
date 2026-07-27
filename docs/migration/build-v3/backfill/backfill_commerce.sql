@@ -119,8 +119,8 @@ update tenant.business b set
   logo_url        = coalesce(o.branding->>'logo_url', b.logo_url),
   brand_color     = coalesce(o.branding->>'primary_color', b.brand_color),
   secondary_color = coalesce(o.branding->>'secondary_color', b.secondary_color),
-  bot_voice   = coalesce(o.config->'voice'->>'assistant_name', b.bot_voice),
-  bot_tone    = coalesce(o.config->'voice'->>'tone_preset', b.bot_tone),
+  assistant_name = coalesce(o.config->'voice'->>'assistant_name', b.assistant_name),
+  assistant_tone = coalesce(o.config->'voice'->>'tone_preset', b.assistant_tone),
   updated_at  = now()
 from ops.businesses o
 where b.id = o.tenant_id;

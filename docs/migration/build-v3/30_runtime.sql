@@ -4,7 +4,7 @@
 -- decide its next action (the read-back test). Nothing here is a business fact.
 -- SEALED (grants in 90_rls). Built AFTER umi + tenant, so all FKs are inline.
 --
--- NOT here (deliberately): device_event, conversation_turn, traces/spans/costs
+-- NOT here (deliberately): device_event, traces/spans/costs
 --   -> those are write-once TELEMETRY nothing reads back -> external OTel, not the DB.
 -- Requires: extensions.vector (pgvector) for the semantic index.
 -- ============================================================================
@@ -186,14 +186,47 @@ create table runtime.dead_letter (
 -- LIVE CONVERSATION   → read to resume the bot / prevent double-sends
 -- ----------------------------------------------------------------------------
 
-create table runtime.conversation_state (
-  conversation_id uuid primary key references tenant.conversation(id) on delete cascade,
-  state           jsonb not null default '{}'::jsonb,   -- honest jsonb: live FSM position + slots
-  updated_at      timestamptz not null default now(),
-  created_at      timestamptz not null default now()
+-- The bot's IN-FLIGHT ORDER (was runtime.conversation_state, minus the FSM). One row per
+-- conversation, last-write-wins — NO current_state enum, NO version cursors, NO CAS. `cart` is
+-- the structured DraftCart (items); `selected_branch_id` is which branch this order is for (asked
+-- at checkout). Both materialize into customer_order + order_item at confirmation, then the row is
+-- cleared. The dialog "state" label is DERIVED from cart-presence each turn, never stored here.
+create table runtime.conversation_cart (
+  conversation_id    uuid primary key references tenant.conversation(id) on delete cascade,
+  business_id        uuid not null references tenant.business(id) on delete cascade,
+  cart               jsonb,                                  -- structured DraftCart, or null when empty
+  selected_branch_id uuid references tenant.branch(id) on delete set null,
+  updated_at         timestamptz not null default now(),
+  created_at         timestamptz not null default now()
 );
-comment on table runtime.conversation_state is
-  'The bot''s live position in a flow — read to resume. Working memory, not history (that is tenant.message).';
+comment on table runtime.conversation_cart is
+  'The bot''s in-flight order (cart + chosen branch), last-write-wins. Replaces the deleted '
+  'conversation_state FSM; materializes to customer_order at confirmation, then cleared.';
+
+-- The fragment-merge / debounce buffer: WhatsApp customers send an order in pieces ("two coffees"
+-- · "make it three" · "add sugar"); the debounce window holds + merges them into one instruction
+-- before the bot acts. Slimmed to that job only — NO integrity_decision / base_state_version /
+-- reconcile columns (those existed only to reconcile against the deleted FSM).
+create table runtime.conversation_turn (
+  id                 uuid primary key default gen_random_uuid(),
+  business_id        uuid not null references tenant.business(id) on delete cascade,
+  conversation_id    uuid not null references tenant.conversation(id) on delete cascade,
+  status             text not null default 'pending'
+                       check (status in ('pending','processing','completed','failed','superseded')),
+  source_message_ids uuid[] not null default '{}',           -- the fragments merged into this turn
+  merged_user_text   text,                                   -- the one coherent instruction
+  first_message_at   timestamptz,
+  last_message_at    timestamptz,
+  hold_until         timestamptz,                            -- debounce: process after this
+  released_at        timestamptz,                            -- when the debounce fired
+  superseded_at      timestamptz,                            -- re-merged: a fragment landed mid-flight
+  created_at         timestamptz not null default now()
+);
+create index conversation_turn_active_idx on runtime.conversation_turn (conversation_id)
+  where status in ('pending','processing');
+comment on table runtime.conversation_turn is
+  'The fragment-merge / debounce buffer for a WhatsApp turn. NOT an FSM — merges message fragments '
+  'into one instruction before the bot acts.';
 
 create table runtime.reminder_sent (
   id            uuid primary key default gen_random_uuid(),

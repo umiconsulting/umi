@@ -32,15 +32,15 @@ describe('CartTools.addToCart', () => {
     };
     const conversations = {
       loadById: vi.fn().mockResolvedValue({ draftCart: null, draftCartVersion: 0 }),
-      updateDraftCartCas: vi.fn().mockResolvedValue(1),
+      setDraftCart: vi.fn().mockResolvedValue(1),
     };
     const cart = new CartTools(products as never, conversations as never);
 
     const r = await cart.addToCart(CTX, { query: 'latte grande', quantity: 1 });
     expect(r.success).toBe(true);
     expect(r.total).toBe(60); // GDE variant, pesos
-    expect(conversations.updateDraftCartCas).toHaveBeenCalledTimes(1);
-    const writtenCart = conversations.updateDraftCartCas.mock.calls[0][2];
+    expect(conversations.setDraftCart).toHaveBeenCalledTimes(1);
+    const writtenCart = conversations.setDraftCart.mock.calls[0][1];
     expect(writtenCart.items[0]).toMatchObject({
       product_id: 'p-latte',
       variant_name: 'GDE, CALIENTE',
@@ -55,7 +55,7 @@ describe('CheckoutTools.confirmOrder', () => {
   let products: { getByIds: ReturnType<typeof vi.fn> };
   let conversations: {
     loadById: ReturnType<typeof vi.fn>;
-    updateDraftCartCas: ReturnType<typeof vi.fn>;
+    setDraftCart: ReturnType<typeof vi.fn>;
   };
   let hours: {
     checkOrderingEnabled: ReturnType<typeof vi.fn>;
@@ -95,7 +95,7 @@ describe('CheckoutTools.confirmOrder', () => {
         },
         draftCartVersion: 3,
       }),
-      updateDraftCartCas: vi.fn().mockResolvedValue(4),
+      setDraftCart: vi.fn().mockResolvedValue(4),
     };
     hours = {
       checkOrderingEnabled: vi.fn().mockResolvedValue({ enabled: true, disabledMessage: null }),
@@ -123,7 +123,7 @@ describe('CheckoutTools.confirmOrder', () => {
       'conversaflow:turn:turn-9',
     );
     // Draft cart cleared at the version it was read at.
-    expect(conversations.updateDraftCartCas).toHaveBeenCalledWith('c1', 3, null);
+    expect(conversations.setDraftCart).toHaveBeenCalledWith('c1', null);
   });
 
   it('writes the branch the fulfillment policy resolved', async () => {
@@ -150,7 +150,7 @@ describe('CheckoutTools.confirmOrder', () => {
     expect(r.error_type).toBe('needs_input');
     expect(orders.createOrder).not.toHaveBeenCalled();
     // Order preserved: the draft cart is NOT cleared while we ask for the branch.
-    expect(conversations.updateDraftCartCas).not.toHaveBeenCalled();
+    expect(conversations.setDraftCart).not.toHaveBeenCalled();
   });
 
   it('degrades to a NULL location (never blocks the order) when the tenant has no active branch', async () => {
@@ -173,7 +173,7 @@ describe('CheckoutTools.reorderLastOrder', () => {
   let products: { getByIds: ReturnType<typeof vi.fn> };
   let conversations: {
     loadById: ReturnType<typeof vi.fn>;
-    updateDraftCartCas: ReturnType<typeof vi.fn>;
+    setDraftCart: ReturnType<typeof vi.fn>;
   };
   let hours: {
     checkOrderingEnabled: ReturnType<typeof vi.fn>;
@@ -214,7 +214,7 @@ describe('CheckoutTools.reorderLastOrder', () => {
     };
     products = { getByIds: vi.fn().mockResolvedValue(new Map([['p-latte', latte]])) };
     // reorder never touches the draft cart; these must stay untouched.
-    conversations = { loadById: vi.fn(), updateDraftCartCas: vi.fn() };
+    conversations = { loadById: vi.fn(), setDraftCart: vi.fn() };
     hours = {
       checkOrderingEnabled: vi.fn().mockResolvedValue({ enabled: true, disabledMessage: null }),
       isWithinOrderHours: vi.fn().mockResolvedValue(true),
@@ -265,7 +265,7 @@ describe('CheckoutTools.reorderLastOrder', () => {
     expect(r.success).toBe(false);
     expect(r.error_type).toBe('needs_input');
     expect(orders.createOrder).not.toHaveBeenCalled();
-    expect(conversations.updateDraftCartCas).not.toHaveBeenCalled();
+    expect(conversations.setDraftCart).not.toHaveBeenCalled();
   });
 
   it('degrades to a NULL location (never blocks the reorder) when the tenant has no active branch', async () => {
@@ -295,7 +295,7 @@ describe('CheckoutTools.cancelOrder', () => {
     const orders = { recentOrders: vi.fn(), markCancelled: vi.fn() };
     const conversations = {
       loadById: vi.fn().mockResolvedValue({ draftCart, draftCartVersion: 7 }),
-      updateDraftCartCas: vi.fn().mockResolvedValue(8),
+      setDraftCart: vi.fn().mockResolvedValue(8),
     };
     const checkout = new CheckoutTools(
       orders as never,
@@ -308,7 +308,7 @@ describe('CheckoutTools.cancelOrder', () => {
     const r = await checkout.cancelOrder(CTX, 'ya no quiero');
     expect(r.success).toBe(true);
     // Draft cart emptied at the read version; ops.orders never consulted.
-    expect(conversations.updateDraftCartCas).toHaveBeenCalledWith('c1', 7, null);
+    expect(conversations.setDraftCart).toHaveBeenCalledWith('c1', null);
     expect(orders.recentOrders).not.toHaveBeenCalled();
     expect(orders.markCancelled).not.toHaveBeenCalled();
   });
@@ -320,7 +320,7 @@ describe('CheckoutTools.cancelOrder', () => {
     };
     const conversations = {
       loadById: vi.fn().mockResolvedValue({ draftCart: null, draftCartVersion: 0 }),
-      updateDraftCartCas: vi.fn(),
+      setDraftCart: vi.fn(),
     };
     const checkout = new CheckoutTools(
       orders as never,
@@ -334,6 +334,6 @@ describe('CheckoutTools.cancelOrder', () => {
     expect(r.success).toBe(true);
     expect(r.order_id).toBe('o-9');
     expect(orders.markCancelled).toHaveBeenCalledWith('t1', 'o-9', 'me arrepentí');
-    expect(conversations.updateDraftCartCas).not.toHaveBeenCalled();
+    expect(conversations.setDraftCart).not.toHaveBeenCalled();
   });
 });
