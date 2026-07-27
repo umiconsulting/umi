@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "phases": [
+    {
+      "id": "0A",
+      "status": "complete",
+      "subject": "Architecture salvage inventory"
+    },
+    {
+      "id": "0B-1",
+      "status": "complete",
+      "subject": "Provenance, licensing, and archival preparation"
+    },
+    {
+      "id": "0B-2",
+      "status": "complete",
+      "subject": "Business knowledge extraction"
+    },
+    {
+      "id": "0C",
+      "status": "complete",
+      "subject": "Build-v3 dependency baseline"
+    },
+    {
+      "commit": "a65bed4025a1fc541ff0d098b6c3112c31fb1402",
+      "id": "1A",
+      "status": "complete",
+      "subject": "Authority, migration ownership, and RLS"
+    },
+    {
+      "commit": "01c7bff93630b4495ae053da8830a394c26671ba",
+      "id": "1B",
+      "status": "complete",
+      "subject": "Canonical contract authority"
+    },
+    {
+      "commit": "8d174f7eeb78c2fb901b9c48b2bc61201575220c",
+      "id": "1C",
+      "status": "complete",
+      "subject": "Identity, sessions, staff, permissions, and entitlements"
+    },
+    {
+      "id": "1D",
+      "status": "complete",
+      "subject": "Transaction integrity, audit, and platform data controls"
+    }
+  ]
+}

@@ -28,6 +28,7 @@ export const routes = {
     capabilities: (tenantId: string): string => `${tenantBase(tenantId)}/capabilities`,
     settings: (tenantId: string): string => `${tenantBase(tenantId)}/settings`,
     locations: (tenantId: string): string => `${tenantBase(tenantId)}/locations`,
+    audit: (tenantId: string): string => `${tenantBase(tenantId)}/audit`,
   },
   cash: {
     // Tenant-scoped surface (dashboard, cookie auth) — /api/tenants/:tenantId/cash/*.

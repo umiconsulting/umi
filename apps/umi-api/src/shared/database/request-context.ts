@@ -11,6 +11,7 @@ export interface RequestContext {
   branchId: string | null;
   userId: string | null;
   requestId: string;
+  correlationId: string;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();

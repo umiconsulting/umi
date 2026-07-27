@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "87430927565efb06d6c5c726f0e396a880917a6230dd083bfc8610ba8ca119b0",
+  "contentHash": "260343ccb24a75aded9f0816647b95ae4f09ba4feca8a0a452a4532d688cbd96",
   "contractVersion": "1.0.0",
   "definitions": {
     "ApiError": {
@@ -16,12 +16,14 @@
             "BRANCH_REQUIRED",
             "CONFLICT",
             "IDEMPOTENCY_CONFLICT",
+            "COMMAND_IN_PROGRESS",
             "OPTIMISTIC_VERSION_CONFLICT",
             "RATE_LIMITED",
             "DEVICE_REVOKED",
             "DEVICE_NOT_ALLOWED",
             "SESSION_REVOKED",
             "ELEVATION_REQUIRED",
+            "AUDIT_INTEGRITY_FAILURE",
             "PAYMENT_OUTCOME_UNKNOWN",
             "RESOURCE_NOT_FOUND",
             "INTERNAL_ERROR"
@@ -76,12 +78,14 @@
                 "BRANCH_REQUIRED",
                 "CONFLICT",
                 "IDEMPOTENCY_CONFLICT",
+                "COMMAND_IN_PROGRESS",
                 "OPTIMISTIC_VERSION_CONFLICT",
                 "RATE_LIMITED",
                 "DEVICE_REVOKED",
                 "DEVICE_NOT_ALLOWED",
                 "SESSION_REVOKED",
                 "ELEVATION_REQUIRED",
+                "AUDIT_INTEGRITY_FAILURE",
                 "PAYMENT_OUTCOME_UNKNOWN",
                 "RESOURCE_NOT_FOUND",
                 "INTERNAL_ERROR"
@@ -126,6 +130,97 @@
       ],
       "type": "object"
     },
+    "AuditEventView": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "correlationId": {
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+          "type": "string"
+        },
+        "data": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "entityId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "entityType": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "eventType": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "occurredAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "success",
+            "denied",
+            "failure"
+          ],
+          "type": "string"
+        },
+        "reasonCode": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "tenantId",
+        "branchId",
+        "eventType",
+        "entityType",
+        "entityId",
+        "outcome",
+        "reasonCode",
+        "data",
+        "correlationId",
+        "occurredAt"
+      ],
+      "type": "object"
+    },
     "AuditMetadata": {
       "additionalProperties": false,
       "properties": {
@@ -156,6 +251,176 @@
         "actorId",
         "occurredAt",
         "correlationId"
+      ],
+      "type": "object"
+    },
+    "AuditSearchRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "before": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "correlationId": {
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+          "type": "string"
+        },
+        "entityId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "entityType": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "eventType": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "limit": {
+          "default": 25,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "AuditSearchResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "events": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "branchId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "correlationId": {
+                "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+                "type": "string"
+              },
+              "data": {
+                "additionalProperties": {},
+                "type": "object"
+              },
+              "entityId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "entityType": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "eventType": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "occurredAt": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "outcome": {
+                "enum": [
+                  "success",
+                  "denied",
+                  "failure"
+                ],
+                "type": "string"
+              },
+              "reasonCode": {
+                "anyOf": [
+                  {
+                    "maxLength": 160,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "tenantId": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "tenantId",
+              "branchId",
+              "eventType",
+              "entityType",
+              "entityId",
+              "outcome",
+              "reasonCode",
+              "data",
+              "correlationId",
+              "occurredAt"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "page": {
+          "additionalProperties": false,
+          "properties": {
+            "hasMore": {
+              "type": "boolean"
+            },
+            "limit": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "nextCursor": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "limit",
+            "hasMore",
+            "nextCursor"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "events",
+        "page"
       ],
       "type": "object"
     },
@@ -267,6 +532,144 @@
         "name",
         "timezone",
         "status"
+      ],
+      "type": "object"
+    },
+    "BusinessCommandResult": {
+      "additionalProperties": false,
+      "properties": {
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "correlationId": {
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+          "type": "string"
+        },
+        "duplicate": {
+          "type": "boolean"
+        },
+        "failureClass": {
+          "anyOf": [
+            {
+              "enum": [
+                "validation",
+                "authorization",
+                "conflict",
+                "transient",
+                "permanent",
+                "unknown_outcome"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failureCode": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "result": {
+          "anyOf": [
+            {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "commandId",
+        "status",
+        "duplicate",
+        "retryable",
+        "result",
+        "failureCode",
+        "failureClass",
+        "correlationId"
+      ],
+      "type": "object"
+    },
+    "BusinessFailureClass": {
+      "enum": [
+        "validation",
+        "authorization",
+        "conflict",
+        "transient",
+        "permanent",
+        "unknown_outcome"
+      ],
+      "type": "string"
+    },
+    "CompensationRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "additionalProperties": false,
+          "properties": {
+            "commandId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "fingerprint": {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            "idempotencyKey": {
+              "maxLength": 128,
+              "minLength": 8,
+              "type": "string"
+            }
+          },
+          "required": [
+            "commandId",
+            "idempotencyKey",
+            "fingerprint"
+          ],
+          "type": "object"
+        },
+        "expectedVersion": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "originalEventId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "reasonCode": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "command",
+        "originalEventId",
+        "reasonCode",
+        "expectedVersion"
       ],
       "type": "object"
     },
@@ -502,6 +905,110 @@
         "permission",
         "method",
         "freshWithinSeconds"
+      ],
+      "type": "object"
+    },
+    "FinancialEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "aggregateId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "aggregateType": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "aggregateVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "amount": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "branchId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "compensatesEventId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "correlationId": {
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+          "type": "string"
+        },
+        "data": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "eventType": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "occurredAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "commandId",
+        "tenantId",
+        "branchId",
+        "aggregateType",
+        "aggregateId",
+        "aggregateVersion",
+        "eventType",
+        "amount",
+        "compensatesEventId",
+        "data",
+        "correlationId",
+        "occurredAt"
       ],
       "type": "object"
     },
@@ -1960,6 +2467,10 @@
     }
   },
   "errors": {
+    "AUDIT_INTEGRITY_FAILURE": {
+      "public": true,
+      "retryable": false
+    },
     "AUTHENTICATION_REQUIRED": {
       "public": true,
       "retryable": false
@@ -1969,6 +2480,10 @@
       "retryable": false
     },
     "BRANCH_REQUIRED": {
+      "public": true,
+      "retryable": false
+    },
+    "COMMAND_IN_PROGRESS": {
       "public": true,
       "retryable": false
     },

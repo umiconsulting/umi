@@ -11,12 +11,24 @@ import { runWithRequestContext } from './request-context';
  */
 @Injectable()
 export class RequestContextMiddleware implements NestMiddleware {
-  use(req: { headers?: Record<string, unknown> }, _res: unknown, next: () => void): void {
-    const headerRequestId = req?.headers?.['x-request-id'];
-    const requestId = typeof headerRequestId === 'string' ? headerRequestId : randomUUID();
+  use(
+    req: { headers?: Record<string, unknown> },
+    res: { header?: (name: string, value: string) => unknown },
+    next: () => void,
+  ): void {
+    const requestId = safeIdentifier(req?.headers?.['x-request-id']) ?? randomUUID();
+    const correlationId = safeIdentifier(req?.headers?.['x-correlation-id']) ?? requestId;
+    res.header?.('x-request-id', requestId);
+    res.header?.('x-correlation-id', correlationId);
 
-    runWithRequestContext({ tenantId: null, branchId: null, userId: null, requestId }, () =>
-      next(),
+    runWithRequestContext(
+      { tenantId: null, branchId: null, userId: null, requestId, correlationId },
+      () => next(),
     );
   }
+}
+
+function safeIdentifier(value: unknown): string | null {
+  if (Array.isArray(value)) value = value[0];
+  return typeof value === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(value) ? value : null;
 }

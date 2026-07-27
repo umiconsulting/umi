@@ -130,6 +130,86 @@ export const ElevationRequirement = z
   .strict();
 export type ElevationRequirement = z.infer<typeof ElevationRequirement>;
 
+export const BusinessFailureClass = z.enum([
+  'validation',
+  'authorization',
+  'conflict',
+  'transient',
+  'permanent',
+  'unknown_outcome',
+]);
+export type BusinessFailureClass = z.infer<typeof BusinessFailureClass>;
+
+export const BusinessCommandResult = z
+  .object({
+    commandId: Uuid,
+    status: z.enum(['succeeded', 'failed']),
+    duplicate: z.boolean(),
+    retryable: z.boolean(),
+    result: JsonPayload.nullable(),
+    failureCode: z.string().min(1).max(100).nullable(),
+    failureClass: BusinessFailureClass.nullable(),
+    correlationId: CorrelationId,
+  })
+  .strict();
+export type BusinessCommandResult = z.infer<typeof BusinessCommandResult>;
+
+export const AuditEventView = z
+  .object({
+    id: Uuid,
+    tenantId: Uuid,
+    branchId: Uuid.nullable(),
+    eventType: z.string().min(1).max(160),
+    entityType: z.string().min(1).max(160),
+    entityId: Uuid.nullable(),
+    outcome: z.enum(['success', 'denied', 'failure']),
+    reasonCode: z.string().min(1).max(160).nullable(),
+    data: JsonPayload,
+    correlationId: CorrelationId,
+    occurredAt: IsoTimestamp,
+  })
+  .strict();
+export type AuditEventView = z.infer<typeof AuditEventView>;
+
+export const AuditSearchRequest = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(25),
+    before: IsoTimestamp.optional(),
+    eventType: z.string().min(1).max(160).optional(),
+    entityType: z.string().min(1).max(160).optional(),
+    entityId: Uuid.optional(),
+    correlationId: CorrelationId.optional(),
+  })
+  .strict();
+export type AuditSearchRequest = z.infer<typeof AuditSearchRequest>;
+
+export const AuditSearchResponse = z
+  .object({
+    events: z.array(AuditEventView).max(100),
+    page: PageInfo,
+  })
+  .strict();
+export type AuditSearchResponse = z.infer<typeof AuditSearchResponse>;
+
+export const FinancialEvent = z
+  .object({
+    id: Uuid,
+    commandId: Uuid,
+    tenantId: Uuid,
+    branchId: Uuid.nullable(),
+    aggregateType: z.string().min(1).max(160),
+    aggregateId: Uuid,
+    aggregateVersion: z.number().int().positive(),
+    eventType: z.string().min(1).max(160),
+    amount: Money,
+    compensatesEventId: Uuid.nullable(),
+    data: JsonPayload,
+    correlationId: CorrelationId,
+    occurredAt: IsoTimestamp,
+  })
+  .strict();
+export type FinancialEvent = z.infer<typeof FinancialEvent>;
+
 export const TenantContext = z
   .object({
     tenantId: Uuid,
@@ -186,6 +266,16 @@ export const IdempotencyMetadata = z
   })
   .strict();
 export type IdempotencyMetadata = z.infer<typeof IdempotencyMetadata>;
+
+export const CompensationRequest = z
+  .object({
+    command: IdempotencyMetadata,
+    originalEventId: Uuid,
+    reasonCode: z.string().min(1).max(160),
+    expectedVersion: z.number().int().nonnegative(),
+  })
+  .strict();
+export type CompensationRequest = z.infer<typeof CompensationRequest>;
 
 export const CorrelationMetadata = z
   .object({
@@ -299,12 +389,14 @@ export const API_ERROR_CODES = [
   'BRANCH_REQUIRED',
   'CONFLICT',
   'IDEMPOTENCY_CONFLICT',
+  'COMMAND_IN_PROGRESS',
   'OPTIMISTIC_VERSION_CONFLICT',
   'RATE_LIMITED',
   'DEVICE_REVOKED',
   'DEVICE_NOT_ALLOWED',
   'SESSION_REVOKED',
   'ELEVATION_REQUIRED',
+  'AUDIT_INTEGRITY_FAILURE',
   'PAYMENT_OUTCOME_UNKNOWN',
   'RESOURCE_NOT_FOUND',
   'INTERNAL_ERROR',
@@ -341,6 +433,13 @@ export const contractModels = {
   AuthorizationDecision,
   EffectiveEntitlement,
   ElevationRequirement,
+  BusinessFailureClass,
+  BusinessCommandResult,
+  AuditEventView,
+  AuditSearchRequest,
+  AuditSearchResponse,
+  FinancialEvent,
+  CompensationRequest,
   TenantContext,
   BranchContext,
   OperatorContext,

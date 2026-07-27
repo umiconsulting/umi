@@ -21,18 +21,26 @@ export class LoggingService {
   }
 
   private write(level: string, message: string, meta: Meta): void {
-    const requestId = getRequestContext()?.requestId;
+    const context = getRequestContext();
+    const requestId = context?.requestId;
+    const correlationId = context?.correlationId;
     const base = { ts: new Date().toISOString(), level, message };
     // requestId is spread LAST so caller-supplied meta can never override the
     // contextual request id. The whole thing is guarded so a circular/
     // unserializable meta can never crash the logger.
     let line: string;
     try {
-      line = JSON.stringify({ ...base, ...meta, ...(requestId ? { requestId } : {}) });
+      line = JSON.stringify({
+        ...base,
+        ...meta,
+        ...(requestId ? { requestId } : {}),
+        ...(correlationId ? { correlationId } : {}),
+      });
     } catch (err) {
       line = JSON.stringify({
         ...base,
         ...(requestId ? { requestId } : {}),
+        ...(correlationId ? { correlationId } : {}),
         metaError: err instanceof Error ? err.message : 'unserializable meta',
       });
     }

@@ -42,8 +42,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       );
     }
 
-    const requestId = getRequestContext()?.requestId ?? 'unavailable';
-    const error = publicError(status, payload, requestId);
+    const context = getRequestContext();
+    const requestId = context?.requestId ?? 'unavailable';
+    const error = publicError(status, payload, context?.correlationId ?? requestId);
     void reply.status(status).send({
       statusCode: status,
       error,

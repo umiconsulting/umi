@@ -22,6 +22,7 @@ import { CashModule } from './modules/cash/cash.module';
 import { KdsModule } from './modules/kds/kds.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { LeadsModule } from './modules/leads/leads.module';
+import { IntegrityModule } from './modules/integrity/integrity.module';
 
 /**
  * Root module for the WEB process. Imports shared infrastructure + domain
@@ -49,6 +50,7 @@ import { LeadsModule } from './modules/leads/leads.module';
     KdsModule,
     ConversationsModule,
     LeadsModule,
+    IntegrityModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

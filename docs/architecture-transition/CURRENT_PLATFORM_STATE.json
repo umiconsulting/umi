@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-07-27",
+  "branch": "architectureUMIposIntegration",
+  "parentHead": "8d174f7eeb78c2fb901b9c48b2bc61201575220c",
+  "completedGates": ["1A", "1B", "1C", "1D"],
+  "authorities": {
+    "api": "apps/umi-api",
+    "contracts": "packages/contract",
+    "database": "Supabase PostgreSQL",
+    "identity": "umi.user",
+    "migrations": "supabase/migrations",
+    "sessions": "runtime.session",
+    "businessCommands": "tenant.business_command",
+    "optimisticConcurrency": "tenant.aggregate_version",
+    "businessAudit": "tenant.audit_event",
+    "internalAuditMetadata": "runtime.audit_event_internal",
+    "financialEvents": "tenant.financial_event"
+  },
+  "security": {
+    "apiRoleBypassesRls": false,
+    "branchIsolation": true,
+    "clientServiceRoleAllowed": false,
+    "durableSessionRevocation": true,
+    "explicitPermissionDeny": true,
+    "tenantIsolation": true,
+    "appendOnlyAudit": true,
+    "appendOnlyFinancialEvents": true,
+    "commandFingerprinting": true,
+    "idempotentBusinessCommands": true,
+    "internalAuditMetadataPubliclyReadable": false,
+    "replayDetection": true
+  },
+  "nextGate": null
+}
