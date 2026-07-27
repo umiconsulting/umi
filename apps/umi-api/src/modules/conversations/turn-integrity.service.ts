@@ -6,7 +6,6 @@ import { TraceService } from '../../shared/logging/trace.service';
 import { ConversationsRepository } from './conversations.repository';
 import { ConversationTurnsRepository } from './conversation-turns.repository';
 import { decideTurnIntegrity } from './turn-integrity.logic';
-import { getActivePendingClarification } from './pending-clarification';
 
 /** Job payloads for the turns queue. */
 export interface TurnIntegrityPayload {
@@ -83,8 +82,10 @@ export class TurnIntegrityService {
 
     const decision = decideTurnIntegrity({
       messages,
-      currentState: conversation.currentState ?? 'initial',
-      pendingClarification: getActivePendingClarification(conversation.pendingClarification),
+      // Dialog-state label DERIVED from cart-presence (no stored FSM); the open
+      // question is inferred by the LLM from the buffer, not tracked here.
+      currentState: conversation.draftCart?.items?.length ? 'awaiting_confirmation' : 'initial',
+      pendingClarification: null,
     });
     if (!decision) return;
 
@@ -126,13 +127,9 @@ export class TurnIntegrityService {
       existingTurnId: existingTurn?.id ?? null,
       tenantId: payload.business_id,
       conversationId: payload.conversation_id,
-      personId: payload.person_id,
       status: 'pending',
       sourceMessageIds: decision.sourceMessageIds,
       mergedUserText: decision.mergedText,
-      integrityDecision: decision.decision,
-      integrityReason: decision.reason,
-      baseStateVersion: conversation.stateVersion ?? 0,
       firstMessageAt: decision.firstMessageAt,
       lastMessageAt: decision.lastMessageAt,
       holdUntil: released ? null : decision.holdUntil,

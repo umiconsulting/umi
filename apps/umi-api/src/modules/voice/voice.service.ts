@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import {
-  DEFAULT_LOCALE,
   DEFAULT_TONE_PRESET,
   TONE_PRESETS,
   TONE_PRESET_KEYS,
@@ -10,11 +9,11 @@ import { VoiceSettingsRepository } from './voice-settings.repository';
 import { UpdateVoiceDto } from './dto/update-voice.dto';
 
 /**
- * Voice & tone settings — the dashboard-facing read/write over the SAME jsonb the
- * WhatsApp bot resolves (`tenant.business.config.voice`). Sibling of HoursService:
- * the dashboard chips (tone_preset) + advanced overrides (assistant name / freeform
- * tone / style notes) are persisted here; the engine reads them via
- * resolveVoiceConfig. TONE_PRESETS is the one shared catalog (no duplication).
+ * Voice & tone settings — the dashboard-facing read/write over the SAME typed
+ * columns the WhatsApp bot resolves (`tenant.business.assistant_name` /
+ * `assistant_tone`). Two knobs only: the tone-preset chip and an optional assistant
+ * name. TONE_PRESETS is the one shared catalog (no duplication); the engine reads
+ * them via resolveVoiceConfig.
  */
 @Injectable()
 export class VoiceService {
@@ -34,20 +33,11 @@ export class VoiceService {
           typeof v.assistant_name === 'string' && v.assistant_name.trim()
             ? v.assistant_name.trim()
             : null,
-        locale: typeof v.locale === 'string' && v.locale.trim() ? v.locale.trim() : DEFAULT_LOCALE,
         tone_preset: presetKey,
-        tone: typeof v.tone === 'string' && v.tone.trim() ? v.tone.trim() : null,
-        style_notes: Array.isArray(v.style_notes)
-          ? v.style_notes
-              .filter((s) => typeof s === 'string')
-              .map((s) => s.trim())
-              .filter(Boolean)
-          : [],
       },
       businessName, // assistant_name placeholder in the UI
       defaults: {
         assistant_name: businessName,
-        locale: DEFAULT_LOCALE,
         tone_preset: DEFAULT_TONE_PRESET,
       },
       presets: TONE_PRESET_KEYS.map((k) => ({
@@ -58,21 +48,14 @@ export class VoiceService {
     };
   }
 
-  /** Dashboard PATCH — persist only the provided fields. Trimmed-empty → null so a
-   *  cleared freeform tone or name reverts to preset / business-name default. */
+  /** Dashboard PATCH — persist only the provided knobs. Trimmed-empty → null so a
+   *  cleared name reverts to the business-name default. */
   async updateVoice(tenantId: string, dto: UpdateVoiceDto): Promise<void> {
-    const patch: Record<string, unknown> = {};
+    const patch: { assistant_name?: string | null; tone_preset?: string | null } = {};
     if (dto.assistant_name !== undefined) {
       patch.assistant_name = dto.assistant_name.trim() || null;
     }
-    if (dto.locale !== undefined) patch.locale = dto.locale.trim() || null;
     if (dto.tone_preset !== undefined) patch.tone_preset = dto.tone_preset;
-    if (dto.tone !== undefined) {
-      patch.tone = dto.tone.trim() || null; // '' clears the override → preset wins
-    }
-    if (dto.style_notes !== undefined) {
-      patch.style_notes = dto.style_notes.map((s) => s.trim()).filter(Boolean);
-    }
     if (Object.keys(patch).length === 0) return;
     await this.repo.write(tenantId, patch);
   }

@@ -22,7 +22,8 @@ export type Row = Record<string, any>;
  *   * reachability (`normalized_phone`/`email`) is DERIVED from
  *     `tenant.contact_identity` (+ `tenant.channel` for the "kind"), not cached
  *     columns; loyalty totals derive (visits=COUNT(visit), balance=SUM(card_ledger)).
- *   * `comms.memory_items` → `tenant.customer_note`; `core.contact_merge_candidates`
+ *   * customer facts → `tenant.customer_fact` (the CDP "memory" atom, was the
+ *     misnamed `customer_note`); `core.contact_merge_candidates`
  *     → `tenant.contact_identity` probabilistic matches (`match_type='probabilistic'`)
  *     + `tenant.contact.merge_state`.
  *   * DROPPED: `observability.data_quality_findings` (not in build-v2 — deferred to
@@ -137,7 +138,7 @@ export class CustomersRepository {
            ) AS order_summary ON true
            LEFT JOIN LATERAL (
              SELECT count(cn.id) AS memory_count, max(cn.updated_at) AS last_memory_at
-             FROM tenant.customer_note AS cn
+             FROM tenant.customer_fact AS cn
              WHERE cn.business_id = c.business_id AND cn.customer_id = c.id
            ) AS memory_summary ON true
            LEFT JOIN LATERAL (
@@ -205,7 +206,7 @@ export class CustomersRepository {
                $4 = ''
                OR ($4 = 'whatsapp' AND EXISTS (SELECT 1 FROM tenant.conversation AS cv WHERE cv.business_id = c.business_id AND cv.customer_id = c.id))
                OR ($4 = 'cash' AND EXISTS (SELECT 1 FROM tenant.loyalty_card AS ca WHERE ca.business_id = c.business_id AND ca.customer_id = c.id))
-               OR ($4 = 'memory' AND EXISTS (SELECT 1 FROM tenant.customer_note AS cn WHERE cn.business_id = c.business_id AND cn.customer_id = c.id))
+               OR ($4 = 'memory' AND EXISTS (SELECT 1 FROM tenant.customer_fact AS cn WHERE cn.business_id = c.business_id AND cn.customer_id = c.id))
                OR ($4 = 'review' AND EXISTS (SELECT 1 FROM tenant.contact_identity AS mc WHERE mc.business_id = c.business_id AND mc.contact_id = c.contact_id AND mc.match_type = 'probabilistic'))
              )
              AND (
@@ -235,8 +236,8 @@ export class CustomersRepository {
            FROM tenant."order" AS o
            WHERE o.customer_id = $1::uuid AND o.business_id = $2::uuid
            UNION ALL
-           SELECT 'memory' AS type, cn.id::text AS id, cn.updated_at AS occurred_at, COALESCE(cn.source, 'note') AS label, COALESCE(cn.fact, '') AS detail, 'conversaflow' AS product
-           FROM tenant.customer_note AS cn
+           SELECT 'memory' AS type, cn.id::text AS id, cn.updated_at AS occurred_at, cn.source AS label, cn.key || ': ' || COALESCE(cn.value #>> '{}', cn.value::text) AS detail, 'conversaflow' AS product
+           FROM tenant.customer_fact AS cn
            WHERE cn.customer_id = $1::uuid AND cn.business_id = $2::uuid
          ) AS timeline
          ORDER BY occurred_at DESC

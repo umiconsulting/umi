@@ -26,7 +26,7 @@ select * from (values
     (select case when count(*)=2 then 'PASS' else 'FAIL' end from pg_class c
        join pg_namespace n on n.oid=c.relnamespace
        where n.nspname='runtime' and c.relrowsecurity and c.relforcerowsecurity
-         and c.relname in ('conversation_state','reminder_sent'))),
+         and c.relname in ('conversation_cart','reminder_sent'))),
   -- Views: security_invoker -------------------------------------------------
   -- EVERY view in umi/tenant must enforce the caller's RLS. An owner-rights view
   -- leaks cross-tenant (the audit reproduced this on conversation_analytics: 0

@@ -41,10 +41,12 @@ create table tenant.business (
   logo_url          text,
   brand_color       text,   -- primary brand color (dashboard theming + wallet pass)
   secondary_color   text,   -- accent color (dashboard theming)
-  -- Conversational agent config (owner-confirmed: typed columns on business).
-  bot_voice         text,
-  bot_tone          text,
-  bot_instructions  text,
+  -- Conversational assistant voice (tenant-configurable from the dashboard). Two knobs:
+  -- assistant_name overrides the display persona (null -> business name); assistant_tone is
+  -- the tone preset (casual|friendly|formal), rendered as the prompt's tone line. Freeform
+  -- tone + extra instructions were deferred (no injection point decided) — add columns then.
+  assistant_name    text,
+  assistant_tone    text,
   status            text not null default 'active'
                       check (status in ('active','suspended')),
   created_at        timestamptz not null default now(),
@@ -221,13 +223,23 @@ comment on column tenant.contact.verified is
   'true only when proven (verified_via=whatsapp_inbound). Gates who is safe to proactively message.';
 create index contact_lookup_idx on tenant.contact (business_id, normalized_value);
 
-create table tenant.customer_note (
+create table tenant.customer_fact (
   id           uuid primary key default gen_random_uuid(),
+  business_id  uuid not null references tenant.business(id) on delete cascade,
   customer_id  uuid not null references tenant.customer(id) on delete cascade,
-  staff_id     uuid references tenant.staff(id),
-  body         text not null,
-  created_at   timestamptz not null default now()
+  source       text not null default 'preferences'
+                 check (source in ('preferences','staff')),
+  key          text not null,            -- fact name: 'usual', 'allergies', 'birthday_month'…
+  value        jsonb not null,           -- fact value (string or list); jsonb for round-trip fidelity
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  unique (business_id, customer_id, source, key)
 );
+comment on table tenant.customer_fact is
+  'The CDP knowledge atom: durable AI-remembered facts about a customer (usuals, allergies, '
+  '"birthday in March"). Renamed + reshaped from customer_note, whose ONLY consumer was this '
+  'facts path; the order note it was confused with lives on customer_order.notes. Customer 360 '
+  'reads it as "memory". source=''staff'' is reserved for future staff-authored facts (no writer yet).';
 
 -- ----------------------------------------------------------------------------
 -- LOYALTY
@@ -486,6 +498,7 @@ create table tenant.conversation (
   status          text not null default 'open' check (status in ('open','closed')),
   outcome         text check (outcome in ('converted','abandoned','resolved','unresolved')),
   external_ref    text,
+  summary         text,        -- rolling working-memory summary of older messages (bot short-term memory)
   started_at      timestamptz not null default now(),
   last_message_at timestamptz,
   created_at      timestamptz not null default now()
@@ -503,6 +516,11 @@ create table tenant.message (
   created_at          timestamptz not null default now()
 );
 comment on column tenant.message.body is 'Body embeddings live in runtime.message_embedding, not here.';
+-- provider_message_id (Twilio SID) is the crash-safe ingress idempotency key: the user-message
+-- INSERT catches this unique violation to drop a re-delivered webhook. runtime.inbound_event is
+-- only an observability gate (written before the work), so it cannot be the authoritative dedup.
+create unique index message_provider_message_id_uidx
+  on tenant.message (provider_message_id) where provider_message_id is not null;
 
 create table tenant.knowledge_document (
   id           uuid primary key default gen_random_uuid(),
@@ -562,7 +580,7 @@ comment on column tenant.customer_order.notes is
   '("add a named customer_order.notes when a real consumer earns it") — NOT a revived free-text '
   'blob. Both ends exist today: the WhatsApp checkout writes it, and the FROZEN iPad KDS ticket '
   'renders it to the barista as `customer_note`. Per-line customization belongs on '
-  'order_item.notes; a lasting customer preference belongs on tenant.customer_note.';
+  'order_item.notes; a lasting customer preference belongs on tenant.customer_fact.';
 comment on column tenant.customer_order.pickup_person is
   'Who collects the order, when that is not the buyer. Also a frozen KDS ticket field. Never '
   'populated in the source (0/51) but written by the WhatsApp checkout, so it gets a real column '

@@ -151,7 +151,7 @@ export class WhatsappController {
     // NOTE: this is NOT the authoritative dedup. It commits before the message
     // insert + enqueue, so hard-dropping on its `duplicate` flag would strand a
     // first attempt that crashed mid-flight (gate written, work not done). The
-    // durable, idempotent guards are below: tenant.message.twilio_message_sid
+    // durable, idempotent guards are below: tenant.message.provider_message_id
     // (UNIQUE) → DUPLICATE_MESSAGE, and the enqueue jobId=messageSid (BullMQ drops
     // a re-add). So we log a duplicate here and continue; the message-level dedup
     // is what actually prevents a double turn.
@@ -172,13 +172,13 @@ export class WhatsappController {
 
     const { conversation } = await this.conversations.getOrCreateConversation(tenantId, personId);
 
-    // ── Persist the user message (twilio_message_sid dedup backstop) ──
+    // ── Persist the user message (provider_message_id dedup backstop) ──
     const userMsgId = await this.messages.insertMessage({
       tenantId,
       conversationId: conversation.id,
       role: 'user',
       content: message,
-      twilioMessageSid: messageSid,
+      providerMessageId: messageSid,
     });
     if (userMsgId === DUPLICATE_MESSAGE) {
       return emptyTwiml();
