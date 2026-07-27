@@ -2,6 +2,8 @@
 export interface AuthUser {
   id: string;
   email: string;
+  sessionId: string;
+  deviceId: string | null;
 }
 
 /** Resolved tenant membership attached by TenantAccessGuard. */
@@ -19,6 +21,7 @@ export interface TenantAccess {
   role: string | null;
   roles: string[];
   permissions: string[]; // ['*'] for super_admin
+  deniedPermissions: string[];
 }
 
 /**

@@ -56,6 +56,8 @@ export const SessionEnvelope = z.object({
   tenants: z.array(TenantMembership),
   provider: z.literal('local'),
   accessExpiresIn: z.number(),
+  sessionId: z.string().uuid(),
+  deviceId: z.string().uuid().nullable(),
 });
 export type SessionEnvelope = z.infer<typeof SessionEnvelope>;
 
@@ -76,6 +78,32 @@ export type MeTenantsResponse = z.infer<typeof MeTenantsResponse>;
 /** logout / forgot-password / reset-password. */
 export const OkResponse = z.object({ ok: z.literal(true) });
 export type OkResponse = z.infer<typeof OkResponse>;
+
+export const GlobalLogoutRequest = z.object({
+  exceptCurrent: z.boolean().default(false),
+});
+export type GlobalLogoutRequest = z.infer<typeof GlobalLogoutRequest>;
+
+export const CreateStaffRequest = z
+  .object({
+    name: z.string().trim().min(1).max(160),
+    email: z.string().trim().email(),
+    role: z.string().min(1).max(100),
+    branchId: z.string().uuid().nullable().optional(),
+    position: z.string().trim().max(160).nullable().optional(),
+  })
+  .strict();
+export type CreateStaffRequest = z.infer<typeof CreateStaffRequest>;
+
+export const UpdateStaffRequest = z
+  .object({
+    role: z.string().min(1).max(100).optional(),
+    branchId: z.string().uuid().nullable().optional(),
+    position: z.string().trim().max(160).nullable().optional(),
+    status: z.enum(['active', 'inactive']).optional(),
+  })
+  .strict();
+export type UpdateStaffRequest = z.infer<typeof UpdateStaffRequest>;
 
 // ── Cash / loyalty product-write requests ─────────────────────────────────
 // Mirror the live umi-api DTOs 1:1 (apps/umi-api/src/modules/cash/dto/*), so the
@@ -192,6 +220,9 @@ export const httpModels = {
   SessionResponse,
   MeTenantsResponse,
   OkResponse,
+  GlobalLogoutRequest,
+  CreateStaffRequest,
+  UpdateStaffRequest,
   ScanRequest,
   TopupRequest,
   PurchaseRequest,

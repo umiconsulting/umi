@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
 import { SUPER_ADMIN_SA_CTE } from './rbac.sql';
+import type { TenantMembership } from '@umi/contract';
 
 export interface UserCredential {
   userId: string;
@@ -16,13 +17,6 @@ export interface UserSummary {
   displayName: string | null;
 }
 
-export interface TenantMembershipSummary {
-  id: string;
-  slug: string;
-  name: string;
-  roles: string[];
-}
-
 export interface MembershipAccess {
   // null for a SYNTHESIZED global-super_admin access (no explicit tenant_access
   // edge in the requested tenant). Only ever surfaced to the client as an
@@ -34,6 +28,7 @@ export interface MembershipAccess {
   timezone: string | null;
   roles: string[];
   permissions: string[];
+  deniedPermissions: string[];
   branchIds: string[];
   allBranches: boolean;
 }
@@ -43,6 +38,23 @@ export interface ResetTokenRecord {
   userId: string;
   expiresAt: Date;
   usedAt: Date | null;
+}
+
+export interface SessionRecord {
+  id: string;
+  userId: string;
+  deviceId: string | null;
+  app: 'dashboard' | 'kds' | 'pos';
+  tokenHash: string;
+  expiresAt: Date;
+  revokedAt: Date | null;
+}
+
+export interface EffectiveEntitlementRecord {
+  featureKey: string;
+  enabled: boolean;
+  limit: number | null;
+  subscriptionStatus: string;
 }
 
 /**
@@ -84,6 +96,7 @@ export class AuthRepository {
        FROM umi.user AS u
        WHERE lower(u.email) = $1
          AND u.password_hash IS NOT NULL
+         AND u.status = 'active'
        LIMIT 1`,
       [email],
     );
@@ -95,7 +108,7 @@ export class AuthRepository {
     const { rows } = await this.pg.query<UserSummary>(
       `SELECT u.id::text AS "userId", u.email, u.full_name AS "displayName"
        FROM umi.user AS u
-       WHERE u.id = $1::uuid AND u.password_hash IS NOT NULL
+       WHERE u.id = $1::uuid AND u.password_hash IS NOT NULL AND u.status = 'active'
        LIMIT 1`,
       [userId],
     );
@@ -108,8 +121,8 @@ export class AuthRepository {
    * super_admin edge) sees EVERY active tenant, tagged with its explicit role
    * where one exists, else 'super_admin'.
    */
-  async findTenantsForUser(userId: string): Promise<TenantMembershipSummary[]> {
-    const { rows } = await this.pg.query<TenantMembershipSummary>(
+  async findTenantsForUser(userId: string): Promise<TenantMembership[]> {
+    const { rows } = await this.pg.query<TenantMembership>(
       `WITH ${SUPER_ADMIN_SA_CTE}
        SELECT
          t.id::text AS "id",
@@ -174,7 +187,18 @@ export class AuthRepository {
               JOIN umi.permission AS p  ON p.id = rp.permission_id
              WHERE r.key IN (SELECT role_key FROM grants)),
            '{}'
-         ) AS "permissions"
+         ) AS "permissions",
+         COALESCE(
+           (SELECT array_agg(DISTINCT p.key)
+              FROM umi.user_permission_override AS upo
+              JOIN umi.permission AS p ON p.id = upo.permission_id
+             WHERE upo.user_id = $1::uuid
+               AND (upo.business_id = $2::uuid OR upo.business_id IS NULL)
+               AND upo.branch_id IS NULL
+               AND upo.effect = 'deny'
+               AND (upo.expires_at IS NULL OR upo.expires_at > now())),
+           '{}'
+         ) AS "deniedPermissions"
        FROM tenant.business AS t
        WHERE t.id = $2::uuid
          AND t.status = 'active'
@@ -195,6 +219,44 @@ export class AuthRepository {
       [branchId, tenantId],
     );
     return rows[0]?.exists === true;
+  }
+
+  async deniedPermissions(
+    userId: string,
+    tenantId: string,
+    branchId: string | null,
+  ): Promise<string[]> {
+    const { rows } = await this.pg.query<{ key: string }>(
+      `SELECT DISTINCT p.key
+       FROM umi.user_permission_override AS upo
+       JOIN umi.permission AS p ON p.id = upo.permission_id
+       WHERE upo.user_id = $1::uuid
+         AND (upo.business_id = $2::uuid OR upo.business_id IS NULL)
+         AND (upo.branch_id IS NULL OR upo.branch_id = $3::uuid)
+         AND upo.effect = 'deny'
+         AND (upo.expires_at IS NULL OR upo.expires_at > now())`,
+      [userId, tenantId, branchId],
+    );
+    return rows.map((row) => row.key);
+  }
+
+  async allowedPermissions(
+    userId: string,
+    tenantId: string,
+    branchId: string | null,
+  ): Promise<string[]> {
+    const { rows } = await this.pg.query<{ key: string }>(
+      `SELECT DISTINCT p.key
+       FROM umi.user_permission_override AS upo
+       JOIN umi.permission AS p ON p.id = upo.permission_id
+       WHERE upo.user_id = $1::uuid
+         AND (upo.business_id = $2::uuid OR upo.business_id IS NULL)
+         AND (upo.branch_id IS NULL OR upo.branch_id = $3::uuid)
+         AND upo.effect = 'allow'
+         AND (upo.expires_at IS NULL OR upo.expires_at > now())`,
+      [userId, tenantId, branchId],
+    );
+    return rows.map((row) => row.key);
   }
 
   /** Resolve a tenant id from its slug (for the legacy `/:slug/...` routes). */
@@ -225,18 +287,275 @@ export class AuthRepository {
    * NOT scope it here; the explicit `business_id` predicate does. Returns null when
    * the feature is absent/disabled (→ `product_not_active`).
    */
-  async productStatus(tenantId: string, productKey: string): Promise<string | null> {
-    const { rows } = await this.pg.query<{ status: string }>(
-      `SELECT s.status
+  async effectiveEntitlement(
+    tenantId: string,
+    productKey: string,
+  ): Promise<EffectiveEntitlementRecord | null> {
+    const { rows } = await this.pg.query<EffectiveEntitlementRecord>(
+      `SELECT ee.feature_key AS "featureKey", ee.enabled,
+              ee.limit_value AS "limit", s.status AS "subscriptionStatus"
          FROM umi.effective_entitlement AS ee
          JOIN umi.subscription          AS s ON s.business_id = ee.business_id
         WHERE ee.business_id = $1::uuid
           AND ee.feature_key = $2
-          AND ee.enabled
         LIMIT 1`,
       [tenantId, productKey],
     );
-    return rows[0]?.status ?? null;
+    return rows[0] ?? null;
+  }
+
+  async createSession(input: {
+    id: string;
+    userId: string;
+    deviceId: string | null;
+    app: 'dashboard' | 'kds' | 'pos';
+    tokenHash: string;
+    expiresAt: Date;
+    ip: string | null;
+    userAgent: string | null;
+    familyId?: string;
+  }): Promise<void> {
+    await this.pg.query(
+      `WITH created AS (
+         INSERT INTO runtime.session
+           (id, user_id, device_id, app, token_hash, expires_at, ip, user_agent, refresh_family_id)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8,
+                 COALESCE($9::uuid, gen_random_uuid()))
+         RETURNING id, user_id
+       )
+       INSERT INTO runtime.security_audit_event
+         (actor_user_id, session_id, event_type, entity_type, entity_id, outcome, metadata)
+       SELECT user_id, id, 'session.created', 'session', id, 'success',
+              jsonb_build_object('app', $4, 'deviceBound', $3::uuid IS NOT NULL)
+       FROM created`,
+      [
+        input.id,
+        input.userId,
+        input.deviceId,
+        input.app,
+        input.tokenHash,
+        input.expiresAt,
+        input.ip,
+        input.userAgent,
+        input.familyId ?? null,
+      ],
+    );
+  }
+
+  async findSession(sessionId: string): Promise<SessionRecord | null> {
+    const { rows } = await this.pg.query<SessionRecord>(
+      `SELECT id::text, user_id::text AS "userId", device_id::text AS "deviceId",
+              app, token_hash AS "tokenHash", expires_at AS "expiresAt",
+              revoked_at AS "revokedAt"
+       FROM runtime.session WHERE id = $1::uuid LIMIT 1`,
+      [sessionId],
+    );
+    return rows[0] ?? null;
+  }
+
+  async sessionIsActive(sessionId: string, userId: string): Promise<boolean> {
+    const { rows } = await this.pg.query<{ active: boolean }>(
+      `UPDATE runtime.session AS s
+       SET last_seen_at = now()
+       WHERE s.id = $1::uuid AND s.user_id = $2::uuid
+         AND s.revoked_at IS NULL AND s.expires_at > now()
+         AND (
+           s.device_id IS NULL OR EXISTS (
+             SELECT 1 FROM tenant.device AS d
+             WHERE d.id = s.device_id AND d.status = 'active'
+           )
+         )
+       RETURNING true AS active`,
+      [sessionId, userId],
+    );
+    return rows[0]?.active === true;
+  }
+
+  async deviceAllowedForUser(
+    userId: string,
+    deviceId: string,
+    app: 'dashboard' | 'kds' | 'pos',
+  ): Promise<boolean> {
+    if (app === 'dashboard') return false;
+    const expectedKind = app === 'kds' ? 'kds' : 'pos_terminal';
+    const { rows } = await this.pg.query<{ allowed: boolean }>(
+      `WITH ${SUPER_ADMIN_SA_CTE}
+       SELECT EXISTS (
+         SELECT 1
+         FROM tenant.device AS d
+         WHERE d.id = $2::uuid
+           AND d.kind = $3
+           AND d.status = 'active'
+           AND (
+             EXISTS (
+               SELECT 1 FROM umi.user_role AS ur
+               WHERE ur.user_id = $1::uuid
+                 AND (ur.business_id = d.business_id OR ur.business_id IS NULL)
+                 AND (ur.branch_id IS NULL OR ur.branch_id = d.branch_id)
+             )
+             OR (SELECT is_sa FROM sa)
+           )
+       ) AS allowed`,
+      [userId, deviceId, expectedKind],
+    );
+    return rows[0]?.allowed === true;
+  }
+
+  async rotateSession(
+    currentId: string,
+    tokenHash: string,
+    replacement: {
+      id: string;
+      userId: string;
+      deviceId: string | null;
+      app: 'dashboard' | 'kds' | 'pos';
+      tokenHash: string;
+      expiresAt: Date;
+      ip: string | null;
+      userAgent: string | null;
+    },
+  ): Promise<boolean> {
+    const client = await this.pg.worker.connect();
+    try {
+      await client.query('BEGIN');
+      const { rows } = await client.query<{ refreshFamilyId: string }>(
+        `SELECT refresh_family_id::text AS "refreshFamilyId"
+         FROM runtime.session
+         WHERE id = $1::uuid AND token_hash = $2 AND revoked_at IS NULL AND expires_at > now()
+         FOR UPDATE`,
+        [currentId, tokenHash],
+      );
+      const current = rows[0];
+      if (!current) {
+        await client.query('ROLLBACK');
+        return false;
+      }
+      await client.query(
+        `INSERT INTO runtime.session
+           (id, user_id, device_id, app, token_hash, expires_at, ip, user_agent, refresh_family_id)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9::uuid)`,
+        [
+          replacement.id,
+          replacement.userId,
+          replacement.deviceId,
+          replacement.app,
+          replacement.tokenHash,
+          replacement.expiresAt,
+          replacement.ip,
+          replacement.userAgent,
+          current.refreshFamilyId,
+        ],
+      );
+      await client.query(
+        `UPDATE runtime.session
+         SET revoked_at = now(), revoked_reason = 'rotated', replaced_by_id = $2::uuid
+         WHERE id = $1::uuid`,
+        [currentId, replacement.id],
+      );
+      await client.query(
+        `INSERT INTO runtime.security_audit_event
+           (actor_user_id, session_id, event_type, entity_type, entity_id, outcome, metadata)
+         VALUES ($1::uuid, $2::uuid, 'session.renewed', 'session', $2::uuid, 'success',
+                 jsonb_build_object('previousSessionId', $3))`,
+        [replacement.userId, replacement.id, currentId],
+      );
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async revokeSession(sessionId: string, reason: string): Promise<void> {
+    await this.pg.query(
+      `UPDATE runtime.session
+       SET revoked_at = COALESCE(revoked_at, now()), revoked_reason = COALESCE(revoked_reason, $2)
+       WHERE id = $1::uuid`,
+      [sessionId, reason],
+    );
+  }
+
+  async revokeSessionFamily(sessionId: string, reason: string): Promise<void> {
+    await this.pg.query(
+      `UPDATE runtime.session
+       SET revoked_at = COALESCE(revoked_at, now()),
+           revoked_reason = COALESCE(revoked_reason, $2)
+       WHERE refresh_family_id = (
+         SELECT refresh_family_id FROM runtime.session WHERE id = $1::uuid
+       )`,
+      [sessionId, reason],
+    );
+  }
+
+  async revokeUserSessions(userId: string, exceptSessionId: string | null): Promise<number> {
+    const { rowCount } = await this.pg.query(
+      `UPDATE runtime.session
+       SET revoked_at = now(), revoked_reason = 'global_logout'
+       WHERE user_id = $1::uuid AND revoked_at IS NULL
+         AND ($2::uuid IS NULL OR id <> $2::uuid)`,
+      [userId, exceptSessionId],
+    );
+    return rowCount ?? 0;
+  }
+
+  async writeSecurityAudit(input: {
+    actorUserId: string | null;
+    sessionId: string | null;
+    businessId?: string | null;
+    branchId?: string | null;
+    eventType: string;
+    entityType: string;
+    entityId?: string | null;
+    outcome: 'success' | 'denied' | 'failure';
+    reasonCode?: string | null;
+    requestId?: string | null;
+    metadata?: Record<string, unknown>;
+  }): Promise<void> {
+    await this.pg.query(
+      `INSERT INTO runtime.security_audit_event
+         (actor_user_id, session_id, business_id, branch_id, event_type, entity_type,
+          entity_id, outcome, reason_code, request_id, metadata)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5, $6, $7::uuid, $8, $9, $10, $11)`,
+      [
+        input.actorUserId,
+        input.sessionId,
+        input.businessId ?? null,
+        input.branchId ?? null,
+        input.eventType,
+        input.entityType,
+        input.entityId ?? null,
+        input.outcome,
+        input.reasonCode ?? null,
+        input.requestId ?? null,
+        input.metadata ?? {},
+      ],
+    );
+  }
+
+  async hasElevation(input: {
+    sessionId: string;
+    businessId: string;
+    branchId: string | null;
+    permission: string;
+    method: 'manager_approval' | 'operator_pin';
+  }): Promise<boolean> {
+    const { rows } = await this.pg.query<{ active: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM runtime.elevation_grant
+         WHERE session_id = $1::uuid
+           AND business_id = $2::uuid
+           AND (branch_id IS NULL OR branch_id = $3::uuid)
+           AND permission_key = $4
+           AND method = $5
+           AND expires_at > now()
+           AND consumed_at IS NULL
+       ) AS active`,
+      [input.sessionId, input.businessId, input.branchId, input.permission, input.method],
+    );
+    return rows[0]?.active === true;
   }
 
   // ── password reset (runtime.password_reset_token, user-keyed) ──
@@ -264,6 +583,7 @@ export class AuthRepository {
     await this.pg.query(
       `UPDATE umi.user
        SET password_salt = $2, password_hash = $3, updated_at = now()
+           , status = 'active'
        WHERE id = $1::uuid`,
       [userId, salt, hash],
     );

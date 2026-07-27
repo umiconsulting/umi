@@ -124,6 +124,8 @@ test('session schemas (auth surface) — representative parse', () => {
         tenants: [{ id: 't', slug: 's', name: 'n', roles: ['owner'] }],
         provider: 'local',
         accessExpiresIn: 1800,
+        sessionId: '00000000-0000-4000-8000-000000000001',
+        deviceId: null,
       },
     }).success,
   );

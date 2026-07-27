@@ -163,7 +163,8 @@ function dartClass(name, schema) {
     .join('\n');
   const decode = properties
     .map(([key, value]) => {
-      const input = required.has(key) ? value : { anyOf: [value, { type: 'null' }] };
+      const input =
+        required.has(key) || nullable(value) ? value : { anyOf: [value, { type: 'null' }] };
       return `      ${key}: ${dartDecode(input, `json[${JSON.stringify(key)}]`)},`;
     })
     .join('\n');

@@ -27,6 +27,7 @@ import {
 } from './auth.types';
 import {
   ForgotPasswordRequest,
+  GlobalLogoutRequest,
   LoginRequest,
   ResetPasswordRequest,
   type SessionEnvelope,
@@ -51,9 +52,10 @@ export class AuthController {
   @Post('local/login')
   async login(
     @Body(new ZodValidationPipe(LoginRequest)) dto: LoginRequest,
+    @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<SessionResponse> {
-    const result = await this.auth.login(dto.username, dto.password);
+    const result = await this.auth.login(dto.username, dto.password, this.client(req));
     this.setAuthCookies(reply, result, dto.remember ?? false);
     return { session: toSession(result, this.accessExpiresIn()) };
   }
@@ -66,7 +68,7 @@ export class AuthController {
   ): Promise<SessionResponse> {
     const token = req.cookies?.[REFRESH_COOKIE];
     if (!token) throw new UnauthorizedException('authentication_required');
-    const result = await this.auth.refresh(token);
+    const result = await this.auth.refresh(token, this.client(req));
     // Preserve the persistent-vs-session choice from login across rotations.
     const remember = req.cookies?.[REMEMBER_COOKIE] === '1';
     this.setAuthCookies(reply, result, remember);
@@ -75,11 +77,34 @@ export class AuthController {
 
   @Public()
   @Post('local/logout')
-  logout(@Res({ passthrough: true }) reply: FastifyReply): { ok: true } {
+  async logout(
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<{ ok: true }> {
+    await this.auth.logout(req.cookies?.[REFRESH_COOKIE]);
     for (const name of [ACCESS_COOKIE, REFRESH_COOKIE, CSRF_COOKIE, REMEMBER_COOKIE]) {
       reply.clearCookie(name, { path: '/' });
     }
     return { ok: true };
+  }
+
+  @Post('local/global-logout')
+  async globalLogout(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodValidationPipe(GlobalLogoutRequest)) dto: GlobalLogoutRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<{ ok: true; revokedSessions: number }> {
+    const revokedSessions = await this.auth.globalLogout(
+      user.id,
+      user.sessionId,
+      dto.exceptCurrent,
+    );
+    if (!dto.exceptCurrent) {
+      for (const name of [ACCESS_COOKIE, REFRESH_COOKIE, CSRF_COOKIE, REMEMBER_COOKIE]) {
+        reply.clearCookie(name, { path: '/' });
+      }
+    }
+    return { ok: true, revokedSessions };
   }
 
   @Public()
@@ -109,6 +134,8 @@ export class AuthController {
         ...session,
         provider: 'local',
         accessExpiresIn: this.remainingAccessSeconds(req),
+        sessionId: user.sessionId,
+        deviceId: user.deviceId,
       },
     };
   }
@@ -169,6 +196,23 @@ export class AuthController {
       buildCookieOptions(this.config, 'refresh', remember),
     );
   }
+
+  private client(req: FastifyRequest): {
+    app: 'dashboard' | 'kds' | 'pos';
+    deviceId: string | null;
+    ip: string | null;
+    userAgent: string | null;
+  } {
+    const rawApp = req.headers['x-umi-app'];
+    const app = rawApp === 'kds' || rawApp === 'pos' ? rawApp : 'dashboard';
+    const rawDevice = req.headers['x-umi-device-id'];
+    return {
+      app,
+      deviceId: typeof rawDevice === 'string' && app !== 'dashboard' ? rawDevice : null,
+      ip: req.ip ?? null,
+      userAgent: req.headers['user-agent'] ?? null,
+    };
+  }
 }
 
 function toSession(result: LoginResult, accessExpiresIn: number): SessionEnvelope {
@@ -177,5 +221,7 @@ function toSession(result: LoginResult, accessExpiresIn: number): SessionEnvelop
     tenants: result.tenants,
     provider: 'local',
     accessExpiresIn,
+    sessionId: result.sessionId,
+    deviceId: result.deviceId,
   };
 }

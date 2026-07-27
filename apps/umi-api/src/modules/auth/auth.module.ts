@@ -7,6 +7,7 @@ import { TenantAccessGuard } from './tenant-access.guard';
 import { PublicTenantGuard } from './public-tenant.guard';
 import { EntitlementGuard } from './entitlement.guard';
 import { RolesGuard } from './roles.guard';
+import { ElevationGuard } from './elevation.guard';
 
 /**
  * Auth domain (D9). Owns login/refresh/logout/reset + the four guards that the
@@ -24,6 +25,7 @@ import { RolesGuard } from './roles.guard';
     PublicTenantGuard,
     EntitlementGuard,
     RolesGuard,
+    ElevationGuard,
   ],
   exports: [
     AuthRepository,
@@ -32,6 +34,7 @@ import { RolesGuard } from './roles.guard';
     PublicTenantGuard,
     EntitlementGuard,
     RolesGuard,
+    ElevationGuard,
   ],
 })
 export class AuthModule {}

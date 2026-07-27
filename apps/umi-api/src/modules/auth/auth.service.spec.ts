@@ -11,11 +11,20 @@ function make() {
     findResetToken: vi.fn(),
     updatePassword: vi.fn().mockResolvedValue(undefined),
     markResetTokenUsed: vi.fn().mockResolvedValue(undefined),
+    createSession: vi.fn().mockResolvedValue(undefined),
+    writeSecurityAudit: vi.fn().mockResolvedValue(undefined),
+    findSession: vi.fn(),
+    rotateSession: vi.fn(),
+    revokeSession: vi.fn(),
+    revokeSessionFamily: vi.fn(),
+    revokeUserSessions: vi.fn(),
+    deviceAllowedForUser: vi.fn().mockResolvedValue(true),
   };
   const passwords = { verify: vi.fn(), hash: vi.fn() };
   const jwt = {
     signAccess: vi.fn().mockResolvedValue('access-tok'),
     signRefresh: vi.fn().mockResolvedValue('refresh-tok'),
+    verifyRefresh: vi.fn(),
   };
   const email = { send: vi.fn().mockResolvedValue({ messageId: 'm1' }) };
   const config = { get: vi.fn().mockReturnValue('https://app.test') };
@@ -36,6 +45,12 @@ const CRED = {
   passwordSalt: 'salt',
   passwordHash: 'hash',
 };
+const CLIENT = {
+  app: 'dashboard' as const,
+  deviceId: null,
+  ip: '127.0.0.1',
+  userAgent: 'test',
+};
 
 describe('AuthService.login', () => {
   let h: ReturnType<typeof make>;
@@ -45,7 +60,7 @@ describe('AuthService.login', () => {
     h.repo.findCredentialByEmail.mockResolvedValue(CRED);
     h.passwords.verify.mockReturnValue(true);
 
-    const r = await h.svc.login('  Owner@Kala.co ', 'pw');
+    const r = await h.svc.login('  Owner@Kala.co ', 'pw', CLIENT);
 
     expect(h.repo.findCredentialByEmail).toHaveBeenCalledWith('owner@kala.co');
     expect(r.accessToken).toBe('access-tok');
@@ -60,12 +75,85 @@ describe('AuthService.login', () => {
   it('401s on wrong password', async () => {
     h.repo.findCredentialByEmail.mockResolvedValue(CRED);
     h.passwords.verify.mockReturnValue(false);
-    await expect(h.svc.login('owner@kala.co', 'bad')).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(h.svc.login('owner@kala.co', 'bad', CLIENT)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
   });
 
   it('401s (no enumeration) on unknown user', async () => {
     h.repo.findCredentialByEmail.mockResolvedValue(null);
-    await expect(h.svc.login('nobody@x.co', 'pw')).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(h.svc.login('nobody@x.co', 'pw', CLIENT)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+  });
+
+  it('rejects a device outside the user tenant and branch scope', async () => {
+    h.repo.findCredentialByEmail.mockResolvedValue(CRED);
+    h.passwords.verify.mockReturnValue(true);
+    h.repo.deviceAllowedForUser.mockResolvedValue(false);
+    await expect(
+      h.svc.login('owner@kala.co', 'pw', {
+        ...CLIENT,
+        app: 'pos',
+        deviceId: '00000000-0000-4000-8000-000000000099',
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(h.repo.createSession).not.toHaveBeenCalled();
+  });
+});
+
+describe('AuthService durable sessions', () => {
+  let h: ReturnType<typeof make>;
+  beforeEach(() => {
+    h = make();
+    h.repo.findUserById.mockResolvedValue({
+      userId: 'u1',
+      email: 'owner@kala.co',
+      displayName: 'Owner',
+    });
+    h.jwt.verifyRefresh.mockResolvedValue({ sub: 'u1', sessionId: 'session-old' });
+    h.repo.findSession.mockResolvedValue({
+      id: 'session-old',
+      userId: 'u1',
+      deviceId: null,
+      app: 'dashboard',
+      tokenHash: '75da00f6378d098bbe2e19dd7ce73a633c0f0f56aa876e9741e37974f1e68ed9',
+      expiresAt: new Date(Date.now() + 60_000),
+      revokedAt: null,
+    });
+    h.repo.rotateSession.mockResolvedValue(true);
+    h.repo.revokeUserSessions.mockResolvedValue(3);
+  });
+
+  it('rotates a durable refresh session and invalidates the old record', async () => {
+    const result = await h.svc.refresh('refresh-tok', CLIENT);
+    expect(result.refreshToken).toBe('refresh-tok');
+    expect(h.repo.rotateSession).toHaveBeenCalledOnce();
+  });
+
+  it('rejects a replay when the stored refresh fingerprint differs', async () => {
+    h.repo.findSession.mockResolvedValue({
+      ...(await h.repo.findSession()),
+      id: 'session-old',
+      userId: 'u1',
+      app: 'dashboard',
+      deviceId: null,
+      tokenHash: 'different',
+      expiresAt: new Date(Date.now() + 60_000),
+      revokedAt: null,
+    });
+    await expect(h.svc.refresh('refresh-tok', CLIENT)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    expect(h.repo.revokeSessionFamily).toHaveBeenCalledWith('session-old', 'refresh_replay');
+  });
+
+  it('revokes all user sessions and audits global logout', async () => {
+    await expect(h.svc.globalLogout('u1', 'session-old', false)).resolves.toBe(3);
+    expect(h.repo.revokeUserSessions).toHaveBeenCalledWith('u1', null);
+    expect(h.repo.writeSecurityAudit).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'session.global_logout' }),
+    );
   });
 });
 

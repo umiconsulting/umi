@@ -33,13 +33,17 @@ describe('AuthGuard', () => {
     (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation(
       (k: string) => k === IS_PUBLIC,
     );
-    const guard = new AuthGuard({ verifyAccess: vi.fn() } as never, reflector);
+    const guard = new AuthGuard({ verifyAccess: vi.fn() } as never, reflector, {
+      sessionIsActive: vi.fn(),
+    } as never);
     expect(await guard.canActivate(ctxFor({}))).toBe(true);
   });
 
   it('401s when no access cookie is present', async () => {
     (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
-    const guard = new AuthGuard({ verifyAccess: vi.fn() } as never, reflector);
+    const guard = new AuthGuard({ verifyAccess: vi.fn() } as never, reflector, {
+      sessionIsActive: vi.fn(),
+    } as never);
     await expect(guard.canActivate(ctxFor({ cookies: {} }))).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
@@ -48,12 +52,46 @@ describe('AuthGuard', () => {
   it('attaches the principal from a valid cookie', async () => {
     (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     const jwt = {
-      verifyAccess: vi.fn().mockResolvedValue({ sub: 'u1', email: 'a@b.co' }),
+      verifyAccess: vi.fn().mockResolvedValue({
+        sub: 'u1',
+        email: 'a@b.co',
+        sessionId: ACCESS,
+        deviceId: null,
+      }),
     };
-    const guard = new AuthGuard(jwt as never, reflector);
+    const guard = new AuthGuard(jwt as never, reflector, {
+      sessionIsActive: vi.fn().mockResolvedValue(true),
+    } as never);
     const req: Record<string, unknown> = { cookies: { umi_access: 'tok' } };
     expect(await guard.canActivate(ctxFor(req))).toBe(true);
-    expect(req.authUser).toEqual({ id: 'u1', email: 'a@b.co' });
+    expect(req.authUser).toEqual({
+      id: 'u1',
+      email: 'a@b.co',
+      sessionId: ACCESS,
+      deviceId: null,
+    });
+  });
+
+  it('rejects a valid access JWT after durable session revocation', async () => {
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+    const guard = new AuthGuard(
+      {
+        verifyAccess: vi.fn().mockResolvedValue({
+          sub: 'u1',
+          email: 'a@b.co',
+          sessionId: ACCESS,
+          deviceId: null,
+        }),
+      } as never,
+      reflector,
+      {
+        sessionIsActive: vi.fn().mockResolvedValue(false),
+        writeSecurityAudit: vi.fn().mockResolvedValue(undefined),
+      } as never,
+    );
+    await expect(
+      guard.canActivate(ctxFor({ cookies: { umi_access: 'tok' } })),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });
 
@@ -62,6 +100,9 @@ describe('TenantAccessGuard', () => {
     const repo = {
       findMembershipAccess: vi.fn().mockResolvedValue(null),
       tenantIdForSlug: vi.fn(),
+      deniedPermissions: vi.fn().mockResolvedValue([]),
+      allowedPermissions: vi.fn().mockResolvedValue([]),
+      writeSecurityAudit: vi.fn().mockResolvedValue(undefined),
     };
     const guard = new TenantAccessGuard(repo as never);
     const req = { authUser: { id: 'u1' }, params: { tenantId: ACCESS } };
@@ -71,6 +112,9 @@ describe('TenantAccessGuard', () => {
   it('resolves a slug → tenant and attaches membership access', async () => {
     const repo = {
       tenantIdForSlug: vi.fn().mockResolvedValue(ACCESS),
+      deniedPermissions: vi.fn().mockResolvedValue([]),
+      allowedPermissions: vi.fn().mockResolvedValue([]),
+      writeSecurityAudit: vi.fn().mockResolvedValue(undefined),
       findMembershipAccess: vi.fn().mockResolvedValue({
         membershipId: 'm1',
         tenantId: ACCESS,
@@ -96,6 +140,9 @@ describe('TenantAccessGuard', () => {
   it('attaches a validated branch scope for an all-branch membership', async () => {
     const repo = {
       tenantIdForSlug: vi.fn(),
+      deniedPermissions: vi.fn().mockResolvedValue([]),
+      allowedPermissions: vi.fn().mockResolvedValue([]),
+      writeSecurityAudit: vi.fn().mockResolvedValue(undefined),
       branchBelongsToTenant: vi.fn().mockResolvedValue(true),
       findMembershipAccess: vi.fn().mockResolvedValue({
         membershipId: 'm1',
@@ -124,6 +171,9 @@ describe('TenantAccessGuard', () => {
   it('fails closed when a restricted membership requests another branch', async () => {
     const repo = {
       tenantIdForSlug: vi.fn(),
+      deniedPermissions: vi.fn().mockResolvedValue([]),
+      allowedPermissions: vi.fn().mockResolvedValue([]),
+      writeSecurityAudit: vi.fn().mockResolvedValue(undefined),
       branchBelongsToTenant: vi.fn(),
       findMembershipAccess: vi.fn().mockResolvedValue({
         membershipId: 'm1',
@@ -156,7 +206,7 @@ describe('EntitlementGuard', () => {
 
   it('passes through when no @RequireProduct is set', async () => {
     (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
-    const guard = new EntitlementGuard(reflector, { productStatus: vi.fn() } as never);
+    const guard = new EntitlementGuard(reflector, { effectiveEntitlement: vi.fn() } as never);
     expect(await guard.canActivate(ctxFor({}))).toBe(true);
   });
 
@@ -164,7 +214,12 @@ describe('EntitlementGuard', () => {
     (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation((k: string) =>
       k === REQUIRE_PRODUCT ? 'cash' : undefined,
     );
-    const repo = { productStatus: vi.fn().mockResolvedValue('canceled') };
+    const repo = {
+      effectiveEntitlement: vi.fn().mockResolvedValue({
+        enabled: true,
+        subscriptionStatus: 'canceled',
+      }),
+    };
     const guard = new EntitlementGuard(reflector, repo as never);
     const req = { tenantAccess: { tenantId: ACCESS } };
     await expect(guard.canActivate(ctxFor(req))).rejects.toBeInstanceOf(ForbiddenException);
@@ -174,7 +229,12 @@ describe('EntitlementGuard', () => {
     (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation((k: string) =>
       k === REQUIRE_PRODUCT ? 'cash' : undefined,
     );
-    const repo = { productStatus: vi.fn().mockResolvedValue('trialing') };
+    const repo = {
+      effectiveEntitlement: vi.fn().mockResolvedValue({
+        enabled: true,
+        subscriptionStatus: 'trialing',
+      }),
+    };
     const guard = new EntitlementGuard(reflector, repo as never);
     expect(await guard.canActivate(ctxFor({ tenantAccess: { tenantId: ACCESS } }))).toBe(true);
   });
@@ -183,21 +243,43 @@ describe('EntitlementGuard', () => {
 describe('RolesGuard', () => {
   const reflector = { getAllAndOverride: vi.fn() } as unknown as Reflector;
 
-  it('403s when the membership lacks the required role', () => {
+  it('403s when the membership lacks the required role', async () => {
     (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation((k: string) =>
       k === ROLES_KEY ? ['owner'] : undefined,
     );
-    const guard = new RolesGuard(reflector);
+    const guard = new RolesGuard(reflector, { writeSecurityAudit: vi.fn() } as never);
     const req = { tenantAccess: { roles: ['staff'], permissions: [] } };
-    expect(() => guard.canActivate(ctxFor(req))).toThrow(ForbiddenException);
+    await expect(guard.canActivate(ctxFor(req))).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('allows when a required role is present', () => {
+  it('allows when a required role is present', async () => {
     (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation((k: string) =>
       k === ROLES_KEY ? ['owner', 'admin'] : undefined,
     );
-    const guard = new RolesGuard(reflector);
+    const guard = new RolesGuard(reflector, { writeSecurityAudit: vi.fn() } as never);
     const req = { tenantAccess: { roles: ['admin'], permissions: [] } };
-    expect(guard.canActivate(ctxFor(req))).toBe(true);
+    await expect(guard.canActivate(ctxFor(req))).resolves.toBe(true);
+  });
+
+  it('fails closed when an explicit deny overrides a role permission', async () => {
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation((key: string) =>
+      key === 'umi:permission' ? 'staff.manage' : undefined,
+    );
+    const audit = vi.fn();
+    const guard = new RolesGuard(reflector, { writeSecurityAudit: audit } as never);
+    const req = {
+      authUser: { id: 'u1', sessionId: ACCESS },
+      tenantAccess: {
+        tenantId: ACCESS,
+        branchId: BRANCH,
+        roles: ['owner'],
+        permissions: ['*'],
+        deniedPermissions: ['staff.manage'],
+      },
+    };
+    await expect(guard.canActivate(ctxFor(req))).rejects.toBeInstanceOf(ForbiddenException);
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'authorization.denied' }),
+    );
   });
 });

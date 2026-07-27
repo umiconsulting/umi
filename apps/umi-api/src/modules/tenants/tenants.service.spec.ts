@@ -28,6 +28,7 @@ const ACCESS: TenantAccess = {
   role: 'owner',
   roles: ['owner'],
   permissions: ['*'],
+  deniedPermissions: [],
 };
 
 const LOCS = [

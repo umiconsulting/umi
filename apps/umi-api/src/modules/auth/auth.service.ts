@@ -1,29 +1,34 @@
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { PasswordService } from '../../shared/auth/password.service';
 import { JwtService } from '../../shared/auth/jwt.service';
 import { EmailAdapter } from '../../shared/adapters/email.adapter';
 import type { AppConfig } from '../../shared/config/config.schema';
-import { AuthRepository, type TenantMembershipSummary } from './auth.repository';
-
-export interface SessionUser {
-  id: string;
-  email: string;
-  displayName: string | null;
-}
+import { AuthRepository } from './auth.repository';
+import { parseDurationSeconds } from './cookies';
+import type { SessionUser, TenantMembership } from '@umi/contract';
 
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;
+  sessionId: string;
+  deviceId: string | null;
 }
 
 export interface LoginResult extends TokenPair {
   user: SessionUser;
-  tenants: TenantMembershipSummary[];
+  tenants: TenantMembership[];
 }
 
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 min, mirrors the dashboard
+
+export interface SessionClient {
+  app: 'dashboard' | 'kds' | 'pos';
+  deviceId: string | null;
+  ip: string | null;
+  userAgent: string | null;
+}
 
 /**
  * Auth business logic (D9). Verifies scrypt credentials, issues JWT pairs, and
@@ -42,7 +47,7 @@ export class AuthService {
     private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
-  async login(usernameRaw: string, password: string): Promise<LoginResult> {
+  async login(usernameRaw: string, password: string, client: SessionClient): Promise<LoginResult> {
     const username = usernameRaw.trim().toLowerCase();
     if (!username || !password) {
       throw new BadRequestException('username and password are required');
@@ -62,17 +67,55 @@ export class AuthService {
       email: credential.email,
       displayName: credential.displayName,
     };
+    if (
+      client.deviceId &&
+      !(await this.repo.deviceAllowedForUser(user.id, client.deviceId, client.app))
+    ) {
+      await this.repo.writeSecurityAudit({
+        actorUserId: user.id,
+        sessionId: null,
+        eventType: 'authentication.denied',
+        entityType: 'device',
+        entityId: client.deviceId,
+        outcome: 'denied',
+        reasonCode: 'device_not_allowed',
+        metadata: { app: client.app },
+      });
+      throw new UnauthorizedException('device_not_allowed');
+    }
     const [tenants, tokens] = await Promise.all([
       this.repo.findTenantsForUser(user.id),
-      this.issueTokens(user),
+      this.createSession(user, client),
     ]);
     return { user, tenants, ...tokens };
   }
 
   /** Rotate the access token from a valid refresh token. */
-  async refresh(refreshToken: string): Promise<LoginResult> {
-    const userId = await this.jwt.verifyRefresh(refreshToken);
-    const summary = await this.repo.findUserById(userId);
+  async refresh(refreshToken: string, client: SessionClient): Promise<LoginResult> {
+    const claims = await this.jwt.verifyRefresh(refreshToken);
+    const current = await this.repo.findSession(claims.sessionId);
+    if (
+      !current ||
+      current.userId !== claims.sub ||
+      current.tokenHash !== tokenHash(refreshToken) ||
+      current.revokedAt ||
+      new Date(current.expiresAt) <= new Date()
+    ) {
+      if (current) {
+        await this.repo.revokeSessionFamily(current.id, 'refresh_replay');
+        await this.repo.writeSecurityAudit({
+          actorUserId: claims.sub,
+          sessionId: current.id,
+          eventType: 'authentication.refresh_replay',
+          entityType: 'session',
+          entityId: current.id,
+          outcome: 'denied',
+          reasonCode: 'refresh_replay',
+        });
+      }
+      throw new UnauthorizedException('invalid_token');
+    }
+    const summary = await this.repo.findUserById(claims.sub);
     if (!summary) throw new UnauthorizedException('invalid_token');
     const user: SessionUser = {
       id: summary.userId,
@@ -81,15 +124,13 @@ export class AuthService {
     };
     const [tenants, tokens] = await Promise.all([
       this.repo.findTenantsForUser(user.id),
-      this.issueTokens(user),
+      this.rotateSession(user, current, refreshToken, client),
     ]);
     return { user, tenants, ...tokens };
   }
 
   /** Rehydrate the session for `/me` from a verified access cookie. */
-  async session(
-    userId: string,
-  ): Promise<{ user: SessionUser; tenants: TenantMembershipSummary[] }> {
+  async session(userId: string): Promise<{ user: SessionUser; tenants: TenantMembership[] }> {
     const summary = await this.repo.findUserById(userId);
     if (!summary) throw new UnauthorizedException('invalid_token');
     const [tenants] = await Promise.all([this.repo.findTenantsForUser(userId)]);
@@ -103,12 +144,97 @@ export class AuthService {
     };
   }
 
-  private async issueTokens(user: SessionUser): Promise<TokenPair> {
-    const [accessToken, refreshToken] = await Promise.all([
-      this.jwt.signAccess({ sub: user.id, email: user.email }),
-      this.jwt.signRefresh(user.id),
-    ]);
-    return { accessToken, refreshToken };
+  private async createSession(user: SessionUser, client: SessionClient): Promise<TokenPair> {
+    const sessionId = randomUUID();
+    const refreshToken = await this.jwt.signRefresh(user.id, sessionId);
+    const accessToken = await this.jwt.signAccess({
+      sub: user.id,
+      email: user.email,
+      sessionId,
+      deviceId: client.deviceId,
+    });
+    await this.repo.createSession({
+      id: sessionId,
+      userId: user.id,
+      deviceId: client.deviceId,
+      app: client.app,
+      tokenHash: tokenHash(refreshToken),
+      expiresAt: this.refreshExpiry(),
+      ip: client.ip,
+      userAgent: client.userAgent,
+    });
+    return { accessToken, refreshToken, sessionId, deviceId: client.deviceId };
+  }
+
+  private async rotateSession(
+    user: SessionUser,
+    current: {
+      id: string;
+      deviceId: string | null;
+      app: 'dashboard' | 'kds' | 'pos';
+    },
+    oldRefreshToken: string,
+    client: SessionClient,
+  ): Promise<TokenPair> {
+    const sessionId = randomUUID();
+    const deviceId = current.deviceId ?? client.deviceId;
+    const refreshToken = await this.jwt.signRefresh(user.id, sessionId);
+    const accessToken = await this.jwt.signAccess({
+      sub: user.id,
+      email: user.email,
+      sessionId,
+      deviceId,
+    });
+    const rotated = await this.repo.rotateSession(current.id, tokenHash(oldRefreshToken), {
+      id: sessionId,
+      userId: user.id,
+      deviceId,
+      app: current.app,
+      tokenHash: tokenHash(refreshToken),
+      expiresAt: this.refreshExpiry(),
+      ip: client.ip,
+      userAgent: client.userAgent,
+    });
+    if (!rotated) throw new UnauthorizedException('invalid_token');
+    return { accessToken, refreshToken, sessionId, deviceId };
+  }
+
+  async logout(refreshToken: string | undefined): Promise<void> {
+    if (!refreshToken) return;
+    try {
+      const claims = await this.jwt.verifyRefresh(refreshToken);
+      await this.repo.revokeSession(claims.sessionId, 'logout');
+      await this.repo.writeSecurityAudit({
+        actorUserId: claims.sub,
+        sessionId: claims.sessionId,
+        eventType: 'session.revoked',
+        entityType: 'session',
+        entityId: claims.sessionId,
+        outcome: 'success',
+        reasonCode: 'logout',
+      });
+    } catch {
+      // Logout remains idempotent. Invalid cookies are cleared by the controller.
+    }
+  }
+
+  async globalLogout(userId: string, sessionId: string, exceptCurrent: boolean): Promise<number> {
+    const count = await this.repo.revokeUserSessions(userId, exceptCurrent ? sessionId : null);
+    await this.repo.writeSecurityAudit({
+      actorUserId: userId,
+      sessionId,
+      eventType: 'session.global_logout',
+      entityType: 'user',
+      entityId: userId,
+      outcome: 'success',
+      metadata: { revokedSessionCount: count, exceptCurrent },
+    });
+    return count;
+  }
+
+  private refreshExpiry(): Date {
+    const ttl = parseDurationSeconds(this.config.get('JWT_REFRESH_TTL', { infer: true }));
+    return new Date(Date.now() + ttl * 1000);
   }
 
   /**
@@ -171,5 +297,19 @@ export class AuthService {
     const { salt, hash } = this.passwords.hash(password);
     await this.repo.updatePassword(record.userId, salt, hash);
     await this.repo.markResetTokenUsed(record.id);
+    await this.repo.revokeUserSessions(record.userId, null);
+    await this.repo.writeSecurityAudit({
+      actorUserId: record.userId,
+      sessionId: null,
+      eventType: 'identity.password_changed',
+      entityType: 'user',
+      entityId: record.userId,
+      outcome: 'success',
+      reasonCode: 'password_reset',
+    });
   }
+}
+
+function tokenHash(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
 }

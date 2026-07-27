@@ -36,6 +36,7 @@ export function effectivePermissions(role: string | null, permissions: string[])
   return role === 'super_admin' ? ['*'] : permissions;
 }
 
-export function hasPermission(granted: string[], required: string): boolean {
+export function hasPermission(granted: string[], required: string, denied: string[] = []): boolean {
+  if (denied.includes(required) || denied.includes('*')) return false;
   return granted.includes('*') || granted.includes(required);
 }

@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "cc11cfd51d2a9bc12b3ccf59fcc9a9db203e73cdbb2297e62bc13cc3822fd2cc",
+  "contentHash": "87430927565efb06d6c5c726f0e396a880917a6230dd083bfc8610ba8ca119b0",
   "contractVersion": "1.0.0",
   "definitions": {
     "ApiError": {
@@ -19,6 +19,9 @@
             "OPTIMISTIC_VERSION_CONFLICT",
             "RATE_LIMITED",
             "DEVICE_REVOKED",
+            "DEVICE_NOT_ALLOWED",
+            "SESSION_REVOKED",
+            "ELEVATION_REQUIRED",
             "PAYMENT_OUTCOME_UNKNOWN",
             "RESOURCE_NOT_FOUND",
             "INTERNAL_ERROR"
@@ -76,6 +79,9 @@
                 "OPTIMISTIC_VERSION_CONFLICT",
                 "RATE_LIMITED",
                 "DEVICE_REVOKED",
+                "DEVICE_NOT_ALLOWED",
+                "SESSION_REVOKED",
+                "ELEVATION_REQUIRED",
                 "PAYMENT_OUTCOME_UNKNOWN",
                 "RESOURCE_NOT_FOUND",
                 "INTERNAL_ERROR"
@@ -150,6 +156,54 @@
         "actorId",
         "occurredAt",
         "correlationId"
+      ],
+      "type": "object"
+    },
+    "AuthorizationDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed": {
+          "type": "boolean"
+        },
+        "branchId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "permission": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "granted",
+            "explicit_deny",
+            "missing_permission",
+            "missing_entitlement",
+            "tenant_scope",
+            "branch_scope",
+            "elevation_required"
+          ],
+          "type": "string"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "allowed",
+        "reason",
+        "permission",
+        "tenantId",
+        "branchId"
       ],
       "type": "object"
     },
@@ -234,6 +288,223 @@
       ],
       "type": "object"
     },
+    "CreateStaffRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "email": {
+          "format": "email",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "role": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "email",
+        "role"
+      ],
+      "type": "object"
+    },
+    "DeviceAuthContext": {
+      "additionalProperties": false,
+      "properties": {
+        "application": {
+          "enum": [
+            "dashboard",
+            "kds",
+            "pos"
+          ],
+          "type": "string"
+        },
+        "deviceId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "deviceId",
+        "application"
+      ],
+      "type": "object"
+    },
+    "DurableSession": {
+      "additionalProperties": false,
+      "properties": {
+        "application": {
+          "enum": [
+            "dashboard",
+            "kds",
+            "pos"
+          ],
+          "type": "string"
+        },
+        "deviceId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expiresAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "issuedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "lastSeenAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "revokedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "userId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sessionId",
+        "userId",
+        "deviceId",
+        "application",
+        "issuedAt",
+        "expiresAt",
+        "lastSeenAt",
+        "revokedAt"
+      ],
+      "type": "object"
+    },
+    "EffectiveEntitlement": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "featureKey": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subscriptionStatus": {
+          "enum": [
+            "trialing",
+            "active",
+            "past_due",
+            "canceled"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "featureKey",
+        "enabled",
+        "limit",
+        "subscriptionStatus"
+      ],
+      "type": "object"
+    },
+    "ElevationRequirement": {
+      "additionalProperties": false,
+      "properties": {
+        "freshWithinSeconds": {
+          "exclusiveMinimum": 0,
+          "maximum": 900,
+          "type": "integer"
+        },
+        "method": {
+          "enum": [
+            "manager_approval",
+            "operator_pin"
+          ],
+          "type": "string"
+        },
+        "permission": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "permission",
+        "method",
+        "freshWithinSeconds"
+      ],
+      "type": "object"
+    },
     "ForgotPasswordRequest": {
       "additionalProperties": false,
       "properties": {
@@ -286,6 +557,16 @@
         },
         "phone": {
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GlobalLogoutRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "exceptCurrent": {
+          "default": false,
+          "type": "boolean"
         }
       },
       "type": "object"
@@ -363,6 +644,69 @@
       "required": [
         "username",
         "password"
+      ],
+      "type": "object"
+    },
+    "Membership": {
+      "additionalProperties": false,
+      "properties": {
+        "allBranches": {
+          "type": "boolean"
+        },
+        "branchIds": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        "membershipId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "permissions": {
+          "items": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        "roles": {
+          "items": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "userId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "membershipId",
+        "userId",
+        "tenantId",
+        "branchIds",
+        "allBranches",
+        "roles",
+        "permissions"
       ],
       "type": "object"
     },
@@ -1132,14 +1476,37 @@
       ],
       "type": "object"
     },
+    "SessionApplication": {
+      "enum": [
+        "dashboard",
+        "kds",
+        "pos"
+      ],
+      "type": "string"
+    },
     "SessionEnvelope": {
       "additionalProperties": false,
       "properties": {
         "accessExpiresIn": {
           "type": "number"
         },
+        "deviceId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "provider": {
           "const": "local",
+          "type": "string"
+        },
+        "sessionId": {
+          "format": "uuid",
           "type": "string"
         },
         "tenants": {
@@ -1200,7 +1567,9 @@
         "user",
         "tenants",
         "provider",
-        "accessExpiresIn"
+        "accessExpiresIn",
+        "sessionId",
+        "deviceId"
       ],
       "type": "object"
     },
@@ -1213,8 +1582,23 @@
             "accessExpiresIn": {
               "type": "number"
             },
+            "deviceId": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "provider": {
               "const": "local",
+              "type": "string"
+            },
+            "sessionId": {
+              "format": "uuid",
               "type": "string"
             },
             "tenants": {
@@ -1275,7 +1659,9 @@
             "user",
             "tenants",
             "provider",
-            "accessExpiresIn"
+            "accessExpiresIn",
+            "sessionId",
+            "deviceId"
           ],
           "type": "object"
         }
@@ -1305,6 +1691,88 @@
         "id",
         "email",
         "displayName"
+      ],
+      "type": "object"
+    },
+    "StaffIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "identity": {
+          "additionalProperties": false,
+          "properties": {
+            "displayName": {
+              "anyOf": [
+                {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "email": {
+              "format": "email",
+              "type": "string"
+            },
+            "id": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "email",
+            "displayName"
+          ],
+          "type": "object"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "staffId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "inactive"
+          ],
+          "type": "string"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "staffId",
+        "identity",
+        "tenantId",
+        "branchId",
+        "position",
+        "status"
       ],
       "type": "object"
     },
@@ -1449,6 +1917,46 @@
         "amountCentavos"
       ],
       "type": "object"
+    },
+    "UpdateStaffRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "position": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "role": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "inactive"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
     }
   },
   "errors": {
@@ -1468,7 +1976,15 @@
       "public": true,
       "retryable": false
     },
+    "DEVICE_NOT_ALLOWED": {
+      "public": true,
+      "retryable": false
+    },
     "DEVICE_REVOKED": {
+      "public": true,
+      "retryable": false
+    },
+    "ELEVATION_REQUIRED": {
       "public": true,
       "retryable": false
     },
@@ -1497,6 +2013,10 @@
       "retryable": true
     },
     "RESOURCE_NOT_FOUND": {
+      "public": true,
+      "retryable": false
+    },
+    "SESSION_REVOKED": {
       "public": true,
       "retryable": false
     },
@@ -1546,6 +2066,23 @@
       "response": "MeTenantsResponse",
       "tenantContext": false
     },
+    "PATCH /api/:slug/admin/staff/:staffId": {
+      "approval": false,
+      "auth": "session",
+      "branchContext": true,
+      "errors": [
+        "VALIDATION_FAILED",
+        "PERMISSION_DENIED",
+        "RESOURCE_NOT_FOUND"
+      ],
+      "idempotent": false,
+      "offline": false,
+      "permission": "staff.manage",
+      "pin": false,
+      "request": "UpdateStaffRequest",
+      "response": null,
+      "tenantContext": true
+    },
     "POST /api/:slug/admin/gift-cards": {
       "approval": false,
       "auth": "session",
@@ -1594,6 +2131,24 @@
       "permission": null,
       "pin": false,
       "request": "ScanRequest",
+      "response": null,
+      "tenantContext": true
+    },
+    "POST /api/:slug/admin/staff": {
+      "approval": false,
+      "auth": "session",
+      "branchContext": true,
+      "errors": [
+        "VALIDATION_FAILED",
+        "PERMISSION_DENIED",
+        "TENANT_NOT_FOUND",
+        "BRANCH_NOT_FOUND"
+      ],
+      "idempotent": false,
+      "offline": false,
+      "permission": "staff.manage",
+      "pin": false,
+      "request": "CreateStaffRequest",
       "response": null,
       "tenantContext": true
     },
@@ -1662,6 +2217,21 @@
       "pin": false,
       "request": "ForgotPasswordRequest",
       "response": "OkResponse",
+      "tenantContext": false
+    },
+    "POST /api/auth/local/global-logout": {
+      "approval": false,
+      "auth": "session",
+      "branchContext": false,
+      "errors": [
+        "AUTHENTICATION_REQUIRED"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "GlobalLogoutRequest",
+      "response": null,
       "tenantContext": false
     },
     "POST /api/auth/local/login": {

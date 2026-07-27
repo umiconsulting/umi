@@ -42,6 +42,94 @@ export const Identity = z
   .strict();
 export type Identity = z.infer<typeof Identity>;
 
+export const SessionApplication = z.enum(['dashboard', 'kds', 'pos']);
+export type SessionApplication = z.infer<typeof SessionApplication>;
+
+export const DeviceAuthContext = z
+  .object({
+    deviceId: Uuid.nullable(),
+    application: SessionApplication,
+  })
+  .strict();
+export type DeviceAuthContext = z.infer<typeof DeviceAuthContext>;
+
+export const DurableSession = z
+  .object({
+    sessionId: Uuid,
+    userId: Uuid,
+    deviceId: Uuid.nullable(),
+    application: SessionApplication,
+    issuedAt: IsoTimestamp,
+    expiresAt: IsoTimestamp,
+    lastSeenAt: IsoTimestamp.nullable(),
+    revokedAt: IsoTimestamp.nullable(),
+  })
+  .strict();
+export type DurableSession = z.infer<typeof DurableSession>;
+
+export const Membership = z
+  .object({
+    membershipId: Uuid.nullable(),
+    userId: Uuid,
+    tenantId: Uuid,
+    branchIds: z.array(Uuid).max(500),
+    allBranches: z.boolean(),
+    roles: z.array(z.string().min(1).max(100)).max(50),
+    permissions: z.array(z.string().min(1).max(100)).max(500),
+  })
+  .strict();
+export type Membership = z.infer<typeof Membership>;
+
+export const StaffIdentity = z
+  .object({
+    staffId: Uuid,
+    identity: Identity,
+    tenantId: Uuid,
+    branchId: Uuid.nullable(),
+    position: z.string().max(160).nullable(),
+    status: z.enum(['active', 'inactive']),
+  })
+  .strict();
+export type StaffIdentity = z.infer<typeof StaffIdentity>;
+
+export const AuthorizationDecision = z
+  .object({
+    allowed: z.boolean(),
+    reason: z.enum([
+      'granted',
+      'explicit_deny',
+      'missing_permission',
+      'missing_entitlement',
+      'tenant_scope',
+      'branch_scope',
+      'elevation_required',
+    ]),
+    permission: z.string().min(1).max(100),
+    tenantId: Uuid,
+    branchId: Uuid.nullable(),
+  })
+  .strict();
+export type AuthorizationDecision = z.infer<typeof AuthorizationDecision>;
+
+export const EffectiveEntitlement = z
+  .object({
+    featureKey: z.string().min(1).max(160),
+    enabled: z.boolean(),
+    limit: z.number().int().nonnegative().nullable(),
+    subscriptionStatus: z.enum(['trialing', 'active', 'past_due', 'canceled']),
+  })
+  .strict();
+export type EffectiveEntitlement = z.infer<typeof EffectiveEntitlement>;
+
+export const ElevationRequirement = z
+  .object({
+    permission: z.string().min(1).max(100),
+    method: z.enum(['manager_approval', 'operator_pin']),
+    freshWithinSeconds: z.number().int().positive().max(900),
+  })
+  .strict();
+export type ElevationRequirement = z.infer<typeof ElevationRequirement>;
+
 export const TenantContext = z
   .object({
     tenantId: Uuid,
@@ -214,6 +302,9 @@ export const API_ERROR_CODES = [
   'OPTIMISTIC_VERSION_CONFLICT',
   'RATE_LIMITED',
   'DEVICE_REVOKED',
+  'DEVICE_NOT_ALLOWED',
+  'SESSION_REVOKED',
+  'ELEVATION_REQUIRED',
   'PAYMENT_OUTCOME_UNKNOWN',
   'RESOURCE_NOT_FOUND',
   'INTERNAL_ERROR',
@@ -242,6 +333,14 @@ export const contractModels = {
   PageRequest,
   PageInfo,
   Identity,
+  SessionApplication,
+  DeviceAuthContext,
+  DurableSession,
+  Membership,
+  StaffIdentity,
+  AuthorizationDecision,
+  EffectiveEntitlement,
+  ElevationRequirement,
   TenantContext,
   BranchContext,
   OperatorContext,

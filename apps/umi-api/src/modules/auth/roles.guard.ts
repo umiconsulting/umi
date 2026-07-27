@@ -9,6 +9,7 @@ import { Reflector } from '@nestjs/core';
 import { hasPermission } from './roles';
 import { PERMISSION_KEY, ROLES_KEY } from './roles.decorator';
 import type { AuthedRequest } from './auth.types';
+import { AuthRepository } from './auth.repository';
 
 /**
  * Enforces `@Roles(...)` and `@RequirePermission(...)` against the membership
@@ -17,9 +18,12 @@ import type { AuthedRequest } from './auth.types';
  */
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly repo: AuthRepository,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -36,11 +40,36 @@ export class RolesGuard implements CanActivate {
 
     if (requiredRoles?.length) {
       const ok = access.roles.some((r) => requiredRoles.includes(r));
-      if (!ok) throw new ForbiddenException({ error: 'insufficient_role' });
+      if (!ok) {
+        await this.auditDenied(req, 'role', requiredRoles.join(','));
+        throw new ForbiddenException({ error: 'insufficient_role' });
+      }
     }
-    if (requiredPermission && !hasPermission(access.permissions, requiredPermission)) {
+    if (
+      requiredPermission &&
+      !hasPermission(access.permissions, requiredPermission, access.deniedPermissions)
+    ) {
+      await this.auditDenied(req, 'permission', requiredPermission);
       throw new ForbiddenException({ error: 'insufficient_permission' });
     }
     return true;
+  }
+
+  private async auditDenied(
+    req: AuthedRequest,
+    kind: 'role' | 'permission',
+    requirement: string,
+  ): Promise<void> {
+    await this.repo.writeSecurityAudit({
+      actorUserId: req.authUser?.id ?? null,
+      sessionId: req.authUser?.sessionId ?? null,
+      businessId: req.tenantAccess?.tenantId,
+      branchId: req.tenantAccess?.branchId,
+      eventType: 'authorization.denied',
+      entityType: kind,
+      outcome: 'denied',
+      reasonCode: `missing_${kind}`,
+      metadata: { requirement },
+    });
   }
 }

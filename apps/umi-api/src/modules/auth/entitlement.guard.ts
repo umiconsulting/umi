@@ -35,12 +35,12 @@ export class EntitlementGuard implements CanActivate {
       });
     }
 
-    const status = await this.repo.productStatus(tenantId, productKey);
-    if (!isProductStatusActive(status)) {
+    const entitlement = await this.repo.effectiveEntitlement(tenantId, productKey);
+    if (!entitlement?.enabled || !isProductStatusActive(entitlement.subscriptionStatus)) {
       throw new ForbiddenException({
         error: 'product_not_active',
         product: productKey,
-        status: status ?? 'missing',
+        status: entitlement?.subscriptionStatus ?? 'missing',
       });
     }
     return true;

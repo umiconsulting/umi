@@ -35,7 +35,19 @@ export class TenantAccessGuard implements CanActivate {
     if (!tenantId) throw new NotFoundException({ error: 'tenant_not_found' });
 
     const access = await this.repo.findMembershipAccess(user.id, tenantId);
-    if (!access) throw new NotFoundException({ error: 'tenant_not_found' });
+    if (!access) {
+      await this.repo.writeSecurityAudit({
+        actorUserId: user.id,
+        sessionId: user.sessionId,
+        businessId: tenantId,
+        eventType: 'authorization.denied',
+        entityType: 'tenant',
+        entityId: tenantId,
+        outcome: 'denied',
+        reasonCode: 'tenant_scope',
+      });
+      throw new NotFoundException({ error: 'tenant_not_found' });
+    }
 
     const requestedBranch = this.header(req, 'x-umi-branch-id');
     let branchId: string | null = requestedBranch;
@@ -46,15 +58,38 @@ export class TenantAccessGuard implements CanActivate {
         !permitted ||
         !(await this.repo.branchBelongsToTenant(requestedBranch, access.tenantId))
       ) {
+        await this.repo.writeSecurityAudit({
+          actorUserId: user.id,
+          sessionId: user.sessionId,
+          businessId: tenantId,
+          branchId: UUID_RE.test(requestedBranch) ? requestedBranch : null,
+          eventType: 'authorization.denied',
+          entityType: 'branch',
+          outcome: 'denied',
+          reasonCode: 'branch_scope',
+        });
         throw new NotFoundException({ error: 'branch_not_found' });
       }
     } else if (!access.allBranches) {
       if (access.branchIds.length !== 1) {
+        await this.repo.writeSecurityAudit({
+          actorUserId: user.id,
+          sessionId: user.sessionId,
+          businessId: tenantId,
+          eventType: 'authorization.denied',
+          entityType: 'branch',
+          outcome: 'denied',
+          reasonCode: 'branch_required',
+        });
         throw new NotFoundException({ error: 'branch_required' });
       }
       branchId = access.branchIds[0];
     }
 
+    const [deniedPermissions, allowedPermissions] = await Promise.all([
+      this.repo.deniedPermissions(user.id, access.tenantId, branchId),
+      this.repo.allowedPermissions(user.id, access.tenantId, branchId),
+    ]);
     const role = normalizeRoleKey(access.roles);
     const tenantAccess: TenantAccess = {
       tenantId: access.tenantId,
@@ -67,7 +102,10 @@ export class TenantAccessGuard implements CanActivate {
       membershipId: access.membershipId,
       role,
       roles: access.roles,
-      permissions: effectivePermissions(role, access.permissions),
+      permissions: [
+        ...new Set([...effectivePermissions(role, access.permissions), ...allowedPermissions]),
+      ],
+      deniedPermissions,
     };
     req.tenantAccess = tenantAccess;
 
