@@ -302,9 +302,9 @@ export class CustomersRepository {
         // Loyalty state DERIVED (no account layer): the customer's active card +
         // balance=SUM(card_ledger), visits=COUNT(visit), cycle/pending vs the rule.
         `WITH vr AS (
-           SELECT COALESCE((SELECT visits_required FROM tenant.loyalty_reward
-             WHERE business_id = $2::uuid AND is_active
-             ORDER BY activated_at DESC NULLS LAST LIMIT 1), 10) AS n
+           SELECT COALESCE((SELECT stamps_required FROM tenant.loyalty_reward
+             WHERE business_id = $2::uuid AND active AND type = 'stamps_free_item'
+             ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
          )
          SELECT
            lc.customer_id::text AS "loyaltyAccountId",

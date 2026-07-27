@@ -10,9 +10,9 @@ import { PgService } from '../../shared/database/pg.service';
  *   loyalty.visit_events   → tenant.loyalty_visit          (card_id, occurred_at)
  *   loyalty.birthday_rewards → tenant.loyalty_birthday_grant (card_id, status 'active')
  *   core.tenants           → tenant.business         (status 'active')
- *   loyalty.programs       → tenant.loyalty_program (branding.lifecycle_copy)
- *   loyalty.reward_configs → tenant.loyalty_reward    (is_active, latest activated_at)
- *   loyalty.lifecycle_sends→ runtime.reminder_sent    UNIQUE(business_id, card_id, journey)
+ *   loyalty.programs       → tenant.loyalty_program (lifecycle_copy)
+ *   loyalty.reward_configs → tenant.loyalty_reward    (active, latest created_at, type='stamps_free_item')
+ *   loyalty.lifecycle_sends→ runtime.reminder_sent    UNIQUE(business_id, card_id, reminder_type)
  *
  * DERIVED (no cache columns): visits_this_cycle = COUNT(visit) % visits_required;
  * the phone is the WhatsApp as-received reply address (contact_identity.display_value,
@@ -24,12 +24,11 @@ import { PgService } from '../../shared/database/pg.service';
 export interface LifecycleTenant {
   id: string;
   name: string;
-  slug: string | null;
   timezone: string | null;
 }
 
 export interface LifecycleTenantConfig {
-  lifecycleCopy: unknown; // loyalty_settings.branding.lifecycle_copy (jsonb) or null
+  lifecycleCopy: unknown; // loyalty_program.lifecycle_copy (jsonb) or null
   birthdayRewardName: string | null;
   visitsRequired: number;
   rewardName: string;
@@ -67,9 +66,9 @@ const HAS_PHONE = `ph.phone IS NOT NULL`;
 // visits_this_cycle = COUNT(visit) % active visits_required (default 10).
 const VISITS_THIS_CYCLE = `(
   (SELECT count(*) FROM tenant.loyalty_visit v WHERE v.business_id = c.business_id AND v.card_id = c.id)
-  % COALESCE((SELECT visits_required FROM tenant.loyalty_reward
-       WHERE business_id = c.business_id AND is_active
-       ORDER BY activated_at DESC NULLS LAST LIMIT 1), ${DEFAULT_VISITS_REQUIRED})
+  % COALESCE((SELECT stamps_required FROM tenant.loyalty_reward
+       WHERE business_id = c.business_id AND active AND type = 'stamps_free_item'
+       ORDER BY created_at DESC NULLS LAST LIMIT 1), ${DEFAULT_VISITS_REQUIRED})
 )::int`;
 
 @Injectable()
@@ -79,7 +78,7 @@ export class LifecycleRepository {
   /** Active tenants (mirrors the legacy `subscriptionStatus = 'ACTIVE'` filter). */
   async activeTenants(): Promise<LifecycleTenant[]> {
     const { rows } = await this.pg.query<LifecycleTenant>(
-      `SELECT id::text, name, slug, timezone
+      `SELECT id::text, name, timezone
          FROM tenant.business WHERE status = 'active'`,
     );
     return rows;
@@ -94,17 +93,17 @@ export class LifecycleRepository {
       reward_name: string | null;
     }>(
       `SELECT
-          p.branding->'lifecycle_copy' AS lifecycle_copy,
+          p.lifecycle_copy             AS lifecycle_copy,
           p.birthday_reward_name       AS birthday_reward_name,
-          rc.visits_required           AS visits_required,
-          rc.reward_name               AS reward_name
+          rc.stamps_required           AS visits_required,
+          rc.name                      AS reward_name
          FROM tenant.business t
          LEFT JOIN tenant.loyalty_program p ON p.business_id = t.id
          LEFT JOIN LATERAL (
-           SELECT visits_required, reward_name
+           SELECT stamps_required, name
              FROM tenant.loyalty_reward
-            WHERE business_id = t.id AND is_active = true
-            ORDER BY activated_at DESC NULLS LAST LIMIT 1
+            WHERE business_id = t.id AND active = true AND type = 'stamps_free_item'
+            ORDER BY created_at DESC NULLS LAST LIMIT 1
          ) rc ON true
         WHERE t.id = $1::uuid
         LIMIT 1`,
@@ -241,13 +240,15 @@ export class LifecycleRepository {
     tenantId: string,
     cardId: string,
     journey: string,
-    body: string,
+    _body: string,
   ): Promise<boolean> {
+    // reminder_sent is the dedup KEY only (no body/metadata columns in build-v3); the
+    // journey value is the `reminder_type`. The message itself lives in tenant.message.
     const { rowCount } = await this.pg.query(
-      `INSERT INTO runtime.reminder_sent (business_id, card_id, journey, sent_at, body, metadata)
-       VALUES ($1::uuid, $2::uuid, $3, now(), $4, '{}'::jsonb)
-       ON CONFLICT (business_id, card_id, journey) DO NOTHING`,
-      [tenantId, cardId, journey, body],
+      `INSERT INTO runtime.reminder_sent (business_id, card_id, reminder_type, sent_at)
+       VALUES ($1::uuid, $2::uuid, $3, now())
+       ON CONFLICT (business_id, card_id, reminder_type) DO NOTHING`,
+      [tenantId, cardId, journey],
     );
     return (rowCount ?? 0) > 0;
   }
@@ -257,7 +258,7 @@ export class LifecycleRepository {
   async deleteSend(tenantId: string, cardId: string, journey: string): Promise<void> {
     await this.pg.query(
       `DELETE FROM runtime.reminder_sent
-        WHERE business_id = $1::uuid AND card_id = $2::uuid AND journey = $3`,
+        WHERE business_id = $1::uuid AND card_id = $2::uuid AND reminder_type = $3`,
       [tenantId, cardId, journey],
     );
   }
