@@ -14,21 +14,21 @@ export interface CustomerListQuery {
 export type Row = Record<string, any>;
 
 /**
- * Customer 360 reads (build-v2). Tenant-scoped → umi_app pool via `withTenant`
- * (RLS). The 9-schema identity graph collapses:
- *   * the row entity is `tenant.customer` (`c`); its `contact_id` anchors the
- *     identity spine (`tenant.contact` / `tenant.contact_identity`), while cards,
- *     conversations, orders and notes key on `customer_id = c.id`.
- *   * reachability (`normalized_phone`/`email`) is DERIVED from
- *     `tenant.contact_identity` (+ `tenant.channel` for the "kind"), not cached
- *     columns; loyalty totals derive (visits=COUNT(visit), balance=SUM(card_ledger)).
- *   * customer facts → `tenant.customer_fact` (the CDP "memory" atom, was the
- *     misnamed `customer_note`); `core.contact_merge_candidates`
- *     → `tenant.contact_identity` probabilistic matches (`match_type='probabilistic'`)
- *     + `tenant.contact.merge_state`.
- *   * DROPPED: `observability.data_quality_findings` (not in build-v2 — deferred to
- *     OTel — and observability is sealed from umi_app); the admin conversation
- *     list's `current_state` (moved to the sealed `runtime.conversation_state`).
+ * Customer 360 reads (build-v3). Tenant-scoped → umi_app pool via `withTenant`
+ * (RLS). build-v3 collapses the identity spine to two tables:
+ *   * the row entity is `tenant.customer` (`c`); its per-channel reachability lives
+ *     in `tenant.contact` (`contact.customer_id → customer.id`, inverted from the old
+ *     `contact_id` link). Cards, conversations, orders and facts key on `customer_id = c.id`.
+ *   * reachability (`normalized_phone`/`email`) is DERIVED from `tenant.contact`
+ *     (+ `umi.channel_type` for the "kind" via `ch.key`), not cached columns; loyalty
+ *     totals derive (visits=COUNT(visit), balance=SUM(card_ledger)); an order's total is
+ *     the derived `tenant.order_total` view.
+ *   * customer facts → `tenant.customer_fact` (the CDP "memory" atom, was the misnamed
+ *     `customer_note`).
+ *   * NO SOURCE in build-v3 (returned as 0/empty, like gift_card): merge candidates
+ *     (`contact_merge_candidates` was a dead detector — dedup is `customer.merged_into_id`)
+ *     and `data_quality_findings` (deferred to OTel). The admin conversation list's
+ *     `current_state` is gone (the live FSM was deleted in the conversation convergence).
  */
 @Injectable()
 export class CustomersRepository {
@@ -68,21 +68,21 @@ export class CustomersRepository {
            FROM tenant.customer AS c
            LEFT JOIN LATERAL (
              SELECT ci.normalized_value
-             FROM tenant.contact_identity AS ci
-             JOIN tenant.channel AS ch ON ch.id = ci.channel_id
-             WHERE ci.business_id = c.business_id AND ci.contact_id = c.contact_id
+             FROM tenant.contact AS ci
+             JOIN umi.channel_type AS ch ON ch.id = ci.channel_id
+             WHERE ci.business_id = c.business_id AND ci.customer_id = c.id
                AND ch.key IN ('phone', 'whatsapp')
                AND ci.normalized_value IS NOT NULL
-             ORDER BY CASE WHEN ch.key = 'phone' THEN 0 ELSE 1 END, ci.first_seen_at ASC
+             ORDER BY CASE WHEN ch.key = 'phone' THEN 0 ELSE 1 END, ci.created_at ASC
              LIMIT 1
            ) AS phone_identity ON true
            LEFT JOIN LATERAL (
              SELECT ci.normalized_value
-             FROM tenant.contact_identity AS ci
-             JOIN tenant.channel AS ch ON ch.id = ci.channel_id
-             WHERE ci.business_id = c.business_id AND ci.contact_id = c.contact_id
+             FROM tenant.contact AS ci
+             JOIN umi.channel_type AS ch ON ch.id = ci.channel_id
+             WHERE ci.business_id = c.business_id AND ci.customer_id = c.id
                AND ch.key = 'email' AND ci.normalized_value IS NOT NULL
-             ORDER BY ci.first_seen_at ASC
+             ORDER BY ci.created_at ASC
              LIMIT 1
            ) AS email_identity ON true
            LEFT JOIN LATERAL (
@@ -90,15 +90,15 @@ export class CustomersRepository {
                jsonb_build_object(
                  'id', ci.id::text,
                  'identity_type', ch.key,
-                 'identity_value', ci.display_value,
+                 'identity_value', COALESCE(ci.raw_phone_number, ci.raw_value),
                  'normalized_value', ci.normalized_value,
-                 'verification_status', CASE WHEN ci.verified_at IS NOT NULL THEN 'verified' ELSE 'unverified' END
+                 'verification_status', CASE WHEN ci.verified THEN 'verified' ELSE 'unverified' END
                )
-               ORDER BY ch.key, ci.first_seen_at
+               ORDER BY ch.key, ci.created_at
              ) AS items
-             FROM tenant.contact_identity AS ci
-             JOIN tenant.channel AS ch ON ch.id = ci.channel_id
-             WHERE ci.business_id = c.business_id AND ci.contact_id = c.contact_id
+             FROM tenant.contact AS ci
+             JOIN umi.channel_type AS ch ON ch.id = ci.channel_id
+             WHERE ci.business_id = c.business_id AND ci.customer_id = c.id
            ) AS identities ON true
            LEFT JOIN LATERAL (
              SELECT
@@ -131,9 +131,10 @@ export class CustomersRepository {
            LEFT JOIN LATERAL (
              SELECT
                count(o.id) AS orders_count,
-               COALESCE(sum(o.total_cents), 0) AS total_spend_cents,
-               max(COALESCE(o.placed_at, o.created_at)) AS last_order_at
-             FROM tenant."order" AS o
+               COALESCE(sum(ot.total), 0) AS total_spend_cents,
+               max(o.created_at) AS last_order_at
+             FROM tenant.customer_order AS o
+             LEFT JOIN tenant.order_total AS ot ON ot.order_id = o.id
              WHERE o.business_id = c.business_id AND o.customer_id = c.id
            ) AS order_summary ON true
            LEFT JOIN LATERAL (
@@ -142,10 +143,9 @@ export class CustomersRepository {
              WHERE cn.business_id = c.business_id AND cn.customer_id = c.id
            ) AS memory_summary ON true
            LEFT JOIN LATERAL (
-             SELECT count(mc.id) AS merge_candidate_count, max(mc.first_seen_at) AS last_merge_at
-             FROM tenant.contact_identity AS mc
-             WHERE mc.business_id = c.business_id AND mc.contact_id = c.contact_id
-               AND mc.match_type = 'probabilistic'
+             -- No merge-candidate source in build-v3 (contact_merge_candidates was a dead
+             -- detector; dedup is now customer.merged_into_id). 0, like gift_card/data_quality.
+             SELECT 0 AS merge_candidate_count, NULL::timestamptz AS last_merge_at
            ) AS merge_summary ON true
            LEFT JOIN LATERAL (
              SELECT max(ts) AS last_touch_at
@@ -185,18 +185,18 @@ export class CustomersRepository {
            FROM tenant.customer AS c
            LEFT JOIN LATERAL (
              SELECT ci.normalized_value
-             FROM tenant.contact_identity AS ci
-             JOIN tenant.channel AS ch ON ch.id = ci.channel_id
-             WHERE ci.business_id = c.business_id AND ci.contact_id = c.contact_id
+             FROM tenant.contact AS ci
+             JOIN umi.channel_type AS ch ON ch.id = ci.channel_id
+             WHERE ci.business_id = c.business_id AND ci.customer_id = c.id
                AND ch.key IN ('phone', 'whatsapp')
                AND ci.normalized_value IS NOT NULL
              LIMIT 1
            ) AS phone_identity ON true
            LEFT JOIN LATERAL (
              SELECT ci.normalized_value
-             FROM tenant.contact_identity AS ci
-             JOIN tenant.channel AS ch ON ch.id = ci.channel_id
-             WHERE ci.business_id = c.business_id AND ci.contact_id = c.contact_id
+             FROM tenant.contact AS ci
+             JOIN umi.channel_type AS ch ON ch.id = ci.channel_id
+             WHERE ci.business_id = c.business_id AND ci.customer_id = c.id
                AND ch.key = 'email' AND ci.normalized_value IS NOT NULL
              LIMIT 1
            ) AS email_identity ON true
@@ -207,7 +207,7 @@ export class CustomersRepository {
                OR ($4 = 'whatsapp' AND EXISTS (SELECT 1 FROM tenant.conversation AS cv WHERE cv.business_id = c.business_id AND cv.customer_id = c.id))
                OR ($4 = 'cash' AND EXISTS (SELECT 1 FROM tenant.loyalty_card AS ca WHERE ca.business_id = c.business_id AND ca.customer_id = c.id))
                OR ($4 = 'memory' AND EXISTS (SELECT 1 FROM tenant.customer_fact AS cn WHERE cn.business_id = c.business_id AND cn.customer_id = c.id))
-               OR ($4 = 'review' AND EXISTS (SELECT 1 FROM tenant.contact_identity AS mc WHERE mc.business_id = c.business_id AND mc.contact_id = c.contact_id AND mc.match_type = 'probabilistic'))
+               OR ($4 = 'review' AND false) -- no merge-candidate source in build-v3 (dedup = customer.merged_into_id)
              )
              AND (
                $5 = ''
@@ -230,10 +230,10 @@ export class CustomersRepository {
            SELECT 'whatsapp_message' AS type, m.id::text AS id, m.created_at AS occurred_at, m.sender AS label, COALESCE(m.body, '') AS detail, 'conversaflow' AS product
            FROM tenant.message AS m
            JOIN tenant.conversation AS cv ON cv.id = m.conversation_id
-           WHERE cv.customer_id = $1::uuid AND m.business_id = $2::uuid
+           WHERE cv.customer_id = $1::uuid AND cv.business_id = $2::uuid
            UNION ALL
-           SELECT 'order' AS type, o.id::text AS id, COALESCE(o.placed_at, o.created_at) AS occurred_at, o.status AS label, COALESCE(o.source_transaction_id, o.id::text) AS detail, 'orders' AS product
-           FROM tenant."order" AS o
+           SELECT 'order' AS type, o.id::text AS id, o.created_at AS occurred_at, o.status AS label, o.id::text AS detail, 'orders' AS product
+           FROM tenant.customer_order AS o
            WHERE o.customer_id = $1::uuid AND o.business_id = $2::uuid
            UNION ALL
            SELECT 'memory' AS type, cn.id::text AS id, cn.updated_at AS occurred_at, cn.source AS label, cn.key || ': ' || COALESCE(cn.value #>> '{}', cn.value::text) AS detail, 'conversaflow' AS product
@@ -257,7 +257,7 @@ export class CustomersRepository {
            cv.created_at AS opened_at,
            NULL::timestamptz AS closed_at,
            cv.last_message_at AS updated_at,
-           cv.metadata,
+           NULL::jsonb AS metadata,
            count(m.id)::int AS "messageCount",
            max(m.created_at) AS "lastMessageAt"
          FROM tenant.conversation AS cv
@@ -277,18 +277,18 @@ export class CustomersRepository {
       c.query<Row>(
         `SELECT
            o.id::text,
-           o.source_transaction_id AS order_number,
-           o.order_type AS source_product,
+           o.id::text AS order_number,
+           o.source AS source_product,
            o.status,
-           ch.key AS channel,
-           o.total_cents,
-           o.placed_at,
+           o.source AS channel,
+           ot.total AS total_cents,
+           o.created_at AS placed_at,
            o.created_at,
            o.updated_at
-         FROM tenant."order" AS o
-         LEFT JOIN tenant.channel AS ch ON ch.id = o.channel_id
+         FROM tenant.customer_order AS o
+         LEFT JOIN tenant.order_total AS ot ON ot.order_id = o.id
          WHERE o.customer_id = $1::uuid AND o.business_id = $2::uuid
-         ORDER BY COALESCE(o.placed_at, o.created_at) DESC
+         ORDER BY o.created_at DESC
          LIMIT 40`,
         [contactId, tenantId],
       ),
@@ -352,7 +352,7 @@ export class CustomersRepository {
              c.id::text,
              c.status,
              NULL::text AS "currentState",
-             COALESCE(c.summary, c.metadata->>'summary') AS summary,
+             c.summary AS summary,
              c.created_at AS "createdAt",
              co.name AS "customerName",
              ph.normalized_value AS "customerPhone",
@@ -362,11 +362,11 @@ export class CustomersRepository {
            LEFT JOIN tenant.customer AS co ON co.business_id = c.business_id AND co.id = c.customer_id
            LEFT JOIN LATERAL (
              SELECT ci.normalized_value
-             FROM tenant.contact_identity AS ci
-             JOIN tenant.channel AS ch ON ch.id = ci.channel_id
-             WHERE ci.business_id = co.business_id AND ci.contact_id = co.contact_id
-               AND ch.normalization_rule = 'e164' AND ci.normalized_value IS NOT NULL
-             ORDER BY ci.is_primary DESC, ci.last_seen_at DESC LIMIT 1
+             FROM tenant.contact AS ci
+             JOIN umi.channel_type AS ch ON ch.id = ci.channel_id
+             WHERE ci.business_id = co.business_id AND ci.customer_id = co.id
+               AND ch.key IN ('phone', 'whatsapp') AND ci.normalized_value IS NOT NULL
+             ORDER BY ci.is_primary DESC, ci.updated_at DESC LIMIT 1
            ) AS ph ON true
            LEFT JOIN tenant.message AS m ON m.conversation_id = c.id
            WHERE c.business_id = $1::uuid
@@ -391,41 +391,26 @@ export class CustomersRepository {
     contactId: string,
   ): Promise<{ identities: Row[]; candidates: Row[]; findings: Row[] }> {
     return this.pg.withTenant(async (c) => {
-      const [identities, candidates] = await Promise.all([
-        c.query<Row>(
-          // Reachability rows for the customer's contact. `kind` recovered from
-          // the global channel catalog. String verification contract preserved.
-          `SELECT ci.id::text, ch.key AS identity_type, ci.display_value AS identity_value,
-                  ci.normalized_value,
-                  CASE WHEN ci.verified_at IS NOT NULL THEN 'verified' ELSE 'unverified' END AS verification_status,
-                  ci.metadata, ci.first_seen_at AS created_at
-           FROM tenant.contact_identity AS ci
-           JOIN tenant.channel AS ch ON ch.id = ci.channel_id
-           JOIN tenant.customer AS cu ON cu.business_id = ci.business_id AND cu.contact_id = ci.contact_id
-           WHERE cu.id = $1::uuid AND ci.business_id = $2::uuid
-           ORDER BY ch.key, ci.first_seen_at`,
-          [contactId, tenantId],
-        ),
-        c.query<Row>(
-          // Merge candidates: the contact's PROBABILISTIC identities (the folded
-          // contact_merge_candidates signal). No left/right person pairs any more —
-          // the merge model is per-contact (contact.merge_state) + soft matches.
-          `SELECT ci.id::text, NULL::text AS left_person_id, NULL::text AS right_person_id,
-                  ci.match_type, ci.confidence, ci.metadata AS detail,
-                  ci.first_seen_at AS created_at, NULL::timestamptz AS resolved_at
-           FROM tenant.contact_identity AS ci
-           JOIN tenant.customer AS cu ON cu.business_id = ci.business_id AND cu.contact_id = ci.contact_id
-           WHERE cu.id = $1::uuid AND ci.business_id = $2::uuid
-             AND ci.match_type = 'probabilistic'
-           ORDER BY ci.first_seen_at DESC
-           LIMIT 20`,
-          [contactId, tenantId],
-        ),
-      ]);
+      // Reachability rows for the customer's contacts (per-channel). `kind` recovered
+      // from the global channel catalog; the string verification contract is preserved.
+      const identities = await c.query<Row>(
+        `SELECT ci.id::text, ch.key AS identity_type,
+                COALESCE(ci.raw_phone_number, ci.raw_value) AS identity_value,
+                ci.normalized_value,
+                CASE WHEN ci.verified THEN 'verified' ELSE 'unverified' END AS verification_status,
+                NULL::jsonb AS metadata, ci.created_at
+         FROM tenant.contact AS ci
+         JOIN umi.channel_type AS ch ON ch.id = ci.channel_id
+         JOIN tenant.customer AS cu ON cu.business_id = ci.business_id AND cu.id = ci.customer_id
+         WHERE cu.id = $1::uuid AND ci.business_id = $2::uuid
+         ORDER BY ch.key, ci.created_at`,
+        [contactId, tenantId],
+      );
       return {
         identities: identities.rows,
-        candidates: candidates.rows,
-        // data_quality_findings is deferred to OTel (not in build-v2) — no source.
+        // Merge candidates + data-quality findings have no build-v3 source yet (dedup is
+        // customer.merged_into_id; findings deferred to OTel) — empty, like gift_card.
+        candidates: [],
         findings: [],
       };
     });
