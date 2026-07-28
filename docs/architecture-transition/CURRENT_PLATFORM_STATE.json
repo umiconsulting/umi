@@ -2,8 +2,11 @@
   "schemaVersion": 1,
   "updatedAt": "2026-07-27",
   "branch": "architectureUMIposIntegration",
-  "parentHead": "42aad13c91d0a1b2835c22d08c965865ac16f896",
-  "completedGates": ["1A", "1B", "1C", "1D", "1E"],
+  "certificationSourceCommit": "a1e794d8fe0e9883f5677147ab81c4342f1a3980",
+  "certificationDate": "2026-07-27",
+  "BUILD_V3_CERTIFIED": true,
+  "umiPosCreationAuthorization": "YES_WITH_OBSERVATIONS",
+  "completedGates": ["1A", "1B", "1C", "1D", "1E", "1F"],
   "authorities": {
     "api": "apps/umi-api",
     "contracts": "packages/contract",
@@ -44,5 +47,5 @@
     "providerDdosMitigationRequired": true,
     "assistantUsageEnabled": false
   },
-  "nextGate": "1F"
+  "nextGate": "2A"
 }

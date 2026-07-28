@@ -48,6 +48,12 @@
       "id": "1E",
       "status": "complete",
       "subject": "Observability, resilience, and abuse resistance"
+    },
+    {
+      "certificationSourceCommit": "a1e794d8fe0e9883f5677147ab81c4342f1a3980",
+      "id": "1F",
+      "status": "complete",
+      "subject": "Build-v3 platform certification"
     }
   ]
 }

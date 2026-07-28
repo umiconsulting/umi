@@ -17,6 +17,8 @@ Future clients use `packages/contract` and controlled UMI APIs.
   and tenant-visible redacted audit search.
 - Gate 1E established bounded structured telemetry, safe operational diagnostics, layered abuse
   limits, dependency readiness, queue protection, deadlines, circuit breakers, and backpressure.
+- Gate 1F certified the build-v3 entry platform and authorized `apps/umi-pos` creation with
+  documented, non-blocking operational observations.
 
 ## Current implementation state
 
@@ -65,5 +67,8 @@ Future clients use `packages/contract` and controlled UMI APIs.
 ## Current local baseline
 
 - Branch: `architectureUMIposIntegration`
-- Gate 1E parent commit: `42aad13c91d0a1b2835c22d08c965865ac16f896`
+- Build-v3 certification source commit: `a1e794d8fe0e9883f5677147ab81c4342f1a3980`
+- Certification date: `2026-07-27`
+- `BUILD_V3_CERTIFIED`: `true`
+- UmiPOS application creation: `YES WITH OBSERVATIONS`
 - Remote publication: deferred because the branch has no configured upstream.
