@@ -29,6 +29,7 @@ import { IpRateLimitGuard } from './shared/operations/ip-rate-limit.guard';
 import { DevicesModule } from './modules/devices/devices.module';
 import { PosEntryModule } from './modules/pos-entry/pos-entry.module';
 import { PosCatalogModule } from './modules/pos-catalog/pos-catalog.module';
+import { PosCartModule } from './modules/pos-cart/pos-cart.module';
 
 /**
  * Root module for the WEB process. Imports shared infrastructure + domain
@@ -61,6 +62,7 @@ import { PosCatalogModule } from './modules/pos-catalog/pos-catalog.module';
     DevicesModule,
     PosEntryModule,
     PosCatalogModule,
+    PosCartModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

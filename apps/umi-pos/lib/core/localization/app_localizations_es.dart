@@ -202,4 +202,46 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get closeAction => 'Cerrar';
+
+  @override
+  String get cartTitle => 'Carrito actual';
+
+  @override
+  String get cartEmpty => 'Abre un producto para iniciar este carrito.';
+
+  @override
+  String get cartUnavailable => 'El carrito no está disponible temporalmente.';
+
+  @override
+  String get cartNoteLabel => 'Nota del operador';
+
+  @override
+  String get addToCartAction => 'Agregar al carrito';
+
+  @override
+  String get removeFromCartAction => 'Eliminar línea';
+
+  @override
+  String get increaseQuantity => 'Aumentar cantidad';
+
+  @override
+  String get decreaseQuantity => 'Disminuir cantidad';
+
+  @override
+  String get subtotalLabel => 'Subtotal';
+
+  @override
+  String get taxLabel => 'Impuestos';
+
+  @override
+  String get discountLabel => 'Vista previa de descuentos';
+
+  @override
+  String get totalLabel => 'Total';
+
+  @override
+  String get businessDateLabel => 'Fecha operativa';
+
+  @override
+  String get checkoutNextGate => 'Checkout disponible en el siguiente Gate';
 }

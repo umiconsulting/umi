@@ -72,6 +72,12 @@
       "id": "2C",
       "status": "complete",
       "subject": "Branch-aware read-only catalog"
+    },
+    {
+      "commit": "HEAD (Gate 2D commit)",
+      "id": "2D",
+      "status": "complete",
+      "subject": "Authoritative shopping cart and sale preparation"
     }
   ]
 }

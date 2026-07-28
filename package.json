@@ -8,7 +8,15 @@
     "lint": "turbo run lint --continue",
     "test": "turbo run test",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "umi-pos:get": "cd apps/umi-pos && flutter pub get",
+    "umi-pos:generate": "pnpm --filter @umi/contract generate && cd apps/umi-pos && flutter gen-l10n",
+    "umi-pos:linux": "cd apps/umi-pos && flutter run -d linux",
+    "umi-pos:macos": "cd apps/umi-pos && flutter run -d macos",
+    "umi-pos:windows": "cd apps/umi-pos && flutter run -d windows",
+    "umi-pos:android": "cd apps/umi-pos && flutter run -d android",
+    "umi-pos:ios": "cd apps/umi-pos && flutter run -d ios",
+    "umi-pos:web": "cd apps/umi-pos && flutter run -d chrome"
   },
   "devDependencies": {
     "prettier": "3.9.4",

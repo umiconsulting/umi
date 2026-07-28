@@ -13,7 +13,50 @@ const {
   ReceiptSnapshot,
   CatalogPage,
   CatalogQuery,
+  Cart,
+  CartLineInput,
 } = require('../dist/index.cjs');
+
+test('Gate 2D cart contracts bound quantities, notes, and checkout authority', () => {
+  const id = '00000000-0000-4000-8000-000000000001';
+  const line = {
+    cartId: id,
+    branchId: id,
+    operatorSessionId: id,
+    productId: id,
+    modifierSelections: [],
+    quantity: 2,
+    expectedVersion: 1,
+    idempotencyKey: id,
+  };
+  assert.ok(CartLineInput.safeParse(line).success);
+  assert.equal(CartLineInput.safeParse({ ...line, quantity: 1000 }).success, false);
+  assert.equal(CartLineInput.safeParse({ ...line, note: '<script>' }).success, false);
+  assert.ok(
+    Cart.safeParse({
+      id,
+      tenantId: id,
+      branchId: id,
+      operatorSessionId: id,
+      status: 'draft',
+      version: 1,
+      items: [],
+      totals: {
+        subtotal: { minorUnits: 0, currency: 'MXN' },
+        tax: { minorUnits: 0, currency: 'MXN' },
+        discounts: {
+          total: { minorUnits: 0, currency: 'MXN' },
+          entries: [],
+        },
+        grandTotal: { minorUnits: 0, currency: 'MXN' },
+        businessDate: '2026-07-28',
+      },
+      checkoutEnabled: false,
+      checkoutMessageCode: 'CHECKOUT_GATE_NOT_AVAILABLE',
+      updatedAt: '2026-07-28T12:00:00Z',
+    }).success,
+  );
+});
 
 test('Money uses integer minor units and explicit currency', () => {
   assert.ok(Money.safeParse({ minorUnits: 1099, currency: 'MXN' }).success);

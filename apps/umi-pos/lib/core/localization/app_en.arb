@@ -59,5 +59,19 @@
   "variantsLabel": "Variants",
   "modifiersLabel": "Modifiers",
   "taxIncludedLabel": "Tax configured",
-  "closeAction": "Close"
+  "closeAction": "Close",
+  "cartTitle": "Current cart",
+  "cartEmpty": "Open a product to begin this cart.",
+  "cartUnavailable": "The cart is temporarily unavailable.",
+  "cartNoteLabel": "Operator note",
+  "addToCartAction": "Add to cart",
+  "removeFromCartAction": "Remove line",
+  "increaseQuantity": "Increase quantity",
+  "decreaseQuantity": "Decrease quantity",
+  "subtotalLabel": "Subtotal",
+  "taxLabel": "Taxes",
+  "discountLabel": "Discount preview",
+  "totalLabel": "Total",
+  "businessDateLabel": "Business date",
+  "checkoutNextGate": "Checkout available in the next Gate"
 }

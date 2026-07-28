@@ -59,5 +59,19 @@
   "variantsLabel": "Variantes",
   "modifiersLabel": "Modificadores",
   "taxIncludedLabel": "Impuesto configurado",
-  "closeAction": "Cerrar"
+  "closeAction": "Cerrar",
+  "cartTitle": "Carrito actual",
+  "cartEmpty": "Abre un producto para iniciar este carrito.",
+  "cartUnavailable": "El carrito no está disponible temporalmente.",
+  "cartNoteLabel": "Nota del operador",
+  "addToCartAction": "Agregar al carrito",
+  "removeFromCartAction": "Eliminar línea",
+  "increaseQuantity": "Aumentar cantidad",
+  "decreaseQuantity": "Disminuir cantidad",
+  "subtotalLabel": "Subtotal",
+  "taxLabel": "Impuestos",
+  "discountLabel": "Vista previa de descuentos",
+  "totalLabel": "Total",
+  "businessDateLabel": "Fecha operativa",
+  "checkoutNextGate": "Checkout disponible en el siguiente Gate"
 }

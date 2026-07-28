@@ -8,6 +8,7 @@ import '../core/localization/app_localizations.dart';
 import '../core/navigation/app_navigation.dart';
 import '../core/theme/umi_theme.dart';
 import '../features/catalog/catalog_surface.dart';
+import '../features/entry/entry_controller.dart';
 import '../features/entry/entry_surface.dart';
 import '../shared/widgets/status_card.dart';
 
@@ -35,7 +36,14 @@ final class _UmiPosAppState extends State<UmiPosApp> {
     super.dispose();
   }
 
-  void _changed() => setState(() {});
+  void _changed() {
+    if (widget.root.entry.state.phase != EntryPhase.ready) {
+      widget.root.cart.clearLocal();
+    }
+    if (mounted) {
+      setState(() {});
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +97,7 @@ final class _GuardedSurface extends StatelessWidget {
       AppRoute.mainShell => CatalogSurface(
         entry: root.entry,
         catalog: root.catalog,
+        cart: root.cart,
       ),
       AppRoute.recoverableError => _FailureSurface(controller: root.controller),
       AppRoute.diagnostics => _DiagnosticsSurface(root: root),

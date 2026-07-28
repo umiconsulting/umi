@@ -2,8 +2,9 @@ import { API_ERROR_CODES, contractModels } from './platform';
 import { httpModels } from './schemas';
 import { deviceModels } from './device';
 import { posCatalogModels } from './pos-catalog';
+import { posCartModels } from './pos-cart';
 
-export const CONTRACT_VERSION = '1.2.0';
+export const CONTRACT_VERSION = '1.3.0';
 export const API_MAJOR_VERSION = 1;
 
 export const errorCatalog = Object.fromEntries(
@@ -382,6 +383,84 @@ export const routeCatalog = {
     approval: false,
     errors: ['PERMISSION_DENIED', 'BRANCH_NOT_FOUND', 'RESOURCE_NOT_FOUND'],
   },
+  'POST /api/pos/tenants/:tenantId/cart': {
+    request: 'CreateCartRequest',
+    response: 'Cart',
+    auth: 'operator-session',
+    permission: 'cart.write',
+    idempotent: true,
+    tenantContext: true,
+    branchContext: true,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: ['PERMISSION_DENIED', 'BRANCH_NOT_FOUND', 'IDEMPOTENCY_CONFLICT'],
+  },
+  'GET /api/pos/tenants/:tenantId/cart': {
+    request: 'CartQuery',
+    response: 'Cart',
+    auth: 'operator-session',
+    permission: 'cart.write',
+    idempotent: true,
+    tenantContext: true,
+    branchContext: true,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+  },
+  'POST /api/pos/tenants/:tenantId/cart/lines': {
+    request: 'CartLineInput',
+    response: 'Cart',
+    auth: 'operator-session',
+    permission: 'cart.write',
+    idempotent: true,
+    tenantContext: true,
+    branchContext: true,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: ['PERMISSION_DENIED', 'CART_VALIDATION_FAILED', 'IDEMPOTENCY_CONFLICT'],
+  },
+  'PATCH /api/pos/tenants/:tenantId/cart/lines/:lineId': {
+    request: 'CartLineInput',
+    response: 'Cart',
+    auth: 'operator-session',
+    permission: 'cart.write',
+    idempotent: true,
+    tenantContext: true,
+    branchContext: true,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: ['PERMISSION_DENIED', 'CART_VALIDATION_FAILED', 'OPTIMISTIC_VERSION_CONFLICT'],
+  },
+  'DELETE /api/pos/tenants/:tenantId/cart/lines/:lineId': {
+    request: 'RemoveCartLineRequest',
+    response: 'Cart',
+    auth: 'operator-session',
+    permission: 'cart.write',
+    idempotent: true,
+    tenantContext: true,
+    branchContext: true,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: ['PERMISSION_DENIED', 'OPTIMISTIC_VERSION_CONFLICT'],
+  },
+  'POST /api/pos/tenants/:tenantId/cart/prepare': {
+    request: 'PrepareSaleRequest',
+    response: 'Cart',
+    auth: 'operator-session',
+    permission: 'cart.write',
+    idempotent: true,
+    tenantContext: true,
+    branchContext: true,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: ['PERMISSION_DENIED', 'CART_VALIDATION_FAILED', 'OPTIMISTIC_VERSION_CONFLICT'],
+  },
 } as const;
 
 export const modelCatalog = {
@@ -389,6 +468,7 @@ export const modelCatalog = {
   ...contractModels,
   ...deviceModels,
   ...posCatalogModels,
+  ...posCartModels,
 };
 
 export const invariantCatalog = {

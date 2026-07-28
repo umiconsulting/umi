@@ -143,7 +143,11 @@ void main() {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          home: CatalogSurface(entry: root.entry, catalog: value),
+          home: CatalogSurface(
+            entry: root.entry,
+            catalog: value,
+            cart: root.cart,
+          ),
         ),
       );
       await tester.pump();

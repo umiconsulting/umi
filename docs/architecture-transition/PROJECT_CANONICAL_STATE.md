@@ -27,6 +27,9 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Gate 2C established a server-authoritative, branch-aware, read-only catalog with bounded cursor
   pagination, search, operator-safe product details, media, variants, modifiers, and Flutter cache
   partitions.
+- Gate 2D established a server-authoritative, tenant/branch/operator-partitioned cart with
+  validated variants, modifiers, notes, optimistic versioning, and tax/total previews. It does
+  not commit an order, mutate inventory, take payment, or issue a receipt.
 
 ## Current implementation state
 
@@ -64,8 +67,10 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - `tenant.device` is the device authority; one-time challenges live in
   `runtime.device_enrollment_challenge`, and `runtime.operator_session` separates operator
   presence from user authentication.
-- UmiPOS consumes contract version `1.2.0`, content hash
-  `1b3553ae7c9280c4b8fba82417992b5996fb61779e13e1d9389e79385e3001f3`.
+- UmiPOS consumes contract version `1.3.0`, content hash
+  `8ee9798c856bf4479e6240314f9d3d325eacb327fed95c0b65c73555291266ab`.
+- `tenant.pos_cart` is mutable sale preparation only. The API owns pricing, availability,
+  inclusive-tax rounding, modifier validation, line merging, and totals previews.
 - POS refresh sessions require the active server device plus its installation and credential
   hashes. Revocation/replacement ends durable and operator sessions.
 
@@ -91,5 +96,5 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - `BUILD_V3_CERTIFIED`: `true`
 - UmiPOS application creation: `YES WITH OBSERVATIONS`
 - Remote publication: deferred because the branch has no configured upstream.
-- Gate 2C: complete in the commit containing this state update.
-- Next gate: `2D` — authoritative online sale command.
+- Gate 2D: complete in the commit containing this state update.
+- Next gate: `2E` — checkout and authoritative online sale commit.

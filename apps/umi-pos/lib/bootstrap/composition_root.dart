@@ -6,6 +6,8 @@ import '../core/observability/telemetry.dart';
 import '../core/platform/platform_adapters.dart';
 import '../core/security/credential_vault.dart';
 import '../core/storage/storage.dart';
+import '../features/cart/cart_controller.dart';
+import '../features/cart/cart_repository.dart';
 import '../features/catalog/catalog_controller.dart';
 import '../features/catalog/catalog_repository.dart';
 import '../features/entry/entry_controller.dart';
@@ -26,6 +28,7 @@ final class AppCompositionRoot {
     required this.credentials,
     required this.entry,
     required this.catalog,
+    required this.cart,
   });
 
   factory AppCompositionRoot.production() {
@@ -73,6 +76,10 @@ final class AppCompositionRoot {
         cache: CatalogCache(),
         telemetry: telemetry,
       ),
+      cart: CartController(
+        repository: ApiCartRepository(apiClient),
+        telemetry: telemetry,
+      ),
     );
   }
 
@@ -88,11 +95,13 @@ final class AppCompositionRoot {
   final CredentialVault credentials;
   final EntryController entry;
   final CatalogController catalog;
+  final CartController cart;
 
   void dispose() {
     controller.dispose();
     entry.dispose();
     catalog.dispose();
+    cart.dispose();
     apiClient.dispose();
   }
 }

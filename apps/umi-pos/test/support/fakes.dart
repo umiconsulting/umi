@@ -8,6 +8,8 @@ import 'package:umi_pos/core/observability/telemetry.dart';
 import 'package:umi_pos/core/platform/platform_adapters.dart';
 import 'package:umi_pos/core/security/credential_vault.dart';
 import 'package:umi_pos/core/storage/storage.dart';
+import 'package:umi_pos/features/cart/cart_controller.dart';
+import 'package:umi_pos/features/cart/cart_repository.dart';
 import 'package:umi_pos/features/catalog/catalog_controller.dart';
 import 'package:umi_pos/features/catalog/catalog_repository.dart';
 import 'package:umi_pos/features/entry/entry_controller.dart';
@@ -118,6 +120,10 @@ AppCompositionRoot testRoot({
     catalog: CatalogController(
       repository: ApiCatalogRepository(api),
       cache: CatalogCache(),
+      telemetry: telemetry,
+    ),
+    cart: CartController(
+      repository: ApiCartRepository(api),
       telemetry: telemetry,
     ),
   );

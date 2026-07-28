@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "1b3553ae7c9280c4b8fba82417992b5996fb61779e13e1d9389e79385e3001f3",
-  "contractVersion": "1.2.0",
+  "contentHash": "8ee9798c856bf4479e6240314f9d3d325eacb327fed95c0b65c73555291266ab",
+  "contractVersion": "1.3.0",
   "definitions": {
     "ApiError": {
       "additionalProperties": false,
@@ -30,6 +30,12 @@
             "TENANT_DISABLED",
             "BRANCH_DISABLED",
             "OPERATOR_SESSION_REQUIRED",
+            "CART_VALIDATION_FAILED",
+            "CART_NOT_FOUND",
+            "PRODUCT_UNAVAILABLE",
+            "VARIANT_NOT_AVAILABLE",
+            "MODIFIER_SELECTION_INVALID",
+            "CHECKOUT_GATE_NOT_AVAILABLE",
             "OPERATOR_LOCKED",
             "PIN_LOCKED",
             "SESSION_REVOKED",
@@ -103,6 +109,12 @@
                 "TENANT_DISABLED",
                 "BRANCH_DISABLED",
                 "OPERATOR_SESSION_REQUIRED",
+                "CART_VALIDATION_FAILED",
+                "CART_NOT_FOUND",
+                "PRODUCT_UNAVAILABLE",
+                "VARIANT_NOT_AVAILABLE",
+                "MODIFIER_SELECTION_INVALID",
+                "CHECKOUT_GATE_NOT_AVAILABLE",
                 "OPERATOR_LOCKED",
                 "PIN_LOCKED",
                 "SESSION_REVOKED",
@@ -736,6 +748,763 @@
         "unknown_outcome"
       ],
       "type": "string"
+    },
+    "Cart": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "checkoutEnabled": {
+          "const": false,
+          "type": "boolean"
+        },
+        "checkoutMessageCode": {
+          "const": "CHECKOUT_GATE_NOT_AVAILABLE",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "modifiers": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "groupId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "modifierId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "name": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "priceDelta": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string"
+                        },
+                        "minorUnits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "minorUnits",
+                        "currency"
+                      ],
+                      "type": "object"
+                    },
+                    "quantity": {
+                      "maximum": 99,
+                      "minimum": 1,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "modifierId",
+                    "groupId",
+                    "name",
+                    "quantity",
+                    "priceDelta"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 100,
+                "type": "array"
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "maxLength": 500,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "price": {
+                "additionalProperties": false,
+                "properties": {
+                  "lineSubtotal": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "currency": {
+                        "pattern": "^[A-Z]{3}$",
+                        "type": "string"
+                      },
+                      "minorUnits": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "minorUnits",
+                      "currency"
+                    ],
+                    "type": "object"
+                  },
+                  "lineTotal": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "currency": {
+                        "pattern": "^[A-Z]{3}$",
+                        "type": "string"
+                      },
+                      "minorUnits": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "minorUnits",
+                      "currency"
+                    ],
+                    "type": "object"
+                  },
+                  "tax": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "currency": {
+                        "pattern": "^[A-Z]{3}$",
+                        "type": "string"
+                      },
+                      "minorUnits": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "minorUnits",
+                      "currency"
+                    ],
+                    "type": "object"
+                  },
+                  "taxRateBasisPoints": {
+                    "maximum": 10000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "unitPrice": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "currency": {
+                        "pattern": "^[A-Z]{3}$",
+                        "type": "string"
+                      },
+                      "minorUnits": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "minorUnits",
+                      "currency"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "unitPrice",
+                  "lineSubtotal",
+                  "tax",
+                  "lineTotal",
+                  "taxRateBasisPoints"
+                ],
+                "type": "object"
+              },
+              "productId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "productName": {
+                "maxLength": 240,
+                "minLength": 1,
+                "type": "string"
+              },
+              "quantity": {
+                "maximum": 999,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "variant": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "attributes": {
+                        "additionalProperties": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "name": {
+                        "maxLength": 160,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "variantId": {
+                        "format": "uuid",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "variantId",
+                      "name",
+                      "attributes"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "productId",
+              "productName",
+              "quantity",
+              "variant",
+              "modifiers",
+              "note",
+              "price"
+            ],
+            "type": "object"
+          },
+          "maxItems": 250,
+          "type": "array"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "draft",
+            "prepared",
+            "abandoned"
+          ],
+          "type": "string"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "totals": {
+          "additionalProperties": false,
+          "properties": {
+            "businessDate": {
+              "format": "date",
+              "type": "string"
+            },
+            "discounts": {
+              "additionalProperties": false,
+              "properties": {
+                "entries": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "amount": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "currency": {
+                            "pattern": "^[A-Z]{3}$",
+                            "type": "string"
+                          },
+                          "minorUnits": {
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "minorUnits",
+                          "currency"
+                        ],
+                        "type": "object"
+                      },
+                      "code": {
+                        "maxLength": 80,
+                        "type": "string"
+                      },
+                      "label": {
+                        "maxLength": 160,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "label",
+                      "amount"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 20,
+                  "type": "array"
+                },
+                "total": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "total",
+                "entries"
+              ],
+              "type": "object"
+            },
+            "grandTotal": {
+              "additionalProperties": false,
+              "properties": {
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "minorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "minorUnits",
+                "currency"
+              ],
+              "type": "object"
+            },
+            "subtotal": {
+              "additionalProperties": false,
+              "properties": {
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "minorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "minorUnits",
+                "currency"
+              ],
+              "type": "object"
+            },
+            "tax": {
+              "additionalProperties": false,
+              "properties": {
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "minorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "minorUnits",
+                "currency"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "subtotal",
+            "tax",
+            "discounts",
+            "grandTotal",
+            "businessDate"
+          ],
+          "type": "object"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "version": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "tenantId",
+        "branchId",
+        "operatorSessionId",
+        "status",
+        "version",
+        "items",
+        "totals",
+        "checkoutEnabled",
+        "checkoutMessageCode",
+        "updatedAt"
+      ],
+      "type": "object"
+    },
+    "CartItem": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "modifiers": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "groupId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "modifierId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "priceDelta": {
+                "additionalProperties": false,
+                "properties": {
+                  "currency": {
+                    "pattern": "^[A-Z]{3}$",
+                    "type": "string"
+                  },
+                  "minorUnits": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "minorUnits",
+                  "currency"
+                ],
+                "type": "object"
+              },
+              "quantity": {
+                "maximum": 99,
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "modifierId",
+              "groupId",
+              "name",
+              "quantity",
+              "priceDelta"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "price": {
+          "additionalProperties": false,
+          "properties": {
+            "lineSubtotal": {
+              "additionalProperties": false,
+              "properties": {
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "minorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "minorUnits",
+                "currency"
+              ],
+              "type": "object"
+            },
+            "lineTotal": {
+              "additionalProperties": false,
+              "properties": {
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "minorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "minorUnits",
+                "currency"
+              ],
+              "type": "object"
+            },
+            "tax": {
+              "additionalProperties": false,
+              "properties": {
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "minorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "minorUnits",
+                "currency"
+              ],
+              "type": "object"
+            },
+            "taxRateBasisPoints": {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "unitPrice": {
+              "additionalProperties": false,
+              "properties": {
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "minorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "minorUnits",
+                "currency"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "unitPrice",
+            "lineSubtotal",
+            "tax",
+            "lineTotal",
+            "taxRateBasisPoints"
+          ],
+          "type": "object"
+        },
+        "productId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "productName": {
+          "maxLength": 240,
+          "minLength": 1,
+          "type": "string"
+        },
+        "quantity": {
+          "maximum": 999,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "variant": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "attributes": {
+                  "additionalProperties": {
+                    "maxLength": 120,
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "name": {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "variantId": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "variantId",
+                "name",
+                "attributes"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "productId",
+        "productName",
+        "quantity",
+        "variant",
+        "modifiers",
+        "note",
+        "price"
+      ],
+      "type": "object"
+    },
+    "CartLineInput": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "cartId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "expectedVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "modifierSelections": {
+          "default": [],
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "modifierId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "quantity": {
+                "maximum": 99,
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "modifierId",
+              "quantity"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "productId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "quantity": {
+          "maximum": 999,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "variantId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "cartId",
+        "branchId",
+        "operatorSessionId",
+        "productId",
+        "quantity",
+        "expectedVersion",
+        "idempotencyKey"
+      ],
+      "type": "object"
+    },
+    "CartQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "branchId",
+        "operatorSessionId"
+      ],
+      "type": "object"
     },
     "CatalogAvailability": {
       "enum": [
@@ -2050,6 +2819,29 @@
       ],
       "type": "object"
     },
+    "CreateCartRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "branchId",
+        "operatorSessionId",
+        "idempotencyKey"
+      ],
+      "type": "object"
+    },
     "CreateStaffRequest": {
       "additionalProperties": false,
       "properties": {
@@ -2405,6 +3197,75 @@
         "kds"
       ],
       "type": "string"
+    },
+    "DiscountPreview": {
+      "additionalProperties": false,
+      "properties": {
+        "entries": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "amount": {
+                "additionalProperties": false,
+                "properties": {
+                  "currency": {
+                    "pattern": "^[A-Z]{3}$",
+                    "type": "string"
+                  },
+                  "minorUnits": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "minorUnits",
+                  "currency"
+                ],
+                "type": "object"
+              },
+              "code": {
+                "maxLength": 80,
+                "type": "string"
+              },
+              "label": {
+                "maxLength": 160,
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "label",
+              "amount"
+            ],
+            "type": "object"
+          },
+          "maxItems": 20,
+          "type": "array"
+        },
+        "total": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "total",
+        "entries"
+      ],
+      "type": "object"
     },
     "DurableSession": {
       "additionalProperties": false,
@@ -3272,6 +4133,55 @@
       ],
       "type": "object"
     },
+    "ModifierSelection": {
+      "additionalProperties": false,
+      "properties": {
+        "groupId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "modifierId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "priceDelta": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "quantity": {
+          "maximum": 99,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "modifierId",
+        "groupId",
+        "name",
+        "quantity",
+        "priceDelta"
+      ],
+      "type": "object"
+    },
     "Money": {
       "additionalProperties": false,
       "properties": {
@@ -3824,6 +4734,129 @@
       ],
       "type": "object"
     },
+    "PrepareSaleRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "cartId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "expectedVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cartId",
+        "branchId",
+        "operatorSessionId",
+        "expectedVersion",
+        "idempotencyKey"
+      ],
+      "type": "object"
+    },
+    "PriceSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "lineSubtotal": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "lineTotal": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "tax": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "taxRateBasisPoints": {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unitPrice": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "unitPrice",
+        "lineSubtotal",
+        "tax",
+        "lineTotal",
+        "taxRateBasisPoints"
+      ],
+      "type": "object"
+    },
     "ProductMedia": {
       "additionalProperties": false,
       "properties": {
@@ -4303,6 +5336,39 @@
         "name",
         "phone",
         "birthDate"
+      ],
+      "type": "object"
+    },
+    "RemoveCartLineRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "cartId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "expectedVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cartId",
+        "branchId",
+        "operatorSessionId",
+        "expectedVersion",
+        "idempotencyKey"
       ],
       "type": "object"
     },
@@ -4910,6 +5976,146 @@
       ],
       "type": "object"
     },
+    "TotalsPreview": {
+      "additionalProperties": false,
+      "properties": {
+        "businessDate": {
+          "format": "date",
+          "type": "string"
+        },
+        "discounts": {
+          "additionalProperties": false,
+          "properties": {
+            "entries": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "amount": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "currency": {
+                        "pattern": "^[A-Z]{3}$",
+                        "type": "string"
+                      },
+                      "minorUnits": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "minorUnits",
+                      "currency"
+                    ],
+                    "type": "object"
+                  },
+                  "code": {
+                    "maxLength": 80,
+                    "type": "string"
+                  },
+                  "label": {
+                    "maxLength": 160,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code",
+                  "label",
+                  "amount"
+                ],
+                "type": "object"
+              },
+              "maxItems": 20,
+              "type": "array"
+            },
+            "total": {
+              "additionalProperties": false,
+              "properties": {
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "minorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "minorUnits",
+                "currency"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "total",
+            "entries"
+          ],
+          "type": "object"
+        },
+        "grandTotal": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "subtotal": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "tax": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "subtotal",
+        "tax",
+        "discounts",
+        "grandTotal",
+        "businessDate"
+      ],
+      "type": "object"
+    },
     "UpdateStaffRequest": {
       "additionalProperties": false,
       "properties": {
@@ -4948,6 +6154,33 @@
           "type": "string"
         }
       },
+      "type": "object"
+    },
+    "VariantSelection": {
+      "additionalProperties": false,
+      "properties": {
+        "attributes": {
+          "additionalProperties": {
+            "maxLength": 120,
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "variantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "variantId",
+        "name",
+        "attributes"
+      ],
       "type": "object"
     },
     "VerifyOperatorPinRequest": {
@@ -4998,6 +6231,18 @@
       "retryable": false
     },
     "BRANCH_REQUIRED": {
+      "public": true,
+      "retryable": false
+    },
+    "CART_NOT_FOUND": {
+      "public": true,
+      "retryable": false
+    },
+    "CART_VALIDATION_FAILED": {
+      "public": true,
+      "retryable": false
+    },
+    "CHECKOUT_GATE_NOT_AVAILABLE": {
       "public": true,
       "retryable": false
     },
@@ -5053,6 +6298,10 @@
       "public": true,
       "retryable": true
     },
+    "MODIFIER_SELECTION_INVALID": {
+      "public": true,
+      "retryable": false
+    },
     "OPERATOR_LOCKED": {
       "public": true,
       "retryable": false
@@ -5074,6 +6323,10 @@
       "retryable": false
     },
     "PIN_LOCKED": {
+      "public": true,
+      "retryable": false
+    },
+    "PRODUCT_UNAVAILABLE": {
       "public": true,
       "retryable": false
     },
@@ -5100,6 +6353,10 @@
     "VALIDATION_FAILED": {
       "public": true,
       "retryable": false
+    },
+    "VARIANT_NOT_AVAILABLE": {
+      "public": true,
+      "retryable": false
     }
   },
   "invariants": {
@@ -5109,6 +6366,22 @@
   },
   "manifestVersion": 1,
   "routes": {
+    "DELETE /api/pos/tenants/:tenantId/cart/lines/:lineId": {
+      "approval": false,
+      "auth": "operator-session",
+      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED",
+        "OPTIMISTIC_VERSION_CONFLICT"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "cart.write",
+      "pin": false,
+      "request": "RemoveCartLineRequest",
+      "response": "Cart",
+      "tenantContext": true
+    },
     "GET /api/auth/me": {
       "approval": false,
       "auth": "session",
@@ -5170,6 +6443,22 @@
       "request": null,
       "response": null,
       "tenantContext": false
+    },
+    "GET /api/pos/tenants/:tenantId/cart": {
+      "approval": false,
+      "auth": "operator-session",
+      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED",
+        "RESOURCE_NOT_FOUND"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "cart.write",
+      "pin": false,
+      "request": "CartQuery",
+      "response": "Cart",
+      "tenantContext": true
     },
     "GET /api/pos/tenants/:tenantId/catalog/categories": {
       "approval": false,
@@ -5237,6 +6526,23 @@
       "pin": false,
       "request": "UpdateStaffRequest",
       "response": null,
+      "tenantContext": true
+    },
+    "PATCH /api/pos/tenants/:tenantId/cart/lines/:lineId": {
+      "approval": false,
+      "auth": "operator-session",
+      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED",
+        "CART_VALIDATION_FAILED",
+        "OPTIMISTIC_VERSION_CONFLICT"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "cart.write",
+      "pin": false,
+      "request": "CartLineInput",
+      "response": "Cart",
       "tenantContext": true
     },
     "POST /api/:slug/admin/gift-cards": {
@@ -5553,6 +6859,57 @@
       "pin": false,
       "request": "StartOperatorSessionRequest",
       "response": "OperatorSessionView",
+      "tenantContext": true
+    },
+    "POST /api/pos/tenants/:tenantId/cart": {
+      "approval": false,
+      "auth": "operator-session",
+      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED",
+        "BRANCH_NOT_FOUND",
+        "IDEMPOTENCY_CONFLICT"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "cart.write",
+      "pin": false,
+      "request": "CreateCartRequest",
+      "response": "Cart",
+      "tenantContext": true
+    },
+    "POST /api/pos/tenants/:tenantId/cart/lines": {
+      "approval": false,
+      "auth": "operator-session",
+      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED",
+        "CART_VALIDATION_FAILED",
+        "IDEMPOTENCY_CONFLICT"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "cart.write",
+      "pin": false,
+      "request": "CartLineInput",
+      "response": "Cart",
+      "tenantContext": true
+    },
+    "POST /api/pos/tenants/:tenantId/cart/prepare": {
+      "approval": false,
+      "auth": "operator-session",
+      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED",
+        "CART_VALIDATION_FAILED",
+        "OPTIMISTIC_VERSION_CONFLICT"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "cart.write",
+      "pin": false,
+      "request": "PrepareSaleRequest",
+      "response": "Cart",
       "tenantContext": true
     },
     "POST /api/tenants/:tenantId/devices/enrollment": {

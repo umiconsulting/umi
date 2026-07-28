@@ -457,6 +457,90 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Cerrar'**
   String get closeAction;
+
+  /// No description provided for @cartTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Carrito actual'**
+  String get cartTitle;
+
+  /// No description provided for @cartEmpty.
+  ///
+  /// In es, this message translates to:
+  /// **'Abre un producto para iniciar este carrito.'**
+  String get cartEmpty;
+
+  /// No description provided for @cartUnavailable.
+  ///
+  /// In es, this message translates to:
+  /// **'El carrito no está disponible temporalmente.'**
+  String get cartUnavailable;
+
+  /// No description provided for @cartNoteLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Nota del operador'**
+  String get cartNoteLabel;
+
+  /// No description provided for @addToCartAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Agregar al carrito'**
+  String get addToCartAction;
+
+  /// No description provided for @removeFromCartAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Eliminar línea'**
+  String get removeFromCartAction;
+
+  /// No description provided for @increaseQuantity.
+  ///
+  /// In es, this message translates to:
+  /// **'Aumentar cantidad'**
+  String get increaseQuantity;
+
+  /// No description provided for @decreaseQuantity.
+  ///
+  /// In es, this message translates to:
+  /// **'Disminuir cantidad'**
+  String get decreaseQuantity;
+
+  /// No description provided for @subtotalLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Subtotal'**
+  String get subtotalLabel;
+
+  /// No description provided for @taxLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Impuestos'**
+  String get taxLabel;
+
+  /// No description provided for @discountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Vista previa de descuentos'**
+  String get discountLabel;
+
+  /// No description provided for @totalLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Total'**
+  String get totalLabel;
+
+  /// No description provided for @businessDateLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Fecha operativa'**
+  String get businessDateLabel;
+
+  /// No description provided for @checkoutNextGate.
+  ///
+  /// In es, this message translates to:
+  /// **'Checkout disponible en el siguiente Gate'**
+  String get checkoutNextGate;
 }
 
 class _AppLocalizationsDelegate

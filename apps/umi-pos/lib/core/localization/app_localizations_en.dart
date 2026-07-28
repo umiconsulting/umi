@@ -201,4 +201,46 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get closeAction => 'Close';
+
+  @override
+  String get cartTitle => 'Current cart';
+
+  @override
+  String get cartEmpty => 'Open a product to begin this cart.';
+
+  @override
+  String get cartUnavailable => 'The cart is temporarily unavailable.';
+
+  @override
+  String get cartNoteLabel => 'Operator note';
+
+  @override
+  String get addToCartAction => 'Add to cart';
+
+  @override
+  String get removeFromCartAction => 'Remove line';
+
+  @override
+  String get increaseQuantity => 'Increase quantity';
+
+  @override
+  String get decreaseQuantity => 'Decrease quantity';
+
+  @override
+  String get subtotalLabel => 'Subtotal';
+
+  @override
+  String get taxLabel => 'Taxes';
+
+  @override
+  String get discountLabel => 'Discount preview';
+
+  @override
+  String get totalLabel => 'Total';
+
+  @override
+  String get businessDateLabel => 'Business date';
+
+  @override
+  String get checkoutNextGate => 'Checkout available in the next Gate';
 }
