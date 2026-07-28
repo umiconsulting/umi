@@ -66,4 +66,94 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get unknownRouteBody => 'This area is not enabled yet.';
+
+  @override
+  String get enrollmentTitle => 'Enroll this device';
+
+  @override
+  String get enrollmentBody =>
+      'Enter the one-time challenge approved by an administrator.';
+
+  @override
+  String get challengeIdLabel => 'Challenge ID';
+
+  @override
+  String get enrollmentCodeLabel => 'Enrollment code';
+
+  @override
+  String get continueAction => 'Continue';
+
+  @override
+  String get loginTitle => 'Sign in to UmiPOS';
+
+  @override
+  String get usernameLabel => 'Email';
+
+  @override
+  String get passwordLabel => 'Password';
+
+  @override
+  String get signInAction => 'Sign in';
+
+  @override
+  String get selectTenantTitle => 'Select a business';
+
+  @override
+  String get noTenantTitle => 'No business access';
+
+  @override
+  String get noTenantBody => 'Your account does not have active UmiPOS access.';
+
+  @override
+  String get selectBranchTitle => 'Select a branch';
+
+  @override
+  String get noBranchBody =>
+      'No active branch intersects your user and device assignments.';
+
+  @override
+  String get operatorTitle => 'Start operator session';
+
+  @override
+  String get operatorBody =>
+      'Confirm this branch to enter the protected POS shell.';
+
+  @override
+  String get startOperatorAction => 'Start session';
+
+  @override
+  String get lockAction => 'Lock operator';
+
+  @override
+  String get logoutAction => 'Sign out';
+
+  @override
+  String get deviceActiveLabel => 'Trusted device';
+
+  @override
+  String get connectivityUnknownLabel => 'Connectivity unknown';
+
+  @override
+  String get shellReadyTitle => 'Operator session ready';
+
+  @override
+  String get catalogNotImplemented => 'Catalog is not implemented yet.';
+
+  @override
+  String get deviceRevokedTitle => 'Device revoked';
+
+  @override
+  String get deviceRevokedBody =>
+      'This installation is no longer trusted. Ask an administrator to replace it.';
+
+  @override
+  String get rotationRequiredTitle => 'Credential rotation required';
+
+  @override
+  String get rotationRequiredBody =>
+      'An administrator must rotate this device credential before entry.';
+
+  @override
+  String get recoverableNetworkBody =>
+      'The trusted entry service could not be reached safely.';
 }

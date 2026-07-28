@@ -4,7 +4,10 @@ import '../core/feature_flags/feature_flags.dart';
 import '../core/network/api_client.dart';
 import '../core/observability/telemetry.dart';
 import '../core/platform/platform_adapters.dart';
+import '../core/security/credential_vault.dart';
 import '../core/storage/storage.dart';
+import '../features/entry/entry_controller.dart';
+import '../features/entry/entry_gateway.dart';
 import 'bootstrap_controller.dart';
 
 final class AppCompositionRoot {
@@ -18,6 +21,8 @@ final class AppCompositionRoot {
     required this.platform,
     required this.apiClient,
     required this.features,
+    required this.credentials,
+    required this.entry,
   });
 
   factory AppCompositionRoot.production() {
@@ -28,10 +33,16 @@ final class AppCompositionRoot {
       exporter: const NoopTelemetryExporter(),
     );
     const secureStorage = FlutterSecureKeyValueStorage();
+    final credentials = CredentialVault(secureStorage);
     const preferences = SharedPreferencesStore();
     const localDatabase = UnsupportedLocalDatabase();
     const platform = PlatformAdapters.unsupported();
-    final apiClient = BoundedApiClient(config: config, telemetry: telemetry);
+    final apiClient = BoundedApiClient(
+      config: config,
+      telemetry: telemetry,
+      tokenProvider: credentials,
+      deviceCredentialProvider: credentials,
+    );
     final controller = BootstrapController(
       config: config,
       contracts: const GeneratedContractGateway(),
@@ -48,6 +59,12 @@ final class AppCompositionRoot {
       platform: platform,
       apiClient: apiClient,
       features: FeatureFlags.bootstrap(config.featureBootstrapMode),
+      credentials: credentials,
+      entry: EntryController(
+        gateway: ApiEntryGateway(apiClient, credentials),
+        vault: credentials,
+        telemetry: telemetry,
+      ),
     );
   }
 
@@ -60,9 +77,12 @@ final class AppCompositionRoot {
   final PlatformAdapters platform;
   final ApiClient apiClient;
   final FeatureFlags features;
+  final CredentialVault credentials;
+  final EntryController entry;
 
   void dispose() {
     controller.dispose();
+    entry.dispose();
     apiClient.dispose();
   }
 }

@@ -7,18 +7,19 @@ import 'support/fakes.dart';
 
 void main() {
   test('generated canonical contract is linked', () {
-    expect(contractVersion, '1.0.0');
+    expect(contractVersion, '1.1.0');
     expect(contractContentHash, hasLength(64));
   });
 
-  testWidgets('bootstrap presents a localized authentication boundary', (
+  testWidgets('bootstrap presents the localized trusted-device boundary', (
     tester,
   ) async {
     final root = testRoot();
     await root.controller.initialize();
+    await root.entry.initialize();
     await tester.pumpWidget(UmiPosApp(root: root));
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.lock_outline), findsOneWidget);
-    expect(find.text('Listo para comenzar'), findsOneWidget);
+    expect(find.text('Registrar este dispositivo'), findsOneWidget);
+    expect(find.byType(TextField), findsNWidgets(2));
   });
 }

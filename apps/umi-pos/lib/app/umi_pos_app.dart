@@ -7,6 +7,7 @@ import '../bootstrap/composition_root.dart';
 import '../core/localization/app_localizations.dart';
 import '../core/navigation/app_navigation.dart';
 import '../core/theme/umi_theme.dart';
+import '../features/entry/entry_surface.dart';
 import '../shared/widgets/status_card.dart';
 
 final class UmiPosApp extends StatefulWidget {
@@ -22,11 +23,13 @@ final class _UmiPosAppState extends State<UmiPosApp> {
   void initState() {
     super.initState();
     widget.root.controller.addListener(_changed);
+    widget.root.entry.addListener(_changed);
   }
 
   @override
   void dispose() {
     widget.root.controller.removeListener(_changed);
+    widget.root.entry.removeListener(_changed);
     widget.root.dispose();
     super.dispose();
   }
@@ -69,14 +72,20 @@ final class _GuardedSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final route = NavigationGuard.resolve(
-      requested: AppRoute.authentication,
+      requested: AppRoute.mainShell,
       bootstrap: root.controller.state,
       config: root.config,
       flags: root.features,
+      entryStage: root.entry.navigationStage,
     );
     return switch (route) {
       AppRoute.bootstrap => const _LoadingSurface(),
-      AppRoute.authentication => const _ReadySurface(),
+      AppRoute.authentication ||
+      AppRoute.enrollment ||
+      AppRoute.tenantSelection ||
+      AppRoute.branchSelection ||
+      AppRoute.operatorSession ||
+      AppRoute.mainShell => EntrySurface(controller: root.entry),
       AppRoute.recoverableError => _FailureSurface(controller: root.controller),
       AppRoute.diagnostics => _DiagnosticsSurface(root: root),
       _ => _UnknownRoute(root: root),
@@ -94,26 +103,6 @@ final class _LoadingSurface extends StatelessWidget {
         liveRegion: true,
         label: l10n.bootstrapLoadingTitle,
         child: const Center(child: CircularProgressIndicator()),
-      ),
-    );
-  }
-}
-
-final class _ReadySurface extends StatelessWidget {
-  const _ReadySurface();
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: StatusCard(
-            icon: Icons.lock_outline,
-            title: l10n.readyTitle,
-            message: l10n.readyBody,
-          ),
-        ),
       ),
     );
   }

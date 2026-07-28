@@ -15,12 +15,23 @@ enum AppRoute {
   unknown,
 }
 
+enum TrustedEntryStage {
+  enrollment,
+  authentication,
+  tenant,
+  branch,
+  operator,
+  ready,
+  blocked,
+}
+
 abstract final class NavigationGuard {
   static AppRoute resolve({
     required AppRoute requested,
     required BootstrapState bootstrap,
     required AppConfig config,
     required FeatureFlags flags,
+    TrustedEntryStage entryStage = TrustedEntryStage.authentication,
   }) {
     if (bootstrap.phase == BootstrapPhase.initializing) {
       return AppRoute.bootstrap;
@@ -39,7 +50,14 @@ abstract final class NavigationGuard {
         flags.diagnostics) {
       return AppRoute.diagnostics;
     }
-    // Authentication and later route groups remain closed until their gates.
-    return AppRoute.authentication;
+    return switch (entryStage) {
+      TrustedEntryStage.enrollment => AppRoute.enrollment,
+      TrustedEntryStage.authentication => AppRoute.authentication,
+      TrustedEntryStage.tenant => AppRoute.tenantSelection,
+      TrustedEntryStage.branch => AppRoute.branchSelection,
+      TrustedEntryStage.operator => AppRoute.operatorSession,
+      TrustedEntryStage.ready => AppRoute.mainShell,
+      TrustedEntryStage.blocked => AppRoute.recoverableError,
+    };
   }
 }

@@ -13,8 +13,34 @@ void main() {
       bootstrap: const BootstrapState(BootstrapPhase.readyForAuthentication),
       config: testConfig,
       flags: FeatureFlags.bootstrap(FeatureBootstrapMode.localSafeDefaults),
+      entryStage: TrustedEntryStage.authentication,
     );
     expect(result, AppRoute.authentication);
+  });
+
+  test('trusted entry stages cannot deep-link past missing context', () {
+    final stages = {
+      TrustedEntryStage.enrollment: AppRoute.enrollment,
+      TrustedEntryStage.authentication: AppRoute.authentication,
+      TrustedEntryStage.tenant: AppRoute.tenantSelection,
+      TrustedEntryStage.branch: AppRoute.branchSelection,
+      TrustedEntryStage.operator: AppRoute.operatorSession,
+      TrustedEntryStage.ready: AppRoute.mainShell,
+    };
+    for (final entry in stages.entries) {
+      expect(
+        NavigationGuard.resolve(
+          requested: AppRoute.mainShell,
+          bootstrap: const BootstrapState(
+            BootstrapPhase.readyForAuthentication,
+          ),
+          config: testConfig,
+          flags: FeatureFlags.bootstrap(FeatureBootstrapMode.localSafeDefaults),
+          entryStage: entry.key,
+        ),
+        entry.value,
+      );
+    }
   });
 
   test('initialization cannot be bypassed', () {

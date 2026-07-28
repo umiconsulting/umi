@@ -21,6 +21,16 @@ abstract interface class AccessTokenProvider {
   Future<String?> accessToken();
 }
 
+abstract interface class DeviceCredentialProvider {
+  Future<Map<String, String>> deviceHeaders();
+}
+
+final class NoDeviceCredentialProvider implements DeviceCredentialProvider {
+  const NoDeviceCredentialProvider();
+  @override
+  Future<Map<String, String>> deviceHeaders() async => const {};
+}
+
 final class NoAccessTokenProvider implements AccessTokenProvider {
   const NoAccessTokenProvider();
   @override
@@ -43,6 +53,8 @@ final class BoundedApiClient implements ApiClient {
     required AppConfig config,
     required Telemetry telemetry,
     AccessTokenProvider tokenProvider = const NoAccessTokenProvider(),
+    DeviceCredentialProvider deviceCredentialProvider =
+        const NoDeviceCredentialProvider(),
     http.Client? client,
   }) : // ignore: prefer_initializing_formals
        _config = config,
@@ -50,6 +62,7 @@ final class BoundedApiClient implements ApiClient {
        _telemetry = telemetry,
        // ignore: prefer_initializing_formals
        _tokenProvider = tokenProvider,
+       _deviceCredentialProvider = deviceCredentialProvider,
        _client = client ?? http.Client();
 
   static const requestTimeout = Duration(seconds: 15);
@@ -59,6 +72,7 @@ final class BoundedApiClient implements ApiClient {
   final AppConfig _config;
   final Telemetry _telemetry;
   final AccessTokenProvider _tokenProvider;
+  final DeviceCredentialProvider _deviceCredentialProvider;
   final http.Client _client;
 
   @override
@@ -99,6 +113,7 @@ final class BoundedApiClient implements ApiClient {
       final correlationId = _correlationId();
       try {
         final token = await _tokenProvider.accessToken();
+        final deviceHeaders = await _deviceCredentialProvider.deviceHeaders();
         final request =
             http.Request(method.name.toUpperCase(), base.resolve(path))
               ..headers.addAll({
@@ -106,6 +121,8 @@ final class BoundedApiClient implements ApiClient {
                 'content-type': 'application/json',
                 'x-correlation-id': correlationId,
                 'x-umi-client': 'umi-pos',
+                'x-umi-app': 'pos',
+                ...deviceHeaders,
               });
         if (token != null) request.headers['authorization'] = 'Bearer $token';
         if (body != null) request.body = jsonEncode(body);

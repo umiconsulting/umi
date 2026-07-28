@@ -6,7 +6,10 @@ import 'package:umi_pos/core/feature_flags/feature_flags.dart';
 import 'package:umi_pos/core/network/api_client.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
 import 'package:umi_pos/core/platform/platform_adapters.dart';
+import 'package:umi_pos/core/security/credential_vault.dart';
 import 'package:umi_pos/core/storage/storage.dart';
+import 'package:umi_pos/features/entry/entry_controller.dart';
+import 'package:umi_pos/features/entry/entry_gateway.dart';
 
 final testConfig = AppConfig(
   environment: AppEnvironment.development,
@@ -87,6 +90,8 @@ AppCompositionRoot testRoot({
     context: TelemetryContext.current(testConfig),
     exporter: exporter,
   );
+  final credentials = CredentialVault(secureStorage);
+  final api = TestApiClient();
   return AppCompositionRoot(
     config: testConfig,
     controller: BootstrapController(
@@ -100,7 +105,13 @@ AppCompositionRoot testRoot({
     preferences: TestPreferences(),
     localDatabase: const UnsupportedLocalDatabase(),
     platform: const PlatformAdapters.unsupported(),
-    apiClient: TestApiClient(),
+    apiClient: api,
     features: FeatureFlags.bootstrap(FeatureBootstrapMode.localSafeDefaults),
+    credentials: credentials,
+    entry: EntryController(
+      gateway: ApiEntryGateway(api, credentials),
+      vault: credentials,
+      telemetry: telemetry,
+    ),
   );
 }

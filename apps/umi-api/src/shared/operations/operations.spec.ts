@@ -7,11 +7,17 @@ describe('operational foundations', () => {
   it('redacts secrets recursively and bounds oversized values', () => {
     const result = redactTelemetry({
       authorization: 'Bearer private',
+      managerPin: '1234',
+      enrollmentCode: 'ABCDEFGH',
+      deviceCredential: 'opaque-secret',
       nested: { cardNumber: '4111111111111111', safe: 'ok' },
       long: 'x'.repeat(2_100),
     });
     expect(result).toEqual({
       authorization: '[REDACTED]',
+      managerPin: '[REDACTED]',
+      enrollmentCode: '[REDACTED]',
+      deviceCredential: '[REDACTED]',
       nested: { cardNumber: '[REDACTED]', safe: 'ok' },
       long: `${'x'.repeat(2_000)}[TRUNCATED]`,
     });

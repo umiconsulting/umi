@@ -375,6 +375,8 @@ export class AuthRepository {
     userId: string,
     deviceId: string,
     app: 'dashboard' | 'kds' | 'pos',
+    installationHash: string | null = null,
+    credentialHash: string | null = null,
   ): Promise<boolean> {
     if (app === 'dashboard') return false;
     const expectedKind = app === 'kds' ? 'kds' : 'pos_terminal';
@@ -387,6 +389,13 @@ export class AuthRepository {
            AND d.kind = $3
            AND d.status = 'active'
            AND (
+             $3 <> 'pos_terminal' OR (
+               d.lifecycle_state = 'active'
+               AND d.installation_hash = $4
+               AND d.credential_hash = $5
+             )
+           )
+           AND (
              EXISTS (
                SELECT 1 FROM umi.user_role AS ur
                WHERE ur.user_id = $1::uuid
@@ -396,7 +405,7 @@ export class AuthRepository {
              OR (SELECT is_sa FROM sa)
            )
        ) AS allowed`,
-      [userId, deviceId, expectedKind],
+      [userId, deviceId, expectedKind, installationHash, credentialHash],
     );
     return rows[0]?.allowed === true;
   }

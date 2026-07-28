@@ -29,6 +29,9 @@ import {
   ForgotPasswordRequest,
   GlobalLogoutRequest,
   LoginRequest,
+  PosLoginRequest,
+  PosRefreshRequest,
+  type PosSessionResponse,
   ResetPasswordRequest,
   type SessionEnvelope,
   type SessionResponse,
@@ -73,6 +76,48 @@ export class AuthController {
     const remember = req.cookies?.[REMEMBER_COOKIE] === '1';
     this.setAuthCookies(reply, result, remember);
     return { session: toSession(result, this.accessExpiresIn()) };
+  }
+
+  @Public()
+  @Post('pos/login')
+  async posLogin(
+    @Body(new ZodValidationPipe(PosLoginRequest)) dto: PosLoginRequest,
+    @Req() req: FastifyRequest,
+  ): Promise<PosSessionResponse> {
+    const result = await this.auth.login(
+      dto.username,
+      dto.password,
+      this.client(req, dto.installationId, true),
+    );
+    return {
+      session: toSession(result, this.accessExpiresIn()),
+      tokens: { accessToken: result.accessToken, refreshToken: result.refreshToken },
+    };
+  }
+
+  @Public()
+  @Post('pos/refresh')
+  async posRefresh(
+    @Body(new ZodValidationPipe(PosRefreshRequest)) dto: PosRefreshRequest,
+    @Req() req: FastifyRequest,
+  ): Promise<PosSessionResponse> {
+    const result = await this.auth.refresh(
+      dto.refreshToken,
+      this.client(req, dto.installationId, true),
+    );
+    return {
+      session: toSession(result, this.accessExpiresIn()),
+      tokens: { accessToken: result.accessToken, refreshToken: result.refreshToken },
+    };
+  }
+
+  @Public()
+  @Post('pos/logout')
+  async posLogout(
+    @Body(new ZodValidationPipe(PosRefreshRequest)) dto: PosRefreshRequest,
+  ): Promise<{ ok: true }> {
+    await this.auth.logout(dto.refreshToken);
+    return { ok: true };
   }
 
   @Public()
@@ -197,20 +242,31 @@ export class AuthController {
     );
   }
 
-  private client(req: FastifyRequest): {
+  private client(
+    req: FastifyRequest,
+    installationId: string | null = null,
+    forcePos = false,
+  ): {
     app: 'dashboard' | 'kds' | 'pos';
     deviceId: string | null;
     ip: string | null;
     userAgent: string | null;
+    installationId: string | null;
+    deviceCredential: string | null;
   } {
     const rawApp = req.headers['x-umi-app'];
-    const app = rawApp === 'kds' || rawApp === 'pos' ? rawApp : 'dashboard';
+    const app = forcePos ? 'pos' : rawApp === 'kds' || rawApp === 'pos' ? rawApp : 'dashboard';
     const rawDevice = req.headers['x-umi-device-id'];
     return {
       app,
       deviceId: typeof rawDevice === 'string' && app !== 'dashboard' ? rawDevice : null,
       ip: req.ip ?? null,
       userAgent: req.headers['user-agent'] ?? null,
+      installationId,
+      deviceCredential:
+        typeof req.headers['x-umi-device-credential'] === 'string'
+          ? req.headers['x-umi-device-credential']
+          : null,
     };
   }
 }

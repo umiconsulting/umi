@@ -17,6 +17,30 @@ export const routes = {
     forgotPassword: '/api/auth/local/forgot-password',
     resetPassword: '/api/auth/local/reset-password',
     me: '/api/auth/me',
+    posLogin: '/api/auth/pos/login',
+    posRefresh: '/api/auth/pos/refresh',
+    posLogout: '/api/auth/pos/logout',
+  },
+  devices: {
+    completeEnrollment: '/api/devices/enrollment/complete',
+    status: '/api/devices/status',
+    beginEnrollment: (tenantId: string): string =>
+      `${tenantBase(tenantId)}/devices/enrollment`,
+    rotate: (tenantId: string, deviceId: string): string =>
+      `${tenantBase(tenantId)}/devices/${enc(deviceId)}/rotate`,
+    revoke: (tenantId: string, deviceId: string): string =>
+      `${tenantBase(tenantId)}/devices/${enc(deviceId)}/revoke`,
+    replace: (tenantId: string): string => `${tenantBase(tenantId)}/devices/replacement`,
+  },
+  pos: {
+    entryContext: '/api/pos/entry-context',
+    operatorSession: '/api/pos/operator-sessions',
+    operatorLock: (sessionId: string): string =>
+      `/api/pos/operator-sessions/${enc(sessionId)}/lock`,
+    operatorEnd: (sessionId: string): string =>
+      `/api/pos/operator-sessions/${enc(sessionId)}/end`,
+    verifyPin: '/api/pos/elevation/pin',
+    managerApproval: '/api/pos/elevation/manager-approval',
   },
   me: {
     tenants: '/api/me/tenants',

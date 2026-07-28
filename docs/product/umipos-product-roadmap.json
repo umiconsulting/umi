@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-27",
-  "latestRelevantCommit": "HEAD (Gate 2A commit)",
+  "updatedAt": "2026-07-28",
+  "latestRelevantCommit": "HEAD (Gate 2B commit)",
   "items": [
     {
       "id": "platform-certification",
@@ -21,15 +21,15 @@
     },
     {
       "id": "2B",
-      "status": "next",
+      "status": "complete",
       "dependencies": ["2A"],
       "nextObjective": "Implement device trust and authenticated operator boundary",
-      "blockers": ["Server device enrollment and operator workflows"],
-      "validationState": "not run"
+      "blockers": [],
+      "validationState": "Focused contract, API, migration, Flutter, and web validation passed"
     },
     {
       "id": "2C",
-      "status": "planned",
+      "status": "next",
       "dependencies": ["2B"],
       "nextObjective": "Implement branch-aware read-only catalog",
       "blockers": ["Catalog readiness"],

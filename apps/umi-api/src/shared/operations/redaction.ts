@@ -1,5 +1,5 @@
 const SENSITIVE_KEY =
-  /(?:authorization|cookie|password|secret|token|api[-_]?key|private[-_]?key|card[-_]?number|cvv|receipt[-_]?access)/i;
+  /(?:authorization|cookie|password|secret|token|pin|credential|enrollment.*code|api[-_]?key|private[-_]?key|card[-_]?number|cvv|receipt[-_]?access)/i;
 
 export function redactTelemetry(value: unknown, depth = 0): unknown {
   if (depth > 8) return '[TRUNCATED]';

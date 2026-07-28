@@ -512,7 +512,7 @@ packages:
       path: "../../packages/contract/generated/dart"
       relative: true
     source: path
-    version: "1.0.0"
+    version: "1.1.0"
   vector_math:
     dependency: transitive
     description:

@@ -114,3 +114,20 @@ test('generated Dart package metadata contains real YAML line breaks', async () 
   assert.match(pubspec, /^name: umi_contract\ndescription:/);
   assert.equal(pubspec.includes('\\n'), false);
 });
+
+test('Gate 2B device contracts are bounded and generated for Flutter', async () => {
+  const artifact = JSON.parse(
+    await readFile(new URL('../generated/contract.json', import.meta.url), 'utf8'),
+  );
+  assert.ok(artifact.definitions.DeviceSummary);
+  assert.ok(artifact.definitions.CompleteDeviceEnrollmentRequest);
+  assert.ok(artifact.definitions.PosSessionResponse);
+  assert.ok(artifact.definitions.OperatorSessionView);
+  assert.ok(artifact.errors.DEVICE_CREDENTIAL_INVALID);
+  const dart = await readFile(
+    new URL('../generated/dart/lib/umi_contract.dart', import.meta.url),
+    'utf8',
+  );
+  assert.match(dart, /abstract final class UmiRoutes/);
+  assert.match(dart, /static const posLogin = '\/api\/auth\/pos\/login'/);
+});

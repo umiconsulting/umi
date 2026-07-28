@@ -1,0 +1,146 @@
+import 'dart:math';
+
+import '../network/api_client.dart';
+import '../storage/storage.dart';
+
+final class DeviceIdentity {
+  const DeviceIdentity({
+    required this.installationId,
+    this.deviceId,
+    this.publicId,
+    this.credential,
+    this.credentialVersion,
+    this.tenantId,
+    this.branchId,
+    this.state,
+  });
+  final String installationId;
+  final String? deviceId;
+  final String? publicId;
+  final String? credential;
+  final int? credentialVersion;
+  final String? tenantId;
+  final String? branchId;
+  final String? state;
+  bool get isEnrolled =>
+      deviceId != null && publicId != null && credential != null;
+}
+
+final class CredentialVault
+    implements AccessTokenProvider, DeviceCredentialProvider {
+  CredentialVault(this._storage);
+  final SecureKeyValueStorage _storage;
+
+  static const _installation = 'device.installation_id';
+  static const _deviceId = 'device.id';
+  static const _publicId = 'device.public_id';
+  static const _credential = 'device.credential';
+  static const _credentialVersion = 'device.credential_version';
+  static const _tenant = 'context.tenant_id';
+  static const _branch = 'context.branch_id';
+  static const _deviceState = 'device.state';
+  static const _access = 'session.access_token';
+  static const _refresh = 'session.refresh_token';
+  static const _operator = 'operator.session_id';
+
+  Future<DeviceIdentity> deviceIdentity() async {
+    var installationId = await _storage.read(_installation);
+    if (installationId == null) {
+      installationId = _uuid();
+      await _storage.write(_installation, installationId);
+    }
+    return DeviceIdentity(
+      installationId: installationId,
+      deviceId: await _storage.read(_deviceId),
+      publicId: await _storage.read(_publicId),
+      credential: await _storage.read(_credential),
+      credentialVersion: int.tryParse(
+        await _storage.read(_credentialVersion) ?? '',
+      ),
+      tenantId: await _storage.read(_tenant),
+      branchId: await _storage.read(_branch),
+      state: await _storage.read(_deviceState),
+    );
+  }
+
+  Future<void> saveDevice({
+    required String id,
+    required String publicId,
+    required String credential,
+    required int credentialVersion,
+    required String state,
+    String? tenantId,
+    String? branchId,
+  }) async {
+    await _storage.write(_deviceId, id);
+    await _storage.write(_publicId, publicId);
+    await _storage.write(_credential, credential);
+    await _storage.write(_credentialVersion, '$credentialVersion');
+    await _storage.write(_deviceState, state);
+    if (tenantId != null) await _storage.write(_tenant, tenantId);
+    if (branchId != null) await _storage.write(_branch, branchId);
+  }
+
+  Future<void> saveTokens(String accessToken, String refreshToken) async {
+    await _storage.write(_access, accessToken);
+    await _storage.write(_refresh, refreshToken);
+  }
+
+  Future<String?> refreshToken() => _storage.read(_refresh);
+  Future<void> saveOperatorSession(String id) => _storage.write(_operator, id);
+
+  Future<void> selectTenant(String tenantId) async {
+    await _storage.write(_tenant, tenantId);
+    await _storage.delete(_branch);
+    await _storage.delete(_operator);
+  }
+
+  Future<void> selectBranch(String branchId) async {
+    await _storage.write(_branch, branchId);
+    await _storage.delete(_operator);
+  }
+
+  Future<void> clearSession() async {
+    for (final key in [_access, _refresh, _tenant, _branch, _operator]) {
+      await _storage.delete(key);
+    }
+  }
+
+  Future<void> clearDeviceTrust() async {
+    await clearSession();
+    for (final key in [
+      _deviceId,
+      _publicId,
+      _credential,
+      _credentialVersion,
+      _deviceState,
+    ]) {
+      await _storage.delete(key);
+    }
+  }
+
+  @override
+  Future<String?> accessToken() => _storage.read(_access);
+
+  @override
+  Future<Map<String, String>> deviceHeaders() async {
+    final identity = await deviceIdentity();
+    if (!identity.isEnrolled) return {};
+    return {
+      'x-umi-device-id': identity.deviceId!,
+      'x-umi-device-public-id': identity.publicId!,
+      'x-umi-device-credential': identity.credential!,
+      'x-umi-installation-id': identity.installationId,
+    };
+  }
+
+  String _uuid() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final hex = bytes.map((v) => v.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+  }
+}

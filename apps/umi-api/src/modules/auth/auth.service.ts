@@ -28,6 +28,8 @@ export interface SessionClient {
   deviceId: string | null;
   ip: string | null;
   userAgent: string | null;
+  installationId?: string | null;
+  deviceCredential?: string | null;
 }
 
 /**
@@ -69,7 +71,13 @@ export class AuthService {
     };
     if (
       client.deviceId &&
-      !(await this.repo.deviceAllowedForUser(user.id, client.deviceId, client.app))
+      !(await this.repo.deviceAllowedForUser(
+        user.id,
+        client.deviceId,
+        client.app,
+        client.installationId ? tokenHash(client.installationId) : null,
+        client.deviceCredential ? tokenHash(client.deviceCredential) : null,
+      ))
     ) {
       await this.repo.writeSecurityAudit({
         actorUserId: user.id,
@@ -114,6 +122,19 @@ export class AuthService {
         });
       }
       throw new UnauthorizedException('invalid_token');
+    }
+    if (
+      current.deviceId &&
+      !(await this.repo.deviceAllowedForUser(
+        claims.sub,
+        current.deviceId,
+        current.app,
+        client.installationId ? tokenHash(client.installationId) : null,
+        client.deviceCredential ? tokenHash(client.deviceCredential) : null,
+      ))
+    ) {
+      await this.repo.revokeSession(current.id, 'device_not_allowed');
+      throw new UnauthorizedException('device_not_allowed');
     }
     const summary = await this.repo.findUserById(claims.sub);
     if (!summary) throw new UnauthorizedException('invalid_token');

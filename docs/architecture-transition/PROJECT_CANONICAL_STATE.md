@@ -21,6 +21,9 @@ Future clients use `packages/contract` and controlled UMI APIs.
   documented, non-blocking operational observations.
 - Gate 2A created the Flutter application foundation at `apps/umi-pos`, consuming the generated
   Dart contract SDK and stopping at a guarded ready-for-authentication boundary.
+- Gate 2B established canonical POS device trust, credential-bound durable authentication,
+  server-intersected tenant/branch context, operator sessions, scoped elevation, and the honest
+  ready shell.
 
 ## Current implementation state
 
@@ -55,8 +58,13 @@ Future clients use `packages/contract` and controlled UMI APIs.
   route guards, typed fail-closed configuration, bounded HTTP behavior, platform secure storage,
   redacted telemetry, localized Spanish/English bootstrap UI, and explicit unsupported hardware
   adapters.
-- UmiPOS consumes contract version `1.0.0`, content hash
-  `260343ccb24a75aded9f0816647b95ae4f09ba4feca8a0a452a4532d688cbd96`.
+- `tenant.device` is the device authority; one-time challenges live in
+  `runtime.device_enrollment_challenge`, and `runtime.operator_session` separates operator
+  presence from user authentication.
+- UmiPOS consumes contract version `1.1.0`, content hash
+  `894cf332eb07e39e1e52a0874bd8586e805e3475b51bddeaea5b515ab8123705`.
+- POS refresh sessions require the active server device plus its installation and credential
+  hashes. Revocation/replacement ends durable and operator sessions.
 
 ## Prohibitions
 
@@ -80,5 +88,5 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - `BUILD_V3_CERTIFIED`: `true`
 - UmiPOS application creation: `YES WITH OBSERVATIONS`
 - Remote publication: deferred because the branch has no configured upstream.
-- Gate 2A: complete in the commit containing this state update.
-- Next gate: `2B` — device trust and operator experience.
+- Gate 2B: complete in the commit containing this state update.
+- Next gate: `2C` — read-only catalog.

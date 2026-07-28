@@ -60,6 +60,12 @@
       "id": "2A",
       "status": "complete",
       "subject": "UmiPOS Flutter application foundation"
+    },
+    {
+      "commit": "HEAD (Gate 2B commit)",
+      "id": "2B",
+      "status": "complete",
+      "subject": "Device trust, authenticated context, and operator entry"
     }
   ]
 }

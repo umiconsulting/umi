@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "260343ccb24a75aded9f0816647b95ae4f09ba4feca8a0a452a4532d688cbd96",
-  "contractVersion": "1.0.0",
+  "contentHash": "894cf332eb07e39e1e52a0874bd8586e805e3475b51bddeaea5b515ab8123705",
+  "contractVersion": "1.1.0",
   "definitions": {
     "ApiError": {
       "additionalProperties": false,
@@ -21,6 +21,17 @@
             "RATE_LIMITED",
             "DEVICE_REVOKED",
             "DEVICE_NOT_ALLOWED",
+            "DEVICE_NOT_ENROLLED",
+            "DEVICE_CREDENTIAL_INVALID",
+            "DEVICE_ROTATION_REQUIRED",
+            "ENROLLMENT_EXPIRED",
+            "ENROLLMENT_REJECTED",
+            "ENROLLMENT_ATTEMPTS_EXCEEDED",
+            "TENANT_DISABLED",
+            "BRANCH_DISABLED",
+            "OPERATOR_SESSION_REQUIRED",
+            "OPERATOR_LOCKED",
+            "PIN_LOCKED",
             "SESSION_REVOKED",
             "ELEVATION_REQUIRED",
             "AUDIT_INTEGRITY_FAILURE",
@@ -83,6 +94,17 @@
                 "RATE_LIMITED",
                 "DEVICE_REVOKED",
                 "DEVICE_NOT_ALLOWED",
+                "DEVICE_NOT_ENROLLED",
+                "DEVICE_CREDENTIAL_INVALID",
+                "DEVICE_ROTATION_REQUIRED",
+                "ENROLLMENT_EXPIRED",
+                "ENROLLMENT_REJECTED",
+                "ENROLLMENT_ATTEMPTS_EXCEEDED",
+                "TENANT_DISABLED",
+                "BRANCH_DISABLED",
+                "OPERATOR_SESSION_REQUIRED",
+                "OPERATOR_LOCKED",
+                "PIN_LOCKED",
                 "SESSION_REVOKED",
                 "ELEVATION_REQUIRED",
                 "AUDIT_INTEGRITY_FAILURE",
@@ -472,6 +494,97 @@
       ],
       "type": "object"
     },
+    "BeginDeviceEnrollmentRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "displayName": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "platform": {
+          "enum": [
+            "android",
+            "ios",
+            "linux",
+            "macos",
+            "windows",
+            "web"
+          ],
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "pos_terminal",
+            "kds"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "branchId",
+        "displayName",
+        "type",
+        "platform",
+        "idempotencyKey"
+      ],
+      "type": "object"
+    },
+    "BranchAccess": {
+      "additionalProperties": false,
+      "properties": {
+        "deviceAllowed": {
+          "type": "boolean"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "operatorAllowed": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "closed"
+          ],
+          "type": "string"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "tenantId",
+        "name",
+        "status",
+        "deviceAllowed",
+        "operatorAllowed"
+      ],
+      "type": "object"
+    },
     "BranchContext": {
       "additionalProperties": false,
       "properties": {
@@ -673,6 +786,29 @@
       ],
       "type": "object"
     },
+    "CompleteDeviceEnrollmentRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "challengeId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "enrollmentCode": {
+          "pattern": "^[A-Z0-9]{8}$",
+          "type": "string"
+        },
+        "installationId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "challengeId",
+        "enrollmentCode",
+        "installationId"
+      ],
+      "type": "object"
+    },
     "CorrelationMetadata": {
       "additionalProperties": false,
       "properties": {
@@ -766,6 +902,286 @@
         "application"
       ],
       "type": "object"
+    },
+    "DeviceCredentialEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "credential": {
+          "maxLength": 128,
+          "minLength": 43,
+          "type": "string"
+        },
+        "device": {
+          "additionalProperties": false,
+          "properties": {
+            "branchId": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "credentialVersion": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "displayName": {
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            },
+            "id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "lastSeenAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "platform": {
+              "enum": [
+                "android",
+                "ios",
+                "linux",
+                "macos",
+                "windows",
+                "web"
+              ],
+              "type": "string"
+            },
+            "publicId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "replacementDeviceId": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "revokedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "rotationRequired": {
+              "type": "boolean"
+            },
+            "state": {
+              "enum": [
+                "enrollment_pending",
+                "active",
+                "rotation_required",
+                "rotated",
+                "revoked",
+                "replaced"
+              ],
+              "type": "string"
+            },
+            "tenantId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "pos_terminal",
+                "kds"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "publicId",
+            "tenantId",
+            "branchId",
+            "displayName",
+            "type",
+            "platform",
+            "state",
+            "credentialVersion",
+            "lastSeenAt",
+            "rotationRequired",
+            "revokedAt",
+            "replacementDeviceId"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "device",
+        "credential"
+      ],
+      "type": "object"
+    },
+    "DeviceLifecycleState": {
+      "enum": [
+        "enrollment_pending",
+        "active",
+        "rotation_required",
+        "rotated",
+        "revoked",
+        "replaced"
+      ],
+      "type": "string"
+    },
+    "DevicePlatform": {
+      "enum": [
+        "android",
+        "ios",
+        "linux",
+        "macos",
+        "windows",
+        "web"
+      ],
+      "type": "string"
+    },
+    "DeviceSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "credentialVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "displayName": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "lastSeenAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "platform": {
+          "enum": [
+            "android",
+            "ios",
+            "linux",
+            "macos",
+            "windows",
+            "web"
+          ],
+          "type": "string"
+        },
+        "publicId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "replacementDeviceId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "revokedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rotationRequired": {
+          "type": "boolean"
+        },
+        "state": {
+          "enum": [
+            "enrollment_pending",
+            "active",
+            "rotation_required",
+            "rotated",
+            "revoked",
+            "replaced"
+          ],
+          "type": "string"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "pos_terminal",
+            "kds"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "publicId",
+        "tenantId",
+        "branchId",
+        "displayName",
+        "type",
+        "platform",
+        "state",
+        "credentialVersion",
+        "lastSeenAt",
+        "rotationRequired",
+        "revokedAt",
+        "replacementDeviceId"
+      ],
+      "type": "object"
+    },
+    "DeviceType": {
+      "enum": [
+        "pos_terminal",
+        "kds"
+      ],
+      "type": "string"
     },
     "DurableSession": {
       "additionalProperties": false,
@@ -880,6 +1296,48 @@
       ],
       "type": "object"
     },
+    "ElevationGrantView": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "elevationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "expiresAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "method": {
+          "enum": [
+            "manager_approval",
+            "operator_pin"
+          ],
+          "type": "string"
+        },
+        "permission": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "elevationId",
+        "permission",
+        "tenantId",
+        "branchId",
+        "method",
+        "expiresAt"
+      ],
+      "type": "object"
+    },
     "ElevationRequirement": {
       "additionalProperties": false,
       "properties": {
@@ -905,6 +1363,300 @@
         "permission",
         "method",
         "freshWithinSeconds"
+      ],
+      "type": "object"
+    },
+    "EnrollmentChallenge": {
+      "additionalProperties": false,
+      "properties": {
+        "challengeId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "enrollmentCode": {
+          "pattern": "^[A-Z0-9]{8}$",
+          "type": "string"
+        },
+        "expiresAt": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "challengeId",
+        "enrollmentCode",
+        "expiresAt"
+      ],
+      "type": "object"
+    },
+    "EntryContextResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "tenants": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "branches": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "deviceAllowed": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "name": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "operatorAllowed": {
+                      "type": "boolean"
+                    },
+                    "status": {
+                      "enum": [
+                        "active",
+                        "closed"
+                      ],
+                      "type": "string"
+                    },
+                    "tenantId": {
+                      "format": "uuid",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "tenantId",
+                    "name",
+                    "status",
+                    "deviceAllowed",
+                    "operatorAllowed"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 500,
+                "type": "array"
+              },
+              "entitlements": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "featureKey": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "limit": {
+                      "anyOf": [
+                        {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "subscriptionStatus": {
+                      "enum": [
+                        "trialing",
+                        "active",
+                        "past_due",
+                        "canceled"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "featureKey",
+                    "enabled",
+                    "limit",
+                    "subscriptionStatus"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 200,
+                "type": "array"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "permissions": {
+                "items": {
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 500,
+                "type": "array"
+              },
+              "roles": {
+                "items": {
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "type": "array"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "roles",
+              "permissions",
+              "branches",
+              "entitlements"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "type": "array"
+        }
+      },
+      "required": [
+        "tenants"
+      ],
+      "type": "object"
+    },
+    "EntryTenant": {
+      "additionalProperties": false,
+      "properties": {
+        "branches": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "deviceAllowed": {
+                "type": "boolean"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "operatorAllowed": {
+                "type": "boolean"
+              },
+              "status": {
+                "enum": [
+                  "active",
+                  "closed"
+                ],
+                "type": "string"
+              },
+              "tenantId": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "tenantId",
+              "name",
+              "status",
+              "deviceAllowed",
+              "operatorAllowed"
+            ],
+            "type": "object"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        "entitlements": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "featureKey": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "limit": {
+                "anyOf": [
+                  {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "subscriptionStatus": {
+                "enum": [
+                  "trialing",
+                  "active",
+                  "past_due",
+                  "canceled"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "featureKey",
+              "enabled",
+              "limit",
+              "subscriptionStatus"
+            ],
+            "type": "object"
+          },
+          "maxItems": 200,
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "permissions": {
+          "items": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        "roles": {
+          "items": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "roles",
+        "permissions",
+        "branches",
+        "entitlements"
       ],
       "type": "object"
     },
@@ -1154,6 +1906,40 @@
       ],
       "type": "object"
     },
+    "ManagerApprovalRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "managerPin": {
+          "pattern": "^\\d{4,8}$",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "permission": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operatorSessionId",
+        "managerPin",
+        "permission",
+        "tenantId",
+        "branchId"
+      ],
+      "type": "object"
+    },
     "Membership": {
       "additionalProperties": false,
       "properties": {
@@ -1396,6 +2182,131 @@
       ],
       "type": "object"
     },
+    "OperatorSessionState": {
+      "enum": [
+        "active",
+        "locked",
+        "ended"
+      ],
+      "type": "string"
+    },
+    "OperatorSessionView": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "deviceId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "entitlements": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "featureKey": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "limit": {
+                "anyOf": [
+                  {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "subscriptionStatus": {
+                "enum": [
+                  "trialing",
+                  "active",
+                  "past_due",
+                  "canceled"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "featureKey",
+              "enabled",
+              "limit",
+              "subscriptionStatus"
+            ],
+            "type": "object"
+          },
+          "maxItems": 200,
+          "type": "array"
+        },
+        "expiresAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "lastActivityAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "permissions": {
+          "items": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        "staffId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "startedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "active",
+            "locked",
+            "ended"
+          ],
+          "type": "string"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "userId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "staffId",
+        "tenantId",
+        "branchId",
+        "deviceId",
+        "state",
+        "permissions",
+        "entitlements",
+        "startedAt",
+        "lastActivityAt",
+        "expiresAt"
+      ],
+      "type": "object"
+    },
     "OptimisticVersion": {
       "additionalProperties": false,
       "properties": {
@@ -1503,6 +2414,190 @@
         "canRetryAsNew",
         "queryAfter",
         "correlationId"
+      ],
+      "type": "object"
+    },
+    "PosLoginRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "installationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "password": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "remember": {
+          "type": "boolean"
+        },
+        "username": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "password",
+        "installationId"
+      ],
+      "type": "object"
+    },
+    "PosRefreshRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "installationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "refreshToken": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "refreshToken",
+        "installationId"
+      ],
+      "type": "object"
+    },
+    "PosSessionResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "session": {
+          "additionalProperties": false,
+          "properties": {
+            "accessExpiresIn": {
+              "type": "number"
+            },
+            "deviceId": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "provider": {
+              "const": "local",
+              "type": "string"
+            },
+            "sessionId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "tenants": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "roles": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "slug": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "slug",
+                  "name",
+                  "roles"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "user": {
+              "additionalProperties": false,
+              "properties": {
+                "displayName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "email": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "email",
+                "displayName"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "user",
+            "tenants",
+            "provider",
+            "accessExpiresIn",
+            "sessionId",
+            "deviceId"
+          ],
+          "type": "object"
+        },
+        "tokens": {
+          "additionalProperties": false,
+          "properties": {
+            "accessToken": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            },
+            "refreshToken": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "accessToken",
+            "refreshToken"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "session",
+        "tokens"
+      ],
+      "type": "object"
+    },
+    "PosSessionTokens": {
+      "additionalProperties": false,
+      "properties": {
+        "accessToken": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "refreshToken": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "accessToken",
+        "refreshToken"
       ],
       "type": "object"
     },
@@ -1932,6 +3027,62 @@
       ],
       "type": "object"
     },
+    "ReplaceDeviceRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "displayName": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "platform": {
+          "enum": [
+            "android",
+            "ios",
+            "linux",
+            "macos",
+            "windows",
+            "web"
+          ],
+          "type": "string"
+        },
+        "replacedDeviceId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "pos_terminal",
+            "kds"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "branchId",
+        "displayName",
+        "type",
+        "platform",
+        "idempotencyKey",
+        "replacedDeviceId"
+      ],
+      "type": "object"
+    },
     "ResetPasswordRequest": {
       "additionalProperties": false,
       "properties": {
@@ -1947,6 +3098,43 @@
       "required": [
         "token",
         "password"
+      ],
+      "type": "object"
+    },
+    "RevokeDeviceRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "idempotencyKey",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "RotateDeviceCredentialRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "currentCredentialVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "idempotencyKey",
+        "currentCredentialVersion"
       ],
       "type": "object"
     },
@@ -2283,6 +3471,24 @@
       ],
       "type": "object"
     },
+    "StartOperatorSessionRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenantId",
+        "branchId"
+      ],
+      "type": "object"
+    },
     "TenantContext": {
       "additionalProperties": false,
       "properties": {
@@ -2464,6 +3670,35 @@
         }
       },
       "type": "object"
+    },
+    "VerifyOperatorPinRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "permission": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "pin": {
+          "pattern": "^\\d{4,8}$",
+          "type": "string"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pin",
+        "permission",
+        "tenantId",
+        "branchId"
+      ],
+      "type": "object"
     }
   },
   "errors": {
@@ -2472,6 +3707,10 @@
       "retryable": false
     },
     "AUTHENTICATION_REQUIRED": {
+      "public": true,
+      "retryable": false
+    },
+    "BRANCH_DISABLED": {
       "public": true,
       "retryable": false
     },
@@ -2491,7 +3730,15 @@
       "public": true,
       "retryable": false
     },
+    "DEVICE_CREDENTIAL_INVALID": {
+      "public": true,
+      "retryable": false
+    },
     "DEVICE_NOT_ALLOWED": {
+      "public": true,
+      "retryable": false
+    },
+    "DEVICE_NOT_ENROLLED": {
       "public": true,
       "retryable": false
     },
@@ -2499,7 +3746,23 @@
       "public": true,
       "retryable": false
     },
+    "DEVICE_ROTATION_REQUIRED": {
+      "public": true,
+      "retryable": false
+    },
     "ELEVATION_REQUIRED": {
+      "public": true,
+      "retryable": false
+    },
+    "ENROLLMENT_ATTEMPTS_EXCEEDED": {
+      "public": true,
+      "retryable": false
+    },
+    "ENROLLMENT_EXPIRED": {
+      "public": true,
+      "retryable": false
+    },
+    "ENROLLMENT_REJECTED": {
       "public": true,
       "retryable": false
     },
@@ -2510,6 +3773,14 @@
     "INTERNAL_ERROR": {
       "public": true,
       "retryable": true
+    },
+    "OPERATOR_LOCKED": {
+      "public": true,
+      "retryable": false
+    },
+    "OPERATOR_SESSION_REQUIRED": {
+      "public": true,
+      "retryable": false
     },
     "OPTIMISTIC_VERSION_CONFLICT": {
       "public": true,
@@ -2523,6 +3794,10 @@
       "public": true,
       "retryable": false
     },
+    "PIN_LOCKED": {
+      "public": true,
+      "retryable": false
+    },
     "RATE_LIMITED": {
       "public": true,
       "retryable": true
@@ -2532,6 +3807,10 @@
       "retryable": false
     },
     "SESSION_REVOKED": {
+      "public": true,
+      "retryable": false
+    },
+    "TENANT_DISABLED": {
       "public": true,
       "retryable": false
     },
@@ -2566,6 +3845,22 @@
       "response": "SessionResponse",
       "tenantContext": false
     },
+    "GET /api/devices/status": {
+      "approval": false,
+      "auth": "device-credential",
+      "branchContext": false,
+      "errors": [
+        "DEVICE_CREDENTIAL_INVALID",
+        "DEVICE_REVOKED"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": null,
+      "response": "DeviceSummary",
+      "tenantContext": false
+    },
     "GET /api/me/tenants": {
       "approval": false,
       "auth": "session",
@@ -2579,6 +3874,22 @@
       "pin": false,
       "request": null,
       "response": "MeTenantsResponse",
+      "tenantContext": false
+    },
+    "GET /api/pos/entry-context": {
+      "approval": false,
+      "auth": "device-session",
+      "branchContext": false,
+      "errors": [
+        "AUTHENTICATION_REQUIRED",
+        "DEVICE_REVOKED"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": null,
+      "response": null,
       "tenantContext": false
     },
     "PATCH /api/:slug/admin/staff/:staffId": {
@@ -2811,6 +4122,125 @@
       "request": "ResetPasswordRequest",
       "response": "OkResponse",
       "tenantContext": false
+    },
+    "POST /api/auth/pos/login": {
+      "approval": false,
+      "auth": "device-credential",
+      "branchContext": false,
+      "errors": [
+        "AUTHENTICATION_REQUIRED",
+        "DEVICE_NOT_ALLOWED",
+        "RATE_LIMITED"
+      ],
+      "idempotent": false,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "PosLoginRequest",
+      "response": "PosSessionResponse",
+      "tenantContext": false
+    },
+    "POST /api/auth/pos/refresh": {
+      "approval": false,
+      "auth": "device-credential",
+      "branchContext": false,
+      "errors": [
+        "SESSION_REVOKED",
+        "DEVICE_NOT_ALLOWED",
+        "RATE_LIMITED"
+      ],
+      "idempotent": false,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "PosRefreshRequest",
+      "response": "PosSessionResponse",
+      "tenantContext": false
+    },
+    "POST /api/devices/enrollment/complete": {
+      "approval": false,
+      "auth": "enrollment-challenge",
+      "branchContext": false,
+      "errors": [
+        "ENROLLMENT_EXPIRED",
+        "ENROLLMENT_REJECTED",
+        "ENROLLMENT_ATTEMPTS_EXCEEDED"
+      ],
+      "idempotent": false,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "CompleteDeviceEnrollmentRequest",
+      "response": "DeviceCredentialEnvelope",
+      "tenantContext": false
+    },
+    "POST /api/pos/elevation/manager-approval": {
+      "approval": true,
+      "auth": "device-session",
+      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED",
+        "PIN_LOCKED",
+        "RATE_LIMITED"
+      ],
+      "idempotent": false,
+      "offline": false,
+      "permission": null,
+      "pin": true,
+      "request": "ManagerApprovalRequest",
+      "response": "ElevationGrantView",
+      "tenantContext": true
+    },
+    "POST /api/pos/elevation/pin": {
+      "approval": false,
+      "auth": "device-session",
+      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED",
+        "PIN_LOCKED",
+        "RATE_LIMITED"
+      ],
+      "idempotent": false,
+      "offline": false,
+      "permission": null,
+      "pin": true,
+      "request": "VerifyOperatorPinRequest",
+      "response": "ElevationGrantView",
+      "tenantContext": true
+    },
+    "POST /api/pos/operator-sessions": {
+      "approval": false,
+      "auth": "device-session",
+      "branchContext": true,
+      "errors": [
+        "BRANCH_NOT_FOUND",
+        "PERMISSION_DENIED",
+        "DEVICE_REVOKED"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "StartOperatorSessionRequest",
+      "response": "OperatorSessionView",
+      "tenantContext": true
+    },
+    "POST /api/tenants/:tenantId/devices/enrollment": {
+      "approval": false,
+      "auth": "session",
+      "branchContext": false,
+      "errors": [
+        "PERMISSION_DENIED",
+        "BRANCH_NOT_FOUND",
+        "RATE_LIMITED"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "devices.manage",
+      "pin": false,
+      "request": "BeginDeviceEnrollmentRequest",
+      "response": "EnrollmentChallenge",
+      "tenantContext": true
     }
   },
   "security": {

@@ -27,7 +27,12 @@ export class AuthGuard implements CanActivate {
     if (isPublic) return true;
 
     const req = context.switchToHttp().getRequest<AuthedRequest>();
-    const token = req.cookies?.[ACCESS_COOKIE];
+    const authorization = req.headers?.authorization;
+    const bearer =
+      typeof authorization === 'string' && authorization.startsWith('Bearer ')
+        ? authorization.slice(7)
+        : undefined;
+    const token = req.cookies?.[ACCESS_COOKIE] ?? bearer;
     if (!token) throw new UnauthorizedException('authentication_required');
 
     const claims = await this.jwt.verifyAccess(token);

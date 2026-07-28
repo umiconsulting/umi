@@ -1,7 +1,8 @@
 import { API_ERROR_CODES, contractModels } from './platform';
 import { httpModels } from './schemas';
+import { deviceModels } from './device';
 
-export const CONTRACT_VERSION = '1.0.0';
+export const CONTRACT_VERSION = '1.1.0';
 export const API_MAJOR_VERSION = 1;
 
 export const errorCatalog = Object.fromEntries(
@@ -120,6 +121,123 @@ export const routeCatalog = {
     approval: false,
     errors: ['AUTHENTICATION_REQUIRED'],
   },
+  'POST /api/tenants/:tenantId/devices/enrollment': {
+    request: 'BeginDeviceEnrollmentRequest',
+    response: 'EnrollmentChallenge',
+    auth: 'session',
+    permission: 'devices.manage',
+    idempotent: true,
+    tenantContext: true,
+    branchContext: false,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: ['PERMISSION_DENIED', 'BRANCH_NOT_FOUND', 'RATE_LIMITED'],
+  },
+  'POST /api/devices/enrollment/complete': {
+    request: 'CompleteDeviceEnrollmentRequest',
+    response: 'DeviceCredentialEnvelope',
+    auth: 'enrollment-challenge',
+    permission: null,
+    idempotent: false,
+    tenantContext: false,
+    branchContext: false,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: ['ENROLLMENT_EXPIRED', 'ENROLLMENT_REJECTED', 'ENROLLMENT_ATTEMPTS_EXCEEDED'],
+  },
+  'GET /api/devices/status': {
+    request: null,
+    response: 'DeviceSummary',
+    auth: 'device-credential',
+    permission: null,
+    idempotent: true,
+    tenantContext: false,
+    branchContext: false,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: ['DEVICE_CREDENTIAL_INVALID', 'DEVICE_REVOKED'],
+  },
+  'POST /api/auth/pos/login': {
+    request: 'PosLoginRequest',
+    response: 'PosSessionResponse',
+    auth: 'device-credential',
+    permission: null,
+    idempotent: false,
+    tenantContext: false,
+    branchContext: false,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: ['AUTHENTICATION_REQUIRED', 'DEVICE_NOT_ALLOWED', 'RATE_LIMITED'],
+  },
+  'POST /api/auth/pos/refresh': {
+    request: 'PosRefreshRequest',
+    response: 'PosSessionResponse',
+    auth: 'device-credential',
+    permission: null,
+    idempotent: false,
+    tenantContext: false,
+    branchContext: false,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: ['SESSION_REVOKED', 'DEVICE_NOT_ALLOWED', 'RATE_LIMITED'],
+  },
+  'GET /api/pos/entry-context': {
+    request: null,
+    response: null,
+    auth: 'device-session',
+    permission: null,
+    idempotent: true,
+    tenantContext: false,
+    branchContext: false,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: ['AUTHENTICATION_REQUIRED', 'DEVICE_REVOKED'],
+  },
+  'POST /api/pos/operator-sessions': {
+    request: 'StartOperatorSessionRequest',
+    response: 'OperatorSessionView',
+    auth: 'device-session',
+    permission: null,
+    idempotent: true,
+    tenantContext: true,
+    branchContext: true,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: ['BRANCH_NOT_FOUND', 'PERMISSION_DENIED', 'DEVICE_REVOKED'],
+  },
+  'POST /api/pos/elevation/pin': {
+    request: 'VerifyOperatorPinRequest',
+    response: 'ElevationGrantView',
+    auth: 'device-session',
+    permission: null,
+    idempotent: false,
+    tenantContext: true,
+    branchContext: true,
+    offline: false,
+    pin: true,
+    approval: false,
+    errors: ['PERMISSION_DENIED', 'PIN_LOCKED', 'RATE_LIMITED'],
+  },
+  'POST /api/pos/elevation/manager-approval': {
+    request: 'ManagerApprovalRequest',
+    response: 'ElevationGrantView',
+    auth: 'device-session',
+    permission: null,
+    idempotent: false,
+    tenantContext: true,
+    branchContext: true,
+    offline: false,
+    pin: true,
+    approval: true,
+    errors: ['PERMISSION_DENIED', 'PIN_LOCKED', 'RATE_LIMITED'],
+  },
   'POST /api/:slug/admin/staff': {
     request: 'CreateStaffRequest',
     response: null,
@@ -226,7 +344,7 @@ export const routeCatalog = {
   },
 } as const;
 
-export const modelCatalog = { ...httpModels, ...contractModels };
+export const modelCatalog = { ...httpModels, ...contractModels, ...deviceModels };
 
 export const invariantCatalog = {
   PaymentAmbiguity:

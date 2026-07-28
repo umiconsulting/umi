@@ -205,6 +205,174 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Esta sección todavía no está habilitada.'**
   String get unknownRouteBody;
+
+  /// No description provided for @enrollmentTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Registrar este dispositivo'**
+  String get enrollmentTitle;
+
+  /// No description provided for @enrollmentBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Ingresa el desafío de un solo uso aprobado por un administrador.'**
+  String get enrollmentBody;
+
+  /// No description provided for @challengeIdLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'ID del desafío'**
+  String get challengeIdLabel;
+
+  /// No description provided for @enrollmentCodeLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Código de registro'**
+  String get enrollmentCodeLabel;
+
+  /// No description provided for @continueAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Continuar'**
+  String get continueAction;
+
+  /// No description provided for @loginTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Iniciar sesión en UmiPOS'**
+  String get loginTitle;
+
+  /// No description provided for @usernameLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Correo'**
+  String get usernameLabel;
+
+  /// No description provided for @passwordLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Contraseña'**
+  String get passwordLabel;
+
+  /// No description provided for @signInAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Iniciar sesión'**
+  String get signInAction;
+
+  /// No description provided for @selectTenantTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Selecciona un negocio'**
+  String get selectTenantTitle;
+
+  /// No description provided for @noTenantTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin acceso a negocios'**
+  String get noTenantTitle;
+
+  /// No description provided for @noTenantBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Tu cuenta no tiene acceso activo a UmiPOS.'**
+  String get noTenantBody;
+
+  /// No description provided for @selectBranchTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Selecciona una sucursal'**
+  String get selectBranchTitle;
+
+  /// No description provided for @noBranchBody.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay una sucursal activa permitida para tu usuario y dispositivo.'**
+  String get noBranchBody;
+
+  /// No description provided for @operatorTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Iniciar sesión de operador'**
+  String get operatorTitle;
+
+  /// No description provided for @operatorBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirma esta sucursal para entrar al entorno protegido de POS.'**
+  String get operatorBody;
+
+  /// No description provided for @startOperatorAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Iniciar sesión'**
+  String get startOperatorAction;
+
+  /// No description provided for @lockAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Bloquear operador'**
+  String get lockAction;
+
+  /// No description provided for @logoutAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cerrar sesión'**
+  String get logoutAction;
+
+  /// No description provided for @deviceActiveLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Dispositivo confiable'**
+  String get deviceActiveLabel;
+
+  /// No description provided for @connectivityUnknownLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Conectividad desconocida'**
+  String get connectivityUnknownLabel;
+
+  /// No description provided for @shellReadyTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Sesión de operador lista'**
+  String get shellReadyTitle;
+
+  /// No description provided for @catalogNotImplemented.
+  ///
+  /// In es, this message translates to:
+  /// **'El catálogo todavía no está implementado.'**
+  String get catalogNotImplemented;
+
+  /// No description provided for @deviceRevokedTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Dispositivo revocado'**
+  String get deviceRevokedTitle;
+
+  /// No description provided for @deviceRevokedBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Esta instalación ya no es confiable. Solicita su reemplazo a un administrador.'**
+  String get deviceRevokedBody;
+
+  /// No description provided for @rotationRequiredTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Rotación de credencial requerida'**
+  String get rotationRequiredTitle;
+
+  /// No description provided for @rotationRequiredBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Un administrador debe rotar la credencial antes de continuar.'**
+  String get rotationRequiredBody;
+
+  /// No description provided for @recoverableNetworkBody.
+  ///
+  /// In es, this message translates to:
+  /// **'No fue posible contactar de forma segura el servicio de acceso.'**
+  String get recoverableNetworkBody;
 }
 
 class _AppLocalizationsDelegate
