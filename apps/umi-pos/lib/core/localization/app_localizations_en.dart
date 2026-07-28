@@ -156,4 +156,49 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get recoverableNetworkBody =>
       'The trusted entry service could not be reached safely.';
+
+  @override
+  String get catalogTitle => 'Catalog';
+
+  @override
+  String get catalogSearchHint => 'Search name, SKU or barcode';
+
+  @override
+  String get allCategories => 'All';
+
+  @override
+  String get catalogLoading => 'Loading authoritative catalog';
+
+  @override
+  String get catalogEmpty => 'No products are available for this branch.';
+
+  @override
+  String get catalogNoResults => 'No products match this search.';
+
+  @override
+  String get catalogPermissionDenied =>
+      'You do not have permission to view this catalog.';
+
+  @override
+  String get catalogNetworkError =>
+      'The catalog could not be reached. Try again safely.';
+
+  @override
+  String get catalogUnexpectedError =>
+      'The catalog is temporarily unavailable.';
+
+  @override
+  String get unavailableLabel => 'Unavailable';
+
+  @override
+  String get variantsLabel => 'Variants';
+
+  @override
+  String get modifiersLabel => 'Modifiers';
+
+  @override
+  String get taxIncludedLabel => 'Tax configured';
+
+  @override
+  String get closeAction => 'Close';
 }

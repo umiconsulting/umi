@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-27",
+  "updatedAt": "2026-07-28",
   "branch": "architectureUMIposIntegration",
   "certificationSourceCommit": "a1e794d8fe0e9883f5677147ab81c4342f1a3980",
   "certificationDate": "2026-07-27",
   "BUILD_V3_CERTIFIED": true,
   "umiPosCreationAuthorization": "YES_WITH_OBSERVATIONS",
-  "completedGates": ["1A", "1B", "1C", "1D", "1E", "1F", "2A", "2B"],
+  "completedGates": ["1A", "1B", "1C", "1D", "1E", "1F", "2A", "2B", "2C"],
   "authorities": {
     "api": "apps/umi-api",
     "contracts": "packages/contract",
@@ -52,8 +52,8 @@
     "gate2AStatus": "complete",
     "flutterVersion": "3.44.6",
     "dartVersion": "3.12.2",
-    "contractVersion": "1.1.0",
-    "contractContentHash": "894cf332eb07e39e1e52a0874bd8586e805e3475b51bddeaea5b515ab8123705",
+    "contractVersion": "1.2.0",
+    "contractContentHash": "1b3553ae7c9280c4b8fba82417992b5996fb61779e13e1d9389e79385e3001f3",
     "stateManagement": "ChangeNotifier with one explicit composition root",
     "navigation": "central typed route guard",
     "secureStorage": "flutter_secure_storage with no plaintext fallback",
@@ -68,6 +68,11 @@
     ],
     "validatedTargets": ["web-debug"],
     "gate2BStatus": "complete",
+    "gate2CStatus": "complete",
+    "catalogAuthority": "apps/umi-api/src/modules/pos-catalog",
+    "catalogMode": "branch-aware read-only cursor pagination",
+    "catalogSearch": "server-side name, description, SKU, and barcode",
+    "catalogCache": "bounded tenant/branch/language/version partitions",
     "deviceAuthority": "tenant.device",
     "enrollmentAuthority": "runtime.device_enrollment_challenge",
     "operatorSessionAuthority": "runtime.operator_session",
@@ -77,8 +82,8 @@
     "pinFoundation": "server-side scrypt verification with bounded attempts",
     "managerApprovalFoundation": "single-action scoped five-minute elevation",
     "readyShell": true,
-    "latestLocalCommit": "HEAD (Gate 2B commit)",
+    "latestLocalCommit": "HEAD (Gate 2C commit)",
     "pushStatus": "DEFERRED — LOCAL COMMIT SAFE"
   },
-  "nextGate": "2C"
+  "nextGate": "2D"
 }

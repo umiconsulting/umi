@@ -7,7 +7,7 @@ import 'support/fakes.dart';
 
 void main() {
   test('generated canonical contract is linked', () {
-    expect(contractVersion, '1.1.0');
+    expect(contractVersion, '1.2.0');
     expect(contractContentHash, hasLength(64));
   });
 

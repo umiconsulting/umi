@@ -7,6 +7,7 @@ import '../bootstrap/composition_root.dart';
 import '../core/localization/app_localizations.dart';
 import '../core/navigation/app_navigation.dart';
 import '../core/theme/umi_theme.dart';
+import '../features/catalog/catalog_surface.dart';
 import '../features/entry/entry_surface.dart';
 import '../shared/widgets/status_card.dart';
 
@@ -84,8 +85,11 @@ final class _GuardedSurface extends StatelessWidget {
       AppRoute.enrollment ||
       AppRoute.tenantSelection ||
       AppRoute.branchSelection ||
-      AppRoute.operatorSession ||
-      AppRoute.mainShell => EntrySurface(controller: root.entry),
+      AppRoute.operatorSession => EntrySurface(controller: root.entry),
+      AppRoute.mainShell => CatalogSurface(
+        entry: root.entry,
+        catalog: root.catalog,
+      ),
       AppRoute.recoverableError => _FailureSurface(controller: root.controller),
       AppRoute.diagnostics => _DiagnosticsSurface(root: root),
       _ => _UnknownRoute(root: root),

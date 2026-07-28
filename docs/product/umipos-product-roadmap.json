@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-07-28",
-  "latestRelevantCommit": "HEAD (Gate 2B commit)",
+  "latestRelevantCommit": "HEAD (Gate 2C commit)",
   "items": [
     {
       "id": "platform-certification",
@@ -29,15 +29,15 @@
     },
     {
       "id": "2C",
-      "status": "next",
+      "status": "complete",
       "dependencies": ["2B"],
       "nextObjective": "Implement branch-aware read-only catalog",
-      "blockers": ["Catalog readiness"],
-      "validationState": "not run"
+      "blockers": [],
+      "validationState": "Focused contract, API, migration, Flutter, cache and web validation passed"
     },
     {
       "id": "2D",
-      "status": "planned",
+      "status": "next",
       "dependencies": ["2C"],
       "nextObjective": "Implement authoritative online sale command vertical",
       "blockers": ["Order and payment command boundaries"],

@@ -8,6 +8,8 @@ import 'package:umi_pos/core/observability/telemetry.dart';
 import 'package:umi_pos/core/platform/platform_adapters.dart';
 import 'package:umi_pos/core/security/credential_vault.dart';
 import 'package:umi_pos/core/storage/storage.dart';
+import 'package:umi_pos/features/catalog/catalog_controller.dart';
+import 'package:umi_pos/features/catalog/catalog_repository.dart';
 import 'package:umi_pos/features/entry/entry_controller.dart';
 import 'package:umi_pos/features/entry/entry_gateway.dart';
 
@@ -111,6 +113,11 @@ AppCompositionRoot testRoot({
     entry: EntryController(
       gateway: ApiEntryGateway(api, credentials),
       vault: credentials,
+      telemetry: telemetry,
+    ),
+    catalog: CatalogController(
+      repository: ApiCatalogRepository(api),
+      cache: CatalogCache(),
       telemetry: telemetry,
     ),
   );

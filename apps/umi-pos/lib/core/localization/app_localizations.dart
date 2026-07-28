@@ -373,6 +373,90 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'No fue posible contactar de forma segura el servicio de acceso.'**
   String get recoverableNetworkBody;
+
+  /// No description provided for @catalogTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Catálogo'**
+  String get catalogTitle;
+
+  /// No description provided for @catalogSearchHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Buscar nombre, SKU o código'**
+  String get catalogSearchHint;
+
+  /// No description provided for @allCategories.
+  ///
+  /// In es, this message translates to:
+  /// **'Todo'**
+  String get allCategories;
+
+  /// No description provided for @catalogLoading.
+  ///
+  /// In es, this message translates to:
+  /// **'Cargando catálogo autorizado'**
+  String get catalogLoading;
+
+  /// No description provided for @catalogEmpty.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay productos disponibles para esta sucursal.'**
+  String get catalogEmpty;
+
+  /// No description provided for @catalogNoResults.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay productos para esta búsqueda.'**
+  String get catalogNoResults;
+
+  /// No description provided for @catalogPermissionDenied.
+  ///
+  /// In es, this message translates to:
+  /// **'No tienes permiso para ver este catálogo.'**
+  String get catalogPermissionDenied;
+
+  /// No description provided for @catalogNetworkError.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo conectar con el catálogo. Intenta de nuevo.'**
+  String get catalogNetworkError;
+
+  /// No description provided for @catalogUnexpectedError.
+  ///
+  /// In es, this message translates to:
+  /// **'El catálogo no está disponible temporalmente.'**
+  String get catalogUnexpectedError;
+
+  /// No description provided for @unavailableLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'No disponible'**
+  String get unavailableLabel;
+
+  /// No description provided for @variantsLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Variantes'**
+  String get variantsLabel;
+
+  /// No description provided for @modifiersLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Modificadores'**
+  String get modifiersLabel;
+
+  /// No description provided for @taxIncludedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Impuesto configurado'**
+  String get taxIncludedLabel;
+
+  /// No description provided for @closeAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cerrar'**
+  String get closeAction;
 }
 
 class _AppLocalizationsDelegate

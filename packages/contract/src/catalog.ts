@@ -1,8 +1,9 @@
 import { API_ERROR_CODES, contractModels } from './platform';
 import { httpModels } from './schemas';
 import { deviceModels } from './device';
+import { posCatalogModels } from './pos-catalog';
 
-export const CONTRACT_VERSION = '1.1.0';
+export const CONTRACT_VERSION = '1.2.0';
 export const API_MAJOR_VERSION = 1;
 
 export const errorCatalog = Object.fromEntries(
@@ -342,9 +343,53 @@ export const routeCatalog = {
     approval: false,
     errors: ['VALIDATION_FAILED', 'RESOURCE_NOT_FOUND', 'RATE_LIMITED'],
   },
+  'GET /api/pos/tenants/:tenantId/catalog/categories': {
+    request: 'CatalogQuery',
+    response: 'CatalogCategoriesResponse',
+    auth: 'operator-session',
+    permission: 'catalog.read',
+    idempotent: true,
+    tenantContext: true,
+    branchContext: true,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: ['PERMISSION_DENIED', 'BRANCH_NOT_FOUND', 'FEATURE_UNAVAILABLE'],
+  },
+  'GET /api/pos/tenants/:tenantId/catalog/products': {
+    request: 'CatalogQuery',
+    response: 'CatalogPage',
+    auth: 'operator-session',
+    permission: 'catalog.read',
+    idempotent: true,
+    tenantContext: true,
+    branchContext: true,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: ['PERMISSION_DENIED', 'BRANCH_NOT_FOUND', 'FEATURE_UNAVAILABLE'],
+  },
+  'GET /api/pos/tenants/:tenantId/catalog/products/:productId': {
+    request: 'CatalogQuery',
+    response: 'CatalogProductDetail',
+    auth: 'operator-session',
+    permission: 'catalog.read',
+    idempotent: true,
+    tenantContext: true,
+    branchContext: true,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: ['PERMISSION_DENIED', 'BRANCH_NOT_FOUND', 'RESOURCE_NOT_FOUND'],
+  },
 } as const;
 
-export const modelCatalog = { ...httpModels, ...contractModels, ...deviceModels };
+export const modelCatalog = {
+  ...httpModels,
+  ...contractModels,
+  ...deviceModels,
+  ...posCatalogModels,
+};
 
 export const invariantCatalog = {
   PaymentAmbiguity:

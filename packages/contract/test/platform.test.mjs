@@ -11,12 +11,28 @@ const {
   OfflineCommandEnvelope,
   PaymentAmbiguity,
   ReceiptSnapshot,
+  CatalogPage,
+  CatalogQuery,
 } = require('../dist/index.cjs');
 
 test('Money uses integer minor units and explicit currency', () => {
   assert.ok(Money.safeParse({ minorUnits: 1099, currency: 'MXN' }).success);
   assert.equal(Money.safeParse({ minorUnits: 10.5, currency: 'MXN' }).success, false);
   assert.equal(Money.safeParse({ minorUnits: 1099, currency: 'mxn' }).success, false);
+});
+
+test('Gate 2C catalog contracts bound branch search and cursor pages', () => {
+  const branchId = '00000000-0000-4000-8000-000000000004';
+  assert.ok(CatalogQuery.safeParse({ branchId, search: 'cafe', limit: 40 }).success);
+  assert.equal(CatalogQuery.safeParse({ branchId, limit: 101 }).success, false);
+  assert.ok(
+    CatalogPage.safeParse({
+      items: [],
+      nextCursor: null,
+      catalogVersion: '42',
+      updatedAt: '2026-07-28T12:00:00Z',
+    }).success,
+  );
 });
 
 test('PaymentAmbiguity prevents a new retry for an unknown outcome', () => {
@@ -110,7 +126,10 @@ test('neutral artifact has required models and a valid checksum', async () => {
 });
 
 test('generated Dart package metadata contains real YAML line breaks', async () => {
-  const pubspec = await readFile(new URL('../generated/dart/pubspec.yaml', import.meta.url), 'utf8');
+  const pubspec = await readFile(
+    new URL('../generated/dart/pubspec.yaml', import.meta.url),
+    'utf8',
+  );
   assert.match(pubspec, /^name: umi_contract\ndescription:/);
   assert.equal(pubspec.includes('\\n'), false);
 });

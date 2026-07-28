@@ -1,6 +1,6 @@
 # UMI × UmiPOS — Canonical Project State
 
-Updated: 2026-07-27
+Updated: 2026-07-28
 
 ## Product authority
 
@@ -24,6 +24,9 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Gate 2B established canonical POS device trust, credential-bound durable authentication,
   server-intersected tenant/branch context, operator sessions, scoped elevation, and the honest
   ready shell.
+- Gate 2C established a server-authoritative, branch-aware, read-only catalog with bounded cursor
+  pagination, search, operator-safe product details, media, variants, modifiers, and Flutter cache
+  partitions.
 
 ## Current implementation state
 
@@ -61,8 +64,8 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - `tenant.device` is the device authority; one-time challenges live in
   `runtime.device_enrollment_challenge`, and `runtime.operator_session` separates operator
   presence from user authentication.
-- UmiPOS consumes contract version `1.1.0`, content hash
-  `894cf332eb07e39e1e52a0874bd8586e805e3475b51bddeaea5b515ab8123705`.
+- UmiPOS consumes contract version `1.2.0`, content hash
+  `1b3553ae7c9280c4b8fba82417992b5996fb61779e13e1d9389e79385e3001f3`.
 - POS refresh sessions require the active server device plus its installation and credential
   hashes. Revocation/replacement ends durable and operator sessions.
 
@@ -88,5 +91,5 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - `BUILD_V3_CERTIFIED`: `true`
 - UmiPOS application creation: `YES WITH OBSERVATIONS`
 - Remote publication: deferred because the branch has no configured upstream.
-- Gate 2B: complete in the commit containing this state update.
-- Next gate: `2C` — read-only catalog.
+- Gate 2C: complete in the commit containing this state update.
+- Next gate: `2D` — authoritative online sale command.

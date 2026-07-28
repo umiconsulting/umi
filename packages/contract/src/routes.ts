@@ -24,8 +24,7 @@ export const routes = {
   devices: {
     completeEnrollment: '/api/devices/enrollment/complete',
     status: '/api/devices/status',
-    beginEnrollment: (tenantId: string): string =>
-      `${tenantBase(tenantId)}/devices/enrollment`,
+    beginEnrollment: (tenantId: string): string => `${tenantBase(tenantId)}/devices/enrollment`,
     rotate: (tenantId: string, deviceId: string): string =>
       `${tenantBase(tenantId)}/devices/${enc(deviceId)}/rotate`,
     revoke: (tenantId: string, deviceId: string): string =>
@@ -37,10 +36,15 @@ export const routes = {
     operatorSession: '/api/pos/operator-sessions',
     operatorLock: (sessionId: string): string =>
       `/api/pos/operator-sessions/${enc(sessionId)}/lock`,
-    operatorEnd: (sessionId: string): string =>
-      `/api/pos/operator-sessions/${enc(sessionId)}/end`,
+    operatorEnd: (sessionId: string): string => `/api/pos/operator-sessions/${enc(sessionId)}/end`,
     verifyPin: '/api/pos/elevation/pin',
     managerApproval: '/api/pos/elevation/manager-approval',
+    catalogCategories: (tenantId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/catalog/categories`,
+    catalogProducts: (tenantId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/catalog/products`,
+    catalogProduct: (tenantId: string, productId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/catalog/products/${enc(productId)}`,
   },
   me: {
     tenants: '/api/me/tenants',

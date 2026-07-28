@@ -28,6 +28,7 @@ import { OperationalInterceptor } from './shared/operations/operational.intercep
 import { IpRateLimitGuard } from './shared/operations/ip-rate-limit.guard';
 import { DevicesModule } from './modules/devices/devices.module';
 import { PosEntryModule } from './modules/pos-entry/pos-entry.module';
+import { PosCatalogModule } from './modules/pos-catalog/pos-catalog.module';
 
 /**
  * Root module for the WEB process. Imports shared infrastructure + domain
@@ -59,6 +60,7 @@ import { PosEntryModule } from './modules/pos-entry/pos-entry.module';
     OperationsModule,
     DevicesModule,
     PosEntryModule,
+    PosCatalogModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

@@ -45,5 +45,19 @@
   "deviceRevokedBody": "Esta instalación ya no es confiable. Solicita su reemplazo a un administrador.",
   "rotationRequiredTitle": "Rotación de credencial requerida",
   "rotationRequiredBody": "Un administrador debe rotar la credencial antes de continuar.",
-  "recoverableNetworkBody": "No fue posible contactar de forma segura el servicio de acceso."
+  "recoverableNetworkBody": "No fue posible contactar de forma segura el servicio de acceso.",
+  "catalogTitle": "Catálogo",
+  "catalogSearchHint": "Buscar nombre, SKU o código",
+  "allCategories": "Todo",
+  "catalogLoading": "Cargando catálogo autorizado",
+  "catalogEmpty": "No hay productos disponibles para esta sucursal.",
+  "catalogNoResults": "No hay productos para esta búsqueda.",
+  "catalogPermissionDenied": "No tienes permiso para ver este catálogo.",
+  "catalogNetworkError": "No se pudo conectar con el catálogo. Intenta de nuevo.",
+  "catalogUnexpectedError": "El catálogo no está disponible temporalmente.",
+  "unavailableLabel": "No disponible",
+  "variantsLabel": "Variantes",
+  "modifiersLabel": "Modificadores",
+  "taxIncludedLabel": "Impuesto configurado",
+  "closeAction": "Cerrar"
 }

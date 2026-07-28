@@ -45,5 +45,19 @@
   "deviceRevokedBody": "This installation is no longer trusted. Ask an administrator to replace it.",
   "rotationRequiredTitle": "Credential rotation required",
   "rotationRequiredBody": "An administrator must rotate this device credential before entry.",
-  "recoverableNetworkBody": "The trusted entry service could not be reached safely."
+  "recoverableNetworkBody": "The trusted entry service could not be reached safely.",
+  "catalogTitle": "Catalog",
+  "catalogSearchHint": "Search name, SKU or barcode",
+  "allCategories": "All",
+  "catalogLoading": "Loading authoritative catalog",
+  "catalogEmpty": "No products are available for this branch.",
+  "catalogNoResults": "No products match this search.",
+  "catalogPermissionDenied": "You do not have permission to view this catalog.",
+  "catalogNetworkError": "The catalog could not be reached. Try again safely.",
+  "catalogUnexpectedError": "The catalog is temporarily unavailable.",
+  "unavailableLabel": "Unavailable",
+  "variantsLabel": "Variants",
+  "modifiersLabel": "Modifiers",
+  "taxIncludedLabel": "Tax configured",
+  "closeAction": "Close"
 }

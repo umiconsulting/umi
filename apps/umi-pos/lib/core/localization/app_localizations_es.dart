@@ -157,4 +157,49 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get recoverableNetworkBody =>
       'No fue posible contactar de forma segura el servicio de acceso.';
+
+  @override
+  String get catalogTitle => 'Catálogo';
+
+  @override
+  String get catalogSearchHint => 'Buscar nombre, SKU o código';
+
+  @override
+  String get allCategories => 'Todo';
+
+  @override
+  String get catalogLoading => 'Cargando catálogo autorizado';
+
+  @override
+  String get catalogEmpty => 'No hay productos disponibles para esta sucursal.';
+
+  @override
+  String get catalogNoResults => 'No hay productos para esta búsqueda.';
+
+  @override
+  String get catalogPermissionDenied =>
+      'No tienes permiso para ver este catálogo.';
+
+  @override
+  String get catalogNetworkError =>
+      'No se pudo conectar con el catálogo. Intenta de nuevo.';
+
+  @override
+  String get catalogUnexpectedError =>
+      'El catálogo no está disponible temporalmente.';
+
+  @override
+  String get unavailableLabel => 'No disponible';
+
+  @override
+  String get variantsLabel => 'Variantes';
+
+  @override
+  String get modifiersLabel => 'Modificadores';
+
+  @override
+  String get taxIncludedLabel => 'Impuesto configurado';
+
+  @override
+  String get closeAction => 'Cerrar';
 }
