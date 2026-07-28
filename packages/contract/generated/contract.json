@@ -1,8 +1,21 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "a4a58c1232b1903b62aa066cfafec450cc52b27cb6fd78fe1cd3d1cc7d7d0d67",
-  "contractVersion": "1.4.0",
+  "contentHash": "7eb6b494b91cfa06d9ee7f9976459e749d0f719654ef6b05a616e783c15af588",
+  "contractVersion": "1.5.0",
   "definitions": {
+    "AcknowledgeReconciliationRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "reconciliationId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reconciliationId"
+      ],
+      "type": "object"
+    },
     "ApiError": {
       "additionalProperties": false,
       "properties": {
@@ -568,6 +581,144 @@
         "type",
         "platform",
         "idempotencyKey"
+      ],
+      "type": "object"
+    },
+    "BeginReplayRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "credentialVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenantId",
+        "branchId",
+        "operatorSessionId",
+        "credentialVersion"
+      ],
+      "type": "object"
+    },
+    "BeginReplayResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "additionalProperties": false,
+          "properties": {
+            "credentialVersion": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "deviceId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "lastAcceptedSequence": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reconciliationRequired": {
+              "type": "boolean"
+            },
+            "updatedAt": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "deviceId",
+            "credentialVersion",
+            "lastAcceptedSequence",
+            "reconciliationRequired",
+            "updatedAt"
+          ],
+          "type": "object"
+        },
+        "policy": {
+          "additionalProperties": false,
+          "properties": {
+            "allowedCommandTypes": {
+              "items": {
+                "enum": [
+                  "operational.ack"
+                ],
+                "type": "string"
+              },
+              "maxItems": 16,
+              "type": "array"
+            },
+            "cashSaleEnabled": {
+              "const": false,
+              "type": "boolean"
+            },
+            "expiresAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "issuedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "maxBatchSize": {
+              "exclusiveMinimum": 0,
+              "maximum": 50,
+              "type": "integer"
+            },
+            "maxCommandAgeSeconds": {
+              "exclusiveMinimum": 0,
+              "maximum": 604800,
+              "type": "integer"
+            },
+            "maxQueueDepth": {
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "type": "integer"
+            },
+            "version": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "webSensitiveJournalEnabled": {
+              "const": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "version",
+            "issuedAt",
+            "expiresAt",
+            "allowedCommandTypes",
+            "cashSaleEnabled",
+            "maxQueueDepth",
+            "maxBatchSize",
+            "maxCommandAgeSeconds",
+            "webSensitiveJournalEnabled"
+          ],
+          "type": "object"
+        },
+        "replaySessionId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "replaySessionId",
+        "cursor",
+        "policy"
       ],
       "type": "object"
     },
@@ -4184,6 +4335,175 @@
       ],
       "type": "object"
     },
+    "ConflictClassification": {
+      "enum": [
+        "duplicate_already_applied",
+        "fingerprint_mismatch",
+        "sequence_gap",
+        "sequence_behind",
+        "credential_rotated",
+        "device_revoked",
+        "tenant_mismatch",
+        "branch_mismatch",
+        "operator_invalid",
+        "permission_revoked",
+        "entitlement_disabled",
+        "catalog_version_expired",
+        "price_changed",
+        "tax_changed",
+        "availability_changed",
+        "inventory_unavailable",
+        "aggregate_version_conflict",
+        "command_expired",
+        "policy_changed",
+        "unsupported_offline_command",
+        "ambiguous_payment_requires_query",
+        "server_validation_failed",
+        "reconciliation_required",
+        "terminal_failure"
+      ],
+      "type": "string"
+    },
+    "ConflictSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "commandId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "deviceSequence": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "failure": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "blocksFollowing": {
+                        "type": "boolean"
+                      },
+                      "classification": {
+                        "enum": [
+                          "duplicate_already_applied",
+                          "fingerprint_mismatch",
+                          "sequence_gap",
+                          "sequence_behind",
+                          "credential_rotated",
+                          "device_revoked",
+                          "tenant_mismatch",
+                          "branch_mismatch",
+                          "operator_invalid",
+                          "permission_revoked",
+                          "entitlement_disabled",
+                          "catalog_version_expired",
+                          "price_changed",
+                          "tax_changed",
+                          "availability_changed",
+                          "inventory_unavailable",
+                          "aggregate_version_conflict",
+                          "command_expired",
+                          "policy_changed",
+                          "unsupported_offline_command",
+                          "ambiguous_payment_requires_query",
+                          "server_validation_failed",
+                          "reconciliation_required",
+                          "terminal_failure"
+                        ],
+                        "type": "string"
+                      },
+                      "correlationId": {
+                        "maxLength": 128,
+                        "minLength": 8,
+                        "type": "string"
+                      },
+                      "guidanceCode": {
+                        "maxLength": 100,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "managerActionRequired": {
+                        "type": "boolean"
+                      },
+                      "operatorActionRequired": {
+                        "type": "boolean"
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "classification",
+                      "retryable",
+                      "blocksFollowing",
+                      "operatorActionRequired",
+                      "managerActionRequired",
+                      "guidanceCode",
+                      "correlationId"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "officialId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "enum": [
+                  "accepted",
+                  "duplicate",
+                  "conflict",
+                  "rejected"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "commandId",
+              "deviceSequence",
+              "status",
+              "officialId",
+              "failure"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "type": "object"
+    },
+    "ConnectivityState": {
+      "enum": [
+        "unknown",
+        "online",
+        "degraded",
+        "offline",
+        "recovering",
+        "replaying",
+        "reconciliation_required",
+        "blocked"
+      ],
+      "type": "string"
+    },
     "CorrelationMetadata": {
       "additionalProperties": false,
       "properties": {
@@ -5691,6 +6011,99 @@
       ],
       "type": "object"
     },
+    "OfflineCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "commandType": {
+          "enum": [
+            "operational.ack"
+          ],
+          "type": "string"
+        },
+        "contractVersion": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "deviceCredentialVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "deviceId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "deviceSequence": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "fingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "payload": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "provisionalId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "schemaVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "commandId",
+        "provisionalId",
+        "deviceId",
+        "deviceCredentialVersion",
+        "deviceSequence",
+        "tenantId",
+        "branchId",
+        "operatorSessionId",
+        "commandType",
+        "idempotencyKey",
+        "fingerprint",
+        "contractVersion",
+        "schemaVersion",
+        "createdAt",
+        "payload"
+      ],
+      "type": "object"
+    },
     "OfflineCommandEnvelope": {
       "additionalProperties": false,
       "properties": {
@@ -5751,6 +6164,75 @@
         "commandType",
         "payload",
         "fingerprint"
+      ],
+      "type": "object"
+    },
+    "OfflineCommandType": {
+      "enum": [
+        "operational.ack"
+      ],
+      "type": "string"
+    },
+    "OfflinePolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "allowedCommandTypes": {
+          "items": {
+            "enum": [
+              "operational.ack"
+            ],
+            "type": "string"
+          },
+          "maxItems": 16,
+          "type": "array"
+        },
+        "cashSaleEnabled": {
+          "const": false,
+          "type": "boolean"
+        },
+        "expiresAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "issuedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "maxBatchSize": {
+          "exclusiveMinimum": 0,
+          "maximum": 50,
+          "type": "integer"
+        },
+        "maxCommandAgeSeconds": {
+          "exclusiveMinimum": 0,
+          "maximum": 604800,
+          "type": "integer"
+        },
+        "maxQueueDepth": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "type": "integer"
+        },
+        "version": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "webSensitiveJournalEnabled": {
+          "const": false,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "version",
+        "issuedAt",
+        "expiresAt",
+        "allowedCommandTypes",
+        "cashSaleEnabled",
+        "maxQueueDepth",
+        "maxBatchSize",
+        "maxCommandAgeSeconds",
+        "webSensitiveJournalEnabled"
       ],
       "type": "object"
     },
@@ -7182,6 +7664,24 @@
       ],
       "type": "object"
     },
+    "ReconcileRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "localLastAcknowledgedSequence": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "localLastAllocatedSequence": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "localLastAllocatedSequence",
+        "localLastAcknowledgedSequence"
+      ],
+      "type": "object"
+    },
     "ReconciliationItem": {
       "additionalProperties": false,
       "properties": {
@@ -7318,6 +7818,208 @@
       ],
       "type": "object"
     },
+    "ReconciliationSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "conflicts": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "commandId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "deviceSequence": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "failure": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "blocksFollowing": {
+                        "type": "boolean"
+                      },
+                      "classification": {
+                        "enum": [
+                          "duplicate_already_applied",
+                          "fingerprint_mismatch",
+                          "sequence_gap",
+                          "sequence_behind",
+                          "credential_rotated",
+                          "device_revoked",
+                          "tenant_mismatch",
+                          "branch_mismatch",
+                          "operator_invalid",
+                          "permission_revoked",
+                          "entitlement_disabled",
+                          "catalog_version_expired",
+                          "price_changed",
+                          "tax_changed",
+                          "availability_changed",
+                          "inventory_unavailable",
+                          "aggregate_version_conflict",
+                          "command_expired",
+                          "policy_changed",
+                          "unsupported_offline_command",
+                          "ambiguous_payment_requires_query",
+                          "server_validation_failed",
+                          "reconciliation_required",
+                          "terminal_failure"
+                        ],
+                        "type": "string"
+                      },
+                      "correlationId": {
+                        "maxLength": 128,
+                        "minLength": 8,
+                        "type": "string"
+                      },
+                      "guidanceCode": {
+                        "maxLength": 100,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "managerActionRequired": {
+                        "type": "boolean"
+                      },
+                      "operatorActionRequired": {
+                        "type": "boolean"
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "classification",
+                      "retryable",
+                      "blocksFollowing",
+                      "operatorActionRequired",
+                      "managerActionRequired",
+                      "guidanceCode",
+                      "correlationId"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "officialId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "enum": [
+                  "accepted",
+                  "duplicate",
+                  "conflict",
+                  "rejected"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "commandId",
+              "deviceSequence",
+              "status",
+              "officialId",
+              "failure"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "credentialVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "deviceId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "duplicates": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "localLastAcknowledgedSequence": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "localLastAllocatedSequence": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "missingSequences": {
+          "items": {
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "provisionalMappings": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "commandId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "officialId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "provisionalId": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "provisionalId",
+              "officialId",
+              "commandId"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "reconciliationRequired": {
+          "type": "boolean"
+        },
+        "serverLastAcceptedSequence": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "deviceId",
+        "credentialVersion",
+        "localLastAllocatedSequence",
+        "localLastAcknowledgedSequence",
+        "serverLastAcceptedSequence",
+        "missingSequences",
+        "duplicates",
+        "conflicts",
+        "provisionalMappings",
+        "reconciliationRequired"
+      ],
+      "type": "object"
+    },
     "RegisterMemberRequest": {
       "additionalProperties": false,
       "properties": {
@@ -7429,6 +8131,628 @@
         "platform",
         "idempotencyKey",
         "replacedDeviceId"
+      ],
+      "type": "object"
+    },
+    "ReplayBatch": {
+      "additionalProperties": false,
+      "properties": {
+        "commands": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "branchId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "commandId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "commandType": {
+                "enum": [
+                  "operational.ack"
+                ],
+                "type": "string"
+              },
+              "contractVersion": {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              "createdAt": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "deviceCredentialVersion": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "deviceId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "deviceSequence": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "fingerprint": {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string"
+              },
+              "idempotencyKey": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "operatorSessionId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "payload": {
+                "additionalProperties": {},
+                "type": "object"
+              },
+              "provisionalId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "schemaVersion": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "tenantId": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "commandId",
+              "provisionalId",
+              "deviceId",
+              "deviceCredentialVersion",
+              "deviceSequence",
+              "tenantId",
+              "branchId",
+              "operatorSessionId",
+              "commandType",
+              "idempotencyKey",
+              "fingerprint",
+              "contractVersion",
+              "schemaVersion",
+              "createdAt",
+              "payload"
+            ],
+            "type": "object"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "type": "array"
+        },
+        "replaySessionId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "replaySessionId",
+        "commands"
+      ],
+      "type": "object"
+    },
+    "ReplayBatchResult": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "additionalProperties": false,
+          "properties": {
+            "credentialVersion": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "deviceId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "lastAcceptedSequence": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reconciliationRequired": {
+              "type": "boolean"
+            },
+            "updatedAt": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "deviceId",
+            "credentialVersion",
+            "lastAcceptedSequence",
+            "reconciliationRequired",
+            "updatedAt"
+          ],
+          "type": "object"
+        },
+        "replaySessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "results": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "commandId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "deviceSequence": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "failure": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "blocksFollowing": {
+                        "type": "boolean"
+                      },
+                      "classification": {
+                        "enum": [
+                          "duplicate_already_applied",
+                          "fingerprint_mismatch",
+                          "sequence_gap",
+                          "sequence_behind",
+                          "credential_rotated",
+                          "device_revoked",
+                          "tenant_mismatch",
+                          "branch_mismatch",
+                          "operator_invalid",
+                          "permission_revoked",
+                          "entitlement_disabled",
+                          "catalog_version_expired",
+                          "price_changed",
+                          "tax_changed",
+                          "availability_changed",
+                          "inventory_unavailable",
+                          "aggregate_version_conflict",
+                          "command_expired",
+                          "policy_changed",
+                          "unsupported_offline_command",
+                          "ambiguous_payment_requires_query",
+                          "server_validation_failed",
+                          "reconciliation_required",
+                          "terminal_failure"
+                        ],
+                        "type": "string"
+                      },
+                      "correlationId": {
+                        "maxLength": 128,
+                        "minLength": 8,
+                        "type": "string"
+                      },
+                      "guidanceCode": {
+                        "maxLength": 100,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "managerActionRequired": {
+                        "type": "boolean"
+                      },
+                      "operatorActionRequired": {
+                        "type": "boolean"
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "classification",
+                      "retryable",
+                      "blocksFollowing",
+                      "operatorActionRequired",
+                      "managerActionRequired",
+                      "guidanceCode",
+                      "correlationId"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "officialId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "enum": [
+                  "accepted",
+                  "duplicate",
+                  "conflict",
+                  "rejected"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "commandId",
+              "deviceSequence",
+              "status",
+              "officialId",
+              "failure"
+            ],
+            "type": "object"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "stopped": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "replaySessionId",
+        "results",
+        "cursor",
+        "stopped"
+      ],
+      "type": "object"
+    },
+    "ReplayCommandResultQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "credentialVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "branchId",
+        "operatorSessionId",
+        "credentialVersion",
+        "commandId"
+      ],
+      "type": "object"
+    },
+    "ReplayContextQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "credentialVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "branchId",
+        "operatorSessionId",
+        "credentialVersion"
+      ],
+      "type": "object"
+    },
+    "ReplayCursor": {
+      "additionalProperties": false,
+      "properties": {
+        "credentialVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "deviceId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "lastAcceptedSequence": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reconciliationRequired": {
+          "type": "boolean"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "deviceId",
+        "credentialVersion",
+        "lastAcceptedSequence",
+        "reconciliationRequired",
+        "updatedAt"
+      ],
+      "type": "object"
+    },
+    "ReplayDiagnostics": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptedCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "conflictCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "contractVersion": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "lastReplayAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastSafeErrorCategory": {
+          "anyOf": [
+            {
+              "enum": [
+                "duplicate_already_applied",
+                "fingerprint_mismatch",
+                "sequence_gap",
+                "sequence_behind",
+                "credential_rotated",
+                "device_revoked",
+                "tenant_mismatch",
+                "branch_mismatch",
+                "operator_invalid",
+                "permission_revoked",
+                "entitlement_disabled",
+                "catalog_version_expired",
+                "price_changed",
+                "tax_changed",
+                "availability_changed",
+                "inventory_unavailable",
+                "aggregate_version_conflict",
+                "command_expired",
+                "policy_changed",
+                "unsupported_offline_command",
+                "ambiguous_payment_requires_query",
+                "server_validation_failed",
+                "reconciliation_required",
+                "terminal_failure"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "serverLastAcceptedSequence": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "serverLastAcceptedSequence",
+        "acceptedCount",
+        "conflictCount",
+        "lastReplayAt",
+        "lastSafeErrorCategory"
+      ],
+      "type": "object"
+    },
+    "ReplayFailure": {
+      "additionalProperties": false,
+      "properties": {
+        "blocksFollowing": {
+          "type": "boolean"
+        },
+        "classification": {
+          "enum": [
+            "duplicate_already_applied",
+            "fingerprint_mismatch",
+            "sequence_gap",
+            "sequence_behind",
+            "credential_rotated",
+            "device_revoked",
+            "tenant_mismatch",
+            "branch_mismatch",
+            "operator_invalid",
+            "permission_revoked",
+            "entitlement_disabled",
+            "catalog_version_expired",
+            "price_changed",
+            "tax_changed",
+            "availability_changed",
+            "inventory_unavailable",
+            "aggregate_version_conflict",
+            "command_expired",
+            "policy_changed",
+            "unsupported_offline_command",
+            "ambiguous_payment_requires_query",
+            "server_validation_failed",
+            "reconciliation_required",
+            "terminal_failure"
+          ],
+          "type": "string"
+        },
+        "correlationId": {
+          "maxLength": 128,
+          "minLength": 8,
+          "type": "string"
+        },
+        "guidanceCode": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "managerActionRequired": {
+          "type": "boolean"
+        },
+        "operatorActionRequired": {
+          "type": "boolean"
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "classification",
+        "retryable",
+        "blocksFollowing",
+        "operatorActionRequired",
+        "managerActionRequired",
+        "guidanceCode",
+        "correlationId"
+      ],
+      "type": "object"
+    },
+    "ReplayResult": {
+      "additionalProperties": false,
+      "properties": {
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "deviceSequence": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "blocksFollowing": {
+                  "type": "boolean"
+                },
+                "classification": {
+                  "enum": [
+                    "duplicate_already_applied",
+                    "fingerprint_mismatch",
+                    "sequence_gap",
+                    "sequence_behind",
+                    "credential_rotated",
+                    "device_revoked",
+                    "tenant_mismatch",
+                    "branch_mismatch",
+                    "operator_invalid",
+                    "permission_revoked",
+                    "entitlement_disabled",
+                    "catalog_version_expired",
+                    "price_changed",
+                    "tax_changed",
+                    "availability_changed",
+                    "inventory_unavailable",
+                    "aggregate_version_conflict",
+                    "command_expired",
+                    "policy_changed",
+                    "unsupported_offline_command",
+                    "ambiguous_payment_requires_query",
+                    "server_validation_failed",
+                    "reconciliation_required",
+                    "terminal_failure"
+                  ],
+                  "type": "string"
+                },
+                "correlationId": {
+                  "maxLength": 128,
+                  "minLength": 8,
+                  "type": "string"
+                },
+                "guidanceCode": {
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "managerActionRequired": {
+                  "type": "boolean"
+                },
+                "operatorActionRequired": {
+                  "type": "boolean"
+                },
+                "retryable": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "classification",
+                "retryable",
+                "blocksFollowing",
+                "operatorActionRequired",
+                "managerActionRequired",
+                "guidanceCode",
+                "correlationId"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "officialId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "accepted",
+            "duplicate",
+            "conflict",
+            "rejected"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "commandId",
+        "deviceSequence",
+        "status",
+        "officialId",
+        "failure"
       ],
       "type": "object"
     },
@@ -8975,6 +10299,67 @@
       "response": "PaymentOutcome",
       "tenantContext": true
     },
+    "GET /api/pos/tenants/:tenantId/offline/conflicts": {
+      "approval": false,
+      "auth": "operator-session",
+      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "offline.replay",
+      "pin": false,
+      "request": "ReplayContextQuery",
+      "response": "ConflictSummary",
+      "tenantContext": true
+    },
+    "GET /api/pos/tenants/:tenantId/offline/diagnostics": {
+      "approval": false,
+      "auth": "operator-session",
+      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "offline.replay",
+      "pin": false,
+      "request": null,
+      "response": "ReplayDiagnostics",
+      "tenantContext": true
+    },
+    "GET /api/pos/tenants/:tenantId/offline/replay/commands/:commandId": {
+      "approval": false,
+      "auth": "operator-session",
+      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED",
+        "RESOURCE_NOT_FOUND"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "offline.replay",
+      "pin": false,
+      "request": "ReplayCommandResultQuery",
+      "response": "ReplayResult",
+      "tenantContext": true
+    },
+    "GET /api/pos/tenants/:tenantId/offline/replay/cursor": {
+      "approval": false,
+      "auth": "operator-session",
+      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "offline.replay",
+      "pin": false,
+      "request": "ReplayContextQuery",
+      "response": "ReplayCursor",
+      "tenantContext": true
+    },
     "PATCH /api/:slug/admin/staff/:staffId": {
       "approval": false,
       "auth": "session",
@@ -9394,6 +10779,70 @@
       "pin": false,
       "request": "CheckoutCommand",
       "response": "CheckoutResult",
+      "tenantContext": true
+    },
+    "POST /api/pos/tenants/:tenantId/offline/reconcile": {
+      "approval": false,
+      "auth": "operator-session",
+      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "offline.replay",
+      "pin": false,
+      "request": "ReconcileRequest",
+      "response": "ReconciliationSummary",
+      "tenantContext": true
+    },
+    "POST /api/pos/tenants/:tenantId/offline/reconcile/acknowledge": {
+      "approval": false,
+      "auth": "operator-session",
+      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "offline.replay",
+      "pin": false,
+      "request": "AcknowledgeReconciliationRequest",
+      "response": null,
+      "tenantContext": true
+    },
+    "POST /api/pos/tenants/:tenantId/offline/replay/batch": {
+      "approval": false,
+      "auth": "operator-session",
+      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED",
+        "IDEMPOTENCY_CONFLICT",
+        "DEVICE_REVOKED"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "offline.replay",
+      "pin": false,
+      "request": "ReplayBatch",
+      "response": "ReplayBatchResult",
+      "tenantContext": true
+    },
+    "POST /api/pos/tenants/:tenantId/offline/replay/begin": {
+      "approval": false,
+      "auth": "operator-session",
+      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED",
+        "DEVICE_REVOKED",
+        "BRANCH_SCOPE_VIOLATION"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "offline.replay",
+      "pin": false,
+      "request": "BeginReplayRequest",
+      "response": "BeginReplayResponse",
       "tenantContext": true
     },
     "POST /api/tenants/:tenantId/devices/enrollment": {

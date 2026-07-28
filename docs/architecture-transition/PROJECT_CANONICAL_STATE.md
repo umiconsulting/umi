@@ -34,6 +34,9 @@ Future clients use `packages/contract` and controlled UMI APIs.
   reconfirmation, idempotent cash completion, query-only external-terminal ambiguity, reservation
   semantics without permanent inventory mutation, immutable receipt snapshots, and append-only
   financial/audit facts.
+- Gate 2F established a native-only AES-GCM offline journal, device-credential sequence authority,
+  ordered replay, stable conflict contracts, and server-authoritative reconciliation. Offline cash
+  and sensitive Web journaling remain disabled by explicit policy.
 
 ## Current implementation state
 
@@ -71,8 +74,11 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - `tenant.device` is the device authority; one-time challenges live in
   `runtime.device_enrollment_challenge`, and `runtime.operator_session` separates operator
   presence from user authentication.
-- UmiPOS consumes contract version `1.4.0`, content hash
-  `a4a58c1232b1903b62aa066cfafec450cc52b27cb6fd78fe1cd3d1cc7d7d0d67`.
+- UmiPOS consumes contract version `1.5.0`, content hash
+  `7eb6b494b91cfa06d9ee7f9976459e749d0f719654ef6b05a616e783c15af588`.
+- Native UmiPOS journal schema version 1 uses AES-256-GCM with platform-secure key storage and
+  separate ciphertext persistence. Replay is ordered per device credential version; Web sensitive
+  journaling is unsupported.
 - `tenant.pos_cart` is mutable sale preparation only. The API owns pricing, availability,
   inclusive-tax rounding, modifier validation, line merging, and totals previews.
 - `tenant.pos_committed_sale` and `tenant.receipt_snapshot` are immutable checkout facts.
@@ -104,5 +110,7 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - `BUILD_V3_CERTIFIED`: `true`
 - UmiPOS application creation: `YES WITH OBSERVATIONS`
 - Remote publication: deferred because the branch has no configured upstream.
-- Gate 2E: complete in the commit containing this state update.
-- Next gate: `2F` — encrypted offline journal, replay, and reconciliation.
+- Gate 2F: incomplete; the deterministic encrypted replay foundation is committed, while checkout
+  journaling and complete recovery/conflict-resolution surfaces remain.
+- Next gate: finish Gate 2F. Offline cash additionally requires server-issued amount, count, and
+  snapshot-freshness policy.

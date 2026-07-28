@@ -53,6 +53,22 @@ export const routes = {
     checkout: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/checkout`,
     checkoutPayment: (tenantId: string, paymentId: string): string =>
       `/api/pos/tenants/${enc(tenantId)}/checkout/payments/${enc(paymentId)}`,
+    offlineReplayBegin: (tenantId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/offline/replay/begin`,
+    offlineReplayBatch: (tenantId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/offline/replay/batch`,
+    offlineReplayCursor: (tenantId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/offline/replay/cursor`,
+    offlineReplayCommand: (tenantId: string, commandId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/offline/replay/commands/${enc(commandId)}`,
+    offlineConflicts: (tenantId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/offline/conflicts`,
+    offlineReconcile: (tenantId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/offline/reconcile`,
+    offlineReconcileAcknowledge: (tenantId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/offline/reconcile/acknowledge`,
+    offlineDiagnostics: (tenantId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/offline/diagnostics`,
   },
   me: {
     tenants: '/api/me/tenants',

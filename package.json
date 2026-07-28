@@ -17,7 +17,9 @@
     "umi-pos:windows": "cd apps/umi-pos && flutter run -d windows",
     "umi-pos:android": "cd apps/umi-pos && flutter run -d android",
     "umi-pos:ios": "cd apps/umi-pos && flutter run -d ios",
-    "umi-pos:web": "cd apps/umi-pos && flutter run -d chrome"
+    "umi-pos:web": "cd apps/umi-pos && flutter run -d chrome",
+    "umi-pos:offline-demo": "cd apps/umi-pos && flutter test test/offline_journal_test.dart --plain-name 'connectivity uses hysteresis'",
+    "umi-pos:replay-check": "cd apps/umi-pos && flutter test test/offline_journal_test.dart"
   },
   "devDependencies": {
     "prettier": "3.9.4",

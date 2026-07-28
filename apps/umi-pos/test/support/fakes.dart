@@ -16,6 +16,8 @@ import 'package:umi_pos/features/checkout/checkout_controller.dart';
 import 'package:umi_pos/features/checkout/checkout_repository.dart';
 import 'package:umi_pos/features/entry/entry_controller.dart';
 import 'package:umi_pos/features/entry/entry_gateway.dart';
+import 'package:umi_pos/features/offline/connectivity_controller.dart';
+import 'package:umi_pos/features/offline/offline_journal.dart';
 
 final testConfig = AppConfig(
   environment: AppEnvironment.development,
@@ -132,5 +134,23 @@ AppCompositionRoot testRoot({
       repository: ApiCheckoutRepository(api),
       telemetry: telemetry,
     ),
+    connectivity: ConnectivityController(),
+    offlineJournal: EncryptedOfflineJournal(
+      _TestJournalCipherStore(),
+      web: false,
+    ),
   );
+}
+
+final class _TestJournalCipherStore implements JournalCipherStore {
+  String? value;
+  String? key;
+  @override
+  Future<String?> readCiphertext() async => value;
+  @override
+  Future<String?> readKey() async => key;
+  @override
+  Future<void> writeCiphertext(String value) async => this.value = value;
+  @override
+  Future<void> writeKey(String value) async => key = value;
 }

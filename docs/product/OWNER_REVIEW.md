@@ -72,3 +72,11 @@ before implementation and preserve owner notes.
 ## Future observations
 
 - Owner notes belong here. Do not turn this file into an implementation backlog.
+
+## Offline and reconciliation
+
+- Review the persistent online/degraded/offline indicator for confidence at typical counter
+  distance and under high contrast.
+- Review pending synchronization, replay progress, provisional receipt, conflict, blocked-device,
+  stale-policy, and corrupted-storage language before offline sales are ever enabled.
+- Owner feedback: pending. This Gate does not infer approval.

@@ -84,6 +84,12 @@
       "id": "2E",
       "status": "complete",
       "subject": "Authoritative online checkout, payment orchestration, and receipt"
+    },
+    {
+      "commit": "HEAD (Gate 2F commit)",
+      "id": "2F",
+      "status": "incomplete",
+      "subject": "Encrypted offline journal, ordered replay, and reconciliation"
     }
   ]
 }

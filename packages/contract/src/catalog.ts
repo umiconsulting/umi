@@ -4,8 +4,9 @@ import { deviceModels } from './device';
 import { posCatalogModels } from './pos-catalog';
 import { posCartModels } from './pos-cart';
 import { posCheckoutModels } from './pos-checkout';
+import { posOfflineModels } from './pos-offline';
 
-export const CONTRACT_VERSION = '1.4.0';
+export const CONTRACT_VERSION = '1.5.0';
 export const API_MAJOR_VERSION = 1;
 
 export const errorCatalog = Object.fromEntries(
@@ -495,6 +496,48 @@ export const routeCatalog = {
     approval: false,
     errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
   },
+  'POST /api/pos/tenants/:tenantId/offline/replay/begin': {
+    request: 'BeginReplayRequest', response: 'BeginReplayResponse', auth: 'operator-session',
+    permission: 'offline.replay', idempotent: true, tenantContext: true, branchContext: true,
+    offline: false, pin: false, approval: false,
+    errors: ['PERMISSION_DENIED', 'DEVICE_REVOKED', 'BRANCH_SCOPE_VIOLATION'],
+  },
+  'POST /api/pos/tenants/:tenantId/offline/replay/batch': {
+    request: 'ReplayBatch', response: 'ReplayBatchResult', auth: 'operator-session',
+    permission: 'offline.replay', idempotent: true, tenantContext: true, branchContext: true,
+    offline: false, pin: false, approval: false,
+    errors: ['PERMISSION_DENIED', 'IDEMPOTENCY_CONFLICT', 'DEVICE_REVOKED'],
+  },
+  'GET /api/pos/tenants/:tenantId/offline/replay/cursor': {
+    request: 'ReplayContextQuery', response: 'ReplayCursor', auth: 'operator-session',
+    permission: 'offline.replay', idempotent: true, tenantContext: true, branchContext: true,
+    offline: false, pin: false, approval: false, errors: ['PERMISSION_DENIED'],
+  },
+  'GET /api/pos/tenants/:tenantId/offline/replay/commands/:commandId': {
+    request: 'ReplayCommandResultQuery', response: 'ReplayResult', auth: 'operator-session',
+    permission: 'offline.replay', idempotent: true, tenantContext: true, branchContext: true,
+    offline: false, pin: false, approval: false, errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+  },
+  'GET /api/pos/tenants/:tenantId/offline/conflicts': {
+    request: 'ReplayContextQuery', response: 'ConflictSummary', auth: 'operator-session',
+    permission: 'offline.replay', idempotent: true, tenantContext: true, branchContext: true,
+    offline: false, pin: false, approval: false, errors: ['PERMISSION_DENIED'],
+  },
+  'POST /api/pos/tenants/:tenantId/offline/reconcile/acknowledge': {
+    request: 'AcknowledgeReconciliationRequest', response: null, auth: 'operator-session',
+    permission: 'offline.replay', idempotent: true, tenantContext: true, branchContext: true,
+    offline: false, pin: false, approval: false, errors: ['PERMISSION_DENIED'],
+  },
+  'POST /api/pos/tenants/:tenantId/offline/reconcile': {
+    request: 'ReconcileRequest', response: 'ReconciliationSummary', auth: 'operator-session',
+    permission: 'offline.replay', idempotent: true, tenantContext: true, branchContext: true,
+    offline: false, pin: false, approval: false, errors: ['PERMISSION_DENIED'],
+  },
+  'GET /api/pos/tenants/:tenantId/offline/diagnostics': {
+    request: null, response: 'ReplayDiagnostics', auth: 'operator-session',
+    permission: 'offline.replay', idempotent: true, tenantContext: true, branchContext: true,
+    offline: false, pin: false, approval: false, errors: ['PERMISSION_DENIED'],
+  },
 } as const;
 
 export const modelCatalog = {
@@ -504,6 +547,7 @@ export const modelCatalog = {
   ...posCatalogModels,
   ...posCartModels,
   ...posCheckoutModels,
+  ...posOfflineModels,
 };
 
 export const invariantCatalog = {

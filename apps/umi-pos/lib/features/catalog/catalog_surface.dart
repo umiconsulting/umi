@@ -7,6 +7,7 @@ import '../cart/cart_controller.dart';
 import '../checkout/checkout_controller.dart';
 import '../checkout/checkout_surface.dart';
 import '../entry/entry_controller.dart';
+import '../offline/connectivity_controller.dart';
 import 'catalog_controller.dart';
 import 'catalog_repository.dart';
 
@@ -16,12 +17,14 @@ final class CatalogSurface extends StatefulWidget {
     required this.catalog,
     required this.cart,
     required this.checkout,
+    required this.connectivity,
     super.key,
   });
   final EntryController entry;
   final CatalogController catalog;
   final CartController cart;
   final CheckoutController checkout;
+  final ConnectivityController connectivity;
   @override
   State<CatalogSurface> createState() => _CatalogSurfaceState();
 }
@@ -35,6 +38,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     super.initState();
     widget.catalog.addListener(_changed);
     widget.cart.addListener(_changed);
+    widget.connectivity.addListener(_changed);
     _scroll.addListener(() {
       if (_scroll.hasClients && _scroll.position.extentAfter < 700) {
         widget.catalog.loadMore();
@@ -72,6 +76,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   void dispose() {
     widget.catalog.removeListener(_changed);
     widget.cart.removeListener(_changed);
+    widget.connectivity.removeListener(_changed);
     _search.dispose();
     _scroll.dispose();
     super.dispose();
@@ -105,6 +110,24 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       appBar: AppBar(
         title: Text(l.catalogTitle),
         actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: UmiSpacing.sm),
+            child: Semantics(
+              liveRegion: true,
+              label: _connectivityLabel(context, widget.connectivity.state),
+              child: Chip(
+                avatar: Icon(
+                  widget.connectivity.state == PosConnectivity.online
+                      ? Icons.cloud_done_outlined
+                      : Icons.cloud_off_outlined,
+                  size: 18,
+                ),
+                label: Text(
+                  _connectivityLabel(context, widget.connectivity.state),
+                ),
+              ),
+            ),
+          ),
           Center(child: Text(widget.entry.state.selectedBranch?.name ?? '—')),
           IconButton(
             tooltip: l.lockAction,
@@ -275,6 +298,23 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       }
     }
   }
+}
+
+String _connectivityLabel(BuildContext context, PosConnectivity state) {
+  final spanish = Localizations.localeOf(context).languageCode == 'es';
+  return switch (state) {
+    PosConnectivity.unknown =>
+      spanish ? 'Conexión desconocida' : 'Connection unknown',
+    PosConnectivity.online => spanish ? 'En línea' : 'Online',
+    PosConnectivity.degraded => spanish ? 'Conexión inestable' : 'Degraded',
+    PosConnectivity.offline => spanish ? 'Sin conexión' : 'Offline',
+    PosConnectivity.recovering =>
+      spanish ? 'Recuperando conexión' : 'Recovering',
+    PosConnectivity.replaying => spanish ? 'Sincronizando' : 'Synchronizing',
+    PosConnectivity.reconciliationRequired =>
+      spanish ? 'Revisión necesaria' : 'Review required',
+    PosConnectivity.blocked => spanish ? 'Operación bloqueada' : 'Blocked',
+  };
 }
 
 final class _Category extends StatelessWidget {

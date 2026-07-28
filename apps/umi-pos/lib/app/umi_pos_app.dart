@@ -99,6 +99,7 @@ final class _GuardedSurface extends StatelessWidget {
         catalog: root.catalog,
         cart: root.cart,
         checkout: root.checkout,
+        connectivity: root.connectivity,
       ),
       AppRoute.recoverableError => _FailureSurface(controller: root.controller),
       AppRoute.diagnostics => _DiagnosticsSurface(root: root),

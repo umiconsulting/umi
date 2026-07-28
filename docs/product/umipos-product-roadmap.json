@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-07-28",
-  "latestRelevantCommit": "HEAD (Gate 2E commit)",
+  "latestRelevantCommit": "HEAD (Gate 2F commit)",
   "items": [
     {
       "id": "platform-certification",
@@ -53,11 +53,15 @@
     },
     {
       "id": "2F",
-      "status": "next",
+      "status": "incomplete",
       "dependencies": ["2E"],
-      "nextObjective": "Implement encrypted offline journal, replay, and reconciliation",
-      "blockers": ["Conflict and recovery model"],
-      "validationState": "not run"
+      "nextObjective": "Connect checkout journaling and finish recovery/conflict-resolution UX",
+      "blockers": [
+        "Server-issued offline cash amount/count/snapshot-freshness policy",
+        "Concrete Flutter replay gateway and checkout integration",
+        "Complete recovery and conflict-resolution surfaces"
+      ],
+      "validationState": "Focused Gate 2F foundation validation passed; Web sensitive journal unsupported"
     }
   ]
 }

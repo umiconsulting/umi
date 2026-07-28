@@ -148,6 +148,7 @@ void main() {
             catalog: value,
             cart: root.cart,
             checkout: root.checkout,
+            connectivity: root.connectivity,
           ),
         ),
       );

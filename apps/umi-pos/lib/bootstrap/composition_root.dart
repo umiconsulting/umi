@@ -14,6 +14,8 @@ import '../features/checkout/checkout_controller.dart';
 import '../features/checkout/checkout_repository.dart';
 import '../features/entry/entry_controller.dart';
 import '../features/entry/entry_gateway.dart';
+import '../features/offline/connectivity_controller.dart';
+import '../features/offline/offline_journal.dart';
 import 'bootstrap_controller.dart';
 
 final class AppCompositionRoot {
@@ -32,6 +34,8 @@ final class AppCompositionRoot {
     required this.catalog,
     required this.cart,
     required this.checkout,
+    required this.connectivity,
+    required this.offlineJournal,
   });
 
   factory AppCompositionRoot.production() {
@@ -51,6 +55,10 @@ final class AppCompositionRoot {
       telemetry: telemetry,
       tokenProvider: credentials,
       deviceCredentialProvider: credentials,
+    );
+    final connectivity = ConnectivityController();
+    final offlineJournal = EncryptedOfflineJournal(
+      PlatformJournalCipherStore(preferences, secureStorage),
     );
     final controller = BootstrapController(
       config: config,
@@ -87,6 +95,8 @@ final class AppCompositionRoot {
         repository: ApiCheckoutRepository(apiClient),
         telemetry: telemetry,
       ),
+      connectivity: connectivity,
+      offlineJournal: offlineJournal,
     );
   }
 
@@ -104,6 +114,8 @@ final class AppCompositionRoot {
   final CatalogController catalog;
   final CartController cart;
   final CheckoutController checkout;
+  final ConnectivityController connectivity;
+  final EncryptedOfflineJournal offlineJournal;
 
   void dispose() {
     controller.dispose();
@@ -111,6 +123,7 @@ final class AppCompositionRoot {
     catalog.dispose();
     cart.dispose();
     checkout.dispose();
+    connectivity.dispose();
     apiClient.dispose();
   }
 }

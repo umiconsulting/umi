@@ -52,8 +52,8 @@
     "gate2AStatus": "complete",
     "flutterVersion": "3.44.6",
     "dartVersion": "3.12.2",
-    "contractVersion": "1.4.0",
-    "contractContentHash": "a4a58c1232b1903b62aa066cfafec450cc52b27cb6fd78fe1cd3d1cc7d7d0d67",
+    "contractVersion": "1.5.0",
+    "contractContentHash": "7eb6b494b91cfa06d9ee7f9976459e749d0f719654ef6b05a616e783c15af588",
     "stateManagement": "ChangeNotifier with one explicit composition root",
     "navigation": "central typed route guard",
     "secureStorage": "flutter_secure_storage with no plaintext fallback",
@@ -71,6 +71,11 @@
     "gate2CStatus": "complete",
     "gate2DStatus": "complete",
     "gate2EStatus": "complete",
+    "gate2FStatus": "incomplete",
+    "offlineJournal": "native AES-256-GCM, schema 1, no plaintext fallback",
+    "offlineReplay": "ordered per device credential version; duplicate results recovered",
+    "offlineCash": "disabled pending server-issued financial limits and snapshot policy",
+    "webOfflineCapability": "sensitive journaling unsupported; online operation only",
     "checkoutAuthority": "apps/umi-api/src/modules/pos-checkout",
     "checkoutMode": "online, immediately repriced, explicitly confirmed, idempotent",
     "paymentOrchestration": "cash succeeds; external terminal unknown is query-only",
@@ -93,8 +98,8 @@
     "pinFoundation": "server-side scrypt verification with bounded attempts",
     "managerApprovalFoundation": "single-action scoped five-minute elevation",
     "readyShell": true,
-    "latestLocalCommit": "HEAD (Gate 2E commit)",
+    "latestLocalCommit": "HEAD (Gate 2F commit)",
     "pushStatus": "DEFERRED — LOCAL COMMIT SAFE"
   },
-  "nextGate": "2F"
+  "nextGate": "2F completion — checkout integration and recovery/conflict UX"
 }
