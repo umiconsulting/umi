@@ -205,6 +205,16 @@ const outputs = {
     'name: umi_contract\\ndescription: Generated UMI API contract models.\\nversion: 1.0.0\\nenvironment:\\n  sdk: \">=3.4.0 <4.0.0\"\\n',
 };
 
+// Keep package metadata consumable by Dart pub. The historical template above
+// encoded backslash-n pairs; override it with deterministic real YAML lines.
+outputs['dart/pubspec.yaml'] = `${[
+  'name: umi_contract',
+  'description: Generated UMI API contract models.',
+  'version: 1.0.0',
+  'environment:',
+  '  sdk: ">=3.4.0 <4.0.0"',
+].join('\n')}\n`;
+
 if (process.argv.includes('--check')) {
   for (const [path, contents] of Object.entries(outputs)) {
     const actual = await readFile(resolve(generated, path), 'utf8').catch(() => '');

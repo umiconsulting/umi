@@ -1,1 +1,5 @@
-name: umi_contract\ndescription: Generated UMI API contract models.\nversion: 1.0.0\nenvironment:\n  sdk: ">=3.4.0 <4.0.0"\n
+name: umi_contract
+description: Generated UMI API contract models.
+version: 1.0.0
+environment:
+  sdk: ">=3.4.0 <4.0.0"

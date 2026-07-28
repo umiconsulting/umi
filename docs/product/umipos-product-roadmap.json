@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-07-27",
+  "latestRelevantCommit": "HEAD (Gate 2A commit)",
+  "items": [
+    {
+      "id": "platform-certification",
+      "status": "complete",
+      "dependencies": ["1A", "1B", "1C", "1D", "1E"],
+      "nextObjective": "Maintain certified authority",
+      "blockers": [],
+      "validationState": "Gate 1F certified"
+    },
+    {
+      "id": "2A",
+      "status": "complete",
+      "dependencies": ["platform-certification"],
+      "nextObjective": "Begin device trust and operator experience",
+      "blockers": [],
+      "validationState": "Focused Gate 2A validation passed"
+    },
+    {
+      "id": "2B",
+      "status": "next",
+      "dependencies": ["2A"],
+      "nextObjective": "Implement device trust and authenticated operator boundary",
+      "blockers": ["Server device enrollment and operator workflows"],
+      "validationState": "not run"
+    },
+    {
+      "id": "2C",
+      "status": "planned",
+      "dependencies": ["2B"],
+      "nextObjective": "Implement branch-aware read-only catalog",
+      "blockers": ["Catalog readiness"],
+      "validationState": "not run"
+    },
+    {
+      "id": "2D",
+      "status": "planned",
+      "dependencies": ["2C"],
+      "nextObjective": "Implement authoritative online sale command vertical",
+      "blockers": ["Order and payment command boundaries"],
+      "validationState": "not run"
+    },
+    {
+      "id": "2E",
+      "status": "planned",
+      "dependencies": ["2D"],
+      "nextObjective": "Implement encrypted offline journal and reconciliation",
+      "blockers": ["Conflict and replay model"],
+      "validationState": "not run"
+    }
+  ]
+}

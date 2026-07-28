@@ -54,6 +54,12 @@
       "id": "1F",
       "status": "complete",
       "subject": "Build-v3 platform certification"
+    },
+    {
+      "commit": "HEAD (Gate 2A commit)",
+      "id": "2A",
+      "status": "complete",
+      "subject": "UmiPOS Flutter application foundation"
     }
   ]
 }

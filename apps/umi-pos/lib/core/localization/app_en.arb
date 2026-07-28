@@ -1,0 +1,21 @@
+{
+  "@@locale": "en",
+  "appName": "UmiPOS",
+  "bootstrapLoadingTitle": "Preparing UmiPOS",
+  "bootstrapLoadingBody": "Checking configuration and secure storage.",
+  "readyTitle": "Ready to begin",
+  "readyBody": "The UmiPOS foundation is ready. Authentication will be enabled in the next step.",
+  "configurationInvalidTitle": "Configuration incomplete",
+  "configurationInvalidBody": "UmiPOS cannot start safely with this configuration.",
+  "storageUnavailableTitle": "Secure storage unavailable",
+  "storageUnavailableBody": "Credentials will not be stored in unencrypted storage.",
+  "sdkUnavailableTitle": "Contract unavailable",
+  "sdkUnavailableBody": "The app could not verify the platform contract.",
+  "recoverableFailureTitle": "Preparation could not finish",
+  "unrecoverableFailureTitle": "UmiPOS needs attention",
+  "retryAction": "Retry",
+  "diagnosticsAction": "View diagnostics",
+  "diagnosticsTitle": "Development diagnostics",
+  "unknownRouteTitle": "Route unavailable",
+  "unknownRouteBody": "This area is not enabled yet."
+}

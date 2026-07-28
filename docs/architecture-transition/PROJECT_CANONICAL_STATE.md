@@ -19,6 +19,8 @@ Future clients use `packages/contract` and controlled UMI APIs.
   limits, dependency readiness, queue protection, deadlines, circuit breakers, and backpressure.
 - Gate 1F certified the build-v3 entry platform and authorized `apps/umi-pos` creation with
   documented, non-blocking operational observations.
+- Gate 2A created the Flutter application foundation at `apps/umi-pos`, consuming the generated
+  Dart contract SDK and stopping at a guarded ready-for-authentication boundary.
 
 ## Current implementation state
 
@@ -49,6 +51,12 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Authenticated traffic has independent user, device, tenant, and branch budgets.
 - Queue admission rejects work at the bounded depth instead of allowing unbounded growth.
 - Platform resilience utilities provide explicit deadlines, circuit state, and bounded concurrency.
+- UmiPOS uses Flutter 3.44.6 / Dart 3.12.2, built-in `ChangeNotifier` composition, centralized
+  route guards, typed fail-closed configuration, bounded HTTP behavior, platform secure storage,
+  redacted telemetry, localized Spanish/English bootstrap UI, and explicit unsupported hardware
+  adapters.
+- UmiPOS consumes contract version `1.0.0`, content hash
+  `260343ccb24a75aded9f0816647b95ae4f09ba4feca8a0a452a4532d688cbd96`.
 
 ## Prohibitions
 
@@ -72,3 +80,5 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - `BUILD_V3_CERTIFIED`: `true`
 - UmiPOS application creation: `YES WITH OBSERVATIONS`
 - Remote publication: deferred because the branch has no configured upstream.
+- Gate 2A: complete in the commit containing this state update.
+- Next gate: `2B` — device trust and operator experience.

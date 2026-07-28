@@ -1,0 +1,21 @@
+{
+  "@@locale": "es",
+  "appName": "UmiPOS",
+  "bootstrapLoadingTitle": "Preparando UmiPOS",
+  "bootstrapLoadingBody": "Verificando la configuración y el almacenamiento seguro.",
+  "readyTitle": "Listo para comenzar",
+  "readyBody": "La base de UmiPOS está preparada. La autenticación se habilitará en el siguiente paso.",
+  "configurationInvalidTitle": "Configuración incompleta",
+  "configurationInvalidBody": "UmiPOS no puede iniciar de forma segura con esta configuración.",
+  "storageUnavailableTitle": "Almacenamiento seguro no disponible",
+  "storageUnavailableBody": "No se guardarán credenciales en almacenamiento sin cifrar.",
+  "sdkUnavailableTitle": "Contrato no disponible",
+  "sdkUnavailableBody": "La aplicación no pudo verificar el contrato de la plataforma.",
+  "recoverableFailureTitle": "No pudimos terminar la preparación",
+  "unrecoverableFailureTitle": "UmiPOS necesita atención",
+  "retryAction": "Reintentar",
+  "diagnosticsAction": "Ver diagnóstico",
+  "diagnosticsTitle": "Diagnóstico de desarrollo",
+  "unknownRouteTitle": "Ruta no disponible",
+  "unknownRouteBody": "Esta sección todavía no está habilitada."
+}

@@ -108,3 +108,9 @@ test('neutral artifact has required models and a valid checksum', async () => {
   ).split(/\s+/)[0];
   assert.equal(createHash('sha256').update(artifactBytes).digest('hex'), checksum);
 });
+
+test('generated Dart package metadata contains real YAML line breaks', async () => {
+  const pubspec = await readFile(new URL('../generated/dart/pubspec.yaml', import.meta.url), 'utf8');
+  assert.match(pubspec, /^name: umi_contract\ndescription:/);
+  assert.equal(pubspec.includes('\\n'), false);
+});
