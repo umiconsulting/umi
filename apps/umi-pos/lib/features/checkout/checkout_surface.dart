@@ -5,6 +5,7 @@ import '../../core/localization/app_localizations.dart';
 import '../../core/theme/umi_theme.dart';
 import '../cart/cart_controller.dart';
 import '../entry/entry_controller.dart';
+import '../offline/offline_policy.dart';
 import 'checkout_controller.dart';
 
 Future<void> showCheckoutSheet(
@@ -34,6 +35,7 @@ final class _CheckoutSheet extends StatefulWidget {
 
 final class _CheckoutSheetState extends State<_CheckoutSheet> {
   String method = 'cash';
+  final cashReceived = TextEditingController();
 
   @override
   void initState() {
@@ -45,6 +47,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   @override
   void dispose() {
     widget.checkout.removeListener(_changed);
+    cashReceived.dispose();
     super.dispose();
   }
 
@@ -69,6 +72,10 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         : TotalsPreview.fromJson(
             confirmation['totals']! as Map<String, Object?>,
           );
+    if (cashReceived.text.isEmpty) {
+      final minor = (totals.grandTotal['minorUnits']! as num).toInt();
+      cashReceived.text = (minor / 100).toStringAsFixed(2);
+    }
     return SafeArea(
       child: SizedBox(
         height: MediaQuery.sizeOf(context).height * .9,
@@ -76,6 +83,10 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
           padding: const EdgeInsets.all(UmiSpacing.lg),
           child: switch (state.phase) {
             CheckoutPhase.completed => _receipt(context, state.result!),
+            CheckoutPhase.provisional => _provisional(
+              context,
+              state.provisionalReceipt!,
+            ),
             CheckoutPhase.paymentUnknown => _unknown(context, state.result!),
             CheckoutPhase.processing || CheckoutPhase.repricing => Center(
               child: Semantics(
@@ -85,8 +96,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
               ),
             ),
             CheckoutPhase.failure => _checkoutError(context, state.errorCode),
-            _ => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            _ => ListView(
               children: [
                 Text(
                   l.checkoutTitle,
@@ -134,6 +144,14 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                     ),
                   ],
                 ),
+                if (method == 'cash')
+                  TextField(
+                    controller: cashReceived,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(labelText: l.cashReceivedLabel),
+                  ),
                 if (state.phase == CheckoutPhase.confirmationRequired) ...[
                   const SizedBox(height: UmiSpacing.lg),
                   Semantics(
@@ -141,18 +159,49 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                     child: Text(l.totalsConfirmedBody),
                   ),
                 ],
-                const Spacer(),
+                const SizedBox(height: UmiSpacing.lg),
                 FilledButton(
                   onPressed: state.phase == CheckoutPhase.confirmationRequired
                       ? () => _confirm(context)
-                      : () => widget.checkout.preview(
-                          tenantId: cart.tenantId,
-                          branchId: cart.branchId,
-                          operatorSessionId: cart.operatorSessionId,
-                          cartId: cart.id,
-                          cartVersion: cart.version,
-                          paymentMethod: method,
-                        ),
+                      : () {
+                          final entry = widget.entry.state;
+                          final tenant = entry.selectedTenant!;
+                          final device = entry.device!;
+                          final operator = entry.operator!;
+                          final currency =
+                              TotalsPreview.fromJson(
+                                    cart.totals,
+                                  ).grandTotal['currency']!
+                                  as String;
+                          widget.checkout.preview(
+                            tenantId: cart.tenantId,
+                            branchId: cart.branchId,
+                            operatorSessionId: cart.operatorSessionId,
+                            cartId: cart.id,
+                            cartVersion: cart.version,
+                            paymentMethod: method,
+                            cart: cart,
+                            authority: OfflineAuthorityContext(
+                              tenantId: tenant.id,
+                              branchId: cart.branchId,
+                              deviceId: device.id,
+                              credentialVersion: device.credentialVersion,
+                              operatorSessionId: operator.id,
+                              permissions: operator.permissions.toSet(),
+                              entitlements: operator.entitlements
+                                  .where((item) => item['enabled'] == true)
+                                  .map((item) => item['featureKey']! as String)
+                                  .toSet(),
+                              currency: currency,
+                              deviceTrusted: device.state == 'active',
+                            ),
+                            branchName: entry.selectedBranch?.name ?? '',
+                            operatorName: operator.staffId,
+                            cashReceivedMinorUnits: _minorUnits(
+                              cashReceived.text,
+                            ),
+                          );
+                        },
                   child: Text(
                     state.phase == CheckoutPhase.confirmationRequired
                         ? l.confirmAndPayAction
@@ -167,6 +216,98 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
             ),
           },
         ),
+      ),
+    );
+  }
+
+  int _minorUnits(String raw) {
+    final parts = raw.trim().split('.');
+    final whole = int.tryParse(parts.first) ?? 0;
+    final fraction = parts.length > 1
+        ? parts[1].padRight(2, '0').substring(0, 2)
+        : '00';
+    return whole * 100 + (int.tryParse(fraction) ?? 0);
+  }
+
+  Widget _provisional(BuildContext context, ProvisionalReceipt receipt) {
+    final l = AppLocalizations.of(context);
+    final snapshot = OfflineCheckoutSnapshot.fromJson(receipt.snapshot);
+    final totals = TotalsConfirmation.fromJson(snapshot.totals);
+    final preview = TotalsPreview.fromJson(totals.totals);
+    final cart = Cart.fromJson(snapshot.cartSnapshot);
+    return Semantics(
+      liveRegion: true,
+      label: l.provisionalSalePendingTitle,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Icon(Icons.cloud_off_outlined, size: 64),
+          Text(
+            l.provisionalSalePendingTitle,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
+          const SizedBox(height: UmiSpacing.md),
+          Text(l.provisionalSalePendingBody, textAlign: TextAlign.center),
+          SelectableText(
+            receipt.provisionalSaleId,
+            textAlign: TextAlign.center,
+          ),
+          Text(receipt.branchName, textAlign: TextAlign.center),
+          Text(receipt.operatorName, textAlign: TextAlign.center),
+          const Divider(),
+          Expanded(
+            child: ListView(
+              children: [
+                for (final raw in cart.items)
+                  Builder(
+                    builder: (context) {
+                      final line = CartItem.fromJson(raw);
+                      return ListTile(
+                        title: Text(line.productName),
+                        subtitle: Text(
+                          [
+                            if (line.variant != null)
+                              line.variant!['name'] as String,
+                            ...line.modifiers.map(
+                              (modifier) => modifier['name']! as String,
+                            ),
+                          ].join(' · '),
+                        ),
+                        trailing: Text('${line.quantity}'),
+                      );
+                    },
+                  ),
+              ],
+            ),
+          ),
+          _AmountRow(label: l.taxLabel, value: _money(preview.tax)),
+          _AmountRow(
+            label: l.totalLabel,
+            value: _money(preview.grandTotal),
+            emphasized: true,
+          ),
+          _AmountRow(
+            label: l.cashReceivedLabel,
+            value: _money({
+              'currency': snapshot.currency,
+              'minorUnits': snapshot.amountReceivedMinorUnits,
+            }),
+          ),
+          _AmountRow(
+            label: l.changeDueLabel,
+            value: _money({
+              'currency': snapshot.currency,
+              'minorUnits': snapshot.changeDueMinorUnits,
+            }),
+          ),
+          Text('${l.businessDateLabel}: ${snapshot.businessDate}'),
+          const Spacer(),
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l.returnToCatalogAction),
+          ),
+        ],
       ),
     );
   }
@@ -282,7 +423,6 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         children: [
           const Icon(Icons.error_outline, size: 64),
           Text(l.checkoutFailed),
-          Text(code ?? 'CHECKOUT_FAILED'),
           FilledButton.tonal(
             onPressed: widget.checkout.reset,
             child: Text(l.retryAction),

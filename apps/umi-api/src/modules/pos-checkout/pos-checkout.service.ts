@@ -274,6 +274,7 @@ export class PosCheckoutService {
     const fingerprint = createHash('sha256')
       .update(JSON.stringify({ cartVersion: cart.version, items, totals, taxes }))
       .digest('hex');
+    const snapshotAt = new Date().toISOString();
     return {
       lineSnapshot: items,
       public: {
@@ -282,6 +283,10 @@ export class PosCheckoutService {
         totals,
         taxes,
         discounts: totals.discounts,
+        catalogVersion: fingerprint,
+        pricingVersion: fingerprint,
+        taxVersion: fingerprint,
+        snapshotAt,
         confirmedAt: null,
       },
     };

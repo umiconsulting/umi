@@ -92,6 +92,10 @@ test('Gate 2E checkout requires explicit totals confirmation and safe ambiguity'
       entries: [],
     },
     discounts: { total: { minorUnits: 0, currency: 'MXN' }, entries: [] },
+    catalogVersion: 'catalog-1',
+    pricingVersion: 'pricing-1',
+    taxVersion: 'tax-1',
+    snapshotAt: '2026-07-28T00:00:00.000Z',
     confirmedAt: null,
   };
   assert.ok(

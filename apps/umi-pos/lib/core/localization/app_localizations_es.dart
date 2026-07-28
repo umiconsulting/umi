@@ -308,4 +308,39 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get checkoutFailed =>
       'No fue posible completar el cobro de forma segura.';
+
+  @override
+  String get provisionalSalePendingTitle => 'Venta pendiente de sincronización';
+
+  @override
+  String get provisionalSalePendingBody =>
+      'La venta se guardó de forma segura en este dispositivo y está pendiente de sincronización. Los datos oficiales del recibo se asignarán cuando el servidor la acepte.';
+
+  @override
+  String get returnToCatalogAction => 'Volver al catálogo';
+
+  @override
+  String get recoveryCenterTitle => 'Centro de recuperación';
+
+  @override
+  String get synchronizingPendingSales => 'Sincronizando ventas pendientes…';
+
+  @override
+  String get pendingSalesSecure =>
+      'Tus ventas pendientes permanecen almacenadas de forma segura en este dispositivo.';
+
+  @override
+  String get synchronizeNowAction => 'Sincronizar ahora';
+
+  @override
+  String get conflictNeedsAttention => 'Una venta requiere tu atención.';
+
+  @override
+  String get officialReceiptAvailable => 'Recibo oficial disponible';
+
+  @override
+  String get cashReceivedLabel => 'Efectivo recibido';
+
+  @override
+  String get changeDueLabel => 'Cambio';
 }

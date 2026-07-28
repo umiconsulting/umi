@@ -15,7 +15,10 @@ import '../features/checkout/checkout_repository.dart';
 import '../features/entry/entry_controller.dart';
 import '../features/entry/entry_gateway.dart';
 import '../features/offline/connectivity_controller.dart';
+import '../features/offline/offline_checkout_service.dart';
 import '../features/offline/offline_journal.dart';
+import '../features/offline/offline_policy.dart';
+import '../features/offline/replay_engine.dart';
 import 'bootstrap_controller.dart';
 
 final class AppCompositionRoot {
@@ -36,6 +39,7 @@ final class AppCompositionRoot {
     required this.checkout,
     required this.connectivity,
     required this.offlineJournal,
+    this.offlineRecovery,
   });
 
   factory AppCompositionRoot.production() {
@@ -59,6 +63,17 @@ final class AppCompositionRoot {
     final connectivity = ConnectivityController();
     final offlineJournal = EncryptedOfflineJournal(
       PlatformJournalCipherStore(preferences, secureStorage),
+    );
+    final policyCache = OfflinePolicyCache(offlineJournal);
+    final offlineCheckout = OfflineCheckoutService(
+      journal: offlineJournal,
+      policyCache: policyCache,
+      eligibility: const OfflineCheckoutEligibilityEngine(),
+    );
+    final offlineRecovery = OfflineRecoveryController(
+      journal: offlineJournal,
+      gateway: ApiReplayGateway(apiClient),
+      connectivity: connectivity,
     );
     final controller = BootstrapController(
       config: config,
@@ -93,10 +108,13 @@ final class AppCompositionRoot {
       ),
       checkout: CheckoutController(
         repository: ApiCheckoutRepository(apiClient),
+        offlineCheckout: offlineCheckout,
+        connectivity: connectivity,
         telemetry: telemetry,
       ),
       connectivity: connectivity,
       offlineJournal: offlineJournal,
+      offlineRecovery: offlineRecovery,
     );
   }
 
@@ -116,6 +134,7 @@ final class AppCompositionRoot {
   final CheckoutController checkout;
   final ConnectivityController connectivity;
   final EncryptedOfflineJournal offlineJournal;
+  final OfflineRecoveryController? offlineRecovery;
 
   void dispose() {
     controller.dispose();
@@ -124,6 +143,7 @@ final class AppCompositionRoot {
     cart.dispose();
     checkout.dispose();
     connectivity.dispose();
+    offlineRecovery?.dispose();
     apiClient.dispose();
   }
 }

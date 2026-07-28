@@ -227,6 +227,8 @@ const dartRoutes = `abstract final class UmiRoutes {
       '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/checkout/payments/\${Uri.encodeComponent(paymentId)}';
   static String posOfflineReplayBegin(String tenantId) =>
       '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/offline/replay/begin';
+  static String posOfflinePolicy(String tenantId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/offline/policy';
   static String posOfflineReplayBatch(String tenantId) =>
       '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/offline/replay/batch';
   static String posOfflineReplayCursor(String tenantId) =>

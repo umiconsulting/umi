@@ -306,4 +306,39 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get checkoutFailed => 'Checkout could not be completed safely.';
+
+  @override
+  String get provisionalSalePendingTitle => 'Sale pending synchronization';
+
+  @override
+  String get provisionalSalePendingBody =>
+      'Sale saved securely on this device and pending synchronization. Official receipt data will be assigned after server acceptance.';
+
+  @override
+  String get returnToCatalogAction => 'Return to catalog';
+
+  @override
+  String get recoveryCenterTitle => 'Recovery Center';
+
+  @override
+  String get synchronizingPendingSales => 'Synchronizing pending sales…';
+
+  @override
+  String get pendingSalesSecure =>
+      'Your pending sales remain securely stored on this device.';
+
+  @override
+  String get synchronizeNowAction => 'Synchronize now';
+
+  @override
+  String get conflictNeedsAttention => 'One sale needs your attention.';
+
+  @override
+  String get officialReceiptAvailable => 'Official receipt available';
+
+  @override
+  String get cashReceivedLabel => 'Cash received';
+
+  @override
+  String get changeDueLabel => 'Change due';
 }

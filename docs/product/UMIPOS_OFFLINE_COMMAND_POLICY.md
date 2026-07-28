@@ -8,17 +8,24 @@ current, unexpired server policy. Web never supports sensitive offline journalin
 | Command | State | Risk / required authority | Reconciliation |
 | --- | --- | --- | --- |
 | `operational.ack` | Allowed | Low; trusted active device, operator, tenant, branch, `offline.replay` | Ordered acknowledgement |
-| Cart preparation | Blocked | Pricing and availability snapshots are not yet policy-certified | Future explicit policy |
-| Sale preparation | Blocked | Financial snapshot freshness policy is absent | Future explicit policy |
-| Cash sale commit | Blocked | No server-issued amount/count/freshness limits exist | Required before enablement |
+| Cart preparation | Online only | Server remains the pricing and availability authority | Preserve its authoritative snapshot |
+| Cash checkout | Conditionally allowed | Active trusted native device, valid operator, `offline.cash.checkout`, `pos.offline_cash`, fresh signed-fingerprint policy and snapshots, matching branch/currency, and configured integer limits | Provisional until ordered replay is accepted |
 | Receipt request | Blocked | Must follow an accepted sale | Recover accepted result by command ID |
 | External terminal/card | Prohibited | Requires real-time provider authority | Unknown outcomes remain query-only |
 | Enrollment, credentials, roles, permissions, elevation, refunds, configuration | Prohibited | Security-sensitive or destructive | Online authority only |
 
-The default limits are 250 native queue records, 20 commands per batch, and 24 hours maximum
-command age. Server policy may lower these bounds. Pending or unresolved financial records are
-never deleted by age. Replay preserves the original command ID, device sequence, idempotency key,
-fingerprint, and payload.
+Offline cash is default deny. A branch policy sets expiry, maximum policy age, single-sale and
+accumulated amounts in integer minor units, sale count, active queue depth, command age, catalog,
+pricing, and tax freshness, permission, entitlement, device class, credential version, branch,
+currency, and optional manager-review threshold. Missing trusted server-time anchors, stale or
+corrupt policy, rotation, revocation, scope changes, and Web block checkout.
+
+An accepted offline checkout remains provisional locally until the generated-SDK replay gateway
+recovers or receives the authoritative result and durably maps the provisional reference to the
+official sale and receipt. Unknown responses are queried by the original command identity; they
+are never treated as failure or submitted as a new payment. Pending, unknown, or unresolved
+financial records are never deleted by age. Accepted records have bounded encrypted retention
+after durable result and mapping persistence.
 
 Residual risks: platform keystore availability, device compromise while unlocked, storage rollback
 outside application control, and prolonged loss of server policy. Production deployment requires

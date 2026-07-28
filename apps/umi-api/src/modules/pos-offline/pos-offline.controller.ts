@@ -15,6 +15,12 @@ import { PosOfflineService } from './pos-offline.service';
 export class PosOfflineController {
   constructor(private readonly offline: PosOfflineService) {}
 
+  @Get('policy')
+  policy(
+    @CurrentUser() user: AuthUser, @Param('tenantId') tenantId: string,
+    @Query(new ZodValidationPipe(ReplayContextQuery)) query: ReplayContextQuery,
+  ) { return this.offline.issuePolicy(user, tenantId, query); }
+
   @Post('replay/begin')
   begin(
     @CurrentUser() user: AuthUser, @Param('tenantId') tenantId: string,
@@ -57,7 +63,7 @@ export class PosOfflineController {
     @CurrentUser() user: AuthUser, @Param('tenantId') tenantId: string,
     @Query(new ZodValidationPipe(ReplayContextQuery)) query: ReplayContextQuery,
   ) {
-    return this.offline.diagnostics(user, tenantId, query).then(() => ({ items: [] }));
+    return this.offline.conflicts(user, tenantId, query);
   }
 
   @Get('diagnostics')

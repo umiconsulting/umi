@@ -9,5 +9,6 @@ import { PosCheckoutService } from './pos-checkout.service';
   imports: [IntegrityModule, PosCartModule],
   controllers: [PosCheckoutController],
   providers: [PosCheckoutRepository, PosCheckoutService],
+  exports: [PosCheckoutService],
 })
 export class PosCheckoutModule {}

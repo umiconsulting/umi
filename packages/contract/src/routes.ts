@@ -55,6 +55,8 @@ export const routes = {
       `/api/pos/tenants/${enc(tenantId)}/checkout/payments/${enc(paymentId)}`,
     offlineReplayBegin: (tenantId: string): string =>
       `/api/pos/tenants/${enc(tenantId)}/offline/replay/begin`,
+    offlinePolicy: (tenantId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/offline/policy`,
     offlineReplayBatch: (tenantId: string): string =>
       `/api/pos/tenants/${enc(tenantId)}/offline/replay/batch`,
     offlineReplayCursor: (tenantId: string): string =>

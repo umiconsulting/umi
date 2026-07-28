@@ -10,10 +10,10 @@ Updated: 2026-07-28
 | 2C Read-only catalog                    | Complete | 2B, catalog contracts  | Maintain authoritative browsing                            | None                    | Contract, API, migration, Flutter, cache and web validation passed |
 | 2D Authoritative cart                   | Complete | 2C, cart contracts     | Maintain sale preparation                                  | None                    | Focused contract, API, Flutter, migration and web validation       |
 | 2E Checkout and online sale commit      | Complete | 2D, command contracts  | Maintain authoritative online sale                         | None                    | Contract, API, migration, Flutter and web validation               |
-| 2F Offline journal and reconciliation   | Incomplete | 2E, command envelopes | Connect checkout and finish recovery/conflict UX | Offline cash policy limits | Focused foundation validation passed |
+| 2F Offline journal and reconciliation   | Incomplete | 2E, command envelopes | Finish durable restart deduplication, journal mutation serialization, and typed recovery actions | Code-controlled durability/UX gaps; Linux build prerequisites absent | Focused contract, API, Flutter, Web, migration and RLS checks passed |
 | Later platform work                     | Planned  | 2F                     | Cash, inventory, refunds, KDS, customer display, Assistant | Domain gates            | Not run                                                            |
 
-The latest relevant revision for Gate 2F is the commit containing this document. Native encrypted
+The latest relevant revision for Gate 2F is the continuation commit containing this document. Native encrypted
 offline support covers an explicit low-risk allowlist; offline cash and Web sensitive journaling
 remain disabled. UMI remains the
 sole business authority; Flutter owns presentation, hardware integration, encrypted local state,

@@ -34,9 +34,11 @@ Future clients use `packages/contract` and controlled UMI APIs.
   reconfirmation, idempotent cash completion, query-only external-terminal ambiguity, reservation
   semantics without permanent inventory mutation, immutable receipt snapshots, and append-only
   financial/audit facts.
-- Gate 2F established a native-only AES-GCM offline journal, device-credential sequence authority,
-  ordered replay, stable conflict contracts, and server-authoritative reconciliation. Offline cash
-  and sensitive Web journaling remain disabled by explicit policy.
+- Gate 2F closeout substantially advanced native AES-256-GCM journaling, default-deny
+  server-issued offline cash policy, provisional checkout, generated-SDK replay, response-loss
+  recovery, official mapping, conflict persistence, reconciliation, and Recovery Center.
+  Sensitive Web journaling remains disabled. Gate 2F remains incomplete pending the recorded
+  recovery and durability gaps.
 
 ## Current implementation state
 
@@ -110,7 +112,8 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - `BUILD_V3_CERTIFIED`: `true`
 - UmiPOS application creation: `YES WITH OBSERVATIONS`
 - Remote publication: deferred because the branch has no configured upstream.
-- Gate 2F: incomplete; the deterministic encrypted replay foundation is committed, while checkout
-  journaling and complete recovery/conflict-resolution surfaces remain.
-- Next gate: finish Gate 2F. Offline cash additionally requires server-issued amount, count, and
-  snapshot-freshness policy.
+- Gate 2F: incomplete. The full disposable PostgreSQL migration chain and fail-closed RLS metadata
+  checks passed; Linux debug compilation was attempted but the runner lacks CMake, Ninja, Clang,
+  and GTK development headers. Remaining code gaps are durable restart duplicate prevention,
+  fully serialized journal mutations, and complete typed conflict/recovery actions and tests.
+- Next gate: Gate 2F closeout only. Do not begin post-2F commercial work.

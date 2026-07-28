@@ -286,6 +286,7 @@ export class PosCheckoutRepository {
     return {
       id: sale.rows[0].id,
       orderId,
+      receiptId: receiptRow.rows[0].id,
       receiptRef: receipt.receiptRef,
       status: 'committed',
       committedAt: sale.rows[0].committedAt,

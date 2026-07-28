@@ -6,7 +6,7 @@ import { posCartModels } from './pos-cart';
 import { posCheckoutModels } from './pos-checkout';
 import { posOfflineModels } from './pos-offline';
 
-export const CONTRACT_VERSION = '1.5.0';
+export const CONTRACT_VERSION = '1.6.0';
 export const API_MAJOR_VERSION = 1;
 
 export const errorCatalog = Object.fromEntries(
@@ -502,6 +502,12 @@ export const routeCatalog = {
     offline: false, pin: false, approval: false,
     errors: ['PERMISSION_DENIED', 'DEVICE_REVOKED', 'BRANCH_SCOPE_VIOLATION'],
   },
+  'GET /api/pos/tenants/:tenantId/offline/policy': {
+    request: 'ReplayContextQuery', response: 'OfflinePolicy', auth: 'operator-session',
+    permission: 'offline.replay', idempotent: true, tenantContext: true, branchContext: true,
+    offline: false, pin: false, approval: false,
+    errors: ['PERMISSION_DENIED', 'DEVICE_REVOKED', 'ENTITLEMENT_DISABLED'],
+  },
   'POST /api/pos/tenants/:tenantId/offline/replay/batch': {
     request: 'ReplayBatch', response: 'ReplayBatchResult', auth: 'operator-session',
     permission: 'offline.replay', idempotent: true, tenantContext: true, branchContext: true,
@@ -534,7 +540,7 @@ export const routeCatalog = {
     offline: false, pin: false, approval: false, errors: ['PERMISSION_DENIED'],
   },
   'GET /api/pos/tenants/:tenantId/offline/diagnostics': {
-    request: null, response: 'ReplayDiagnostics', auth: 'operator-session',
+    request: null, response: 'SafeReplayDiagnostic', auth: 'operator-session',
     permission: 'offline.replay', idempotent: true, tenantContext: true, branchContext: true,
     offline: false, pin: false, approval: false, errors: ['PERMISSION_DENIED'],
   },

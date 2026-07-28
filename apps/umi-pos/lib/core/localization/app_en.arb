@@ -93,5 +93,16 @@
   "correlationLabel": "Correlation",
   "saleCompletedTitle": "Sale completed",
   "finishSaleAction": "Finish and start a new cart",
-  "checkoutFailed": "Checkout could not be completed safely."
+  "checkoutFailed": "Checkout could not be completed safely.",
+  "provisionalSalePendingTitle": "Sale pending synchronization",
+  "provisionalSalePendingBody": "Sale saved securely on this device and pending synchronization. Official receipt data will be assigned after server acceptance.",
+  "returnToCatalogAction": "Return to catalog",
+  "recoveryCenterTitle": "Recovery Center",
+  "synchronizingPendingSales": "Synchronizing pending sales…",
+  "pendingSalesSecure": "Your pending sales remain securely stored on this device.",
+  "synchronizeNowAction": "Synchronize now",
+  "conflictNeedsAttention": "One sale needs your attention.",
+  "officialReceiptAvailable": "Official receipt available",
+  "cashReceivedLabel": "Cash received",
+  "changeDueLabel": "Change due"
 }

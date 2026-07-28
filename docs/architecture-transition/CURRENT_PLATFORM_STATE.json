@@ -52,8 +52,8 @@
     "gate2AStatus": "complete",
     "flutterVersion": "3.44.6",
     "dartVersion": "3.12.2",
-    "contractVersion": "1.5.0",
-    "contractContentHash": "7eb6b494b91cfa06d9ee7f9976459e749d0f719654ef6b05a616e783c15af588",
+    "contractVersion": "1.6.0",
+    "contractContentHash": "77443d02ab93819dba88b00ea0e863bfc1b085604bad2aeaea986d773ea1a26d",
     "stateManagement": "ChangeNotifier with one explicit composition root",
     "navigation": "central typed route guard",
     "secureStorage": "flutter_secure_storage with no plaintext fallback",
@@ -74,7 +74,10 @@
     "gate2FStatus": "incomplete",
     "offlineJournal": "native AES-256-GCM, schema 1, no plaintext fallback",
     "offlineReplay": "ordered per device credential version; duplicate results recovered",
-    "offlineCash": "disabled pending server-issued financial limits and snapshot policy",
+    "offlineCash": "default-deny server-issued branch policy; eligible native cash checkout is encrypted and provisional",
+    "offlineRecovery": "generated-SDK gateway, ordered replay, response-loss query, reconciliation, immutable mapping, Recovery Center",
+    "offlineDatabaseValidation": "clean migration chain plus tenant and branch RLS runtime isolation passed in disposable PostgreSQL",
+    "nativeBuild": "Linux debug attempted; external CMake, Ninja, Clang and GTK development prerequisites unavailable",
     "webOfflineCapability": "sensitive journaling unsupported; online operation only",
     "checkoutAuthority": "apps/umi-api/src/modules/pos-checkout",
     "checkoutMode": "online, immediately repriced, explicitly confirmed, idempotent",
@@ -98,8 +101,8 @@
     "pinFoundation": "server-side scrypt verification with bounded attempts",
     "managerApprovalFoundation": "single-action scoped five-minute elevation",
     "readyShell": true,
-    "latestLocalCommit": "HEAD (Gate 2F commit)",
+    "latestLocalCommit": "HEAD (Gate 2F continuation commit)",
     "pushStatus": "DEFERRED — LOCAL COMMIT SAFE"
   },
-  "nextGate": "2F completion — checkout integration and recovery/conflict UX"
+  "nextGate": "Gate 2F closeout — durability and typed recovery completion"
 }

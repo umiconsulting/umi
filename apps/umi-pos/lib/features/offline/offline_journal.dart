@@ -14,6 +14,7 @@ const offlineJournalMaxDepth = 250;
 enum JournalStatus {
   pending,
   replaying,
+  unknown,
   accepted,
   duplicate,
   conflict,
@@ -35,6 +36,9 @@ final class JournalEntry {
     this.lastReplayAt,
     this.lastSafeErrorCategory,
     this.officialId,
+    this.officialCommit,
+    this.failure,
+    this.serverConflictReference,
     this.retentionDeadline,
   });
   final OfflineCommand command;
@@ -43,12 +47,18 @@ final class JournalEntry {
   final DateTime? lastReplayAt;
   final String? lastSafeErrorCategory;
   final String? officialId;
+  final Map<String, Object?>? officialCommit;
+  final Map<String, Object?>? failure;
+  final String? serverConflictReference;
   final DateTime? retentionDeadline;
 
   JournalEntry replayed({
     required JournalStatus status,
     String? error,
     String? officialId,
+    Map<String, Object?>? officialCommit,
+    Map<String, Object?>? failure,
+    String? serverConflictReference,
   }) => JournalEntry(
     command: command,
     status: status,
@@ -56,6 +66,10 @@ final class JournalEntry {
     lastReplayAt: DateTime.now().toUtc(),
     lastSafeErrorCategory: error,
     officialId: officialId ?? this.officialId,
+    officialCommit: officialCommit ?? this.officialCommit,
+    failure: failure ?? this.failure,
+    serverConflictReference:
+        serverConflictReference ?? this.serverConflictReference,
     retentionDeadline:
         (status == JournalStatus.accepted || status == JournalStatus.duplicate)
         ? DateTime.now().toUtc().add(const Duration(days: 30))
@@ -69,6 +83,9 @@ final class JournalEntry {
     'lastReplayAt': lastReplayAt?.toIso8601String(),
     'lastSafeErrorCategory': lastSafeErrorCategory,
     'officialId': officialId,
+    'officialCommit': officialCommit,
+    'failure': failure,
+    'serverConflictReference': serverConflictReference,
     'retentionDeadline': retentionDeadline?.toIso8601String(),
   };
   factory JournalEntry.fromJson(Map<String, Object?> json) => JournalEntry(
@@ -78,6 +95,9 @@ final class JournalEntry {
     lastReplayAt: _date(json['lastReplayAt']),
     lastSafeErrorCategory: json['lastSafeErrorCategory'] as String?,
     officialId: json['officialId'] as String?,
+    officialCommit: json['officialCommit'] as Map<String, Object?>?,
+    failure: json['failure'] as Map<String, Object?>?,
+    serverConflictReference: json['serverConflictReference'] as String?,
     retentionDeadline: _date(json['retentionDeadline']),
   );
 }
@@ -91,13 +111,38 @@ final class OfflineJournalSnapshot {
     required this.lastAcknowledgedSequence,
     required this.entries,
     required this.mappings,
+    this.cachedPolicy,
+    this.lastTrustedServerTime,
+    this.lastTrustedLocalTime,
   });
   final int nextSequence;
   final int lastAcknowledgedSequence;
   final List<JournalEntry> entries;
   final Map<String, String> mappings;
-  int get pendingCount =>
-      entries.where((e) => e.status == JournalStatus.pending).length;
+  final Map<String, Object?>? cachedPolicy;
+  final DateTime? lastTrustedServerTime;
+  final DateTime? lastTrustedLocalTime;
+  int get pendingCount => entries
+      .where(
+        (e) =>
+            e.status == JournalStatus.pending ||
+            e.status == JournalStatus.unknown ||
+            e.status == JournalStatus.conflict,
+      )
+      .length;
+  Iterable<JournalEntry> get activeCash => entries.where(
+    (entry) =>
+        entry.command.commandType == 'pos.checkout.cash' &&
+        entry.status != JournalStatus.accepted &&
+        entry.status != JournalStatus.duplicate &&
+        entry.status != JournalStatus.archived,
+  );
+  int get pendingCashCount => activeCash.length;
+  int get pendingCashMinorUnits => activeCash.fold(0, (sum, entry) {
+    final snapshot = entry.command.payload['snapshot'];
+    if (snapshot is! Map<String, Object?>) return sum;
+    return sum + ((snapshot['amountDueMinorUnits'] as num?)?.toInt() ?? 0);
+  });
 }
 
 abstract interface class JournalCipherStore {
@@ -131,6 +176,7 @@ final class EncryptedOfflineJournal {
   final JournalCipherStore _store;
   final bool _web;
   final _cipher = AesGcm.with256bits();
+  bool _mutating = false;
 
   Future<OfflineJournalSnapshot> load() async {
     _ensureSupported();
@@ -141,6 +187,9 @@ final class EncryptedOfflineJournal {
         lastAcknowledgedSequence: 0,
         entries: [],
         mappings: {},
+        cachedPolicy: null,
+        lastTrustedServerTime: null,
+        lastTrustedLocalTime: null,
       );
     }
     try {
@@ -165,6 +214,9 @@ final class EncryptedOfflineJournal {
         mappings: (data['mappings']! as Map<String, Object?>).map(
           (key, value) => MapEntry(key, value! as String),
         ),
+        cachedPolicy: data['cachedPolicy'] as Map<String, Object?>?,
+        lastTrustedServerTime: _date(data['lastTrustedServerTime']),
+        lastTrustedLocalTime: _date(data['lastTrustedLocalTime']),
       );
     } on OfflineJournalException {
       rethrow;
@@ -185,53 +237,100 @@ final class EncryptedOfflineJournal {
     String commandType = 'operational.ack',
     String? provisionalId,
   }) async {
-    final current = await load();
-    if (current.entries
-            .where((e) => e.status != JournalStatus.archived)
-            .length >=
-        offlineJournalMaxDepth) {
-      throw const OfflineJournalException('queue_capacity_exceeded');
+    if (_mutating) {
+      throw const OfflineJournalException('journal_write_in_progress');
     }
-    if (current.entries.any((entry) => entry.command.commandId == commandId)) {
-      throw const OfflineJournalException('duplicate_command');
+    _mutating = true;
+    try {
+      final current = await load();
+      if (commandType != 'operational.ack' &&
+          commandType != 'pos.checkout.cash') {
+        throw const OfflineJournalException('command_not_offline_eligible');
+      }
+      final duplicate = current.entries.where(
+        (entry) => entry.command.commandId == commandId,
+      );
+      if (duplicate.isNotEmpty) {
+        final existing = duplicate.single.command;
+        final same =
+            existing.deviceId == deviceId &&
+            existing.deviceCredentialVersion == credentialVersion &&
+            existing.tenantId == tenantId &&
+            existing.branchId == branchId &&
+            existing.operatorSessionId == operatorSessionId &&
+            existing.commandType == commandType &&
+            existing.idempotencyKey == idempotencyKey &&
+            existing.provisionalId == provisionalId &&
+            jsonEncode(_canonical(existing.payload)) ==
+                jsonEncode(_canonical(payload));
+        if (same) return existing;
+        throw const OfflineJournalException('fingerprint_mismatch');
+      }
+      final createdAt = DateTime.now().toUtc().toIso8601String();
+      final unsigned = OfflineCommand(
+        commandId: commandId,
+        provisionalId: provisionalId,
+        deviceId: deviceId,
+        deviceCredentialVersion: credentialVersion,
+        deviceSequence: current.nextSequence,
+        tenantId: tenantId,
+        branchId: branchId,
+        operatorSessionId: operatorSessionId,
+        commandType: commandType,
+        idempotencyKey: idempotencyKey,
+        fingerprint: List.filled(64, '0').join(),
+        contractVersion: contractVersion,
+        schemaVersion: offlineJournalSchemaVersion,
+        createdAt: createdAt,
+        payload: payload,
+      ).toJson()..remove('fingerprint');
+      final canonical = jsonEncode(_canonical(unsigned));
+      final fingerprint = sha256.convert(utf8.encode(canonical)).toString();
+      if (current.entries
+              .where((e) => e.status != JournalStatus.archived)
+              .length >=
+          offlineJournalMaxDepth) {
+        throw const OfflineJournalException('queue_capacity_exceeded');
+      }
+      final command = OfflineCommand(
+        commandId: commandId,
+        provisionalId: provisionalId,
+        deviceId: deviceId,
+        deviceCredentialVersion: credentialVersion,
+        deviceSequence: current.nextSequence,
+        tenantId: tenantId,
+        branchId: branchId,
+        operatorSessionId: operatorSessionId,
+        commandType: commandType,
+        idempotencyKey: idempotencyKey,
+        fingerprint: fingerprint,
+        contractVersion: contractVersion,
+        schemaVersion: offlineJournalSchemaVersion,
+        createdAt: createdAt,
+        payload: payload,
+      );
+      await _save(
+        OfflineJournalSnapshot(
+          nextSequence: current.nextSequence + 1,
+          lastAcknowledgedSequence: current.lastAcknowledgedSequence,
+          entries: [
+            ...current.entries,
+            JournalEntry(
+              command: command,
+              status: JournalStatus.pending,
+              attempts: 0,
+            ),
+          ],
+          mappings: current.mappings,
+          cachedPolicy: current.cachedPolicy,
+          lastTrustedServerTime: current.lastTrustedServerTime,
+          lastTrustedLocalTime: current.lastTrustedLocalTime,
+        ),
+      );
+      return command;
+    } finally {
+      _mutating = false;
     }
-    if (commandType != 'operational.ack') {
-      throw const OfflineJournalException('command_not_offline_eligible');
-    }
-    final canonical = jsonEncode(_canonical(payload));
-    final command = OfflineCommand(
-      commandId: commandId,
-      provisionalId: provisionalId,
-      deviceId: deviceId,
-      deviceCredentialVersion: credentialVersion,
-      deviceSequence: current.nextSequence,
-      tenantId: tenantId,
-      branchId: branchId,
-      operatorSessionId: operatorSessionId,
-      commandType: commandType,
-      idempotencyKey: idempotencyKey,
-      fingerprint: sha256.convert(utf8.encode(canonical)).toString(),
-      contractVersion: contractVersion,
-      schemaVersion: offlineJournalSchemaVersion,
-      createdAt: DateTime.now().toUtc().toIso8601String(),
-      payload: payload,
-    );
-    await _save(
-      OfflineJournalSnapshot(
-        nextSequence: current.nextSequence + 1,
-        lastAcknowledgedSequence: current.lastAcknowledgedSequence,
-        entries: [
-          ...current.entries,
-          JournalEntry(
-            command: command,
-            status: JournalStatus.pending,
-            attempts: 0,
-          ),
-        ],
-        mappings: current.mappings,
-      ),
-    );
-    return command;
   }
 
   Future<void> apply(ReplayResult result) async {
@@ -254,6 +353,9 @@ final class EncryptedOfflineJournal {
       status: status,
       error: result.failure?['classification'] as String?,
       officialId: result.officialId,
+      officialCommit: result.officialCommit,
+      failure: result.failure,
+      serverConflictReference: result.serverConflictReference,
     );
     final mappings = {...current.mappings};
     if (old.command.provisionalId != null && result.officialId != null) {
@@ -263,16 +365,80 @@ final class EncryptedOfflineJournal {
       }
       mappings[old.command.provisionalId!] = result.officialId!;
     }
-    final acknowledged =
-        status == JournalStatus.accepted || status == JournalStatus.duplicate
-        ? max(current.lastAcknowledgedSequence, result.deviceSequence)
-        : current.lastAcknowledgedSequence;
+    var acknowledged = current.lastAcknowledgedSequence;
+    while (true) {
+      final next = entries.where(
+        (entry) => entry.command.deviceSequence == acknowledged + 1,
+      );
+      if (next.isEmpty ||
+          (next.single.status != JournalStatus.accepted &&
+              next.single.status != JournalStatus.duplicate)) {
+        break;
+      }
+      acknowledged += 1;
+    }
     await _save(
       OfflineJournalSnapshot(
         nextSequence: current.nextSequence,
         lastAcknowledgedSequence: acknowledged,
         entries: entries,
         mappings: mappings,
+        cachedPolicy: current.cachedPolicy,
+        lastTrustedServerTime: current.lastTrustedServerTime,
+        lastTrustedLocalTime: current.lastTrustedLocalTime,
+      ),
+    );
+  }
+
+  Future<void> markUnknown(String commandId) async {
+    final current = await load();
+    final index = current.entries.indexWhere(
+      (entry) => entry.command.commandId == commandId,
+    );
+    if (index < 0) {
+      throw const OfflineJournalException('result_command_unknown');
+    }
+    final entries = [...current.entries];
+    final old = entries[index];
+    entries[index] = JournalEntry(
+      command: old.command,
+      status: JournalStatus.unknown,
+      attempts: old.attempts + 1,
+      lastReplayAt: DateTime.now().toUtc(),
+      lastSafeErrorCategory: 'response_unknown',
+      officialId: old.officialId,
+      officialCommit: old.officialCommit,
+      failure: old.failure,
+      serverConflictReference: old.serverConflictReference,
+      retentionDeadline: old.retentionDeadline,
+    );
+    await _save(
+      OfflineJournalSnapshot(
+        nextSequence: current.nextSequence,
+        lastAcknowledgedSequence: current.lastAcknowledgedSequence,
+        entries: entries,
+        mappings: current.mappings,
+        cachedPolicy: current.cachedPolicy,
+        lastTrustedServerTime: current.lastTrustedServerTime,
+        lastTrustedLocalTime: current.lastTrustedLocalTime,
+      ),
+    );
+  }
+
+  Future<void> cachePolicy(
+    OfflinePolicy policy,
+    DateTime trustedServerTime,
+  ) async {
+    final current = await load();
+    await _save(
+      OfflineJournalSnapshot(
+        nextSequence: current.nextSequence,
+        lastAcknowledgedSequence: current.lastAcknowledgedSequence,
+        entries: current.entries,
+        mappings: current.mappings,
+        cachedPolicy: policy.toJson(),
+        lastTrustedServerTime: trustedServerTime.toUtc(),
+        lastTrustedLocalTime: DateTime.now().toUtc(),
       ),
     );
   }
@@ -282,10 +448,18 @@ final class EncryptedOfflineJournal {
     final retained = current.entries
         .where((entry) {
           if (entry.status == JournalStatus.pending ||
+              entry.status == JournalStatus.unknown ||
               entry.status == JournalStatus.conflict) {
             return true;
           }
           final deadline = entry.retentionDeadline;
+          if ((entry.status == JournalStatus.accepted ||
+                  entry.status == JournalStatus.duplicate) &&
+              entry.command.commandType == 'pos.checkout.cash' &&
+              (entry.command.provisionalId == null ||
+                  !current.mappings.containsKey(entry.command.provisionalId))) {
+            return true;
+          }
           return deadline == null || deadline.isAfter(now);
         })
         .toList(growable: false);
@@ -295,6 +469,9 @@ final class EncryptedOfflineJournal {
         lastAcknowledgedSequence: current.lastAcknowledgedSequence,
         entries: retained,
         mappings: current.mappings,
+        cachedPolicy: current.cachedPolicy,
+        lastTrustedServerTime: current.lastTrustedServerTime,
+        lastTrustedLocalTime: current.lastTrustedLocalTime,
       ),
     );
   }
@@ -307,6 +484,11 @@ final class EncryptedOfflineJournal {
         'lastAcknowledgedSequence': snapshot.lastAcknowledgedSequence,
         'entries': snapshot.entries.map((e) => e.toJson()).toList(),
         'mappings': snapshot.mappings,
+        'cachedPolicy': snapshot.cachedPolicy,
+        'lastTrustedServerTime': snapshot.lastTrustedServerTime
+            ?.toIso8601String(),
+        'lastTrustedLocalTime': snapshot.lastTrustedLocalTime
+            ?.toIso8601String(),
       }),
     );
     final box = await _cipher.encrypt(

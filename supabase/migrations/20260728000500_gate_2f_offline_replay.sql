@@ -12,6 +12,11 @@ create table tenant.pos_offline_policy (
   updated_at timestamptz not null default clock_timestamp()
 );
 
+create or replace function umi.current_device() returns uuid
+language sql stable as $$
+  select nullif(current_setting('app.current_device', true), '')::uuid
+$$;
+
 create table tenant.device_replay_cursor (
   business_id uuid not null references tenant.business(id),
   branch_id uuid not null references tenant.branch(id),
@@ -30,7 +35,7 @@ create table tenant.offline_replay_command (
   credential_version integer not null,
   device_sequence bigint not null check (device_sequence > 0),
   command_id uuid primary key,
-  operator_session_id uuid not null references tenant.operator_session(id),
+  operator_session_id uuid not null references runtime.operator_session(id),
   idempotency_key uuid not null,
   command_type text not null check (command_type = 'operational.ack'),
   fingerprint text not null check (fingerprint ~ '^[a-f0-9]{64}$'),
@@ -71,16 +76,28 @@ alter table tenant.offline_replay_command enable row level security;
 alter table tenant.offline_reconciliation enable row level security;
 
 create policy offline_policy_scope on tenant.pos_offline_policy
-  using (business_id = runtime.current_business_id());
+  using (business_id = umi.current_business());
 create policy replay_cursor_scope on tenant.device_replay_cursor
-  using (business_id = runtime.current_business_id())
-  with check (business_id = runtime.current_business_id());
+  using (business_id = umi.current_business() and
+    umi.current_branch() is not null and branch_id = umi.current_branch() and
+    umi.current_device() is not null and device_id = umi.current_device())
+  with check (business_id = umi.current_business() and
+    umi.current_branch() is not null and branch_id = umi.current_branch() and
+    umi.current_device() is not null and device_id = umi.current_device());
 create policy replay_command_scope on tenant.offline_replay_command
-  using (business_id = runtime.current_business_id())
-  with check (business_id = runtime.current_business_id());
+  using (business_id = umi.current_business() and
+    umi.current_branch() is not null and branch_id = umi.current_branch() and
+    umi.current_device() is not null and device_id = umi.current_device())
+  with check (business_id = umi.current_business() and
+    umi.current_branch() is not null and branch_id = umi.current_branch() and
+    umi.current_device() is not null and device_id = umi.current_device());
 create policy reconciliation_scope on tenant.offline_reconciliation
-  using (business_id = runtime.current_business_id())
-  with check (business_id = runtime.current_business_id());
+  using (business_id = umi.current_business() and
+    umi.current_branch() is not null and branch_id = umi.current_branch() and
+    umi.current_device() is not null and device_id = umi.current_device())
+  with check (business_id = umi.current_business() and
+    umi.current_branch() is not null and branch_id = umi.current_branch() and
+    umi.current_device() is not null and device_id = umi.current_device());
 
 grant select on tenant.pos_offline_policy to api;
 grant select, insert, update on tenant.device_replay_cursor to api;

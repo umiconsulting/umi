@@ -5,6 +5,10 @@ import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/errors/app_error.dart';
 import '../../core/observability/telemetry.dart';
+import '../offline/connectivity_controller.dart';
+import '../offline/offline_checkout_service.dart';
+import '../offline/offline_journal.dart';
+import '../offline/offline_policy.dart';
 import 'checkout_repository.dart';
 
 enum CheckoutPhase {
@@ -14,6 +18,7 @@ enum CheckoutPhase {
   processing,
   paymentUnknown,
   completed,
+  provisional,
   failure,
 }
 
@@ -22,20 +27,28 @@ final class CheckoutState {
     this.phase = CheckoutPhase.idle,
     this.result,
     this.errorCode,
+    this.provisionalReceipt,
   });
   final CheckoutPhase phase;
   final CheckoutResult? result;
   final String? errorCode;
+  final ProvisionalReceipt? provisionalReceipt;
 }
 
 final class CheckoutController extends ChangeNotifier {
   CheckoutController({
     required CheckoutRepository repository,
+    OfflineCheckoutService? offlineCheckout,
+    ConnectivityController? connectivity,
     required Telemetry telemetry,
   }) : _repository = repository,
+       _offlineCheckout = offlineCheckout,
+       _connectivity = connectivity,
        _telemetry = telemetry;
 
   final CheckoutRepository _repository;
+  final OfflineCheckoutService? _offlineCheckout;
+  final ConnectivityController? _connectivity;
   final Telemetry _telemetry;
   CheckoutState _state = const CheckoutState();
   CheckoutState get state => _state;
@@ -45,6 +58,12 @@ final class CheckoutController extends ChangeNotifier {
   String? _cartId;
   int? _cartVersion;
   String _paymentMethod = 'cash';
+  Cart? _cart;
+  OfflineAuthorityContext? _authority;
+  String _branchName = '';
+  String _operatorName = '';
+  int? _cashReceivedMinorUnits;
+  final Map<String, CheckoutResult> _confirmationCache = {};
 
   Future<void> preview({
     required String tenantId,
@@ -53,6 +72,11 @@ final class CheckoutController extends ChangeNotifier {
     required String cartId,
     required int cartVersion,
     required String paymentMethod,
+    Cart? cart,
+    OfflineAuthorityContext? authority,
+    String branchName = '',
+    String operatorName = '',
+    int? cashReceivedMinorUnits,
   }) async {
     _tenantId = tenantId;
     _branchId = branchId;
@@ -60,14 +84,53 @@ final class CheckoutController extends ChangeNotifier {
     _cartId = cartId;
     _cartVersion = cartVersion;
     _paymentMethod = paymentMethod;
+    _cart = cart;
+    _authority = authority;
+    _branchName = branchName;
+    _operatorName = operatorName;
+    _cashReceivedMinorUnits = cashReceivedMinorUnits;
     _set(const CheckoutState(phase: CheckoutPhase.repricing));
     _event('checkout_opened');
+    if ((_connectivity?.state ?? PosConnectivity.online) !=
+        PosConnectivity.online) {
+      if (cart == null || authority == null) {
+        _set(
+          const CheckoutState(
+            phase: CheckoutPhase.failure,
+            errorCode: 'OFFLINE_CONTEXT_UNAVAILABLE',
+          ),
+        );
+        return;
+      }
+      final cached = _confirmationCache['${cart.id}:${cart.version}'];
+      if (cached == null) {
+        _set(
+          const CheckoutState(
+            phase: CheckoutPhase.failure,
+            errorCode: 'OFFLINE_SNAPSHOT_REFRESH_REQUIRED',
+          ),
+        );
+        return;
+      }
+      _set(
+        CheckoutState(
+          phase: CheckoutPhase.confirmationRequired,
+          result: cached,
+        ),
+      );
+      return;
+    }
     await _submit(null);
   }
 
   Future<void> confirm() async {
     final fingerprint = _state.result?.confirmation['fingerprint'] as String?;
     if (fingerprint == null) return;
+    if ((_connectivity?.state ?? PosConnectivity.online) !=
+        PosConnectivity.online) {
+      await _submitOffline(fingerprint);
+      return;
+    }
     _set(CheckoutState(phase: CheckoutPhase.processing, result: _state.result));
     _event('checkout_confirmed');
     _event('payment_started');
@@ -140,6 +203,9 @@ final class CheckoutController extends ChangeNotifier {
         _ => CheckoutPhase.processing,
       };
       _set(CheckoutState(phase: phase, result: result));
+      if (phase == CheckoutPhase.confirmationRequired && _cart != null) {
+        _confirmationCache['${_cart!.id}:${_cart!.version}'] = result;
+      }
       if (phase == CheckoutPhase.completed) {
         _event('payment_completed');
         _event('receipt_created');
@@ -148,6 +214,83 @@ final class CheckoutController extends ChangeNotifier {
       }
     } on AppException catch (error) {
       _failure(error);
+    }
+  }
+
+  Future<void> _submitOffline(String fingerprint) async {
+    final offlineCheckout = _offlineCheckout;
+    final cart = _cart;
+    final authority = _authority;
+    final raw = _state.result?.confirmation;
+    if (offlineCheckout == null ||
+        cart == null ||
+        authority == null ||
+        raw == null) {
+      return;
+    }
+    final totals = TotalsConfirmation.fromJson(raw);
+    final grandTotal = totals.totals['grandTotal']! as Map<String, Object?>;
+    final amount = (grandTotal['minorUnits']! as num).toInt();
+    final snapshotAt = DateTime.parse(
+      totals.confirmedAt ?? cart.updatedAt,
+    ).toUtc();
+    _set(CheckoutState(phase: CheckoutPhase.processing, result: _state.result));
+    try {
+      final commandId = _uuid();
+      final receipt = await offlineCheckout.checkout(
+        OfflineCheckoutRequest(
+          commandId: commandId,
+          idempotencyKey: _uuid(),
+          provisionalSaleId: 'prov-$commandId',
+          authority: authority,
+          checkoutCommand: CheckoutCommand(
+            cartId: cart.id,
+            branchId: cart.branchId,
+            operatorSessionId: cart.operatorSessionId,
+            expectedCartVersion: cart.version,
+            paymentMethod: 'cash',
+            totalsFingerprint: fingerprint,
+            idempotencyKey: _uuid(),
+          ),
+          cart: cart,
+          totals: totals,
+          catalogVersion: totals.catalogVersion,
+          pricingVersion: totals.pricingVersion,
+          taxVersion: totals.taxVersion,
+          catalogSnapshotAt: snapshotAt,
+          pricingSnapshotAt: snapshotAt,
+          taxSnapshotAt: snapshotAt,
+          amountReceivedMinorUnits: _cashReceivedMinorUnits ?? amount,
+          businessDate: TotalsPreview.fromJson(totals.totals).businessDate,
+          branchName: _branchName,
+          operatorName: _operatorName,
+        ),
+        facts: OfflineCheckoutFacts(
+          amountMinorUnits: amount,
+          catalogSnapshotAt: snapshotAt,
+          pricingSnapshotAt: snapshotAt,
+          taxSnapshotAt: snapshotAt,
+          connectivity: _connectivity?.state ?? PosConnectivity.unknown,
+          paymentMethod: _paymentMethod,
+        ),
+        now: DateTime.now().toUtc(),
+      );
+      _set(
+        CheckoutState(
+          phase: CheckoutPhase.provisional,
+          result: _state.result,
+          provisionalReceipt: receipt,
+        ),
+      );
+      _event('offline_checkout_journaled');
+    } on OfflineJournalException catch (error) {
+      _set(
+        CheckoutState(
+          phase: CheckoutPhase.failure,
+          result: _state.result,
+          errorCode: error.category,
+        ),
+      );
     }
   }
 

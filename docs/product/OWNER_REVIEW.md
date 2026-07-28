@@ -75,8 +75,18 @@ before implementation and preserve owner notes.
 
 ## Offline and reconciliation
 
-- Review the persistent online/degraded/offline indicator for confidence at typical counter
-  distance and under high contrast.
-- Review pending synchronization, replay progress, provisional receipt, conflict, blocked-device,
-  stale-policy, and corrupted-storage language before offline sales are ever enabled.
-- Owner feedback: pending. This Gate does not infer approval.
+- Implemented: persistent connectivity state, encrypted provisional cash result, provisional
+  receipt, replay progress, startup recovery, official mapping, conflict summary, and Recovery
+  Center in English and Spanish.
+- Future owner visual review: counter-distance indicator clarity, high contrast, tablet layout,
+  reduced motion, keyboard/touch flow, conflict tone, blocked-device, expired-policy, stale-data,
+  storage recovery, and the provisional-to-official receipt transition.
+- Owner feedback remains pending. This record does not infer approval.
+
+Recommended Mac review sequence:
+
+1. Open the app online and load a valid offline policy.
+2. Disconnect the network and complete an eligible cash sale.
+3. View the provisional receipt, then return online.
+4. Observe ordered replay and official receipt mapping.
+5. Simulate a safe conflict and open the Recovery Center.

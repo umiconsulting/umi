@@ -41,29 +41,27 @@ void main() {
     },
   );
 
-  test(
-    'duplicate ids and non-allowlisted financial commands fail closed',
-    () async {
-      final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
-      Future<void> add([String type = 'operational.ack']) => journal.append(
-        commandId: _id(1),
-        deviceId: _id(2),
-        credentialVersion: 1,
-        tenantId: _id(3),
-        branchId: _id(4),
-        operatorSessionId: _id(5),
-        idempotencyKey: _id(6),
-        payload: const {},
-        commandType: type,
-      );
-      await add();
-      await expectLater(add(), throwsA(isA<OfflineJournalException>()));
-      await expectLater(
-        add('pos.checkout.cash'),
-        throwsA(isA<OfflineJournalException>()),
-      );
-    },
-  );
+  test('duplicate ids and non-allowlisted commands fail closed', () async {
+    final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+    Future<void> add([String type = 'operational.ack']) => journal.append(
+      commandId: _id(1),
+      deviceId: _id(2),
+      credentialVersion: 1,
+      tenantId: _id(3),
+      branchId: _id(4),
+      operatorSessionId: _id(5),
+      idempotencyKey: _id(6),
+      payload: const {},
+      commandType: type,
+    );
+    await add();
+    await add();
+    expect((await journal.load()).entries, hasLength(1));
+    await expectLater(
+      add('device.rotate'),
+      throwsA(isA<OfflineJournalException>()),
+    );
+  });
 
   test('replay remains ordered and stops on a blocking conflict', () async {
     final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
@@ -80,10 +78,16 @@ void main() {
       );
     }
     final gateway = _Gateway();
-    final count = await OrderedReplayEngine(
-      journal,
-      gateway,
-    ).replay(tenantId: _id(11), replaySessionId: _id(30), batchSize: 2);
+    final count = await OrderedReplayEngine(journal, gateway).replay(
+      scope: ReplayScope(
+        tenantId: _id(11),
+        branchId: _id(12),
+        operatorSessionId: _id(13),
+        credentialVersion: 1,
+      ),
+      replaySessionId: _id(30),
+      batchSize: 2,
+    );
     expect(count, 1);
     expect(gateway.sequences, [1, 2]);
     expect((await journal.load()).entries.last.status, JournalStatus.pending);
@@ -132,10 +136,10 @@ final class _MemoryCipherStore implements JournalCipherStore {
 final class _Gateway implements ReplayGateway {
   final sequences = <int>[];
   @override
-  Future<ReplayResult?> resultFor(String tenantId, String commandId) async =>
+  Future<ReplayResult?> resultFor(ReplayScope scope, String commandId) async =>
       null;
   @override
-  Future<ReplayBatchResult> submit(String tenantId, ReplayBatch batch) async {
+  Future<ReplayBatchResult> submit(ReplayScope scope, ReplayBatch batch) async {
     final results = <ReplayResult>[];
     for (final encoded in batch.commands) {
       final command = OfflineCommand.fromJson(encoded);
@@ -147,6 +151,8 @@ final class _Gateway implements ReplayGateway {
           deviceSequence: command.deviceSequence,
           status: blocked ? 'conflict' : 'accepted',
           officialId: null,
+          officialCommit: null,
+          serverConflictReference: blocked ? command.commandId : null,
           failure: blocked
               ? ReplayFailure(
                   classification: 'sequence_gap',
@@ -177,4 +183,25 @@ final class _Gateway implements ReplayGateway {
       stopped: results.last.failure?['blocksFollowing'] == true,
     );
   }
+
+  @override
+  Future<void> acknowledge(ReplayScope scope, String reconciliationId) async {}
+  @override
+  Future<BeginReplayResponse> begin(ReplayScope scope) =>
+      throw UnimplementedError();
+  @override
+  Future<ConflictSummary> conflicts(ReplayScope scope) =>
+      throw UnimplementedError();
+  @override
+  Future<ReplayCursor> cursor(ReplayScope scope) => throw UnimplementedError();
+  @override
+  Future<SafeReplayDiagnostic> diagnostics(ReplayScope scope) =>
+      throw UnimplementedError();
+  @override
+  Future<OfflinePolicy> policy(ReplayScope scope) => throw UnimplementedError();
+  @override
+  Future<ReconciliationSummary> reconcile(
+    ReplayScope scope,
+    ReconcileRequest request,
+  ) => throw UnimplementedError();
 }

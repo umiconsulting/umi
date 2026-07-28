@@ -8,6 +8,9 @@ import '../checkout/checkout_controller.dart';
 import '../checkout/checkout_surface.dart';
 import '../entry/entry_controller.dart';
 import '../offline/connectivity_controller.dart';
+import '../offline/offline_journal.dart';
+import '../offline/recovery_center.dart';
+import '../offline/replay_engine.dart';
 import 'catalog_controller.dart';
 import 'catalog_repository.dart';
 
@@ -18,6 +21,8 @@ final class CatalogSurface extends StatefulWidget {
     required this.cart,
     required this.checkout,
     required this.connectivity,
+    this.offlineJournal,
+    this.offlineRecovery,
     super.key,
   });
   final EntryController entry;
@@ -25,6 +30,8 @@ final class CatalogSurface extends StatefulWidget {
   final CartController cart;
   final CheckoutController checkout;
   final ConnectivityController connectivity;
+  final EncryptedOfflineJournal? offlineJournal;
+  final OfflineRecoveryController? offlineRecovery;
   @override
   State<CatalogSurface> createState() => _CatalogSurfaceState();
 }
@@ -32,6 +39,7 @@ final class CatalogSurface extends StatefulWidget {
 final class _CatalogSurfaceState extends State<CatalogSurface> {
   final _search = TextEditingController();
   final _scroll = ScrollController();
+  bool _initialLoadStarted = false;
 
   @override
   void initState() {
@@ -49,22 +57,37 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (_initialLoadStarted) return;
     final entry = widget.entry.state;
     if (entry.selectedTenant != null && entry.selectedBranch != null) {
-      widget.catalog.open(
+      _initialLoadStarted = true;
+      _loadInitial(Localizations.localeOf(context).languageCode);
+    }
+  }
+
+  Future<void> _loadInitial(String locale) async {
+    final entry = widget.entry.state;
+    await _recover();
+    try {
+      await widget.catalog.open(
         CatalogPartition(
           entry.selectedTenant!.id,
           entry.selectedBranch!.id,
-          Localizations.localeOf(context).languageCode,
+          locale,
         ),
       );
+      widget.connectivity.apiReachable(authorityValid: true);
       if (entry.operator != null) {
-        widget.cart.open(
+        await widget.cart.open(
           entry.selectedTenant!.id,
           entry.selectedBranch!.id,
           entry.operator!.id,
         );
+        widget.connectivity.apiReachable(authorityValid: true);
       }
+      await _recover();
+    } catch (_) {
+      widget.connectivity.apiFailure();
     }
   }
 
@@ -127,6 +150,23 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 ),
               ),
             ),
+          ),
+          IconButton(
+            tooltip: AppLocalizations.of(context).recoveryCenterTitle,
+            onPressed: () {
+              final scope = _scope();
+              if (scope != null &&
+                  widget.offlineJournal != null &&
+                  widget.offlineRecovery != null) {
+                showRecoveryCenter(
+                  context,
+                  journal: widget.offlineJournal!,
+                  recovery: widget.offlineRecovery!,
+                  scope: scope,
+                );
+              }
+            },
+            icon: const Icon(Icons.sync_problem_outlined),
           ),
           Center(child: Text(widget.entry.state.selectedBranch?.name ?? '—')),
           IconButton(
@@ -216,6 +256,31 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         ),
       ),
     );
+  }
+
+  ReplayScope? _scope() {
+    final state = widget.entry.state;
+    final tenant = state.selectedTenant;
+    final branch = state.selectedBranch;
+    final operator = state.operator;
+    final device = state.device;
+    if (tenant == null ||
+        branch == null ||
+        operator == null ||
+        device == null) {
+      return null;
+    }
+    return ReplayScope(
+      tenantId: tenant.id,
+      branchId: branch.id,
+      operatorSessionId: operator.id,
+      credentialVersion: device.credentialVersion,
+    );
+  }
+
+  Future<void> _recover() async {
+    final scope = _scope();
+    if (scope != null) await widget.offlineRecovery?.recover(scope);
   }
 
   Widget _content(BuildContext context, CatalogState state) {

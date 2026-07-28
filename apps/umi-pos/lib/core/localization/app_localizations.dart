@@ -661,6 +661,72 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'No fue posible completar el cobro de forma segura.'**
   String get checkoutFailed;
+
+  /// No description provided for @provisionalSalePendingTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Venta pendiente de sincronización'**
+  String get provisionalSalePendingTitle;
+
+  /// No description provided for @provisionalSalePendingBody.
+  ///
+  /// In es, this message translates to:
+  /// **'La venta se guardó de forma segura en este dispositivo y está pendiente de sincronización. Los datos oficiales del recibo se asignarán cuando el servidor la acepte.'**
+  String get provisionalSalePendingBody;
+
+  /// No description provided for @returnToCatalogAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Volver al catálogo'**
+  String get returnToCatalogAction;
+
+  /// No description provided for @recoveryCenterTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Centro de recuperación'**
+  String get recoveryCenterTitle;
+
+  /// No description provided for @synchronizingPendingSales.
+  ///
+  /// In es, this message translates to:
+  /// **'Sincronizando ventas pendientes…'**
+  String get synchronizingPendingSales;
+
+  /// No description provided for @pendingSalesSecure.
+  ///
+  /// In es, this message translates to:
+  /// **'Tus ventas pendientes permanecen almacenadas de forma segura en este dispositivo.'**
+  String get pendingSalesSecure;
+
+  /// No description provided for @synchronizeNowAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Sincronizar ahora'**
+  String get synchronizeNowAction;
+
+  /// No description provided for @conflictNeedsAttention.
+  ///
+  /// In es, this message translates to:
+  /// **'Una venta requiere tu atención.'**
+  String get conflictNeedsAttention;
+
+  /// No description provided for @officialReceiptAvailable.
+  ///
+  /// In es, this message translates to:
+  /// **'Recibo oficial disponible'**
+  String get officialReceiptAvailable;
+
+  /// No description provided for @cashReceivedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Efectivo recibido'**
+  String get cashReceivedLabel;
+
+  /// No description provided for @changeDueLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Cambio'**
+  String get changeDueLabel;
 }
 
 class _AppLocalizationsDelegate

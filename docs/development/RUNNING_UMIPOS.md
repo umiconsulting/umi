@@ -49,12 +49,17 @@ approved provider adapter exists; never treat it as a simulated success or submi
 
 ## Offline journal and replay
 
-Apply migrations through `20260728000500_gate_2f_offline_replay.sql`. Native journal payloads are
+Apply migrations through `20260728000600_gate_2f_offline_closeout.sql`. Native journal payloads are
 AES-256-GCM encrypted; the key lives in platform secure storage and ciphertext lives separately.
 There is no plaintext fallback. Web remains online-compatible but sensitive offline journaling is
 disabled.
 
 - Run focused offline scenarios: `pnpm umi-pos:replay-check`.
+- Run all focused offline client checks: `pnpm umi-pos:offline-tests`.
+- Run focused replay API checks: `pnpm umi-pos:replay-api-tests`.
+- Validate the clean migration chain and RLS metadata in disposable PostgreSQL:
+  `pnpm umi-pos:offline-db-check`.
+- Exercise recovery scenarios: `pnpm umi-pos:recovery-demo`.
 - Run the development connectivity demonstration: `pnpm umi-pos:offline-demo`.
 - Simulate network loss with OS/development proxy controls; never alter TLS or encryption.
 - Restore connectivity, reauthenticate if required, and allow ordered replay only after device,
@@ -68,3 +73,15 @@ disabled.
 
 Secure-storage or integrity failure blocks journaling without resetting data. Migration downgrade
 is unsupported. An owner-assisted recovery path must preserve ciphertext for support analysis.
+
+Load policy while online by opening the authenticated catalog. To exercise the safe cash path,
+review authoritative totals online, disconnect, confirm cash checkout, inspect the provisional
+receipt and Recovery Center, then reconnect. Replay queries unknown results before reuse of the
+same command identity. Simulate response loss only with a development proxy after the server
+accepts the request. Simulate revocation, expiry, stale snapshots, and corruption only against
+disposable identities and app data. Never delete a production journal.
+
+Linux native builds require CMake, Ninja, Clang, GTK 3 development headers, and the platform
+secure-storage dependencies. Web builds confirm online compatibility only; browser storage is
+not certified for financial journaling. The completion notification endpoint is exactly
+`https://ntfy.sh/nxoumipos`.

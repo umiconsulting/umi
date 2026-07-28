@@ -72,6 +72,10 @@ export const TotalsConfirmation = z
     totals: TotalsPreview,
     taxes: TaxBreakdown,
     discounts: DiscountBreakdown,
+    catalogVersion: z.string().min(1).max(128),
+    pricingVersion: z.string().min(1).max(128),
+    taxVersion: z.string().min(1).max(128),
+    snapshotAt: IsoTimestamp,
     confirmedAt: IsoTimestamp.nullable(),
   })
   .strict();
@@ -94,6 +98,7 @@ export const CommittedSale = z
   .object({
     id: Uuid,
     orderId: Uuid,
+    receiptId: Uuid,
     receiptRef: z.string().min(1).max(100),
     status: z.literal('committed'),
     committedAt: IsoTimestamp,

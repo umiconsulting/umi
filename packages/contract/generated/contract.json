@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "7eb6b494b91cfa06d9ee7f9976459e749d0f719654ef6b05a616e783c15af588",
-  "contractVersion": "1.5.0",
+  "contentHash": "77443d02ab93819dba88b00ea0e863bfc1b085604bad2aeaea986d773ea1a26d",
+  "contractVersion": "1.6.0",
   "definitions": {
     "AcknowledgeReconciliationRequest": {
       "additionalProperties": false,
@@ -653,44 +653,178 @@
             "allowedCommandTypes": {
               "items": {
                 "enum": [
-                  "operational.ack"
+                  "operational.ack",
+                  "pos.checkout.cash"
                 ],
                 "type": "string"
               },
               "maxItems": 16,
               "type": "array"
             },
-            "cashSaleEnabled": {
-              "const": false,
-              "type": "boolean"
-            },
-            "expiresAt": {
-              "format": "date-time",
-              "type": "string"
-            },
-            "issuedAt": {
-              "format": "date-time",
-              "type": "string"
+            "cash": {
+              "additionalProperties": false,
+              "properties": {
+                "allowedDeviceClasses": {
+                  "items": {
+                    "maxLength": 50,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 20,
+                  "type": "array"
+                },
+                "branchId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "correlationId": {
+                  "maxLength": 128,
+                  "minLength": 8,
+                  "type": "string"
+                },
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "deviceCredentialVersion": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                "deviceId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "expiresAt": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "fingerprint": {
+                  "pattern": "^[a-f0-9]{64}$",
+                  "type": "string"
+                },
+                "issuedAt": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "limits": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "maxAccumulatedMinorUnits": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer"
+                    },
+                    "maxActiveQueueDepth": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 1000,
+                      "type": "integer"
+                    },
+                    "maxCatalogAgeSeconds": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 604800,
+                      "type": "integer"
+                    },
+                    "maxCommandAgeSeconds": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 604800,
+                      "type": "integer"
+                    },
+                    "maxOfflineSaleCount": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 1000,
+                      "type": "integer"
+                    },
+                    "maxPricingAgeSeconds": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 604800,
+                      "type": "integer"
+                    },
+                    "maxSingleSaleMinorUnits": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer"
+                    },
+                    "maxTaxAgeSeconds": {
+                      "exclusiveMinimum": 0,
+                      "maximum": 604800,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "maxSingleSaleMinorUnits",
+                    "maxAccumulatedMinorUnits",
+                    "maxOfflineSaleCount",
+                    "maxActiveQueueDepth",
+                    "maxCommandAgeSeconds",
+                    "maxCatalogAgeSeconds",
+                    "maxPricingAgeSeconds",
+                    "maxTaxAgeSeconds"
+                  ],
+                  "type": "object"
+                },
+                "managerApprovalThresholdMinorUnits": {
+                  "anyOf": [
+                    {
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "maxPolicyAgeSeconds": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 86400,
+                  "type": "integer"
+                },
+                "requiredEntitlement": {
+                  "const": "pos.offline_cash",
+                  "type": "string"
+                },
+                "requiredPermission": {
+                  "const": "offline.cash.checkout",
+                  "type": "string"
+                },
+                "tenantId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "version": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "enabled",
+                "version",
+                "issuedAt",
+                "expiresAt",
+                "maxPolicyAgeSeconds",
+                "tenantId",
+                "branchId",
+                "deviceId",
+                "deviceCredentialVersion",
+                "currency",
+                "requiredPermission",
+                "requiredEntitlement",
+                "managerApprovalThresholdMinorUnits",
+                "allowedDeviceClasses",
+                "limits",
+                "correlationId",
+                "fingerprint"
+              ],
+              "type": "object"
             },
             "maxBatchSize": {
               "exclusiveMinimum": 0,
               "maximum": 50,
               "type": "integer"
-            },
-            "maxCommandAgeSeconds": {
-              "exclusiveMinimum": 0,
-              "maximum": 604800,
-              "type": "integer"
-            },
-            "maxQueueDepth": {
-              "exclusiveMinimum": 0,
-              "maximum": 1000,
-              "type": "integer"
-            },
-            "version": {
-              "maxLength": 64,
-              "minLength": 1,
-              "type": "string"
             },
             "webSensitiveJournalEnabled": {
               "const": false,
@@ -698,14 +832,9 @@
             }
           },
           "required": [
-            "version",
-            "issuedAt",
-            "expiresAt",
+            "cash",
             "allowedCommandTypes",
-            "cashSaleEnabled",
-            "maxQueueDepth",
             "maxBatchSize",
-            "maxCommandAgeSeconds",
             "webSensitiveJournalEnabled"
           ],
           "type": "object"
@@ -3002,6 +3131,11 @@
               "exclusiveMinimum": 0,
               "type": "integer"
             },
+            "catalogVersion": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
             "confirmedAt": {
               "anyOf": [
                 {
@@ -3084,6 +3218,15 @@
             },
             "fingerprint": {
               "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            "pricingVersion": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "snapshotAt": {
+              "format": "date-time",
               "type": "string"
             },
             "taxes": {
@@ -3172,6 +3315,11 @@
                 "entries"
               ],
               "type": "object"
+            },
+            "taxVersion": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
             },
             "totals": {
               "additionalProperties": false,
@@ -3320,6 +3468,10 @@
             "totals",
             "taxes",
             "discounts",
+            "catalogVersion",
+            "pricingVersion",
+            "taxVersion",
+            "snapshotAt",
             "confirmedAt"
           ],
           "type": "object"
@@ -3902,6 +4054,10 @@
                   "format": "uuid",
                   "type": "string"
                 },
+                "receiptId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
                 "receiptRef": {
                   "maxLength": 100,
                   "minLength": 1,
@@ -4055,6 +4211,7 @@
               "required": [
                 "id",
                 "orderId",
+                "receiptId",
                 "receiptRef",
                 "status",
                 "committedAt",
@@ -4100,6 +4257,10 @@
           "type": "string"
         },
         "orderId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "receiptId": {
           "format": "uuid",
           "type": "string"
         },
@@ -4256,6 +4417,7 @@
       "required": [
         "id",
         "orderId",
+        "receiptId",
         "receiptRef",
         "status",
         "committedAt",
@@ -4452,7 +4614,427 @@
                   }
                 ]
               },
+              "officialCommit": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "acceptedAt": {
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "businessDate": {
+                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                        "type": "string"
+                      },
+                      "committedTotals": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "cartVersion": {
+                            "exclusiveMinimum": 0,
+                            "type": "integer"
+                          },
+                          "catalogVersion": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "confirmedAt": {
+                            "anyOf": [
+                              {
+                                "format": "date-time",
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "discounts": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "entries": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "amount": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "currency": {
+                                          "pattern": "^[A-Z]{3}$",
+                                          "type": "string"
+                                        },
+                                        "minorUnits": {
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "minorUnits",
+                                        "currency"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "code": {
+                                      "maxLength": 80,
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "maxLength": 160,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "code",
+                                    "label",
+                                    "amount"
+                                  ],
+                                  "type": "object"
+                                },
+                                "maxItems": 20,
+                                "type": "array"
+                              },
+                              "total": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              }
+                            },
+                            "required": [
+                              "total",
+                              "entries"
+                            ],
+                            "type": "object"
+                          },
+                          "fingerprint": {
+                            "pattern": "^[a-f0-9]{64}$",
+                            "type": "string"
+                          },
+                          "pricingVersion": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "snapshotAt": {
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "taxes": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "entries": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "rateBasisPoints": {
+                                      "maximum": 10000,
+                                      "minimum": 0,
+                                      "type": "integer"
+                                    },
+                                    "taxableAmount": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "currency": {
+                                          "pattern": "^[A-Z]{3}$",
+                                          "type": "string"
+                                        },
+                                        "minorUnits": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": -9007199254740991,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "minorUnits",
+                                        "currency"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "taxAmount": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "currency": {
+                                          "pattern": "^[A-Z]{3}$",
+                                          "type": "string"
+                                        },
+                                        "minorUnits": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": -9007199254740991,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "minorUnits",
+                                        "currency"
+                                      ],
+                                      "type": "object"
+                                    }
+                                  },
+                                  "required": [
+                                    "rateBasisPoints",
+                                    "taxableAmount",
+                                    "taxAmount"
+                                  ],
+                                  "type": "object"
+                                },
+                                "maxItems": 30,
+                                "type": "array"
+                              },
+                              "total": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "maximum": 9007199254740991,
+                                    "minimum": -9007199254740991,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              }
+                            },
+                            "required": [
+                              "total",
+                              "entries"
+                            ],
+                            "type": "object"
+                          },
+                          "taxVersion": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "totals": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "businessDate": {
+                                "format": "date",
+                                "type": "string"
+                              },
+                              "discounts": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "entries": {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "amount": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "currency": {
+                                              "pattern": "^[A-Z]{3}$",
+                                              "type": "string"
+                                            },
+                                            "minorUnits": {
+                                              "minimum": 0,
+                                              "type": "integer"
+                                            }
+                                          },
+                                          "required": [
+                                            "minorUnits",
+                                            "currency"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        "code": {
+                                          "maxLength": 80,
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "maxLength": 160,
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "code",
+                                        "label",
+                                        "amount"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "maxItems": 20,
+                                    "type": "array"
+                                  },
+                                  "total": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "currency": {
+                                        "pattern": "^[A-Z]{3}$",
+                                        "type": "string"
+                                      },
+                                      "minorUnits": {
+                                        "minimum": 0,
+                                        "type": "integer"
+                                      }
+                                    },
+                                    "required": [
+                                      "minorUnits",
+                                      "currency"
+                                    ],
+                                    "type": "object"
+                                  }
+                                },
+                                "required": [
+                                  "total",
+                                  "entries"
+                                ],
+                                "type": "object"
+                              },
+                              "grandTotal": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              },
+                              "subtotal": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              },
+                              "tax": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              }
+                            },
+                            "required": [
+                              "subtotal",
+                              "tax",
+                              "discounts",
+                              "grandTotal",
+                              "businessDate"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "cartVersion",
+                          "fingerprint",
+                          "totals",
+                          "taxes",
+                          "discounts",
+                          "catalogVersion",
+                          "pricingVersion",
+                          "taxVersion",
+                          "snapshotAt",
+                          "confirmedAt"
+                        ],
+                        "type": "object"
+                      },
+                      "officialReceiptId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "officialReceiptNumber": {
+                        "maxLength": 100,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "officialSaleId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "paymentSummary": {
+                        "additionalProperties": {},
+                        "type": "object"
+                      },
+                      "provisionalSaleId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "reconciliationReference": {
+                        "format": "uuid",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "provisionalSaleId",
+                      "officialSaleId",
+                      "officialReceiptId",
+                      "officialReceiptNumber",
+                      "committedTotals",
+                      "businessDate",
+                      "acceptedAt",
+                      "paymentSummary",
+                      "reconciliationReference"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "officialId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "serverConflictReference": {
                 "anyOf": [
                   {
                     "format": "uuid",
@@ -4478,6 +5060,8 @@
               "deviceSequence",
               "status",
               "officialId",
+              "officialCommit",
+              "serverConflictReference",
               "failure"
             ],
             "type": "object"
@@ -6011,6 +6595,1677 @@
       ],
       "type": "object"
     },
+    "OfficialCommitResult": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "businessDate": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "committedTotals": {
+          "additionalProperties": false,
+          "properties": {
+            "cartVersion": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "catalogVersion": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "confirmedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "discounts": {
+              "additionalProperties": false,
+              "properties": {
+                "entries": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "amount": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "currency": {
+                            "pattern": "^[A-Z]{3}$",
+                            "type": "string"
+                          },
+                          "minorUnits": {
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "minorUnits",
+                          "currency"
+                        ],
+                        "type": "object"
+                      },
+                      "code": {
+                        "maxLength": 80,
+                        "type": "string"
+                      },
+                      "label": {
+                        "maxLength": 160,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "label",
+                      "amount"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 20,
+                  "type": "array"
+                },
+                "total": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "total",
+                "entries"
+              ],
+              "type": "object"
+            },
+            "fingerprint": {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            "pricingVersion": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "snapshotAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "taxes": {
+              "additionalProperties": false,
+              "properties": {
+                "entries": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "rateBasisPoints": {
+                        "maximum": 10000,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "taxableAmount": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "currency": {
+                            "pattern": "^[A-Z]{3}$",
+                            "type": "string"
+                          },
+                          "minorUnits": {
+                            "maximum": 9007199254740991,
+                            "minimum": -9007199254740991,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "minorUnits",
+                          "currency"
+                        ],
+                        "type": "object"
+                      },
+                      "taxAmount": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "currency": {
+                            "pattern": "^[A-Z]{3}$",
+                            "type": "string"
+                          },
+                          "minorUnits": {
+                            "maximum": 9007199254740991,
+                            "minimum": -9007199254740991,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "minorUnits",
+                          "currency"
+                        ],
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "rateBasisPoints",
+                      "taxableAmount",
+                      "taxAmount"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 30,
+                  "type": "array"
+                },
+                "total": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "total",
+                "entries"
+              ],
+              "type": "object"
+            },
+            "taxVersion": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "totals": {
+              "additionalProperties": false,
+              "properties": {
+                "businessDate": {
+                  "format": "date",
+                  "type": "string"
+                },
+                "discounts": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "entries": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "amount": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "currency": {
+                                "pattern": "^[A-Z]{3}$",
+                                "type": "string"
+                              },
+                              "minorUnits": {
+                                "minimum": 0,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "minorUnits",
+                              "currency"
+                            ],
+                            "type": "object"
+                          },
+                          "code": {
+                            "maxLength": 80,
+                            "type": "string"
+                          },
+                          "label": {
+                            "maxLength": 160,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "label",
+                          "amount"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 20,
+                      "type": "array"
+                    },
+                    "total": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string"
+                        },
+                        "minorUnits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "minorUnits",
+                        "currency"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "total",
+                    "entries"
+                  ],
+                  "type": "object"
+                },
+                "grandTotal": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "subtotal": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "tax": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "subtotal",
+                "tax",
+                "discounts",
+                "grandTotal",
+                "businessDate"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "cartVersion",
+            "fingerprint",
+            "totals",
+            "taxes",
+            "discounts",
+            "catalogVersion",
+            "pricingVersion",
+            "taxVersion",
+            "snapshotAt",
+            "confirmedAt"
+          ],
+          "type": "object"
+        },
+        "officialReceiptId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "officialReceiptNumber": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "officialSaleId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "paymentSummary": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "provisionalSaleId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "reconciliationReference": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provisionalSaleId",
+        "officialSaleId",
+        "officialReceiptId",
+        "officialReceiptNumber",
+        "committedTotals",
+        "businessDate",
+        "acceptedAt",
+        "paymentSummary",
+        "reconciliationReference"
+      ],
+      "type": "object"
+    },
+    "OfflineCashPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "allowedDeviceClasses": {
+          "items": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 20,
+          "type": "array"
+        },
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "correlationId": {
+          "maxLength": 128,
+          "minLength": 8,
+          "type": "string"
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "deviceCredentialVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "deviceId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "expiresAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "fingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "issuedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "limits": {
+          "additionalProperties": false,
+          "properties": {
+            "maxAccumulatedMinorUnits": {
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "type": "integer"
+            },
+            "maxActiveQueueDepth": {
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "type": "integer"
+            },
+            "maxCatalogAgeSeconds": {
+              "exclusiveMinimum": 0,
+              "maximum": 604800,
+              "type": "integer"
+            },
+            "maxCommandAgeSeconds": {
+              "exclusiveMinimum": 0,
+              "maximum": 604800,
+              "type": "integer"
+            },
+            "maxOfflineSaleCount": {
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "type": "integer"
+            },
+            "maxPricingAgeSeconds": {
+              "exclusiveMinimum": 0,
+              "maximum": 604800,
+              "type": "integer"
+            },
+            "maxSingleSaleMinorUnits": {
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "type": "integer"
+            },
+            "maxTaxAgeSeconds": {
+              "exclusiveMinimum": 0,
+              "maximum": 604800,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "maxSingleSaleMinorUnits",
+            "maxAccumulatedMinorUnits",
+            "maxOfflineSaleCount",
+            "maxActiveQueueDepth",
+            "maxCommandAgeSeconds",
+            "maxCatalogAgeSeconds",
+            "maxPricingAgeSeconds",
+            "maxTaxAgeSeconds"
+          ],
+          "type": "object"
+        },
+        "managerApprovalThresholdMinorUnits": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "maxPolicyAgeSeconds": {
+          "exclusiveMinimum": 0,
+          "maximum": 86400,
+          "type": "integer"
+        },
+        "requiredEntitlement": {
+          "const": "pos.offline_cash",
+          "type": "string"
+        },
+        "requiredPermission": {
+          "const": "offline.cash.checkout",
+          "type": "string"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "version",
+        "issuedAt",
+        "expiresAt",
+        "maxPolicyAgeSeconds",
+        "tenantId",
+        "branchId",
+        "deviceId",
+        "deviceCredentialVersion",
+        "currency",
+        "requiredPermission",
+        "requiredEntitlement",
+        "managerApprovalThresholdMinorUnits",
+        "allowedDeviceClasses",
+        "limits",
+        "correlationId",
+        "fingerprint"
+      ],
+      "type": "object"
+    },
+    "OfflineCheckoutBlockReason": {
+      "enum": [
+        "unsupported_platform",
+        "storage_unavailable",
+        "journal_unhealthy",
+        "device_untrusted",
+        "credential_rotated",
+        "operator_invalid",
+        "permission_denied",
+        "entitlement_disabled",
+        "tenant_mismatch",
+        "branch_mismatch",
+        "currency_mismatch",
+        "policy_missing",
+        "policy_invalid",
+        "policy_expired",
+        "catalog_stale",
+        "pricing_stale",
+        "tax_stale",
+        "single_sale_limit",
+        "manager_approval_required",
+        "cash_received_insufficient",
+        "accumulated_amount_limit",
+        "sale_count_limit",
+        "queue_full",
+        "payment_method_unsupported",
+        "ambiguous_payment",
+        "reconciliation_required",
+        "trusted_time_unavailable"
+      ],
+      "type": "string"
+    },
+    "OfflineCheckoutCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "policyFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "policyVersion": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "snapshot": {
+          "additionalProperties": false,
+          "properties": {
+            "amountDueMinorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "amountReceivedMinorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "businessDate": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            "cartSnapshot": {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            "catalogSnapshotAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "catalogVersion": {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            "changeDueMinorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "checkoutCommand": {
+              "additionalProperties": false,
+              "properties": {
+                "branchId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "cartId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "expectedCartVersion": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                "idempotencyKey": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "operatorSessionId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "paymentMethod": {
+                  "enum": [
+                    "cash",
+                    "external_terminal"
+                  ],
+                  "type": "string"
+                },
+                "totalsFingerprint": {
+                  "anyOf": [
+                    {
+                      "pattern": "^[a-f0-9]{64}$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                }
+              },
+              "required": [
+                "cartId",
+                "branchId",
+                "operatorSessionId",
+                "expectedCartVersion",
+                "paymentMethod",
+                "idempotencyKey"
+              ],
+              "type": "object"
+            },
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "pricingSnapshotAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "pricingVersion": {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            "taxSnapshotAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "taxVersion": {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            "totals": {
+              "additionalProperties": false,
+              "properties": {
+                "cartVersion": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                "catalogVersion": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "confirmedAt": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "discounts": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "entries": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "amount": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "currency": {
+                                "pattern": "^[A-Z]{3}$",
+                                "type": "string"
+                              },
+                              "minorUnits": {
+                                "minimum": 0,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "minorUnits",
+                              "currency"
+                            ],
+                            "type": "object"
+                          },
+                          "code": {
+                            "maxLength": 80,
+                            "type": "string"
+                          },
+                          "label": {
+                            "maxLength": 160,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "label",
+                          "amount"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 20,
+                      "type": "array"
+                    },
+                    "total": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string"
+                        },
+                        "minorUnits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "minorUnits",
+                        "currency"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "total",
+                    "entries"
+                  ],
+                  "type": "object"
+                },
+                "fingerprint": {
+                  "pattern": "^[a-f0-9]{64}$",
+                  "type": "string"
+                },
+                "pricingVersion": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "snapshotAt": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "taxes": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "entries": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "rateBasisPoints": {
+                            "maximum": 10000,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "taxableAmount": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "currency": {
+                                "pattern": "^[A-Z]{3}$",
+                                "type": "string"
+                              },
+                              "minorUnits": {
+                                "maximum": 9007199254740991,
+                                "minimum": -9007199254740991,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "minorUnits",
+                              "currency"
+                            ],
+                            "type": "object"
+                          },
+                          "taxAmount": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "currency": {
+                                "pattern": "^[A-Z]{3}$",
+                                "type": "string"
+                              },
+                              "minorUnits": {
+                                "maximum": 9007199254740991,
+                                "minimum": -9007199254740991,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "minorUnits",
+                              "currency"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "rateBasisPoints",
+                          "taxableAmount",
+                          "taxAmount"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 30,
+                      "type": "array"
+                    },
+                    "total": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string"
+                        },
+                        "minorUnits": {
+                          "maximum": 9007199254740991,
+                          "minimum": -9007199254740991,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "minorUnits",
+                        "currency"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "total",
+                    "entries"
+                  ],
+                  "type": "object"
+                },
+                "taxVersion": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "totals": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "businessDate": {
+                      "format": "date",
+                      "type": "string"
+                    },
+                    "discounts": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "entries": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "amount": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              },
+                              "code": {
+                                "maxLength": 80,
+                                "type": "string"
+                              },
+                              "label": {
+                                "maxLength": 160,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "label",
+                              "amount"
+                            ],
+                            "type": "object"
+                          },
+                          "maxItems": 20,
+                          "type": "array"
+                        },
+                        "total": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "currency": {
+                              "pattern": "^[A-Z]{3}$",
+                              "type": "string"
+                            },
+                            "minorUnits": {
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "minorUnits",
+                            "currency"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "entries"
+                      ],
+                      "type": "object"
+                    },
+                    "grandTotal": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string"
+                        },
+                        "minorUnits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "minorUnits",
+                        "currency"
+                      ],
+                      "type": "object"
+                    },
+                    "subtotal": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string"
+                        },
+                        "minorUnits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "minorUnits",
+                        "currency"
+                      ],
+                      "type": "object"
+                    },
+                    "tax": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string"
+                        },
+                        "minorUnits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "minorUnits",
+                        "currency"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "subtotal",
+                    "tax",
+                    "discounts",
+                    "grandTotal",
+                    "businessDate"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "cartVersion",
+                "fingerprint",
+                "totals",
+                "taxes",
+                "discounts",
+                "catalogVersion",
+                "pricingVersion",
+                "taxVersion",
+                "snapshotAt",
+                "confirmedAt"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "checkoutCommand",
+            "cartSnapshot",
+            "totals",
+            "catalogVersion",
+            "pricingVersion",
+            "taxVersion",
+            "catalogSnapshotAt",
+            "pricingSnapshotAt",
+            "taxSnapshotAt",
+            "currency",
+            "amountDueMinorUnits",
+            "amountReceivedMinorUnits",
+            "changeDueMinorUnits",
+            "businessDate"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "policyVersion",
+        "policyFingerprint",
+        "snapshot"
+      ],
+      "type": "object"
+    },
+    "OfflineCheckoutEligibility": {
+      "additionalProperties": false,
+      "properties": {
+        "cartPreserved": {
+          "const": true,
+          "type": "boolean"
+        },
+        "correlationId": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 8,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "unsupported_platform",
+                "storage_unavailable",
+                "journal_unhealthy",
+                "device_untrusted",
+                "credential_rotated",
+                "operator_invalid",
+                "permission_denied",
+                "entitlement_disabled",
+                "tenant_mismatch",
+                "branch_mismatch",
+                "currency_mismatch",
+                "policy_missing",
+                "policy_invalid",
+                "policy_expired",
+                "catalog_stale",
+                "pricing_stale",
+                "tax_stale",
+                "single_sale_limit",
+                "manager_approval_required",
+                "cash_received_insufficient",
+                "accumulated_amount_limit",
+                "sale_count_limit",
+                "queue_full",
+                "payment_method_unsupported",
+                "ambiguous_payment",
+                "reconciliation_required",
+                "trusted_time_unavailable"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recoveryActions": {
+          "items": {
+            "enum": [
+              "retry",
+              "refresh_policy",
+              "refresh_data",
+              "reauthenticate",
+              "reselect_branch",
+              "reconcile",
+              "manager_review",
+              "contact_support"
+            ],
+            "type": "string"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
+        "retrySafe": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "eligible",
+            "blocked",
+            "requires_manager_approval",
+            "requires_online_refresh",
+            "requires_reauthentication",
+            "requires_reconciliation",
+            "unsupported_platform"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "reason",
+        "recoveryActions",
+        "cartPreserved",
+        "retrySafe",
+        "correlationId"
+      ],
+      "type": "object"
+    },
+    "OfflineCheckoutSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "amountDueMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "amountReceivedMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "businessDate": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "cartSnapshot": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "catalogSnapshotAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "catalogVersion": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "changeDueMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "checkoutCommand": {
+          "additionalProperties": false,
+          "properties": {
+            "branchId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "cartId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "expectedCartVersion": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "idempotencyKey": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "operatorSessionId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "paymentMethod": {
+              "enum": [
+                "cash",
+                "external_terminal"
+              ],
+              "type": "string"
+            },
+            "totalsFingerprint": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-f0-9]{64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "required": [
+            "cartId",
+            "branchId",
+            "operatorSessionId",
+            "expectedCartVersion",
+            "paymentMethod",
+            "idempotencyKey"
+          ],
+          "type": "object"
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "pricingSnapshotAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "pricingVersion": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "taxSnapshotAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "taxVersion": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "totals": {
+          "additionalProperties": false,
+          "properties": {
+            "cartVersion": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "catalogVersion": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "confirmedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "discounts": {
+              "additionalProperties": false,
+              "properties": {
+                "entries": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "amount": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "currency": {
+                            "pattern": "^[A-Z]{3}$",
+                            "type": "string"
+                          },
+                          "minorUnits": {
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "minorUnits",
+                          "currency"
+                        ],
+                        "type": "object"
+                      },
+                      "code": {
+                        "maxLength": 80,
+                        "type": "string"
+                      },
+                      "label": {
+                        "maxLength": 160,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "label",
+                      "amount"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 20,
+                  "type": "array"
+                },
+                "total": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "total",
+                "entries"
+              ],
+              "type": "object"
+            },
+            "fingerprint": {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            "pricingVersion": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "snapshotAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "taxes": {
+              "additionalProperties": false,
+              "properties": {
+                "entries": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "rateBasisPoints": {
+                        "maximum": 10000,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "taxableAmount": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "currency": {
+                            "pattern": "^[A-Z]{3}$",
+                            "type": "string"
+                          },
+                          "minorUnits": {
+                            "maximum": 9007199254740991,
+                            "minimum": -9007199254740991,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "minorUnits",
+                          "currency"
+                        ],
+                        "type": "object"
+                      },
+                      "taxAmount": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "currency": {
+                            "pattern": "^[A-Z]{3}$",
+                            "type": "string"
+                          },
+                          "minorUnits": {
+                            "maximum": 9007199254740991,
+                            "minimum": -9007199254740991,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "minorUnits",
+                          "currency"
+                        ],
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "rateBasisPoints",
+                      "taxableAmount",
+                      "taxAmount"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 30,
+                  "type": "array"
+                },
+                "total": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "total",
+                "entries"
+              ],
+              "type": "object"
+            },
+            "taxVersion": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "totals": {
+              "additionalProperties": false,
+              "properties": {
+                "businessDate": {
+                  "format": "date",
+                  "type": "string"
+                },
+                "discounts": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "entries": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "amount": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "currency": {
+                                "pattern": "^[A-Z]{3}$",
+                                "type": "string"
+                              },
+                              "minorUnits": {
+                                "minimum": 0,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "minorUnits",
+                              "currency"
+                            ],
+                            "type": "object"
+                          },
+                          "code": {
+                            "maxLength": 80,
+                            "type": "string"
+                          },
+                          "label": {
+                            "maxLength": 160,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "label",
+                          "amount"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 20,
+                      "type": "array"
+                    },
+                    "total": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string"
+                        },
+                        "minorUnits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "minorUnits",
+                        "currency"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "total",
+                    "entries"
+                  ],
+                  "type": "object"
+                },
+                "grandTotal": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "subtotal": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "tax": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "subtotal",
+                "tax",
+                "discounts",
+                "grandTotal",
+                "businessDate"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "cartVersion",
+            "fingerprint",
+            "totals",
+            "taxes",
+            "discounts",
+            "catalogVersion",
+            "pricingVersion",
+            "taxVersion",
+            "snapshotAt",
+            "confirmedAt"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "checkoutCommand",
+        "cartSnapshot",
+        "totals",
+        "catalogVersion",
+        "pricingVersion",
+        "taxVersion",
+        "catalogSnapshotAt",
+        "pricingSnapshotAt",
+        "taxSnapshotAt",
+        "currency",
+        "amountDueMinorUnits",
+        "amountReceivedMinorUnits",
+        "changeDueMinorUnits",
+        "businessDate"
+      ],
+      "type": "object"
+    },
     "OfflineCommand": {
       "additionalProperties": false,
       "properties": {
@@ -6024,7 +8279,8 @@
         },
         "commandType": {
           "enum": [
-            "operational.ack"
+            "operational.ack",
+            "pos.checkout.cash"
           ],
           "type": "string"
         },
@@ -6169,7 +8425,8 @@
     },
     "OfflineCommandType": {
       "enum": [
-        "operational.ack"
+        "operational.ack",
+        "pos.checkout.cash"
       ],
       "type": "string"
     },
@@ -6179,44 +8436,178 @@
         "allowedCommandTypes": {
           "items": {
             "enum": [
-              "operational.ack"
+              "operational.ack",
+              "pos.checkout.cash"
             ],
             "type": "string"
           },
           "maxItems": 16,
           "type": "array"
         },
-        "cashSaleEnabled": {
-          "const": false,
-          "type": "boolean"
-        },
-        "expiresAt": {
-          "format": "date-time",
-          "type": "string"
-        },
-        "issuedAt": {
-          "format": "date-time",
-          "type": "string"
+        "cash": {
+          "additionalProperties": false,
+          "properties": {
+            "allowedDeviceClasses": {
+              "items": {
+                "maxLength": 50,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 20,
+              "type": "array"
+            },
+            "branchId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "correlationId": {
+              "maxLength": 128,
+              "minLength": 8,
+              "type": "string"
+            },
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "deviceCredentialVersion": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "deviceId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "expiresAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "fingerprint": {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            "issuedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "limits": {
+              "additionalProperties": false,
+              "properties": {
+                "maxAccumulatedMinorUnits": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer"
+                },
+                "maxActiveQueueDepth": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 1000,
+                  "type": "integer"
+                },
+                "maxCatalogAgeSeconds": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 604800,
+                  "type": "integer"
+                },
+                "maxCommandAgeSeconds": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 604800,
+                  "type": "integer"
+                },
+                "maxOfflineSaleCount": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 1000,
+                  "type": "integer"
+                },
+                "maxPricingAgeSeconds": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 604800,
+                  "type": "integer"
+                },
+                "maxSingleSaleMinorUnits": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer"
+                },
+                "maxTaxAgeSeconds": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 604800,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "maxSingleSaleMinorUnits",
+                "maxAccumulatedMinorUnits",
+                "maxOfflineSaleCount",
+                "maxActiveQueueDepth",
+                "maxCommandAgeSeconds",
+                "maxCatalogAgeSeconds",
+                "maxPricingAgeSeconds",
+                "maxTaxAgeSeconds"
+              ],
+              "type": "object"
+            },
+            "managerApprovalThresholdMinorUnits": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "maxPolicyAgeSeconds": {
+              "exclusiveMinimum": 0,
+              "maximum": 86400,
+              "type": "integer"
+            },
+            "requiredEntitlement": {
+              "const": "pos.offline_cash",
+              "type": "string"
+            },
+            "requiredPermission": {
+              "const": "offline.cash.checkout",
+              "type": "string"
+            },
+            "tenantId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "version": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "enabled",
+            "version",
+            "issuedAt",
+            "expiresAt",
+            "maxPolicyAgeSeconds",
+            "tenantId",
+            "branchId",
+            "deviceId",
+            "deviceCredentialVersion",
+            "currency",
+            "requiredPermission",
+            "requiredEntitlement",
+            "managerApprovalThresholdMinorUnits",
+            "allowedDeviceClasses",
+            "limits",
+            "correlationId",
+            "fingerprint"
+          ],
+          "type": "object"
         },
         "maxBatchSize": {
           "exclusiveMinimum": 0,
           "maximum": 50,
           "type": "integer"
-        },
-        "maxCommandAgeSeconds": {
-          "exclusiveMinimum": 0,
-          "maximum": 604800,
-          "type": "integer"
-        },
-        "maxQueueDepth": {
-          "exclusiveMinimum": 0,
-          "maximum": 1000,
-          "type": "integer"
-        },
-        "version": {
-          "maxLength": 64,
-          "minLength": 1,
-          "type": "string"
         },
         "webSensitiveJournalEnabled": {
           "const": false,
@@ -6224,15 +8615,66 @@
         }
       },
       "required": [
-        "version",
-        "issuedAt",
-        "expiresAt",
+        "cash",
         "allowedCommandTypes",
-        "cashSaleEnabled",
-        "maxQueueDepth",
         "maxBatchSize",
-        "maxCommandAgeSeconds",
         "webSensitiveJournalEnabled"
+      ],
+      "type": "object"
+    },
+    "OfflinePolicyLimits": {
+      "additionalProperties": false,
+      "properties": {
+        "maxAccumulatedMinorUnits": {
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "type": "integer"
+        },
+        "maxActiveQueueDepth": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "type": "integer"
+        },
+        "maxCatalogAgeSeconds": {
+          "exclusiveMinimum": 0,
+          "maximum": 604800,
+          "type": "integer"
+        },
+        "maxCommandAgeSeconds": {
+          "exclusiveMinimum": 0,
+          "maximum": 604800,
+          "type": "integer"
+        },
+        "maxOfflineSaleCount": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "type": "integer"
+        },
+        "maxPricingAgeSeconds": {
+          "exclusiveMinimum": 0,
+          "maximum": 604800,
+          "type": "integer"
+        },
+        "maxSingleSaleMinorUnits": {
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "type": "integer"
+        },
+        "maxTaxAgeSeconds": {
+          "exclusiveMinimum": 0,
+          "maximum": 604800,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "maxSingleSaleMinorUnits",
+        "maxAccumulatedMinorUnits",
+        "maxOfflineSaleCount",
+        "maxActiveQueueDepth",
+        "maxCommandAgeSeconds",
+        "maxCatalogAgeSeconds",
+        "maxPricingAgeSeconds",
+        "maxTaxAgeSeconds"
       ],
       "type": "object"
     },
@@ -7210,6 +9652,869 @@
       ],
       "type": "object"
     },
+    "ProvisionalReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "branchName": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "lastSynchronizationAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "officialReceipt": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "branchId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "branchName": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "businessDate": {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "discountTotal": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "grandTotal": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "issuedAt": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "lines": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "description": {
+                        "maxLength": 300,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "lineRef": {
+                        "maxLength": 100,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "lineTotal": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "currency": {
+                            "pattern": "^[A-Z]{3}$",
+                            "type": "string"
+                          },
+                          "minorUnits": {
+                            "maximum": 9007199254740991,
+                            "minimum": -9007199254740991,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "minorUnits",
+                          "currency"
+                        ],
+                        "type": "object"
+                      },
+                      "modifiers": {
+                        "items": {
+                          "maxLength": 160,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "maxItems": 100,
+                        "type": "array"
+                      },
+                      "note": {
+                        "anyOf": [
+                          {
+                            "maxLength": 500,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "quantity": {
+                        "exclusiveMinimum": 0,
+                        "type": "integer"
+                      },
+                      "tax": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "currency": {
+                            "pattern": "^[A-Z]{3}$",
+                            "type": "string"
+                          },
+                          "minorUnits": {
+                            "maximum": 9007199254740991,
+                            "minimum": -9007199254740991,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "minorUnits",
+                          "currency"
+                        ],
+                        "type": "object"
+                      },
+                      "unitPrice": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "currency": {
+                            "pattern": "^[A-Z]{3}$",
+                            "type": "string"
+                          },
+                          "minorUnits": {
+                            "maximum": 9007199254740991,
+                            "minimum": -9007199254740991,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "minorUnits",
+                          "currency"
+                        ],
+                        "type": "object"
+                      },
+                      "variantName": {
+                        "anyOf": [
+                          {
+                            "maxLength": 160,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "lineRef",
+                      "description",
+                      "quantity",
+                      "unitPrice",
+                      "lineTotal"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 500,
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "operatorName": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "payment": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "amount": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string"
+                        },
+                        "minorUnits": {
+                          "maximum": 9007199254740991,
+                          "minimum": -9007199254740991,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "minorUnits",
+                        "currency"
+                      ],
+                      "type": "object"
+                    },
+                    "method": {
+                      "enum": [
+                        "cash",
+                        "external_terminal",
+                        "card",
+                        "stored_value",
+                        "gift_card"
+                      ],
+                      "type": "string"
+                    },
+                    "reference": {
+                      "maxLength": 100,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "status": {
+                      "enum": [
+                        "succeeded",
+                        "captured"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "method",
+                    "status",
+                    "reference",
+                    "amount"
+                  ],
+                  "type": "object"
+                },
+                "receiptRef": {
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "subtotal": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "taxTotal": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "tenantId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "tenantName": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "version": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "receiptRef",
+                "tenantId",
+                "branchId",
+                "issuedAt",
+                "businessDate",
+                "lines",
+                "subtotal",
+                "taxTotal",
+                "grandTotal",
+                "currency",
+                "version"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "operatorName": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "provisionalSaleId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "snapshot": {
+          "additionalProperties": false,
+          "properties": {
+            "amountDueMinorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "amountReceivedMinorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "businessDate": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            "cartSnapshot": {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            "catalogSnapshotAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "catalogVersion": {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            "changeDueMinorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "checkoutCommand": {
+              "additionalProperties": false,
+              "properties": {
+                "branchId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "cartId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "expectedCartVersion": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                "idempotencyKey": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "operatorSessionId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "paymentMethod": {
+                  "enum": [
+                    "cash",
+                    "external_terminal"
+                  ],
+                  "type": "string"
+                },
+                "totalsFingerprint": {
+                  "anyOf": [
+                    {
+                      "pattern": "^[a-f0-9]{64}$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                }
+              },
+              "required": [
+                "cartId",
+                "branchId",
+                "operatorSessionId",
+                "expectedCartVersion",
+                "paymentMethod",
+                "idempotencyKey"
+              ],
+              "type": "object"
+            },
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "pricingSnapshotAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "pricingVersion": {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            "taxSnapshotAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "taxVersion": {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            "totals": {
+              "additionalProperties": false,
+              "properties": {
+                "cartVersion": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                "catalogVersion": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "confirmedAt": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "discounts": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "entries": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "amount": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "currency": {
+                                "pattern": "^[A-Z]{3}$",
+                                "type": "string"
+                              },
+                              "minorUnits": {
+                                "minimum": 0,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "minorUnits",
+                              "currency"
+                            ],
+                            "type": "object"
+                          },
+                          "code": {
+                            "maxLength": 80,
+                            "type": "string"
+                          },
+                          "label": {
+                            "maxLength": 160,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "label",
+                          "amount"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 20,
+                      "type": "array"
+                    },
+                    "total": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string"
+                        },
+                        "minorUnits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "minorUnits",
+                        "currency"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "total",
+                    "entries"
+                  ],
+                  "type": "object"
+                },
+                "fingerprint": {
+                  "pattern": "^[a-f0-9]{64}$",
+                  "type": "string"
+                },
+                "pricingVersion": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "snapshotAt": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "taxes": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "entries": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "rateBasisPoints": {
+                            "maximum": 10000,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "taxableAmount": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "currency": {
+                                "pattern": "^[A-Z]{3}$",
+                                "type": "string"
+                              },
+                              "minorUnits": {
+                                "maximum": 9007199254740991,
+                                "minimum": -9007199254740991,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "minorUnits",
+                              "currency"
+                            ],
+                            "type": "object"
+                          },
+                          "taxAmount": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "currency": {
+                                "pattern": "^[A-Z]{3}$",
+                                "type": "string"
+                              },
+                              "minorUnits": {
+                                "maximum": 9007199254740991,
+                                "minimum": -9007199254740991,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "minorUnits",
+                              "currency"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "rateBasisPoints",
+                          "taxableAmount",
+                          "taxAmount"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 30,
+                      "type": "array"
+                    },
+                    "total": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string"
+                        },
+                        "minorUnits": {
+                          "maximum": 9007199254740991,
+                          "minimum": -9007199254740991,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "minorUnits",
+                        "currency"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "total",
+                    "entries"
+                  ],
+                  "type": "object"
+                },
+                "taxVersion": {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "totals": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "businessDate": {
+                      "format": "date",
+                      "type": "string"
+                    },
+                    "discounts": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "entries": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "amount": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              },
+                              "code": {
+                                "maxLength": 80,
+                                "type": "string"
+                              },
+                              "label": {
+                                "maxLength": 160,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "label",
+                              "amount"
+                            ],
+                            "type": "object"
+                          },
+                          "maxItems": 20,
+                          "type": "array"
+                        },
+                        "total": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "currency": {
+                              "pattern": "^[A-Z]{3}$",
+                              "type": "string"
+                            },
+                            "minorUnits": {
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "minorUnits",
+                            "currency"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "entries"
+                      ],
+                      "type": "object"
+                    },
+                    "grandTotal": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string"
+                        },
+                        "minorUnits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "minorUnits",
+                        "currency"
+                      ],
+                      "type": "object"
+                    },
+                    "subtotal": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string"
+                        },
+                        "minorUnits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "minorUnits",
+                        "currency"
+                      ],
+                      "type": "object"
+                    },
+                    "tax": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "currency": {
+                          "pattern": "^[A-Z]{3}$",
+                          "type": "string"
+                        },
+                        "minorUnits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "minorUnits",
+                        "currency"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "subtotal",
+                    "tax",
+                    "discounts",
+                    "grandTotal",
+                    "businessDate"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "cartVersion",
+                "fingerprint",
+                "totals",
+                "taxes",
+                "discounts",
+                "catalogVersion",
+                "pricingVersion",
+                "taxVersion",
+                "snapshotAt",
+                "confirmedAt"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "checkoutCommand",
+            "cartSnapshot",
+            "totals",
+            "catalogVersion",
+            "pricingVersion",
+            "taxVersion",
+            "catalogSnapshotAt",
+            "pricingSnapshotAt",
+            "taxSnapshotAt",
+            "currency",
+            "amountDueMinorUnits",
+            "amountReceivedMinorUnits",
+            "changeDueMinorUnits",
+            "businessDate"
+          ],
+          "type": "object"
+        },
+        "status": {
+          "enum": [
+            "pending_sync",
+            "synchronizing",
+            "accepted",
+            "official_available",
+            "conflict"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "provisionalSaleId",
+        "status",
+        "branchName",
+        "operatorName",
+        "snapshot",
+        "createdAt",
+        "lastSynchronizationAt",
+        "officialReceipt"
+      ],
+      "type": "object"
+    },
+    "ProvisionalReceiptStatus": {
+      "enum": [
+        "pending_sync",
+        "synchronizing",
+        "accepted",
+        "official_available",
+        "conflict"
+      ],
+      "type": "string"
+    },
     "PurchaseRequest": {
       "additionalProperties": false,
       "properties": {
@@ -7818,6 +11123,21 @@
       ],
       "type": "object"
     },
+    "ReconciliationState": {
+      "enum": [
+        "in_sync",
+        "replay_required",
+        "result_recovery_required",
+        "conflict_resolution_required",
+        "reauthentication_required",
+        "device_blocked",
+        "branch_reselection_required",
+        "policy_refresh_required",
+        "storage_recovery_required",
+        "support_required"
+      ],
+      "type": "string"
+    },
     "ReconciliationSummary": {
       "additionalProperties": false,
       "properties": {
@@ -7906,7 +11226,427 @@
                   }
                 ]
               },
+              "officialCommit": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "acceptedAt": {
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "businessDate": {
+                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                        "type": "string"
+                      },
+                      "committedTotals": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "cartVersion": {
+                            "exclusiveMinimum": 0,
+                            "type": "integer"
+                          },
+                          "catalogVersion": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "confirmedAt": {
+                            "anyOf": [
+                              {
+                                "format": "date-time",
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "discounts": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "entries": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "amount": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "currency": {
+                                          "pattern": "^[A-Z]{3}$",
+                                          "type": "string"
+                                        },
+                                        "minorUnits": {
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "minorUnits",
+                                        "currency"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "code": {
+                                      "maxLength": 80,
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "maxLength": 160,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "code",
+                                    "label",
+                                    "amount"
+                                  ],
+                                  "type": "object"
+                                },
+                                "maxItems": 20,
+                                "type": "array"
+                              },
+                              "total": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              }
+                            },
+                            "required": [
+                              "total",
+                              "entries"
+                            ],
+                            "type": "object"
+                          },
+                          "fingerprint": {
+                            "pattern": "^[a-f0-9]{64}$",
+                            "type": "string"
+                          },
+                          "pricingVersion": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "snapshotAt": {
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "taxes": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "entries": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "rateBasisPoints": {
+                                      "maximum": 10000,
+                                      "minimum": 0,
+                                      "type": "integer"
+                                    },
+                                    "taxableAmount": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "currency": {
+                                          "pattern": "^[A-Z]{3}$",
+                                          "type": "string"
+                                        },
+                                        "minorUnits": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": -9007199254740991,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "minorUnits",
+                                        "currency"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "taxAmount": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "currency": {
+                                          "pattern": "^[A-Z]{3}$",
+                                          "type": "string"
+                                        },
+                                        "minorUnits": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": -9007199254740991,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "minorUnits",
+                                        "currency"
+                                      ],
+                                      "type": "object"
+                                    }
+                                  },
+                                  "required": [
+                                    "rateBasisPoints",
+                                    "taxableAmount",
+                                    "taxAmount"
+                                  ],
+                                  "type": "object"
+                                },
+                                "maxItems": 30,
+                                "type": "array"
+                              },
+                              "total": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "maximum": 9007199254740991,
+                                    "minimum": -9007199254740991,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              }
+                            },
+                            "required": [
+                              "total",
+                              "entries"
+                            ],
+                            "type": "object"
+                          },
+                          "taxVersion": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "totals": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "businessDate": {
+                                "format": "date",
+                                "type": "string"
+                              },
+                              "discounts": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "entries": {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "amount": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "currency": {
+                                              "pattern": "^[A-Z]{3}$",
+                                              "type": "string"
+                                            },
+                                            "minorUnits": {
+                                              "minimum": 0,
+                                              "type": "integer"
+                                            }
+                                          },
+                                          "required": [
+                                            "minorUnits",
+                                            "currency"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        "code": {
+                                          "maxLength": 80,
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "maxLength": 160,
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "code",
+                                        "label",
+                                        "amount"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "maxItems": 20,
+                                    "type": "array"
+                                  },
+                                  "total": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "currency": {
+                                        "pattern": "^[A-Z]{3}$",
+                                        "type": "string"
+                                      },
+                                      "minorUnits": {
+                                        "minimum": 0,
+                                        "type": "integer"
+                                      }
+                                    },
+                                    "required": [
+                                      "minorUnits",
+                                      "currency"
+                                    ],
+                                    "type": "object"
+                                  }
+                                },
+                                "required": [
+                                  "total",
+                                  "entries"
+                                ],
+                                "type": "object"
+                              },
+                              "grandTotal": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              },
+                              "subtotal": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              },
+                              "tax": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              }
+                            },
+                            "required": [
+                              "subtotal",
+                              "tax",
+                              "discounts",
+                              "grandTotal",
+                              "businessDate"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "cartVersion",
+                          "fingerprint",
+                          "totals",
+                          "taxes",
+                          "discounts",
+                          "catalogVersion",
+                          "pricingVersion",
+                          "taxVersion",
+                          "snapshotAt",
+                          "confirmedAt"
+                        ],
+                        "type": "object"
+                      },
+                      "officialReceiptId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "officialReceiptNumber": {
+                        "maxLength": 100,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "officialSaleId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "paymentSummary": {
+                        "additionalProperties": {},
+                        "type": "object"
+                      },
+                      "provisionalSaleId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "reconciliationReference": {
+                        "format": "uuid",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "provisionalSaleId",
+                      "officialSaleId",
+                      "officialReceiptId",
+                      "officialReceiptNumber",
+                      "committedTotals",
+                      "businessDate",
+                      "acceptedAt",
+                      "paymentSummary",
+                      "reconciliationReference"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "officialId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "serverConflictReference": {
                 "anyOf": [
                   {
                     "format": "uuid",
@@ -7932,6 +11672,8 @@
               "deviceSequence",
               "status",
               "officialId",
+              "officialCommit",
+              "serverConflictReference",
               "failure"
             ],
             "type": "object"
@@ -7998,6 +11740,10 @@
           "maxItems": 100,
           "type": "array"
         },
+        "reconciliationId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "reconciliationRequired": {
           "type": "boolean"
         },
@@ -8007,6 +11753,7 @@
         }
       },
       "required": [
+        "reconciliationId",
         "deviceId",
         "credentialVersion",
         "localLastAllocatedSequence",
@@ -8019,6 +11766,43 @@
         "reconciliationRequired"
       ],
       "type": "object"
+    },
+    "RecoveryAction": {
+      "enum": [
+        "synchronize",
+        "query_result",
+        "refresh_policy",
+        "reauthenticate",
+        "reselect_branch",
+        "manager_review",
+        "acknowledge",
+        "view_receipt",
+        "contact_support"
+      ],
+      "type": "string"
+    },
+    "RecoveryState": {
+      "enum": [
+        "idle",
+        "inspecting_storage",
+        "validating_authority",
+        "recovering_unknown_results",
+        "reconciling",
+        "ready_to_replay",
+        "replaying",
+        "waiting_for_connectivity",
+        "waiting_for_authentication",
+        "waiting_for_branch",
+        "waiting_for_policy_refresh",
+        "waiting_for_operator_action",
+        "waiting_for_manager_action",
+        "blocked_by_device",
+        "blocked_by_conflict",
+        "blocked_by_storage",
+        "completed",
+        "failed_safely"
+      ],
+      "type": "string"
     },
     "RegisterMemberRequest": {
       "additionalProperties": false,
@@ -8134,6 +11918,70 @@
       ],
       "type": "object"
     },
+    "ReplayAuditSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "branchReference": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "commandReference": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "correlationId": {
+          "maxLength": 128,
+          "minLength": 8,
+          "type": "string"
+        },
+        "deviceReference": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "eventCategory": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "occurredAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "outcomeCode": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "resolutionStatus": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "sequence": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "eventCategory",
+        "occurredAt",
+        "correlationId",
+        "commandReference",
+        "deviceReference",
+        "sequence",
+        "branchReference",
+        "outcomeCode",
+        "resolutionStatus"
+      ],
+      "type": "object"
+    },
     "ReplayBatch": {
       "additionalProperties": false,
       "properties": {
@@ -8151,7 +11999,8 @@
               },
               "commandType": {
                 "enum": [
-                  "operational.ack"
+                  "operational.ack",
+                  "pos.checkout.cash"
                 ],
                 "type": "string"
               },
@@ -8370,7 +12219,427 @@
                   }
                 ]
               },
+              "officialCommit": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "acceptedAt": {
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "businessDate": {
+                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                        "type": "string"
+                      },
+                      "committedTotals": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "cartVersion": {
+                            "exclusiveMinimum": 0,
+                            "type": "integer"
+                          },
+                          "catalogVersion": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "confirmedAt": {
+                            "anyOf": [
+                              {
+                                "format": "date-time",
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "discounts": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "entries": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "amount": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "currency": {
+                                          "pattern": "^[A-Z]{3}$",
+                                          "type": "string"
+                                        },
+                                        "minorUnits": {
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "minorUnits",
+                                        "currency"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "code": {
+                                      "maxLength": 80,
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "maxLength": 160,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "code",
+                                    "label",
+                                    "amount"
+                                  ],
+                                  "type": "object"
+                                },
+                                "maxItems": 20,
+                                "type": "array"
+                              },
+                              "total": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              }
+                            },
+                            "required": [
+                              "total",
+                              "entries"
+                            ],
+                            "type": "object"
+                          },
+                          "fingerprint": {
+                            "pattern": "^[a-f0-9]{64}$",
+                            "type": "string"
+                          },
+                          "pricingVersion": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "snapshotAt": {
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "taxes": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "entries": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "rateBasisPoints": {
+                                      "maximum": 10000,
+                                      "minimum": 0,
+                                      "type": "integer"
+                                    },
+                                    "taxableAmount": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "currency": {
+                                          "pattern": "^[A-Z]{3}$",
+                                          "type": "string"
+                                        },
+                                        "minorUnits": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": -9007199254740991,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "minorUnits",
+                                        "currency"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "taxAmount": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "currency": {
+                                          "pattern": "^[A-Z]{3}$",
+                                          "type": "string"
+                                        },
+                                        "minorUnits": {
+                                          "maximum": 9007199254740991,
+                                          "minimum": -9007199254740991,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "minorUnits",
+                                        "currency"
+                                      ],
+                                      "type": "object"
+                                    }
+                                  },
+                                  "required": [
+                                    "rateBasisPoints",
+                                    "taxableAmount",
+                                    "taxAmount"
+                                  ],
+                                  "type": "object"
+                                },
+                                "maxItems": 30,
+                                "type": "array"
+                              },
+                              "total": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "maximum": 9007199254740991,
+                                    "minimum": -9007199254740991,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              }
+                            },
+                            "required": [
+                              "total",
+                              "entries"
+                            ],
+                            "type": "object"
+                          },
+                          "taxVersion": {
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "totals": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "businessDate": {
+                                "format": "date",
+                                "type": "string"
+                              },
+                              "discounts": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "entries": {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "amount": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "currency": {
+                                              "pattern": "^[A-Z]{3}$",
+                                              "type": "string"
+                                            },
+                                            "minorUnits": {
+                                              "minimum": 0,
+                                              "type": "integer"
+                                            }
+                                          },
+                                          "required": [
+                                            "minorUnits",
+                                            "currency"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        "code": {
+                                          "maxLength": 80,
+                                          "type": "string"
+                                        },
+                                        "label": {
+                                          "maxLength": 160,
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "code",
+                                        "label",
+                                        "amount"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "maxItems": 20,
+                                    "type": "array"
+                                  },
+                                  "total": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "currency": {
+                                        "pattern": "^[A-Z]{3}$",
+                                        "type": "string"
+                                      },
+                                      "minorUnits": {
+                                        "minimum": 0,
+                                        "type": "integer"
+                                      }
+                                    },
+                                    "required": [
+                                      "minorUnits",
+                                      "currency"
+                                    ],
+                                    "type": "object"
+                                  }
+                                },
+                                "required": [
+                                  "total",
+                                  "entries"
+                                ],
+                                "type": "object"
+                              },
+                              "grandTotal": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              },
+                              "subtotal": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              },
+                              "tax": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              }
+                            },
+                            "required": [
+                              "subtotal",
+                              "tax",
+                              "discounts",
+                              "grandTotal",
+                              "businessDate"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "cartVersion",
+                          "fingerprint",
+                          "totals",
+                          "taxes",
+                          "discounts",
+                          "catalogVersion",
+                          "pricingVersion",
+                          "taxVersion",
+                          "snapshotAt",
+                          "confirmedAt"
+                        ],
+                        "type": "object"
+                      },
+                      "officialReceiptId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "officialReceiptNumber": {
+                        "maxLength": 100,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "officialSaleId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "paymentSummary": {
+                        "additionalProperties": {},
+                        "type": "object"
+                      },
+                      "provisionalSaleId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "reconciliationReference": {
+                        "format": "uuid",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "provisionalSaleId",
+                      "officialSaleId",
+                      "officialReceiptId",
+                      "officialReceiptNumber",
+                      "committedTotals",
+                      "businessDate",
+                      "acceptedAt",
+                      "paymentSummary",
+                      "reconciliationReference"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "officialId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "serverConflictReference": {
                 "anyOf": [
                   {
                     "format": "uuid",
@@ -8396,6 +12665,8 @@
               "deviceSequence",
               "status",
               "officialId",
+              "officialCommit",
+              "serverConflictReference",
               "failure"
             ],
             "type": "object"
@@ -8642,6 +12913,62 @@
       ],
       "type": "object"
     },
+    "ReplayProgress": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "awaitingResult": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "conflicts": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "duplicates": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "lastSynchronizedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "operationCode": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "processed": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "total": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "total",
+        "processed",
+        "accepted",
+        "duplicates",
+        "awaitingResult",
+        "conflicts",
+        "operationCode",
+        "lastSynchronizedAt"
+      ],
+      "type": "object"
+    },
     "ReplayResult": {
       "additionalProperties": false,
       "properties": {
@@ -8726,7 +13053,427 @@
             }
           ]
         },
+        "officialCommit": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "acceptedAt": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "businessDate": {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                "committedTotals": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "cartVersion": {
+                      "exclusiveMinimum": 0,
+                      "type": "integer"
+                    },
+                    "catalogVersion": {
+                      "maxLength": 128,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "confirmedAt": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "discounts": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "entries": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "amount": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              },
+                              "code": {
+                                "maxLength": 80,
+                                "type": "string"
+                              },
+                              "label": {
+                                "maxLength": 160,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "label",
+                              "amount"
+                            ],
+                            "type": "object"
+                          },
+                          "maxItems": 20,
+                          "type": "array"
+                        },
+                        "total": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "currency": {
+                              "pattern": "^[A-Z]{3}$",
+                              "type": "string"
+                            },
+                            "minorUnits": {
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "minorUnits",
+                            "currency"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "entries"
+                      ],
+                      "type": "object"
+                    },
+                    "fingerprint": {
+                      "pattern": "^[a-f0-9]{64}$",
+                      "type": "string"
+                    },
+                    "pricingVersion": {
+                      "maxLength": 128,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "snapshotAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "taxes": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "entries": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "rateBasisPoints": {
+                                "maximum": 10000,
+                                "minimum": 0,
+                                "type": "integer"
+                              },
+                              "taxableAmount": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "maximum": 9007199254740991,
+                                    "minimum": -9007199254740991,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              },
+                              "taxAmount": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "maximum": 9007199254740991,
+                                    "minimum": -9007199254740991,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              }
+                            },
+                            "required": [
+                              "rateBasisPoints",
+                              "taxableAmount",
+                              "taxAmount"
+                            ],
+                            "type": "object"
+                          },
+                          "maxItems": 30,
+                          "type": "array"
+                        },
+                        "total": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "currency": {
+                              "pattern": "^[A-Z]{3}$",
+                              "type": "string"
+                            },
+                            "minorUnits": {
+                              "maximum": 9007199254740991,
+                              "minimum": -9007199254740991,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "minorUnits",
+                            "currency"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "entries"
+                      ],
+                      "type": "object"
+                    },
+                    "taxVersion": {
+                      "maxLength": 128,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "totals": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "businessDate": {
+                          "format": "date",
+                          "type": "string"
+                        },
+                        "discounts": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "entries": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "amount": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "currency": {
+                                        "pattern": "^[A-Z]{3}$",
+                                        "type": "string"
+                                      },
+                                      "minorUnits": {
+                                        "minimum": 0,
+                                        "type": "integer"
+                                      }
+                                    },
+                                    "required": [
+                                      "minorUnits",
+                                      "currency"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "code": {
+                                    "maxLength": 80,
+                                    "type": "string"
+                                  },
+                                  "label": {
+                                    "maxLength": 160,
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "code",
+                                  "label",
+                                  "amount"
+                                ],
+                                "type": "object"
+                              },
+                              "maxItems": 20,
+                              "type": "array"
+                            },
+                            "total": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "currency": {
+                                  "pattern": "^[A-Z]{3}$",
+                                  "type": "string"
+                                },
+                                "minorUnits": {
+                                  "minimum": 0,
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "minorUnits",
+                                "currency"
+                              ],
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "total",
+                            "entries"
+                          ],
+                          "type": "object"
+                        },
+                        "grandTotal": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "currency": {
+                              "pattern": "^[A-Z]{3}$",
+                              "type": "string"
+                            },
+                            "minorUnits": {
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "minorUnits",
+                            "currency"
+                          ],
+                          "type": "object"
+                        },
+                        "subtotal": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "currency": {
+                              "pattern": "^[A-Z]{3}$",
+                              "type": "string"
+                            },
+                            "minorUnits": {
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "minorUnits",
+                            "currency"
+                          ],
+                          "type": "object"
+                        },
+                        "tax": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "currency": {
+                              "pattern": "^[A-Z]{3}$",
+                              "type": "string"
+                            },
+                            "minorUnits": {
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "minorUnits",
+                            "currency"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "subtotal",
+                        "tax",
+                        "discounts",
+                        "grandTotal",
+                        "businessDate"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "cartVersion",
+                    "fingerprint",
+                    "totals",
+                    "taxes",
+                    "discounts",
+                    "catalogVersion",
+                    "pricingVersion",
+                    "taxVersion",
+                    "snapshotAt",
+                    "confirmedAt"
+                  ],
+                  "type": "object"
+                },
+                "officialReceiptId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "officialReceiptNumber": {
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "officialSaleId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "paymentSummary": {
+                  "additionalProperties": {},
+                  "type": "object"
+                },
+                "provisionalSaleId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "reconciliationReference": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "provisionalSaleId",
+                "officialSaleId",
+                "officialReceiptId",
+                "officialReceiptNumber",
+                "committedTotals",
+                "businessDate",
+                "acceptedAt",
+                "paymentSummary",
+                "reconciliationReference"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "officialId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "serverConflictReference": {
           "anyOf": [
             {
               "format": "uuid",
@@ -8752,6 +13499,8 @@
         "deviceSequence",
         "status",
         "officialId",
+        "officialCommit",
+        "serverConflictReference",
         "failure"
       ],
       "type": "object"
@@ -8808,6 +13557,163 @@
       "required": [
         "idempotencyKey",
         "currentCredentialVersion"
+      ],
+      "type": "object"
+    },
+    "SafeReplayDiagnostic": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptedCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "audit": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "branchReference": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "commandReference": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "correlationId": {
+                "maxLength": 128,
+                "minLength": 8,
+                "type": "string"
+              },
+              "deviceReference": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "eventCategory": {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              "occurredAt": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "outcomeCode": {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              "resolutionStatus": {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              "sequence": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "eventCategory",
+              "occurredAt",
+              "correlationId",
+              "commandReference",
+              "deviceReference",
+              "sequence",
+              "branchReference",
+              "outcomeCode",
+              "resolutionStatus"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "conflictCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "contractVersion": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "lastReplayAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastSafeErrorCategory": {
+          "anyOf": [
+            {
+              "enum": [
+                "duplicate_already_applied",
+                "fingerprint_mismatch",
+                "sequence_gap",
+                "sequence_behind",
+                "credential_rotated",
+                "device_revoked",
+                "tenant_mismatch",
+                "branch_mismatch",
+                "operator_invalid",
+                "permission_revoked",
+                "entitlement_disabled",
+                "catalog_version_expired",
+                "price_changed",
+                "tax_changed",
+                "availability_changed",
+                "inventory_unavailable",
+                "aggregate_version_conflict",
+                "command_expired",
+                "policy_changed",
+                "unsupported_offline_command",
+                "ambiguous_payment_requires_query",
+                "server_validation_failed",
+                "reconciliation_required",
+                "terminal_failure"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "queueDepth": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "serverLastAcceptedSequence": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unresolvedCount": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "serverLastAcceptedSequence",
+        "acceptedCount",
+        "conflictCount",
+        "lastReplayAt",
+        "lastSafeErrorCategory",
+        "queueDepth",
+        "unresolvedCount",
+        "audit"
       ],
       "type": "object"
     },
@@ -9398,6 +14304,11 @@
           "exclusiveMinimum": 0,
           "type": "integer"
         },
+        "catalogVersion": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
         "confirmedAt": {
           "anyOf": [
             {
@@ -9480,6 +14391,15 @@
         },
         "fingerprint": {
           "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "pricingVersion": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        "snapshotAt": {
+          "format": "date-time",
           "type": "string"
         },
         "taxes": {
@@ -9568,6 +14488,11 @@
             "entries"
           ],
           "type": "object"
+        },
+        "taxVersion": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
         },
         "totals": {
           "additionalProperties": false,
@@ -9716,6 +14641,10 @@
         "totals",
         "taxes",
         "discounts",
+        "catalogVersion",
+        "pricingVersion",
+        "taxVersion",
+        "snapshotAt",
         "confirmedAt"
       ],
       "type": "object"
@@ -10326,7 +15255,24 @@
       "permission": "offline.replay",
       "pin": false,
       "request": null,
-      "response": "ReplayDiagnostics",
+      "response": "SafeReplayDiagnostic",
+      "tenantContext": true
+    },
+    "GET /api/pos/tenants/:tenantId/offline/policy": {
+      "approval": false,
+      "auth": "operator-session",
+      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED",
+        "DEVICE_REVOKED",
+        "ENTITLEMENT_DISABLED"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "offline.replay",
+      "pin": false,
+      "request": "ReplayContextQuery",
+      "response": "OfflinePolicy",
       "tenantContext": true
     },
     "GET /api/pos/tenants/:tenantId/offline/replay/commands/:commandId": {

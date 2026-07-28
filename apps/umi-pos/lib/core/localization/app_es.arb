@@ -93,5 +93,16 @@
   "correlationLabel": "Correlación",
   "saleCompletedTitle": "Venta completada",
   "finishSaleAction": "Finalizar e iniciar otro carrito",
-  "checkoutFailed": "No fue posible completar el cobro de forma segura."
+  "checkoutFailed": "No fue posible completar el cobro de forma segura.",
+  "provisionalSalePendingTitle": "Venta pendiente de sincronización",
+  "provisionalSalePendingBody": "La venta se guardó de forma segura en este dispositivo y está pendiente de sincronización. Los datos oficiales del recibo se asignarán cuando el servidor la acepte.",
+  "returnToCatalogAction": "Volver al catálogo",
+  "recoveryCenterTitle": "Centro de recuperación",
+  "synchronizingPendingSales": "Sincronizando ventas pendientes…",
+  "pendingSalesSecure": "Tus ventas pendientes permanecen almacenadas de forma segura en este dispositivo.",
+  "synchronizeNowAction": "Sincronizar ahora",
+  "conflictNeedsAttention": "Una venta requiere tu atención.",
+  "officialReceiptAvailable": "Recibo oficial disponible",
+  "cashReceivedLabel": "Efectivo recibido",
+  "changeDueLabel": "Cambio"
 }

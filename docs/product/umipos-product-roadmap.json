@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-07-28",
-  "latestRelevantCommit": "HEAD (Gate 2F commit)",
+  "latestRelevantCommit": "HEAD (Gate 2F continuation commit)",
   "items": [
     {
       "id": "platform-certification",
@@ -55,13 +55,13 @@
       "id": "2F",
       "status": "incomplete",
       "dependencies": ["2E"],
-      "nextObjective": "Connect checkout journaling and finish recovery/conflict-resolution UX",
+      "nextObjective": "Finish durable restart deduplication, serialized journal mutations, typed recovery actions, and focused recovery tests",
       "blockers": [
-        "Server-issued offline cash amount/count/snapshot-freshness policy",
-        "Concrete Flutter replay gateway and checkout integration",
-        "Complete recovery and conflict-resolution surfaces"
+        "Durable duplicate prevention after restart",
+        "Serialized encrypted journal mutation boundary",
+        "Complete typed conflict and recovery actions plus focused tests"
       ],
-      "validationState": "Focused Gate 2F foundation validation passed; Web sensitive journal unsupported"
+      "validationState": "Focused contract, API, Flutter, Web, migration and fail-closed RLS checks passed; Linux native build prerequisites unavailable; Web sensitive journal unsupported"
     }
   ]
 }
