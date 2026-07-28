@@ -205,25 +205,46 @@ create table umi.invoice (
 -- SALES PIPELINE
 -- ----------------------------------------------------------------------------
 
+-- Umi's ONE sales pipeline. A café-prospect is the same entity whether an
+-- automated funnel is nurturing it (a "lead" — landing-page diagnostic + email
+-- drip) or a human is working it (a "prospect" — notes/calls). So this table
+-- carries both halves: the CRM spine + the funnel-automation fields the
+-- landing-page sequence engine (modules/leads) drives. Sealed/service-role
+-- (worker BYPASSRLS); business_id is NULL by design (Umi-internal, no tenant).
 create table umi.prospect (
-  id             uuid primary key default gen_random_uuid(),
-  business_name  text not null,
-  contact_name   text,
-  email          text,
-  phone          text,
-  status         text not null default 'new'
-                   check (status in ('new','contacted','qualified','won','lost')),
-  source         text,
-  created_at     timestamptz not null default now(),
-  updated_at     timestamptz not null default now()
+  id                 uuid primary key default gen_random_uuid(),
+  business_name      text,                       -- a landing lead may not give a company
+  contact_name       text,
+  email              text,
+  phone              text,
+  status             text not null default 'new'
+                       check (status in ('new','nurturing','qualified','converted','lost','unsubscribed')),
+  source_app         text,                       -- surface that captured it (e.g. umi-landing-page)
+  submitted_form     text,                       -- which form (e.g. diagnostic)
+  diagnostic_data    jsonb,                      -- landing-page diagnostic score/level/recommendations
+  diagnostic_date    timestamptz,
+  sequence_paused    boolean not null default false,
+  pause_reason       text,
+  emails_sent        text[] not null default '{}',   -- drip dedup gate (array_append/array_remove)
+  last_email_sent_at timestamptz,
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now()
 );
+-- One live lead per email while it is still in an active stage; once it leaves
+-- (converted/lost/unsubscribed) the email is free to re-enter. Backs the
+-- engine's insert-or-update-by-active-email (TOCTOU 23505 catch).
+create unique index umi_prospect_email_active_uidx
+  on umi.prospect (email) where status in ('new','nurturing','qualified');
 
+-- Unified prospect timeline: automation events (diagnostic_completed, email_sent,
+-- email_failed, sequence_paused/resumed, responded, unsubscribed) and manual
+-- touches (note/call/meeting) share one log. `event_type` is open text on purpose
+-- — the funnel's event set is actively evolving, so a CHECK here is a migration tax.
 create table umi.prospect_event (
   id           uuid primary key default gen_random_uuid(),
   prospect_id  uuid not null references umi.prospect(id) on delete cascade,
-  kind         text not null
-                 check (kind in ('note','call','email','meeting','status_change')),
-  body         text,
+  event_type   text not null,
+  event_data   jsonb,
   occurred_at  timestamptz not null default now(),
   created_at   timestamptz not null default now()
 );
