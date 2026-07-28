@@ -243,4 +243,67 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get checkoutNextGate => 'Checkout available in the next Gate';
+
+  @override
+  String get checkoutAction => 'Checkout';
+
+  @override
+  String get checkoutTitle => 'Authoritative checkout';
+
+  @override
+  String get operatorLabel => 'Operator';
+
+  @override
+  String get paymentMethodLabel => 'Payment method';
+
+  @override
+  String get cashPayment => 'Cash';
+
+  @override
+  String get externalTerminalPayment => 'External terminal';
+
+  @override
+  String get reviewTotalsAction => 'Review authoritative totals';
+
+  @override
+  String get confirmAndPayAction => 'Confirm and pay';
+
+  @override
+  String get confirmAction => 'Confirm';
+
+  @override
+  String get confirmSaleTitle => 'Confirm this sale?';
+
+  @override
+  String get confirmSaleBody =>
+      'The displayed totals were recalculated by UMI. This confirmation starts payment.';
+
+  @override
+  String get totalsConfirmedBody =>
+      'UMI recalculated this cart. Review every total before confirming payment.';
+
+  @override
+  String get paymentProcessing => 'Payment is processing';
+
+  @override
+  String get paymentUnknownTitle => 'Payment status unknown';
+
+  @override
+  String get paymentUnknownBody =>
+      'Do not start a new payment. Query this payment status or ask a manager for help.';
+
+  @override
+  String get queryPaymentAction => 'Query payment status';
+
+  @override
+  String get correlationLabel => 'Correlation';
+
+  @override
+  String get saleCompletedTitle => 'Sale completed';
+
+  @override
+  String get finishSaleAction => 'Finish and start a new cart';
+
+  @override
+  String get checkoutFailed => 'Checkout could not be completed safely.';
 }

@@ -3,8 +3,9 @@ import { httpModels } from './schemas';
 import { deviceModels } from './device';
 import { posCatalogModels } from './pos-catalog';
 import { posCartModels } from './pos-cart';
+import { posCheckoutModels } from './pos-checkout';
 
-export const CONTRACT_VERSION = '1.3.0';
+export const CONTRACT_VERSION = '1.4.0';
 export const API_MAJOR_VERSION = 1;
 
 export const errorCatalog = Object.fromEntries(
@@ -461,6 +462,39 @@ export const routeCatalog = {
     approval: false,
     errors: ['PERMISSION_DENIED', 'CART_VALIDATION_FAILED', 'OPTIMISTIC_VERSION_CONFLICT'],
   },
+  'POST /api/pos/tenants/:tenantId/checkout': {
+    request: 'CheckoutCommand',
+    response: 'CheckoutResult',
+    auth: 'operator-session',
+    permission: 'checkout.commit',
+    idempotent: true,
+    tenantContext: true,
+    branchContext: true,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: [
+      'PERMISSION_DENIED',
+      'CHECKOUT_CART_CHANGED',
+      'INVENTORY_UNAVAILABLE',
+      'PAYMENT_UNKNOWN',
+      'OPTIMISTIC_VERSION_CONFLICT',
+      'IDEMPOTENCY_CONFLICT',
+    ],
+  },
+  'GET /api/pos/tenants/:tenantId/checkout/payments/:paymentId': {
+    request: 'PaymentStatusQuery',
+    response: 'PaymentOutcome',
+    auth: 'operator-session',
+    permission: 'checkout.commit',
+    idempotent: true,
+    tenantContext: true,
+    branchContext: true,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+  },
 } as const;
 
 export const modelCatalog = {
@@ -469,6 +503,7 @@ export const modelCatalog = {
   ...deviceModels,
   ...posCatalogModels,
   ...posCartModels,
+  ...posCheckoutModels,
 };
 
 export const invariantCatalog = {

@@ -126,6 +126,7 @@ export const PrepareSaleRequest = z
 export const CartQuery = z.object({ branchId: Uuid, operatorSessionId: Uuid }).strict();
 
 export type Cart = z.infer<typeof Cart>;
+export type CartItem = z.infer<typeof CartItem>;
 export type CartLineInput = z.infer<typeof CartLineInput>;
 export type CreateCartRequest = z.infer<typeof CreateCartRequest>;
 export type RemoveCartLineRequest = z.infer<typeof RemoveCartLineRequest>;

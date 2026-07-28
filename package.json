@@ -13,6 +13,7 @@
     "umi-pos:generate": "pnpm --filter @umi/contract generate && cd apps/umi-pos && flutter gen-l10n",
     "umi-pos:linux": "cd apps/umi-pos && flutter run -d linux",
     "umi-pos:macos": "cd apps/umi-pos && flutter run -d macos",
+    "umi-pos:mac": "cd apps/umi-pos && flutter run -d macos",
     "umi-pos:windows": "cd apps/umi-pos && flutter run -d windows",
     "umi-pos:android": "cd apps/umi-pos && flutter run -d android",
     "umi-pos:ios": "cd apps/umi-pos && flutter run -d ios",

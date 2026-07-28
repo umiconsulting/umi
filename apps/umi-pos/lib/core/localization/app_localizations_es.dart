@@ -244,4 +244,68 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get checkoutNextGate => 'Checkout disponible en el siguiente Gate';
+
+  @override
+  String get checkoutAction => 'Cobrar';
+
+  @override
+  String get checkoutTitle => 'Cobro autorizado';
+
+  @override
+  String get operatorLabel => 'Operador';
+
+  @override
+  String get paymentMethodLabel => 'Método de pago';
+
+  @override
+  String get cashPayment => 'Efectivo';
+
+  @override
+  String get externalTerminalPayment => 'Terminal externa';
+
+  @override
+  String get reviewTotalsAction => 'Revisar totales autorizados';
+
+  @override
+  String get confirmAndPayAction => 'Confirmar y cobrar';
+
+  @override
+  String get confirmAction => 'Confirmar';
+
+  @override
+  String get confirmSaleTitle => '¿Confirmar esta venta?';
+
+  @override
+  String get confirmSaleBody =>
+      'UMI recalculó los totales mostrados. Esta confirmación inicia el pago.';
+
+  @override
+  String get totalsConfirmedBody =>
+      'UMI recalculó el carrito. Revisa cada total antes de confirmar el pago.';
+
+  @override
+  String get paymentProcessing => 'Procesando pago';
+
+  @override
+  String get paymentUnknownTitle => 'Estado de pago desconocido';
+
+  @override
+  String get paymentUnknownBody =>
+      'No inicies otro pago. Consulta el estado de este pago o solicita ayuda a un gerente.';
+
+  @override
+  String get queryPaymentAction => 'Consultar estado del pago';
+
+  @override
+  String get correlationLabel => 'Correlación';
+
+  @override
+  String get saleCompletedTitle => 'Venta completada';
+
+  @override
+  String get finishSaleAction => 'Finalizar e iniciar otro carrito';
+
+  @override
+  String get checkoutFailed =>
+      'No fue posible completar el cobro de forma segura.';
 }

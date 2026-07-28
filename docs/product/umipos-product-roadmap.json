@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-07-28",
-  "latestRelevantCommit": "HEAD (Gate 2D commit)",
+  "latestRelevantCommit": "HEAD (Gate 2E commit)",
   "items": [
     {
       "id": "platform-certification",
@@ -45,10 +45,18 @@
     },
     {
       "id": "2E",
-      "status": "next",
+      "status": "complete",
       "dependencies": ["2D"],
-      "nextObjective": "Implement checkout and authoritative online sale commit",
-      "blockers": ["Payment and order command boundaries"],
+      "nextObjective": "Maintain authoritative online checkout",
+      "blockers": [],
+      "validationState": "Focused contract, API, migration, Flutter and web validation passed"
+    },
+    {
+      "id": "2F",
+      "status": "next",
+      "dependencies": ["2E"],
+      "nextObjective": "Implement encrypted offline journal, replay, and reconciliation",
+      "blockers": ["Conflict and recovery model"],
       "validationState": "not run"
     }
   ]

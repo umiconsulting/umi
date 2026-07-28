@@ -541,6 +541,126 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Checkout disponible en el siguiente Gate'**
   String get checkoutNextGate;
+
+  /// No description provided for @checkoutAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cobrar'**
+  String get checkoutAction;
+
+  /// No description provided for @checkoutTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Cobro autorizado'**
+  String get checkoutTitle;
+
+  /// No description provided for @operatorLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Operador'**
+  String get operatorLabel;
+
+  /// No description provided for @paymentMethodLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Método de pago'**
+  String get paymentMethodLabel;
+
+  /// No description provided for @cashPayment.
+  ///
+  /// In es, this message translates to:
+  /// **'Efectivo'**
+  String get cashPayment;
+
+  /// No description provided for @externalTerminalPayment.
+  ///
+  /// In es, this message translates to:
+  /// **'Terminal externa'**
+  String get externalTerminalPayment;
+
+  /// No description provided for @reviewTotalsAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Revisar totales autorizados'**
+  String get reviewTotalsAction;
+
+  /// No description provided for @confirmAndPayAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirmar y cobrar'**
+  String get confirmAndPayAction;
+
+  /// No description provided for @confirmAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirmar'**
+  String get confirmAction;
+
+  /// No description provided for @confirmSaleTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'¿Confirmar esta venta?'**
+  String get confirmSaleTitle;
+
+  /// No description provided for @confirmSaleBody.
+  ///
+  /// In es, this message translates to:
+  /// **'UMI recalculó los totales mostrados. Esta confirmación inicia el pago.'**
+  String get confirmSaleBody;
+
+  /// No description provided for @totalsConfirmedBody.
+  ///
+  /// In es, this message translates to:
+  /// **'UMI recalculó el carrito. Revisa cada total antes de confirmar el pago.'**
+  String get totalsConfirmedBody;
+
+  /// No description provided for @paymentProcessing.
+  ///
+  /// In es, this message translates to:
+  /// **'Procesando pago'**
+  String get paymentProcessing;
+
+  /// No description provided for @paymentUnknownTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Estado de pago desconocido'**
+  String get paymentUnknownTitle;
+
+  /// No description provided for @paymentUnknownBody.
+  ///
+  /// In es, this message translates to:
+  /// **'No inicies otro pago. Consulta el estado de este pago o solicita ayuda a un gerente.'**
+  String get paymentUnknownBody;
+
+  /// No description provided for @queryPaymentAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Consultar estado del pago'**
+  String get queryPaymentAction;
+
+  /// No description provided for @correlationLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Correlación'**
+  String get correlationLabel;
+
+  /// No description provided for @saleCompletedTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Venta completada'**
+  String get saleCompletedTitle;
+
+  /// No description provided for @finishSaleAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Finalizar e iniciar otro carrito'**
+  String get finishSaleAction;
+
+  /// No description provided for @checkoutFailed.
+  ///
+  /// In es, this message translates to:
+  /// **'No fue posible completar el cobro de forma segura.'**
+  String get checkoutFailed;
 }
 
 class _AppLocalizationsDelegate

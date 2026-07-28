@@ -30,6 +30,10 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Gate 2D established a server-authoritative, tenant/branch/operator-partitioned cart with
   validated variants, modifiers, notes, optimistic versioning, and tax/total previews. It does
   not commit an order, mutate inventory, take payment, or issue a receipt.
+- Gate 2E established the first authoritative online sale: immediate repricing, explicit totals
+  reconfirmation, idempotent cash completion, query-only external-terminal ambiguity, reservation
+  semantics without permanent inventory mutation, immutable receipt snapshots, and append-only
+  financial/audit facts.
 
 ## Current implementation state
 
@@ -67,10 +71,14 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - `tenant.device` is the device authority; one-time challenges live in
   `runtime.device_enrollment_challenge`, and `runtime.operator_session` separates operator
   presence from user authentication.
-- UmiPOS consumes contract version `1.3.0`, content hash
-  `8ee9798c856bf4479e6240314f9d3d325eacb327fed95c0b65c73555291266ab`.
+- UmiPOS consumes contract version `1.4.0`, content hash
+  `a4a58c1232b1903b62aa066cfafec450cc52b27cb6fd78fe1cd3d1cc7d7d0d67`.
 - `tenant.pos_cart` is mutable sale preparation only. The API owns pricing, availability,
   inclusive-tax rounding, modifier validation, line merging, and totals previews.
+- `tenant.pos_committed_sale` and `tenant.receipt_snapshot` are immutable checkout facts.
+  `tenant.inventory_reservation` is a time-bounded preparation record and never decrements stock.
+- Cash checkout commits atomically through `tenant.business_command`; an external-terminal
+  unknown outcome is query-only and does not create an order, receipt, or financial event.
 - POS refresh sessions require the active server device plus its installation and credential
   hashes. Revocation/replacement ends durable and operator sessions.
 
@@ -96,5 +104,5 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - `BUILD_V3_CERTIFIED`: `true`
 - UmiPOS application creation: `YES WITH OBSERVATIONS`
 - Remote publication: deferred because the branch has no configured upstream.
-- Gate 2D: complete in the commit containing this state update.
-- Next gate: `2E` — checkout and authoritative online sale commit.
+- Gate 2E: complete in the commit containing this state update.
+- Next gate: `2F` — encrypted offline journal, replay, and reconciliation.

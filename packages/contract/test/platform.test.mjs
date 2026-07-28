@@ -15,6 +15,8 @@ const {
   CatalogQuery,
   Cart,
   CartLineInput,
+  CheckoutCommand,
+  CheckoutResult,
 } = require('../dist/index.cjs');
 
 test('Gate 2D cart contracts bound quantities, notes, and checkout authority', () => {
@@ -54,6 +56,58 @@ test('Gate 2D cart contracts bound quantities, notes, and checkout authority', (
       checkoutEnabled: false,
       checkoutMessageCode: 'CHECKOUT_GATE_NOT_AVAILABLE',
       updatedAt: '2026-07-28T12:00:00Z',
+    }).success,
+  );
+});
+
+test('Gate 2E checkout requires explicit totals confirmation and safe ambiguity', () => {
+  const id = '00000000-0000-4000-8000-000000000001';
+  const command = {
+    cartId: id,
+    branchId: id,
+    operatorSessionId: id,
+    expectedCartVersion: 1,
+    paymentMethod: 'cash',
+    totalsFingerprint: null,
+    idempotencyKey: id,
+  };
+  assert.ok(CheckoutCommand.safeParse(command).success);
+  assert.equal(
+    CheckoutCommand.safeParse({ ...command, paymentMethod: 'client_card_sdk' }).success,
+    false,
+  );
+  const money = { minorUnits: 100, currency: 'MXN' };
+  const confirmation = {
+    cartVersion: 1,
+    fingerprint: 'a'.repeat(64),
+    totals: {
+      subtotal: money,
+      tax: { minorUnits: 14, currency: 'MXN' },
+      discounts: { total: { minorUnits: 0, currency: 'MXN' }, entries: [] },
+      grandTotal: money,
+      businessDate: '2026-07-28',
+    },
+    taxes: {
+      total: { minorUnits: 14, currency: 'MXN' },
+      entries: [],
+    },
+    discounts: { total: { minorUnits: 0, currency: 'MXN' }, entries: [] },
+    confirmedAt: null,
+  };
+  assert.ok(
+    CheckoutResult.safeParse({
+      status: 'confirmation_required',
+      confirmation,
+      payment: null,
+      reservation: null,
+      sale: null,
+      receipt: null,
+      failure: {
+        code: 'CHECKOUT_CONFIRMATION_REQUIRED',
+        retryable: false,
+        operatorGuidance: 'confirm_totals',
+        correlationId: 'checkout-test',
+      },
     }).success,
   );
 });

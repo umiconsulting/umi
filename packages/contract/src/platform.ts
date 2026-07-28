@@ -339,6 +339,10 @@ export const ReceiptLineSnapshot = z
     quantity: z.number().int().positive(),
     unitPrice: Money,
     lineTotal: Money,
+    variantName: z.string().min(1).max(160).nullable().optional(),
+    modifiers: z.array(z.string().min(1).max(160)).max(100).optional(),
+    tax: Money.optional(),
+    note: z.string().max(500).nullable().optional(),
   })
   .strict();
 export type ReceiptLineSnapshot = z.infer<typeof ReceiptLineSnapshot>;
@@ -356,6 +360,19 @@ export const ReceiptSnapshot = z
     grandTotal: Money,
     currency: CurrencyCode,
     version: z.number().int().positive(),
+    tenantName: z.string().min(1).max(240).optional(),
+    branchName: z.string().min(1).max(240).optional(),
+    operatorName: z.string().min(1).max(240).optional(),
+    payment: z
+      .object({
+        method: z.enum(['cash', 'external_terminal', 'card', 'stored_value', 'gift_card']),
+        status: z.enum(['succeeded', 'captured']),
+        reference: z.string().min(1).max(100),
+        amount: Money,
+      })
+      .strict()
+      .optional(),
+    discountTotal: Money.optional(),
   })
   .strict();
 export type ReceiptSnapshot = z.infer<typeof ReceiptSnapshot>;
@@ -409,6 +426,13 @@ export const API_ERROR_CODES = [
   'VARIANT_NOT_AVAILABLE',
   'MODIFIER_SELECTION_INVALID',
   'CHECKOUT_GATE_NOT_AVAILABLE',
+  'CHECKOUT_CONFIRMATION_REQUIRED',
+  'CHECKOUT_CART_CHANGED',
+  'INVENTORY_UNAVAILABLE',
+  'PAYMENT_DECLINED',
+  'PAYMENT_UNKNOWN',
+  'PAYMENT_TIMEOUT',
+  'RECEIPT_CREATION_FAILED',
   'OPERATOR_LOCKED',
   'PIN_LOCKED',
   'SESSION_REVOKED',

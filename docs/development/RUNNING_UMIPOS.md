@@ -31,7 +31,7 @@ Start the backend with its documented UMI API command before running authenticat
 ## One-command targets
 
 - Linux: `pnpm umi-pos:linux`
-- macOS: `pnpm umi-pos:macos`
+- macOS: `pnpm umi-pos:mac` (`pnpm umi-pos:macos` remains an alias)
 - Windows: `pnpm umi-pos:windows`
 - Android: `pnpm umi-pos:android`
 - iPhone/iPad (macOS and Xcode required): `pnpm umi-pos:ios`
@@ -39,3 +39,10 @@ Start the backend with its documented UMI API command before running authenticat
 
 Flutter reports a clear failure when the requested SDK or device is unavailable; do not install
 or bypass platform prerequisites from repository scripts.
+
+## Online checkout development
+
+Gate 2E checkout requires the UMI API plus the canonical migrations through
+`20260728000400_gate_2e_online_checkout.sql`. Cash is the supported end-to-end development
+method. The external-terminal option deliberately returns a query-only unknown outcome until an
+approved provider adapter exists; never treat it as a simulated success or submit a new payment.

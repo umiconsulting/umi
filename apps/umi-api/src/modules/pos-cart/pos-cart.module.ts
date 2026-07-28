@@ -8,5 +8,6 @@ import { PosCartService } from './pos-cart.service';
   imports: [IntegrityModule],
   controllers: [PosCartController],
   providers: [PosCartRepository, PosCartService],
+  exports: [PosCartRepository],
 })
 export class PosCartModule {}

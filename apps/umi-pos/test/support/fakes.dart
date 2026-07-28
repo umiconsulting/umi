@@ -12,6 +12,8 @@ import 'package:umi_pos/features/cart/cart_controller.dart';
 import 'package:umi_pos/features/cart/cart_repository.dart';
 import 'package:umi_pos/features/catalog/catalog_controller.dart';
 import 'package:umi_pos/features/catalog/catalog_repository.dart';
+import 'package:umi_pos/features/checkout/checkout_controller.dart';
+import 'package:umi_pos/features/checkout/checkout_repository.dart';
 import 'package:umi_pos/features/entry/entry_controller.dart';
 import 'package:umi_pos/features/entry/entry_gateway.dart';
 
@@ -124,6 +126,10 @@ AppCompositionRoot testRoot({
     ),
     cart: CartController(
       repository: ApiCartRepository(api),
+      telemetry: telemetry,
+    ),
+    checkout: CheckoutController(
+      repository: ApiCheckoutRepository(api),
       telemetry: telemetry,
     ),
   );

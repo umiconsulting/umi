@@ -147,6 +147,7 @@ void main() {
             entry: root.entry,
             catalog: value,
             cart: root.cart,
+            checkout: root.checkout,
           ),
         ),
       );

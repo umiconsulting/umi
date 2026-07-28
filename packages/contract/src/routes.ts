@@ -50,6 +50,9 @@ export const routes = {
     cartLine: (tenantId: string, lineId: string): string =>
       `/api/pos/tenants/${enc(tenantId)}/cart/lines/${enc(lineId)}`,
     prepareCart: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/cart/prepare`,
+    checkout: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/checkout`,
+    checkoutPayment: (tenantId: string, paymentId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/checkout/payments/${enc(paymentId)}`,
   },
   me: {
     tenants: '/api/me/tenants',

@@ -10,6 +10,8 @@ import '../features/cart/cart_controller.dart';
 import '../features/cart/cart_repository.dart';
 import '../features/catalog/catalog_controller.dart';
 import '../features/catalog/catalog_repository.dart';
+import '../features/checkout/checkout_controller.dart';
+import '../features/checkout/checkout_repository.dart';
 import '../features/entry/entry_controller.dart';
 import '../features/entry/entry_gateway.dart';
 import 'bootstrap_controller.dart';
@@ -29,6 +31,7 @@ final class AppCompositionRoot {
     required this.entry,
     required this.catalog,
     required this.cart,
+    required this.checkout,
   });
 
   factory AppCompositionRoot.production() {
@@ -80,6 +83,10 @@ final class AppCompositionRoot {
         repository: ApiCartRepository(apiClient),
         telemetry: telemetry,
       ),
+      checkout: CheckoutController(
+        repository: ApiCheckoutRepository(apiClient),
+        telemetry: telemetry,
+      ),
     );
   }
 
@@ -96,12 +103,14 @@ final class AppCompositionRoot {
   final EntryController entry;
   final CatalogController catalog;
   final CartController cart;
+  final CheckoutController checkout;
 
   void dispose() {
     controller.dispose();
     entry.dispose();
     catalog.dispose();
     cart.dispose();
+    checkout.dispose();
     apiClient.dispose();
   }
 }

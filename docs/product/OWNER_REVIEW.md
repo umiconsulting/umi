@@ -15,6 +15,22 @@ before implementation and preserve owner notes.
   tax, discount preview, and totals.
 - Checkout is visibly disabled until Gate 2E.
 
+## Checkout
+
+- Gate 2E uses a focused checkout sheet with server-repriced totals, payment selection, and a
+  second explicit confirmation before payment.
+- Cash can complete an online sale. External-terminal ambiguity is visually distinct and offers
+  status lookup only—never a second payment.
+
+## Payment
+
+- Processing disables consequential controls. Unknown outcomes keep the correlation reference
+  visible and provide no “retry payment” action.
+
+## Receipt
+
+- Completion presents the immutable server receipt number, lines, business date, and total.
+
 ## Navigation
 
 - Product selection opens a focused detail sheet; the cart survives navigation within the
@@ -23,6 +39,7 @@ before implementation and preserve owner notes.
 ## Animations
 
 - Existing subtle Material motion is retained and respects reduced-motion system settings.
+- Checkout transitions use bounded sheets and progress states rather than indefinite animation.
 
 ## Typography
 
@@ -31,10 +48,26 @@ before implementation and preserve owner notes.
 ## Spacing
 
 - The cart follows UMI spacing tokens and a 380-pixel desktop rail.
+- Checkout preserves a large primary confirmation target and separates cancellation from payment.
 
 ## Visual polish
 
-- Review the cart rail and product-selection sheet on target pilot hardware before Gate 2E.
+- Review the cart rail, checkout sheet, and product-selection sheet on target pilot hardware
+  before Gate 2F.
+- Review receipt density and external-terminal recovery language on pilot desktop and tablet.
+
+## Error handling
+
+- Repricing changes require confirmation; unknown payment outcomes prohibit a new attempt.
+
+## Button hierarchy
+
+- Review totals → explicit confirmation → payment is the only primary path.
+
+## Operator workflow
+
+- The completed receipt closes into a fresh server cart. Ambiguous payments remain unresolved
+  until their existing attempt is queried.
 
 ## Future observations
 

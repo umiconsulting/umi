@@ -4,6 +4,8 @@ import 'package:umi_contract/umi_contract.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme/umi_theme.dart';
 import '../cart/cart_controller.dart';
+import '../checkout/checkout_controller.dart';
+import '../checkout/checkout_surface.dart';
 import '../entry/entry_controller.dart';
 import 'catalog_controller.dart';
 import 'catalog_repository.dart';
@@ -13,11 +15,13 @@ final class CatalogSurface extends StatefulWidget {
     required this.entry,
     required this.catalog,
     required this.cart,
+    required this.checkout,
     super.key,
   });
   final EntryController entry;
   final CatalogController catalog;
   final CartController cart;
+  final CheckoutController checkout;
   @override
   State<CatalogSurface> createState() => _CatalogSurfaceState();
 }
@@ -86,7 +90,11 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 builder: (_) => SafeArea(
                   child: SizedBox(
                     height: MediaQuery.sizeOf(context).height * .82,
-                    child: _CartPanel(controller: widget.cart),
+                    child: _CartPanel(
+                      controller: widget.cart,
+                      checkout: widget.checkout,
+                      entry: widget.entry,
+                    ),
                   ),
                 ),
               ),
@@ -173,7 +181,11 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 const SizedBox(width: UmiSpacing.lg),
                 SizedBox(
                   width: 380,
-                  child: _CartPanel(controller: widget.cart),
+                  child: _CartPanel(
+                    controller: widget.cart,
+                    checkout: widget.checkout,
+                    entry: widget.entry,
+                  ),
                 ),
               ],
             ],
@@ -554,8 +566,14 @@ final class _Message extends StatelessWidget {
 }
 
 final class _CartPanel extends StatelessWidget {
-  const _CartPanel({required this.controller});
+  const _CartPanel({
+    required this.controller,
+    required this.checkout,
+    required this.entry,
+  });
   final CartController controller;
+  final CheckoutController checkout;
+  final EntryController entry;
 
   String _money(Map<String, Object?> value) {
     final currency = value['currency'] as String? ?? '';
@@ -660,7 +678,17 @@ final class _CartPanel extends StatelessWidget {
             ),
             Text('${l.businessDateLabel}: ${totals.businessDate}'),
             const SizedBox(height: UmiSpacing.md),
-            FilledButton(onPressed: null, child: Text(l.checkoutNextGate)),
+            FilledButton(
+              onPressed: items.isEmpty
+                  ? null
+                  : () => showCheckoutSheet(
+                      context,
+                      checkout: checkout,
+                      cart: controller,
+                      entry: entry,
+                    ),
+              child: Text(l.checkoutAction),
+            ),
           ],
         ),
       ),
