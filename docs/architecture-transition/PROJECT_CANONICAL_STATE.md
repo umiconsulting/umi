@@ -15,6 +15,8 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Gate 1D established canonical idempotent business commands, optimistic aggregate versions,
   append-only audit and financial events, compensation references, correlation propagation,
   and tenant-visible redacted audit search.
+- Gate 1E established bounded structured telemetry, safe operational diagnostics, layered abuse
+  limits, dependency readiness, queue protection, deadlines, circuit breakers, and backpressure.
 
 ## Current implementation state
 
@@ -37,6 +39,14 @@ Future clients use `packages/contract` and controlled UMI APIs.
   updated or deleted.
 - Request and correlation identifiers are validated at the HTTP boundary and propagated
   through logs, commands, audit events, and public error envelopes.
+- Logs, traces, and dead letters redact sensitive content and retain safe error categories.
+- `/health/live` reports process liveness; `/health/ready` reports PostgreSQL and Redis readiness.
+- `/health/diagnostics` requires an operations token and returns bounded aggregate telemetry.
+- HTTP requests have bounded bodies, connection/request deadlines, and per-IP limits before route
+  authorization.
+- Authenticated traffic has independent user, device, tenant, and branch budgets.
+- Queue admission rejects work at the bounded depth instead of allowing unbounded growth.
+- Platform resilience utilities provide explicit deadlines, circuit state, and bounded concurrency.
 
 ## Prohibitions
 
@@ -47,9 +57,13 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Do not update or delete audit or financial events.
 - Do not reuse an idempotency key with a different canonical command fingerprint.
 - Do not expose `runtime.audit_event_internal` through a public API or generated contract.
+- Do not log raw credentials, authorization data, payment-sensitive values, customer message
+  content, or raw phone numbers.
+- Do not claim DDoS immunity; production requires provider mitigation, CDN/WAF controls, and a
+  distributed limiter before horizontal scaling.
 
 ## Current local baseline
 
 - Branch: `architectureUMIposIntegration`
-- Gate 1D parent commit: `8d174f7eeb78c2fb901b9c48b2bc61201575220c`
+- Gate 1E parent commit: `42aad13c91d0a1b2835c22d08c965865ac16f896`
 - Remote publication: deferred because the branch has no configured upstream.

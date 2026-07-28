@@ -30,15 +30,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
       exception instanceof HttpException ? exception.getResponse() : 'Internal server error';
 
     if (status >= SERVER_ERROR_MIN) {
-      let payloadStr: string;
-      try {
-        payloadStr = JSON.stringify(payload);
-      } catch {
-        payloadStr = String(payload);
-      }
+      const correlationId = getRequestContext()?.correlationId ?? 'unavailable';
+      const errorType = exception instanceof Error ? exception.constructor.name : 'UnknownError';
       this.logger.error(
-        `${status} ${payloadStr}`,
-        exception instanceof Error ? exception.stack : undefined,
+        `${status} request_failed correlationId=${correlationId} type=${errorType}`,
       );
     }
 

@@ -1,5 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AppConfigModule } from './shared/config/config.module';
 import { DatabaseModule } from './shared/database/database.module';
 import { RequestContextMiddleware } from './shared/database/request-context.middleware';
@@ -23,6 +23,9 @@ import { KdsModule } from './modules/kds/kds.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { IntegrityModule } from './modules/integrity/integrity.module';
+import { OperationsModule } from './shared/operations/operations.module';
+import { OperationalInterceptor } from './shared/operations/operational.interceptor';
+import { IpRateLimitGuard } from './shared/operations/ip-rate-limit.guard';
 
 /**
  * Root module for the WEB process. Imports shared infrastructure + domain
@@ -51,10 +54,13 @@ import { IntegrityModule } from './modules/integrity/integrity.module';
     ConversationsModule,
     LeadsModule,
     IntegrityModule,
+    OperationsModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
+    { provide: APP_GUARD, useClass: IpRateLimitGuard },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: OperationalInterceptor },
   ],
 })
 export class AppModule implements NestModule {

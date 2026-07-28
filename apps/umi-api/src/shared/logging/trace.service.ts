@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { createHash } from 'node:crypto';
 import { PgService } from '../database/pg.service';
 import type { AppConfig } from '../config/config.schema';
+import { errorCategory, redactTelemetry } from '../operations/redaction';
 
 // Ported from umi-conversaflow `_shared/logger.ts`. Writes the runtime trace
 // tables that umi-logs reads (ai_turn_logs, edge_function_logs, security_logs)
@@ -90,8 +91,8 @@ export class TraceService {
         data.latency_ms ?? null,
         data.response_type ?? null,
         this.json(data.products_referenced),
-        this.json(data.customer_context),
-        this.json(data.metadata),
+        this.json(redactTelemetry(data.customer_context)),
+        this.json(redactTelemetry(data.metadata)),
         data.request_id ?? null,
       ],
     );
@@ -107,9 +108,9 @@ export class TraceService {
         data.function_name,
         data.status,
         data.duration_ms ?? null,
-        data.error_message ?? null,
-        data.error_stack ?? null,
-        this.json(data.metadata),
+        data.error_message ? '[REDACTED_ERROR]' : null,
+        data.error_stack ? '[REDACTED_STACK]' : null,
+        this.json(redactTelemetry(data.metadata)),
         data.request_id ?? null,
       ],
     );
@@ -128,10 +129,10 @@ export class TraceService {
          (phone, event_type, input_text, details, timestamp, request_id)
        VALUES ($1,$2,$3,$4,$5,$6)`,
       [
-        params.phone, // raw phone only in the restricted security_logs table
+        this.hashPhone(params.phone),
         params.eventType,
-        params.inputText.substring(0, 500),
-        params.details ?? null,
+        '[REDACTED_INPUT]',
+        params.details ? '[REDACTED_DETAILS]' : null,
         new Date().toISOString(),
         params.requestId ?? null,
       ],
@@ -151,8 +152,8 @@ export class TraceService {
         data.business_id ?? null,
         data.stage,
         data.event,
-        this.json(data.detail),
-        data.error ?? null,
+        this.json(redactTelemetry(data.detail)),
+        data.error ? '[REDACTED_ERROR]' : null,
       ],
     );
   }
@@ -164,9 +165,7 @@ export class TraceService {
     try {
       return JSON.stringify(value);
     } catch (err) {
-      this.logger.warn(
-        `trace_json_serialize_failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      this.logger.warn(`trace_json_serialize_failed category=${errorCategory(err)}`);
       return JSON.stringify({ _unserializable: true });
     }
   }
@@ -176,9 +175,7 @@ export class TraceService {
     try {
       await this.pg.query(text, params);
     } catch (err) {
-      this.logger.warn(
-        `${table}_insert_failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      this.logger.warn(`${table}_insert_failed category=${errorCategory(err)}`);
     }
   }
 }

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { getRequestContext } from '../database/request-context';
+import { redactTelemetry } from '../operations/redaction';
 
 type Meta = Record<string, unknown>;
 
@@ -30,12 +31,14 @@ export class LoggingService {
     // unserializable meta can never crash the logger.
     let line: string;
     try {
-      line = JSON.stringify({
-        ...base,
-        ...meta,
-        ...(requestId ? { requestId } : {}),
-        ...(correlationId ? { correlationId } : {}),
-      });
+      line = JSON.stringify(
+        redactTelemetry({
+          ...base,
+          ...meta,
+          ...(requestId ? { requestId } : {}),
+          ...(correlationId ? { correlationId } : {}),
+        }),
+      );
     } catch (err) {
       line = JSON.stringify({
         ...base,

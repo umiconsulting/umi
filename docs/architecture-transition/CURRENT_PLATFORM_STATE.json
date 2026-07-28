@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "updatedAt": "2026-07-27",
   "branch": "architectureUMIposIntegration",
-  "parentHead": "8d174f7eeb78c2fb901b9c48b2bc61201575220c",
-  "completedGates": ["1A", "1B", "1C", "1D"],
+  "parentHead": "42aad13c91d0a1b2835c22d08c965865ac16f896",
+  "completedGates": ["1A", "1B", "1C", "1D", "1E"],
   "authorities": {
     "api": "apps/umi-api",
     "contracts": "packages/contract",
@@ -15,7 +15,9 @@
     "optimisticConcurrency": "tenant.aggregate_version",
     "businessAudit": "tenant.audit_event",
     "internalAuditMetadata": "runtime.audit_event_internal",
-    "financialEvents": "tenant.financial_event"
+    "financialEvents": "tenant.financial_event",
+    "operationalTelemetry": "apps/umi-api/src/shared/operations",
+    "health": "apps/umi-api/src/modules/health"
   },
   "security": {
     "apiRoleBypassesRls": false,
@@ -29,7 +31,18 @@
     "commandFingerprinting": true,
     "idempotentBusinessCommands": true,
     "internalAuditMetadataPubliclyReadable": false,
-    "replayDetection": true
+    "replayDetection": true,
+    "telemetryRedaction": true,
+    "layeredRateLimits": true,
+    "boundedHttpResources": true,
+    "boundedQueueDepth": true,
+    "safeOperationalDiagnostics": true
   },
-  "nextGate": null
+  "operations": {
+    "applicationLimiter": "process-local-bounded",
+    "distributedLimiterRequiredBeforeHorizontalScale": true,
+    "providerDdosMitigationRequired": true,
+    "assistantUsageEnabled": false
+  },
+  "nextGate": "1F"
 }

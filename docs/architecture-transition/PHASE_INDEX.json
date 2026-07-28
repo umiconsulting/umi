@@ -43,6 +43,11 @@
       "id": "1D",
       "status": "complete",
       "subject": "Transaction integrity, audit, and platform data controls"
+    },
+    {
+      "id": "1E",
+      "status": "complete",
+      "subject": "Observability, resilience, and abuse resistance"
     }
   ]
 }

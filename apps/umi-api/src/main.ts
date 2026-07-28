@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import fastifyCookie from '@fastify/cookie';
 import { AppModule } from './app.module';
 import type { AppConfig } from './shared/config/config.schema';
+import { RESOURCE_LIMITS } from './shared/operations/resource-limits';
 
 /**
  * Web process. Handles all HTTP ingress (health now; Twilio webhook, KDS,
@@ -15,7 +16,12 @@ import type { AppConfig } from './shared/config/config.schema';
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({ trustProxy: true }),
+    new FastifyAdapter({
+      trustProxy: true,
+      bodyLimit: RESOURCE_LIMITS.httpBodyBytes,
+      requestTimeout: RESOURCE_LIMITS.httpRequestMs,
+      connectionTimeout: RESOURCE_LIMITS.httpConnectionMs,
+    }),
   );
 
   // Cookie parsing/signing for the JWT auth cookies (D9). Reads `req.cookies`

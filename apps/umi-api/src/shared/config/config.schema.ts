@@ -35,6 +35,7 @@ export const configSchema = z
 
     // Redis / BullMQ.
     REDIS_URL: z.string().url(),
+    OPERATIONS_TOKEN: z.string().min(32).optional(),
 
     // Observability schema that holds the runtime trace tables umi-logs reads
     // (ai_turn_logs, edge_function_logs, security_logs, pipeline_traces). Live

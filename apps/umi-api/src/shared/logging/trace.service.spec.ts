@@ -44,7 +44,7 @@ describe('TraceService', () => {
     expect(params).toContain(JSON.stringify({ message_id: 'm1' }));
   });
 
-  it('truncates security input_text to 500 chars', async () => {
+  it('hashes identity and redacts security input content', async () => {
     const { service, query } = makeService();
     await service.logSecurityEvent({
       phone: '+1',
@@ -52,7 +52,9 @@ describe('TraceService', () => {
       inputText: 'x'.repeat(900),
     });
     const params = query.mock.calls[0][1];
-    expect((params[2] as string).length).toBe(500);
+    expect(params[0]).toMatch(/^[0-9a-f]{16}$/);
+    expect(params[0]).not.toBe('+1');
+    expect(params[2]).toBe('[REDACTED_INPUT]');
   });
 
   it('is best-effort — a failed insert never throws', async () => {

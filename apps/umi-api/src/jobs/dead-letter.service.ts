@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import { QueueRepository } from './queue.repository';
+import { errorCategory, redactTelemetry } from '../shared/operations/redaction';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -28,13 +29,13 @@ export class DeadLetterService {
   constructor(private readonly repo: QueueRepository) {}
 
   async recordTerminalFailure(job: Job, error: unknown): Promise<void> {
-    const message = error instanceof Error ? error.message : String(error);
+    const category = errorCategory(error);
     const tenantId = extractTenantId(job.data);
 
     if (!tenantId) {
       this.logger.error(
         `dead-letter (no tenant — log only): ${job.queueName}/${job.name} #${job.id} ` +
-          `after ${job.attemptsMade} attempts: ${message}`,
+          `after ${job.attemptsMade} attempts category=${category}`,
       );
       return;
     }
@@ -46,18 +47,18 @@ export class DeadLetterService {
         sourceTable: job.queueName,
         sourceId: typeof job.id === 'string' && UUID_RE.test(job.id) ? job.id : null,
         eventType: job.name,
-        payload: job.data,
-        error: message,
+        payload: redactTelemetry(job.data),
+        error: category,
         attempts: job.attemptsMade,
       });
       this.logger.error(
         `dead-lettered ${job.queueName}/${job.name} #${job.id} ` +
-          `after ${job.attemptsMade} attempts: ${message}`,
+          `after ${job.attemptsMade} attempts category=${category}`,
       );
     } catch (err) {
       this.logger.warn(
-        `dead_letter_insert_failed for ${job.queueName}/${job.name} #${job.id}: ` +
-          `${err instanceof Error ? err.message : String(err)}`,
+        `dead_letter_insert_failed for ${job.queueName}/${job.name} #${job.id} ` +
+          `category=${errorCategory(err)}`,
       );
     }
   }

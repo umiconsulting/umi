@@ -33,7 +33,7 @@ describe('DeadLetterService', () => {
         tenantId: 't1',
         sourceTable: 'turns',
         eventType: 'turn.process',
-        error: 'boom',
+        error: 'Error',
         attempts: 3,
       }),
     );
