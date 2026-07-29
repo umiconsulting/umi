@@ -82,6 +82,7 @@ from device.devices d;
 -- ----------------------------------------------------------------------------
 insert into runtime.session (id, business_id, principal_type, principal_id, token_hash,
                              station_id, device_name, is_active, metadata,
+                             revoked_at, revoked_reason,
                              last_used_at, created_at)
 select se.id,                                     -- preserved: the device_id the iPad already holds
        se.tenant_id             as business_id,
@@ -92,6 +93,15 @@ select se.id,                                     -- preserved: the device_id th
        se.device_name,
        se.is_active,
        coalesce(se.metadata, '{}'::jsonb) || jsonb_build_object('location_id', d.location_id::text),
+       -- `is_active` and `revoked_at` are ONE fact, and session_revocation_ck enforces
+       -- it: an inactive session must carry a revocation time. The source has only the
+       -- boolean, so last_used_at stands in for "when it stopped being usable" — the
+       -- same substitution this backfill already makes for is_cancelled -> voided_at.
+       -- The reason names it as a migration artifact rather than pretending we know why.
+       case when se.is_active then null
+            else coalesce(se.last_used_at, se.created_at) end   as revoked_at,
+       case when se.is_active then null
+            else 'migrated_inactive' end                        as revoked_reason,
        se.last_used_at,
        se.created_at
 from device.sessions se

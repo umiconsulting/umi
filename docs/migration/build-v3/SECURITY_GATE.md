@@ -11,7 +11,7 @@ The gate has two halves:
 
 | Half                      | What it covers                                                                     | How it runs                                                                          | Blocks         |
 | ------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | -------------- |
-| **A · Automated DB gate** | RLS, grants, credential exposure, data hygiene — everything provable from the DB   | `psql -v ON_ERROR_STOP=1 -f security_gate.sql` (24 structural + 3 behavioral checks) | the build / CI |
+| **A · Automated DB gate** | RLS, grants, credential exposure, data hygiene — everything provable from the DB   | `psql -v ON_ERROR_STOP=1 -f security_gate.sql` (26 structural + 3 behavioral checks) | the build / CI |
 | **B · Deployment gate**   | TLS, SCRAM, pg_hba, role wiring, secrets, pooler contract — the instance & backend | manual/CI checklist below, evidence recorded                                         | the cutover    |
 
 ---
@@ -47,6 +47,21 @@ reasoning:
 
 ## 3 · Automated DB gate — `security_gate.sql`
 
+> **Two gate defects found 2026-07-28 during the UmiPOS integration, both fixed here.**
+>
+> 1. **`revoke update (col) … from api` had never bound.** Postgres treats a table-level
+>    privilege as covering every column, so a column-level REVOKE cannot subtract from the
+>    blanket `grant … update … on all tables in schema tenant to api`. The much-commented
+>    "UNFORGEABLE" guard on `tenant.contact.normalized_value` was inert for its whole life;
+>    only its trigger was protecting the column. The working form (revoke the table UPDATE,
+>    grant it back on every other column) is now generated in `90_rls.sql`, and a new gate
+>    check asserts the class.
+> 2. **Two checks asserted a hardcoded list of table names**, so anything added afterwards was
+>    invisible to them and they passed while the new tables went unchecked. Both are now
+>    universals. The rule this file already applied to views — _"a hand-maintained list cannot
+>    satisfy a universal assertion — it goes stale the first time someone adds a view. It did"_ —
+>    applies to every check here, not just that one.
+
 Run: `PGPORT=5233 psql -v ON_ERROR_STOP=1 -d <db> -f security_gate.sql` → must end `SECURITY GATE PASSED`.
 All rows below are **enforced by that script** and currently **PASS**.
 
@@ -54,7 +69,15 @@ All rows below are **enforced by that script** and currently **PASS**.
 
 - **Every `tenant` base table has RLS _and_ FORCE.** (`relrowsecurity AND relforcerowsecurity` on all 33; FORCE closes the owner-bypass path.)
 - **`umi` per-café tables RLS+FORCE:** `subscription, subscription_item, invoice, entitlement_override, user_role` scoped to `app.current_business`; global catalogs (`role/permission/channel_type/feature/plan/plan_feature`) stay readable.
-- **`runtime` request-path tables RLS+FORCE:** `conversation_state` (via `conversation`), `reminder_sent` (business_id).
+- **`runtime` request-path tables RLS+FORCE:** `conversation_cart` and `conversation_turn` (via
+  `conversation`), `reminder_sent` (business_id), and the POS set — `operator_session`,
+  `device_enrollment_challenge`, `elevation_grant`, `security_audit_event`,
+  `audit_event_internal`. The last two are INSERT-only for `api`, and still need a policy:
+  insert alone is enough to forge an event against another café.
+  _(This line named `conversation_state`, which has not existed since it became
+  `conversation_cart`. The assertion is now a SWEEP — "every api-reachable runtime table with a
+  business_id has RLS+FORCE" — rather than a list of names, so the doc going stale can no longer
+  make the gate go blind.)_
 - **Views run `security_invoker`** (`conversation_analytics`, `effective_entitlement`) and `api` holds **no DML** on any view — the confirmed cross-tenant view leak is closed.
 - **Fail-closed GUC:** `umi.current_business()` returns NULL on unset/empty context → 0 rows, never an error. Behavioral test proves EGR sees 0 foreign rows; Kalala sees exactly its own.
 

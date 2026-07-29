@@ -80,7 +80,8 @@ group by b.name, s.status order by b.name;
 select t.name, string_agg(pi.product_key,',' order by pi.product_key) as provisioned
 from core.tenants t join core.product_instances pi on pi.tenant_id=t.id
 group by t.name order by t.name;
-\echo '-- packaging seed (expect feature=5, plan=3, plan_feature=7 — pos is catalog-only, in no plan):'
+\echo '-- packaging seed (expect feature=6, plan=3, plan_feature=7 — pos + pos.offline_cash'
+\echo '   are catalog-only, in no plan; feature went 5 -> 6 with pos.offline_cash):'
 select (select count(*) from umi.feature) feature, (select count(*) from umi.plan) plan, (select count(*) from umi.plan_feature) plan_feature;
 \echo '-- pos is catalog-only (expect pos_plan_feature=0; a nonzero means pos got bundled into a plan):'
 select count(*) as pos_plan_feature
@@ -96,3 +97,39 @@ union all select 'contact.channel', count(*) from tenant.contact c where not exi
 union all select 'conversation.channel', count(*) from tenant.conversation cv where not exists (select 1 from umi.channel_type ct where ct.id=cv.channel_id)
 union all select 'plan_feature.feature', count(*) from umi.plan_feature pf where not exists (select 1 from umi.feature f where f.id=pf.feature_id)
 order by 1;
+
+\echo ''
+\echo '========== F. POS CARRIES (2026-07-28) =========='
+\echo '-- business_date is DERIVED on every order, never NULL (expect 0):'
+select count(*) as orders_missing_business_date
+  from tenant.customer_order where business_date is null;
+\echo '-- and it agrees with the derivation from placed_at + timezone + business_day_start'
+\echo '   for EVERY order (an aggregate would hide a per-row drift) — expect 0:'
+select count(*) as business_date_mismatch
+  from tenant.customer_order o
+  join tenant.business b on b.id = o.business_id
+ where o.business_date
+       is distinct from (((o.placed_at at time zone b.timezone) - b.business_day_start::interval)::date);
+\echo '-- nothing was FABRICATED: the source has no discounts, comps or structured'
+\echo '   modifiers, so these tables must be empty (expect 0, 0):'
+select (select count(*) from tenant.order_discount)      as order_discount,
+       (select count(*) from tenant.order_item_modifier) as order_item_modifier;
+\echo '-- the derived order total is still GROSS while no discounts exist, so section B'
+\echo '   compares like with like (expect Σgross = Σtotal):'
+select coalesce(sum(gross),0) as gross, coalesce(sum(total),0) as total from tenant.order_total;
+\echo '-- session revocation is ONE fact: no active session carries a revoked_at, and no'
+\echo '   inactive session lacks one (session_revocation_ck; expect 0):'
+select count(*) as session_revocation_inconsistent
+  from runtime.session where is_active <> (revoked_at is null);
+\echo '-- every branch reference belongs to the SAME business (the composite FK now'
+\echo '   enforces this; a nonzero here means the source carried cross-tenant rows):'
+select count(*) as cross_business_branch_refs
+  from tenant.customer_order o
+  join tenant.branch br on br.id = o.branch_id
+ where o.branch_id is not null and br.business_id <> o.business_id;
+\echo '-- POS permissions have a holder (expect 21 grants across owner/admin/staff):'
+select count(*) as pos_role_grants
+  from umi.role_permission rp
+  join umi.permission p on p.id = rp.permission_id
+ where p.key in ('catalog.read','cart.write','checkout.commit','offline.replay',
+                 'offline.cash.checkout','device.enroll','offline.recovery.review','audit.read');

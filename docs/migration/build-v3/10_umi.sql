@@ -398,18 +398,10 @@ insert into umi.permission (key, description) values
   ('audit.read',               'Read tenant-visible, redacted audit events')
 on conflict (key) do update set description = excluded.description;
 
--- Every non-platform role can read the catalog and build a cart: a cashier who cannot
--- see the menu cannot sell. Committing money, replaying offline commands and reading
--- the audit chain are NOT granted here — those are attached to specific roles when the
--- role catalogue is seeded, so that "can operate the till" and "can move money" stay
--- separate decisions.
-insert into umi.role_permission (role_id, permission_id)
-select r.id, p.id
-  from umi.role r
- cross join umi.permission p
- where not r.is_platform
-   and p.key in ('catalog.read', 'cart.write')
-on conflict do nothing;
+-- ⚠️ NO role->permission grants here. This file runs BEFORE any role exists — the role
+-- catalogue is seeded by backfill_identity / seed_rbac — so a grant written here joins
+-- against an empty umi.role and silently inserts nothing. The POS grants live in
+-- backfill/seed_rbac.sql, which runs after the roles do.
 
 -- The POS offline-cash flag. Off until a business is explicitly certified for it;
 -- `tenant.pos_offline_cash_policy` then carries the limits.

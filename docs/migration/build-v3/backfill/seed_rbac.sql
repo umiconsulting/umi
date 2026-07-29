@@ -61,3 +61,43 @@ where not exists (
   select 1 from umi.role_permission x
   where x.role_id = r.id and x.permission_id = p.id
 );
+
+-- ---------------------------------------------------------------------------
+-- POS role -> permission grants (added 2026-07-28 with the UmiPOS integration).
+--
+-- These were briefly written into 10_umi.sql, which runs BEFORE any role exists, so
+-- they joined an empty umi.role and granted nothing. Permissions without a holder look
+-- exactly like permissions with one until somebody tries to sell something.
+--
+-- The split follows the existing one — `staff` is front-of-house ops:
+--   catalog.read / cart.write / checkout.commit  owner, admin, staff
+--       A cashier who cannot see the menu cannot sell, and taking money at the counter
+--       IS the front-of-house job.
+--   offline.replay / offline.cash.checkout       owner, admin, staff
+--       A till drains its own queue; the operator does not fetch a manager to reconnect.
+--       Offline CASH is additionally gated by the pos.offline_cash entitlement and by
+--       tenant.pos_offline_cash_policy, so this grant alone does not enable it.
+--   device.enroll / offline.recovery.review      owner, admin
+--       Enrolling a terminal and approving a recovery action are management decisions.
+--   audit.read                                   owner, admin
+--       The audit chain names who did what; it is not a shift-worker surface.
+--   viewer                                        none — read-only has no till.
+-- ---------------------------------------------------------------------------
+insert into umi.role_permission (role_id, permission_id)
+select r.id, p.id
+from (values
+  ('owner','catalog.read'),  ('owner','cart.write'),  ('owner','checkout.commit'),
+  ('owner','offline.replay'),('owner','offline.cash.checkout'),
+  ('owner','device.enroll'), ('owner','offline.recovery.review'), ('owner','audit.read'),
+  ('admin','catalog.read'),  ('admin','cart.write'),  ('admin','checkout.commit'),
+  ('admin','offline.replay'),('admin','offline.cash.checkout'),
+  ('admin','device.enroll'), ('admin','offline.recovery.review'), ('admin','audit.read'),
+  ('staff','catalog.read'),  ('staff','cart.write'),  ('staff','checkout.commit'),
+  ('staff','offline.replay'),('staff','offline.cash.checkout')
+) as m(role_key, perm_key)
+join umi.role r       on r.key = m.role_key
+join umi.permission p on p.key = m.perm_key
+where not exists (
+  select 1 from umi.role_permission x
+  where x.role_id = r.id and x.permission_id = p.id
+);
