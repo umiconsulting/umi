@@ -21,6 +21,18 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-07-29 - stashed documentation swept back into the tree
+- task type: root workspace documentation reconciliation (stash archaeology)
+- request summary: look through the stashed changes for instructions in the documentation that were never looked at or considered, then land what is necessary
+- filesystem slice inspected: the 3 live stashes plus the 11 dangling stash-like commits that touch `*.md`/`*.sql`, each compared against HEAD rather than against its own base
+- chosen owner: root `docs/` + `apps/umi-api/docs/` + `.agents/skills/task-router/`
+- chosen path: direct authorship; each stashed claim re-verified against the current tree before it was written down
+- skill or subagent used: `task-router`
+- files touched: `docs/migration/2026-06-26-hours-unification.sql`, `docs/migration/local-postgres/{020_local_source_fdw.sql,README.md}`, `apps/umi-api/docs/vps-setup.md`, `docs/architecture/2026-06-23-umi-api-centralization-spec.md`, `docs/migration/2026-06-09-workspace-integration-implementation-plan.md`, `.agents/skills/task-router/{registry,skill-seeds,routing-ledger}.md`
+- outcome: 7 unlanded items found. Two build-v3-era dropped stashes were confirmed already landed (`CONVENTIONS.md` required-check rule, the `runtime.product_embedding` grant), so the loss was bounded. The rest were real: a migration marked GATED that had in fact been applied to production; FDW servers pointing at a port and two databases that no longer exist; a deploy runbook that stopped two phases behind production; a skill installed but never registered.
+- reusable pattern observed: **diff a stash against HEAD, not against its own base.** `git stash show` answers "what did I change back then", which is the wrong question weeks later — the useful question is "what does this still carry that the tree does not", and only a HEAD diff answers it. The corollary is that a doc's *status header* is the highest-value thing to check, because a stale "GATED / not applied" reads as an instruction to go and apply it.
+- promotion follow-up: seed if a second stash sweep recurs; one trace is not a pattern.
+
 ### 2026-06-10 - Phase 5 monorepo migration: S5.1 executed, S5.2 rehearsed, stoppers registered
 - task type: cross-workspace program execution (monorepo track) under an active sequencing gate
 - request summary: continue with Phase 5 of the integration plan; document all stoppers

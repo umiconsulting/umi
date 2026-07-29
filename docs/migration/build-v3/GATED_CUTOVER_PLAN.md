@@ -106,6 +106,19 @@ Legend: ✅ done · 🔄 in flight · ⏳ pending · ◑ partial
   reading this plan against the UmiPOS integration; `runtime.operator_session` follows the
   same discipline — a distinct presence table rather than another overload of `session`.)
 - ⏳ **hours** — typed `tenant.business_hours` + fold `open_hours`; drop the `business.config` read.
+  Two facts recovered from a stash 2026-07-29, both of which change the shape of this item:
+  **(1) There is real source data.** `docs/migration/2026-06-26-hours-unification.sql` was marked
+  GATED / not applied, and it had in fact been applied to production on 2026-06-27 — Kalala Café
+  has 7 `ops.business_hours` rows at its oldest active location. Whatever `tenant.business_hours`
+  becomes has to carry them; the header now records this.
+  **(2) The client half of the ordering window was never written.** `hours.service.ts` and both
+  controllers accept an `ordering` block, and `ordering-settings.repository` merge-writes it into
+  `tenant.business.config` — but `saveBusinessHours(hours, timezone)` in the dashboard takes two
+  arguments and there is no third. **`updateOrdering` has no caller.** The screen also hardcodes
+  its own state (a 45-minute cutoff, a Spanish notice string, three `+52` numbers as the bypass
+  list, and a permanent `badge: 'PAUSED'` in `shell.jsx`), so it shows an operator a bot
+  configuration that nothing reads or writes. Settle that contract in the SAME pass that moves
+  `business.config` — doing it afterwards means doing it across a column move.
 - ⏳ **identity dissolution** — `contact_identity` / `channel` / `whatsapp_number` → the build-v3 model.
 - ⏳ **`90_rls.sql` booby-trap** — delete the hard-coded child-list rows in the _same_ commit that adds
   `business_id` to `station`/`order_event` (else `42710` aborts the whole RLS rebuild).

@@ -9,9 +9,11 @@ It is not a production migration set. Apply only to a disposable local database.
 
 ## Current Execution Scripts
 
-- `020_local_source_fdw.sql` links a local execution target to local source copies:
-  - `umi_cash_production_local_20260515`
-  - `umi_platform_production_local_20260515`
+- `020_local_source_fdw.sql` links a local execution target to local source copies
+  (last verified 2026-06-29 — the names carry their restore date and they drift;
+  the file's own header says how to check and how to correct a stale server):
+  - `umi_cash_production_local_20260618`
+  - `umi_platform_production_local_20260617`
 - `030_platform_identity_backfill.sql` performs the local Phase 3 platform identity backfill:
   - active Cash tenants, locations, staff, customer contacts, and phone identities
   - candidate ConversaFlow/KDS tenant mapping to `kalalacafe`
@@ -44,7 +46,10 @@ It is not a production migration set. Apply only to a disposable local database.
 
 ```bash
 export PG_BIN=/opt/homebrew/opt/postgresql@18/bin
-export UMI_LOCAL_DATABASE_URL="postgresql://localhost:5432/umi_platform_local"
+# The target and the FDW source servers in 020 must be the SAME cluster, so this
+# port has to match the one in 020_local_source_fdw.sql (5233 as last verified).
+export PGPORT=5233
+export UMI_LOCAL_DATABASE_URL="postgresql://localhost:$PGPORT/umi_platform_local"
 
 "$PG_BIN/pg_ctl" -D /opt/homebrew/var/postgresql@18 -l /tmp/umi_platform_postgresql18.log start
 "$PG_BIN/dropdb" --if-exists umi_platform_local
