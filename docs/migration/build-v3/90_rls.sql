@@ -304,6 +304,16 @@ create policy tenant_isolation on runtime.conversation_cart
   with check (exists (select 1 from tenant.conversation cv where cv.id = conversation_cart.conversation_id
                    and cv.business_id = umi.current_business()));
 
+-- Tenant-scoped the moment it gained a business_id (2026-07-29, queue-cluster restore).
+-- `api` holds select+insert on it for request dedup, and the universal gate check caught
+-- this within one run of adding the column — which is the whole argument for stating a
+-- check as a universal rather than a list of table names.
+alter table runtime.idempotency_key enable row level security;
+alter table runtime.idempotency_key force  row level security;
+create policy tenant_isolation on runtime.idempotency_key
+  using      (business_id = umi.current_business())
+  with check (business_id = umi.current_business());
+
 alter table runtime.conversation_turn enable row level security;
 alter table runtime.conversation_turn force  row level security;
 create policy tenant_isolation on runtime.conversation_turn

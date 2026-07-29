@@ -114,6 +114,21 @@ Legend: ✅ done · 🔄 in flight · ⏳ pending · ◑ partial
   silently, failing OPEN. Now swept with a recorded opt-out (`staff`, `loyalty_visit`), which
   also picked up four tables that had none — `customer_order`, `device`, `station`,
   `product_branch_availability`. **Rule: in this file, sweep and exclude; never list and include.**
+- ✅ **Queue cluster RESTORED (2026-07-29)** — `runtime.inbound_event` / `dead_letter` /
+  `idempotency_key`, the three siblings of the `outbox_event` restore above. Same loss, same
+  cause: the from-scratch DDL simplified past what the live worker writes, and nothing noticed
+  because the statements resolved against nothing. `inbound_event.external_id` → the
+  `provider_event_id` the code has always written (so the existing UNIQUE is the one
+  `ON CONFLICT` was addressing) plus `business_id`/`event_type`/`payload_hash`;
+  `dead_letter` gets back `business_id` (NOT NULL, which `dead-letter.service.ts` already cites
+  as why untenanted jobs are log-only) and the four facts `source text` had concatenated;
+  `idempotency_key` becomes tenant-scoped `(business_id, scope, key)` — a global `key` PK put
+  every café in one namespace. **This cluster was not on this list**; it was found by running
+  the preflight rather than reading the plan. Zero backfill impact: all three tables' rows are
+  dropped by the 2026-07-12 security decision.
+- ⏳ **`tenant.staff.name`** — `staff.repository` reads/writes `staff.name`/`phone`/`email`, which
+  build-v3 moved onto `umi.user` (staff carries `user_id`). 3 preflight failures. **Also not
+  previously on this list.**
 - ⏳ **Backfill rewrite to PRESERVE** — extend the reconcile to field-level for each new carry.
 
 > **Why P1 is "in progress" while P2 already shipped:** the order cluster was the cleanly-separable
@@ -226,8 +241,29 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
   `loyalty_program` branding layer (typed columns + `lifecycle_copy` jsonb + the partial/clear write).
   Deferred by decision: gift-card gifting model, `open_hours` (hours track), the branding read (P5 slug),
   and the birthday ISSUANCE cron (a wallet-push journey still in legacy umi-cash, not yet ported).
-- **Preflight:** **81** unresolved · **0** `42883`. Measured against `umi_backfill_v3` rebuilt with the
-  device- and loyalty-cluster deltas.
+- **Preflight (2026-07-29, PRISTINE build):** **26** unresolved · **0** `42883`. Measured by
+  building `00→90` into a throwaway database and running the gate against it — no prod snapshot
+  needed, so this number is reproducible on any machine with a Postgres. It is NOT comparable to
+  the 81 below, which was measured against `umi_backfill_v3` with the source schemas present.
+  The remaining 26 are **four buckets, each owned by a named phase**:
+
+  | bucket     | n   | cause                                                                                    | owner              |
+  | ---------- | --- | ---------------------------------------------------------------------------------------- | ------------------ |
+  | gift cards | 8   | `loyalty_gift_card.amount_cents` / `redeemed_at`, `loyalty_gift_card_ledger.source_type` | P4 (cash deferred) |
+  | hours      | 8   | `tenant.open_hours` missing, `business.config`                                           | P1 hours           |
+  | slug       | 7   | `business.slug`, `branch.slug` / `aliases`                                               | P5                 |
+  | staff      | 3   | `staff.name` → `umi.user`                                                                | P1 (new)           |
+
+  ⚠️ **The gate was over-reporting.** It scanned backtick spans over raw file text, so a doc
+  comment that QUOTES SQL counted as a statement: `kds.repository.ts` explains a rewrite with
+  "Replaces the old \`SELECT kitchen_status FROM ops.orders FOR UPDATE\`" and the gate reported it
+  as unresolved against a table that is supposed to be gone. Comments are now blanked before
+  scanning, preserving offsets so line numbers stay true. This matters because P1's DoD is
+  **0 unresolved**, and a false positive makes that unreachable except by deleting a correct
+  comment — a gate that cannot reach zero is one people learn to read past.
+
+- **Preflight (2026-07-25, historical):** **81** unresolved · **0** `42883`. Measured against
+  `umi_backfill_v3` rebuilt with the device- and loyalty-cluster deltas.
   ⚠️ **The earlier jump 140 → 171 was the gate no longer under-reporting, not a regression** — the 46
   interpolated statements were counted but unlooked-at, and `products.repository.ts` was failing every
   one (it read `p.price_cents`/`p.variants` where build-v3 has `price` and relational variants); the

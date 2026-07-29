@@ -172,10 +172,29 @@ create table runtime.outbox_event (
 -- The relay's claim query: ready rows oldest-first, plus stale leases to reclaim.
 create index outbox_event_claim_idx on runtime.outbox_event (status, available_at, created_at);
 
+-- The ingress observability gate. RESTORED to the shape the worker actually writes
+-- (same class of loss as runtime.outbox_event: the from-scratch DDL simplified past
+-- what the live code needs, and the statements resolved against nothing).
+--
+-- `provider_event_id` was called `external_id` here, which is the same fact under a
+-- different name — the code has always written `provider_event_id`.
+--
+-- The UNIQUE below already existed; it indexed the column under its old name, so the
+-- `ON CONFLICT (provider, provider_event_id)` in queue.repository failed on the column
+-- name rather than on a missing constraint. Renaming the column makes the existing
+-- index the one the code was always addressing.
+-- `whatsapp.controller` documents this as observability, NOT authoritative dedup: the
+-- durable guards are tenant.message.provider_message_id and the BullMQ jobId.
 create table runtime.inbound_event (
   id           uuid primary key default gen_random_uuid(),
+  -- Soft ref, and NULLABLE: a webhook is recorded as it arrives, which can be before
+  -- (or without) resolving which café it belongs to. Attribution is not a precondition
+  -- for observing that something arrived.
+  business_id  uuid,
   provider     text not null,              -- 'twilio','zettle','google_wallet',...
-  external_id  text,                        -- provider's event id (for dedup)
+  provider_event_id text,                  -- the provider's own event id
+  event_type   text,
+  payload_hash text,                       -- cheap equality check without re-reading payload
   payload      jsonb not null,             -- honest jsonb: the raw webhook envelope
   status       text not null default 'received'
                  check (status in ('received','processed','failed')),
@@ -184,7 +203,7 @@ create table runtime.inbound_event (
   created_at   timestamptz not null default now()
 );
 create unique index inbound_event_provider_ext_uq
-  on runtime.inbound_event (provider, external_id) where external_id is not null;
+  on runtime.inbound_event (provider, provider_event_id) where provider_event_id is not null;
 
 -- Inbound dedup only: "have I already seen this webhook / this provider callback?"
 --
@@ -195,20 +214,38 @@ create unique index inbound_event_provider_ext_uq
 -- order, use tenant.business_command, which keeps the fingerprint and the recorded
 -- result and answers IDEMPOTENCY_CONFLICT when they disagree.
 create table runtime.idempotency_key (
-  key          text primary key,           -- read BEFORE processing: "already done?"
+  -- RESTORED to a TENANT-SCOPED key. `key` alone as the primary key put every café in
+  -- one namespace: two businesses whose upstream hands them the same provider id would
+  -- collide, and one café's write could answer another café's "already done?".
+  business_id  uuid not null references tenant.business(id) on delete cascade,
   scope        text not null,
+  key          text not null,              -- read BEFORE processing: "already done?"
   created_at   timestamptz not null default now(),
-  expires_at   timestamptz
+  expires_at   timestamptz,
+  primary key (business_id, scope, key)
 );
 
+-- The exhausted-job sink. RESTORED: `source text` collapsed four facts the operator
+-- surface needs into one concatenated string ('bullmq.turns:turn.process'), and dropped
+-- the business entirely — a dead letter nobody can attribute to a café is not
+-- actionable, it is just a log line.
+--
+-- business_id is NOT NULL and FKs tenant.business, which dead-letter.service.ts already
+-- states as the reason infra jobs with no tenant are log-only rather than persisted.
 create table runtime.dead_letter (
-  id           uuid primary key default gen_random_uuid(),
-  source       text not null,
-  payload      jsonb,
-  error        text,
-  failed_at    timestamptz not null default now(),
-  created_at   timestamptz not null default now()
+  id            uuid primary key default gen_random_uuid(),
+  business_id   uuid not null references tenant.business(id) on delete cascade,
+  source_schema text,                      -- 'bullmq'
+  source_table  text,                      -- 'turns'
+  source_id     text,                      -- the job id
+  event_type    text,                      -- 'turn.process'
+  payload       jsonb,
+  error         text,
+  attempts      integer not null default 0 check (attempts >= 0),
+  failed_at     timestamptz not null default now(),
+  created_at    timestamptz not null default now()
 );
+create index dead_letter_business_time_idx on runtime.dead_letter (business_id, failed_at desc);
 
 -- ----------------------------------------------------------------------------
 -- LIVE CONVERSATION   → read to resume the bot / prevent double-sends
