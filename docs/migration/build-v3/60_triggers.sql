@@ -224,3 +224,49 @@ end $$;
 create trigger offline_replay_authority_guard
   before insert on tenant.offline_replay_command
   for each row execute function tenant.validate_offline_replay_authority();
+
+-- ----------------------------------------------------------------------------
+-- THE BUSINESS DATE is derived, never supplied.
+--
+-- Same discipline as tenant.contact.normalized_value: a column a caller could write
+-- is a column a caller can get wrong, and this one decides which day's revenue a sale
+-- lands in. A POS terminal with a drifted clock, or a client that computes midnight in
+-- the wrong timezone, would silently move money between trading days.
+--
+-- The source timestamp differs per table (customer_order has placed_at, pos_cart has
+-- created_at), so the column name is passed as a trigger argument and read through
+-- to_jsonb rather than duplicating the function. Subtracting business_day_start before
+-- casting to date is what makes an 01:00 sale belong to the previous trading day.
+-- ----------------------------------------------------------------------------
+create or replace function tenant.tg_business_date() returns trigger
+  language plpgsql
+  set search_path = pg_catalog as $$
+declare
+  v_tz        text;
+  v_day_start time;
+  v_at        timestamptz;
+begin
+  select b.timezone, b.business_day_start
+    into v_tz, v_day_start
+    from tenant.business b
+   where b.id = new.business_id;
+  if v_tz is null then
+    raise exception 'business_date: unknown business %', new.business_id using errcode = '23503';
+  end if;
+  v_at := coalesce((to_jsonb(new) ->> tg_argv[0])::timestamptz, now());
+  new.business_date := ((v_at at time zone v_tz) - v_day_start::interval)::date;
+  return new;
+end $$;
+
+-- INSERT **or UPDATE**, for the same reason contact_normalize does: a trigger that
+-- only fires on insert leaves the column forgeable by a later UPDATE. Re-deriving is
+-- idempotent, so firing on update costs nothing and closes the hole.
+create trigger customer_order_business_date
+  before insert or update on tenant.customer_order
+  for each row execute function tenant.tg_business_date('placed_at');
+
+-- The POS cart carries one too, and it must be derived by the SAME function, or the
+-- cart and the order it becomes could disagree about the day.
+create trigger pos_cart_business_date
+  before insert or update on tenant.pos_cart
+  for each row execute function tenant.tg_business_date('created_at');

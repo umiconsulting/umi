@@ -96,7 +96,37 @@ end $$;
 --   never supplied. Revoking the column makes it UNFORGEABLE: an app can no longer write a
 --   hand-rolled normalization into it, which is exactly how the L15 corruption stayed
 --   self-consistent (same broken function on read and write). raw is the truth.
-revoke update (normalized_value) on tenant.contact from api;
+--   ⚠️ `revoke update (col) on t from api` DOES NOT WORK once api holds table-level
+--   UPDATE — and it does, from the blanket grant above (`api=arwd`). PostgreSQL treats a
+--   table-level privilege as covering every column, and a column-level REVOKE cannot
+--   subtract from it. This file carried exactly that statement for
+--   tenant.contact.normalized_value with a long comment about making the column
+--   UNFORGEABLE; the statement had never had any effect. Only its trigger, which fires
+--   on INSERT **or UPDATE**, was actually protecting the column.
+--
+--   The working form is: revoke the table-level UPDATE, then grant UPDATE back on every
+--   column except the protected one. Generated rather than listed, so a new column is
+--   grantable automatically and cannot silently become read-only.
+do $$
+declare
+  r record;
+  cols text;
+begin
+  for r in select * from (values
+    -- table,                  protected column,  why
+    ('contact',        'normalized_value'),  -- derived by tg_contact_normalize; raw is the truth
+    ('customer_order', 'business_date'),     -- decides which day's revenue and cash-up a sale lands in
+    ('pos_cart',       'business_date')
+  ) as v(tbl, col)
+  loop
+    select string_agg(quote_ident(column_name), ', ' order by ordinal_position)
+      into cols
+      from information_schema.columns
+     where table_schema = 'tenant' and table_name = r.tbl and column_name <> r.col;
+    execute format('revoke update on tenant.%I from api', r.tbl);
+    execute format('grant update (%s) on tenant.%I to api', cols, r.tbl);
+  end loop;
+end $$;
 
 --   runtime — only the machinery the request path legitimately serves, scoped:
 grant select, insert, update, delete on runtime.conversation_cart to api;  -- live in-flight cart
@@ -298,34 +328,46 @@ create policy tenant_isolation on runtime.conversation_turn
 --   server. A request that cannot prove which device it is has no business reading any
 --   of them, so NULL means zero rows.
 
--- ---- Branch narrowing (nullable branch_id: a row with no branch is business-wide) ----
+-- ---- Branch narrowing: SWEPT, with a recorded opt-OUT ----
+-- This was an opt-IN list of table names, which is the booby-trap this file already
+-- warns about for the child-table list: a new tenant table with a branch_id that
+-- nobody remembers to add gets NO narrowing, silently, and the failure is open. The
+-- sweep inverts it — forgetting now yields narrowing, which is the safe direction.
+--
+-- ONE predicate serves both column shapes. Where branch_id is NOT NULL the
+-- `branch_id is null` disjunct is simply never true, so it costs nothing; where it is
+-- nullable, a business-wide row (no branch) stays visible to a branch-scoped caller,
+-- which is what "this fact belongs to the whole café" means.
+--
+-- The opt-out list is short and each entry is a claim about the DATA, not a
+-- convenience:
+--   staff          — manager approval reaches ACROSS branches. Narrowing staff would
+--                    make a manager at another branch unreachable to authorize a void,
+--                    which is precisely when you need one.
+--   loyalty_visit  — a stamp count is a property of the CARD, business-wide. A café
+--                    with two branches would undercount a customer's stamps the moment
+--                    a till set its branch, and quietly deny an earned reward.
 do $$
-declare t text;
+declare
+  t record;
+  skip constant text[] := array['staff', 'loyalty_visit'];
 begin
-  foreach t in array array[
-    'business_command', 'audit_event', 'financial_event'
-  ] loop
+  for t in
+    select c.relname
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'tenant' and c.relkind = 'r'          -- base tables only; a view has no policies
+       and exists (select 1 from information_schema.columns col
+                    where col.table_schema = 'tenant' and col.table_name = c.relname
+                      and col.column_name = 'branch_id')
+       and not (c.relname = any(skip))
+     order by c.relname
+  loop
     execute format($f$create policy branch_narrowing on tenant.%I as restrictive
       using      (umi.current_branch() is null or branch_id is null
                   or branch_id = umi.current_branch())
       with check (umi.current_branch() is null or branch_id is null
-                  or branch_id = umi.current_branch())$f$, t);
-  end loop;
-end $$;
-
--- ---- Branch narrowing (branch_id NOT NULL: every row belongs to one branch) ----
-do $$
-declare t text;
-begin
-  foreach t in array array[
-    'pos_cart', 'inventory_reservation', 'pos_payment_attempt', 'receipt_snapshot',
-    'pos_committed_sale', 'pos_offline_cash_policy', 'device_replay_cursor',
-    'offline_replay_command', 'offline_reconciliation', 'offline_replay_conflict',
-    'offline_provisional_mapping'
-  ] loop
-    execute format($f$create policy branch_narrowing on tenant.%I as restrictive
-      using      (umi.current_branch() is null or branch_id = umi.current_branch())
-      with check (umi.current_branch() is null or branch_id = umi.current_branch())$f$, t);
+                  or branch_id = umi.current_branch())$f$, t.relname);
   end loop;
 end $$;
 
@@ -334,6 +376,12 @@ end $$;
 -- app.current_device, and the repositories ran on the BYPASSRLS worker pool, so
 -- nothing ever evaluated these predicates. pg.service.ts now sets the GUC and the POS
 -- repositories run as `api`, which is what makes this real rather than decorative.
+--
+-- Deliberately opt-IN, unlike branch narrowing above. Device scoping is the strongest
+-- restriction in this file — it hides a row from everyone who cannot prove which
+-- terminal they are — so applying it by sweep would silently blind the dashboard to
+-- any future device-related table it legitimately reads. Opt-in, plus the assertion
+-- below so that forgetting is LOUD instead of silent.
 do $$
 declare t text;
 begin
@@ -345,6 +393,35 @@ begin
       using      (umi.current_device() is not null and device_id = umi.current_device())
       with check (umi.current_device() is not null and device_id = umi.current_device())$f$, t);
   end loop;
+end $$;
+
+-- Every tenant table carrying a device_id must have made a DECISION about device
+-- scoping — either it is scoped above, or it is named here as deliberately not. A new
+-- table that does neither aborts the build rather than shipping unscoped.
+do $$
+declare
+  undecided text[];
+  -- Empty today: every tenant table with a device_id is device-scoped. Add a name here
+  -- WITH A REASON when one legitimately is not — e.g. a dashboard-readable device
+  -- inventory or a telemetry roll-up. The cast is required: Postgres cannot infer the
+  -- element type of an empty array literal.
+  not_device_scoped constant text[] := array[]::text[];
+begin
+  select array_agg(c.relname order by c.relname) into undecided
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'tenant' and c.relkind = 'r'
+     and exists (select 1 from information_schema.columns col
+                  where col.table_schema = 'tenant' and col.table_name = c.relname
+                    and col.column_name = 'device_id')
+     and not exists (select 1 from pg_policy p
+                      where p.polrelid = c.oid and p.polname = 'device_scoping')
+     and not (c.relname = any(not_device_scoped));
+  if undecided is not null then
+    raise exception
+      'tenant tables carry device_id with no device-scoping decision: %. Scope them or name them in not_device_scoped.',
+      undecided;
+  end if;
 end $$;
 
 -- ===========================================================================

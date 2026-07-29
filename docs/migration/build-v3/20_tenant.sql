@@ -47,6 +47,12 @@ create table tenant.business (
   -- tone + extra instructions were deferred (no injection point decided) — add columns then.
   assistant_name    text,
   assistant_tone    text,
+  -- When the trading day rolls over. A café that serves until 01:00 counts that sale as
+  -- belonging to the previous day, and its cash-up, its revenue report and its receipt
+  -- must all agree about which day that is. Midnight is the safe default; a late-night
+  -- business sets 04:00. EVERY business_date in this schema is derived from this column
+  -- plus `timezone` by tenant.tg_business_date, so they cannot disagree with each other.
+  business_day_start time not null default '00:00',
   status            text not null default 'active'
                       check (status in ('active','suspended')),
   created_at        timestamptz not null default now(),
@@ -633,6 +639,17 @@ create table tenant.customer_order (
   pickup_person    text,                          -- who collects the order, when not the buyer
   external_ref     text,                          -- Zettle order id when synced; also the bot's idempotency key
   placed_at        timestamptz not null default now(),
+  -- WHICH TRADING DAY THIS SALE BELONGS TO. Derived by tenant.tg_business_date from
+  -- placed_at, the business timezone and business.business_day_start — never supplied
+  -- by a caller, because a till whose clock has drifted must not be able to move a sale
+  -- into yesterday.
+  --
+  -- Without this column the POS and the order cluster answer "what did we sell today?"
+  -- differently: pos_cart, receipt_snapshot and the cash-up all carry a business_date,
+  -- while an order carried only placed_at, so a 23:40 sale is today on the receipt and
+  -- yesterday in a placed_at report. That disagreement is silent, which is why it is a
+  -- column and not a convention.
+  business_date    date not null,
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
   -- NOTE: no stored `total`. The order's working/owed total is DERIVED (Σ live
@@ -1243,9 +1260,9 @@ create table tenant.pos_cart (
   -- and a till whose clock drifted must not be able to move a sale into yesterday.
   business_date date not null,
   created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now(),
-  constraint pos_cart_branch_same_business_fk
-    foreign key (business_id, branch_id) references tenant.branch (business_id, id)
+  updated_at    timestamptz not null default now()
+  -- The (business_id, branch_id) composite FK is added by the sweep at the end of this
+  -- file, together with every other tenant table that carries both columns.
 );
 -- One open cart per operator session. Two live carts on one till is how a sale gets
 -- rung into the wrong basket.
@@ -1522,3 +1539,47 @@ create table tenant.offline_provisional_mapping (
   unique (business_id, official_receipt_id),
   unique (command_id)
 );
+
+-- ============================================================================
+-- BRANCH BELONGS TO BUSINESS — enforced by the database, not by hope.
+-- ============================================================================
+-- Every tenant table that carries BOTH business_id and branch_id gets a composite
+-- foreign key (business_id, branch_id) -> tenant.branch (business_id, id).
+--
+-- Without it, a plain `branch_id references tenant.branch(id)` happily accepts a branch
+-- belonging to a DIFFERENT café. RLS scopes what a request can read, but the row is
+-- already malformed by then, and a malformed row outlives the bug that wrote it: a sale
+-- filed against another business's branch corrupts both cafés' day.
+--
+-- This became free the moment `tenant.branch` gained `unique (business_id, id)` for the
+-- POS. It costs one index lookup per insert and removes a whole class of write bug.
+--
+-- MATCH SIMPLE (the default) is what we want: where branch_id is NULL — a business-wide
+-- row — the constraint is not checked at all, so "no branch" stays legal.
+--
+-- Swept rather than listed, for the same reason as the RLS policies: a hand-maintained
+-- list is a list someone forgets to extend, and forgetting here fails OPEN.
+do $$
+declare
+  t record;
+begin
+  for t in
+    select c.relname
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'tenant' and c.relkind = 'r'
+       and c.relname <> 'branch'
+       and exists (select 1 from information_schema.columns col
+                    where col.table_schema='tenant' and col.table_name=c.relname
+                      and col.column_name='business_id')
+       and exists (select 1 from information_schema.columns col
+                    where col.table_schema='tenant' and col.table_name=c.relname
+                      and col.column_name='branch_id')
+     order by c.relname
+  loop
+    execute format(
+      'alter table tenant.%I add constraint %I foreign key (business_id, branch_id)
+         references tenant.branch (business_id, id)',
+      t.relname, t.relname || '_branch_same_business_fk');
+  end loop;
+end $$;

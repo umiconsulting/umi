@@ -22,6 +22,16 @@ select * from (values
        join pg_namespace n on n.oid=c.relnamespace
        where n.nspname='umi' and c.relrowsecurity and c.relforcerowsecurity
          and c.relname in ('subscription','subscription_item','invoice','entitlement_override','user_role'))),
+  -- Derived columns must be genuinely un-writable by the request path. This check
+  -- exists because 90_rls asserted it with a statement that does nothing:
+  -- `revoke update (col)` is a no-op while api holds table-level UPDATE, so the
+  -- much-commented "UNFORGEABLE" guard on contact.normalized_value never bound.
+  ('api cannot UPDATE derived columns (normalized_value, business_date)',
+    (select case when bool_and(not has_column_privilege('api', t, c, 'UPDATE'))
+                 then 'PASS' else 'FAIL' end
+       from (values ('tenant.contact','normalized_value'),
+                    ('tenant.customer_order','business_date'),
+                    ('tenant.pos_cart','business_date')) as v(t,c))),
   -- SWEPT, not listed. This was a hardcoded pair of table names, so every runtime
   -- table added to the request path afterwards was invisible to it: the check passed
   -- while the new tables went unchecked. Stated as a universal instead — if a runtime
