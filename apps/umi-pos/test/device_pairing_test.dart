@@ -187,6 +187,48 @@ void main() {
     expect(field.decoration?.errorText, isNotNull);
   });
 
+  testWidgets('a setup code timeout shows an inline recovery error', (
+    tester,
+  ) async {
+    final storage = MemorySecureStorage();
+    storage.values['device.installation_id'] = _installationId;
+    final vault = CredentialVault(storage);
+    final gateway = _PairingGateway()..claimFailureCode = 'REQUEST_TIMEOUT';
+    final controller = _controller(gateway, vault);
+    await controller.initialize();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('es'),
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ListenableBuilder(
+          listenable: controller,
+          builder: (context, _) => EntrySurface(controller: controller),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), 'ABCDEFGH');
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+
+    expect(controller.state.phase, EntryPhase.enrollmentRequired);
+    expect(
+      find.text(
+        'UmiPOS no puede verificar este código ahora. Revisa la conexión e inténtalo de nuevo.',
+      ),
+      findsOneWidget,
+    );
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.decoration?.errorText, isNotNull);
+  });
+
   testWidgets('trusted device uses the personal PIN and loads cashier access', (
     tester,
   ) async {
@@ -340,14 +382,15 @@ final class _PairingGateway implements EntryGateway {
   String? authenticatedPin;
   bool failLock = false;
   bool failClaim = false;
+  String? claimFailureCode;
 
   @override
   Future<DevicePairingSession> claimPairing(String code) async {
     claimedCode = code;
-    if (failClaim) {
-      throw const AppException(
+    if (failClaim || claimFailureCode != null) {
+      throw AppException(
         category: AppErrorCategory.authentication,
-        code: 'ENROLLMENT_REJECTED',
+        code: claimFailureCode ?? 'ENROLLMENT_REJECTED',
         recoverable: false,
       );
     }

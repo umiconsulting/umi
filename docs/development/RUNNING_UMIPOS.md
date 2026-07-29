@@ -10,8 +10,7 @@ Android, iOS (from macOS), and Flutter Web are supported when their platform SDK
 3. Generate contracts with `pnpm --filter @umi/contract generate`.
 4. In `apps/umi-pos`, run `flutter pub get` and `flutter gen-l10n`.
 
-No machine-specific path is required. UmiPOS never accepts Supabase service-role or database
-credentials.
+Use paths that work on each development machine. UmiPOS accepts only client credentials.
 
 ## Configuration
 
@@ -85,7 +84,7 @@ Seed the disposable local database with five POS roles and 12 products:
 
 `UMI_POS_DEV_SEED_CONFIRM=disposable pnpm umi-pos:demo-seed`
 
-Use the direct script when `pnpm` is not available:
+Alternative command without `pnpm`:
 
 `UMI_POS_DEV_SEED_CONFIRM=disposable bash scripts/umi-pos-demo-seed.sh`
 
@@ -117,8 +116,8 @@ approved provider adapter exists; never treat it as a simulated success or submi
 
 Apply migrations through `20260728000600_gate_2f_offline_closeout.sql`. Native journal payloads are
 AES-256-GCM encrypted; the key lives in platform secure storage and ciphertext lives separately.
-There is no plaintext fallback. Web remains online-compatible but sensitive offline journaling is
-disabled.
+Native storage always uses encryption. Web remains online-compatible. Policy disables sensitive
+offline journaling on Web.
 
 - Run focused offline scenarios: `pnpm umi-pos:replay-check`.
 - Run all focused offline client checks: `pnpm umi-pos:offline-tests`.

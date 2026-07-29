@@ -102,13 +102,16 @@ final class _EnrollmentState extends State<_Enrollment> {
 }
 
 String? _enrollmentError(AppLocalizations l, String? code) => switch (code) {
+  null => null,
   'AUTHENTICATION_REQUIRED' ||
   'ENROLLMENT_REJECTED' => l.enrollmentCodeRejected,
   'ENROLLMENT_EXPIRED' => l.enrollmentCodeExpired,
   'ENROLLMENT_ATTEMPTS_EXCEEDED' => l.enrollmentCodeAttemptsExceeded,
   'RATE_LIMITED' => l.enrollmentCodeRateLimited,
-  'TRANSPORT_FAILURE' || 'NETWORK_UNAVAILABLE' => l.enrollmentCodeUnavailable,
-  _ => null,
+  'TRANSPORT_FAILURE' ||
+  'NETWORK_UNAVAILABLE' ||
+  'REQUEST_TIMEOUT' => l.enrollmentCodeUnavailable,
+  _ => l.enrollmentCodeUnavailable,
 };
 
 final class _EnrollmentPending extends StatelessWidget {

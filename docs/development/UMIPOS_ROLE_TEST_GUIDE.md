@@ -41,13 +41,13 @@ El registro del dispositivo y el PIN del operador son controles diferentes.
 | Cajero        | `2468` | Catálogo, carrito y checkout                                      |
 | Consulta      | `5555` | Catálogo de solo lectura                                          |
 
-Los permisos vienen de la API. Flutter no concede permisos.
+La API concede todos los permisos.
 
-UmiPOS Web no muestra una administración de personal. Usa el Dashboard para esa función.
+Usa el Dashboard para administrar el personal.
 
-El seed no crea un PIN de `super_admin`. Ese rol pertenece a la plataforma UMI.
+La plataforma UMI administra el rol `super_admin`.
 
-El seed no crea un PIN de cocina. La operación de cocina pertenece a UmiKDS.
+UmiKDS administra la operación de cocina.
 
 ## Cambio de operador
 
@@ -73,7 +73,7 @@ Ejecuta esta prueba con todos los roles:
 9. Confirma que Rollo de canela muestra disponibilidad futura.
 10. Confirma que Bebida de temporada muestra fuera de surtido.
 
-La búsqueda consulta la API. La aplicación no descarga todo el catálogo para buscar.
+La búsqueda consulta resultados paginados de la API.
 
 ## Prueba del rol Consulta
 
@@ -88,9 +88,9 @@ Prueba estas funciones:
 5. Abre un detalle de producto.
 6. Revisa variantes, modificadores y disponibilidad.
 
-Este rol no tiene `cart.write`.
+Este rol tiene el permiso `catalog.read`.
 
-El panel del carrito debe indicar que el carrito no está disponible.
+El panel del carrito debe mostrar el estado de solo lectura.
 
 ## Prueba del rol Cajero
 
@@ -128,8 +128,6 @@ El Gerente también tiene estos permisos:
 - `offline.recovery.review`.
 - `offline.replay`.
 
-UmiPOS Web no guarda ventas financieras sin conexión.
-
 Usa una aplicación nativa compatible para probar el diario cifrado.
 
 ## Prueba del rol Administrador
@@ -154,13 +152,9 @@ Usa el PIN `1111`.
 
 Ejecuta toda la prueba del Administrador.
 
-La aplicación Web actual no tiene una pantalla exclusiva para el Propietario.
-
 El Dashboard mantiene las funciones de propiedad y configuración.
 
-## Funciones que todavía no existen
-
-UmiPOS no implementa estas funciones:
+## Funciones fuera del alcance actual
 
 - Corte y conciliación de caja.
 - Reembolsos.
@@ -171,7 +165,7 @@ UmiPOS no implementa estas funciones:
 - Pagos con un proveedor real.
 - Ventas financieras sin conexión en Web.
 
-Un PIN de Gerente no crea una función que todavía no existe.
+Los permisos del Gerente se limitan a las funciones actuales.
 
 ## Errores esperados
 
@@ -204,4 +198,4 @@ El seed es idempotente para los usuarios, los roles y el catálogo de demostraci
 
 El seed restablece los PIN y los intentos fallidos.
 
-El seed no elimina ventas, recibos ni comandos pendientes.
+El seed conserva las ventas, los recibos y los comandos pendientes.
