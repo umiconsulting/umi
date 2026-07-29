@@ -97,9 +97,26 @@ export const PosSessionTokens = z
     refreshToken: z.string().min(1).max(4096),
   })
   .strict();
+/**
+ * The session envelope a POS device receives. It EXTENDS the shared browser
+ * envelope rather than changing it.
+ *
+ * The POS needs two facts the dashboard has no use for: which durable session this
+ * is (so an operator session can be bound to it and revoked with it) and which
+ * device it was issued to. Adding them to the shared `SessionEnvelope` as required
+ * fields would have been a breaking change to every dashboard consumer, in service
+ * of a client that does not read them. Extending keeps one definition, one author,
+ * and puts each field where it is meaningful.
+ */
+export const PosSessionEnvelope = SessionEnvelope.extend({
+  sessionId: Uuid,
+  deviceId: Uuid.nullable(),
+});
+export type PosSessionEnvelope = z.infer<typeof PosSessionEnvelope>;
+
 export const PosSessionResponse = z
   .object({
-    session: SessionEnvelope,
+    session: PosSessionEnvelope,
     tokens: PosSessionTokens,
   })
   .strict();
@@ -195,6 +212,7 @@ export const deviceModels = {
   PosLoginRequest,
   PosRefreshRequest,
   PosSessionTokens,
+  PosSessionEnvelope,
   PosSessionResponse,
   BranchAccess,
   EntryTenant,

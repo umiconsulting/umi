@@ -291,5 +291,24 @@ test('Gate 2B device contracts are bounded and generated for Flutter', async () 
     'utf8',
   );
   assert.match(dart, /abstract final class UmiRoutes/);
-  assert.match(dart, /static const posLogin = '\/api\/auth\/pos\/login'/);
+  // The generated Dart must agree with ROUTE_TABLE, not with a path repeated here.
+  // Asserting a literal is how this file became a fourth copy of the URL space.
+  const { ROUTE_TABLE } = await import('../dist/index.js');
+  const exposed = ROUTE_TABLE.filter((r) => r.dart !== null);
+  assert.ok(exposed.length > 0, 'no routes are exposed to the Dart client');
+  for (const def of exposed) {
+    const literal = def.path.replace(
+      /:([A-Za-z0-9_]+)/g,
+      (_m, name) => '${Uri.encodeComponent(' + name + ')}',
+    );
+    assert.ok(
+      dart.includes(`'${literal}'`),
+      `generated Dart is missing ${def.method} ${def.path} (${def.dart})`,
+    );
+  }
+  // Every POS-facing path carries the URL major. A field client must never be able
+  // to reach an unversioned POS route.
+  for (const def of exposed) {
+    assert.match(def.path, /^\/api\/v1\//, `${def.id} is exposed to the POS but unversioned`);
+  }
 });

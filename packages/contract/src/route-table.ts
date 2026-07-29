@@ -1,0 +1,1268 @@
+// THE route table. Every HTTP path literal in the Umi platform is written here
+// exactly once, and nowhere else.
+//
+// Three surfaces are DERIVED from this file. None of them may hold a path literal:
+//   - `src/routes.ts`      → the ergonomic accessor the dashboard and umi-cash import.
+//   - `src/catalog.ts`     → `routeCatalog`, the contract manifest (request/response/auth/…).
+//   - `scripts/generate.mjs` → the Dart `UmiRoutes` class the Flutter POS imports.
+//
+// Before this file existed there were three independent lists and they had already
+// drifted on four routes (`/api/auth/local/global-logout` was in two of them,
+// `POST /api/auth/pos/logout` in a different two). The rule is the same one that
+// governs data: one path, one author.
+//
+// ── Versioning ────────────────────────────────────────────────────────────────
+// The major version lives in the path, per the contract-seam decision. It is applied
+// to the surfaces that exist FOR the POS, because the POS is the one client that
+// lives in the field on an old build and must never silently receive new semantics:
+//
+//     /api/v1/auth/pos/**        POS authentication
+//     /api/v1/devices/**         device lifecycle (enrolment, status)
+//     /api/v1/tenants/:id/devices/**
+//     /api/v1/pos/**             the POS surface proper
+//
+// Everything else keeps its unversioned path. The dashboard, umi-cash and the KDS
+// deploy in lockstep with the API, so they gain nothing from a version segment and
+// renaming their routes would be churn. A route the POS calls is always versioned:
+// where a capability is shared, the POS gets its own versioned route in its own
+// namespace rather than reaching into an unversioned one. `auth.posGlobalLogout` is
+// the worked example.
+//
+// ── Scope boundary ────────────────────────────────────────────────────────────
+// This table covers the routes that `routes.ts` and `routeCatalog` already carried,
+// plus the whole POS and device surface. `apps/umi-api` exposes further handlers
+// (KDS dashboard, customers, hours, voice, leads, conversations) that no shared client
+// imports by path. Bringing those in is worthwhile and is deliberately NOT done here,
+// so that this change stays reviewable. The drift test asserts the direction that
+// matters today: every POS and device route in this table resolves to a live handler.
+//
+// This module imports nothing, so the dashboard can consume it without pulling zod
+// into its bundle.
+
+export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+
+/**
+ * How a caller proves who it is.
+ *   public            no credential
+ *   session           browser cookie session (dashboard, umi-cash)
+ *   refresh-cookie    the refresh cookie only
+ *   device            an enrolled device credential, no operator yet
+ *   operator-session  an enrolled device AND an open operator session
+ */
+export type AuthMode = 'public' | 'session' | 'refresh-cookie' | 'device' | 'operator-session';
+
+/** The contract facts for a route. Absent when the route is not yet specified. */
+export interface RouteContract {
+  /** Model name in `modelCatalog`, or null when the route takes no body. */
+  readonly request: string | null;
+  /** Model name in `modelCatalog`, or null when the route returns no body. */
+  readonly response: string | null;
+  readonly auth: AuthMode;
+  /** Permission key checked by the guard chain, or null. */
+  readonly permission: string | null;
+  /** True when a retry with the same Idempotency-Key must replay, not repeat. */
+  readonly idempotent: boolean;
+  readonly tenantContext: boolean;
+  readonly branchContext: boolean;
+  /** True when the command may be journaled and replayed from an offline device. */
+  readonly offline: boolean;
+  /** True when a fresh operator PIN is required. */
+  readonly pin: boolean;
+  /** True when a manager approval token is required. */
+  readonly approval: boolean;
+  readonly errors: readonly string[];
+}
+
+export interface RouteDef {
+  /** Stable dotted id. `routes.ts` and the Dart emitter address routes by this. */
+  readonly id: string;
+  readonly method: HttpMethod;
+  /** The one and only place this path is written. `:name` marks a parameter. */
+  readonly path: string;
+  /** Parameter names in path order. Drives the generated Dart builder signature. */
+  readonly params: readonly string[];
+  /** Member name on the generated Dart `UmiRoutes`, or null when the POS never calls it. */
+  readonly dart: string | null;
+  readonly contract?: RouteContract;
+}
+
+/**
+ * Prefix for a tenant-scoped resource. Exported because the dashboard composes
+ * ad-hoc sub-paths onto it; kept here so `/api/tenants` is also written once.
+ */
+export const tenantBase = (tenantId: string): string =>
+  `/api/tenants/${encodeURIComponent(tenantId)}`;
+
+const E: readonly string[] = [];
+
+export const ROUTE_TABLE: readonly RouteDef[] = [
+  // ── Local authentication (dashboard, umi-cash) ─────────────────────────────
+  {
+    id: 'auth.login',
+    method: 'POST',
+    path: '/api/auth/local/login',
+    params: E,
+    dart: null,
+    contract: {
+      request: 'LoginRequest',
+      response: 'SessionResponse',
+      auth: 'public',
+      permission: null,
+      idempotent: false,
+      tenantContext: false,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'AUTHENTICATION_REQUIRED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'auth.refresh',
+    method: 'POST',
+    path: '/api/auth/local/refresh',
+    params: E,
+    dart: null,
+    contract: {
+      request: null,
+      response: 'SessionResponse',
+      auth: 'refresh-cookie',
+      permission: null,
+      idempotent: false,
+      tenantContext: false,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['AUTHENTICATION_REQUIRED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'auth.logout',
+    method: 'POST',
+    path: '/api/auth/local/logout',
+    params: E,
+    dart: null,
+    contract: {
+      request: null,
+      response: 'OkResponse',
+      auth: 'session',
+      permission: null,
+      idempotent: true,
+      tenantContext: false,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: E,
+    },
+  },
+  {
+    id: 'auth.globalLogout',
+    method: 'POST',
+    path: '/api/auth/local/global-logout',
+    params: E,
+    dart: null,
+    contract: {
+      request: 'GlobalLogoutRequest',
+      response: 'OkResponse',
+      auth: 'session',
+      permission: null,
+      idempotent: true,
+      tenantContext: false,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['AUTHENTICATION_REQUIRED'],
+    },
+  },
+  {
+    id: 'auth.forgotPassword',
+    method: 'POST',
+    path: '/api/auth/local/forgot-password',
+    params: E,
+    dart: null,
+    contract: {
+      request: 'ForgotPasswordRequest',
+      response: 'OkResponse',
+      auth: 'public',
+      permission: null,
+      idempotent: true,
+      tenantContext: false,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'auth.resetPassword',
+    method: 'POST',
+    path: '/api/auth/local/reset-password',
+    params: E,
+    dart: null,
+    contract: {
+      request: 'ResetPasswordRequest',
+      response: 'OkResponse',
+      auth: 'public',
+      permission: null,
+      idempotent: false,
+      tenantContext: false,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'AUTHENTICATION_REQUIRED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'auth.me',
+    method: 'GET',
+    path: '/api/auth/me',
+    params: E,
+    dart: null,
+    contract: {
+      request: null,
+      response: 'SessionResponse',
+      auth: 'session',
+      permission: null,
+      idempotent: true,
+      tenantContext: false,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['AUTHENTICATION_REQUIRED'],
+    },
+  },
+
+  // ── POS authentication (versioned: a field client depends on these) ────────
+  {
+    id: 'auth.posLogin',
+    method: 'POST',
+    path: '/api/v1/auth/pos/login',
+    params: E,
+    dart: 'posLogin',
+    contract: {
+      request: 'PosLoginRequest',
+      response: 'PosSessionResponse',
+      auth: 'device',
+      permission: null,
+      idempotent: false,
+      tenantContext: false,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'VALIDATION_FAILED',
+        'AUTHENTICATION_REQUIRED',
+        'DEVICE_REVOKED',
+        'ENTITLEMENT_DISABLED',
+        'RATE_LIMITED',
+      ],
+    },
+  },
+  {
+    id: 'auth.posRefresh',
+    method: 'POST',
+    path: '/api/v1/auth/pos/refresh',
+    params: E,
+    dart: 'posRefresh',
+    contract: {
+      request: 'PosRefreshRequest',
+      response: 'PosSessionResponse',
+      auth: 'device',
+      permission: null,
+      idempotent: false,
+      tenantContext: false,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['AUTHENTICATION_REQUIRED', 'DEVICE_REVOKED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'auth.posLogout',
+    method: 'POST',
+    path: '/api/v1/auth/pos/logout',
+    params: E,
+    dart: 'posLogout',
+    contract: {
+      request: null,
+      response: 'OkResponse',
+      auth: 'device',
+      permission: null,
+      idempotent: true,
+      tenantContext: false,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: E,
+    },
+  },
+  {
+    // The POS gets its own versioned route rather than calling the dashboard's
+    // unversioned `auth.globalLogout`. Same service behind it.
+    id: 'auth.posGlobalLogout',
+    method: 'POST',
+    path: '/api/v1/auth/pos/global-logout',
+    params: E,
+    dart: 'globalLogout',
+    contract: {
+      request: 'GlobalLogoutRequest',
+      response: 'OkResponse',
+      auth: 'device',
+      permission: null,
+      idempotent: true,
+      tenantContext: false,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['AUTHENTICATION_REQUIRED'],
+    },
+  },
+
+  // ── Tenancy ────────────────────────────────────────────────────────────────
+  {
+    id: 'me.tenants',
+    method: 'GET',
+    path: '/api/me/tenants',
+    params: E,
+    dart: null,
+    contract: {
+      request: null,
+      response: 'MeTenantsResponse',
+      auth: 'session',
+      permission: null,
+      idempotent: true,
+      tenantContext: false,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['AUTHENTICATION_REQUIRED'],
+    },
+  },
+  {
+    id: 'tenants.capabilities',
+    method: 'GET',
+    path: '/api/tenants/:tenantId/capabilities',
+    params: ['tenantId'],
+    dart: null,
+  },
+  {
+    id: 'tenants.settings',
+    method: 'GET',
+    path: '/api/tenants/:tenantId/settings',
+    params: ['tenantId'],
+    dart: null,
+  },
+  {
+    id: 'tenants.locations',
+    method: 'GET',
+    path: '/api/tenants/:tenantId/locations',
+    params: ['tenantId'],
+    dart: null,
+  },
+  {
+    id: 'tenants.audit',
+    method: 'GET',
+    path: '/api/tenants/:tenantId/audit',
+    params: ['tenantId'],
+    dart: null,
+    contract: {
+      request: 'AuditSearchRequest',
+      response: 'AuditSearchResponse',
+      auth: 'session',
+      permission: 'audit.read',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED'],
+    },
+  },
+
+  // ── Cash / loyalty, tenant-scoped (dashboard) ──────────────────────────────
+  {
+    id: 'cash.stats',
+    method: 'GET',
+    path: '/api/tenants/:tenantId/cash/stats',
+    params: ['tenantId'],
+    dart: null,
+  },
+  {
+    id: 'cash.analytics',
+    method: 'GET',
+    path: '/api/tenants/:tenantId/cash/analytics',
+    params: ['tenantId'],
+    dart: null,
+  },
+  {
+    id: 'cash.customers',
+    method: 'GET',
+    path: '/api/tenants/:tenantId/cash/customers',
+    params: ['tenantId'],
+    dart: null,
+  },
+  {
+    id: 'cash.members',
+    method: 'GET',
+    path: '/api/tenants/:tenantId/cash/members',
+    params: ['tenantId'],
+    dart: null,
+  },
+  {
+    id: 'cash.giftCards',
+    method: 'GET',
+    path: '/api/tenants/:tenantId/cash/gift-cards',
+    params: ['tenantId'],
+    dart: null,
+  },
+  {
+    id: 'cash.rewardConfig',
+    method: 'GET',
+    path: '/api/tenants/:tenantId/cash/reward-config',
+    params: ['tenantId'],
+    dart: null,
+  },
+
+  // ── Cash / loyalty, slug-scoped (umi-cash frontend) ────────────────────────
+  {
+    id: 'cash.slug.scan',
+    method: 'POST',
+    path: '/api/:slug/admin/scan',
+    params: ['slug'],
+    dart: null,
+    contract: {
+      request: 'ScanRequest',
+      response: null,
+      auth: 'session',
+      permission: null,
+      idempotent: false,
+      tenantContext: true,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'cash.slug.topup',
+    method: 'POST',
+    path: '/api/:slug/admin/topup',
+    params: ['slug'],
+    dart: null,
+    contract: {
+      request: 'TopupRequest',
+      response: null,
+      auth: 'session',
+      permission: null,
+      idempotent: false,
+      tenantContext: true,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'cash.slug.purchase',
+    method: 'POST',
+    path: '/api/:slug/admin/purchase',
+    params: ['slug'],
+    dart: null,
+    contract: {
+      request: 'PurchaseRequest',
+      response: null,
+      auth: 'session',
+      permission: null,
+      idempotent: false,
+      tenantContext: true,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'cash.slug.giftCards',
+    method: 'POST',
+    path: '/api/:slug/admin/gift-cards',
+    params: ['slug'],
+    dart: null,
+    contract: {
+      request: 'GiftCardCreateRequest',
+      response: null,
+      auth: 'session',
+      permission: null,
+      idempotent: false,
+      tenantContext: true,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'PERMISSION_DENIED'],
+    },
+  },
+  {
+    id: 'cash.slug.settings',
+    method: 'GET',
+    path: '/api/:slug/admin/settings',
+    params: ['slug'],
+    dart: null,
+  },
+  {
+    id: 'cash.slug.rewardConfig',
+    method: 'GET',
+    path: '/api/:slug/admin/reward-config',
+    params: ['slug'],
+    dart: null,
+  },
+  {
+    id: 'cash.slug.stats',
+    method: 'GET',
+    path: '/api/:slug/admin/stats',
+    params: ['slug'],
+    dart: null,
+  },
+  {
+    id: 'cash.slug.analytics',
+    method: 'GET',
+    path: '/api/:slug/admin/analytics',
+    params: ['slug'],
+    dart: null,
+  },
+  {
+    id: 'cash.slug.registerMember',
+    method: 'POST',
+    path: '/api/:slug/customers',
+    params: ['slug'],
+    dart: null,
+    contract: {
+      request: 'RegisterMemberRequest',
+      response: null,
+      auth: 'public',
+      permission: null,
+      idempotent: false,
+      tenantContext: true,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'cash.slug.gift',
+    method: 'POST',
+    path: '/api/:slug/gift/:code',
+    params: ['slug', 'code'],
+    dart: null,
+    contract: {
+      request: 'GiftRedeemRequest',
+      response: null,
+      auth: 'public',
+      permission: null,
+      idempotent: false,
+      tenantContext: true,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'RESOURCE_NOT_FOUND', 'RATE_LIMITED'],
+    },
+  },
+
+  // ── Staff ──────────────────────────────────────────────────────────────────
+  {
+    id: 'staff.create',
+    method: 'POST',
+    path: '/api/:slug/admin/staff',
+    params: ['slug'],
+    dart: null,
+    contract: {
+      request: 'CreateStaffRequest',
+      response: null,
+      auth: 'session',
+      permission: null,
+      idempotent: false,
+      tenantContext: true,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'PERMISSION_DENIED'],
+    },
+  },
+  {
+    id: 'staff.update',
+    method: 'PATCH',
+    path: '/api/:slug/admin/staff/:staffId',
+    params: ['slug', 'staffId'],
+    dart: null,
+    contract: {
+      request: 'UpdateStaffRequest',
+      response: null,
+      auth: 'session',
+      permission: null,
+      idempotent: false,
+      tenantContext: true,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+
+  // ── Device lifecycle (versioned) ───────────────────────────────────────────
+  {
+    id: 'devices.beginEnrollment',
+    method: 'POST',
+    path: '/api/v1/tenants/:tenantId/devices/enrollment',
+    params: ['tenantId'],
+    dart: null,
+    contract: {
+      request: 'BeginDeviceEnrollmentRequest',
+      response: 'EnrollmentChallenge',
+      auth: 'session',
+      permission: 'device.enroll',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED', 'ENTITLEMENT_DISABLED'],
+    },
+  },
+  {
+    id: 'devices.completeEnrollment',
+    method: 'POST',
+    path: '/api/v1/devices/enrollment/complete',
+    params: E,
+    dart: 'deviceEnrollmentComplete',
+    contract: {
+      request: 'CompleteDeviceEnrollmentRequest',
+      response: 'DeviceCredentialEnvelope',
+      auth: 'public',
+      permission: null,
+      idempotent: true,
+      tenantContext: false,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'AUTHENTICATION_REQUIRED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'devices.status',
+    method: 'GET',
+    path: '/api/v1/devices/status',
+    params: E,
+    dart: 'deviceStatus',
+    contract: {
+      request: null,
+      response: 'DeviceSummary',
+      auth: 'device',
+      permission: null,
+      idempotent: true,
+      tenantContext: false,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['AUTHENTICATION_REQUIRED', 'DEVICE_REVOKED'],
+    },
+  },
+
+  // ── POS entry: operator sessions and elevation ─────────────────────────────
+  {
+    id: 'pos.entryContext',
+    method: 'GET',
+    path: '/api/v1/pos/entry-context',
+    params: E,
+    dart: 'posEntryContext',
+    contract: {
+      request: null,
+      response: 'EntryContextResponse',
+      auth: 'device',
+      permission: null,
+      idempotent: true,
+      tenantContext: false,
+      branchContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['AUTHENTICATION_REQUIRED', 'DEVICE_REVOKED', 'ENTITLEMENT_DISABLED'],
+    },
+  },
+  {
+    id: 'pos.operatorSessions',
+    method: 'POST',
+    path: '/api/v1/pos/operator-sessions',
+    params: E,
+    dart: 'operatorSessions',
+    contract: {
+      request: 'StartOperatorSessionRequest',
+      response: 'OperatorSessionView',
+      auth: 'device',
+      permission: null,
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'DEVICE_REVOKED',
+        'BRANCH_SCOPE_VIOLATION',
+        'ENTITLEMENT_DISABLED',
+      ],
+    },
+  },
+  {
+    id: 'pos.operatorLock',
+    method: 'POST',
+    path: '/api/v1/pos/operator-sessions/:operatorSessionId/lock',
+    params: ['operatorSessionId'],
+    dart: 'operatorLock',
+    contract: {
+      request: null,
+      response: 'OperatorSessionView',
+      auth: 'operator-session',
+      permission: null,
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'pos.operatorEnd',
+    method: 'POST',
+    path: '/api/v1/pos/operator-sessions/:operatorSessionId/end',
+    params: ['operatorSessionId'],
+    dart: 'operatorEnd',
+    contract: {
+      request: null,
+      response: 'OperatorSessionView',
+      auth: 'operator-session',
+      permission: null,
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'pos.verifyPin',
+    method: 'POST',
+    path: '/api/v1/pos/elevation/pin',
+    params: E,
+    dart: 'operatorPin',
+    contract: {
+      request: 'VerifyOperatorPinRequest',
+      response: 'ElevationGrantView',
+      auth: 'operator-session',
+      permission: null,
+      idempotent: false,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: true,
+      approval: false,
+      errors: ['AUTHENTICATION_REQUIRED', 'PERMISSION_DENIED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'pos.managerApproval',
+    method: 'POST',
+    path: '/api/v1/pos/elevation/manager-approval',
+    params: E,
+    dart: 'managerApproval',
+    contract: {
+      request: 'ManagerApprovalRequest',
+      response: 'ElevationGrantView',
+      auth: 'operator-session',
+      permission: null,
+      idempotent: false,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: true,
+      errors: ['AUTHENTICATION_REQUIRED', 'PERMISSION_DENIED', 'RATE_LIMITED'],
+    },
+  },
+
+  // ── POS catalog (read model) ───────────────────────────────────────────────
+  {
+    id: 'pos.catalogCategories',
+    method: 'GET',
+    path: '/api/v1/pos/tenants/:tenantId/catalog/categories',
+    params: ['tenantId'],
+    dart: 'posCatalogCategories',
+    contract: {
+      request: 'CatalogQuery',
+      response: 'CatalogCategoriesResponse',
+      auth: 'operator-session',
+      permission: 'catalog.read',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'BRANCH_SCOPE_VIOLATION'],
+    },
+  },
+  {
+    id: 'pos.catalogProducts',
+    method: 'GET',
+    path: '/api/v1/pos/tenants/:tenantId/catalog/products',
+    params: ['tenantId'],
+    dart: 'posCatalogProducts',
+    contract: {
+      request: 'CatalogQuery',
+      response: 'CatalogPage',
+      auth: 'operator-session',
+      permission: 'catalog.read',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'BRANCH_SCOPE_VIOLATION'],
+    },
+  },
+  {
+    id: 'pos.catalogProduct',
+    method: 'GET',
+    path: '/api/v1/pos/tenants/:tenantId/catalog/products/:productId',
+    params: ['tenantId', 'productId'],
+    dart: 'posCatalogProduct',
+    contract: {
+      request: 'CatalogQuery',
+      response: 'CatalogProductDetail',
+      auth: 'operator-session',
+      permission: 'catalog.read',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+
+  // ── POS cart ───────────────────────────────────────────────────────────────
+  {
+    id: 'pos.cartCreate',
+    method: 'POST',
+    path: '/api/v1/pos/tenants/:tenantId/cart',
+    params: ['tenantId'],
+    dart: 'posCart',
+    contract: {
+      request: 'CreateCartRequest',
+      response: 'Cart',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'IDEMPOTENCY_CONFLICT', 'BRANCH_SCOPE_VIOLATION'],
+    },
+  },
+  {
+    id: 'pos.cartGet',
+    method: 'GET',
+    path: '/api/v1/pos/tenants/:tenantId/cart',
+    params: ['tenantId'],
+    dart: null,
+    contract: {
+      request: 'CartQuery',
+      response: 'Cart',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'pos.cartLines',
+    method: 'POST',
+    path: '/api/v1/pos/tenants/:tenantId/cart/lines',
+    params: ['tenantId'],
+    dart: 'posCartLines',
+    contract: {
+      request: 'CartLineInput',
+      response: 'Cart',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'OPTIMISTIC_VERSION_CONFLICT', 'IDEMPOTENCY_CONFLICT'],
+    },
+  },
+  {
+    id: 'pos.cartLineUpdate',
+    method: 'PATCH',
+    path: '/api/v1/pos/tenants/:tenantId/cart/lines/:lineId',
+    params: ['tenantId', 'lineId'],
+    dart: 'posCartLine',
+    contract: {
+      request: 'CartLineInput',
+      response: 'Cart',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'OPTIMISTIC_VERSION_CONFLICT', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'pos.cartLineRemove',
+    method: 'DELETE',
+    path: '/api/v1/pos/tenants/:tenantId/cart/lines/:lineId',
+    params: ['tenantId', 'lineId'],
+    dart: null,
+    contract: {
+      request: 'RemoveCartLineRequest',
+      response: 'Cart',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'OPTIMISTIC_VERSION_CONFLICT', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'pos.cartPrepare',
+    method: 'POST',
+    path: '/api/v1/pos/tenants/:tenantId/cart/prepare',
+    params: ['tenantId'],
+    dart: 'posCartPrepare',
+    contract: {
+      request: 'PrepareSaleRequest',
+      response: 'TotalsConfirmation',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'OPTIMISTIC_VERSION_CONFLICT', 'INVENTORY_UNAVAILABLE'],
+    },
+  },
+
+  // ── POS checkout ───────────────────────────────────────────────────────────
+  {
+    id: 'pos.checkout',
+    method: 'POST',
+    path: '/api/v1/pos/tenants/:tenantId/checkout',
+    params: ['tenantId'],
+    dart: 'posCheckout',
+    contract: {
+      request: 'CheckoutCommand',
+      response: 'CheckoutResult',
+      auth: 'operator-session',
+      permission: 'checkout.commit',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: true,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'INVENTORY_UNAVAILABLE',
+        'PAYMENT_UNKNOWN',
+        'OPTIMISTIC_VERSION_CONFLICT',
+        'IDEMPOTENCY_CONFLICT',
+      ],
+    },
+  },
+  {
+    id: 'pos.checkoutPayment',
+    method: 'GET',
+    path: '/api/v1/pos/tenants/:tenantId/checkout/payments/:paymentId',
+    params: ['tenantId', 'paymentId'],
+    dart: 'posCheckoutPayment',
+    contract: {
+      request: 'PaymentStatusQuery',
+      response: 'PaymentOutcome',
+      auth: 'operator-session',
+      permission: 'checkout.commit',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+
+  // ── POS offline replay ─────────────────────────────────────────────────────
+  {
+    id: 'pos.offlineReplayBegin',
+    method: 'POST',
+    path: '/api/v1/pos/tenants/:tenantId/offline/replay/begin',
+    params: ['tenantId'],
+    dart: 'posOfflineReplayBegin',
+    contract: {
+      request: 'BeginReplayRequest',
+      response: 'BeginReplayResponse',
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'DEVICE_REVOKED', 'BRANCH_SCOPE_VIOLATION'],
+    },
+  },
+  {
+    id: 'pos.offlinePolicy',
+    method: 'GET',
+    path: '/api/v1/pos/tenants/:tenantId/offline/policy',
+    params: ['tenantId'],
+    dart: 'posOfflinePolicy',
+    contract: {
+      request: 'ReplayContextQuery',
+      response: 'OfflinePolicy',
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'DEVICE_REVOKED', 'ENTITLEMENT_DISABLED'],
+    },
+  },
+  {
+    // Deliberately NOT idempotent: a lost response must be queried by command id
+    // before the same batch is sent again. See pos-offline replay engine.
+    id: 'pos.offlineReplayBatch',
+    method: 'POST',
+    path: '/api/v1/pos/tenants/:tenantId/offline/replay/batch',
+    params: ['tenantId'],
+    dart: 'posOfflineReplayBatch',
+    contract: {
+      request: 'ReplayBatch',
+      response: 'ReplayBatchResult',
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: false,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'IDEMPOTENCY_CONFLICT', 'DEVICE_REVOKED'],
+    },
+  },
+  {
+    id: 'pos.offlineReplayCursor',
+    method: 'GET',
+    path: '/api/v1/pos/tenants/:tenantId/offline/replay/cursor',
+    params: ['tenantId'],
+    dart: 'posOfflineReplayCursor',
+    contract: {
+      request: 'ReplayContextQuery',
+      response: 'ReplayCursor',
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED'],
+    },
+  },
+  {
+    id: 'pos.offlineReplayCommand',
+    method: 'GET',
+    path: '/api/v1/pos/tenants/:tenantId/offline/replay/commands/:commandId',
+    params: ['tenantId', 'commandId'],
+    dart: 'posOfflineReplayCommand',
+    contract: {
+      request: 'ReplayCommandResultQuery',
+      response: 'ReplayResult',
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'pos.offlineConflicts',
+    method: 'GET',
+    path: '/api/v1/pos/tenants/:tenantId/offline/conflicts',
+    params: ['tenantId'],
+    dart: 'posOfflineConflicts',
+    contract: {
+      request: 'ReplayContextQuery',
+      response: 'ConflictSummary',
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED'],
+    },
+  },
+  {
+    id: 'pos.offlineReconcile',
+    method: 'POST',
+    path: '/api/v1/pos/tenants/:tenantId/offline/reconcile',
+    params: ['tenantId'],
+    dart: 'posOfflineReconcile',
+    contract: {
+      request: 'ReconcileRequest',
+      response: 'ReconciliationSummary',
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED'],
+    },
+  },
+  {
+    id: 'pos.offlineReconcileAcknowledge',
+    method: 'POST',
+    path: '/api/v1/pos/tenants/:tenantId/offline/reconcile/acknowledge',
+    params: ['tenantId'],
+    dart: 'posOfflineReconcileAcknowledge',
+    contract: {
+      request: 'AcknowledgeReconciliationRequest',
+      response: null,
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED'],
+    },
+  },
+  {
+    id: 'pos.offlineDiagnostics',
+    method: 'GET',
+    path: '/api/v1/pos/tenants/:tenantId/offline/diagnostics',
+    params: ['tenantId'],
+    dart: 'posOfflineDiagnostics',
+    contract: {
+      request: null,
+      response: 'SafeReplayDiagnostic',
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: true,
+      tenantContext: true,
+      branchContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED'],
+    },
+  },
+];
+
+/** Route ids, for lookups that must fail at compile time when an id is wrong. */
+export type RouteId = (typeof ROUTE_TABLE)[number]['id'];
+
+const byId = new Map<string, RouteDef>(ROUTE_TABLE.map((r) => [r.id, r]));
+
+if (byId.size !== ROUTE_TABLE.length) {
+  throw new Error('ROUTE_TABLE contains duplicate route ids');
+}
+
+/** The route definition for an id. Throws on an unknown id — a typo must not ship. */
+export const route = (id: string): RouteDef => {
+  const found = byId.get(id);
+  if (!found) throw new Error(`Unknown route id: ${id}`);
+  return found;
+};
+
+/** The raw path template for an id, `:params` unsubstituted. */
+export const routePath = (id: string): string => route(id).path;
+
+/**
+ * The path for an id with its parameters substituted and percent-encoded.
+ * Throws when a parameter is missing, so a half-built URL cannot reach the network.
+ */
+export const buildPath = (id: string, params: Readonly<Record<string, string>> = {}): string => {
+  const def = route(id);
+  return def.path.replace(/:([A-Za-z0-9_]+)/g, (_match, name: string) => {
+    const value = params[name];
+    if (value === undefined) {
+      throw new Error(`Route ${id} is missing path parameter "${name}"`);
+    }
+    return encodeURIComponent(value);
+  });
+};

@@ -1,57 +1,121 @@
-// Zero-dependency HTTP route contract shared by umi-api (server) and
-// umi-dashboard (client). Keeping the path literals + builders in one place means
-// a rename can't silently drift between the two sides. Byte-exact to the NestJS
-// controllers (apps/umi-api/src/modules/**). This module imports nothing, so the
+// Zero-dependency HTTP route accessor shared by umi-api (server), umi-dashboard and
+// umi-cash (clients). This module imports nothing but `route-table.ts`, so the
 // dashboard can consume it without pulling zod into its bundle.
+//
+// THERE ARE NO PATH LITERALS HERE. Every path comes from `ROUTE_TABLE` in
+// `./route-table.ts`, which is the single author of the platform's URL space. This
+// file is the ergonomic view of that table: the shape callers already use, with the
+// parameters encoded. To change a path, change the table.
+//
+// The POS surface is versioned (`/api/v1/...`); the browser surfaces are not. The
+// reasoning is in `route-table.ts`.
 
-const enc = encodeURIComponent;
+import { buildPath, routePath, tenantBase } from './route-table';
 
-/** Base path for a tenant-scoped resource: `/api/tenants/:tenantId`. */
-const tenantBase = (tenantId: string): string => `/api/tenants/${enc(tenantId)}`;
+export { tenantBase };
 
 export const routes = {
   auth: {
-    login: '/api/auth/local/login',
-    refresh: '/api/auth/local/refresh',
-    logout: '/api/auth/local/logout',
-    forgotPassword: '/api/auth/local/forgot-password',
-    resetPassword: '/api/auth/local/reset-password',
-    me: '/api/auth/me',
+    login: routePath('auth.login'),
+    refresh: routePath('auth.refresh'),
+    logout: routePath('auth.logout'),
+    globalLogout: routePath('auth.globalLogout'),
+    forgotPassword: routePath('auth.forgotPassword'),
+    resetPassword: routePath('auth.resetPassword'),
+    me: routePath('auth.me'),
+    /** POS device authentication. Versioned — a field client depends on it. */
+    pos: {
+      login: routePath('auth.posLogin'),
+      refresh: routePath('auth.posRefresh'),
+      logout: routePath('auth.posLogout'),
+      globalLogout: routePath('auth.posGlobalLogout'),
+    },
   },
   me: {
-    tenants: '/api/me/tenants',
+    tenants: routePath('me.tenants'),
   },
   tenants: {
-    /** `/api/tenants/:tenantId` — compose sub-paths onto this. Encodes the id,
-     *  matching the dashboard's `_tenantPath` (encodeURIComponent). */
+    /** `/api/tenants/:tenantId` — compose ad-hoc sub-paths onto this. */
     base: tenantBase,
-    capabilities: (tenantId: string): string => `${tenantBase(tenantId)}/capabilities`,
-    settings: (tenantId: string): string => `${tenantBase(tenantId)}/settings`,
-    locations: (tenantId: string): string => `${tenantBase(tenantId)}/locations`,
+    capabilities: (tenantId: string): string => buildPath('tenants.capabilities', { tenantId }),
+    settings: (tenantId: string): string => buildPath('tenants.settings', { tenantId }),
+    locations: (tenantId: string): string => buildPath('tenants.locations', { tenantId }),
+    audit: (tenantId: string): string => buildPath('tenants.audit', { tenantId }),
   },
   cash: {
-    // Tenant-scoped surface (dashboard, cookie auth) — /api/tenants/:tenantId/cash/*.
-    stats: (tenantId: string): string => `${tenantBase(tenantId)}/cash/stats`,
-    analytics: (tenantId: string): string => `${tenantBase(tenantId)}/cash/analytics`,
-    customers: (tenantId: string): string => `${tenantBase(tenantId)}/cash/customers`,
-    members: (tenantId: string): string => `${tenantBase(tenantId)}/cash/members`,
-    giftCards: (tenantId: string): string => `${tenantBase(tenantId)}/cash/gift-cards`,
-    rewardConfig: (tenantId: string): string => `${tenantBase(tenantId)}/cash/reward-config`,
-    // Slug-scoped surface (umi-cash frontend) — /api/:slug/... . The write + primary
-    // read paths both surfaces call; each byte-exact to the cash-scan / cash-write /
-    // cash-customer / cash controllers (not an exhaustive mirror of every GET).
+    // Tenant-scoped surface (dashboard, cookie auth).
+    stats: (tenantId: string): string => buildPath('cash.stats', { tenantId }),
+    analytics: (tenantId: string): string => buildPath('cash.analytics', { tenantId }),
+    customers: (tenantId: string): string => buildPath('cash.customers', { tenantId }),
+    members: (tenantId: string): string => buildPath('cash.members', { tenantId }),
+    giftCards: (tenantId: string): string => buildPath('cash.giftCards', { tenantId }),
+    rewardConfig: (tenantId: string): string => buildPath('cash.rewardConfig', { tenantId }),
+    // Slug-scoped surface (umi-cash frontend). The write plus primary read paths both
+    // surfaces call; not an exhaustive mirror of every GET.
     slug: {
-      scan: (slug: string): string => `/api/${enc(slug)}/admin/scan`,
-      topup: (slug: string): string => `/api/${enc(slug)}/admin/topup`,
-      purchase: (slug: string): string => `/api/${enc(slug)}/admin/purchase`,
-      giftCards: (slug: string): string => `/api/${enc(slug)}/admin/gift-cards`,
-      settings: (slug: string): string => `/api/${enc(slug)}/admin/settings`,
-      rewardConfig: (slug: string): string => `/api/${enc(slug)}/admin/reward-config`,
-      stats: (slug: string): string => `/api/${enc(slug)}/admin/stats`,
-      analytics: (slug: string): string => `/api/${enc(slug)}/admin/analytics`,
+      scan: (slug: string): string => buildPath('cash.slug.scan', { slug }),
+      topup: (slug: string): string => buildPath('cash.slug.topup', { slug }),
+      purchase: (slug: string): string => buildPath('cash.slug.purchase', { slug }),
+      giftCards: (slug: string): string => buildPath('cash.slug.giftCards', { slug }),
+      settings: (slug: string): string => buildPath('cash.slug.settings', { slug }),
+      rewardConfig: (slug: string): string => buildPath('cash.slug.rewardConfig', { slug }),
+      stats: (slug: string): string => buildPath('cash.slug.stats', { slug }),
+      analytics: (slug: string): string => buildPath('cash.slug.analytics', { slug }),
       // POST /api/:slug/customers — member registration (name↔path: registers a member).
-      registerMember: (slug: string): string => `/api/${enc(slug)}/customers`,
-      gift: (slug: string, code: string): string => `/api/${enc(slug)}/gift/${enc(code)}`,
+      registerMember: (slug: string): string => buildPath('cash.slug.registerMember', { slug }),
+      gift: (slug: string, code: string): string => buildPath('cash.slug.gift', { slug, code }),
+    },
+  },
+  staff: {
+    create: (slug: string): string => buildPath('staff.create', { slug }),
+    update: (slug: string, staffId: string): string => buildPath('staff.update', { slug, staffId }),
+  },
+  devices: {
+    beginEnrollment: (tenantId: string): string =>
+      buildPath('devices.beginEnrollment', { tenantId }),
+    completeEnrollment: routePath('devices.completeEnrollment'),
+    status: routePath('devices.status'),
+  },
+  pos: {
+    entryContext: routePath('pos.entryContext'),
+    operatorSessions: routePath('pos.operatorSessions'),
+    operatorLock: (operatorSessionId: string): string =>
+      buildPath('pos.operatorLock', { operatorSessionId }),
+    operatorEnd: (operatorSessionId: string): string =>
+      buildPath('pos.operatorEnd', { operatorSessionId }),
+    verifyPin: routePath('pos.verifyPin'),
+    managerApproval: routePath('pos.managerApproval'),
+    catalog: {
+      categories: (tenantId: string): string => buildPath('pos.catalogCategories', { tenantId }),
+      products: (tenantId: string): string => buildPath('pos.catalogProducts', { tenantId }),
+      product: (tenantId: string, productId: string): string =>
+        buildPath('pos.catalogProduct', { tenantId, productId }),
+    },
+    cart: {
+      base: (tenantId: string): string => buildPath('pos.cartCreate', { tenantId }),
+      lines: (tenantId: string): string => buildPath('pos.cartLines', { tenantId }),
+      line: (tenantId: string, lineId: string): string =>
+        buildPath('pos.cartLineUpdate', { tenantId, lineId }),
+      prepare: (tenantId: string): string => buildPath('pos.cartPrepare', { tenantId }),
+    },
+    checkout: {
+      base: (tenantId: string): string => buildPath('pos.checkout', { tenantId }),
+      payment: (tenantId: string, paymentId: string): string =>
+        buildPath('pos.checkoutPayment', { tenantId, paymentId }),
+    },
+    offline: {
+      policy: (tenantId: string): string => buildPath('pos.offlinePolicy', { tenantId }),
+      replayBegin: (tenantId: string): string => buildPath('pos.offlineReplayBegin', { tenantId }),
+      replayBatch: (tenantId: string): string => buildPath('pos.offlineReplayBatch', { tenantId }),
+      replayCursor: (tenantId: string): string =>
+        buildPath('pos.offlineReplayCursor', { tenantId }),
+      replayCommand: (tenantId: string, commandId: string): string =>
+        buildPath('pos.offlineReplayCommand', { tenantId, commandId }),
+      conflicts: (tenantId: string): string => buildPath('pos.offlineConflicts', { tenantId }),
+      reconcile: (tenantId: string): string => buildPath('pos.offlineReconcile', { tenantId }),
+      reconcileAcknowledge: (tenantId: string): string =>
+        buildPath('pos.offlineReconcileAcknowledge', { tenantId }),
+      diagnostics: (tenantId: string): string => buildPath('pos.offlineDiagnostics', { tenantId }),
     },
   },
 } as const;

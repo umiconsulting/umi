@@ -404,8 +404,15 @@ export const API_ERROR_CODES = [
   'TENANT_NOT_FOUND',
   'BRANCH_NOT_FOUND',
   'BRANCH_REQUIRED',
+  // The caller is bound to a different branch than the one it addressed. A POS
+  // cannot transact at a branch where it is not enrolled.
+  'BRANCH_SCOPE_VIOLATION',
   'CONFLICT',
   'IDEMPOTENCY_CONFLICT',
+  // The idempotency key is older than the retention window (see
+  // `IDEMPOTENCY_RETENTION_HOURS`). The recorded result is gone, so the command
+  // must be queried by id — replaying it must never produce a second charge.
+  'IDEMPOTENCY_EXPIRED',
   'COMMAND_IN_PROGRESS',
   'OPTIMISTIC_VERSION_CONFLICT',
   'RATE_LIMITED',
@@ -419,6 +426,9 @@ export const API_ERROR_CODES = [
   'ENROLLMENT_ATTEMPTS_EXCEEDED',
   'TENANT_DISABLED',
   'BRANCH_DISABLED',
+  // The product is not active for this business, so the whole surface is closed.
+  // What `EntitlementGuard(@RequireProduct('pos'))` returns.
+  'ENTITLEMENT_DISABLED',
   'OPERATOR_SESSION_REQUIRED',
   'CART_VALIDATION_FAILED',
   'CART_NOT_FOUND',
