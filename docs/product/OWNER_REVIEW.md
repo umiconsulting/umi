@@ -77,7 +77,8 @@ before implementation and preserve owner notes.
 
 - Implemented: persistent connectivity state, encrypted provisional cash result, provisional
   receipt, replay progress, startup recovery, official mapping, conflict summary, and Recovery
-  Center in English and Spanish.
+  Center in English and Spanish. Final closeout adds typed executable recovery actions and
+  restart-safe recovery of an already journaled checkout.
 - Future owner visual review: counter-distance indicator clarity, high contrast, tablet layout,
   reduced motion, keyboard/touch flow, conflict tone, blocked-device, expired-policy, stale-data,
   storage recovery, and the provisional-to-official receipt transition.

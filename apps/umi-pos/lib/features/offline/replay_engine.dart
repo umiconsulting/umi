@@ -266,7 +266,9 @@ final class OfflineRecoveryController extends ChangeNotifier {
   final ConnectivityController _connectivity;
   RecoveryStatus _status = const RecoveryStatus();
   bool _running = false;
+  String? _reconciliationId;
   RecoveryStatus get status => _status;
+  String? get reconciliationId => _reconciliationId;
 
   Future<void> recover(ReplayScope scope) async {
     if (_running) return;
@@ -340,6 +342,7 @@ final class OfflineRecoveryController extends ChangeNotifier {
           localLastAcknowledgedSequence: afterRecovery.lastAcknowledgedSequence,
         ),
       );
+      _reconciliationId = reconciliation.reconciliationId;
       if (reconciliation.reconciliationRequired &&
           reconciliation.serverLastAcceptedSequence >
               afterRecovery.lastAcknowledgedSequence) {
@@ -366,12 +369,38 @@ final class OfflineRecoveryController extends ChangeNotifier {
         ),
       );
     } on AppException catch (error) {
-      final phase = error.code == 'DEVICE_REVOKED'
+      final phase =
+          error.code == 'DEVICE_REVOKED' ||
+              error.code == 'DEVICE_CREDENTIAL_ROTATED'
           ? RecoveryPhase.blockedByDevice
           : RecoveryPhase.failedSafely;
       _set(RecoveryStatus(phase: phase, errorCode: error.code));
     } finally {
       _running = false;
+    }
+  }
+
+  Future<void> acknowledgeReconciliation(ReplayScope scope) async {
+    final reconciliationId = _reconciliationId;
+    if (reconciliationId == null || _running) return;
+    await _gateway.acknowledge(scope, reconciliationId);
+    _reconciliationId = null;
+    await recover(scope);
+  }
+
+  Future<void> refreshPolicy(ReplayScope scope) async {
+    final policy = await _gateway.policy(scope);
+    final cash = OfflineCashPolicy.fromJson(policy.cash);
+    await _journal.cachePolicy(policy, DateTime.parse(cash.issuedAt));
+  }
+
+  Future<void> queryUnknownResults(ReplayScope scope) async {
+    final snapshot = await _journal.load();
+    for (final entry in snapshot.entries.where(
+      (entry) => entry.status == JournalStatus.unknown,
+    )) {
+      final result = await _gateway.resultFor(scope, entry.command.commandId);
+      if (result != null) await _journal.apply(result);
     }
   }
 

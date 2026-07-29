@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:umi_contract/umi_contract.dart';
 
 import 'offline_journal.dart';
@@ -101,9 +104,10 @@ final class OfflineCheckoutService {
     final payload = OfflineCheckoutCommand(
       policyVersion: policy.cash.version,
       policyFingerprint: policy.cash.fingerprint,
+      checkoutIdentity: _checkoutIdentity(request),
       snapshot: snapshot.toJson(),
     );
-    await _journal.append(
+    final persisted = await _journal.append(
       commandId: request.commandId,
       deviceId: request.authority.deviceId,
       credentialVersion: request.authority.credentialVersion,
@@ -114,16 +118,39 @@ final class OfflineCheckoutService {
       payload: payload.toJson(),
       commandType: 'pos.checkout.cash',
       provisionalId: request.provisionalSaleId,
+      deduplicationKey: payload.checkoutIdentity,
+      maxPendingCashCount: policy.limits.maxOfflineSaleCount,
+      maxPendingCashMinorUnits: policy.limits.maxAccumulatedMinorUnits,
+      cashAmountMinorUnits: due,
+    );
+    final persistedPayload = OfflineCheckoutCommand.fromJson(persisted.payload);
+    final persistedSnapshot = OfflineCheckoutSnapshot.fromJson(
+      persistedPayload.snapshot,
     );
     return ProvisionalReceipt(
-      provisionalSaleId: request.provisionalSaleId,
+      provisionalSaleId: persisted.provisionalId!,
       status: 'pending_sync',
       branchName: request.branchName,
       operatorName: request.operatorName,
-      snapshot: snapshot.toJson(),
-      createdAt: now.toUtc().toIso8601String(),
+      snapshot: persistedSnapshot.toJson(),
+      createdAt: persisted.createdAt,
       lastSynchronizationAt: null,
       officialReceipt: null,
     );
+  }
+
+  String _checkoutIdentity(OfflineCheckoutRequest request) {
+    final canonical = <String, Object?>{
+      'tenantId': request.authority.tenantId,
+      'branchId': request.authority.branchId,
+      'operatorSessionId': request.authority.operatorSessionId,
+      'deviceId': request.authority.deviceId,
+      'credentialVersion': request.authority.credentialVersion,
+      'cartId': request.cart.id,
+      'cartVersion': request.cart.version,
+      'totalsFingerprint': request.totals.fingerprint,
+      'paymentMethod': 'cash',
+    };
+    return sha256.convert(utf8.encode(jsonEncode(canonical))).toString();
   }
 }

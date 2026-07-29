@@ -727,6 +727,168 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Cambio'**
   String get changeDueLabel;
+
+  /// No description provided for @recoveryQueryTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Consultar resultado guardado'**
+  String get recoveryQueryTitle;
+
+  /// No description provided for @recoveryQueryDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Pregunta a UMI si esta misma operación ya fue aceptada.'**
+  String get recoveryQueryDescription;
+
+  /// No description provided for @recoveryPolicyTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualizar política sin conexión'**
+  String get recoveryPolicyTitle;
+
+  /// No description provided for @recoveryPolicyDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Reconecta para cargar el permiso vigente del servidor para ventas sin conexión.'**
+  String get recoveryPolicyDescription;
+
+  /// No description provided for @recoveryAuthenticationTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Iniciar sesión de nuevo'**
+  String get recoveryAuthenticationTitle;
+
+  /// No description provided for @recoveryAuthenticationDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Restablece tu sesión autorizada antes de continuar la sincronización.'**
+  String get recoveryAuthenticationDescription;
+
+  /// No description provided for @recoveryBranchTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Seleccionar la sucursal autorizada'**
+  String get recoveryBranchTitle;
+
+  /// No description provided for @recoveryBranchDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Vuelve a seleccionar sucursal sin mover las ventas pendientes.'**
+  String get recoveryBranchDescription;
+
+  /// No description provided for @recoveryManagerTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Solicitar revisión de gerente'**
+  String get recoveryManagerTitle;
+
+  /// No description provided for @recoveryManagerDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Verifica un gerente autorizado únicamente para esta acción de recuperación.'**
+  String get recoveryManagerDescription;
+
+  /// No description provided for @recoveryManagerCredentialLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'PIN de gerente'**
+  String get recoveryManagerCredentialLabel;
+
+  /// No description provided for @recoveryAcknowledgeTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirmar conciliación'**
+  String get recoveryAcknowledgeTitle;
+
+  /// No description provided for @recoveryAcknowledgeDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirma la conciliación del servidor solo después de guardar la recuperación local.'**
+  String get recoveryAcknowledgeDescription;
+
+  /// No description provided for @recoveryReceiptTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Ver estado del recibo'**
+  String get recoveryReceiptTitle;
+
+  /// No description provided for @recoveryReceiptDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Abre el estado conservado del recibo provisional u oficial.'**
+  String get recoveryReceiptDescription;
+
+  /// No description provided for @recoveryPaymentTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Consultar pago original'**
+  String get recoveryPaymentTitle;
+
+  /// No description provided for @recoveryPaymentDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Consulta únicamente el pago original. No se iniciará otro cargo.'**
+  String get recoveryPaymentDescription;
+
+  /// No description provided for @recoveryDeviceTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Verificar este dispositivo'**
+  String get recoveryDeviceTitle;
+
+  /// No description provided for @recoveryDeviceDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Este dispositivo está bloqueado. Restablece la autorización antes de reproducir.'**
+  String get recoveryDeviceDescription;
+
+  /// No description provided for @recoveryCredentialTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Recuperar credenciales rotadas'**
+  String get recoveryCredentialTitle;
+
+  /// No description provided for @recoveryCredentialDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Los comandos históricos permanecen ligados a su versión de credencial original.'**
+  String get recoveryCredentialDescription;
+
+  /// No description provided for @recoveryStorageTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Conservar almacenamiento para recuperación'**
+  String get recoveryStorageTitle;
+
+  /// No description provided for @recoveryStorageDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Conserva intactos los datos cifrados y sigue la recuperación autorizada.'**
+  String get recoveryStorageDescription;
+
+  /// No description provided for @recoverySnapshotTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualizar datos autorizados'**
+  String get recoverySnapshotTitle;
+
+  /// No description provided for @recoverySnapshotDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Reconecta para actualizar catálogo, precios e impuestos vencidos.'**
+  String get recoverySnapshotDescription;
+
+  /// No description provided for @recoverySupportTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Copiar referencia de soporte'**
+  String get recoverySupportTitle;
+
+  /// No description provided for @recoverySupportDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Copia la referencia de diagnóstico segura sin exponer el contenido de la venta.'**
+  String get recoverySupportDescription;
 }
 
 class _AppLocalizationsDelegate

@@ -68,10 +68,14 @@ disabled.
   opaque context references. Never export payloads or encryption material.
 - Disposable development journal data may be removed only through the platform app-data controls;
   never use that recovery step on a real pending queue.
-- To test crash recovery, terminate between journal insertion and replay, restart, verify the
-  encrypted queue count, then query/replay from the last acknowledged cursor.
+- To test crash recovery, terminate before or after durable insertion, replay result, mapping, or
+  archive; restart, verify the encrypted queue count, then query/replay from the last acknowledged
+  cursor. Repeating checkout for the same persisted cart/version/totals identity recovers the
+  existing provisional sale rather than creating another command.
 
-Secure-storage or integrity failure blocks journaling without resetting data. Migration downgrade
+All append, replay-result, unknown-result, policy, mapping, conflict, and compaction writes share
+one serialized encrypted mutation boundary. Secure-storage or integrity failure blocks journaling
+without resetting data. Migration downgrade
 is unsupported. An owner-assisted recovery path must preserve ciphertext for support analysis.
 
 Load policy while online by opening the authenticated catalog. To exercise the safe cash path,

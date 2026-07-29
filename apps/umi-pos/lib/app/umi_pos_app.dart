@@ -100,6 +100,7 @@ final class _GuardedSurface extends StatelessWidget {
         cart: root.cart,
         checkout: root.checkout,
         connectivity: root.connectivity,
+        telemetry: root.telemetry,
         offlineJournal: root.offlineJournal,
         offlineRecovery: root.offlineRecovery,
       ),

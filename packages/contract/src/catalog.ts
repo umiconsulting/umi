@@ -6,7 +6,7 @@ import { posCartModels } from './pos-cart';
 import { posCheckoutModels } from './pos-checkout';
 import { posOfflineModels } from './pos-offline';
 
-export const CONTRACT_VERSION = '1.6.0';
+export const CONTRACT_VERSION = '1.6.1';
 export const API_MAJOR_VERSION = 1;
 
 export const errorCatalog = Object.fromEntries(

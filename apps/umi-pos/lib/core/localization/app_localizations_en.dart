@@ -341,4 +341,98 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get changeDueLabel => 'Change due';
+
+  @override
+  String get recoveryQueryTitle => 'Check saved result';
+
+  @override
+  String get recoveryQueryDescription =>
+      'Ask UMI whether this exact operation was already accepted.';
+
+  @override
+  String get recoveryPolicyTitle => 'Refresh offline policy';
+
+  @override
+  String get recoveryPolicyDescription =>
+      'Reconnect to load current server permission for offline sales.';
+
+  @override
+  String get recoveryAuthenticationTitle => 'Sign in again';
+
+  @override
+  String get recoveryAuthenticationDescription =>
+      'Restore your authorized session before synchronization continues.';
+
+  @override
+  String get recoveryBranchTitle => 'Select the authorized branch';
+
+  @override
+  String get recoveryBranchDescription =>
+      'Return to branch selection without moving pending sales.';
+
+  @override
+  String get recoveryManagerTitle => 'Request manager review';
+
+  @override
+  String get recoveryManagerDescription =>
+      'Verify an authorized manager for this recovery action only.';
+
+  @override
+  String get recoveryManagerCredentialLabel => 'Manager PIN';
+
+  @override
+  String get recoveryAcknowledgeTitle => 'Confirm reconciliation';
+
+  @override
+  String get recoveryAcknowledgeDescription =>
+      'Acknowledge the server reconciliation only after local recovery is durable.';
+
+  @override
+  String get recoveryReceiptTitle => 'View receipt status';
+
+  @override
+  String get recoveryReceiptDescription =>
+      'Open the preserved provisional or official receipt status.';
+
+  @override
+  String get recoveryPaymentTitle => 'Check original payment';
+
+  @override
+  String get recoveryPaymentDescription =>
+      'Query the original payment only. No new charge will be started.';
+
+  @override
+  String get recoveryDeviceTitle => 'Verify this device';
+
+  @override
+  String get recoveryDeviceDescription =>
+      'This device is blocked. Restore authority before any replay.';
+
+  @override
+  String get recoveryCredentialTitle => 'Recover rotated credentials';
+
+  @override
+  String get recoveryCredentialDescription =>
+      'Historical commands stay bound to their original credential version.';
+
+  @override
+  String get recoveryStorageTitle => 'Preserve storage for recovery';
+
+  @override
+  String get recoveryStorageDescription =>
+      'Keep encrypted data intact and follow authorized support recovery.';
+
+  @override
+  String get recoverySnapshotTitle => 'Refresh authoritative data';
+
+  @override
+  String get recoverySnapshotDescription =>
+      'Reconnect to refresh expired catalog, price, and tax snapshots.';
+
+  @override
+  String get recoverySupportTitle => 'Copy support reference';
+
+  @override
+  String get recoverySupportDescription =>
+      'Copy the safe diagnostic reference without exposing sale contents.';
 }

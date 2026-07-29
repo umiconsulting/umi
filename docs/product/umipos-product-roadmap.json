@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-07-28",
-  "latestRelevantCommit": "HEAD (Gate 2F continuation commit)",
+  "latestRelevantCommit": "HEAD (Gate 2F final closeout commit)",
   "items": [
     {
       "id": "platform-certification",
@@ -53,15 +53,13 @@
     },
     {
       "id": "2F",
-      "status": "incomplete",
+      "status": "complete_with_observations",
       "dependencies": ["2E"],
-      "nextObjective": "Finish durable restart deduplication, serialized journal mutations, typed recovery actions, and focused recovery tests",
+      "nextObjective": "Preserve the certified offline authority boundary",
       "blockers": [
-        "Durable duplicate prevention after restart",
-        "Serialized encrypted journal mutation boundary",
-        "Complete typed conflict and recovery actions plus focused tests"
+        "External Linux native build prerequisites are unavailable in this runner"
       ],
-      "validationState": "Focused contract, API, Flutter, Web, migration and fail-closed RLS checks passed; Linux native build prerequisites unavailable; Web sensitive journal unsupported"
+      "validationState": "Focused contract, API, Flutter, Web, migration and PostgreSQL negative authorization checks passed; Linux native build prerequisites unavailable; Web sensitive journal unsupported"
     }
   ]
 }

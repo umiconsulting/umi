@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/localization/app_localizations.dart';
+import '../../core/observability/telemetry.dart';
 import '../../core/theme/umi_theme.dart';
 import '../cart/cart_controller.dart';
 import '../checkout/checkout_controller.dart';
@@ -21,6 +22,7 @@ final class CatalogSurface extends StatefulWidget {
     required this.cart,
     required this.checkout,
     required this.connectivity,
+    required this.telemetry,
     this.offlineJournal,
     this.offlineRecovery,
     super.key,
@@ -30,6 +32,7 @@ final class CatalogSurface extends StatefulWidget {
   final CartController cart;
   final CheckoutController checkout;
   final ConnectivityController connectivity;
+  final Telemetry telemetry;
   final EncryptedOfflineJournal? offlineJournal;
   final OfflineRecoveryController? offlineRecovery;
   @override
@@ -163,6 +166,12 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                   journal: widget.offlineJournal!,
                   recovery: widget.offlineRecovery!,
                   scope: scope,
+                  entry: widget.entry,
+                  telemetry: widget.telemetry,
+                  refreshSnapshots: () => _loadInitial(
+                    Localizations.localeOf(context).languageCode,
+                  ),
+                  queryAmbiguousPayment: widget.checkout.queryUnknownPayment,
                 );
               }
             },

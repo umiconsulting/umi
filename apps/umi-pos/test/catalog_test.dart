@@ -149,6 +149,7 @@ void main() {
             cart: root.cart,
             checkout: root.checkout,
             connectivity: root.connectivity,
+            telemetry: root.telemetry,
           ),
         ),
       );

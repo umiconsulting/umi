@@ -174,12 +174,39 @@ void main() {
         facts: facts,
         now: DateTime.now().toUtc(),
       );
-      await service.checkout(
-        request,
+      final restartedService = OfflineCheckoutService(
+        journal: EncryptedOfflineJournal(store, web: false),
+        policyCache: OfflinePolicyCache(
+          EncryptedOfflineJournal(store, web: false),
+          web: false,
+        ),
+        eligibility: const OfflineCheckoutEligibilityEngine(),
+      );
+      final recovered = await restartedService.checkout(
+        OfflineCheckoutRequest(
+          commandId: _id(31),
+          idempotencyKey: _id(32),
+          provisionalSaleId: _id(33),
+          authority: request.authority,
+          checkoutCommand: request.checkoutCommand,
+          cart: request.cart,
+          totals: request.totals,
+          catalogVersion: request.catalogVersion,
+          pricingVersion: request.pricingVersion,
+          taxVersion: request.taxVersion,
+          catalogSnapshotAt: request.catalogSnapshotAt,
+          pricingSnapshotAt: request.pricingSnapshotAt,
+          taxSnapshotAt: request.taxSnapshotAt,
+          amountReceivedMinorUnits: request.amountReceivedMinorUnits,
+          businessDate: request.businessDate,
+          branchName: request.branchName,
+          operatorName: request.operatorName,
+        ),
         facts: facts,
         now: DateTime.now().toUtc(),
       );
       expect(receipt.status, 'pending_sync');
+      expect(recovered.provisionalSaleId, receipt.provisionalSaleId);
       expect((await journal.load()).entries, hasLength(1));
       expect(store.ciphertext, isNot(contains('catalog-1')));
       expect(receipt.officialReceipt, isNull);

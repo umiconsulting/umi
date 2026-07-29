@@ -17,7 +17,49 @@ const {
   CartLineInput,
   CheckoutCommand,
   CheckoutResult,
+  OfflineCheckoutCommand,
+  RecoveryAction,
 } = require('../dist/index.cjs');
+
+test('Gate 2F checkout identity and recovery actions are typed and bounded', () => {
+  const hash = 'a'.repeat(64);
+  assert.equal(
+    OfflineCheckoutCommand.safeParse({
+      policyVersion: '1',
+      policyFingerprint: hash,
+      checkoutIdentity: hash,
+      snapshot: {},
+    }).success,
+    false,
+  );
+  assert.ok(
+    RecoveryAction.safeParse({
+      id: 'query_ambiguous_payment',
+      titleCode: 'recoveryPaymentTitle',
+      descriptionCode: 'recoveryPaymentDescription',
+      requiredPermission: 'pos.checkout',
+      allowedActor: 'operator',
+      severity: 'security',
+      retryPolicy: 'query_only',
+      diagnosticCode: 'query_ambiguous_payment',
+      auditEvent: 'offline.recovery.payment_query_requested',
+    }).success,
+  );
+  assert.equal(
+    RecoveryAction.safeParse({
+      id: 'retry',
+      titleCode: 'raw',
+      descriptionCode: 'raw',
+      requiredPermission: null,
+      allowedActor: 'operator',
+      severity: 'information',
+      retryPolicy: 'transport_safe',
+      diagnosticCode: 'retry',
+      auditEvent: 'retry',
+    }).success,
+    false,
+  );
+});
 
 test('Gate 2D cart contracts bound quantities, notes, and checkout authority', () => {
   const id = '00000000-0000-4000-8000-000000000001';

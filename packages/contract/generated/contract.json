@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "77443d02ab93819dba88b00ea0e863bfc1b085604bad2aeaea986d773ea1a26d",
-  "contractVersion": "1.6.0",
+  "contentHash": "da30fcb1f36c4db4e294116ce9201fed2874e441b5556ad932ace5a00ab3ac40",
+  "contractVersion": "1.6.1",
   "definitions": {
     "AcknowledgeReconciliationRequest": {
       "additionalProperties": false,
@@ -7192,6 +7192,10 @@
     "OfflineCheckoutCommand": {
       "additionalProperties": false,
       "properties": {
+        "checkoutIdentity": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
         "policyFingerprint": {
           "pattern": "^[a-f0-9]{64}$",
           "type": "string"
@@ -7683,6 +7687,7 @@
       "required": [
         "policyVersion",
         "policyFingerprint",
+        "checkoutIdentity",
         "snapshot"
       ],
       "type": "object"
@@ -11768,6 +11773,110 @@
       "type": "object"
     },
     "RecoveryAction": {
+      "additionalProperties": false,
+      "properties": {
+        "allowedActor": {
+          "enum": [
+            "operator",
+            "manager",
+            "administrator",
+            "support"
+          ],
+          "type": "string"
+        },
+        "auditEvent": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "descriptionCode": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "diagnosticCode": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "id": {
+          "enum": [
+            "synchronize",
+            "query_result",
+            "refresh_policy",
+            "reauthenticate",
+            "reselect_branch",
+            "manager_review",
+            "acknowledge",
+            "view_receipt",
+            "query_ambiguous_payment",
+            "device_recovery",
+            "credential_recovery",
+            "storage_recovery",
+            "refresh_snapshots",
+            "contact_support"
+          ],
+          "type": "string"
+        },
+        "requiredPermission": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retryPolicy": {
+          "enum": [
+            "never",
+            "transport_safe",
+            "after_authority",
+            "query_only"
+          ],
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "information",
+            "warning",
+            "blocking",
+            "security"
+          ],
+          "type": "string"
+        },
+        "titleCode": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "titleCode",
+        "descriptionCode",
+        "requiredPermission",
+        "allowedActor",
+        "severity",
+        "retryPolicy",
+        "diagnosticCode",
+        "auditEvent"
+      ],
+      "type": "object"
+    },
+    "RecoveryActionActor": {
+      "enum": [
+        "operator",
+        "manager",
+        "administrator",
+        "support"
+      ],
+      "type": "string"
+    },
+    "RecoveryActionId": {
       "enum": [
         "synchronize",
         "query_result",
@@ -11777,7 +11886,30 @@
         "manager_review",
         "acknowledge",
         "view_receipt",
+        "query_ambiguous_payment",
+        "device_recovery",
+        "credential_recovery",
+        "storage_recovery",
+        "refresh_snapshots",
         "contact_support"
+      ],
+      "type": "string"
+    },
+    "RecoveryActionRetryPolicy": {
+      "enum": [
+        "never",
+        "transport_safe",
+        "after_authority",
+        "query_only"
+      ],
+      "type": "string"
+    },
+    "RecoveryActionSeverity": {
+      "enum": [
+        "information",
+        "warning",
+        "blocking",
+        "security"
       ],
       "type": "string"
     },

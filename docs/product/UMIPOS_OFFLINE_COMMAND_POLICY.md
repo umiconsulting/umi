@@ -25,7 +25,8 @@ recovers or receives the authoritative result and durably maps the provisional r
 official sale and receipt. Unknown responses are queried by the original command identity; they
 are never treated as failure or submitted as a new payment. Pending, unknown, or unresolved
 financial records are never deleted by age. Accepted records have bounded encrypted retention
-after durable result and mapping persistence.
+after durable result and mapping persistence. Every encrypted mutation uses one serialized writer;
+the persisted cart/version/totals identity recovers an existing provisional sale after restart.
 
 Residual risks: platform keystore availability, device compromise while unlocked, storage rollback
 outside application control, and prolonged loss of server policy. Production deployment requires

@@ -105,6 +105,7 @@ export type OfflineCheckoutSnapshot = z.infer<typeof OfflineCheckoutSnapshot>;
 export const OfflineCheckoutCommand = z.object({
   policyVersion: z.string().min(1).max(64),
   policyFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  checkoutIdentity: z.string().regex(/^[a-f0-9]{64}$/),
   snapshot: OfflineCheckoutSnapshot,
 }).strict();
 export type OfflineCheckoutCommand = z.infer<typeof OfflineCheckoutCommand>;
@@ -239,11 +240,32 @@ export const RecoveryState = z.enum([
   'waiting_for_operator_action', 'waiting_for_manager_action', 'blocked_by_device',
   'blocked_by_conflict', 'blocked_by_storage', 'completed', 'failed_safely',
 ]);
-export const RecoveryAction = z.enum([
+export const RecoveryActionId = z.enum([
   'synchronize', 'query_result', 'refresh_policy', 'reauthenticate',
   'reselect_branch', 'manager_review', 'acknowledge', 'view_receipt',
-  'contact_support',
+  'query_ambiguous_payment', 'device_recovery', 'credential_recovery',
+  'storage_recovery', 'refresh_snapshots', 'contact_support',
 ]);
+export const RecoveryActionActor = z.enum([
+  'operator', 'manager', 'administrator', 'support',
+]);
+export const RecoveryActionSeverity = z.enum([
+  'information', 'warning', 'blocking', 'security',
+]);
+export const RecoveryActionRetryPolicy = z.enum([
+  'never', 'transport_safe', 'after_authority', 'query_only',
+]);
+export const RecoveryAction = z.object({
+  id: RecoveryActionId,
+  titleCode: z.string().min(1).max(100),
+  descriptionCode: z.string().min(1).max(100),
+  requiredPermission: z.string().min(1).max(100).nullable(),
+  allowedActor: RecoveryActionActor,
+  severity: RecoveryActionSeverity,
+  retryPolicy: RecoveryActionRetryPolicy,
+  diagnosticCode: z.string().min(1).max(100),
+  auditEvent: z.string().min(1).max(100),
+}).strict();
 export const ReconciliationState = z.enum([
   'in_sync', 'replay_required', 'result_recovery_required',
   'conflict_resolution_required', 'reauthentication_required', 'device_blocked',
@@ -318,7 +340,9 @@ export const posOfflineModels = {
   OfflineCheckoutCommand, OfflineCheckoutBlockReason, OfflineCheckoutEligibility,
   ProvisionalReceiptStatus, ProvisionalReceipt, OfficialCommitResult,
   ReplayBatch, ReplayFailure, ReplayResult, ReplayCursor, ReplayProgress,
-  RecoveryState, RecoveryAction, ReconciliationState,
+  RecoveryState, RecoveryActionId, RecoveryActionActor,
+  RecoveryActionSeverity, RecoveryActionRetryPolicy, RecoveryAction,
+  ReconciliationState,
   BeginReplayRequest, BeginReplayResponse, ReplayBatchResult,
   ReconciliationSummary, ReconcileRequest, AcknowledgeReconciliationRequest,
   ReplayDiagnostics, ReplayContextQuery, ReplayCommandResultQuery, ConflictSummary,

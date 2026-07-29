@@ -239,6 +239,50 @@ final class EntryController extends ChangeNotifier {
     );
   }
 
+  Future<void> reselectBranch() async {
+    final operator = _state.operator;
+    if (operator != null) await _gateway.endOperator(operator.id);
+    final tenant = _state.selectedTenant;
+    if (tenant == null) {
+      await _vault.clearSession();
+      _set(
+        EntryState(EntryPhase.authenticationRequired, device: _state.device),
+      );
+      return;
+    }
+    await _vault.selectTenant(tenant.id);
+    _event('branch.reselection_requested');
+    _set(
+      EntryState(
+        EntryPhase.branchRequired,
+        device: _state.device,
+        tenants: _state.tenants,
+        selectedTenant: tenant,
+      ),
+    );
+  }
+
+  Future<bool> requestRecoveryManagerReview(String managerPin) async {
+    final operator = _state.operator;
+    final tenant = _state.selectedTenant;
+    final branch = _state.selectedBranch;
+    if (operator == null || tenant == null || branch == null) return false;
+    try {
+      await _gateway.requestManagerApproval(
+        operatorSessionId: operator.id,
+        managerPin: managerPin,
+        permission: 'offline.recovery.review',
+        tenantId: tenant.id,
+        branchId: branch.id,
+      );
+      _event('offline.recovery.manager_review_granted');
+      return true;
+    } on AppException catch (error) {
+      _event('offline.recovery.manager_review_denied', error.code);
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     final operator = _state.operator;
     if (operator != null) await _gateway.endOperator(operator.id);

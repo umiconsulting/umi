@@ -86,10 +86,10 @@
       "subject": "Authoritative online checkout, payment orchestration, and receipt"
     },
     {
-      "commit": "HEAD (Gate 2F continuation commit)",
+      "commit": "HEAD (Gate 2F final closeout commit)",
       "id": "2F",
-      "status": "incomplete",
-      "subject": "Encrypted offline checkout, ordered replay, recovery, and reconciliation closeout"
+      "status": "complete_with_observations",
+      "subject": "Encrypted offline checkout, serialized journal, ordered replay, recovery, and reconciliation"
     }
   ]
 }

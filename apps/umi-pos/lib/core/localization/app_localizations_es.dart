@@ -343,4 +343,99 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get changeDueLabel => 'Cambio';
+
+  @override
+  String get recoveryQueryTitle => 'Consultar resultado guardado';
+
+  @override
+  String get recoveryQueryDescription =>
+      'Pregunta a UMI si esta misma operación ya fue aceptada.';
+
+  @override
+  String get recoveryPolicyTitle => 'Actualizar política sin conexión';
+
+  @override
+  String get recoveryPolicyDescription =>
+      'Reconecta para cargar el permiso vigente del servidor para ventas sin conexión.';
+
+  @override
+  String get recoveryAuthenticationTitle => 'Iniciar sesión de nuevo';
+
+  @override
+  String get recoveryAuthenticationDescription =>
+      'Restablece tu sesión autorizada antes de continuar la sincronización.';
+
+  @override
+  String get recoveryBranchTitle => 'Seleccionar la sucursal autorizada';
+
+  @override
+  String get recoveryBranchDescription =>
+      'Vuelve a seleccionar sucursal sin mover las ventas pendientes.';
+
+  @override
+  String get recoveryManagerTitle => 'Solicitar revisión de gerente';
+
+  @override
+  String get recoveryManagerDescription =>
+      'Verifica un gerente autorizado únicamente para esta acción de recuperación.';
+
+  @override
+  String get recoveryManagerCredentialLabel => 'PIN de gerente';
+
+  @override
+  String get recoveryAcknowledgeTitle => 'Confirmar conciliación';
+
+  @override
+  String get recoveryAcknowledgeDescription =>
+      'Confirma la conciliación del servidor solo después de guardar la recuperación local.';
+
+  @override
+  String get recoveryReceiptTitle => 'Ver estado del recibo';
+
+  @override
+  String get recoveryReceiptDescription =>
+      'Abre el estado conservado del recibo provisional u oficial.';
+
+  @override
+  String get recoveryPaymentTitle => 'Consultar pago original';
+
+  @override
+  String get recoveryPaymentDescription =>
+      'Consulta únicamente el pago original. No se iniciará otro cargo.';
+
+  @override
+  String get recoveryDeviceTitle => 'Verificar este dispositivo';
+
+  @override
+  String get recoveryDeviceDescription =>
+      'Este dispositivo está bloqueado. Restablece la autorización antes de reproducir.';
+
+  @override
+  String get recoveryCredentialTitle => 'Recuperar credenciales rotadas';
+
+  @override
+  String get recoveryCredentialDescription =>
+      'Los comandos históricos permanecen ligados a su versión de credencial original.';
+
+  @override
+  String get recoveryStorageTitle =>
+      'Conservar almacenamiento para recuperación';
+
+  @override
+  String get recoveryStorageDescription =>
+      'Conserva intactos los datos cifrados y sigue la recuperación autorizada.';
+
+  @override
+  String get recoverySnapshotTitle => 'Actualizar datos autorizados';
+
+  @override
+  String get recoverySnapshotDescription =>
+      'Reconecta para actualizar catálogo, precios e impuestos vencidos.';
+
+  @override
+  String get recoverySupportTitle => 'Copiar referencia de soporte';
+
+  @override
+  String get recoverySupportDescription =>
+      'Copia la referencia de diagnóstico segura sin exponer el contenido de la venta.';
 }

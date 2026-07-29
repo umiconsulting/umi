@@ -53,7 +53,7 @@
     "flutterVersion": "3.44.6",
     "dartVersion": "3.12.2",
     "contractVersion": "1.6.0",
-    "contractContentHash": "77443d02ab93819dba88b00ea0e863bfc1b085604bad2aeaea986d773ea1a26d",
+    "contractContentHash": "da30fcb1f36c4db4e294116ce9201fed2874e441b5556ad932ace5a00ab3ac40",
     "stateManagement": "ChangeNotifier with one explicit composition root",
     "navigation": "central typed route guard",
     "secureStorage": "flutter_secure_storage with no plaintext fallback",
@@ -71,12 +71,12 @@
     "gate2CStatus": "complete",
     "gate2DStatus": "complete",
     "gate2EStatus": "complete",
-    "gate2FStatus": "incomplete",
+    "gate2FStatus": "complete_with_observations",
     "offlineJournal": "native AES-256-GCM, schema 1, no plaintext fallback",
     "offlineReplay": "ordered per device credential version; duplicate results recovered",
     "offlineCash": "default-deny server-issued branch policy; eligible native cash checkout is encrypted and provisional",
-    "offlineRecovery": "generated-SDK gateway, ordered replay, response-loss query, reconciliation, immutable mapping, Recovery Center",
-    "offlineDatabaseValidation": "clean migration chain plus tenant and branch RLS runtime isolation passed in disposable PostgreSQL",
+    "offlineRecovery": "generated-SDK gateway, serialized journal mutations, restart deduplication, ordered replay, typed recovery actions, response-loss query, reconciliation, immutable mapping, Recovery Center",
+    "offlineDatabaseValidation": "clean migration chain plus tenant, branch, device, credential, immutability, revocation and rotation negative matrix passed in disposable PostgreSQL",
     "nativeBuild": "Linux debug attempted; external CMake, Ninja, Clang and GTK development prerequisites unavailable",
     "webOfflineCapability": "sensitive journaling unsupported; online operation only",
     "checkoutAuthority": "apps/umi-api/src/modules/pos-checkout",
@@ -101,8 +101,9 @@
     "pinFoundation": "server-side scrypt verification with bounded attempts",
     "managerApprovalFoundation": "single-action scoped five-minute elevation",
     "readyShell": true,
-    "latestLocalCommit": "HEAD (Gate 2F continuation commit)",
-    "pushStatus": "DEFERRED — LOCAL COMMIT SAFE"
+    "latestLocalCommit": "HEAD (Gate 2F final closeout commit)",
+    "pushStatus": "DEFERRED — LOCAL COMMIT SAFE",
+    "pullRequestStatus": "DEFERRED — REMOTE PR CREDENTIAL REQUIRED"
   },
-  "nextGate": "Gate 2F closeout — durability and typed recovery completion"
+  "nextGate": "Approved post-2F roadmap selection; Gate 3 not started"
 }
