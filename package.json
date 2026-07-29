@@ -28,6 +28,7 @@
     "umi-pos:pairing-tests": "cd apps/umi-pos && flutter test test/device_pairing_test.dart",
     "umi-pos:pairing-db-check": "bash scripts/umi-pos-device-pairing-db-check.sh",
     "umi-pos:local-access-seed": "bash scripts/umi-pos-local-access-seed.sh",
+    "umi-pos:demo-seed": "bash scripts/umi-pos-demo-seed.sh",
     "umi-pos:pin-tests": "pnpm --filter @umi/api exec vitest run src/modules/auth/auth.service.spec.ts src/modules/staff/staff.service.spec.ts src/shared/database/pos-pin-authentication-migration.spec.ts && cd apps/umi-pos && flutter test test/device_pairing_test.dart"
   },
   "devDependencies": {

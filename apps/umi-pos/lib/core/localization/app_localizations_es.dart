@@ -85,6 +85,26 @@ class AppLocalizationsEs extends AppLocalizations {
       'Ingresa el código completo de ocho caracteres. Usa tu PIN de operador después de aprobar el dispositivo.';
 
   @override
+  String get enrollmentCodeRejected =>
+      'El código de registro no es válido o caducó. Solicita un código nuevo al administrador.';
+
+  @override
+  String get enrollmentCodeExpired =>
+      'El código de registro caducó. Solicita un código nuevo al administrador.';
+
+  @override
+  String get enrollmentCodeAttemptsExceeded =>
+      'Esta solicitud alcanzó el límite de intentos. Solicita un código nuevo al administrador.';
+
+  @override
+  String get enrollmentCodeRateLimited =>
+      'Se hicieron demasiados intentos. Espera antes de volver a intentarlo.';
+
+  @override
+  String get enrollmentCodeUnavailable =>
+      'UmiPOS no puede verificar este código ahora. Revisa la conexión e inténtalo de nuevo.';
+
+  @override
   String get enrollmentPendingTitle =>
       'Se requiere la aprobación del administrador';
 
@@ -378,6 +398,14 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get recoveryCenterTitle => 'Centro de recuperación';
+
+  @override
+  String get recoveryWebUnsupportedTitle =>
+      'La recuperación sin conexión no está disponible en Web';
+
+  @override
+  String get recoveryWebUnsupportedBody =>
+      'La versión Web funciona en línea. Usa una aplicación nativa compatible para almacenar y recuperar ventas sin conexión de forma segura.';
 
   @override
   String get synchronizingPendingSales => 'Sincronizando ventas pendientes…';

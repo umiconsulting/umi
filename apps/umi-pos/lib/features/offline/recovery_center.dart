@@ -62,7 +62,7 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
   void initState() {
     super.initState();
     widget.recovery.addListener(_changed);
-    _load();
+    if (widget.journal.supportsSecureOffline) _load();
   }
 
   @override
@@ -72,10 +72,11 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
   }
 
   void _changed() {
-    if (mounted) _load();
+    if (mounted && widget.journal.supportsSecureOffline) _load();
   }
 
   Future<void> _load() async {
+    if (!widget.journal.supportsSecureOffline) return;
     final value = await widget.journal.load();
     if (mounted) setState(() => snapshot = value);
   }
@@ -83,6 +84,9 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    if (!widget.journal.supportsSecureOffline) {
+      return _WebRecoveryUnavailable(localizations: l);
+    }
     final status = widget.recovery.status;
     final entries = snapshot?.entries ?? const <JournalEntry>[];
     final actions = _availableActions(status, entries);
@@ -356,6 +360,60 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
     }
     return l.pendingSalesSecure;
   }
+}
+
+final class _WebRecoveryUnavailable extends StatelessWidget {
+  const _WebRecoveryUnavailable({required this.localizations});
+
+  final AppLocalizations localizations;
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    child: SizedBox(
+      height: MediaQuery.sizeOf(context).height * .88,
+      child: Padding(
+        padding: const EdgeInsets.all(UmiSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              localizations.recoveryCenterTitle,
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            Expanded(
+              child: Center(
+                child: Semantics(
+                  liveRegion: true,
+                  label: localizations.recoveryWebUnsupportedTitle,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.desktop_windows_outlined, size: 48),
+                      const SizedBox(height: UmiSpacing.md),
+                      Text(
+                        localizations.recoveryWebUnsupportedTitle,
+                        style: Theme.of(context).textTheme.titleLarge,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: UmiSpacing.sm),
+                      Text(
+                        localizations.recoveryWebUnsupportedBody,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(localizations.closeAction),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 final class AppRecoveryActionExecutor implements RecoveryActionExecutor {

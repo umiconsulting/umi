@@ -236,6 +236,36 @@ abstract class AppLocalizations {
   /// **'Ingresa el código completo de ocho caracteres. Usa tu PIN de operador después de aprobar el dispositivo.'**
   String get enrollmentCodeInvalid;
 
+  /// No description provided for @enrollmentCodeRejected.
+  ///
+  /// In es, this message translates to:
+  /// **'El código de registro no es válido o caducó. Solicita un código nuevo al administrador.'**
+  String get enrollmentCodeRejected;
+
+  /// No description provided for @enrollmentCodeExpired.
+  ///
+  /// In es, this message translates to:
+  /// **'El código de registro caducó. Solicita un código nuevo al administrador.'**
+  String get enrollmentCodeExpired;
+
+  /// No description provided for @enrollmentCodeAttemptsExceeded.
+  ///
+  /// In es, this message translates to:
+  /// **'Esta solicitud alcanzó el límite de intentos. Solicita un código nuevo al administrador.'**
+  String get enrollmentCodeAttemptsExceeded;
+
+  /// No description provided for @enrollmentCodeRateLimited.
+  ///
+  /// In es, this message translates to:
+  /// **'Se hicieron demasiados intentos. Espera antes de volver a intentarlo.'**
+  String get enrollmentCodeRateLimited;
+
+  /// No description provided for @enrollmentCodeUnavailable.
+  ///
+  /// In es, this message translates to:
+  /// **'UmiPOS no puede verificar este código ahora. Revisa la conexión e inténtalo de nuevo.'**
+  String get enrollmentCodeUnavailable;
+
   /// No description provided for @enrollmentPendingTitle.
   ///
   /// In es, this message translates to:
@@ -781,6 +811,18 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Centro de recuperación'**
   String get recoveryCenterTitle;
+
+  /// No description provided for @recoveryWebUnsupportedTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'La recuperación sin conexión no está disponible en Web'**
+  String get recoveryWebUnsupportedTitle;
+
+  /// No description provided for @recoveryWebUnsupportedBody.
+  ///
+  /// In es, this message translates to:
+  /// **'La versión Web funciona en línea. Usa una aplicación nativa compatible para almacenar y recuperar ventas sin conexión de forma segura.'**
+  String get recoveryWebUnsupportedBody;
 
   /// No description provided for @synchronizingPendingSales.
   ///

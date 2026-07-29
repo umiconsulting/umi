@@ -360,6 +360,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
+        constraints: const BoxConstraints(maxWidth: 760),
         builder: (_) => _Detail(detail, cart: widget.cart),
       );
     } catch (_) {
@@ -519,111 +520,140 @@ final class _DetailState extends State<_Detail> {
         initialChildSize: .82,
         minChildSize: .45,
         maxChildSize: .95,
-        builder: (_, controller) => ListView(
+        builder: (_, controller) => Scrollbar(
           controller: controller,
-          padding: const EdgeInsets.all(24),
-          children: [
-            Text(
-              detail.name,
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            Text(
-              '${money.currency} ${(money.minorUnits / 100).toStringAsFixed(2)}',
-            ),
-            if (detail.description != null) Text(detail.description!),
-            if (detail.sku != null) Text('SKU: ${detail.sku}'),
-            if (detail.barcode != null) Text('Barcode: ${detail.barcode}'),
-            if (detail.taxRateBasisPoints > 0) Text(l.taxIncludedLabel),
-            if (detail.variants.isNotEmpty) ...[
-              const SizedBox(height: 16),
+          thumbVisibility: true,
+          child: ListView(
+            controller: controller,
+            padding: const EdgeInsets.all(UmiSpacing.xl),
+            children: [
               Text(
-                l.variantsLabel,
-                style: Theme.of(context).textTheme.titleLarge,
+                detail.name,
+                style: Theme.of(context).textTheme.headlineMedium,
               ),
-              ...detail.variants.map(
-                (item) => ListTile(
-                  title: ChoiceChip(
-                    label: Text(item['name']! as String),
-                    selected: variantId == item['id'],
-                    onSelected: (_) =>
-                        setState(() => variantId = item['id']! as String),
-                  ),
-                ),
-              ),
-            ],
-            if (detail.optionGroups.isNotEmpty) ...[
-              const SizedBox(height: 16),
               Text(
-                l.modifiersLabel,
-                style: Theme.of(context).textTheme.titleLarge,
+                '${money.currency} ${(money.minorUnits / 100).toStringAsFixed(2)}',
               ),
-              ...detail.optionGroups.expand((group) sync* {
-                yield Text(
-                  group['name']! as String,
-                  style: Theme.of(context).textTheme.titleMedium,
-                );
-                for (final raw in group['modifiers']! as List<Object?>) {
-                  final modifier = raw! as Map<String, Object?>;
-                  final id = modifier['id']! as String;
-                  yield CheckboxListTile(
-                    value: selectedModifiers.containsKey(id),
-                    title: Text(modifier['name']! as String),
-                    onChanged: (selected) => setState(() {
-                      if (selected ?? false) {
-                        selectedModifiers[id] = 1;
-                      } else {
-                        selectedModifiers.remove(id);
-                      }
-                    }),
-                  );
-                }
-              }),
-            ],
-            TextField(
-              controller: note,
-              maxLength: 500,
-              decoration: InputDecoration(labelText: l.cartNoteLabel),
-            ),
-            Row(
-              children: [
-                IconButton(
-                  tooltip: l.decreaseQuantity,
-                  onPressed: quantity > 1
-                      ? () => setState(() => quantity--)
-                      : null,
-                  icon: const Icon(Icons.remove),
+              if (detail.description != null) Text(detail.description!),
+              if (detail.sku != null) Text('SKU: ${detail.sku}'),
+              if (detail.barcode != null) Text('Barcode: ${detail.barcode}'),
+              if (detail.taxRateBasisPoints > 0) Text(l.taxIncludedLabel),
+              if (detail.variants.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  l.variantsLabel,
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
-                Text('$quantity'),
-                IconButton(
-                  tooltip: l.increaseQuantity,
-                  onPressed: quantity < 999
-                      ? () => setState(() => quantity++)
-                      : null,
-                  icon: const Icon(Icons.add),
+                const SizedBox(height: UmiSpacing.sm),
+                Wrap(
+                  spacing: UmiSpacing.sm,
+                  runSpacing: UmiSpacing.sm,
+                  children: detail.variants
+                      .map(
+                        (item) => ChoiceChip(
+                          label: Text(item['name']! as String),
+                          selected: variantId == item['id'],
+                          onSelected: (_) =>
+                              setState(() => variantId = item['id']! as String),
+                        ),
+                      )
+                      .toList(),
                 ),
               ],
-            ),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: detail.variants.isNotEmpty && variantId == null
-                  ? null
-                  : () async {
-                      await widget.cart.add(
-                        productId: detail.id,
-                        variantId: variantId,
-                        modifiers: selectedModifiers.entries
-                            .map(
-                              (e) => {'modifierId': e.key, 'quantity': e.value},
-                            )
-                            .toList(),
-                        quantity: quantity,
-                        note: note.text,
-                      );
-                      if (context.mounted) Navigator.pop(context);
-                    },
-              child: Text(l.addToCartAction),
-            ),
-          ],
+              if (detail.optionGroups.isNotEmpty) ...[
+                const SizedBox(height: UmiSpacing.xl),
+                Text(
+                  l.modifiersLabel,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: UmiSpacing.md),
+                ...detail.optionGroups.map((group) {
+                  final modifiers = group['modifiers']! as List<Object?>;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: UmiSpacing.lg),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          group['name']! as String,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: UmiSpacing.sm),
+                        Wrap(
+                          spacing: UmiSpacing.sm,
+                          runSpacing: UmiSpacing.sm,
+                          children: modifiers.map((raw) {
+                            final modifier = raw! as Map<String, Object?>;
+                            final id = modifier['id']! as String;
+                            return FilterChip(
+                              label: Text(modifier['name']! as String),
+                              selected: selectedModifiers.containsKey(id),
+                              onSelected: (selected) => setState(() {
+                                if (selected) {
+                                  selectedModifiers[id] = 1;
+                                } else {
+                                  selectedModifiers.remove(id);
+                                }
+                              }),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+              const SizedBox(height: UmiSpacing.md),
+              TextField(
+                controller: note,
+                maxLength: 500,
+                decoration: InputDecoration(labelText: l.cartNoteLabel),
+              ),
+              Row(
+                children: [
+                  IconButton(
+                    tooltip: l.decreaseQuantity,
+                    onPressed: quantity > 1
+                        ? () => setState(() => quantity--)
+                        : null,
+                    icon: const Icon(Icons.remove),
+                  ),
+                  Text('$quantity'),
+                  IconButton(
+                    tooltip: l.increaseQuantity,
+                    onPressed: quantity < 999
+                        ? () => setState(() => quantity++)
+                        : null,
+                    icon: const Icon(Icons.add),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: detail.variants.isNotEmpty && variantId == null
+                    ? null
+                    : () async {
+                        await widget.cart.add(
+                          productId: detail.id,
+                          variantId: variantId,
+                          modifiers: selectedModifiers.entries
+                              .map(
+                                (e) => {
+                                  'modifierId': e.key,
+                                  'quantity': e.value,
+                                },
+                              )
+                              .toList(),
+                          quantity: quantity,
+                          note: note.text,
+                        );
+                        if (context.mounted) Navigator.pop(context);
+                      },
+                child: Text(l.addToCartAction),
+              ),
+              const SizedBox(height: UmiSpacing.md),
+            ],
+          ),
         ),
       ),
     );

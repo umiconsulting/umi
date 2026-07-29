@@ -32,6 +32,10 @@ export interface CheckoutCart {
   lines: CheckoutLine[];
 }
 
+export interface CheckoutAuthorization {
+  operatorName: string;
+}
+
 @Injectable()
 export class PosCheckoutRepository {
   constructor(private readonly pg: PgService) {}
@@ -43,10 +47,12 @@ export class PosCheckoutRepository {
     tenantId: string,
     branchId: string,
     operatorSessionId: string,
-  ): Promise<boolean> {
-    const { rowCount } = await this.pg.worker.query(
-      `SELECT 1 FROM runtime.operator_session os
+  ): Promise<CheckoutAuthorization | null> {
+    const { rows } = await this.pg.worker.query<CheckoutAuthorization>(
+      `SELECT u.full_name AS "operatorName"
+       FROM runtime.operator_session os
        JOIN tenant.device d ON d.id=os.device_id
+       JOIN umi.user u ON u.id=os.user_id
        WHERE os.id=$6::uuid AND os.durable_session_id=$2::uuid AND os.user_id=$1::uuid
          AND os.device_id=$3::uuid AND os.business_id=$4::uuid AND os.branch_id=$5::uuid
          AND os.state='active' AND os.expires_at>now() AND d.lifecycle_state='active'
@@ -55,7 +61,7 @@ export class PosCheckoutRepository {
            WHERE e->>'featureKey'='pos' AND COALESCE((e->>'enabled')::boolean,false))`,
       [userId, sessionId, deviceId, tenantId, branchId, operatorSessionId],
     );
-    return (rowCount ?? 0) > 0;
+    return rows[0] ?? null;
   }
 
   async lockCart(
@@ -65,22 +71,21 @@ export class PosCheckoutRepository {
     operatorSessionId: string,
     cartId: string,
     expectedVersion: number,
+    operatorName: string,
   ): Promise<CheckoutCart | null> {
     const cart = await client.query<Omit<CheckoutCart, 'lines'>>(
       `SELECT c.id::text,c.business_id::text AS "tenantId",c.branch_id::text AS "branchId",
               c.operator_session_id::text AS "operatorSessionId",c.version,
               c.business_date::text AS "businessDate",b.name AS "tenantName",
-              br.name AS "branchName",u.full_name AS "operatorName"
+              br.name AS "branchName",$6::text AS "operatorName"
        FROM tenant.pos_cart c
        JOIN tenant.business b ON b.id=c.business_id
        JOIN tenant.branch br ON br.id=c.branch_id
-       JOIN runtime.operator_session os ON os.id=c.operator_session_id
-       JOIN umi.user u ON u.id=os.user_id
        WHERE c.id=$1::uuid AND c.business_id=$2::uuid AND c.branch_id=$3::uuid
          AND c.operator_session_id=$4::uuid AND c.version=$5
          AND c.status IN ('draft','prepared')
        FOR UPDATE OF c`,
-      [cartId, tenantId, branchId, operatorSessionId, expectedVersion],
+      [cartId, tenantId, branchId, operatorSessionId, expectedVersion, operatorName],
     );
     if (!cart.rows[0]) return null;
     const lines = await client.query<CheckoutLine>(
@@ -116,7 +121,7 @@ export class PosCheckoutRepository {
                      THEN 'reserved' ELSE tenant.inventory_reservation.status END,
          line_snapshot=excluded.line_snapshot,expires_at=excluded.expires_at,updated_at=now()
        RETURNING id::text,status,expires_at::text AS "expiresAt"`,
-      [cart.tenantId, cart.branchId, cart.id, cart.version, lineSnapshot],
+      [cart.tenantId, cart.branchId, cart.id, cart.version, JSON.stringify(lineSnapshot)],
     );
     return {
       ...rows[0],

@@ -37,7 +37,7 @@ const cart = {
 
 function harness() {
   const repo = {
-    authorize: vi.fn().mockResolvedValue(true),
+    authorize: vi.fn().mockResolvedValue({ operatorName: 'Ada' }),
     lockCart: vi.fn().mockResolvedValue(cart),
     reserve: vi.fn().mockResolvedValue({
       id: id(10),
@@ -117,6 +117,15 @@ describe('PosCheckoutService', () => {
     const result = await service.checkout(user, id(1), base);
     expect(result.status).toBe('confirmation_required');
     expect(result.confirmation.totals.grandTotal.minorUnits).toBe(23200);
+    expect(repo.lockCart).toHaveBeenCalledWith(
+      expect.anything(),
+      id(1),
+      base.branchId,
+      base.operatorSessionId,
+      base.cartId,
+      base.expectedCartVersion,
+      'Ada',
+    );
     expect(repo.reserve).not.toHaveBeenCalled();
   });
 

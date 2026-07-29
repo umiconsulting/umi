@@ -85,6 +85,26 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter the complete eight-character setup code. Your operator PIN is used after device approval.';
 
   @override
+  String get enrollmentCodeRejected =>
+      'The setup code is invalid or expired. Request a new code from an administrator.';
+
+  @override
+  String get enrollmentCodeExpired =>
+      'The setup code expired. Request a new code from an administrator.';
+
+  @override
+  String get enrollmentCodeAttemptsExceeded =>
+      'This setup request reached its attempt limit. Request a new code from an administrator.';
+
+  @override
+  String get enrollmentCodeRateLimited =>
+      'Too many attempts were made. Wait before you try again.';
+
+  @override
+  String get enrollmentCodeUnavailable =>
+      'UmiPOS cannot verify this code now. Check the connection and try again.';
+
+  @override
   String get enrollmentPendingTitle => 'Administrator approval required';
 
   @override
@@ -375,6 +395,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get recoveryCenterTitle => 'Recovery Center';
+
+  @override
+  String get recoveryWebUnsupportedTitle =>
+      'Offline recovery is not available on Web';
+
+  @override
+  String get recoveryWebUnsupportedBody =>
+      'The Web version operates online. Use a supported native app to store and recover offline sales securely.';
 
   @override
   String get synchronizingPendingSales => 'Synchronizing pending sales…';

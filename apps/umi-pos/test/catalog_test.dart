@@ -65,9 +65,39 @@ final class FakeCatalogRepository implements CatalogRepository {
   Future<CatalogProductDetail> detail(
     CatalogPartition partition,
     String productId,
-  ) {
-    throw UnimplementedError();
-  }
+  ) async => CatalogProductDetail(
+    id: productId,
+    name: 'Latte',
+    description: 'Espresso con leche.',
+    sku: 'CAF-LAT',
+    hasBarcode: true,
+    category: null,
+    price: const CatalogMoney(minorUnits: 6500, currency: 'MXN').toJson(),
+    taxRateBasisPoints: 1600,
+    availability: 'enabled',
+    availableFrom: null,
+    primaryMedia: null,
+    hasVariants: true,
+    hasModifiers: true,
+    updatedAt: '2026-07-28T00:00:00Z',
+    barcode: '7501000000002',
+    media: const [],
+    variants: const [
+      {'id': 'small', 'name': 'Chico'},
+      {'id': 'medium', 'name': 'Mediano'},
+      {'id': 'large', 'name': 'Grande'},
+    ],
+    optionGroups: const [
+      {
+        'id': 'milk',
+        'name': 'Tipo de leche',
+        'modifiers': [
+          {'id': 'oat', 'name': 'Leche de avena'},
+          {'id': 'whole', 'name': 'Leche entera'},
+        ],
+      },
+    ],
+  );
 }
 
 CatalogController controller(FakeCatalogRepository repository) {
@@ -156,6 +186,52 @@ void main() {
       await tester.pump();
       expect(find.text('Café'), findsOneWidget);
       expect(find.byType(GridView), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      value.dispose();
+      root.dispose();
+    },
+  );
+
+  testWidgets(
+    'product detail keeps variant choices horizontal inside its scroll surface',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1400, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final repository = FakeCatalogRepository();
+      final value = controller(repository);
+      await value.open(partition);
+      final root = testRoot();
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('es'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          home: CatalogSurface(
+            entry: root.entry,
+            catalog: value,
+            cart: root.cart,
+            checkout: root.checkout,
+            connectivity: root.connectivity,
+            telemetry: root.telemetry,
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.text('Café'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Scrollbar), findsWidgets);
+      final small = tester.getCenter(find.text('Chico'));
+      final medium = tester.getCenter(find.text('Mediano'));
+      final large = tester.getCenter(find.text('Grande'));
+      expect(small.dy, medium.dy);
+      expect(medium.dy, large.dy);
+
       await tester.pumpWidget(const SizedBox());
       value.dispose();
       root.dispose();

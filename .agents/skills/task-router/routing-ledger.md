@@ -21,6 +21,19 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-07-29 - UmiPOS checkout and product dialog correction
+- task type: cross-app defect correction
+- request summary: fix the checkout HTTP 500 and the product dialog layout
+- filesystem slice inspected: `apps/umi-api` checkout and `apps/umi-pos` catalog, checkout, and recovery
+- chosen owner: UMI API for checkout authority; UmiPOS for presentation
+- chosen path: direct focused implementation
+- skill or subagent used: `task-router`, `diagnosing-bugs`, `tdd`, `baseline-ui`, `fixing-accessibility`, `webapp-testing`
+- files touched: checkout repository, service and tests; catalog surface and test
+- tools used: Flutter, Vitest, TypeScript, ESLint, curl, PostgreSQL
+- outcome: cash checkout completed; terminal ambiguity stayed query-only; product controls became responsive and contained
+- reusable pattern observed: resolve identity on the worker boundary before a tenant transaction
+- promotion follow-up: none
+
 ### 2026-06-10 - Phase 5 monorepo migration: S5.1 executed, S5.2 rehearsed, stoppers registered
 - task type: cross-workspace program execution (monorepo track) under an active sequencing gate
 - request summary: continue with Phase 5 of the integration plan; document all stoppers

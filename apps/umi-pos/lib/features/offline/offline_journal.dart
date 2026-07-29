@@ -184,6 +184,8 @@ final class EncryptedOfflineJournal {
   final bool _web;
   final _cipher = AesGcm.with256bits();
 
+  bool get supportsSecureOffline => !_web;
+
   Future<OfflineJournalSnapshot> load() async {
     _ensureSupported();
     final encoded = await _store.readCiphertext();

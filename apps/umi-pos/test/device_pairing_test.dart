@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
+import 'package:umi_pos/core/errors/app_error.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
 import 'package:umi_pos/core/security/credential_vault.dart';
@@ -144,6 +145,48 @@ void main() {
     expect(controller.state.phase, EntryPhase.enrollmentRequired);
   });
 
+  testWidgets('a rejected setup code shows an inline field error', (
+    tester,
+  ) async {
+    final storage = MemorySecureStorage();
+    storage.values['device.installation_id'] = _installationId;
+    final vault = CredentialVault(storage);
+    final gateway = _PairingGateway()..failClaim = true;
+    final controller = _controller(gateway, vault);
+    await controller.initialize();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('es'),
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ListenableBuilder(
+          listenable: controller,
+          builder: (context, _) => EntrySurface(controller: controller),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), 'BADCODE1');
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+
+    expect(controller.state.phase, EntryPhase.enrollmentRequired);
+    expect(
+      find.text(
+        'El código de registro no es válido o caducó. Solicita un código nuevo al administrador.',
+      ),
+      findsOneWidget,
+    );
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.decoration?.errorText, isNotNull);
+  });
+
   testWidgets('trusted device uses the personal PIN and loads cashier access', (
     tester,
   ) async {
@@ -215,6 +258,66 @@ void main() {
       expect(await vault.refreshToken(), isNull);
     },
   );
+
+  test('operator lock preserves the device branch for the next PIN', () async {
+    final storage = MemorySecureStorage();
+    storage.values['device.installation_id'] = _installationId;
+    final vault = CredentialVault(storage);
+    await vault.saveDevice(
+      id: _deviceId,
+      publicId: _publicId,
+      credential: _secret,
+      credentialVersion: 1,
+      state: 'active',
+      tenantId: _tenantId,
+      branchId: _branchId,
+    );
+    final gateway = _PairingGateway();
+    final controller = _controller(gateway, vault);
+    await controller.initialize();
+    await controller.loginWithPin('2468');
+    expect(controller.state.phase, EntryPhase.ready);
+
+    await controller.lock();
+
+    final identity = await vault.deviceIdentity();
+    expect(identity.tenantId, _tenantId);
+    expect(identity.branchId, _branchId);
+    expect(controller.state.phase, EntryPhase.pinRequired);
+    expect(controller.state.errorCode, isNull);
+
+    await controller.loginWithPin('2468');
+
+    expect(controller.state.phase, EntryPhase.ready);
+    expect(controller.state.errorCode, isNull);
+  });
+
+  test(
+    'operator lock fails locally closed without exposing a network error',
+    () async {
+      final storage = MemorySecureStorage();
+      storage.values['device.installation_id'] = _installationId;
+      final vault = CredentialVault(storage);
+      await vault.saveDevice(
+        id: _deviceId,
+        publicId: _publicId,
+        credential: _secret,
+        credentialVersion: 1,
+        state: 'active',
+        tenantId: _tenantId,
+        branchId: _branchId,
+      );
+      final gateway = _PairingGateway()..failLock = true;
+      final controller = _controller(gateway, vault);
+      await controller.initialize();
+      await controller.loginWithPin('2468');
+
+      await controller.lock();
+
+      expect(controller.state.phase, EntryPhase.pinRequired);
+      expect(controller.state.errorCode, isNull);
+    },
+  );
 }
 
 EntryController _controller(EntryGateway gateway, CredentialVault vault) {
@@ -235,10 +338,19 @@ final class _PairingGateway implements EntryGateway {
   int acknowledgements = 0;
   int logouts = 0;
   String? authenticatedPin;
+  bool failLock = false;
+  bool failClaim = false;
 
   @override
   Future<DevicePairingSession> claimPairing(String code) async {
     claimedCode = code;
+    if (failClaim) {
+      throw const AppException(
+        category: AppErrorCategory.authentication,
+        code: 'ENROLLMENT_REJECTED',
+        recoverable: false,
+      );
+    }
     return DevicePairingSession(
       pairingSessionId: _sessionId,
       pollingCredential: _secret,
@@ -372,7 +484,16 @@ final class _PairingGateway implements EntryGateway {
         ),
       );
   @override
-  Future<void> lockOperator(String id) => throw UnimplementedError();
+  Future<void> lockOperator(String id) async {
+    if (failLock) {
+      throw const AppException(
+        category: AppErrorCategory.transport,
+        code: 'TRANSPORT_FAILURE',
+        recoverable: true,
+      );
+    }
+  }
+
   @override
   Future<void> endOperator(String id) => throw UnimplementedError();
   @override

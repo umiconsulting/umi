@@ -118,14 +118,16 @@ final class BoundedApiClient implements ApiClient {
             http.Request(method.name.toUpperCase(), base.resolve(path))
               ..headers.addAll({
                 'accept': 'application/json',
-                'content-type': 'application/json',
                 'x-correlation-id': correlationId,
                 'x-umi-client': 'umi-pos',
                 'x-umi-app': 'pos',
                 ...deviceHeaders,
               });
         if (token != null) request.headers['authorization'] = 'Bearer $token';
-        if (body != null) request.body = jsonEncode(body);
+        if (body != null) {
+          request.headers['content-type'] = 'application/json';
+          request.body = jsonEncode(body);
+        }
         final streamed = await _client.send(request).timeout(requestTimeout);
         final bytes = await streamed.stream
             .fold<List<int>>(<int>[], (buffer, chunk) {

@@ -46,26 +46,17 @@ final class CartController extends ChangeNotifier {
     _operatorSessionId = operatorSessionId;
     _set(const CartState(phase: CartPhase.loading));
     try {
-      final cart = await _repository.read(
+      final cart = await _repository.create(
         tenantId,
-        CartQuery(branchId: branchId, operatorSessionId: operatorSessionId),
+        CreateCartRequest(
+          branchId: branchId,
+          operatorSessionId: operatorSessionId,
+          idempotencyKey: _uuid(),
+        ),
       );
       _set(CartState(phase: CartPhase.ready, cart: cart));
     } on AppException catch (error) {
-      if (error.code == 'CART_NOT_FOUND' ||
-          error.code == 'RESOURCE_NOT_FOUND') {
-        final cart = await _repository.create(
-          tenantId,
-          CreateCartRequest(
-            branchId: branchId,
-            operatorSessionId: operatorSessionId,
-            idempotencyKey: _uuid(),
-          ),
-        );
-        _set(CartState(phase: CartPhase.ready, cart: cart));
-      } else {
-        _failure(error);
-      }
+      _failure(error);
     }
     _event('cart_opened');
   }

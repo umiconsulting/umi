@@ -7,11 +7,21 @@ import 'package:umi_pos/features/cart/cart_repository.dart';
 final class _CartRepository implements CartRepository {
   Cart cart = _cart();
   CartLineInput? lastAdded;
+  int creates = 0;
+  int reads = 0;
 
   @override
-  Future<Cart> create(String tenantId, CreateCartRequest request) async => cart;
+  Future<Cart> create(String tenantId, CreateCartRequest request) async {
+    creates++;
+    return cart;
+  }
+
   @override
-  Future<Cart> read(String tenantId, CartQuery query) async => cart;
+  Future<Cart> read(String tenantId, CartQuery query) async {
+    reads++;
+    return cart;
+  }
+
   @override
   Future<Cart> add(String tenantId, CartLineInput input) async {
     lastAdded = input;
@@ -58,6 +68,32 @@ Cart _cart() => const Cart(
 );
 
 void main() {
+  test('cart open creates or restores without an expected 404 read', () async {
+    final repository = _CartRepository();
+    final controller = CartController(
+      repository: repository,
+      telemetry: const SafeTelemetry(
+        enabled: false,
+        context: TelemetryContext(
+          environment: 'test',
+          appVersion: 'test',
+          platform: 'test',
+        ),
+        exporter: NoopTelemetryExporter(),
+      ),
+    );
+
+    await controller.open(
+      repository.cart.tenantId,
+      repository.cart.branchId,
+      repository.cart.operatorSessionId,
+    );
+
+    expect(repository.creates, 1);
+    expect(repository.reads, 0);
+    expect(controller.state.cart, repository.cart);
+  });
+
   test(
     'cart uses server snapshot and preserves partition across navigation',
     () async {

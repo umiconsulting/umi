@@ -31,7 +31,7 @@ export class PosCheckoutService {
   ) {}
 
   async checkout(user: AuthUser, tenantId: string, dto: CheckoutCommand) {
-    await this.authorize(user, tenantId, dto.branchId, dto.operatorSessionId);
+    const authorization = await this.authorize(user, tenantId, dto.branchId, dto.operatorSessionId);
     const result = await this.integrity.execute<CheckoutResult>(
       {
         tenantId,
@@ -49,6 +49,7 @@ export class PosCheckoutService {
           dto.operatorSessionId,
           dto.cartId,
           dto.expectedCartVersion,
+          authorization.operatorName,
         );
         if (!cart) {
           return {
@@ -363,17 +364,17 @@ export class PosCheckoutService {
     operatorSessionId: string,
   ) {
     if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
-    if (
-      !(await this.repo.authorize(
-        user.id,
-        user.sessionId,
-        user.deviceId,
-        tenantId,
-        branchId,
-        operatorSessionId,
-      ))
-    ) {
+    const authorization = await this.repo.authorize(
+      user.id,
+      user.sessionId,
+      user.deviceId,
+      tenantId,
+      branchId,
+      operatorSessionId,
+    );
+    if (!authorization) {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
     }
+    return authorization;
   }
 }

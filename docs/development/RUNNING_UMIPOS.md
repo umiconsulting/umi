@@ -79,6 +79,21 @@ Run the focused PIN checks:
 
 Do not use the disposable seed against a shared, staging, or production database.
 
+## Local role and catalog demo
+
+Seed the disposable local database with five POS roles and 12 products:
+
+`UMI_POS_DEV_SEED_CONFIRM=disposable pnpm umi-pos:demo-seed`
+
+Use the direct script when `pnpm` is not available:
+
+`UMI_POS_DEV_SEED_CONFIRM=disposable bash scripts/umi-pos-demo-seed.sh`
+
+The seed does not print or store the API JWT secret. It reads the secret from the local
+environment or the active Linux API process.
+
+Read `docs/development/UMIPOS_ROLE_TEST_GUIDE.md` for the PIN list and each role test.
+
 ## One-command targets
 
 - Linux: `pnpm umi-pos:linux`

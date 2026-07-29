@@ -66,7 +66,9 @@ final class _EnrollmentState extends State<_Enrollment> {
             controller: code,
             decoration: InputDecoration(
               labelText: l.enrollmentCodeLabel,
-              errorText: _invalidCode ? l.enrollmentCodeInvalid : null,
+              errorText: _invalidCode
+                  ? l.enrollmentCodeInvalid
+                  : _enrollmentError(l, widget.controller.state.errorCode),
             ),
             textCapitalization: TextCapitalization.characters,
             textInputAction: TextInputAction.done,
@@ -82,10 +84,7 @@ final class _EnrollmentState extends State<_Enrollment> {
             onSubmitted: (_) => _submit(),
           ),
           const SizedBox(height: UmiSpacing.lg),
-          ElevatedButton(
-            onPressed: _submit,
-            child: Text(l.continueAction),
-          ),
+          ElevatedButton(onPressed: _submit, child: Text(l.continueAction)),
         ],
       ),
     );
@@ -101,6 +100,16 @@ final class _EnrollmentState extends State<_Enrollment> {
     widget.controller.enroll(normalized);
   }
 }
+
+String? _enrollmentError(AppLocalizations l, String? code) => switch (code) {
+  'AUTHENTICATION_REQUIRED' ||
+  'ENROLLMENT_REJECTED' => l.enrollmentCodeRejected,
+  'ENROLLMENT_EXPIRED' => l.enrollmentCodeExpired,
+  'ENROLLMENT_ATTEMPTS_EXCEEDED' => l.enrollmentCodeAttemptsExceeded,
+  'RATE_LIMITED' => l.enrollmentCodeRateLimited,
+  'TRANSPORT_FAILURE' || 'NETWORK_UNAVAILABLE' => l.enrollmentCodeUnavailable,
+  _ => null,
+};
 
 final class _EnrollmentPending extends StatelessWidget {
   const _EnrollmentPending({required this.controller});

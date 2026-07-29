@@ -47,6 +47,8 @@ final class CredentialVault
   static const _publicId = 'device.public_id';
   static const _credential = 'device.credential';
   static const _credentialVersion = 'device.credential_version';
+  static const _deviceTenant = 'device.tenant_id';
+  static const _deviceBranch = 'device.branch_id';
   static const _tenant = 'context.tenant_id';
   static const _branch = 'context.branch_id';
   static const _deviceState = 'device.state';
@@ -63,16 +65,27 @@ final class CredentialVault
       installationId = _uuid();
       await _storage.write(_installation, installationId);
     }
+    final deviceId = await _storage.read(_deviceId);
+    final publicId = await _storage.read(_publicId);
+    final credential = await _storage.read(_credential);
+    var tenantId = await _storage.read(_deviceTenant);
+    var branchId = await _storage.read(_deviceBranch);
+    if (deviceId != null && publicId != null && credential != null) {
+      tenantId ??= await _storage.read(_tenant);
+      branchId ??= await _storage.read(_branch);
+      if (tenantId != null) await _storage.write(_deviceTenant, tenantId);
+      if (branchId != null) await _storage.write(_deviceBranch, branchId);
+    }
     return DeviceIdentity(
       installationId: installationId,
-      deviceId: await _storage.read(_deviceId),
-      publicId: await _storage.read(_publicId),
-      credential: await _storage.read(_credential),
+      deviceId: deviceId,
+      publicId: publicId,
+      credential: credential,
       credentialVersion: int.tryParse(
         await _storage.read(_credentialVersion) ?? '',
       ),
-      tenantId: await _storage.read(_tenant),
-      branchId: await _storage.read(_branch),
+      tenantId: tenantId,
+      branchId: branchId,
       state: await _storage.read(_deviceState),
     );
   }
@@ -91,8 +104,14 @@ final class CredentialVault
     await _storage.write(_credential, credential);
     await _storage.write(_credentialVersion, '$credentialVersion');
     await _storage.write(_deviceState, state);
-    if (tenantId != null) await _storage.write(_tenant, tenantId);
-    if (branchId != null) await _storage.write(_branch, branchId);
+    if (tenantId != null) {
+      await _storage.write(_deviceTenant, tenantId);
+      await _storage.write(_tenant, tenantId);
+    }
+    if (branchId != null) {
+      await _storage.write(_deviceBranch, branchId);
+      await _storage.write(_branch, branchId);
+    }
   }
 
   Future<void> saveTokens(String accessToken, String refreshToken) async {
@@ -160,6 +179,8 @@ final class CredentialVault
       _publicId,
       _credential,
       _credentialVersion,
+      _deviceTenant,
+      _deviceBranch,
       _deviceState,
     ]) {
       await _storage.delete(key);

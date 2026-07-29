@@ -392,12 +392,20 @@ final class EntryController extends ChangeNotifier {
     if (operator == null) return;
     try {
       await _gateway.lockOperator(operator.id);
-      await _gateway.logout();
-    } finally {
-      await _vault.clearSession();
-      _event('operator.locked');
-      _set(EntryState(EntryPhase.pinRequired, device: _state.device));
+    } on AppException catch (error) {
+      _event('operator.lock_sync_failed', error.code);
+    } catch (_) {
+      _event('operator.lock_sync_failed', 'UNEXPECTED_FAILURE');
     }
+    try {
+      await _gateway.logout();
+    } catch (_) {
+      // The local lock remains authoritative for the presentation state.
+      // Server session expiry and the next PIN authentication fail closed.
+    }
+    await _vault.clearSession();
+    _event('operator.locked');
+    _set(EntryState(EntryPhase.pinRequired, device: _state.device));
   }
 
   Future<void> reselectBranch() async {
@@ -464,21 +472,27 @@ final class EntryController extends ChangeNotifier {
   }
 
   Future<void> _resolveContext() async {
+    final device = _state.device;
     final response = await _gateway.entryContext();
     final tenants = response.tenants.map(EntryTenant.fromJson).toList();
     if (tenants.isEmpty) {
       _set(
         EntryState(
           EntryPhase.tenantRequired,
+          device: device,
           tenants: tenants,
           errorCode: 'NO_ACCESS',
         ),
       );
     } else if (tenants.length == 1) {
-      _set(EntryState(EntryPhase.tenantRequired, tenants: tenants));
+      _set(
+        EntryState(EntryPhase.tenantRequired, device: device, tenants: tenants),
+      );
       await selectTenant(tenants.single);
     } else {
-      _set(EntryState(EntryPhase.tenantRequired, tenants: tenants));
+      _set(
+        EntryState(EntryPhase.tenantRequired, device: device, tenants: tenants),
+      );
     }
   }
 

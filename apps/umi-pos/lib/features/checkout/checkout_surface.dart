@@ -127,6 +127,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                 ),
                 Wrap(
                   spacing: 12,
+                  runSpacing: UmiSpacing.sm,
                   children: [
                     ChoiceChip(
                       label: Text(l.cashPayment),
@@ -144,7 +145,8 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                     ),
                   ],
                 ),
-                if (method == 'cash')
+                if (method == 'cash') ...[
+                  const SizedBox(height: UmiSpacing.md),
                   TextField(
                     controller: cashReceived,
                     keyboardType: const TextInputType.numberWithOptions(
@@ -152,6 +154,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                     ),
                     decoration: InputDecoration(labelText: l.cashReceivedLabel),
                   ),
+                ],
                 if (state.phase == CheckoutPhase.confirmationRequired) ...[
                   const SizedBox(height: UmiSpacing.lg),
                   Semantics(

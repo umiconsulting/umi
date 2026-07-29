@@ -90,6 +90,46 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'Web Recovery Center fails closed without opening the encrypted journal',
+    (tester) async {
+      final journal = EncryptedOfflineJournal(_Store(), web: true);
+      final recovery = OfflineRecoveryController(
+        journal: journal,
+        gateway: _Gateway(),
+        connectivity: ConnectivityController(),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('es'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: RecoveryCenter(
+              journal: journal,
+              recovery: recovery,
+              scope: ReplayScope(
+                tenantId: _id(1),
+                branchId: _id(2),
+                operatorSessionId: _id(3),
+                credentialVersion: 1,
+              ),
+              executor: _Executor(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(tester.takeException(), isNull);
+      expect(
+        find.text('La recuperación sin conexión no está disponible en Web'),
+        findsOneWidget,
+      );
+      expect(find.text('Sincronizar ahora'), findsNothing);
+    },
+  );
 }
 
 String _id(int value) =>
