@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-28",
+  "updatedAt": "2026-07-29",
   "latestRelevantCommit": "HEAD (Gate 2F final closeout commit)",
   "items": [
     {
@@ -23,9 +23,9 @@
       "id": "2B",
       "status": "complete",
       "dependencies": ["2A"],
-      "nextObjective": "Implement device trust and authenticated operator boundary",
+      "nextObjective": "Maintain administrator-approved device trust",
       "blockers": [],
-      "validationState": "Focused contract, API, migration, Flutter, and web validation passed"
+      "validationState": "Administrator-approved pairing and personal PIN operator entry passed focused contract, API, database, Flutter, and Web validation"
     },
     {
       "id": "2C",

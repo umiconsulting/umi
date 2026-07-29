@@ -215,7 +215,7 @@ abstract class AppLocalizations {
   /// No description provided for @enrollmentBody.
   ///
   /// In es, this message translates to:
-  /// **'Ingresa el desafío de un solo uso aprobado por un administrador.'**
+  /// **'Ingresa el código de configuración de ocho caracteres que muestra el administrador.'**
   String get enrollmentBody;
 
   /// No description provided for @challengeIdLabel.
@@ -229,6 +229,36 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Código de registro'**
   String get enrollmentCodeLabel;
+
+  /// No description provided for @enrollmentCodeInvalid.
+  ///
+  /// In es, this message translates to:
+  /// **'Ingresa el código completo de ocho caracteres. Usa tu PIN de operador después de aprobar el dispositivo.'**
+  String get enrollmentCodeInvalid;
+
+  /// No description provided for @enrollmentPendingTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Se requiere la aprobación del administrador'**
+  String get enrollmentPendingTitle;
+
+  /// No description provided for @enrollmentPendingBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Este dispositivo solicitó acceso. Pide a un administrador que lo revise en el Dashboard de UMI.'**
+  String get enrollmentPendingBody;
+
+  /// No description provided for @enrollmentPendingSecure.
+  ///
+  /// In es, this message translates to:
+  /// **'La credencial de pareo está protegida en este dispositivo.'**
+  String get enrollmentPendingSecure;
+
+  /// No description provided for @cancelEnrollmentAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar solicitud'**
+  String get cancelEnrollmentAction;
 
   /// No description provided for @continueAction.
   ///
@@ -259,6 +289,72 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Iniciar sesión'**
   String get signInAction;
+
+  /// No description provided for @operatorPinTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Ingresa tu PIN de operador'**
+  String get operatorPinTitle;
+
+  /// No description provided for @operatorPinBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Tu PIN te identifica y carga tus permisos actuales.'**
+  String get operatorPinBody;
+
+  /// No description provided for @operatorPinLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'PIN de operador'**
+  String get operatorPinLabel;
+
+  /// No description provided for @operatorPinHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Usa de 4 a 8 dígitos.'**
+  String get operatorPinHint;
+
+  /// No description provided for @operatorPinAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Continuar'**
+  String get operatorPinAction;
+
+  /// No description provided for @operatorPinInvalid.
+  ///
+  /// In es, this message translates to:
+  /// **'El PIN no es válido para esta sucursal.'**
+  String get operatorPinInvalid;
+
+  /// No description provided for @operatorPinLocked.
+  ///
+  /// In es, this message translates to:
+  /// **'El ingreso de PIN está bloqueado temporalmente. Intenta más tarde.'**
+  String get operatorPinLocked;
+
+  /// No description provided for @operatorPinRateLimited.
+  ///
+  /// In es, this message translates to:
+  /// **'Hay demasiados intentos. Espera antes de intentar de nuevo.'**
+  String get operatorPinRateLimited;
+
+  /// No description provided for @operatorPinEntitlementDisabled.
+  ///
+  /// In es, this message translates to:
+  /// **'UmiPOS no está habilitado para este negocio.'**
+  String get operatorPinEntitlementDisabled;
+
+  /// No description provided for @operatorPinBranchInvalid.
+  ///
+  /// In es, this message translates to:
+  /// **'Este dispositivo no está asignado a una sucursal activa.'**
+  String get operatorPinBranchInvalid;
+
+  /// No description provided for @operatorPinLength.
+  ///
+  /// In es, this message translates to:
+  /// **'Ingresa al menos cuatro dígitos.'**
+  String get operatorPinLength;
 
   /// No description provided for @selectTenantTitle.
   ///

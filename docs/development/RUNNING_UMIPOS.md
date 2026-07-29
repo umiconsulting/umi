@@ -28,6 +28,57 @@ endpoint for staging, and the approved TLS production endpoint for production.
 
 Start the backend with its documented UMI API command before running authenticated flows.
 
+## Device enrollment
+
+Apply migrations through `20260729000200_pos_pin_authentication.sql`.
+
+Use this development flow:
+
+1. Sign in to the UMI Dashboard as an owner or administrator.
+2. Open **Devices**.
+3. Select the tenant and branch.
+4. Select **Register UmiPOS**.
+5. Enter the device name, type, and platform.
+6. Create the eight-character setup code.
+7. Open UmiPOS.
+8. Enter the setup code.
+9. Return to the Dashboard.
+10. Approve the matching installation reference.
+11. Wait for UmiPOS to store and acknowledge its device credential.
+12. Enter the personal operator PIN.
+
+The setup code expires after five minutes. The code works once.
+
+UmiPOS stores the pairing session and polling credential in secure storage.
+
+Native targets use the platform credential store. Web storage has browser-origin limits.
+
+Run these focused checks:
+
+- Pairing API tests: `pnpm umi-pos:pairing-api-tests`.
+- Pairing Flutter tests: `pnpm umi-pos:pairing-tests`.
+- Pairing database check: `pnpm umi-pos:pairing-db-check`.
+
+Do not use the old challenge ID flow. The public direct-activation route is disabled.
+
+## Personal operator PIN
+
+Each operator enters only a personal PIN after device enrollment. UMI derives the tenant and
+branch from the trusted device. The API loads the operator identity, role, permissions, and
+entitlement.
+
+For the disposable local database, the cashier PIN is `2468`.
+
+Seed the POS entitlement only in the disposable local database:
+
+`UMI_POS_DEV_SEED_CONFIRM=disposable pnpm umi-pos:local-access-seed`
+
+Run the focused PIN checks:
+
+`pnpm umi-pos:pin-tests`
+
+Do not use the disposable seed against a shared, staging, or production database.
+
 ## One-command targets
 
 - Linux: `pnpm umi-pos:linux`

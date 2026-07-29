@@ -1,8 +1,33 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "da30fcb1f36c4db4e294116ce9201fed2874e441b5556ad932ace5a00ab3ac40",
-  "contractVersion": "1.6.1",
+  "contentHash": "53934043942493e69d01b2f399e0e64b8f597787a08acea96bff177534f07710",
+  "contractVersion": "1.8.0",
   "definitions": {
+    "AcknowledgeDeviceCredentialRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "deviceCredential": {
+          "maxLength": 128,
+          "minLength": 43,
+          "type": "string"
+        },
+        "installationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "pollingCredential": {
+          "maxLength": 128,
+          "minLength": 43,
+          "type": "string"
+        }
+      },
+      "required": [
+        "pollingCredential",
+        "installationId",
+        "deviceCredential"
+      ],
+      "type": "object"
+    },
     "AcknowledgeReconciliationRequest": {
       "additionalProperties": false,
       "properties": {
@@ -4245,6 +4270,56 @@
       ],
       "type": "object"
     },
+    "ClaimDevicePairingRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "deviceType": {
+          "enum": [
+            "pos_terminal",
+            "kds"
+          ],
+          "type": "string"
+        },
+        "ephemeralPublicKey": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 32,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "installationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "platform": {
+          "enum": [
+            "android",
+            "ios",
+            "linux",
+            "macos",
+            "windows",
+            "web"
+          ],
+          "type": "string"
+        },
+        "setupCode": {
+          "pattern": "^[A-Z0-9]{8}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "setupCode",
+        "installationId",
+        "platform",
+        "deviceType"
+      ],
+      "type": "object"
+    },
     "CommittedSale": {
       "additionalProperties": false,
       "properties": {
@@ -5152,6 +5227,10 @@
           "minLength": 1,
           "type": "string"
         },
+        "operatorPin": {
+          "pattern": "^\\d{4,8}$",
+          "type": "string"
+        },
         "position": {
           "anyOf": [
             {
@@ -5179,6 +5258,19 @@
     "CurrencyCode": {
       "pattern": "^[A-Z]{3}$",
       "type": "string"
+    },
+    "DecideDeviceEnrollmentRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "idempotencyKey"
+      ],
+      "type": "object"
     },
     "DeviceAuthContext": {
       "additionalProperties": false,
@@ -5342,6 +5434,347 @@
       ],
       "type": "object"
     },
+    "DeviceEnrollmentDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "decidedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "enrollmentRequestId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "credential_ready",
+            "denied"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "enrollmentRequestId",
+        "state",
+        "decidedAt"
+      ],
+      "type": "object"
+    },
+    "DeviceEnrollmentRequestCreated": {
+      "additionalProperties": false,
+      "properties": {
+        "enrollmentRequestId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "expiresAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "pollAfterSeconds": {
+          "maximum": 30,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "qrPayload": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "setupCode": {
+          "pattern": "^[A-Z0-9]{8}$",
+          "type": "string"
+        },
+        "state": {
+          "const": "created",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enrollmentRequestId",
+        "setupCode",
+        "qrPayload",
+        "state",
+        "expiresAt",
+        "pollAfterSeconds"
+      ],
+      "type": "object"
+    },
+    "DeviceEnrollmentRequestList": {
+      "additionalProperties": false,
+      "properties": {
+        "requests": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "branchId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "claimedAt": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "displayName": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "expiresAt": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "installationReference": {
+                "anyOf": [
+                  {
+                    "pattern": "^[a-f0-9]{16}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "platform": {
+                "enum": [
+                  "android",
+                  "ios",
+                  "linux",
+                  "macos",
+                  "windows",
+                  "web"
+                ],
+                "type": "string"
+              },
+              "requestedPlatform": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "android",
+                      "ios",
+                      "linux",
+                      "macos",
+                      "windows",
+                      "web"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "state": {
+                "enum": [
+                  "created",
+                  "awaiting_approval",
+                  "approved",
+                  "denied",
+                  "credential_ready",
+                  "credential_delivered",
+                  "completed",
+                  "expired",
+                  "cancelled"
+                ],
+                "type": "string"
+              },
+              "tenantId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "pos_terminal",
+                  "kds"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "tenantId",
+              "branchId",
+              "displayName",
+              "type",
+              "platform",
+              "requestedPlatform",
+              "state",
+              "expiresAt",
+              "claimedAt",
+              "installationReference",
+              "createdAt"
+            ],
+            "type": "object"
+          },
+          "maxItems": 200,
+          "type": "array"
+        }
+      },
+      "required": [
+        "requests"
+      ],
+      "type": "object"
+    },
+    "DeviceEnrollmentRequestState": {
+      "enum": [
+        "created",
+        "awaiting_approval",
+        "approved",
+        "denied",
+        "credential_ready",
+        "credential_delivered",
+        "completed",
+        "expired",
+        "cancelled"
+      ],
+      "type": "string"
+    },
+    "DeviceEnrollmentRequestView": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "claimedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "displayName": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "expiresAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "installationReference": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{16}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "platform": {
+          "enum": [
+            "android",
+            "ios",
+            "linux",
+            "macos",
+            "windows",
+            "web"
+          ],
+          "type": "string"
+        },
+        "requestedPlatform": {
+          "anyOf": [
+            {
+              "enum": [
+                "android",
+                "ios",
+                "linux",
+                "macos",
+                "windows",
+                "web"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "created",
+            "awaiting_approval",
+            "approved",
+            "denied",
+            "credential_ready",
+            "credential_delivered",
+            "completed",
+            "expired",
+            "cancelled"
+          ],
+          "type": "string"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "pos_terminal",
+            "kds"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "tenantId",
+        "branchId",
+        "displayName",
+        "type",
+        "platform",
+        "requestedPlatform",
+        "state",
+        "expiresAt",
+        "claimedAt",
+        "installationReference",
+        "createdAt"
+      ],
+      "type": "object"
+    },
     "DeviceLifecycleState": {
       "enum": [
         "enrollment_pending",
@@ -5352,6 +5785,240 @@
         "replaced"
       ],
       "type": "string"
+    },
+    "DevicePairingAcknowledgement": {
+      "additionalProperties": false,
+      "properties": {
+        "completedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "pairingSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "state": {
+          "const": "completed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pairingSessionId",
+        "state",
+        "completedAt"
+      ],
+      "type": "object"
+    },
+    "DevicePairingPollResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "credential": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 43,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "device": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "branchId": {
+                  "anyOf": [
+                    {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "credentialVersion": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                "displayName": {
+                  "maxLength": 120,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "lastSeenAt": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "platform": {
+                  "enum": [
+                    "android",
+                    "ios",
+                    "linux",
+                    "macos",
+                    "windows",
+                    "web"
+                  ],
+                  "type": "string"
+                },
+                "publicId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "replacementDeviceId": {
+                  "anyOf": [
+                    {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "revokedAt": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "rotationRequired": {
+                  "type": "boolean"
+                },
+                "state": {
+                  "enum": [
+                    "enrollment_pending",
+                    "active",
+                    "rotation_required",
+                    "rotated",
+                    "revoked",
+                    "replaced"
+                  ],
+                  "type": "string"
+                },
+                "tenantId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": {
+                  "enum": [
+                    "pos_terminal",
+                    "kds"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "publicId",
+                "tenantId",
+                "branchId",
+                "displayName",
+                "type",
+                "platform",
+                "state",
+                "credentialVersion",
+                "lastSeenAt",
+                "rotationRequired",
+                "revokedAt",
+                "replacementDeviceId"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expiresAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "pairingSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "pollAfterSeconds": {
+          "maximum": 30,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "state": {
+          "enum": [
+            "awaiting_approval",
+            "credential_ready",
+            "credential_delivered",
+            "completed",
+            "denied",
+            "expired",
+            "cancelled"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "pairingSessionId",
+        "state",
+        "expiresAt",
+        "pollAfterSeconds",
+        "device",
+        "credential"
+      ],
+      "type": "object"
+    },
+    "DevicePairingSession": {
+      "additionalProperties": false,
+      "properties": {
+        "expiresAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "pairingSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "pollAfterSeconds": {
+          "maximum": 30,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "pollingCredential": {
+          "maxLength": 128,
+          "minLength": 43,
+          "type": "string"
+        },
+        "state": {
+          "const": "awaiting_approval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pairingSessionId",
+        "pollingCredential",
+        "state",
+        "expiresAt",
+        "pollAfterSeconds"
+      ],
+      "type": "object"
     },
     "DevicePlatform": {
       "enum": [
@@ -9294,6 +9961,25 @@
       ],
       "type": "object"
     },
+    "PollDevicePairingRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "installationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "pollingCredential": {
+          "maxLength": 128,
+          "minLength": 43,
+          "type": "string"
+        }
+      },
+      "required": [
+        "pollingCredential",
+        "installationId"
+      ],
+      "type": "object"
+    },
     "PosLoginRequest": {
       "additionalProperties": false,
       "properties": {
@@ -9316,6 +10002,34 @@
       "required": [
         "username",
         "password",
+        "installationId"
+      ],
+      "type": "object"
+    },
+    "PosPinLoginRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "branchId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "installationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "pin": {
+          "pattern": "^\\d{4,8}$",
+          "type": "string"
+        },
+        "tenantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pin",
+        "tenantId",
+        "branchId",
         "installationId"
       ],
       "type": "object"
@@ -14935,6 +15649,17 @@
             }
           ]
         },
+        "operatorPin": {
+          "anyOf": [
+            {
+              "pattern": "^\\d{4,8}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "position": {
           "anyOf": [
             {
@@ -15438,6 +16163,21 @@
       "response": "ReplayCursor",
       "tenantContext": true
     },
+    "GET /api/tenants/:tenantId/devices/enrollment-requests": {
+      "approval": false,
+      "auth": "session",
+      "branchContext": false,
+      "errors": [
+        "PERMISSION_DENIED"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "devices.manage",
+      "pin": false,
+      "request": null,
+      "response": "DeviceEnrollmentRequestList",
+      "tenantContext": true
+    },
     "PATCH /api/:slug/admin/staff/:staffId": {
       "approval": false,
       "auth": "session",
@@ -15703,6 +16443,25 @@
       "response": "PosSessionResponse",
       "tenantContext": false
     },
+    "POST /api/auth/pos/pin-login": {
+      "approval": false,
+      "auth": "device-credential",
+      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED",
+        "PIN_LOCKED",
+        "RATE_LIMITED",
+        "DEVICE_NOT_ALLOWED",
+        "ENTITLEMENT_DISABLED"
+      ],
+      "idempotent": false,
+      "offline": false,
+      "permission": null,
+      "pin": true,
+      "request": "PosPinLoginRequest",
+      "response": "PosSessionResponse",
+      "tenantContext": true
+    },
     "POST /api/auth/pos/refresh": {
       "approval": false,
       "auth": "device-credential",
@@ -15720,21 +16479,52 @@
       "response": "PosSessionResponse",
       "tenantContext": false
     },
-    "POST /api/devices/enrollment/complete": {
+    "POST /api/devices/pairing/:pairingSessionId/acknowledge": {
       "approval": false,
-      "auth": "enrollment-challenge",
+      "auth": "polling-credential",
       "branchContext": false,
       "errors": [
-        "ENROLLMENT_EXPIRED",
         "ENROLLMENT_REJECTED",
-        "ENROLLMENT_ATTEMPTS_EXCEEDED"
+        "RATE_LIMITED"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "AcknowledgeDeviceCredentialRequest",
+      "response": "DevicePairingAcknowledgement",
+      "tenantContext": false
+    },
+    "POST /api/devices/pairing/:pairingSessionId/poll": {
+      "approval": false,
+      "auth": "polling-credential",
+      "branchContext": false,
+      "errors": [
+        "ENROLLMENT_REJECTED",
+        "RATE_LIMITED"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "PollDevicePairingRequest",
+      "response": "DevicePairingPollResponse",
+      "tenantContext": false
+    },
+    "POST /api/devices/pairing/claim": {
+      "approval": false,
+      "auth": "public-pairing-code",
+      "branchContext": false,
+      "errors": [
+        "ENROLLMENT_REJECTED",
+        "RATE_LIMITED"
       ],
       "idempotent": false,
       "offline": false,
       "permission": null,
       "pin": false,
-      "request": "CompleteDeviceEnrollmentRequest",
-      "response": "DeviceCredentialEnvelope",
+      "request": "ClaimDevicePairingRequest",
+      "response": "DevicePairingSession",
       "tenantContext": false
     },
     "POST /api/pos/elevation/manager-approval": {
@@ -15924,7 +16714,7 @@
       "tenantContext": true
     },
     "POST /api/tenants/:tenantId/devices/enrollment": {
-      "approval": false,
+      "approval": true,
       "auth": "session",
       "branchContext": false,
       "errors": [
@@ -15937,7 +16727,41 @@
       "permission": "devices.manage",
       "pin": false,
       "request": "BeginDeviceEnrollmentRequest",
-      "response": "EnrollmentChallenge",
+      "response": "DeviceEnrollmentRequestCreated",
+      "tenantContext": true
+    },
+    "POST /api/tenants/:tenantId/devices/enrollment-requests/:requestId/approve": {
+      "approval": true,
+      "auth": "session",
+      "branchContext": false,
+      "errors": [
+        "PERMISSION_DENIED",
+        "ENROLLMENT_EXPIRED",
+        "CONFLICT"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "devices.manage",
+      "pin": false,
+      "request": "DecideDeviceEnrollmentRequest",
+      "response": "DeviceEnrollmentDecision",
+      "tenantContext": true
+    },
+    "POST /api/tenants/:tenantId/devices/enrollment-requests/:requestId/deny": {
+      "approval": true,
+      "auth": "session",
+      "branchContext": false,
+      "errors": [
+        "PERMISSION_DENIED",
+        "ENROLLMENT_EXPIRED",
+        "CONFLICT"
+      ],
+      "idempotent": true,
+      "offline": false,
+      "permission": "devices.manage",
+      "pin": false,
+      "request": "DecideDeviceEnrollmentRequest",
+      "response": "DeviceEnrollmentDecision",
       "tenantContext": true
     }
   },

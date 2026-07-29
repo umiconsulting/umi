@@ -68,6 +68,9 @@ before implementation and preserve owner notes.
 
 - The completed receipt closes into a fresh server cart. Ambiguous payments remain unresolved
   until their existing attempt is queried.
+- Implemented: a trusted device asks only for the personal operator PIN.
+- Implemented: operator lock returns to the PIN surface for a cashier-to-manager handoff.
+- Review the PIN keypad size, focus order, and lock action on pilot desktop and tablet hardware.
 
 ## Future observations
 

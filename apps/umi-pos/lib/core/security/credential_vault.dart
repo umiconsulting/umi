@@ -26,6 +26,17 @@ final class DeviceIdentity {
       deviceId != null && publicId != null && credential != null;
 }
 
+final class PairingIdentity {
+  const PairingIdentity({
+    required this.sessionId,
+    required this.pollingCredential,
+    required this.expiresAt,
+  });
+  final String sessionId;
+  final String pollingCredential;
+  final DateTime expiresAt;
+}
+
 final class CredentialVault
     implements AccessTokenProvider, DeviceCredentialProvider {
   CredentialVault(this._storage);
@@ -42,6 +53,9 @@ final class CredentialVault
   static const _access = 'session.access_token';
   static const _refresh = 'session.refresh_token';
   static const _operator = 'operator.session_id';
+  static const _pairingSession = 'device.pairing_session_id';
+  static const _pollingCredential = 'device.polling_credential';
+  static const _pairingExpires = 'device.pairing_expires_at';
 
   Future<DeviceIdentity> deviceIdentity() async {
     var installationId = await _storage.read(_installation);
@@ -86,6 +100,38 @@ final class CredentialVault
     await _storage.write(_refresh, refreshToken);
   }
 
+  Future<PairingIdentity?> pairingIdentity() async {
+    final sessionId = await _storage.read(_pairingSession);
+    final pollingCredential = await _storage.read(_pollingCredential);
+    final expiresAt = DateTime.tryParse(
+      await _storage.read(_pairingExpires) ?? '',
+    );
+    if (sessionId == null || pollingCredential == null || expiresAt == null) {
+      return null;
+    }
+    return PairingIdentity(
+      sessionId: sessionId,
+      pollingCredential: pollingCredential,
+      expiresAt: expiresAt,
+    );
+  }
+
+  Future<void> savePairing({
+    required String sessionId,
+    required String pollingCredential,
+    required String expiresAt,
+  }) async {
+    await _storage.write(_pairingSession, sessionId);
+    await _storage.write(_pollingCredential, pollingCredential);
+    await _storage.write(_pairingExpires, expiresAt);
+  }
+
+  Future<void> clearPairing() async {
+    for (final key in [_pairingSession, _pollingCredential, _pairingExpires]) {
+      await _storage.delete(key);
+    }
+  }
+
   Future<String?> refreshToken() => _storage.read(_refresh);
   Future<void> saveOperatorSession(String id) => _storage.write(_operator, id);
 
@@ -108,6 +154,7 @@ final class CredentialVault
 
   Future<void> clearDeviceTrust() async {
     await clearSession();
+    await clearPairing();
     for (final key in [
       _deviceId,
       _publicId,

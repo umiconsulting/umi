@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
 function make() {
@@ -19,6 +19,16 @@ function make() {
     revokeSessionFamily: vi.fn(),
     revokeUserSessions: vi.fn(),
     deviceAllowedForUser: vi.fn().mockResolvedValue(true),
+    findPosPinStaff: vi.fn(),
+    findLegacyPosPinCandidates: vi.fn().mockResolvedValue([]),
+    recordPosPinFailure: vi.fn().mockResolvedValue(undefined),
+    confirmPosPin: vi.fn().mockResolvedValue(true),
+    effectiveEntitlement: vi.fn().mockResolvedValue({
+      featureKey: 'pos',
+      enabled: true,
+      limit: null,
+      subscriptionStatus: 'active',
+    }),
   };
   const passwords = { verify: vi.fn(), hash: vi.fn() };
   const jwt = {
@@ -28,14 +38,22 @@ function make() {
   };
   const email = { send: vi.fn().mockResolvedValue({ messageId: 'm1' }) };
   const config = { get: vi.fn().mockReturnValue('https://app.test') };
+  const rateLimit = {
+    hit: vi.fn().mockReturnValue({
+      allowed: true,
+      remaining: 9,
+      resetAt: Date.now() + 60_000,
+    }),
+  };
   const svc = new AuthService(
     repo as never,
     passwords,
     jwt as never,
     email as never,
     config as never,
+    rateLimit as never,
   );
-  return { svc, repo, passwords, jwt, email };
+  return { svc, repo, passwords, jwt, email, rateLimit };
 }
 
 const CRED = {
@@ -50,6 +68,26 @@ const CLIENT = {
   deviceId: null,
   ip: '127.0.0.1',
   userAgent: 'test',
+};
+
+const POS_CLIENT = {
+  app: 'pos' as const,
+  deviceId: '00000000-0000-4000-8000-000000000099',
+  installationId: '00000000-0000-4000-8000-000000000098',
+  deviceCredential: 'device-secret',
+  ip: '127.0.0.1',
+  userAgent: 'test',
+};
+
+const PIN_STAFF = {
+  staffId: '00000000-0000-4000-8000-000000000010',
+  userId: 'u1',
+  email: 'cashier@umipos.local',
+  displayName: 'Cashier',
+  pinSalt: 'pin-salt',
+  pinHash: 'pin-hash',
+  failedAttempts: 0,
+  lockedUntil: null,
 };
 
 describe('AuthService.login', () => {
@@ -99,6 +137,120 @@ describe('AuthService.login', () => {
       }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
     expect(h.repo.createSession).not.toHaveBeenCalled();
+  });
+});
+
+describe('AuthService.pinLogin', () => {
+  let h: ReturnType<typeof make>;
+  beforeEach(() => {
+    h = make();
+    h.repo.findPosPinStaff.mockResolvedValue(PIN_STAFF);
+    h.passwords.verify.mockReturnValue(true);
+  });
+
+  it('creates a device-bound session for the staff identity', async () => {
+    const result = await h.svc.pinLogin(
+      '2468',
+      '10000000-0000-4000-8000-000000000101',
+      '20000000-0000-4000-8000-000000000101',
+      POS_CLIENT,
+    );
+
+    expect(result.user.email).toBe('cashier@umipos.local');
+    expect(h.repo.deviceAllowedForUser).toHaveBeenCalledWith(
+      'u1',
+      POS_CLIENT.deviceId,
+      'pos',
+      expect.any(String),
+      expect.any(String),
+      '10000000-0000-4000-8000-000000000101',
+      '20000000-0000-4000-8000-000000000101',
+    );
+    expect(h.repo.createSession).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'u1', deviceId: POS_CLIENT.deviceId, app: 'pos' }),
+    );
+    expect(h.repo.writeSecurityAudit).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'authentication.pin_succeeded' }),
+    );
+  });
+
+  it('upgrades one matching legacy PIN to the keyed lookup', async () => {
+    h.repo.findPosPinStaff.mockResolvedValue(null);
+    h.repo.findLegacyPosPinCandidates.mockResolvedValue([PIN_STAFF]);
+
+    await h.svc.pinLogin(
+      '2468',
+      '10000000-0000-4000-8000-000000000101',
+      '20000000-0000-4000-8000-000000000101',
+      POS_CLIENT,
+    );
+
+    expect(h.repo.confirmPosPin).toHaveBeenCalledWith(
+      PIN_STAFF.staffId,
+      '10000000-0000-4000-8000-000000000101',
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+    );
+  });
+
+  it('fails closed when the POS entitlement is disabled', async () => {
+    h.repo.effectiveEntitlement.mockResolvedValue(null);
+
+    await expect(
+      h.svc.pinLogin(
+        '2468',
+        '10000000-0000-4000-8000-000000000101',
+        '20000000-0000-4000-8000-000000000101',
+        POS_CLIENT,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(h.repo.createSession).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the trusted device does not match the tenant and branch', async () => {
+    h.repo.deviceAllowedForUser.mockResolvedValue(false);
+
+    await expect(
+      h.svc.pinLogin(
+        '2468',
+        '10000000-0000-4000-8000-000000000101',
+        '20000000-0000-4000-8000-000000000101',
+        POS_CLIENT,
+      ),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(h.repo.createSession).not.toHaveBeenCalled();
+  });
+
+  it('rejects an ambiguous legacy PIN', async () => {
+    h.repo.findPosPinStaff.mockResolvedValue(null);
+    h.repo.findLegacyPosPinCandidates.mockResolvedValue([PIN_STAFF, { ...PIN_STAFF, staffId: 's2' }]);
+
+    await expect(
+      h.svc.pinLogin(
+        '2468',
+        '10000000-0000-4000-8000-000000000101',
+        '20000000-0000-4000-8000-000000000101',
+        POS_CLIENT,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(h.repo.createSession).not.toHaveBeenCalled();
+  });
+
+  it('enforces the bounded device attempt rate', async () => {
+    h.rateLimit.hit.mockReturnValueOnce({
+      allowed: false,
+      remaining: 0,
+      resetAt: Date.now() + 60_000,
+    });
+
+    await expect(
+      h.svc.pinLogin(
+        '2468',
+        '10000000-0000-4000-8000-000000000101',
+        '20000000-0000-4000-8000-000000000101',
+        POS_CLIENT,
+      ),
+    ).rejects.toBeInstanceOf(HttpException);
+    expect(h.repo.findPosPinStaff).not.toHaveBeenCalled();
   });
 });
 

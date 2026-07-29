@@ -2,6 +2,12 @@ import { Injectable } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { PgService } from '../../shared/database/pg.service';
 import type { DeviceSummary } from '@umi/contract';
+import type {
+  DeviceEnrollmentDecision,
+  DeviceEnrollmentRequestView,
+  DevicePairingAcknowledgement,
+  DevicePairingPollResponse,
+} from '@umi/contract';
 
 type ChallengeRow = {
   id: string;
@@ -14,6 +20,23 @@ type ChallengeRow = {
   expiresAt: Date;
   attempts: number;
   consumedAt: Date | null;
+  replacesDeviceId: string | null;
+};
+
+type PairingRequestRow = {
+  id: string;
+  businessId: string;
+  branchId: string | null;
+  displayName: string;
+  deviceKind: 'kds' | 'pos_terminal';
+  platform: ChallengeRow['platform'];
+  requestedPlatform: ChallengeRow['platform'] | null;
+  state: string;
+  attempts: number;
+  installationHash: string | null;
+  expiresAt: Date;
+  pairingSessionId: string | null;
+  deviceId: string | null;
   replacesDeviceId: string | null;
 };
 
@@ -77,6 +100,488 @@ export class DevicesRepository {
     );
     if (!rows[0]) throw new Error('branch_not_allowed');
     return rows[0];
+  }
+
+  async beginPairing(input: {
+    id: string;
+    tenantId: string;
+    branchId: string | null;
+    displayName: string;
+    type: 'kds' | 'pos_terminal';
+    platform: ChallengeRow['platform'];
+    codeHash: string;
+    idempotencyKey: string;
+    expiresAt: Date;
+    actorUserId: string;
+    replacesDeviceId?: string | null;
+  }): Promise<{ id: string; expiresAt: Date }> {
+    const { rows } = await this.pg.worker.query<{ id: string; expiresAt: Date }>(
+      `INSERT INTO runtime.device_enrollment_request
+         (id, business_id, branch_id, display_name, device_kind, platform,
+          setup_code_hash, idempotency_key, expires_at, created_by, replaces_device_id)
+       SELECT $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8::uuid, $9, $10::uuid, $11::uuid
+       WHERE $3::uuid IS NULL OR EXISTS (
+         SELECT 1 FROM tenant.branch
+         WHERE id = $3::uuid AND business_id = $2::uuid AND status = 'active'
+       )
+       ON CONFLICT (business_id, idempotency_key) DO UPDATE
+         SET idempotency_key = excluded.idempotency_key
+       RETURNING id::text, expires_at AS "expiresAt"`,
+      [
+        input.id,
+        input.tenantId,
+        input.branchId,
+        input.displayName,
+        input.type,
+        input.platform,
+        input.codeHash,
+        input.idempotencyKey,
+        input.expiresAt,
+        input.actorUserId,
+        input.replacesDeviceId ?? null,
+      ],
+    );
+    if (!rows[0]) throw new Error('branch_not_allowed');
+    if (rows[0].id === input.id) {
+      await this.pg.worker.query(
+        `INSERT INTO runtime.security_audit_event
+           (actor_user_id, business_id, branch_id, event_type, entity_type, entity_id, outcome)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, 'device.enrollment_created',
+                 'device_enrollment_request', $4::uuid, 'success')`,
+        [input.actorUserId, input.tenantId, input.branchId, input.id],
+      );
+    }
+    return rows[0];
+  }
+
+  async claimPairing(input: {
+    setupCodeHash: string;
+    installationHash: string;
+    installationReference: string;
+    platform: ChallengeRow['platform'];
+    deviceType: 'kds' | 'pos_terminal';
+    ephemeralPublicKey: string | null;
+    pairingSessionId: string;
+    pollingCredentialHash: string;
+  }): Promise<
+    { state: 'claimed'; pairingSessionId: string; expiresAt: Date } | { state: 'rejected' }
+  > {
+    const client = await this.pg.worker.connect();
+    try {
+      await client.query('BEGIN');
+      const selected = await client.query<PairingRequestRow>(
+        `SELECT r.id::text, r.business_id::text AS "businessId",
+                r.branch_id::text AS "branchId", r.display_name AS "displayName",
+                r.device_kind AS "deviceKind", r.platform, r.requested_platform AS "requestedPlatform",
+                r.state, r.attempts, r.installation_hash AS "installationHash",
+                r.expires_at AS "expiresAt", s.id::text AS "pairingSessionId",
+                r.device_id::text AS "deviceId",
+                r.replaces_device_id::text AS "replacesDeviceId"
+         FROM runtime.device_enrollment_request r
+         LEFT JOIN runtime.device_pairing_session s ON s.enrollment_request_id = r.id
+         WHERE r.setup_code_hash = $1
+         FOR UPDATE OF r`,
+        [input.setupCodeHash],
+      );
+      const request = selected.rows[0];
+      if (!request) {
+        await client.query('ROLLBACK');
+        return { state: 'rejected' };
+      }
+      if (request.expiresAt.getTime() <= Date.now()) {
+        await client.query(
+          `UPDATE runtime.device_enrollment_request
+           SET state = 'expired', updated_at = now()
+           WHERE id = $1::uuid AND state IN ('created', 'awaiting_approval')`,
+          [request.id],
+        );
+        await this.audit(client, request, 'device.enrollment_expired', 'denied', null);
+        await client.query('COMMIT');
+        return { state: 'rejected' };
+      }
+      if (
+        request.state !== 'created' ||
+        request.attempts >= 5 ||
+        request.platform !== input.platform ||
+        request.deviceKind !== input.deviceType
+      ) {
+        if (request.state === 'created') {
+          await client.query(
+            `UPDATE runtime.device_enrollment_request
+             SET attempts = least(attempts + 1, 5), updated_at = now()
+             WHERE id = $1::uuid`,
+            [request.id],
+          );
+        }
+        await this.audit(client, request, 'device.enrollment_claim_denied', 'denied', null);
+        await client.query('COMMIT');
+        return { state: 'rejected' };
+      }
+      await client.query(
+        `UPDATE runtime.device_enrollment_request
+         SET state = 'awaiting_approval', installation_hash = $2,
+             installation_reference = $3, requested_platform = $4,
+             ephemeral_public_key = $5, claimed_at = now(), updated_at = now()
+         WHERE id = $1::uuid`,
+        [
+          request.id,
+          input.installationHash,
+          input.installationReference,
+          input.platform,
+          input.ephemeralPublicKey,
+        ],
+      );
+      await client.query(
+        `INSERT INTO runtime.device_pairing_session
+           (id, enrollment_request_id, polling_credential_hash)
+         VALUES ($1::uuid, $2::uuid, $3)`,
+        [input.pairingSessionId, request.id, input.pollingCredentialHash],
+      );
+      await this.audit(client, request, 'device.enrollment_claimed', 'success', null, {
+        installationReference: input.installationReference,
+      });
+      await client.query('COMMIT');
+      return {
+        state: 'claimed',
+        pairingSessionId: input.pairingSessionId,
+        expiresAt: request.expiresAt,
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async listPairingRequests(
+    tenantId: string,
+    branchIds: string[] | null,
+  ): Promise<DeviceEnrollmentRequestView[]> {
+    const { rows } = await this.pg.worker.query<DeviceEnrollmentRequestView>(
+      `SELECT id::text, business_id::text AS "tenantId", branch_id::text AS "branchId",
+              display_name AS "displayName", device_kind AS type, platform,
+              requested_platform AS "requestedPlatform", state,
+              expires_at AS "expiresAt", claimed_at AS "claimedAt",
+              installation_reference AS "installationReference", created_at AS "createdAt"
+       FROM runtime.device_enrollment_request
+       WHERE business_id = $1::uuid
+         AND ($2::uuid[] IS NULL OR branch_id = any($2::uuid[]))
+       ORDER BY created_at DESC
+       LIMIT 200`,
+      [tenantId, branchIds],
+    );
+    return rows;
+  }
+
+  async decidePairing(input: {
+    tenantId: string;
+    requestId: string;
+    actorUserId: string;
+    idempotencyKey: string;
+    approve: boolean;
+    credentialHash: string | null;
+    allowedBranchIds: string[] | null;
+  }): Promise<DeviceEnrollmentDecision | null> {
+    const client = await this.pg.worker.connect();
+    try {
+      await client.query('BEGIN');
+      const selected = await client.query<PairingRequestRow>(
+        `SELECT r.id::text, r.business_id::text AS "businessId",
+                r.branch_id::text AS "branchId", r.display_name AS "displayName",
+                r.device_kind AS "deviceKind", r.platform, r.requested_platform AS "requestedPlatform",
+                r.state, r.attempts, r.installation_hash AS "installationHash",
+                r.expires_at AS "expiresAt", s.id::text AS "pairingSessionId",
+                r.device_id::text AS "deviceId",
+                r.replaces_device_id::text AS "replacesDeviceId"
+         FROM runtime.device_enrollment_request r
+         LEFT JOIN runtime.device_pairing_session s ON s.enrollment_request_id = r.id
+         WHERE r.id = $1::uuid AND r.business_id = $2::uuid
+           AND ($3::uuid[] IS NULL OR r.branch_id = any($3::uuid[]))
+         FOR UPDATE OF r`,
+        [input.requestId, input.tenantId, input.allowedBranchIds],
+      );
+      const request = selected.rows[0];
+      if (!request || !request.pairingSessionId || !request.installationHash) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+      if (
+        request.state === (input.approve ? 'credential_ready' : 'denied') ||
+        request.state === (input.approve ? 'credential_delivered' : 'denied') ||
+        request.state === (input.approve ? 'completed' : 'denied')
+      ) {
+        const decided = await client.query<{ decidedAt: Date }>(
+          `SELECT decided_at AS "decidedAt"
+           FROM runtime.device_enrollment_request
+           WHERE id = $1::uuid AND decision_idempotency_key = $2::uuid`,
+          [request.id, input.idempotencyKey],
+        );
+        if (!decided.rows[0]) {
+          await client.query('ROLLBACK');
+          return null;
+        }
+        await client.query('COMMIT');
+        return {
+          enrollmentRequestId: request.id,
+          state: input.approve ? 'credential_ready' : 'denied',
+          decidedAt: decided.rows[0].decidedAt.toISOString(),
+        };
+      }
+      if (request.state !== 'awaiting_approval' || request.expiresAt.getTime() <= Date.now()) {
+        if (request.expiresAt.getTime() <= Date.now()) {
+          await client.query(
+            `UPDATE runtime.device_enrollment_request
+             SET state = 'expired', updated_at = now() WHERE id = $1::uuid`,
+            [request.id],
+          );
+        }
+        await client.query('COMMIT');
+        return null;
+      }
+      let deviceId: string | null = null;
+      if (input.approve) {
+        if (!input.credentialHash) throw new Error('credential_hash_required');
+        const inserted = await client.query<{ id: string }>(
+          `INSERT INTO tenant.device
+             (business_id, branch_id, name, kind, status, platform, lifecycle_state,
+              installation_hash, credential_hash, credential_version)
+           VALUES ($1::uuid, $2::uuid, $3, $4, 'active', $5, 'active', $6, $7, 1)
+           RETURNING id::text`,
+          [
+            request.businessId,
+            request.branchId,
+            request.displayName,
+            request.deviceKind,
+            request.requestedPlatform ?? request.platform,
+            request.installationHash,
+            input.credentialHash,
+          ],
+        );
+        deviceId = inserted.rows[0].id;
+        if (request.replacesDeviceId) {
+          await client.query(
+            `UPDATE tenant.device
+             SET lifecycle_state = 'replaced', status = 'retired', revoked_at = now(),
+                 revocation_reason = 'replaced', replacement_device_id = $2::uuid,
+                 credential_hash = null, updated_at = now()
+             WHERE id = $1::uuid AND business_id = $3::uuid
+               AND lifecycle_state NOT IN ('revoked', 'replaced')`,
+            [request.replacesDeviceId, deviceId, request.businessId],
+          );
+        }
+      }
+      const nextState = input.approve ? 'credential_ready' : 'denied';
+      const updated = await client.query<{ decidedAt: Date }>(
+        `UPDATE runtime.device_enrollment_request
+         SET state = $2, device_id = $3::uuid, decided_at = now(), decided_by = $4::uuid,
+             decision_idempotency_key = $5::uuid, updated_at = now()
+         WHERE id = $1::uuid
+         RETURNING decided_at AS "decidedAt"`,
+        [request.id, nextState, deviceId, input.actorUserId, input.idempotencyKey],
+      );
+      await this.audit(
+        client,
+        request,
+        input.approve ? 'device.enrollment_approved' : 'device.enrollment_denied',
+        input.approve ? 'success' : 'denied',
+        input.actorUserId,
+      );
+      await client.query('COMMIT');
+      return {
+        enrollmentRequestId: request.id,
+        state: nextState,
+        decidedAt: updated.rows[0].decidedAt.toISOString(),
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async pollPairing(input: {
+    pairingSessionId: string;
+    pollingCredentialHash: string;
+    installationHash: string;
+  }): Promise<{
+    requestId: string;
+    state: DevicePairingPollResponse['state'];
+    expiresAt: Date;
+    device: DeviceSummary | null;
+  } | null> {
+    const client = await this.pg.worker.connect();
+    try {
+      await client.query('BEGIN');
+      const selected = await client.query<PairingRequestRow & { pollingAttempts: number }>(
+        `SELECT r.id::text, r.business_id::text AS "businessId",
+                r.branch_id::text AS "branchId", r.display_name AS "displayName",
+                r.device_kind AS "deviceKind", r.platform, r.requested_platform AS "requestedPlatform",
+                r.state, r.attempts, r.installation_hash AS "installationHash",
+                r.expires_at AS "expiresAt", s.id::text AS "pairingSessionId",
+                r.device_id::text AS "deviceId",
+                r.replaces_device_id::text AS "replacesDeviceId",
+                s.polling_attempts AS "pollingAttempts"
+         FROM runtime.device_pairing_session s
+         JOIN runtime.device_enrollment_request r ON r.id = s.enrollment_request_id
+         WHERE s.id = $1::uuid AND s.polling_credential_hash = $2
+         FOR UPDATE OF r, s`,
+        [input.pairingSessionId, input.pollingCredentialHash],
+      );
+      const request = selected.rows[0];
+      if (
+        !request ||
+        request.installationHash !== input.installationHash ||
+        request.pollingAttempts >= 240
+      ) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+      let state = request.state as DevicePairingPollResponse['state'];
+      if (
+        request.expiresAt.getTime() <= Date.now() &&
+        ['created', 'awaiting_approval'].includes(state)
+      ) {
+        state = 'expired';
+        await client.query(
+          `UPDATE runtime.device_enrollment_request
+           SET state = 'expired', updated_at = now() WHERE id = $1::uuid`,
+          [request.id],
+        );
+        await this.audit(client, request, 'device.enrollment_expired', 'denied', null);
+      }
+      await client.query(
+        `UPDATE runtime.device_pairing_session
+         SET polling_attempts = polling_attempts + 1, last_polled_at = now(),
+             credential_delivered_at = CASE
+               WHEN $2 IN ('credential_ready', 'credential_delivered')
+               THEN coalesce(credential_delivered_at, now())
+               ELSE credential_delivered_at
+             END
+         WHERE id = $1::uuid`,
+        [input.pairingSessionId, state],
+      );
+      if (state === 'credential_ready') {
+        await client.query(
+          `UPDATE runtime.device_enrollment_request
+           SET state = 'credential_delivered', updated_at = now() WHERE id = $1::uuid`,
+          [request.id],
+        );
+        state = 'credential_delivered';
+        await this.audit(client, request, 'device.credential_delivered', 'success', null);
+      }
+      let device: DeviceSummary | null = null;
+      if (
+        request.deviceId &&
+        ['credential_ready', 'credential_delivered', 'completed'].includes(state)
+      ) {
+        const result = await client.query<DeviceSummary>(
+          `SELECT ${DEVICE_PROJECTION}
+           FROM tenant.device d WHERE d.id = $1::uuid AND d.business_id = $2::uuid`,
+          [request.deviceId, request.businessId],
+        );
+        device = result.rows[0] ?? null;
+      }
+      await client.query('COMMIT');
+      return { requestId: request.id, state, expiresAt: request.expiresAt, device };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async acknowledgePairing(input: {
+    pairingSessionId: string;
+    pollingCredentialHash: string;
+    installationHash: string;
+    credentialHash: string;
+  }): Promise<DevicePairingAcknowledgement | null> {
+    const client = await this.pg.worker.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query<PairingRequestRow>(
+        `SELECT r.id::text, r.business_id::text AS "businessId",
+                r.branch_id::text AS "branchId", r.display_name AS "displayName",
+                r.device_kind AS "deviceKind", r.platform, r.requested_platform AS "requestedPlatform",
+                r.state, r.attempts, r.installation_hash AS "installationHash",
+                r.expires_at AS "expiresAt", s.id::text AS "pairingSessionId",
+                r.device_id::text AS "deviceId",
+                r.replaces_device_id::text AS "replacesDeviceId"
+         FROM runtime.device_pairing_session s
+         JOIN runtime.device_enrollment_request r ON r.id = s.enrollment_request_id
+         JOIN tenant.device d ON d.id = r.device_id
+         WHERE s.id = $1::uuid AND s.polling_credential_hash = $2
+           AND r.installation_hash = $3 AND d.credential_hash = $4
+         FOR UPDATE OF r, s`,
+        [
+          input.pairingSessionId,
+          input.pollingCredentialHash,
+          input.installationHash,
+          input.credentialHash,
+        ],
+      );
+      const request = result.rows[0];
+      if (!request || !['credential_delivered', 'completed'].includes(request.state)) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+      const completed = await client.query<{ completedAt: Date }>(
+        `UPDATE runtime.device_enrollment_request
+         SET state = 'completed', completed_at = coalesce(completed_at, now()), updated_at = now()
+         WHERE id = $1::uuid
+         RETURNING completed_at AS "completedAt"`,
+        [request.id],
+      );
+      await client.query(
+        `UPDATE runtime.device_pairing_session
+         SET acknowledged_at = coalesce(acknowledged_at, now())
+         WHERE id = $1::uuid`,
+        [input.pairingSessionId],
+      );
+      if (request.state !== 'completed') {
+        await this.audit(client, request, 'device.enrollment_completed', 'success', null);
+      }
+      await client.query('COMMIT');
+      return {
+        pairingSessionId: input.pairingSessionId,
+        state: 'completed',
+        completedAt: completed.rows[0].completedAt.toISOString(),
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async audit(
+    client: PoolClient,
+    request: Pick<PairingRequestRow, 'id' | 'businessId' | 'branchId'>,
+    eventType: string,
+    outcome: 'success' | 'denied' | 'failure',
+    actorUserId: string | null,
+    metadata: Record<string, string> = {},
+  ): Promise<void> {
+    await client.query(
+      `INSERT INTO runtime.security_audit_event
+         (actor_user_id, business_id, branch_id, event_type, entity_type, entity_id,
+          outcome, metadata)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, $4, 'device_enrollment_request',
+               $5::uuid, $6, $7::jsonb)`,
+      [
+        actorUserId,
+        request.businessId,
+        request.branchId,
+        eventType,
+        request.id,
+        outcome,
+        JSON.stringify(metadata),
+      ],
+    );
   }
 
   async completeEnrollment(input: {

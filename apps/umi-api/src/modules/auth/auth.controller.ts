@@ -30,6 +30,7 @@ import {
   GlobalLogoutRequest,
   LoginRequest,
   PosLoginRequest,
+  PosPinLoginRequest,
   PosRefreshRequest,
   type PosSessionResponse,
   ResetPasswordRequest,
@@ -87,6 +88,24 @@ export class AuthController {
     const result = await this.auth.login(
       dto.username,
       dto.password,
+      this.client(req, dto.installationId, true),
+    );
+    return {
+      session: toSession(result, this.accessExpiresIn()),
+      tokens: { accessToken: result.accessToken, refreshToken: result.refreshToken },
+    };
+  }
+
+  @Public()
+  @Post('pos/pin-login')
+  async posPinLogin(
+    @Body(new ZodValidationPipe(PosPinLoginRequest)) dto: PosPinLoginRequest,
+    @Req() req: FastifyRequest,
+  ): Promise<PosSessionResponse> {
+    const result = await this.auth.pinLogin(
+      dto.pin,
+      dto.tenantId,
+      dto.branchId,
       this.client(req, dto.installationId, true),
     );
     return {

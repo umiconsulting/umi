@@ -1,10 +1,19 @@
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { PasswordService } from '../../shared/auth/password.service';
+import { posPinLookupHash } from '../../shared/auth/pos-pin';
 import { JwtService } from '../../shared/auth/jwt.service';
 import { EmailAdapter } from '../../shared/adapters/email.adapter';
 import type { AppConfig } from '../../shared/config/config.schema';
+import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 import { AuthRepository } from './auth.repository';
 import { parseDurationSeconds } from './cookies';
 import type { SessionUser, TenantMembership } from '@umi/contract';
@@ -47,6 +56,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly email: EmailAdapter,
     private readonly config: ConfigService<AppConfig, true>,
+    private readonly rateLimit: RateLimitService,
   ) {}
 
   async login(usernameRaw: string, password: string, client: SessionClient): Promise<LoginResult> {
@@ -95,6 +105,108 @@ export class AuthService {
       this.repo.findTenantsForUser(user.id),
       this.createSession(user, client),
     ]);
+    return { user, tenants, ...tokens };
+  }
+
+  async pinLogin(
+    pin: string,
+    tenantId: string,
+    branchId: string,
+    client: SessionClient,
+  ): Promise<LoginResult> {
+    if (
+      client.app !== 'pos' ||
+      !client.deviceId ||
+      !client.installationId ||
+      !client.deviceCredential
+    ) {
+      throw new UnauthorizedException({ code: 'DEVICE_NOT_ALLOWED' });
+    }
+    this.enforcePinRateLimit(`pos-pin:ip:${client.ip ?? 'unknown'}`, 20, 5 * 60_000);
+    this.enforcePinRateLimit(`pos-pin:device:${client.deviceId}`, 10, 5 * 60_000);
+    this.enforcePinRateLimit(`pos-pin:tenant:${tenantId}`, 100, 5 * 60_000);
+
+    const lookupHash = this.pinLookupHash(tenantId, pin);
+    let record = await this.repo.findPosPinStaff(tenantId, branchId, lookupHash);
+    if (!record) {
+      const candidates = await this.repo.findLegacyPosPinCandidates(tenantId, branchId);
+      const matches = candidates.filter((candidate) =>
+        this.passwords.verify(pin, candidate.pinSalt, candidate.pinHash),
+      );
+      if (matches.length !== 1) {
+        throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+      }
+      record = matches[0];
+    }
+    if ((record.lockedUntil?.getTime() ?? 0) > Date.now() || record.failedAttempts >= 10) {
+      throw new ForbiddenException({ code: 'PIN_LOCKED' });
+    }
+    if (!this.passwords.verify(pin, record.pinSalt, record.pinHash)) {
+      await this.repo.recordPosPinFailure(record.staffId);
+      await this.repo.writeSecurityAudit({
+        actorUserId: record.userId,
+        sessionId: null,
+        businessId: tenantId,
+        branchId,
+        eventType: 'authentication.pin_denied',
+        entityType: 'staff',
+        entityId: record.staffId,
+        outcome: 'denied',
+        reasonCode: 'pin_invalid',
+        metadata: { app: 'pos' },
+      });
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+    }
+    const allowed = await this.repo.deviceAllowedForUser(
+      record.userId,
+      client.deviceId,
+      client.app,
+      tokenHash(client.installationId),
+      tokenHash(client.deviceCredential),
+      tenantId,
+      branchId,
+    );
+    if (!allowed) {
+      throw new UnauthorizedException({ code: 'DEVICE_NOT_ALLOWED' });
+    }
+    const entitlement = await this.repo.effectiveEntitlement(tenantId, 'pos');
+    if (
+      !entitlement?.enabled ||
+      !['trialing', 'active'].includes(entitlement.subscriptionStatus)
+    ) {
+      throw new ForbiddenException({ code: 'ENTITLEMENT_DISABLED' });
+    }
+    try {
+      if (!(await this.repo.confirmPosPin(record.staffId, tenantId, lookupHash))) {
+        throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+      }
+    } catch (error) {
+      if ((error as { code?: string }).code === '23505') {
+        throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+      }
+      throw error;
+    }
+
+    const user: SessionUser = {
+      id: record.userId,
+      email: record.email,
+      displayName: record.displayName,
+    };
+    const [tenants, tokens] = await Promise.all([
+      this.repo.findTenantsForUser(user.id),
+      this.createSession(user, client),
+    ]);
+    await this.repo.writeSecurityAudit({
+      actorUserId: user.id,
+      sessionId: tokens.sessionId,
+      businessId: tenantId,
+      branchId,
+      eventType: 'authentication.pin_succeeded',
+      entityType: 'staff',
+      entityId: record.staffId,
+      outcome: 'success',
+      metadata: { app: 'pos' },
+    });
     return { user, tenants, ...tokens };
   }
 
@@ -185,6 +297,25 @@ export class AuthService {
       userAgent: client.userAgent,
     });
     return { accessToken, refreshToken, sessionId, deviceId: client.deviceId };
+  }
+
+  private pinLookupHash(tenantId: string, pin: string): string {
+    const secret = this.config.get('JWT_SECRET', { infer: true });
+    if (!secret) throw new Error('JWT_SECRET is required for POS PIN authentication');
+    return posPinLookupHash(secret, tenantId, pin);
+  }
+
+  private enforcePinRateLimit(key: string, max: number, windowMs: number): void {
+    const result = this.rateLimit.hit(key, max, windowMs);
+    if (!result.allowed) {
+      throw new HttpException(
+        {
+          code: 'RATE_LIMITED',
+          retryAfterSeconds: Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1_000)),
+        },
+        429,
+      );
+    }
   }
 
   private async rotateSession(

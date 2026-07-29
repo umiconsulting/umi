@@ -23,7 +23,12 @@
     "umi-pos:recovery-demo": "cd apps/umi-pos && flutter test test/offline_journal_test.dart test/offline_policy_test.dart",
     "umi-pos:offline-tests": "cd apps/umi-pos && flutter test test/offline_journal_test.dart test/offline_policy_test.dart test/checkout_test.dart",
     "umi-pos:replay-api-tests": "pnpm --filter @umi/api exec vitest run src/modules/pos-offline/pos-offline.service.spec.ts",
-    "umi-pos:offline-db-check": "bash scripts/umi-pos-offline-db-check.sh"
+    "umi-pos:offline-db-check": "bash scripts/umi-pos-offline-db-check.sh",
+    "umi-pos:pairing-api-tests": "pnpm --filter @umi/api exec vitest run src/modules/devices/devices.service.spec.ts src/shared/database/device-pairing-migration.spec.ts",
+    "umi-pos:pairing-tests": "cd apps/umi-pos && flutter test test/device_pairing_test.dart",
+    "umi-pos:pairing-db-check": "bash scripts/umi-pos-device-pairing-db-check.sh",
+    "umi-pos:local-access-seed": "bash scripts/umi-pos-local-access-seed.sh",
+    "umi-pos:pin-tests": "pnpm --filter @umi/api exec vitest run src/modules/auth/auth.service.spec.ts src/modules/staff/staff.service.spec.ts src/shared/database/pos-pin-authentication-migration.spec.ts && cd apps/umi-pos && flutter test test/device_pairing_test.dart"
   },
   "devDependencies": {
     "prettier": "3.9.4",

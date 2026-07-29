@@ -88,7 +88,14 @@ async function _apiFetch(path, opts, _retried) {
     // HTTP status so callers can map to friendly copy and log the raw detail.
     const err = new Error(errMessage(payload, `${res.status} ${path}`));
     err.status = res.status;
-    err.code = payload && typeof payload.error === 'string' ? payload.error : null;
+    err.code =
+      payload && typeof payload.code === 'string'
+        ? payload.code
+        : payload && payload.error && typeof payload.error.code === 'string'
+          ? payload.error.code
+          : payload && typeof payload.error === 'string'
+            ? payload.error
+            : null;
     err.path = path;
     throw err;
   }
@@ -504,6 +511,39 @@ async function generateDevicePairingPin(device) {
   });
 }
 
+async function createPosEnrollmentRequest(device) {
+  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
+  if (!tenantId) throw new Error('No active tenant selected');
+  return _apiFetch(routes.devices.beginEnrollment(tenantId), {
+    method: 'POST',
+    body: JSON.stringify(device),
+  });
+}
+
+async function getPosEnrollmentRequests() {
+  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
+  if (!tenantId) throw new Error('No active tenant selected');
+  return _apiFetch(routes.devices.enrollmentRequests(tenantId));
+}
+
+async function approvePosEnrollmentRequest(requestId) {
+  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
+  if (!tenantId) throw new Error('No active tenant selected');
+  return _apiFetch(routes.devices.approveEnrollment(tenantId, requestId), {
+    method: 'POST',
+    body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
+  });
+}
+
+async function denyPosEnrollmentRequest(requestId) {
+  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
+  if (!tenantId) throw new Error('No active tenant selected');
+  return _apiFetch(routes.devices.denyEnrollment(tenantId, requestId), {
+    method: 'POST',
+    body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
+  });
+}
+
 async function createKdsStation(station) {
   return _apiFetch(tenantScopedPath('/kds/stations'), {
     method: 'POST',
@@ -844,6 +884,10 @@ export {
   deleteStaffMember,
   provisionDevice,
   generateDevicePairingPin,
+  createPosEnrollmentRequest,
+  getPosEnrollmentRequests,
+  approvePosEnrollmentRequest,
+  denyPosEnrollmentRequest,
   approveDevicePairing,
   denyDevicePairing,
   updateDevice,

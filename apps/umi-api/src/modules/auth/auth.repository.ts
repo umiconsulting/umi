@@ -57,6 +57,17 @@ export interface EffectiveEntitlementRecord {
   subscriptionStatus: string;
 }
 
+export interface PosPinStaffRecord {
+  staffId: string;
+  userId: string;
+  email: string;
+  displayName: string | null;
+  pinSalt: string;
+  pinHash: string;
+  failedAttempts: number;
+  lockedUntil: Date | null;
+}
+
 /**
  * Auth/membership/entitlement reads. These run BEFORE any tenant RLS context
  * exists (login resolves which tenants a user has), so they use the worker pool
@@ -304,6 +315,102 @@ export class AuthRepository {
     return rows[0] ?? null;
   }
 
+  async findPosPinStaff(
+    tenantId: string,
+    branchId: string,
+    lookupHash: string,
+  ): Promise<PosPinStaffRecord | null> {
+    const { rows } = await this.pg.query<PosPinStaffRecord>(
+      `SELECT s.id::text AS "staffId", s.user_id::text AS "userId",
+              u.email, u.full_name AS "displayName",
+              s.operator_pin_salt AS "pinSalt",
+              s.operator_pin_hash AS "pinHash",
+              s.pin_failed_attempts AS "failedAttempts",
+              s.pin_locked_until AS "lockedUntil"
+       FROM tenant.staff s
+       JOIN umi.user u ON u.id = s.user_id AND u.status = 'active'
+       JOIN tenant.branch b ON b.id = $2::uuid
+         AND b.business_id = s.business_id AND b.status = 'active'
+       WHERE s.business_id = $1::uuid
+         AND s.status = 'active'
+         AND (s.branch_id IS NULL OR s.branch_id = b.id)
+         AND s.operator_pin_lookup_hash = $3
+         AND EXISTS (
+           SELECT 1 FROM umi.user_role ur
+           WHERE ur.user_id = s.user_id
+             AND (ur.business_id = s.business_id OR ur.business_id IS NULL)
+             AND (ur.branch_id IS NULL OR ur.branch_id = b.id)
+         )
+       LIMIT 1`,
+      [tenantId, branchId, lookupHash],
+    );
+    return rows[0] ?? null;
+  }
+
+  async findLegacyPosPinCandidates(
+    tenantId: string,
+    branchId: string,
+  ): Promise<PosPinStaffRecord[]> {
+    const { rows } = await this.pg.query<PosPinStaffRecord>(
+      `SELECT s.id::text AS "staffId", s.user_id::text AS "userId",
+              u.email, u.full_name AS "displayName",
+              s.operator_pin_salt AS "pinSalt",
+              s.operator_pin_hash AS "pinHash",
+              s.pin_failed_attempts AS "failedAttempts",
+              s.pin_locked_until AS "lockedUntil"
+       FROM tenant.staff s
+       JOIN umi.user u ON u.id = s.user_id AND u.status = 'active'
+       JOIN tenant.branch b ON b.id = $2::uuid
+         AND b.business_id = s.business_id AND b.status = 'active'
+       WHERE s.business_id = $1::uuid
+         AND s.status = 'active'
+         AND (s.branch_id IS NULL OR s.branch_id = b.id)
+         AND s.operator_pin_hash IS NOT NULL
+         AND s.operator_pin_salt IS NOT NULL
+         AND s.operator_pin_lookup_hash IS NULL
+         AND EXISTS (
+           SELECT 1 FROM umi.user_role ur
+           WHERE ur.user_id = s.user_id
+             AND (ur.business_id = s.business_id OR ur.business_id IS NULL)
+             AND (ur.branch_id IS NULL OR ur.branch_id = b.id)
+         )
+       ORDER BY s.id
+       LIMIT 100`,
+      [tenantId, branchId],
+    );
+    return rows;
+  }
+
+  async recordPosPinFailure(staffId: string): Promise<void> {
+    await this.pg.query(
+      `UPDATE tenant.staff
+       SET pin_failed_attempts = least(pin_failed_attempts + 1, 10),
+           pin_locked_until = CASE
+             WHEN pin_failed_attempts + 1 >= 5
+             THEN now() + interval '15 minutes'
+             ELSE pin_locked_until
+           END,
+           updated_at = now()
+       WHERE id = $1::uuid`,
+      [staffId],
+    );
+  }
+
+  async confirmPosPin(staffId: string, tenantId: string, lookupHash: string): Promise<boolean> {
+    const { rowCount } = await this.pg.query(
+      `UPDATE tenant.staff
+       SET operator_pin_lookup_hash = $3,
+           pin_failed_attempts = 0,
+           pin_locked_until = null,
+           updated_at = now()
+       WHERE id = $1::uuid AND business_id = $2::uuid
+         AND status = 'active'
+       RETURNING id`,
+      [staffId, tenantId, lookupHash],
+    );
+    return (rowCount ?? 0) === 1;
+  }
+
   async createSession(input: {
     id: string;
     userId: string;
@@ -377,6 +484,8 @@ export class AuthRepository {
     app: 'dashboard' | 'kds' | 'pos',
     installationHash: string | null = null,
     credentialHash: string | null = null,
+    tenantId: string | null = null,
+    branchId: string | null = null,
   ): Promise<boolean> {
     if (app === 'dashboard') return false;
     const expectedKind = app === 'kds' ? 'kds' : 'pos_terminal';
@@ -388,6 +497,8 @@ export class AuthRepository {
          WHERE d.id = $2::uuid
            AND d.kind = $3
            AND d.status = 'active'
+           AND ($6::uuid IS NULL OR d.business_id = $6::uuid)
+           AND ($7::uuid IS NULL OR d.branch_id = $7::uuid)
            AND (
              $3 <> 'pos_terminal' OR (
                d.lifecycle_state = 'active'
@@ -405,7 +516,15 @@ export class AuthRepository {
              OR (SELECT is_sa FROM sa)
            )
        ) AS allowed`,
-      [userId, deviceId, expectedKind, installationHash, credentialHash],
+      [
+        userId,
+        deviceId,
+        expectedKind,
+        installationHash,
+        credentialHash,
+        tenantId,
+        branchId,
+      ],
     );
     return rows[0]?.allowed === true;
   }

@@ -72,13 +72,32 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get enrollmentBody =>
-      'Ingresa el desafío de un solo uso aprobado por un administrador.';
+      'Ingresa el código de configuración de ocho caracteres que muestra el administrador.';
 
   @override
   String get challengeIdLabel => 'ID del desafío';
 
   @override
   String get enrollmentCodeLabel => 'Código de registro';
+
+  @override
+  String get enrollmentCodeInvalid =>
+      'Ingresa el código completo de ocho caracteres. Usa tu PIN de operador después de aprobar el dispositivo.';
+
+  @override
+  String get enrollmentPendingTitle =>
+      'Se requiere la aprobación del administrador';
+
+  @override
+  String get enrollmentPendingBody =>
+      'Este dispositivo solicitó acceso. Pide a un administrador que lo revise en el Dashboard de UMI.';
+
+  @override
+  String get enrollmentPendingSecure =>
+      'La credencial de pareo está protegida en este dispositivo.';
+
+  @override
+  String get cancelEnrollmentAction => 'Cancelar solicitud';
 
   @override
   String get continueAction => 'Continuar';
@@ -94,6 +113,44 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get signInAction => 'Iniciar sesión';
+
+  @override
+  String get operatorPinTitle => 'Ingresa tu PIN de operador';
+
+  @override
+  String get operatorPinBody =>
+      'Tu PIN te identifica y carga tus permisos actuales.';
+
+  @override
+  String get operatorPinLabel => 'PIN de operador';
+
+  @override
+  String get operatorPinHint => 'Usa de 4 a 8 dígitos.';
+
+  @override
+  String get operatorPinAction => 'Continuar';
+
+  @override
+  String get operatorPinInvalid => 'El PIN no es válido para esta sucursal.';
+
+  @override
+  String get operatorPinLocked =>
+      'El ingreso de PIN está bloqueado temporalmente. Intenta más tarde.';
+
+  @override
+  String get operatorPinRateLimited =>
+      'Hay demasiados intentos. Espera antes de intentar de nuevo.';
+
+  @override
+  String get operatorPinEntitlementDisabled =>
+      'UmiPOS no está habilitado para este negocio.';
+
+  @override
+  String get operatorPinBranchInvalid =>
+      'Este dispositivo no está asignado a una sucursal activa.';
+
+  @override
+  String get operatorPinLength => 'Ingresa al menos cuatro dígitos.';
 
   @override
   String get selectTenantTitle => 'Selecciona un negocio';

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:umi_contract/umi_contract.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme/umi_theme.dart';
@@ -11,11 +12,13 @@ final class EntrySurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) => switch (controller.state.phase) {
     EntryPhase.checkingDevice ||
-    EntryPhase.enrollmentPending ||
-    EntryPhase.authenticating => const Center(
+    EntryPhase.authenticating ||
+    EntryPhase.pinAuthenticating => const Center(
       child: CircularProgressIndicator(),
     ),
     EntryPhase.enrollmentRequired => _Enrollment(controller: controller),
+    EntryPhase.enrollmentPending => _EnrollmentPending(controller: controller),
+    EntryPhase.pinRequired => _PinLogin(controller: controller),
     EntryPhase.authenticationRequired => _Login(controller: controller),
     EntryPhase.tenantRequired => _TenantSelection(controller: controller),
     EntryPhase.branchRequired => _BranchSelection(controller: controller),
@@ -36,11 +39,11 @@ final class _Enrollment extends StatefulWidget {
 }
 
 final class _EnrollmentState extends State<_Enrollment> {
-  final challenge = TextEditingController();
   final code = TextEditingController();
+  bool _invalidCode = false;
+
   @override
   void dispose() {
-    challenge.dispose();
     code.dispose();
     super.dispose();
   }
@@ -60,24 +63,90 @@ final class _EnrollmentState extends State<_Enrollment> {
           Text(l.enrollmentBody, textAlign: TextAlign.center),
           const SizedBox(height: UmiSpacing.lg),
           TextField(
-            controller: challenge,
-            decoration: InputDecoration(labelText: l.challengeIdLabel),
-            autocorrect: false,
-          ),
-          const SizedBox(height: UmiSpacing.md),
-          TextField(
             controller: code,
-            decoration: InputDecoration(labelText: l.enrollmentCodeLabel),
+            decoration: InputDecoration(
+              labelText: l.enrollmentCodeLabel,
+              errorText: _invalidCode ? l.enrollmentCodeInvalid : null,
+            ),
             textCapitalization: TextCapitalization.characters,
+            textInputAction: TextInputAction.done,
             autocorrect: false,
+            maxLength: 8,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9]')),
+              LengthLimitingTextInputFormatter(8),
+            ],
+            onChanged: (_) {
+              if (_invalidCode) setState(() => _invalidCode = false);
+            },
+            onSubmitted: (_) => _submit(),
           ),
           const SizedBox(height: UmiSpacing.lg),
           ElevatedButton(
-            onPressed: () =>
-                widget.controller.enroll(challenge.text, code.text),
+            onPressed: _submit,
             child: Text(l.continueAction),
           ),
         ],
+      ),
+    );
+  }
+
+  void _submit() {
+    final normalized = code.text.replaceAll(RegExp('[^A-Za-z0-9]'), '');
+    if (normalized.length != 8) {
+      setState(() => _invalidCode = true);
+      return;
+    }
+    setState(() => _invalidCode = false);
+    widget.controller.enroll(normalized);
+  }
+}
+
+final class _EnrollmentPending extends StatelessWidget {
+  const _EnrollmentPending({required this.controller});
+  final EntryController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return _EntryFrame(
+      child: Semantics(
+        liveRegion: true,
+        label: l.enrollmentPendingTitle,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: UmiSpacing.lg),
+            Text(
+              l.enrollmentPendingTitle,
+              style: Theme.of(context).textTheme.headlineSmall,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: UmiSpacing.sm),
+            Text(l.enrollmentPendingBody, textAlign: TextAlign.center),
+            const SizedBox(height: UmiSpacing.sm),
+            Text(
+              l.enrollmentPendingSecure,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (controller.state.errorCode != null) ...[
+              const SizedBox(height: UmiSpacing.md),
+              Text(l.recoverableNetworkBody, textAlign: TextAlign.center),
+              const SizedBox(height: UmiSpacing.sm),
+              OutlinedButton(
+                onPressed: controller.retryPairing,
+                child: Text(l.retryAction),
+              ),
+            ],
+            const SizedBox(height: UmiSpacing.lg),
+            TextButton(
+              onPressed: controller.cancelPairing,
+              child: Text(l.cancelEnrollmentAction),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -89,6 +158,100 @@ final class _Login extends StatefulWidget {
   @override
   State<_Login> createState() => _LoginState();
 }
+
+final class _PinLogin extends StatefulWidget {
+  const _PinLogin({required this.controller});
+  final EntryController controller;
+
+  @override
+  State<_PinLogin> createState() => _PinLoginState();
+}
+
+final class _PinLoginState extends State<_PinLogin> {
+  final pin = TextEditingController();
+  final focus = FocusNode();
+  bool _tooShort = false;
+
+  @override
+  void dispose() {
+    pin.dispose();
+    focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return _EntryFrame(
+      child: Semantics(
+        label: l.operatorPinTitle,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.dialpad_outlined, size: 44),
+            const SizedBox(height: UmiSpacing.md),
+            Text(
+              l.operatorPinTitle,
+              style: Theme.of(context).textTheme.headlineSmall,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: UmiSpacing.sm),
+            Text(l.operatorPinBody, textAlign: TextAlign.center),
+            const SizedBox(height: UmiSpacing.lg),
+            TextField(
+              controller: pin,
+              focusNode: focus,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
+              obscureText: true,
+              maxLength: 8,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                labelText: l.operatorPinLabel,
+                helperText: l.operatorPinHint,
+                counterText: '',
+                errorText: _tooShort
+                    ? l.operatorPinLength
+                    : _pinError(l, widget.controller.state.errorCode),
+              ),
+              onChanged: (_) {
+                if (_tooShort) setState(() => _tooShort = false);
+              },
+              onSubmitted: (_) => _submit(),
+            ),
+            const SizedBox(height: UmiSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _submit,
+                child: Text(l.operatorPinAction),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _submit() {
+    if (pin.text.length < 4) {
+      setState(() => _tooShort = true);
+      return;
+    }
+    setState(() => _tooShort = false);
+    widget.controller.loginWithPin(pin.text);
+  }
+}
+
+String? _pinError(AppLocalizations l, String? code) => switch (code) {
+  'PIN_LOCKED' => l.operatorPinLocked,
+  'RATE_LIMITED' => l.operatorPinRateLimited,
+  'ENTITLEMENT_DISABLED' => l.operatorPinEntitlementDisabled,
+  'BRANCH_NOT_FOUND' => l.operatorPinBranchInvalid,
+  'PERMISSION_DENIED' => l.operatorPinInvalid,
+  _ => null,
+};
 
 final class _LoginState extends State<_Login> {
   final username = TextEditingController();

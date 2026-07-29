@@ -65,6 +65,9 @@ export class StaffRepository {
       role: string;
       position: string | null;
       actorUserId: string;
+      pinSalt: string | null;
+      pinHash: string | null;
+      pinLookupHash: string | null;
     },
   ): Promise<StaffRow> {
     const client = await this.pg.worker.connect();
@@ -93,10 +96,19 @@ export class StaffRepository {
       if (!role.rows[0]) throw new Error('invalid_staff_role');
       const staff = await client.query<{ id: string }>(
         `INSERT INTO tenant.staff
-           (business_id, branch_id, user_id, position, status)
-         VALUES ($1::uuid, $2::uuid, $3::uuid, $4, 'active')
+           (business_id, branch_id, user_id, position, status,
+            operator_pin_salt, operator_pin_hash, operator_pin_lookup_hash)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, $4, 'active', $5, $6, $7)
          RETURNING id::text`,
-        [tenantId, locationId, userId, data.position],
+        [
+          tenantId,
+          locationId,
+          userId,
+          data.position,
+          data.pinSalt,
+          data.pinHash,
+          data.pinLookupHash,
+        ],
       );
       await client.query(
         `INSERT INTO umi.user_role (user_id, role_id, business_id, branch_id, granted_by)
@@ -134,6 +146,27 @@ export class StaffRepository {
     );
     if (!rows[0]) return null;
     return this.findById(tenantId, staffId);
+  }
+
+  async updateOperatorPin(
+    tenantId: string,
+    staffId: string,
+    pin: { salt: string; hash: string; lookupHash: string } | null,
+  ): Promise<boolean> {
+    const { rowCount } = await this.pg.withTenant((c) =>
+      c.query(
+        `UPDATE tenant.staff
+         SET operator_pin_salt = $3,
+             operator_pin_hash = $4,
+             operator_pin_lookup_hash = $5,
+             pin_failed_attempts = 0,
+             pin_locked_until = null,
+             updated_at = now()
+         WHERE business_id = $1::uuid AND id = $2::uuid`,
+        [tenantId, staffId, pin?.salt ?? null, pin?.hash ?? null, pin?.lookupHash ?? null],
+      ),
+    );
+    return (rowCount ?? 0) === 1;
   }
 
   async softDelete(tenantId: string, staffId: string): Promise<boolean> {

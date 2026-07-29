@@ -25,7 +25,7 @@ export const MODULES = {
     label: 'Devices',
     icon: 'Tablet',
     section: 'OPERATIONS',
-    product: 'kds',
+    product: 'dashboard',
     locationScoped: true,
   },
   staff: {

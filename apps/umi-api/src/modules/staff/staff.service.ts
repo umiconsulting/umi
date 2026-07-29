@@ -1,5 +1,9 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { CreateStaffRequest, UpdateStaffRequest } from '@umi/contract';
+import { PasswordService } from '../../shared/auth/password.service';
+import { posPinLookupHash } from '../../shared/auth/pos-pin';
+import type { AppConfig } from '../../shared/config/config.schema';
 import { iso } from '../../shared/format/money';
 import { TenantsRepository } from '../tenants/tenants.repository';
 import { AuthRepository } from '../auth/auth.repository';
@@ -25,6 +29,8 @@ export class StaffService {
     private readonly repo: StaffRepository,
     private readonly tenants: TenantsRepository,
     private readonly auth: AuthRepository,
+    private readonly passwords: PasswordService,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
   private toDto(row: StaffRow): StaffDto {
@@ -60,12 +66,16 @@ export class StaffService {
       body.branchId ?? requestedLocationId,
     );
     try {
+      const pin = body.operatorPin ? this.pinMaterial(tenantId, body.operatorPin) : null;
       const row = await this.repo.insert(tenantId, locationId, {
         name: body.name,
         email: body.email,
         role: body.role,
         position: body.position ?? null,
         actorUserId,
+        pinSalt: pin?.salt ?? null,
+        pinHash: pin?.hash ?? null,
+        pinLookupHash: pin?.lookupHash ?? null,
       });
       await this.auth.writeSecurityAudit({
         actorUserId,
@@ -115,6 +125,22 @@ export class StaffService {
       row = await this.repo.findById(tenantId, staffId);
       if (!row) throw new NotFoundException('Staff member not found');
     }
+    if (body.operatorPin !== undefined) {
+      const pin =
+        body.operatorPin === null ? null : this.pinMaterial(tenantId, body.operatorPin);
+      try {
+        if (!(await this.repo.updateOperatorPin(tenantId, staffId, pin))) {
+          throw new NotFoundException('Staff member not found');
+        }
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new ConflictException('Operator PIN is already assigned in this business');
+        }
+        throw error;
+      }
+      row = await this.repo.findById(tenantId, staffId);
+      if (!row) throw new NotFoundException('Staff member not found');
+    }
     await this.auth.writeSecurityAudit({
       actorUserId,
       sessionId,
@@ -146,6 +172,19 @@ export class StaffService {
       entityId: staffId,
       outcome: 'success',
     });
+  }
+
+  private pinMaterial(tenantId: string, pin: string): {
+    salt: string;
+    hash: string;
+    lookupHash: string;
+  } {
+    const secret = this.config.get('JWT_SECRET', { infer: true });
+    if (!secret) throw new Error('JWT_SECRET is required for POS PIN management');
+    return {
+      ...this.passwords.hash(pin),
+      lookupHash: posPinLookupHash(secret, tenantId, pin),
+    };
   }
 }
 

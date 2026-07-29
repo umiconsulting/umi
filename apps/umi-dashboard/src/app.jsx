@@ -161,7 +161,7 @@ function DashboardLayout() {
             <Route
               path="devices"
               element={
-                <GuardedScreen moduleKey="devices" moduleName="Devices" product="KDS">
+                <GuardedScreen moduleKey="devices" moduleName="Devices" product="Dashboard">
                   <DevicesScreen />
                 </GuardedScreen>
               }

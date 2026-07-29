@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:umi_contract/umi_contract.dart';
 
@@ -11,6 +13,8 @@ enum EntryPhase {
   checkingDevice,
   enrollmentRequired,
   enrollmentPending,
+  pinRequired,
+  pinAuthenticating,
   authenticationRequired,
   authenticating,
   tenantRequired,
@@ -54,13 +58,16 @@ final class EntryController extends ChangeNotifier {
   final EntryGateway _gateway;
   final CredentialVault _vault;
   final Telemetry _telemetry;
+  int _pairingGeneration = 0;
   EntryState _state = const EntryState(EntryPhase.checkingDevice);
   EntryState get state => _state;
   TrustedEntryStage get navigationStage => switch (_state.phase) {
     EntryPhase.enrollmentRequired ||
     EntryPhase.enrollmentPending => TrustedEntryStage.enrollment,
     EntryPhase.authenticationRequired ||
-    EntryPhase.authenticating => TrustedEntryStage.authentication,
+    EntryPhase.authenticating ||
+    EntryPhase.pinRequired ||
+    EntryPhase.pinAuthenticating => TrustedEntryStage.authentication,
     EntryPhase.tenantRequired => TrustedEntryStage.tenant,
     EntryPhase.branchRequired => TrustedEntryStage.branch,
     EntryPhase.operatorRequired => TrustedEntryStage.operator,
@@ -73,8 +80,29 @@ final class EntryController extends ChangeNotifier {
     _set(const EntryState(EntryPhase.checkingDevice));
     final identity = await _vault.deviceIdentity();
     if (!identity.isEnrolled) {
+      final pairing = await _vault.pairingIdentity();
+      if (pairing != null && pairing.expiresAt.isAfter(DateTime.now())) {
+        _set(const EntryState(EntryPhase.enrollmentPending));
+        final generation = ++_pairingGeneration;
+        unawaited(_pollPairing(pairing, generation));
+        return;
+      }
+      if (pairing != null) await _vault.clearPairing();
       _set(const EntryState(EntryPhase.enrollmentRequired));
       return;
+    }
+    final pendingAcknowledgement = await _vault.pairingIdentity();
+    if (pendingAcknowledgement != null && identity.credential != null) {
+      try {
+        await _gateway.acknowledgePairing(
+          pendingAcknowledgement,
+          identity.credential!,
+        );
+        await _vault.clearPairing();
+      } catch (_) {
+        // Device authentication remains safe. The next bootstrap retries this
+        // acknowledgement with the same persisted pairing session.
+      }
     }
     try {
       final device = await _gateway.deviceStatus();
@@ -87,10 +115,18 @@ final class EntryController extends ChangeNotifier {
         _set(EntryState(EntryPhase.rotationRequired, device: device));
         return;
       }
-      _set(EntryState(EntryPhase.authenticationRequired, device: device));
+      // A durable server session can survive an application restart. The POS
+      // still requires a personal PIN before it restores operator access.
       if (await _vault.refreshToken() != null) {
-        await restoreSession();
+        try {
+          await _gateway.logout();
+        } catch (_) {
+          // Local access still fails closed. Server expiry and device
+          // revocation remain authoritative when logout cannot reach the API.
+        }
       }
+      await _vault.clearSession();
+      _set(EntryState(EntryPhase.pinRequired, device: device));
     } on AppException catch (error) {
       if (error.code == 'DEVICE_REVOKED' ||
           error.code == 'DEVICE_CREDENTIAL_INVALID') {
@@ -102,25 +138,115 @@ final class EntryController extends ChangeNotifier {
     }
   }
 
-  Future<void> enroll(String challengeId, String code) async {
+  Future<void> enroll(String code) async {
     _set(const EntryState(EntryPhase.enrollmentPending));
     try {
-      final result = await _gateway.completeEnrollment(challengeId, code);
-      final device = DeviceSummary.fromJson(result.device);
-      await _vault.saveDevice(
-        id: device.id,
-        publicId: device.publicId,
-        credential: result.credential,
-        credentialVersion: device.credentialVersion,
-        state: device.state,
-        tenantId: device.tenantId,
-        branchId: device.branchId,
+      final result = await _gateway.claimPairing(code);
+      await _vault.savePairing(
+        sessionId: result.pairingSessionId,
+        pollingCredential: result.pollingCredential,
+        expiresAt: result.expiresAt,
       );
-      _event('device.enrollment_completed');
-      _set(EntryState(EntryPhase.authenticationRequired, device: device));
+      _event('device.enrollment_claimed');
+      final pairing = await _vault.pairingIdentity();
+      if (pairing == null) throw StateError('pairing persistence failed');
+      final generation = ++_pairingGeneration;
+      unawaited(_pollPairing(pairing, generation));
     } on AppException catch (error) {
       _event('device.enrollment_failed', error.code);
       _set(EntryState(EntryPhase.enrollmentRequired, errorCode: error.code));
+    }
+  }
+
+  Future<void> cancelPairing() async {
+    _pairingGeneration++;
+    await _vault.clearPairing();
+    _set(const EntryState(EntryPhase.enrollmentRequired));
+  }
+
+  Future<void> retryPairing() async {
+    final pairing = await _vault.pairingIdentity();
+    if (pairing == null) {
+      _set(const EntryState(EntryPhase.enrollmentRequired));
+      return;
+    }
+    _set(const EntryState(EntryPhase.enrollmentPending));
+    final generation = ++_pairingGeneration;
+    unawaited(_pollPairing(pairing, generation));
+  }
+
+  Future<void> _pollPairing(PairingIdentity pairing, int generation) async {
+    while (generation == _pairingGeneration &&
+        pairing.expiresAt.isAfter(DateTime.now())) {
+      try {
+        final response = await _gateway.pollPairing(pairing);
+        if (generation != _pairingGeneration) return;
+        if (response.state == 'awaiting_approval') {
+          _set(const EntryState(EntryPhase.enrollmentPending));
+          await Future<void>.delayed(
+            Duration(seconds: response.pollAfterSeconds),
+          );
+          continue;
+        }
+        if (response.state == 'denied' ||
+            response.state == 'expired' ||
+            response.state == 'cancelled') {
+          await _vault.clearPairing();
+          _set(
+            EntryState(
+              EntryPhase.enrollmentRequired,
+              errorCode: response.state == 'denied'
+                  ? 'ENROLLMENT_REJECTED'
+                  : 'ENROLLMENT_EXPIRED',
+            ),
+          );
+          return;
+        }
+        if (response.device != null && response.credential != null) {
+          final device = DeviceSummary.fromJson(response.device!);
+          await _vault.saveDevice(
+            id: device.id,
+            publicId: device.publicId,
+            credential: response.credential!,
+            credentialVersion: device.credentialVersion,
+            state: device.state,
+            tenantId: device.tenantId,
+            branchId: device.branchId,
+          );
+          try {
+            await _gateway.acknowledgePairing(pairing, response.credential!);
+            await _vault.clearPairing();
+          } catch (_) {
+            // Keep the pairing session. Bootstrap retries the same
+            // acknowledgement without issuing a second credential.
+          }
+          _event('device.enrollment_completed');
+          _set(EntryState(EntryPhase.pinRequired, device: device));
+          return;
+        }
+        await Future<void>.delayed(
+          Duration(seconds: response.pollAfterSeconds),
+        );
+      } on AppException catch (error) {
+        if (error.code == 'ENROLLMENT_REJECTED') {
+          await _vault.clearPairing();
+          _set(
+            EntryState(EntryPhase.enrollmentRequired, errorCode: error.code),
+          );
+          return;
+        }
+        _set(EntryState(EntryPhase.enrollmentPending, errorCode: error.code));
+        await Future<void>.delayed(const Duration(seconds: 3));
+      }
+    }
+    if (generation == _pairingGeneration) {
+      await _vault.clearPairing();
+      _set(
+        const EntryState(
+          EntryPhase.enrollmentRequired,
+          errorCode: 'ENROLLMENT_EXPIRED',
+        ),
+      );
     }
   }
 
@@ -143,6 +269,45 @@ final class EntryController extends ChangeNotifier {
     }
   }
 
+  Future<void> loginWithPin(String pin) async {
+    final device = _state.device;
+    final tenantId = device?.tenantId;
+    final branchId = device?.branchId;
+    if (tenantId == null || branchId == null) {
+      _set(
+        EntryState(
+          EntryPhase.pinRequired,
+          device: device,
+          errorCode: 'BRANCH_NOT_FOUND',
+        ),
+      );
+      return;
+    }
+    _set(EntryState(EntryPhase.pinAuthenticating, device: device));
+    try {
+      final response = await _gateway.pinLogin(
+        pin: pin,
+        tenantId: tenantId,
+        branchId: branchId,
+      );
+      await _saveSession(response);
+      _event('authentication.pin_succeeded');
+      await _resolveContext();
+      if (_state.phase == EntryPhase.operatorRequired) {
+        await startOperator();
+      }
+    } on AppException catch (error) {
+      _event('authentication.pin_failed', error.code);
+      _set(
+        EntryState(
+          EntryPhase.pinRequired,
+          device: device,
+          errorCode: error.code,
+        ),
+      );
+    }
+  }
+
   Future<void> restoreSession() async {
     try {
       final response = await _gateway.refresh();
@@ -151,9 +316,7 @@ final class EntryController extends ChangeNotifier {
       await _resolveContext();
     } catch (_) {
       await _vault.clearSession();
-      _set(
-        EntryState(EntryPhase.authenticationRequired, device: _state.device),
-      );
+      _set(EntryState(EntryPhase.pinRequired, device: _state.device));
     }
   }
 
@@ -227,16 +390,14 @@ final class EntryController extends ChangeNotifier {
   Future<void> lock() async {
     final operator = _state.operator;
     if (operator == null) return;
-    await _gateway.lockOperator(operator.id);
-    _event('operator.locked');
-    _set(
-      EntryState(
-        EntryPhase.operatorRequired,
-        device: _state.device,
-        selectedTenant: _state.selectedTenant,
-        selectedBranch: _state.selectedBranch,
-      ),
-    );
+    try {
+      await _gateway.lockOperator(operator.id);
+      await _gateway.logout();
+    } finally {
+      await _vault.clearSession();
+      _event('operator.locked');
+      _set(EntryState(EntryPhase.pinRequired, device: _state.device));
+    }
   }
 
   Future<void> reselectBranch() async {
@@ -245,9 +406,7 @@ final class EntryController extends ChangeNotifier {
     final tenant = _state.selectedTenant;
     if (tenant == null) {
       await _vault.clearSession();
-      _set(
-        EntryState(EntryPhase.authenticationRequired, device: _state.device),
-      );
+      _set(EntryState(EntryPhase.pinRequired, device: _state.device));
       return;
     }
     await _vault.selectTenant(tenant.id);
@@ -289,14 +448,14 @@ final class EntryController extends ChangeNotifier {
     await _gateway.logout();
     await _vault.clearSession();
     _event('session.ended');
-    _set(EntryState(EntryPhase.authenticationRequired, device: _state.device));
+    _set(EntryState(EntryPhase.pinRequired, device: _state.device));
   }
 
   Future<void> globalLogout() async {
     await _gateway.globalLogout();
     await _vault.clearSession();
     _event('session.global_logout');
-    _set(EntryState(EntryPhase.authenticationRequired, device: _state.device));
+    _set(EntryState(EntryPhase.pinRequired, device: _state.device));
   }
 
   Future<void> _saveSession(PosSessionResponse response) async {

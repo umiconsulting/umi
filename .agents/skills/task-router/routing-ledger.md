@@ -435,3 +435,5 @@ Record successful and failed cross-workspace traces here before proposing new re
 - outcome: SQL migration applied live. `search_products_text('horchata cafe')` now returns "Horchata Kafe" with word_similarity score 0.647. Client ranker now gives fuzzy matches score 90 (≥ band threshold). Remaining action: user must set VOYAGE_API_KEY in Supabase edge function secrets to re-enable the semantic stage for synonym-level misses.
 - reusable pattern observed: when a multi-stage search pipeline silently degrades (missing external API key), the intermediate stage (client-side scorer) must also handle fuzzy matching independently — don't assume the SQL and semantic layers are always healthy
 - promotion follow-up: none — fix is localized to conversaflow-functions; the pattern (missing Supabase secret disabling a search tier) is not yet recurrent enough to warrant a new skill
+
+- 2026-07-29: Routed UmiPOS device pairing to `packages/contract`, `umi-api`, `umi-dashboard`, `umi-pos`, and platform migrations. Used `workspace-boundary-check`. Implemented administrator-approved pairing.

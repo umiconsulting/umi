@@ -1,6 +1,6 @@
 # UMI × UmiPOS — Canonical Project State
 
-Updated: 2026-07-28
+Updated: 2026-07-29
 
 ## Product authority
 
@@ -73,11 +73,16 @@ Future clients use `packages/contract` and controlled UMI APIs.
   route guards, typed fail-closed configuration, bounded HTTP behavior, platform secure storage,
   redacted telemetry, localized Spanish/English bootstrap UI, and explicit unsupported hardware
   adapters.
-- `tenant.device` is the device authority; one-time challenges live in
-  `runtime.device_enrollment_challenge`, and `runtime.operator_session` separates operator
-  presence from user authentication.
-- UmiPOS consumes contract version `1.6.1`, content hash
-  `da30fcb1f36c4db4e294116ce9201fed2874e441b5556ad932ace5a00ab3ac40`.
+- `tenant.device` is the device authority. Approval-based requests live in
+  `runtime.device_enrollment_request`, and polling state lives in
+  `runtime.device_pairing_session`.
+- UmiPOS device pairing uses one eight-character code, one polling credential, administrator
+  approval, secure credential storage, and transition audit.
+- UmiPOS uses a personal tenant-unique PIN after device trust. The API resolves the staff identity
+  and current role without an email or client role selector.
+- `runtime.operator_session` separates operator presence from PIN authentication.
+- UmiPOS consumes contract version `1.8.0`, content hash
+  `53934043942493e69d01b2f399e0e64b8f597787a08acea96bff177534f07710`.
 - Native UmiPOS journal schema version 1 uses AES-256-GCM with platform-secure key storage and
   separate ciphertext persistence. Replay is ordered per device credential version; Web sensitive
   journaling is unsupported.

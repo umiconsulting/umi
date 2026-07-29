@@ -72,13 +72,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get enrollmentBody =>
-      'Enter the one-time challenge approved by an administrator.';
+      'Enter the eight-character setup code shown by your administrator.';
 
   @override
   String get challengeIdLabel => 'Challenge ID';
 
   @override
   String get enrollmentCodeLabel => 'Enrollment code';
+
+  @override
+  String get enrollmentCodeInvalid =>
+      'Enter the complete eight-character setup code. Your operator PIN is used after device approval.';
+
+  @override
+  String get enrollmentPendingTitle => 'Administrator approval required';
+
+  @override
+  String get enrollmentPendingBody =>
+      'This device requested access. Ask an administrator to review it in the UMI Dashboard.';
+
+  @override
+  String get enrollmentPendingSecure =>
+      'The pairing credential is stored securely on this device.';
+
+  @override
+  String get cancelEnrollmentAction => 'Cancel request';
 
   @override
   String get continueAction => 'Continue';
@@ -94,6 +112,44 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get signInAction => 'Sign in';
+
+  @override
+  String get operatorPinTitle => 'Enter your operator PIN';
+
+  @override
+  String get operatorPinBody =>
+      'Your PIN identifies you and loads your current permissions.';
+
+  @override
+  String get operatorPinLabel => 'Operator PIN';
+
+  @override
+  String get operatorPinHint => 'Use 4 to 8 digits.';
+
+  @override
+  String get operatorPinAction => 'Continue';
+
+  @override
+  String get operatorPinInvalid => 'The PIN is not valid for this branch.';
+
+  @override
+  String get operatorPinLocked =>
+      'PIN entry is temporarily locked. Try again later.';
+
+  @override
+  String get operatorPinRateLimited =>
+      'Too many attempts. Wait before you try again.';
+
+  @override
+  String get operatorPinEntitlementDisabled =>
+      'UmiPOS is not enabled for this business.';
+
+  @override
+  String get operatorPinBranchInvalid =>
+      'This device is not assigned to an active branch.';
+
+  @override
+  String get operatorPinLength => 'Enter at least four digits.';
 
   @override
   String get selectTenantTitle => 'Select a business';

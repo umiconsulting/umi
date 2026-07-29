@@ -8,16 +8,28 @@ function make() {
     insert: vi.fn(),
     update: vi.fn(),
     updateAuthorization: vi.fn().mockResolvedValue(true),
+    updateOperatorPin: vi.fn().mockResolvedValue(true),
     findById: vi.fn(),
     softDelete: vi.fn(),
   };
   const tenants = { resolveLocationId: vi.fn().mockResolvedValue('loc-1') };
   const auth = { writeSecurityAudit: vi.fn().mockResolvedValue(undefined) };
+  const passwords = {
+    hash: vi.fn().mockReturnValue({ salt: 'pin-salt', hash: 'pin-hash' }),
+  };
+  const config = { get: vi.fn().mockReturnValue('test-jwt-secret-that-is-long-enough') };
   return {
-    svc: new StaffService(repo as never, tenants as never, auth as never),
+    svc: new StaffService(
+      repo as never,
+      tenants as never,
+      auth as never,
+      passwords as never,
+      config as never,
+    ),
     repo,
     tenants,
     auth,
+    passwords,
   };
 }
 
@@ -56,8 +68,32 @@ describe('StaffService', () => {
       role: 'staff',
       position: null,
       actorUserId: 'actor-1',
+      pinSalt: null,
+      pinHash: null,
+      pinLookupHash: null,
     });
     expect(h.auth.writeSecurityAudit).toHaveBeenCalledOnce();
+  });
+
+  it('stores a salted verifier and a keyed PIN lookup during staff creation', async () => {
+    h.repo.insert.mockResolvedValue(ROW);
+    await h.svc.create(
+      't1',
+      null,
+      { ...CREATE, operatorPin: '2468' },
+      'actor-1',
+      'session-1',
+    );
+
+    expect(h.repo.insert).toHaveBeenCalledWith(
+      't1',
+      'loc-1',
+      expect.objectContaining({
+        pinSalt: 'pin-salt',
+        pinHash: 'pin-hash',
+        pinLookupHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+    );
   });
 
   it('maps a duplicate identity or membership to conflict', async () => {

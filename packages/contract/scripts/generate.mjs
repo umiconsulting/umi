@@ -192,9 +192,10 @@ const dartModels = Object.entries(definitions)
   .map(([name, schema]) => dartClass(name, schema))
   .join('\n\n');
 const dartRoutes = `abstract final class UmiRoutes {
-  static const deviceEnrollmentComplete = '/api/devices/enrollment/complete';
+  static const devicePairingClaim = '/api/devices/pairing/claim';
   static const deviceStatus = '/api/devices/status';
   static const posLogin = '/api/auth/pos/login';
+  static const posPinLogin = '/api/auth/pos/pin-login';
   static const posRefresh = '/api/auth/pos/refresh';
   static const posLogout = '/api/auth/pos/logout';
   static const globalLogout = '/api/auth/local/global-logout';
@@ -207,6 +208,10 @@ const dartRoutes = `abstract final class UmiRoutes {
       '/api/pos/operator-sessions/\${Uri.encodeComponent(id)}/lock';
   static String operatorEnd(String id) =>
       '/api/pos/operator-sessions/\${Uri.encodeComponent(id)}/end';
+  static String devicePairingPoll(String id) =>
+      '/api/devices/pairing/\${Uri.encodeComponent(id)}/poll';
+  static String devicePairingAcknowledge(String id) =>
+      '/api/devices/pairing/\${Uri.encodeComponent(id)}/acknowledge';
   static String posCatalogCategories(String tenantId) =>
       '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/catalog/categories';
   static String posCatalogProducts(String tenantId) =>

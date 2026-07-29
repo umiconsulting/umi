@@ -296,7 +296,7 @@ const Topbar = ({
   const titles = {
     overview: { eyebrow: '01 / OPERACIONES', title: 'Panorama', en: 'Overview' },
     orders: { eyebrow: '02 / OPERACIONES', title: 'Pedidos WhatsApp', en: 'KDS tickets' },
-    devices: { eyebrow: '03 / OPERACIONES', title: 'Dispositivos KDS', en: 'Kitchen displays' },
+    devices: { eyebrow: '03 / OPERACIONES', title: 'Dispositivos', en: 'Trusted devices' },
     staff: { eyebrow: '04 / OPERACIONES', title: 'Equipo y permisos', en: 'Staff & Access' },
     customers: { eyebrow: '05 / OPERACIONES', title: 'Customers', en: 'Customer platform' },
     members: { eyebrow: '06 / GROWTH', title: 'Loyalty', en: 'Umi Cash members' },

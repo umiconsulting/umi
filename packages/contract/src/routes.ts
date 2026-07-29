@@ -18,13 +18,24 @@ export const routes = {
     resetPassword: '/api/auth/local/reset-password',
     me: '/api/auth/me',
     posLogin: '/api/auth/pos/login',
+    posPinLogin: '/api/auth/pos/pin-login',
     posRefresh: '/api/auth/pos/refresh',
     posLogout: '/api/auth/pos/logout',
   },
   devices: {
-    completeEnrollment: '/api/devices/enrollment/complete',
+    claimPairing: '/api/devices/pairing/claim',
+    pollPairing: (pairingSessionId: string): string =>
+      `/api/devices/pairing/${enc(pairingSessionId)}/poll`,
+    acknowledgePairing: (pairingSessionId: string): string =>
+      `/api/devices/pairing/${enc(pairingSessionId)}/acknowledge`,
     status: '/api/devices/status',
     beginEnrollment: (tenantId: string): string => `${tenantBase(tenantId)}/devices/enrollment`,
+    enrollmentRequests: (tenantId: string): string =>
+      `${tenantBase(tenantId)}/devices/enrollment-requests`,
+    approveEnrollment: (tenantId: string, requestId: string): string =>
+      `${tenantBase(tenantId)}/devices/enrollment-requests/${enc(requestId)}/approve`,
+    denyEnrollment: (tenantId: string, requestId: string): string =>
+      `${tenantBase(tenantId)}/devices/enrollment-requests/${enc(requestId)}/deny`,
     rotate: (tenantId: string, deviceId: string): string =>
       `${tenantBase(tenantId)}/devices/${enc(deviceId)}/rotate`,
     revoke: (tenantId: string, deviceId: string): string =>
@@ -55,8 +66,7 @@ export const routes = {
       `/api/pos/tenants/${enc(tenantId)}/checkout/payments/${enc(paymentId)}`,
     offlineReplayBegin: (tenantId: string): string =>
       `/api/pos/tenants/${enc(tenantId)}/offline/replay/begin`,
-    offlinePolicy: (tenantId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/offline/policy`,
+    offlinePolicy: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/offline/policy`,
     offlineReplayBatch: (tenantId: string): string =>
       `/api/pos/tenants/${enc(tenantId)}/offline/replay/batch`,
     offlineReplayCursor: (tenantId: string): string =>

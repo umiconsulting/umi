@@ -65,6 +65,8 @@
       "commit": "HEAD (Gate 2B commit)",
       "id": "2B",
       "status": "complete",
+      "pairingMode": "administrator-approved setup code and polling credential",
+      "operatorAuthentication": "personal PIN after trusted-device verification",
       "subject": "Device trust, authenticated context, and operator entry"
     },
     {
