@@ -86,6 +86,50 @@ comment on table umi.user_role is
   'GRANT: one human holds many roles across scopes. Null business = platform-wide. '
   'This replaces the old polymorphic tenant.login; there is no principal_type discriminator.';
 
+-- A result that a role grant cannot express: a temporary allow, or a deny that must
+-- beat every role the human holds. A POS needs both — suspend one cashier's refund
+-- right today without touching the role everyone else shares.
+--
+-- RESOLUTION ORDER: deny > allow > role grant. A deny row is absolute; that is the
+-- whole point of the table, so nothing here may be resolved by "most specific wins".
+create table umi.user_permission_override (
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null references umi.user(id) on delete cascade,
+  permission_id  uuid not null references umi.permission(id) on delete cascade,
+  business_id    uuid,        -- xfk-> tenant.business ; NULL = every business
+  branch_id      uuid,        -- xfk-> tenant.branch   ; NULL = every branch of the business
+  effect         text not null check (effect in ('allow','deny')),
+  expires_at     timestamptz, -- NULL = until revoked
+  granted_by     uuid references umi.user(id),
+  created_at     timestamptz not null default now(),
+  -- A branch without a business is not a scope, it is a bug.
+  constraint permission_override_branch_scope_ck
+    check (branch_id is null or business_id is not null)
+);
+-- One row per (human, permission, scope). The coalesce sentinels make NULL scopes
+-- collide the way a plain UNIQUE would not: without them a user could hold two
+-- contradictory platform-wide rows for the same permission.
+create unique index user_permission_override_scope_uq
+  on umi.user_permission_override
+  (user_id, permission_id,
+   coalesce(business_id, '00000000-0000-0000-0000-000000000000'::uuid),
+   coalesce(branch_id,   '00000000-0000-0000-0000-000000000000'::uuid));
+comment on table umi.user_permission_override is
+  'Explicit permission result for one human. A deny always beats role grants and allows.';
+
+-- How long an audit class must survive, by law and by policy. Read by the retention
+-- worker; never by a request. The floor is a year — a shorter policy is a mistake, so
+-- the CHECK refuses it rather than trusting review to catch it.
+create table umi.audit_retention_policy (
+  id                uuid primary key default gen_random_uuid(),
+  event_class       text not null unique,
+  minimum_days      integer not null check (minimum_days >= 365),
+  archive_required  boolean not null default true,
+  created_at        timestamptz not null default now()
+);
+comment on table umi.audit_retention_policy is
+  'Minimum retention per audit class. Sealed: no tenant role may read or write it.';
+
 -- ----------------------------------------------------------------------------
 -- PLATFORM VOCABULARY
 -- ----------------------------------------------------------------------------
@@ -328,4 +372,48 @@ insert into umi.channel_type (key, name, supports_outbound) values
   ('pos',     'Point of Sale', false),
   ('web',     'Web',           false),
   ('manual',  'Manual entry',  false)
+on conflict (key) do nothing;
+
+-- Retention floors. Financial history outlives everything else because a tax
+-- authority can ask for it ten years later; security and business events follow the
+-- seven-year commercial default.
+insert into umi.audit_retention_policy (event_class, minimum_days) values
+  ('security',  2555),
+  ('business',  2555),
+  ('financial', 3650)
+on conflict (event_class) do nothing;
+
+-- ---- POS permission vocabulary ----------------------------------------------
+-- The permission keys the POS guard chain checks. They are seeded here rather than
+-- created by application code so that a fresh database can authorize a POS before any
+-- request has ever run.
+insert into umi.permission (key, description) values
+  ('device.enroll',            'Enrol a POS or KDS device for a branch'),
+  ('catalog.read',             'Read the operator-safe branch catalog'),
+  ('cart.write',               'Prepare a branch-scoped POS cart'),
+  ('checkout.commit',          'Commit a branch-scoped POS sale'),
+  ('offline.replay',           'Replay and reconcile device-authenticated offline commands'),
+  ('offline.cash.checkout',    'Create a policy-authorized provisional cash sale'),
+  ('offline.recovery.review',  'Approve one scoped offline recovery action'),
+  ('audit.read',               'Read tenant-visible, redacted audit events')
+on conflict (key) do update set description = excluded.description;
+
+-- Every non-platform role can read the catalog and build a cart: a cashier who cannot
+-- see the menu cannot sell. Committing money, replaying offline commands and reading
+-- the audit chain are NOT granted here — those are attached to specific roles when the
+-- role catalogue is seeded, so that "can operate the till" and "can move money" stay
+-- separate decisions.
+insert into umi.role_permission (role_id, permission_id)
+select r.id, p.id
+  from umi.role r
+ cross join umi.permission p
+ where not r.is_platform
+   and p.key in ('catalog.read', 'cart.write')
+on conflict do nothing;
+
+-- The POS offline-cash flag. Off until a business is explicitly certified for it;
+-- `tenant.pos_offline_cash_policy` then carries the limits.
+insert into umi.feature (key, module, name, description, kind) values
+  ('pos.offline_cash', 'pos', 'POS offline cash',
+   'Policy-controlled provisional cash checkout', 'flag')
 on conflict (key) do nothing;

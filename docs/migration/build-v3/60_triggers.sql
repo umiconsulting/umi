@@ -50,3 +50,177 @@ end $$;
 create trigger contact_normalize
   before insert or update on tenant.contact
   for each row execute function tenant.tg_contact_normalize();
+
+-- ============================================================================
+-- POS INTEGRITY TRIGGERS
+-- ============================================================================
+
+-- A branch must belong to the business the row claims. Most POS tables get this
+-- structurally through the composite FK on tenant.branch (business_id, id); the
+-- integrity tables carry a nullable branch_id, which a composite FK cannot express,
+-- so they get it here instead.
+create or replace function tenant.tg_integrity_scope() returns trigger
+  language plpgsql
+  set search_path = pg_catalog as $$
+begin
+  if new.branch_id is not null and not exists (
+    select 1 from tenant.branch where id = new.branch_id and business_id = new.business_id
+  ) then
+    raise exception 'branch_tenant_mismatch' using errcode = '23514';
+  end if;
+  -- A compensating entry must compensate something in the SAME business, or a refund
+  -- in one café could cancel a sale in another.
+  --
+  -- The table test MUST be its own statement. Folding it into a single condition —
+  -- `if tg_table_name = 'financial_event' and new.compensates_event_id is not null` —
+  -- compiles to one SQL expression, and SQL's AND does not promise to short-circuit,
+  -- so PL/pgSQL resolves the field against whichever record it was handed and raises
+  -- `record "new" has no field "compensates_event_id"` on every audit_event insert.
+  -- One trigger function serving three tables has to branch before it reads.
+  if tg_table_name = 'financial_event' then
+    if new.compensates_event_id is not null and not exists (
+      select 1 from tenant.financial_event
+      where id = new.compensates_event_id and business_id = new.business_id
+    ) then
+      raise exception 'compensation_tenant_mismatch' using errcode = '23514';
+    end if;
+  end if;
+  return new;
+end $$;
+
+create trigger business_command_scope before insert on tenant.business_command
+  for each row execute function tenant.tg_integrity_scope();
+create trigger audit_event_scope before insert on tenant.audit_event
+  for each row execute function tenant.tg_integrity_scope();
+create trigger financial_event_scope before insert on tenant.financial_event
+  for each row execute function tenant.tg_integrity_scope();
+
+-- The audit hash chain. Each event hashes the previous event's hash, so removing or
+-- editing any row in the middle breaks every hash after it and the tampering is
+-- detectable without a second copy of the data.
+--
+-- The advisory lock serialises writers PER BUSINESS: without it two concurrent events
+-- read the same predecessor and the chain forks, which silently destroys the property
+-- the table exists for. Locking per business rather than globally keeps one busy café
+-- from serialising every other café's audit writes.
+--
+-- occurred_at is overwritten with the SERVER clock. A caller — including a till whose
+-- clock has drifted — must not be able to choose where in the chain its event lands.
+create or replace function tenant.tg_audit_event_hash() returns trigger
+  language plpgsql
+  security definer
+  set search_path = pg_catalog, extensions as $$
+declare
+  prior text;
+begin
+  perform pg_advisory_xact_lock(hashtextextended(new.business_id::text, 0));
+  select event_hash into prior
+    from tenant.audit_event
+   where business_id = new.business_id
+   order by occurred_at desc, id desc
+   limit 1;
+  new.previous_hash := prior;
+  new.occurred_at := clock_timestamp();
+  new.event_hash := encode(extensions.digest(
+    concat_ws('|', new.id, new.business_id, coalesce(new.branch_id::text, ''),
+      coalesce(new.actor_user_id::text, ''), coalesce(new.command_id::text, ''),
+      new.event_type, new.entity_type, coalesce(new.entity_id::text, ''),
+      new.outcome, coalesce(new.reason_code, ''), new.public_data::text,
+      new.correlation_id, coalesce(prior, ''), new.occurred_at::text),
+    'sha256'), 'hex');
+  return new;
+end $$;
+
+create trigger audit_event_hash before insert on tenant.audit_event
+  for each row execute function tenant.tg_audit_event_hash();
+
+-- Append-only: history that can be edited is not history.
+create trigger audit_event_append_only before update or delete on tenant.audit_event
+  for each row execute function tenant.tg_append_only();
+create trigger financial_event_append_only before update or delete on tenant.financial_event
+  for each row execute function tenant.tg_append_only();
+create trigger receipt_snapshot_append_only before update or delete on tenant.receipt_snapshot
+  for each row execute function tenant.tg_append_only();
+create trigger committed_sale_append_only before update or delete on tenant.pos_committed_sale
+  for each row execute function tenant.tg_append_only();
+create trigger offline_replay_command_append_only
+  before update or delete on tenant.offline_replay_command
+  for each row execute function tenant.tg_append_only();
+create trigger offline_mapping_append_only
+  before update or delete on tenant.offline_provisional_mapping
+  for each row execute function tenant.tg_append_only();
+create trigger audit_internal_append_only
+  before update or delete on runtime.audit_event_internal
+  for each row execute function tenant.tg_append_only();
+
+-- Losing a terminal must end everything it could do, in one statement, at the moment
+-- its status changes — not when some service remembers to clean up. Sessions are
+-- addressed through (principal_type, principal_id), which is how this schema models a
+-- session's subject.
+create or replace function runtime.revoke_device_sessions() returns trigger
+  language plpgsql
+  security definer
+  set search_path = pg_catalog as $$
+begin
+  if new.status in ('revoked','replaced','rotated')
+     and old.status is distinct from new.status then
+    update runtime.session
+       set is_active = false,
+           revoked_at = coalesce(revoked_at, now()),
+           revoked_reason = 'device_' || new.status
+     where principal_type = 'device' and principal_id = new.id and is_active;
+    update runtime.operator_session
+       set state = 'ended', ended_at = now()
+     where device_id = new.id and state <> 'ended';
+  end if;
+  return new;
+end $$;
+
+create trigger device_session_revocation
+  after update of status on tenant.device
+  for each row execute function runtime.revoke_device_sessions();
+
+-- Defence in depth for offline replay. RLS already scopes these rows to the proven
+-- device; this refuses the write even if a caller reaches the table another way —
+-- through the worker pool, a future service, or a mistake. A revoked device, a rotated
+-- credential, an ended shift or a missing permission each stop the sale here, in the
+-- database, where no application bug can talk past it.
+create or replace function tenant.validate_offline_replay_authority() returns trigger
+  language plpgsql
+  security definer
+  set search_path = pg_catalog as $$
+declare
+  device_record   record;
+  operator_record record;
+begin
+  select business_id, branch_id, credential_version, status
+    into device_record
+    from tenant.device where id = new.device_id;
+  if not found
+     or device_record.business_id <> new.business_id
+     or device_record.branch_id is distinct from new.branch_id
+     or device_record.credential_version <> new.credential_version
+     or device_record.status <> 'active' then
+    raise exception using errcode = '42501', message = 'offline replay authority invalid';
+  end if;
+
+  select business_id, branch_id, device_id, state, expires_at, permissions
+    into operator_record
+    from runtime.operator_session where id = new.operator_session_id;
+  if not found
+     or operator_record.business_id <> new.business_id
+     or operator_record.branch_id <> new.branch_id
+     or operator_record.device_id <> new.device_id
+     or operator_record.state <> 'active'
+     or operator_record.expires_at <= clock_timestamp()
+     or not ('offline.replay' = any(operator_record.permissions)
+             or '*' = any(operator_record.permissions)) then
+    raise exception using errcode = '42501',
+      message = 'offline replay operator authority invalid';
+  end if;
+  return new;
+end $$;
+
+create trigger offline_replay_authority_guard
+  before insert on tenant.offline_replay_command
+  for each row execute function tenant.validate_offline_replay_authority();

@@ -22,6 +22,10 @@ create schema if not exists runtime;
 -- Extensions (own schema, matches Supabase layout)
 create schema if not exists extensions;
 create extension if not exists vector schema extensions;   -- pgvector -> runtime.*_embedding
+-- digest() for the tenant.audit_event hash chain. Same schema discipline as pgvector:
+-- it lives in `extensions` and is always called qualified (extensions.digest), so the
+-- search_path can never decide which implementation a security-definer trigger gets.
+create extension if not exists pgcrypto schema extensions;
 -- gen_random_uuid() is core in PG13+ (pg_catalog); no extension needed.
 
 -- Putting pgvector in its own schema is right, but it is only half the job: with no
