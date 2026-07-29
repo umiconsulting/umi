@@ -679,6 +679,19 @@ comment on column tenant.customer_order.pickup_person is
 -- relies on ON CONFLICT to return the existing order; without this index the
 -- conflict target does not exist and a retried turn creates a DUPLICATE order.
 -- Partial, so the many orders with no external ref are unconstrained.
+-- ORIGIN IDENTITY, not a retry key. `external_ref` answers "which record is this in
+-- the system the order came FROM" (a Zettle payment id, an aggregator's order number),
+-- and it is unique per business because one source record is one order.
+--
+-- It is NOT the idempotency key, though it was pressed into service as one when the
+-- WhatsApp checkout turned out to be a live injection path with nothing to ON CONFLICT
+-- against. With a second writer that overload breaks down: two injection paths would
+-- have to agree on a namespace for a column that means "their id, not ours", and a
+-- retry key must be chosen by the CALLER before the call, which an origin id is not.
+--
+-- Retry identity lives in tenant.business_command — `unique (business_id,
+-- idempotency_key)` plus a request fingerprint, so a replay with a different body is a
+-- conflict rather than a second charge. Order writes go through it.
 create unique index customer_order_external_ref_uidx
   on tenant.customer_order (business_id, external_ref)
   where external_ref is not null;
@@ -692,14 +705,30 @@ create table tenant.order_item (
   quantity      integer not null default 1 check (quantity > 0),
   unit_price    bigint not null default 0 check (unit_price >= 0),  -- centavos, snapshot (final, incl. chosen modifiers)
   display_order integer not null default 0, -- the line's position on the ticket
+  -- WHERE THIS LINE IS PREPARED. Deferred until "a second station + real routing
+  -- exist" — the POS is that condition. A KDS device could infer its station from the
+  -- device login because the device IS a station; a POS rings up a latte (bar) and a
+  -- panini (grill) on one ticket, away from either, so the routing has to live on the
+  -- line. The §2 grain ruling always said it belonged here.
+  station_id    uuid references tenant.station(id),
   voided_at     timestamptz,                -- void tombstone; a live line = voided_at IS NULL
-  void_reason   text,                       -- why: mistake · duplicate · customer_changed · comp (service recovery) · test
+  void_reason   text,                       -- why: mistake · duplicate · customer_changed · test
   notes         text,
   created_at    timestamptz not null default now(),
   -- a reason is meaningless without a void (the reverse is allowed: a historical/
   -- unattributed void may have no reason — the backfill carries exactly that).
-  constraint order_item_reason_needs_void check (void_reason is null or voided_at is not null)
+  constraint order_item_reason_needs_void check (void_reason is null or voided_at is not null),
+  -- A COMP IS NOT A VOID. The interim convention was `voided_at` + void_reason='comp',
+  -- which was harmless while nothing tracked stock. It stops being harmless the moment
+  -- inventory is real: a VOID returns the item to stock because it was never made, a
+  -- COMP does not because you served it and ate the cost. Encoding both as a void makes
+  -- a free-text reason load-bearing for inventory. A comp is a 100%-off discount and
+  -- now lives in tenant.order_discount, exactly as ORDER_MODEL §3 describes it.
+  constraint order_item_comp_is_not_a_void
+    check (void_reason is null or lower(void_reason) <> 'comp')
 );
+create index order_item_station_idx on tenant.order_item (station_id)
+  where station_id is not null and voided_at is null;
 create index tenant_order_item_order_idx on tenant.order_item (order_id);
 comment on column tenant.order_item.name is
   'Snapshot at order time — a line must not change if the product is later renamed.';
@@ -880,6 +909,62 @@ create table tenant.refund (
   created_at  timestamptz not null default now()
 );
 
+-- ---- Applied discounts, comps and promos ----------------------------------
+-- The FACT that a discount was applied, not the RULE that decided it. The rule engine
+-- (promo definitions, eligibility, stacking) stays deferred exactly as ORDER_MODEL says
+-- — but the facts cannot wait, because @umi/contract already declares DiscountPreview
+-- and DiscountBreakdown on every cart and checkout total, and a receipt has to print
+-- what was taken off. Until this table existed the contract described money the schema
+-- could not store.
+--
+-- A COMP is the 100%-off case, per ORDER_MODEL §3 ("a comp is really a 100 %-off
+-- discount"), and it is always line-level: you comp a dish, not an order.
+create table tenant.order_discount (
+  id            uuid primary key default gen_random_uuid(),
+  business_id   uuid not null references tenant.business(id) on delete cascade,
+  order_id      uuid not null references tenant.customer_order(id) on delete cascade,
+  -- NULL = the discount applies to the whole order; set = to this one line.
+  order_item_id uuid references tenant.order_item(id) on delete cascade,
+  kind          text not null check (kind in ('discount','comp','promo')),
+  code          text not null,     -- machine key, mirrors DiscountPreview.entries[].code
+  label         text not null,     -- what the receipt prints
+  -- The magnitude REMOVED from the total, always positive. Storing a signed value here
+  -- invites a sign error in the one place a sign error is a refund.
+  amount        bigint not null check (amount > 0),
+  reason        text,              -- free text for a comp: "wrong order, remade"
+  authorized_by uuid references umi.user(id),   -- who approved it; a comp needs a name
+  created_at    timestamptz not null default now(),
+  constraint order_discount_comp_is_line_level
+    check (kind <> 'comp' or order_item_id is not null)
+);
+create index order_discount_order_idx on tenant.order_discount (order_id);
+comment on table tenant.order_discount is
+  'Applied discount FACTS (incl. comps as the 100%-off case). The promo RULE engine is '
+  'still deferred; this is what a receipt prints and what a total subtracts.';
+
+-- ---- Per-modifier money breakdown ------------------------------------------
+-- Deferred until "a receipt needs \'$4 latte + $0.50 oat\' split out". A POS receipt
+-- does. The POS already models this at cart grain in tenant.pos_cart_line_modifier;
+-- without this table the breakdown collapses into order_item.unit_price at commit and
+-- survives only inside receipt_snapshot.snapshot jsonb — money structure demoted to a
+-- blob the moment it becomes money.
+create table tenant.order_item_modifier (
+  id            uuid primary key default gen_random_uuid(),
+  business_id   uuid not null references tenant.business(id) on delete cascade,
+  order_item_id uuid not null references tenant.order_item(id) on delete cascade,
+  -- Snapshots, like the line itself: renaming a modifier tomorrow must not rewrite a
+  -- receipt printed today. The catalog refs are for analytics, and may go NULL.
+  modifier_id   uuid references tenant.product_modifier(id) on delete set null,
+  name          text not null,
+  quantity      integer not null default 1 check (quantity > 0),
+  price_delta   bigint not null,   -- centavos, signed: a modifier can subtract
+  created_at    timestamptz not null default now()
+);
+create index order_item_modifier_line_idx on tenant.order_item_modifier (order_item_id);
+comment on table tenant.order_item_modifier is
+  'The receipt-level split of a line price. order_item.unit_price stays the line total; '
+  'this explains it.';
+
 -- ---- Sale → loyalty. The link the whole POS project exists to create. ----
 -- Declared here rather than on the columns because the loyalty cluster is defined
 -- earlier in this file than the order cluster. `on delete set null`: deleting an order
@@ -909,14 +994,37 @@ alter table tenant.loyalty_stored_value_ledger
 -- against it). It is NOT revenue — never sum it across statuses; revenue aggregates
 -- tenant.payment. Consumers wanting "owed right now" filter to open orders (as
 -- order_ticket does).
+-- Gross of live lines, minus applied discounts. The two halves are summed in separate
+-- subqueries rather than one join: joining both children to the order multiplies the
+-- rows, and an order with two lines and one discount would count the discount twice.
 create view tenant.order_total with (security_invoker = true) as
   select o.id          as order_id,
          o.business_id,
-         coalesce(sum(i.unit_price * i.quantity)
-                    filter (where i.voided_at is null), 0)::bigint as total
+         coalesce(li.gross, 0)::bigint                          as gross,
+         coalesce(di.discount, 0)::bigint                       as discount,
+         (coalesce(li.gross, 0) - coalesce(di.discount, 0))::bigint as total
     from tenant.customer_order o
-    left join tenant.order_item i on i.order_id = o.id
-   group by o.id, o.business_id;
+    left join lateral (
+      select sum(i.unit_price * i.quantity) as gross
+        from tenant.order_item i
+       where i.order_id = o.id and i.voided_at is null
+    ) li on true
+    left join lateral (
+      -- A discount attached to a VOIDED line falls out with the line. Without this a
+      -- comped item that is then voided keeps subtracting money from an order that no
+      -- longer contains it, and the total goes negative. Same self-healing property the
+      -- gross sum has: amend the order and the derivation follows.
+      --
+      -- An ORDER-level discount is not filtered — it applies to the order, not a line.
+      -- If it exceeds the remaining gross the total goes negative, and that is left
+      -- VISIBLE on purpose: it means the pricing path allowed a discount larger than the
+      -- bill, which is a service bug worth seeing rather than a number worth clamping.
+      select sum(d.amount) as discount
+        from tenant.order_discount d
+        left join tenant.order_item i on i.id = d.order_item_id
+       where d.order_id = o.id
+         and (d.order_item_id is null or i.voided_at is null)
+    ) di on true;
 
 -- THE TICKET — one live projection of an order, and the only one.
 --

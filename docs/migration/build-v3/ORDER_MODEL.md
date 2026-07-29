@@ -291,13 +291,13 @@ them with **two independent questions**, not one:
    100 %-off discount: _"if inventory has already been impacted, the item should be comped
    instead of voided."_
 
-Mapped onto build-v3, three of the four have a home and one is deferred:
+Mapped onto build-v3, all four now have a home (Comp landed 2026-07-28 with the POS):
 
 | operation  | trigger                                                             | home                                                 | cost                       |
 | ---------- | ------------------------------------------------------------------- | ---------------------------------------------------- | -------------------------- |
 | **Cancel** | the whole **order** is called off                                   | `customer_order.status='canceled'` + `cancel_reason` | none (if unmade)           |
 | **Void**   | a **line** killed, not-yet-made / not-settled                       | `order_item.voided_at` (+ `void_reason`)             | none — inventory returns   |
-| **Comp**   | a line **made**, not charged (service recovery — "fly in the food") | **deferred** (a discount entity)                     | food cost absorbed         |
+| **Comp**   | a line **made**, not charged (service recovery — "fly in the food") | `order_discount` (`kind='comp'`, line-scoped)        | food cost absorbed         |
 | **Refund** | **money** already settled, returned                                 | `refund` → `payment` (append-only)                   | money out (+ cost if made) |
 
 Two rules keep them straight. **(a) The axes are orthogonal — money never collapses into
@@ -308,13 +308,15 @@ axis — adding a status value would re-fuse money into fulfillment, the §4 mis
 kitchen-rejected, customer-changed, test all live in `cancel_reason` / `void_reason`, so the
 status enums stay tiny.
 
-**Comp is the one gap, and it is a deferral, not an oversight.** A comp is really a 100 %-off
-discount, and build-v3 has **no discount mechanism at all** yet (only `product_modifier.price_delta`)
-— discounts/comps/promos are a whole cluster, clearly Phase-3+. Until it lands, a service
-recovery is a `voided_at` line with `void_reason='comp'`, and its cost is still recoverable
-because "was it fired" is derivable from `order_event`. Add a first-class `discount`/`comp`
-line-type when food-cost analytics earns it — the same build-when-earned discipline as
-`order_item_modifier`.
+**Comp WAS the one gap. Closed 2026-07-28 (UmiPOS integration).** A comp is really a
+100 %-off discount — and once the POS reserved inventory, the interim (`voided_at` +
+`void_reason='comp'`) became actively wrong rather than merely approximate: a **void**
+returns the item to stock because it was never made, a **comp** does not because you served
+it and absorbed the cost. Encoding both as a void makes a free-text reason decide inventory.
+
+A comp is now a line-scoped `tenant.order_discount` row with `kind='comp'`, and
+`order_item.void_reason = 'comp'` is refused by CHECK. The discount FACT table landed; the
+promo RULE engine (definitions, eligibility, stacking) stays Phase-3+, unchanged.
 
 ---
 
@@ -488,14 +490,19 @@ in `unit_price`, so a customization rides as a value, **not** a column-per-varia
 
 ### Deferred — earned later, decision recorded, table not built
 
-- **`order_item.station_id`** (per-line routing FK, _not_ the `station` table) — a build-v3
-  invention (the source lines have no station column), null on 100% of lines, backed by 0
-  routing rules, and read by nothing (the KDS ticket's station comes from the device login,
-  not the line). Add when a second station + real routing exist; the §2 grain ruling (it
-  goes on the line) stands. ⚠️ **`tenant.station` the table is NOT deferred** — it is a live
-  KDS consumer, kept as config.
-- **`order_item_modifier`** — structured per-modifier money breakdown; add when a receipt
-  needs "$4 latte + $0.50 oat" split out. Until then the delta is folded into `unit_price`.
+- ~~**`order_item.station_id`**~~ — **LANDED 2026-07-28 (UmiPOS integration).** The deferral
+  condition was "add when a second station + real routing exist", and the POS is it. The
+  KDS could infer a station from the device login because a KDS device _is_ a station; a
+  POS rings a latte (bar) and a panini (grill) onto one ticket from neither, so the routing
+  has to live on the line — which is what the §2 grain ruling always said. ⚠️
+  **`tenant.station` the table was never deferred** — it is a live KDS consumer, kept as config.
+- ~~**`order_item_modifier`**~~ — **LANDED 2026-07-28 (UmiPOS integration).** The deferral
+  condition was "when a receipt needs '$4 latte + $0.50 oat' split out". A POS receipt does.
+  The POS already modelled it at cart grain (`tenant.pos_cart_line_modifier`); without the
+  order-grain table the breakdown collapsed into `order_item.unit_price` at commit and
+  survived only inside `receipt_snapshot.snapshot` jsonb — money structure demoted to a blob
+  at the exact moment it became money. `unit_price` remains the line total; the new table
+  explains it.
 - **`replaces_id`** (line supersession) — no consumer (`partial_cancellation_reason` 0×);
   add only for substitution analytics. A per-line amendment saga is **refused** at 2/51.
 - **`customer_order.personal_message`** (the gift message that accompanies `pickup_person`)
@@ -507,11 +514,21 @@ in `unit_price`, so a customization rides as a value, **not** a column-per-varia
   as a plain nullable text column then. Nothing to retrofit, precisely because there is no
   history. ⚠️ Contrast `pickup_person` + `notes`, which are **not** deferred: both are frozen
   KDS ticket fields with a live reader, and `notes` carries 7 real rows.
-- **discount / comp cluster** (an order-/line-level discount entity, of which a _comp_ is the
-  100 %-off case) — build-v3 has **no** discount mechanism yet (only `product_modifier.price_delta`).
-  Discounts, comps and promos are a whole feature, Phase-3+. Interim: a service recovery is a
-  `voided_at` line with `void_reason='comp'` (cost still derivable from `order_event`). Add the
-  first-class type when food-cost / promo analytics earns it. See §3.
+- **discount / comp cluster** — **SPLIT 2026-07-28 (UmiPOS integration).** The FACTS landed;
+  the RULES are still deferred.
+  - **Landed:** `tenant.order_discount` — the fact that a discount, promo or comp was applied,
+    with `code` / `label` / `amount`, line-scoped or order-scoped. It had to: `@umi/contract`
+    already declares `DiscountPreview` and `DiscountBreakdown` on every cart and checkout
+    total, so the contract was describing money the schema could not store, and a receipt has
+    to print what was taken off. `tenant.order_total` now returns `gross`, `discount` and
+    `total`, and a discount attached to a voided line falls out with the line.
+  - **Still deferred:** the promo RULE engine — definitions, eligibility, stacking. Phase-3+,
+    unchanged.
+  - ⚠️ **The `void_reason='comp'` interim is WITHDRAWN and now refused by a CHECK.** It was
+    harmless while nothing tracked stock; it stops being harmless the moment inventory is
+    real, because a VOID returns the item (never made) and a COMP does not (made and served),
+    and encoding both as a void makes a free-text reason load-bearing for inventory. A comp is
+    a line-scoped `order_discount` row with `kind='comp'`, exactly as §3 always described it.
 
 > The status enum (`placed · preparing · ready · completed · canceled`) conflates the
 > commercial axis (placed/completed/canceled) with the operational axis (preparing/ready).
@@ -585,8 +602,19 @@ grows into the POS, it becomes the **injection target**, so its order must be ab
 (a) _receive_ orders tagged by origin (`source ∈ whatsapp · pos · web · dashboard`, and
 later `aggregator`) and (b) _emit_ status outward. `source` + `external_ref` are the
 origin-tagging fields that make an order injection-ready, and are **already present**; a
-tenant-scoped `idempotency_key` (with a uniqueness constraint) is the **planned** third —
-it makes re-injection duplicate-safe and lands when the injection path is built, not now.
+tenant-scoped `idempotency_key` (with a uniqueness constraint) was the **planned** third.
+
+**Resolved 2026-07-28 (UmiPOS integration), and not where this section expected.** The
+§1 amendment already had to press `UNIQUE (business_id, external_ref)` into service as an
+idempotency key when the WhatsApp checkout turned out to be a live injection path. With the
+POS as a _second_ path that overload breaks down: two producers would have to agree on a
+namespace for a column that means "_their_ id, not ours", and a retry key is chosen by the
+caller **before** the call, which an origin id is not. So the two are now separate —
+`external_ref` is origin identity, and retry identity lives in `tenant.business_command`
+(`unique (business_id, idempotency_key)` **plus a request fingerprint**, so a replay with a
+different body is a conflict rather than a second charge). `runtime.idempotency_key` keeps
+inbound webhook dedup and is explicitly not for business commands: it stores no fingerprint
+and no response, so a reused key returns silence instead of a conflict.
 The model is ecosystem-compatible by construction; the one rule is to never let
 "order" collapse back into a KDS-only artifact.
 

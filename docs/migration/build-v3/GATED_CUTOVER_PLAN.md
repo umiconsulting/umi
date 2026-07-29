@@ -99,12 +99,21 @@ Legend: ✅ done · 🔄 in flight · ⏳ pending · ◑ partial
   `idempotency_key` + `UNIQUE (business_id, idempotency_key)`, and `available_at`/`leased_at`
   split apart (one column was serving as both backoff and lease).
 - ⏳ **`runtime.conversation_turn` RESTORE** (5 live read paths; it is load-bearing, not telemetry).
-- ⏳ **customer-session home** (`runtime.session` has no place for a `tenant.customer`; `app` CHECK
-  excludes `'cash'`).
+- ✅ **customer-session home** — **RESOLVED.** This line described the old `app`-CHECK session
+  shape. Current build-v3 `runtime.session` is keyed by `(principal_type, principal_id)` with
+  `principal_type in ('user','device','person')`, and its own comment names the umi-cash
+  customer case as the `'person'` principal. Nothing to build. (Confirmed 2026-07-28 while
+  reading this plan against the UmiPOS integration; `runtime.operator_session` follows the
+  same discipline — a distinct presence table rather than another overload of `session`.)
 - ⏳ **hours** — typed `tenant.business_hours` + fold `open_hours`; drop the `business.config` read.
 - ⏳ **identity dissolution** — `contact_identity` / `channel` / `whatsapp_number` → the build-v3 model.
 - ⏳ **`90_rls.sql` booby-trap** — delete the hard-coded child-list rows in the _same_ commit that adds
   `business_id` to `station`/`order_event` (else `42710` aborts the whole RLS rebuild).
+  ⚠️ **The same species bit again 2026-07-28**: the POS branch-narrowing policies were written as
+  an opt-IN list of table names, so a new tenant table with a `branch_id` got no narrowing,
+  silently, failing OPEN. Now swept with a recorded opt-out (`staff`, `loyalty_visit`), which
+  also picked up four tables that had none — `customer_order`, `device`, `station`,
+  `product_branch_availability`. **Rule: in this file, sweep and exclude; never list and include.**
 - ⏳ **Backfill rewrite to PRESERVE** — extend the reconcile to field-level for each new carry.
 
 > **Why P1 is "in progress" while P2 already shipped:** the order cluster was the cleanly-separable

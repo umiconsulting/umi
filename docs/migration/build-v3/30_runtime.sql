@@ -186,6 +186,14 @@ create table runtime.inbound_event (
 create unique index inbound_event_provider_ext_uq
   on runtime.inbound_event (provider, external_id) where external_id is not null;
 
+-- Inbound dedup only: "have I already seen this webhook / this provider callback?"
+--
+-- ⚠️ NOT for business commands. This table records that a key was SEEN; it stores no
+-- request fingerprint and no response, so a retry carrying the same key with a
+-- DIFFERENT body looks identical to a genuine replay, and a caller that reuses a key
+-- gets silence instead of a conflict. For anything that moves money or creates an
+-- order, use tenant.business_command, which keeps the fingerprint and the recorded
+-- result and answers IDEMPOTENCY_CONFLICT when they disagree.
 create table runtime.idempotency_key (
   key          text primary key,           -- read BEFORE processing: "already done?"
   scope        text not null,
