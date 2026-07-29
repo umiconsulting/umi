@@ -187,13 +187,7 @@ export class PosEntryRepository {
             entity_type, entity_id, outcome)
          VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 'operator.session_started',
                  'operator_session', $5::uuid, 'success')`,
-        [
-          input.userId,
-          input.durableSessionId,
-          input.tenantId,
-          input.branchId,
-          rows[0].id,
-        ],
+        [input.userId, input.durableSessionId, input.tenantId, input.branchId, rows[0].id],
       );
     }
     return rows[0] ?? null;
@@ -353,13 +347,7 @@ export class PosEntryRepository {
          VALUES ($1::uuid, $2::uuid, $3::uuid, 'elevation.manager_granted',
                  'elevation_grant', $4::uuid, 'success',
                  jsonb_build_object('method','manager_approval','permission',$5))`,
-        [
-          input.managerUserId,
-          input.tenantId,
-          input.branchId,
-          rows[0].id,
-          input.permission,
-        ],
+        [input.managerUserId, input.tenantId, input.branchId, rows[0].id, input.permission],
       );
     }
     return rows[0] ?? null;

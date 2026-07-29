@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { BadRequestException, ForbiddenException, HttpException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 
 function make() {
@@ -222,7 +227,10 @@ describe('AuthService.pinLogin', () => {
 
   it('rejects an ambiguous legacy PIN', async () => {
     h.repo.findPosPinStaff.mockResolvedValue(null);
-    h.repo.findLegacyPosPinCandidates.mockResolvedValue([PIN_STAFF, { ...PIN_STAFF, staffId: 's2' }]);
+    h.repo.findLegacyPosPinCandidates.mockResolvedValue([
+      PIN_STAFF,
+      { ...PIN_STAFF, staffId: 's2' },
+    ]);
 
     await expect(
       h.svc.pinLogin(

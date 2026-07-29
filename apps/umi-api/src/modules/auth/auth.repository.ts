@@ -516,15 +516,7 @@ export class AuthRepository {
              OR (SELECT is_sa FROM sa)
            )
        ) AS allowed`,
-      [
-        userId,
-        deviceId,
-        expectedKind,
-        installationHash,
-        credentialHash,
-        tenantId,
-        branchId,
-      ],
+      [userId, deviceId, expectedKind, installationHash, credentialHash, tenantId, branchId],
     );
     return rows[0]?.allowed === true;
   }

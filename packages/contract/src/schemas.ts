@@ -91,7 +91,10 @@ export const CreateStaffRequest = z
     role: z.string().min(1).max(100),
     branchId: z.string().uuid().nullable().optional(),
     position: z.string().trim().max(160).nullable().optional(),
-    operatorPin: z.string().regex(/^\d{4,8}$/).optional(),
+    operatorPin: z
+      .string()
+      .regex(/^\d{4,8}$/)
+      .optional(),
   })
   .strict();
 export type CreateStaffRequest = z.infer<typeof CreateStaffRequest>;
@@ -102,7 +105,11 @@ export const UpdateStaffRequest = z
     branchId: z.string().uuid().nullable().optional(),
     position: z.string().trim().max(160).nullable().optional(),
     status: z.enum(['active', 'inactive']).optional(),
-    operatorPin: z.string().regex(/^\d{4,8}$/).nullable().optional(),
+    operatorPin: z
+      .string()
+      .regex(/^\d{4,8}$/)
+      .nullable()
+      .optional(),
   })
   .strict();
 export type UpdateStaffRequest = z.infer<typeof UpdateStaffRequest>;

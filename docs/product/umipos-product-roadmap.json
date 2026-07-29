@@ -56,9 +56,7 @@
       "status": "complete_with_observations",
       "dependencies": ["2E"],
       "nextObjective": "Preserve the certified offline authority boundary",
-      "blockers": [
-        "External Linux native build prerequisites are unavailable in this runner"
-      ],
+      "blockers": ["External Linux native build prerequisites are unavailable in this runner"],
       "validationState": "Focused contract, API, Flutter, Web, migration and PostgreSQL negative authorization checks passed; Linux native build prerequisites unavailable; Web sensitive journal unsupported"
     }
   ]

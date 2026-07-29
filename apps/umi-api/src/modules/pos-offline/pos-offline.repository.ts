@@ -26,13 +26,21 @@ export class PosOfflineRepository {
   }
 
   async context(input: {
-    userId: string; deviceId: string; tenantId: string; branchId: string;
-    operatorSessionId: string; credentialVersion: number;
+    userId: string;
+    deviceId: string;
+    tenantId: string;
+    branchId: string;
+    operatorSessionId: string;
+    credentialVersion: number;
   }) {
     const { rows } = await this.pg.worker.query<{
-      lifecycle: string; credentialVersion: number; permissions: string[];
+      lifecycle: string;
+      credentialVersion: number;
+      permissions: string[];
       entitlements: Array<{ featureKey?: string; enabled?: boolean }>;
-      deviceKind: string; currency: string; lastAcceptedSequence: string;
+      deviceKind: string;
+      currency: string;
+      lastAcceptedSequence: string;
     }>(
       `SELECT d.lifecycle_state AS lifecycle, d.credential_version AS "credentialVersion",
               os.permissions, os.entitlements, d.kind AS "deviceKind", b.currency,
@@ -46,23 +54,42 @@ export class PosOfflineRepository {
         ON c.device_id=d.id AND c.credential_version=$6
        WHERE d.id=$2::uuid AND d.business_id=$3::uuid
         AND (d.branch_id IS NULL OR d.branch_id=$4::uuid)`,
-      [input.userId, input.deviceId, input.tenantId, input.branchId,
-        input.operatorSessionId, input.credentialVersion],
+      [
+        input.userId,
+        input.deviceId,
+        input.tenantId,
+        input.branchId,
+        input.operatorSessionId,
+        input.credentialVersion,
+      ],
     );
-    return rows[0] ? {
-      ...rows[0], lastAcceptedSequence: Number(rows[0].lastAcceptedSequence),
-    } : null;
+    return rows[0]
+      ? {
+          ...rows[0],
+          lastAcceptedSequence: Number(rows[0].lastAcceptedSequence),
+        }
+      : null;
   }
 
   async policy(tenantId: string, branchId: string) {
     const { rows } = await this.pg.worker.query<{
-      id: string; enabled: boolean; version: string; currency: string;
-      issuedAt: Date; expiresAt: Date;
-      maxPolicyAgeSeconds: number; maxSingleSaleMinorUnits: string;
-      maxAccumulatedMinorUnits: string; maxOfflineSaleCount: number;
-      maxActiveQueueDepth: number; maxCommandAgeSeconds: number;
-      maxCatalogAgeSeconds: number; maxPricingAgeSeconds: number; maxTaxAgeSeconds: number;
-      managerApprovalThresholdMinorUnits: string | null; allowedDeviceClasses: string[];
+      id: string;
+      enabled: boolean;
+      version: string;
+      currency: string;
+      issuedAt: Date;
+      expiresAt: Date;
+      maxPolicyAgeSeconds: number;
+      maxSingleSaleMinorUnits: string;
+      maxAccumulatedMinorUnits: string;
+      maxOfflineSaleCount: number;
+      maxActiveQueueDepth: number;
+      maxCommandAgeSeconds: number;
+      maxCatalogAgeSeconds: number;
+      maxPricingAgeSeconds: number;
+      maxTaxAgeSeconds: number;
+      managerApprovalThresholdMinorUnits: string | null;
+      allowedDeviceClasses: string[];
     }>(
       `SELECT id::text,enabled,version,currency,issued_at AS "issuedAt",expires_at AS "expiresAt",
               max_policy_age_seconds AS "maxPolicyAgeSeconds",
@@ -92,7 +119,8 @@ export class PosOfflineRepository {
       await client.query('BEGIN');
       const existing = await client.query<{ fingerprint: string; result: ReplayResult }>(
         `SELECT fingerprint, result FROM tenant.offline_replay_command
-         WHERE command_id=$1::uuid FOR SHARE`, [command.commandId],
+         WHERE command_id=$1::uuid FOR SHARE`,
+        [command.commandId],
       );
       if (existing.rows[0]) {
         await client.query('COMMIT');
@@ -122,9 +150,13 @@ export class PosOfflineRepository {
         );
       }
       const result: ReplayResult = {
-        commandId: command.commandId, deviceSequence: command.deviceSequence,
-        status: 'accepted', officialId: officialCommit?.officialSaleId ?? null,
-        officialCommit, serverConflictReference: null, failure: null,
+        commandId: command.commandId,
+        deviceSequence: command.deviceSequence,
+        status: 'accepted',
+        officialId: officialCommit?.officialSaleId ?? null,
+        officialCommit,
+        serverConflictReference: null,
+        failure: null,
       };
       await client.query(
         `INSERT INTO tenant.offline_replay_command
@@ -132,11 +164,24 @@ export class PosOfflineRepository {
           operator_session_id,idempotency_key,command_type,fingerprint,contract_version,
           schema_version,client_created_at,result,provisional_id,payload)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
-        [command.tenantId, command.branchId, command.deviceId, command.deviceCredentialVersion,
-          command.deviceSequence, command.commandId, command.operatorSessionId,
-          command.idempotencyKey, command.commandType, command.fingerprint,
-          command.contractVersion, command.schemaVersion, command.createdAt,
-          JSON.stringify(result), command.provisionalId, JSON.stringify(command.payload)],
+        [
+          command.tenantId,
+          command.branchId,
+          command.deviceId,
+          command.deviceCredentialVersion,
+          command.deviceSequence,
+          command.commandId,
+          command.operatorSessionId,
+          command.idempotencyKey,
+          command.commandType,
+          command.fingerprint,
+          command.contractVersion,
+          command.schemaVersion,
+          command.createdAt,
+          JSON.stringify(result),
+          command.provisionalId,
+          JSON.stringify(command.payload),
+        ],
       );
       await client.query(
         `UPDATE tenant.device_replay_cursor SET last_accepted_sequence=$3, updated_at=clock_timestamp()
@@ -151,9 +196,14 @@ export class PosOfflineRepository {
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
            ON CONFLICT (business_id,provisional_id) DO NOTHING`,
           [
-            command.tenantId, command.branchId, command.deviceId, command.commandId,
-            command.provisionalId, officialCommit.officialSaleId,
-            officialCommit.officialReceiptId, officialCommit.officialReceiptNumber,
+            command.tenantId,
+            command.branchId,
+            command.deviceId,
+            command.commandId,
+            command.provisionalId,
+            officialCommit.officialSaleId,
+            officialCommit.officialReceiptId,
+            officialCommit.officialReceiptNumber,
             officialCommit.reconciliationReference,
           ],
         );
@@ -175,8 +225,11 @@ export class PosOfflineRepository {
           'offline_command',$3::uuid,'success',
           jsonb_build_object('commandType',$4::text,'deviceSequence',$5::bigint),$3::text,'')`,
         [
-          command.tenantId, command.branchId, command.commandId,
-          command.commandType, command.deviceSequence,
+          command.tenantId,
+          command.branchId,
+          command.commandId,
+          command.commandType,
+          command.deviceSequence,
         ],
       );
       await client.query('COMMIT');
@@ -229,7 +282,9 @@ export class PosOfflineRepository {
 
   async diagnostics(tenantId: string, deviceId: string, credentialVersion: number) {
     const { rows } = await this.pg.worker.query<{
-      lastAcceptedSequence: string; acceptedCount: string; lastReplayAt: Date | null;
+      lastAcceptedSequence: string;
+      acceptedCount: string;
+      lastReplayAt: Date | null;
     }>(
       `SELECT COALESCE(c.last_accepted_sequence,0)::text AS "lastAcceptedSequence",
               count(r.command_id)::text AS "acceptedCount", max(r.accepted_at) AS "lastReplayAt"
@@ -266,8 +321,12 @@ export class PosOfflineRepository {
         (id,business_id,branch_id,device_id,credential_version,summary)
        VALUES ($1,$2,$3,$4,$5,$6)`,
       [
-        id, input.tenantId, input.branchId, input.deviceId,
-        input.credentialVersion, JSON.stringify(input.summary),
+        id,
+        input.tenantId,
+        input.branchId,
+        input.deviceId,
+        input.credentialVersion,
+        JSON.stringify(input.summary),
       ],
     );
     return id;
@@ -275,10 +334,16 @@ export class PosOfflineRepository {
 
   async conflicts(tenantId: string, branchId: string, deviceId: string) {
     const { rows } = await this.pg.worker.query<{
-      commandId: string; deviceSequence: string; classification: ConflictClassification;
-      blocksFollowing: boolean; operatorActionRequired: boolean;
-      managerActionRequired: boolean; guidanceCode: string; correlationId: string;
-      officialId: string | null; id: string;
+      commandId: string;
+      deviceSequence: string;
+      classification: ConflictClassification;
+      blocksFollowing: boolean;
+      operatorActionRequired: boolean;
+      managerActionRequired: boolean;
+      guidanceCode: string;
+      correlationId: string;
+      officialId: string | null;
+      id: string;
     }>(
       `SELECT command_id::text AS "commandId",device_sequence::text AS "deviceSequence",
               classification,blocks_following AS "blocksFollowing",
@@ -311,7 +376,9 @@ export class PosOfflineRepository {
 
   async mappings(tenantId: string, branchId: string, deviceId: string) {
     const { rows } = await this.pg.worker.query<{
-      provisionalId: string; officialId: string; commandId: string;
+      provisionalId: string;
+      officialId: string;
+      commandId: string;
     }>(
       `SELECT provisional_id::text AS "provisionalId",
               official_sale_id::text AS "officialId",
@@ -326,8 +393,12 @@ export class PosOfflineRepository {
 
   async audit(tenantId: string, branchId: string, deviceId: string) {
     const { rows } = await this.pg.worker.query<{
-      eventCategory: string; occurredAt: Date; correlationId: string;
-      commandReference: string | null; sequence: string; outcomeCode: string;
+      eventCategory: string;
+      occurredAt: Date;
+      correlationId: string;
+      commandReference: string | null;
+      sequence: string;
+      outcomeCode: string;
     }>(
       `SELECT a.event_type AS "eventCategory",a.occurred_at AS "occurredAt",
               a.correlation_id AS "correlationId",a.command_id::text AS "commandReference",
@@ -362,13 +433,19 @@ export class PosOfflineRepository {
     blocksFollowing: boolean,
   ): ReplayResult {
     return {
-      commandId: command.commandId, deviceSequence: command.deviceSequence,
-      status: 'conflict', officialId: null, officialCommit: null,
+      commandId: command.commandId,
+      deviceSequence: command.deviceSequence,
+      status: 'conflict',
+      officialId: null,
+      officialCommit: null,
       serverConflictReference: null,
       failure: {
         classification,
-        retryable: false, blocksFollowing, operatorActionRequired: true,
-        managerActionRequired: false, guidanceCode: classification,
+        retryable: false,
+        blocksFollowing,
+        operatorActionRequired: true,
+        managerActionRequired: false,
+        guidanceCode: classification,
         correlationId: command.commandId,
       },
     };
@@ -390,8 +467,14 @@ export class PosOfflineRepository {
         SET last_observed_at=clock_timestamp()
        RETURNING id::text`,
       [
-        command.tenantId, command.branchId, command.deviceId, command.commandId,
-        command.deviceSequence, classification, blocksFollowing, command.provisionalId,
+        command.tenantId,
+        command.branchId,
+        command.deviceId,
+        command.commandId,
+        command.deviceSequence,
+        classification,
+        blocksFollowing,
+        command.provisionalId,
       ],
     );
     return { ...result, serverConflictReference: rows[0].id };

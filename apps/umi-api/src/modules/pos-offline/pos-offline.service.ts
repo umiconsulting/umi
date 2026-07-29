@@ -1,10 +1,19 @@
 import {
-  ForbiddenException, Injectable, NotFoundException, UnauthorizedException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import type {
-  BeginReplayRequest, OfficialCommitResult, OfflineCashPolicy, OfflinePolicy,
-  ReplayBatch, ReplayBatchResult, ReconcileRequest, ReconciliationSummary,
+  BeginReplayRequest,
+  OfficialCommitResult,
+  OfflineCashPolicy,
+  OfflinePolicy,
+  ReplayBatch,
+  ReplayBatchResult,
+  ReconcileRequest,
+  ReconciliationSummary,
   ReplayContextQuery,
 } from '@umi/contract';
 import { OfflineCheckoutCommand } from '@umi/contract';
@@ -21,7 +30,13 @@ export class PosOfflineService {
   ) {}
 
   async begin(user: AuthUser, tenantId: string, dto: BeginReplayRequest) {
-    const context = await this.authorize(user, tenantId, dto.branchId, dto.operatorSessionId, dto.credentialVersion);
+    const context = await this.authorize(
+      user,
+      tenantId,
+      dto.branchId,
+      dto.operatorSessionId,
+      dto.credentialVersion,
+    );
     const policy = await this.issuePolicy(user, tenantId, dto);
     return {
       replaySessionId: randomUUID(),
@@ -30,20 +45,31 @@ export class PosOfflineService {
     };
   }
 
-  async issuePolicy(user: AuthUser, tenantId: string, query: ReplayContextQuery): Promise<OfflinePolicy> {
+  async issuePolicy(
+    user: AuthUser,
+    tenantId: string,
+    query: ReplayContextQuery,
+  ): Promise<OfflinePolicy> {
     const context = await this.authorize(
-      user, tenantId, query.branchId, query.operatorSessionId, query.credentialVersion,
+      user,
+      tenantId,
+      query.branchId,
+      query.operatorSessionId,
+      query.credentialVersion,
     );
     const configured = await this.repo.policy(tenantId, query.branchId);
-    const hasPermission = context.permissions.includes('*') ||
-      context.permissions.includes('offline.cash.checkout');
+    const hasPermission =
+      context.permissions.includes('*') || context.permissions.includes('offline.cash.checkout');
     const hasEntitlement = context.entitlements.some(
       (value) => value.featureKey === 'pos.offline_cash' && value.enabled === true,
     );
     const deviceAllowed = configured?.allowedDeviceClasses.includes(context.deviceKind) ?? false;
     const enabled = Boolean(
-      configured?.enabled && configured.expiresAt > new Date() &&
-      hasPermission && hasEntitlement && deviceAllowed &&
+      configured?.enabled &&
+      configured.expiresAt > new Date() &&
+      hasPermission &&
+      hasEntitlement &&
+      deviceAllowed &&
       configured.currency === context.currency,
     );
     const issuedAt = configured?.issuedAt ?? new Date();
@@ -80,15 +106,11 @@ export class PosOfflineService {
     };
     const cash: OfflineCashPolicy = {
       ...cashWithoutFingerprint,
-      fingerprint: createHash('sha256')
-        .update(canonicalJson(cashWithoutFingerprint))
-        .digest('hex'),
+      fingerprint: createHash('sha256').update(canonicalJson(cashWithoutFingerprint)).digest('hex'),
     };
     return {
       cash,
-      allowedCommandTypes: enabled
-        ? ['operational.ack', 'pos.checkout.cash']
-        : ['operational.ack'],
+      allowedCommandTypes: enabled ? ['operational.ack', 'pos.checkout.cash'] : ['operational.ack'],
       maxBatchSize: 20,
       webSensitiveJournalEnabled: false,
     };
@@ -114,16 +136,24 @@ export class PosOfflineService {
   ): Promise<ReplayBatchResult> {
     const first = batch.commands[0];
     const replayContext = await this.authorize(
-      user, tenantId, first.branchId, first.operatorSessionId,
+      user,
+      tenantId,
+      first.branchId,
+      first.operatorSessionId,
       first.deviceCredentialVersion,
     );
     const sorted = [...batch.commands].sort((a, b) => a.deviceSequence - b.deviceSequence);
-    if (sorted.some((command, index) =>
-      command.tenantId !== tenantId || command.deviceId !== user.deviceId ||
-      command.branchId !== first.branchId ||
-      command.operatorSessionId !== first.operatorSessionId ||
-      command.deviceCredentialVersion !== first.deviceCredentialVersion ||
-      command.deviceSequence !== sorted[0].deviceSequence + index)) {
+    if (
+      sorted.some(
+        (command, index) =>
+          command.tenantId !== tenantId ||
+          command.deviceId !== user.deviceId ||
+          command.branchId !== first.branchId ||
+          command.operatorSessionId !== first.operatorSessionId ||
+          command.deviceCredentialVersion !== first.deviceCredentialVersion ||
+          command.deviceSequence !== sorted[0].deviceSequence + index,
+      )
+    ) {
       throw new ForbiddenException({ code: 'REPLAY_SCOPE_INVALID' });
     }
     const results = [];
@@ -138,16 +168,17 @@ export class PosOfflineService {
         .update(canonicalJson(unsignedCommand))
         .digest('hex');
       if (expectedFingerprint !== fingerprint) {
-        results.push(
-          await this.repo.recordConflict(command, 'fingerprint_mismatch', true),
-        );
+        results.push(await this.repo.recordConflict(command, 'fingerprint_mismatch', true));
         stopped = true;
         break;
       }
       if (command.deviceSequence < expectedSequence) {
         const duplicate = await this.repo.replay(command);
         results.push(duplicate);
-        if (duplicate.failure?.blocksFollowing) { stopped = true; break; }
+        if (duplicate.failure?.blocksFollowing) {
+          stopped = true;
+          break;
+        }
         continue;
       }
       if (command.deviceSequence > expectedSequence) {
@@ -160,7 +191,9 @@ export class PosOfflineService {
         const parsed = OfflineCheckoutCommand.safeParse(command.payload);
         if (!parsed.success || !command.provisionalId) {
           const conflict = await this.repo.recordConflict(
-            command, 'server_validation_failed', true,
+            command,
+            'server_validation_failed',
+            true,
           );
           results.push(conflict);
           stopped = true;
@@ -181,10 +214,12 @@ export class PosOfflineService {
           );
           exposureByPolicy.set(parsed.data.policyFingerprint, exposure);
         }
-        if (!policy.cash.enabled ||
-            policy.cash.version !== parsed.data.policyVersion ||
-            policy.cash.fingerprint !== parsed.data.policyFingerprint ||
-            new Date(policy.cash.expiresAt) <= new Date()) {
+        if (
+          !policy.cash.enabled ||
+          policy.cash.version !== parsed.data.policyVersion ||
+          policy.cash.fingerprint !== parsed.data.policyFingerprint ||
+          new Date(policy.cash.expiresAt) <= new Date()
+        ) {
           const conflict = await this.repo.recordConflict(command, 'policy_changed', true);
           results.push(conflict);
           stopped = true;
@@ -200,28 +235,21 @@ export class PosOfflineService {
           snapshot.checkoutCommand.operatorSessionId !== command.operatorSessionId ||
           snapshot.checkoutCommand.paymentMethod !== 'cash' ||
           snapshot.currency !== policy.cash.currency ||
-          snapshot.amountDueMinorUnits !==
-            snapshot.totals.totals.grandTotal.minorUnits ||
+          snapshot.amountDueMinorUnits !== snapshot.totals.totals.grandTotal.minorUnits ||
           snapshot.currency !== snapshot.totals.totals.grandTotal.currency ||
           snapshot.amountReceivedMinorUnits < snapshot.amountDueMinorUnits ||
           createdAt.getTime() - catalogAt.getTime() >
             policy.cash.limits.maxCatalogAgeSeconds * 1000 ||
           createdAt.getTime() - pricingAt.getTime() >
             policy.cash.limits.maxPricingAgeSeconds * 1000 ||
-          createdAt.getTime() - taxAt.getTime() >
-            policy.cash.limits.maxTaxAgeSeconds * 1000 ||
-          [createdAt, catalogAt, pricingAt, taxAt].some(
-            (value) => Number.isNaN(value.getTime()),
-          );
+          createdAt.getTime() - taxAt.getTime() > policy.cash.limits.maxTaxAgeSeconds * 1000 ||
+          [createdAt, catalogAt, pricingAt, taxAt].some((value) => Number.isNaN(value.getTime()));
         if (invalidSnapshot) {
-          results.push(
-            await this.repo.recordConflict(command, 'server_validation_failed', true),
-          );
+          results.push(await this.repo.recordConflict(command, 'server_validation_failed', true));
           stopped = true;
           break;
         }
-        if (Date.now() - createdAt.getTime() >
-            policy.cash.limits.maxCommandAgeSeconds * 1000) {
+        if (Date.now() - createdAt.getTime() > policy.cash.limits.maxCommandAgeSeconds * 1000) {
           results.push(await this.repo.recordConflict(command, 'command_expired', true));
           stopped = true;
           break;
@@ -231,31 +259,34 @@ export class PosOfflineService {
           totalsFingerprint: null,
           idempotencyKey: command.idempotencyKey,
         });
-        const authoritativeAmount =
-          preview.confirmation.totals.grandTotal.minorUnits;
-        const authoritativeCurrency =
-          preview.confirmation.totals.grandTotal.currency;
+        const authoritativeAmount = preview.confirmation.totals.grandTotal.minorUnits;
+        const authoritativeCurrency = preview.confirmation.totals.grandTotal.currency;
         batchCashMinorUnits += authoritativeAmount;
         batchCashCount += 1;
-        if (preview.status !== 'confirmation_required' ||
-            preview.confirmation.fingerprint !==
-              snapshot.checkoutCommand.totalsFingerprint ||
-            authoritativeAmount !== snapshot.amountDueMinorUnits ||
-            authoritativeCurrency !== snapshot.currency ||
-            authoritativeAmount > policy.cash.limits.maxSingleSaleMinorUnits ||
-            exposure.amount + batchCashMinorUnits >
-              policy.cash.limits.maxAccumulatedMinorUnits ||
-            exposure.count + batchCashCount >
-              policy.cash.limits.maxOfflineSaleCount) {
+        if (
+          preview.status !== 'confirmation_required' ||
+          preview.confirmation.fingerprint !== snapshot.checkoutCommand.totalsFingerprint ||
+          authoritativeAmount !== snapshot.amountDueMinorUnits ||
+          authoritativeCurrency !== snapshot.currency ||
+          authoritativeAmount > policy.cash.limits.maxSingleSaleMinorUnits ||
+          exposure.amount + batchCashMinorUnits > policy.cash.limits.maxAccumulatedMinorUnits ||
+          exposure.count + batchCashCount > policy.cash.limits.maxOfflineSaleCount
+        ) {
           results.push(await this.repo.recordConflict(command, 'price_changed', true));
           stopped = true;
           break;
         }
         const checkout = await this.checkout.checkout(
-          user, tenantId, parsed.data.snapshot.checkoutCommand,
+          user,
+          tenantId,
+          parsed.data.snapshot.checkoutCommand,
         );
-        if (checkout.status !== 'completed' || !checkout.sale || !checkout.receipt ||
-            !checkout.payment) {
+        if (
+          checkout.status !== 'completed' ||
+          !checkout.sale ||
+          !checkout.receipt ||
+          !checkout.payment
+        ) {
           const classification =
             checkout.status === 'payment_unknown'
               ? 'ambiguous_payment_requires_query'
@@ -282,35 +313,63 @@ export class PosOfflineService {
       if (result.status === 'accepted' || result.status === 'duplicate') {
         expectedSequence += 1;
       }
-      if (result.failure?.blocksFollowing) { stopped = true; break; }
+      if (result.failure?.blocksFollowing) {
+        stopped = true;
+        break;
+      }
     }
-    const last = results.filter((r) => r.status === 'accepted' || r.status === 'duplicate')
-      .reduce((value, result) => Math.max(value, result.deviceSequence), sorted[0].deviceSequence - 1);
+    const last = results
+      .filter((r) => r.status === 'accepted' || r.status === 'duplicate')
+      .reduce(
+        (value, result) => Math.max(value, result.deviceSequence),
+        sorted[0].deviceSequence - 1,
+      );
     return {
-      replaySessionId: batch.replaySessionId, results,
+      replaySessionId: batch.replaySessionId,
+      results,
       cursor: this.cursor(user.deviceId!, first.deviceCredentialVersion, last),
       stopped,
     };
   }
 
   async reconcile(
-    user: AuthUser, tenantId: string, branchId: string, operatorSessionId: string,
-    credentialVersion: number, dto: ReconcileRequest,
+    user: AuthUser,
+    tenantId: string,
+    branchId: string,
+    operatorSessionId: string,
+    credentialVersion: number,
+    dto: ReconcileRequest,
   ): Promise<ReconciliationSummary> {
-    const context = await this.authorize(user, tenantId, branchId, operatorSessionId, credentialVersion);
+    const context = await this.authorize(
+      user,
+      tenantId,
+      branchId,
+      operatorSessionId,
+      credentialVersion,
+    );
     const missing: number[] = [];
-    for (let value = context.lastAcceptedSequence + 1; value <= dto.localLastAllocatedSequence && missing.length < 100; value++) missing.push(value);
+    for (
+      let value = context.lastAcceptedSequence + 1;
+      value <= dto.localLastAllocatedSequence && missing.length < 100;
+      value++
+    )
+      missing.push(value);
     const [conflicts, provisionalMappings] = await Promise.all([
       this.repo.conflicts(tenantId, branchId, user.deviceId!),
       this.repo.mappings(tenantId, branchId, user.deviceId!),
     ]);
     const summary = {
-      deviceId: user.deviceId!, credentialVersion,
+      deviceId: user.deviceId!,
+      credentialVersion,
       localLastAllocatedSequence: dto.localLastAllocatedSequence,
       localLastAcknowledgedSequence: dto.localLastAcknowledgedSequence,
       serverLastAcceptedSequence: context.lastAcceptedSequence,
-      missingSequences: missing, duplicates: [], conflicts, provisionalMappings,
-      reconciliationRequired: missing.length > 0 ||
+      missingSequences: missing,
+      duplicates: [],
+      conflicts,
+      provisionalMappings,
+      reconciliationRequired:
+        missing.length > 0 ||
         context.lastAcceptedSequence > dto.localLastAcknowledgedSequence ||
         dto.localLastAcknowledgedSequence > context.lastAcceptedSequence ||
         conflicts.length > 0,
@@ -327,16 +386,27 @@ export class PosOfflineService {
 
   async readCursor(user: AuthUser, tenantId: string, query: ReplayContextQuery) {
     const context = await this.authorize(
-      user, tenantId, query.branchId, query.operatorSessionId, query.credentialVersion,
+      user,
+      tenantId,
+      query.branchId,
+      query.operatorSessionId,
+      query.credentialVersion,
     );
     return this.cursor(user.deviceId!, query.credentialVersion, context.lastAcceptedSequence);
   }
 
   async commandResult(
-    user: AuthUser, tenantId: string, query: ReplayContextQuery, commandId: string,
+    user: AuthUser,
+    tenantId: string,
+    query: ReplayContextQuery,
+    commandId: string,
   ) {
     await this.authorize(
-      user, tenantId, query.branchId, query.operatorSessionId, query.credentialVersion,
+      user,
+      tenantId,
+      query.branchId,
+      query.operatorSessionId,
+      query.credentialVersion,
     );
     const result = await this.repo.commandResult(
       tenantId,
@@ -351,7 +421,11 @@ export class PosOfflineService {
 
   async diagnostics(user: AuthUser, tenantId: string, query: ReplayContextQuery) {
     await this.authorize(
-      user, tenantId, query.branchId, query.operatorSessionId, query.credentialVersion,
+      user,
+      tenantId,
+      query.branchId,
+      query.operatorSessionId,
+      query.credentialVersion,
     );
     const value = await this.repo.diagnostics(tenantId, user.deviceId!, query.credentialVersion);
     const [conflicts, audit] = await Promise.all([
@@ -364,22 +438,25 @@ export class PosOfflineService {
       acceptedCount: Number(value.acceptedCount),
       conflictCount: conflicts.length,
       lastReplayAt: value.lastReplayAt?.toISOString() ?? null,
-      lastSafeErrorCategory:
-        conflicts[0]?.failure?.classification ?? null,
-      queueDepth: Math.max(
-        0,
-        Number(value.lastAcceptedSequence) - Number(value.acceptedCount),
-      ),
+      lastSafeErrorCategory: conflicts[0]?.failure?.classification ?? null,
+      queueDepth: Math.max(0, Number(value.lastAcceptedSequence) - Number(value.acceptedCount)),
       unresolvedCount: conflicts.length,
       audit,
     };
   }
 
   async acknowledge(
-    user: AuthUser, tenantId: string, query: ReplayContextQuery, reconciliationId: string,
+    user: AuthUser,
+    tenantId: string,
+    query: ReplayContextQuery,
+    reconciliationId: string,
   ) {
     await this.authorize(
-      user, tenantId, query.branchId, query.operatorSessionId, query.credentialVersion,
+      user,
+      tenantId,
+      query.branchId,
+      query.operatorSessionId,
+      query.credentialVersion,
     );
     return {
       acknowledged: await this.repo.acknowledge(tenantId, user.deviceId!, reconciliationId),
@@ -388,22 +465,35 @@ export class PosOfflineService {
 
   async conflicts(user: AuthUser, tenantId: string, query: ReplayContextQuery) {
     await this.authorize(
-      user, tenantId, query.branchId, query.operatorSessionId, query.credentialVersion,
+      user,
+      tenantId,
+      query.branchId,
+      query.operatorSessionId,
+      query.credentialVersion,
     );
     return { items: await this.repo.conflicts(tenantId, query.branchId, user.deviceId!) };
   }
 
   private async authorize(
-    user: AuthUser, tenantId: string, branchId: string,
-    operatorSessionId: string, credentialVersion: number,
+    user: AuthUser,
+    tenantId: string,
+    branchId: string,
+    operatorSessionId: string,
+    credentialVersion: number,
   ) {
     if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ALLOWED' });
     const context = await this.repo.context({
-      userId: user.id, deviceId: user.deviceId, tenantId, branchId,
-      operatorSessionId, credentialVersion,
+      userId: user.id,
+      deviceId: user.deviceId,
+      tenantId,
+      branchId,
+      operatorSessionId,
+      credentialVersion,
     });
-    if (!context || context.lifecycle !== 'active') throw new ForbiddenException({ code: 'DEVICE_REVOKED' });
-    if (context.credentialVersion !== credentialVersion) throw new ForbiddenException({ code: 'DEVICE_CREDENTIAL_ROTATED' });
+    if (!context || context.lifecycle !== 'active')
+      throw new ForbiddenException({ code: 'DEVICE_REVOKED' });
+    if (context.credentialVersion !== credentialVersion)
+      throw new ForbiddenException({ code: 'DEVICE_CREDENTIAL_ROTATED' });
     if (!context.permissions.includes('*') && !context.permissions.includes('offline.replay')) {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
     }
@@ -412,8 +502,11 @@ export class PosOfflineService {
 
   private cursor(deviceId: string, credentialVersion: number, lastAcceptedSequence: number) {
     return {
-      deviceId, credentialVersion, lastAcceptedSequence,
-      reconciliationRequired: false, updatedAt: new Date().toISOString(),
+      deviceId,
+      credentialVersion,
+      lastAcceptedSequence,
+      reconciliationRequired: false,
+      updatedAt: new Date().toISOString(),
     };
   }
 }

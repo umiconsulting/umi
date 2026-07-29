@@ -170,10 +170,7 @@ export class AuthService {
       throw new UnauthorizedException({ code: 'DEVICE_NOT_ALLOWED' });
     }
     const entitlement = await this.repo.effectiveEntitlement(tenantId, 'pos');
-    if (
-      !entitlement?.enabled ||
-      !['trialing', 'active'].includes(entitlement.subscriptionStatus)
-    ) {
+    if (!entitlement?.enabled || !['trialing', 'active'].includes(entitlement.subscriptionStatus)) {
       throw new ForbiddenException({ code: 'ENTITLEMENT_DISABLED' });
     }
     try {

@@ -1290,8 +1290,7 @@ const PosEnrollmentRequestsCard = ({ requests, error, currentTime, onChanged }) 
   const [actionError, setActionError] = useState(null);
   const visible = (requests || []).filter(function (request) {
     return (
-      request.state !== 'completed' ||
-      currentTime - new Date(request.createdAt).getTime() < 3600000
+      request.state !== 'completed' || currentTime - new Date(request.createdAt).getTime() < 3600000
     );
   });
 

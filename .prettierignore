@@ -6,12 +6,14 @@
 **/coverage/
 **/.turbo/
 **/.vercel/
+**/.dart_tool/
 
 # Generated / lockfiles
 pnpm-lock.yaml
 **/package-lock.json
 **/*.tsbuildinfo
 **/next-env.d.ts
+packages/contract/generated/
 
 # Captured evidence + generated diagrams. These are ARTIFACTS of a run, kept so a
 # past result stays auditable. Reformatting them edits the evidence, and the raw

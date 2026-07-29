@@ -77,13 +77,7 @@ describe('StaffService', () => {
 
   it('stores a salted verifier and a keyed PIN lookup during staff creation', async () => {
     h.repo.insert.mockResolvedValue(ROW);
-    await h.svc.create(
-      't1',
-      null,
-      { ...CREATE, operatorPin: '2468' },
-      'actor-1',
-      'session-1',
-    );
+    await h.svc.create('t1', null, { ...CREATE, operatorPin: '2468' }, 'actor-1', 'session-1');
 
     expect(h.repo.insert).toHaveBeenCalledWith(
       't1',

@@ -126,8 +126,7 @@ export class StaffService {
       if (!row) throw new NotFoundException('Staff member not found');
     }
     if (body.operatorPin !== undefined) {
-      const pin =
-        body.operatorPin === null ? null : this.pinMaterial(tenantId, body.operatorPin);
+      const pin = body.operatorPin === null ? null : this.pinMaterial(tenantId, body.operatorPin);
       try {
         if (!(await this.repo.updateOperatorPin(tenantId, staffId, pin))) {
           throw new NotFoundException('Staff member not found');
@@ -174,7 +173,10 @@ export class StaffService {
     });
   }
 
-  private pinMaterial(tenantId: string, pin: string): {
+  private pinMaterial(
+    tenantId: string,
+    pin: string,
+  ): {
     salt: string;
     hash: string;
     lookupHash: string;

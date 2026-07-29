@@ -31,6 +31,10 @@ node_modules/
 dist/
 build/
 .next/
+**/.dart_tool/
+
+# Generated Dart SDK package metadata
+packages/contract/generated/dart/pubspec.lock
 
 # Exception: packages/tokens ships its generator (build/) AND its generated output
 # (dist/) in git. The frontends deploy as separate Vercel projects that run an

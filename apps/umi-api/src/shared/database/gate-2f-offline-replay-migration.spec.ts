@@ -7,10 +7,7 @@ const sql = readFileSync(
   'utf8',
 );
 const finalCloseoutSql = readFileSync(
-  resolve(
-    process.cwd(),
-    '../../supabase/migrations/20260728000700_gate_2f_final_closeout.sql',
-  ),
+  resolve(process.cwd(), '../../supabase/migrations/20260728000700_gate_2f_final_closeout.sql'),
   'utf8',
 );
 
@@ -36,9 +33,7 @@ describe('Gate 2F offline replay migration', () => {
     expect(finalCloseoutSql).toContain(
       'device_record.credential_version <> new.credential_version',
     );
-    expect(finalCloseoutSql).toContain(
-      'operator_record.branch_id <> new.branch_id',
-    );
+    expect(finalCloseoutSql).toContain('operator_record.branch_id <> new.branch_id');
     expect(finalCloseoutSql).toContain('offline_replay_authority_guard');
   });
 });
