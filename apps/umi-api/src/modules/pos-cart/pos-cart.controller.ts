@@ -12,6 +12,7 @@ import {
 import {
   CartLineInput,
   CartQuery,
+  ClearCartRequest,
   CreateCartRequest,
   PrepareSaleRequest,
   RemoveCartLineRequest,
@@ -82,5 +83,14 @@ export class PosCartController {
     @Body(new ZodValidationPipe(PrepareSaleRequest)) dto: PrepareSaleRequest,
   ) {
     return this.cart.prepare(user, tenantId, dto);
+  }
+
+  @Post('clear')
+  clear(
+    @CurrentUser() user: AuthUser,
+    @Param('tenantId') tenantId: string,
+    @Body(new ZodValidationPipe(ClearCartRequest)) dto: ClearCartRequest,
+  ) {
+    return this.cart.clear(user, tenantId, dto);
   }
 }

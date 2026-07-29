@@ -1,5 +1,5 @@
 name: umi_contract
 description: Generated UMI API contract models.
-version: 1.8.0
+version: 1.9.0
 environment:
   sdk: ">=3.4.0 <4.0.0"

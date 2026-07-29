@@ -94,6 +94,8 @@ values
   ('offline.cash.checkout', 'Create a policy-authorized provisional cash sale'),
   ('offline.replay', 'Replay and reconcile device-authenticated offline commands'),
   ('offline.recovery.review', 'Approve one scoped offline recovery action'),
+  ('sale.lifecycle', 'Manage the branch-scoped POS sale lifecycle'),
+  ('sale.resume.any', 'Resume a suspended sale from another operator'),
   ('audit.read', 'Read tenant-visible, redacted audit events')
 on conflict (key) do update set description=excluded.description;
 
@@ -121,22 +123,27 @@ where rp.role_id=r.id
   and r.key in ('owner','admin','manager','cashier','viewer')
   and p.key in (
     'catalog.read','cart.write','checkout.commit','offline.cash.checkout',
-    'offline.replay','offline.recovery.review','audit.read'
+    'offline.replay','offline.recovery.review','sale.lifecycle','sale.resume.any',
+    'audit.read'
   );
 
 with grants(role_key, permission_key) as (
   values
     ('owner','catalog.read'),('owner','cart.write'),('owner','checkout.commit'),
     ('owner','offline.cash.checkout'),('owner','offline.replay'),
-    ('owner','offline.recovery.review'),('owner','audit.read'),
+    ('owner','offline.recovery.review'),('owner','sale.lifecycle'),
+    ('owner','sale.resume.any'),('owner','audit.read'),
     ('admin','catalog.read'),('admin','cart.write'),('admin','checkout.commit'),
     ('admin','offline.cash.checkout'),('admin','offline.replay'),
-    ('admin','offline.recovery.review'),('admin','audit.read'),
+    ('admin','offline.recovery.review'),('admin','sale.lifecycle'),
+    ('admin','sale.resume.any'),('admin','audit.read'),
     ('manager','catalog.read'),('manager','cart.write'),('manager','checkout.commit'),
     ('manager','offline.cash.checkout'),('manager','offline.replay'),
-    ('manager','offline.recovery.review'),('manager','audit.read'),
+    ('manager','offline.recovery.review'),('manager','sale.lifecycle'),
+    ('manager','sale.resume.any'),('manager','audit.read'),
     ('cashier','catalog.read'),('cashier','cart.write'),('cashier','checkout.commit'),
     ('cashier','offline.cash.checkout'),('cashier','offline.replay'),
+    ('cashier','sale.lifecycle'),
     ('viewer','catalog.read')
 )
 insert into umi.role_permission(role_id, permission_id)

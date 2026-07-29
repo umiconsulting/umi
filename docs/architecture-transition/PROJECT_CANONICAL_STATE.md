@@ -39,6 +39,9 @@ Future clients use `packages/contract` and controlled UMI APIs.
   policy, generated-SDK replay, response-loss recovery, immutable official mapping, typed
   recovery actions, reconciliation, and Recovery Center. Sensitive Web journaling remains
   disabled.
+- Gate 3A established one server-authoritative sale lifecycle. It supports start, suspend,
+  resume, cancel, customer attachment, sale navigation, receipt navigation, and automatic
+  next-sale creation.
 
 ## Current implementation state
 
@@ -81,13 +84,15 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - UmiPOS uses a personal tenant-unique PIN after device trust. The API resolves the staff identity
   and current role without an email or client role selector.
 - `runtime.operator_session` separates operator presence from PIN authentication.
-- UmiPOS consumes contract version `1.8.0`, content hash
-  `53934043942493e69d01b2f399e0e64b8f597787a08acea96bff177534f07710`.
+- UmiPOS consumes contract version `1.9.0`, content hash
+  `13db86bce50686813f3f8a58e522653a8cabe26c5e598e085da8562f2ca6edb9`.
 - Native UmiPOS journal schema version 1 uses AES-256-GCM with platform-secure key storage and
   separate ciphertext persistence. Replay is ordered per device credential version; Web sensitive
   journaling is unsupported.
 - `tenant.pos_cart` is mutable sale preparation only. The API owns pricing, availability,
   inclusive-tax rounding, modifier validation, line merging, and totals previews.
+- `tenant.pos_cart.lifecycle_state` is the Gate 3A sale state authority. One tenant, branch,
+  and operator identity can own only one editable sale. Terminal sales are immutable.
 - `tenant.pos_committed_sale` and `tenant.receipt_snapshot` are immutable checkout facts.
   `tenant.inventory_reservation` is a time-bounded preparation record and never decrements stock.
 - Cash checkout commits atomically through `tenant.business_command`; an external-terminal
@@ -116,10 +121,22 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Certification date: `2026-07-27`
 - `BUILD_V3_CERTIFIED`: `true`
 - UmiPOS application creation: `YES WITH OBSERVATIONS`
-- Remote publication: deferred; the final amended local commit is safe. The runner has no callable
-  GitHub publication connector or PR-capable credential.
+- Remote publication: Gate 3A publication follows the local commit through the PR gate.
 - Gate 2F: complete with the external native-toolchain observation. The full disposable PostgreSQL
   migration chain and negative authorization matrix passed. Linux debug compilation cannot start
   because the runner lacks CMake, Ninja, Clang, and GTK development headers; no code defect is
   demonstrated.
-- Next gate: select the approved post-2F roadmap objective; Gate 3 was not started.
+- Gate 3A: complete. Sale lifecycle state version 1 supports deterministic recovery and
+  automatic next-sale creation.
+- Gate 3A produced a successful Linux debug build. This resolves the earlier runner toolchain
+  observation for the current workspace.
+- Next gate: 3B, Advanced Checkout and Payment Experience.
+
+## Gate 3A decision basis
+
+- Documented fact: the UMI API already owns `tenant.pos_cart`, checkout, customers, and operator
+  sessions in this transition branch.
+- Source-backed tradeoff: the existing transaction, RLS, and generated-contract boundaries keep
+  sale authority in one service and one migration chain.
+- Umi-specific inference: tenant, branch, and operator identity form the active-sale uniqueness
+  key. An operator session can change after a restart.

@@ -154,3 +154,29 @@ Linux native builds require CMake, Ninja, Clang, GTK 3 development headers, and 
 secure-storage dependencies. Web builds confirm online compatibility only; browser storage is
 not certified for financial journaling. The completion notification endpoint is exactly
 `https://ntfy.sh/nxoumipos`.
+
+## Sale lifecycle
+
+Apply migrations through `20260729000300_gate_3a_sale_lifecycle.sql`.
+
+Use these commands:
+
+- Run focused API tests: `pnpm umi-pos:sale-api-tests`.
+- Run focused Flutter tests: `pnpm umi-pos:sale-tests`.
+- Run the disposable PostgreSQL check: `pnpm umi-pos:sale-db-check`.
+
+Test this cashier flow:
+
+1. Start an empty sale.
+2. Add and edit products.
+3. Attach a customer or keep the anonymous customer.
+4. Suspend the sale.
+5. Resume the sale.
+6. Cancel a separate sale with a reason.
+7. Complete checkout.
+8. Verify that UmiPOS opens one fresh sale and focuses search.
+9. Open the latest receipt from the sale center.
+10. Restart UmiPOS and verify the active or suspended sale state.
+
+Use the existing offline checkout path for a policy-authorized offline cash sale. Lifecycle
+commands require API authority. Gate 3A preserves the Gate 2F journal allowlist.

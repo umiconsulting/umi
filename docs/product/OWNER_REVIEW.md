@@ -94,3 +94,15 @@ Recommended Mac review sequence:
 3. View the provisional receipt, then return online.
 4. Observe ordered replay and official receipt mapping.
 5. Simulate a safe conflict and open the Recovery Center.
+
+## Gate 3A sale lifecycle
+
+- Implemented: one active editable sale for each tenant, branch, and operator.
+- Implemented: start, suspend, rename, resume, cancel, restart recovery, and next-sale creation.
+- Implemented: customer attach and detach. CRM, loyalty, and payment behavior stay separate.
+- Implemented: suspended, committed, and cancelled sale navigation with search, sort, and filter.
+- Implemented: official and provisional receipt navigation. Printer hardware stays outside Gate 3A.
+- Implemented: safe sale suspension before operator lock, logout, or branch reselection.
+- Review on pilot hardware: consecutive-sale focus, suspend labels, cancellation wording, and
+  receipt density.
+- Review keyboard and touch use on desktop and tablet. Owner approval remains pending.

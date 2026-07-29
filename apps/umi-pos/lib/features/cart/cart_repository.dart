@@ -13,6 +13,7 @@ abstract interface class CartRepository {
     RemoveCartLineRequest input,
   );
   Future<Cart> prepare(String tenantId, PrepareSaleRequest input);
+  Future<Cart> clear(String tenantId, ClearCartRequest input);
 }
 
 final class ApiCartRepository implements CartRepository {
@@ -85,6 +86,17 @@ final class ApiCartRepository implements CartRepository {
           method: ApiMethod.post,
           path: UmiRoutes.posCartPrepare(tenantId),
           body: input.toJson(),
+        ),
+      );
+
+  @override
+  Future<Cart> clear(String tenantId, ClearCartRequest input) async =>
+      Cart.fromJson(
+        await _api.request(
+          method: ApiMethod.post,
+          path: UmiRoutes.posCartClear(tenantId),
+          body: input.toJson(),
+          idempotent: true,
         ),
       );
 }

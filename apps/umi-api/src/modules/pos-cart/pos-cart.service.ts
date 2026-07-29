@@ -9,6 +9,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type {
   Cart,
   CartLineInput,
+  ClearCartRequest,
   CreateCartRequest,
   PrepareSaleRequest,
   RemoveCartLineRequest,
@@ -114,6 +115,7 @@ export class PosCartService {
           dto.cartId,
           lineId,
           dto.expectedVersion,
+          dto.operatorSessionId,
         );
         return changed ? this.repo.snapshotWithClient(client, tenantId, dto.cartId) : null;
       },
@@ -129,7 +131,34 @@ export class PosCartService {
       'cart.prepare',
       dto,
       async (client) => {
-        const changed = await this.repo.prepare(client, tenantId, dto.cartId, dto.expectedVersion);
+        const changed = await this.repo.prepare(
+          client,
+          tenantId,
+          dto.cartId,
+          dto.expectedVersion,
+          dto.operatorSessionId,
+        );
+        return changed ? this.repo.snapshotWithClient(client, tenantId, dto.cartId) : null;
+      },
+    );
+  }
+
+  async clear(user: AuthUser, tenantId: string, dto: ClearCartRequest) {
+    await this.authorize(user, tenantId, dto.branchId, dto.operatorSessionId);
+    return this.command(
+      tenantId,
+      dto.branchId,
+      dto.idempotencyKey,
+      'cart.cleared',
+      dto,
+      async (client) => {
+        const changed = await this.repo.clear(
+          client,
+          tenantId,
+          dto.cartId,
+          dto.expectedVersion,
+          dto.operatorSessionId,
+        );
         return changed ? this.repo.snapshotWithClient(client, tenantId, dto.cartId) : null;
       },
     );

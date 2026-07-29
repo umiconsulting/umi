@@ -32,6 +32,7 @@ import { PosCatalogModule } from './modules/pos-catalog/pos-catalog.module';
 import { PosCartModule } from './modules/pos-cart/pos-cart.module';
 import { PosCheckoutModule } from './modules/pos-checkout/pos-checkout.module';
 import { PosOfflineModule } from './modules/pos-offline/pos-offline.module';
+import { PosSaleModule } from './modules/pos-sale/pos-sale.module';
 
 /**
  * Root module for the WEB process. Imports shared infrastructure + domain
@@ -67,6 +68,7 @@ import { PosOfflineModule } from './modules/pos-offline/pos-offline.module';
     PosCartModule,
     PosCheckoutModule,
     PosOfflineModule,
+    PosSaleModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

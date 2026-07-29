@@ -1027,6 +1027,264 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Copia la referencia de diagnóstico segura sin exponer el contenido de la venta.'**
   String get recoverySupportDescription;
+
+  /// No description provided for @saleActionsTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Acciones de venta'**
+  String get saleActionsTitle;
+
+  /// No description provided for @newSaleAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Nueva venta'**
+  String get newSaleAction;
+
+  /// No description provided for @suspendSaleAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Suspender venta'**
+  String get suspendSaleAction;
+
+  /// No description provided for @resumeSaleAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Reanudar venta'**
+  String get resumeSaleAction;
+
+  /// No description provided for @renameSaleAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cambiar nombre de venta suspendida'**
+  String get renameSaleAction;
+
+  /// No description provided for @cancelSaleAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar venta'**
+  String get cancelSaleAction;
+
+  /// No description provided for @suspendedSaleLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Nombre de la venta suspendida'**
+  String get suspendedSaleLabel;
+
+  /// No description provided for @cancelSaleReasonLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Motivo de cancelación'**
+  String get cancelSaleReasonLabel;
+
+  /// No description provided for @confirmCancelSaleTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'¿Cancelar esta venta?'**
+  String get confirmCancelSaleTitle;
+
+  /// No description provided for @confirmCancelSaleBody.
+  ///
+  /// In es, this message translates to:
+  /// **'El carrito se cerrará sin pago ni recibo. La cancelación permanecerá en el historial de auditoría.'**
+  String get confirmCancelSaleBody;
+
+  /// No description provided for @saleRestoredMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Tu venta activa se restauró.'**
+  String get saleRestoredMessage;
+
+  /// No description provided for @readyForNextCustomerMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Listo para el siguiente cliente.'**
+  String get readyForNextCustomerMessage;
+
+  /// No description provided for @currentCustomerLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Cliente actual'**
+  String get currentCustomerLabel;
+
+  /// No description provided for @anonymousCustomerLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Cliente anónimo'**
+  String get anonymousCustomerLabel;
+
+  /// No description provided for @attachCustomerAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Asignar cliente'**
+  String get attachCustomerAction;
+
+  /// No description provided for @detachCustomerAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Usar cliente anónimo'**
+  String get detachCustomerAction;
+
+  /// No description provided for @searchCustomerHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Buscar clientes'**
+  String get searchCustomerHint;
+
+  /// No description provided for @recentCustomersAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Clientes recientes'**
+  String get recentCustomersAction;
+
+  /// No description provided for @saleHistoryTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Ventas'**
+  String get saleHistoryTitle;
+
+  /// No description provided for @currentSaleLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Venta actual'**
+  String get currentSaleLabel;
+
+  /// No description provided for @suspendedSalesLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Ventas suspendidas'**
+  String get suspendedSalesLabel;
+
+  /// No description provided for @committedSalesLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Ventas completadas recientes'**
+  String get committedSalesLabel;
+
+  /// No description provided for @cancelledSalesLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Ventas canceladas'**
+  String get cancelledSalesLabel;
+
+  /// No description provided for @saleHistoryEmpty.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay ventas para esta vista.'**
+  String get saleHistoryEmpty;
+
+  /// No description provided for @sortNewestLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Más recientes primero'**
+  String get sortNewestLabel;
+
+  /// No description provided for @sortOldestLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Más antiguas primero'**
+  String get sortOldestLabel;
+
+  /// No description provided for @loadMoreSalesAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cargar más ventas'**
+  String get loadMoreSalesAction;
+
+  /// No description provided for @saleStateBuilding.
+  ///
+  /// In es, this message translates to:
+  /// **'En curso'**
+  String get saleStateBuilding;
+
+  /// No description provided for @saleStateSuspended.
+  ///
+  /// In es, this message translates to:
+  /// **'Suspendida'**
+  String get saleStateSuspended;
+
+  /// No description provided for @saleStateCommitted.
+  ///
+  /// In es, this message translates to:
+  /// **'Completada'**
+  String get saleStateCommitted;
+
+  /// No description provided for @saleStateCancelled.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelada'**
+  String get saleStateCancelled;
+
+  /// No description provided for @saleStateRecovered.
+  ///
+  /// In es, this message translates to:
+  /// **'Recuperada'**
+  String get saleStateRecovered;
+
+  /// No description provided for @openReceiptAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Abrir recibo'**
+  String get openReceiptAction;
+
+  /// No description provided for @reprintReceiptAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Ver para reimpresión'**
+  String get reprintReceiptAction;
+
+  /// No description provided for @receiptAvailableMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Recibo disponible'**
+  String get receiptAvailableMessage;
+
+  /// No description provided for @saleLifecycleError.
+  ///
+  /// In es, this message translates to:
+  /// **'No fue posible completar la acción de venta de forma segura.'**
+  String get saleLifecycleError;
+
+  /// No description provided for @saleSearchHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Buscar por nombre, cliente o recibo'**
+  String get saleSearchHint;
+
+  /// No description provided for @saleNameFallback.
+  ///
+  /// In es, this message translates to:
+  /// **'Venta'**
+  String get saleNameFallback;
+
+  /// No description provided for @editCartLineAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Editar producto'**
+  String get editCartLineAction;
+
+  /// No description provided for @saveCartLineAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Guardar cambios'**
+  String get saveCartLineAction;
+
+  /// No description provided for @clearCartAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Vaciar carrito'**
+  String get clearCartAction;
+
+  /// No description provided for @confirmClearCartTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'¿Vaciar este carrito?'**
+  String get confirmClearCartTitle;
+
+  /// No description provided for @confirmClearCartBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Se eliminarán todos los productos de la venta actual.'**
+  String get confirmClearCartBody;
 }
 
 class _AppLocalizationsDelegate

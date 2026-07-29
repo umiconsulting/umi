@@ -38,7 +38,7 @@ final class _UmiPosAppState extends State<UmiPosApp> {
 
   void _changed() {
     if (widget.root.entry.state.phase != EntryPhase.ready) {
-      widget.root.cart.clearLocal();
+      widget.root.sales.clear();
     }
     if (mounted) {
       setState(() {});
@@ -99,6 +99,7 @@ final class _GuardedSurface extends StatelessWidget {
         catalog: root.catalog,
         cart: root.cart,
         checkout: root.checkout,
+        sales: root.sales,
         connectivity: root.connectivity,
         telemetry: root.telemetry,
         offlineJournal: root.offlineJournal,

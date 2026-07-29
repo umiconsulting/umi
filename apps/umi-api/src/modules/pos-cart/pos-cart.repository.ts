@@ -56,13 +56,19 @@ export class PosCartRepository {
   ): Promise<string> {
     const { rows } = await client.query<{ id: string }>(
       `INSERT INTO tenant.pos_cart
-         (business_id,branch_id,operator_session_id,business_date)
-       SELECT $1::uuid,$2::uuid,$3::uuid,
+         (business_id,branch_id,operator_session_id,original_operator_session_id,
+          original_operator_user_id,operator_user_id,business_date)
+       SELECT $1::uuid,$2::uuid,$3::uuid,$3::uuid,os.user_id,os.user_id,
          (now() at time zone COALESCE(b.timezone,business.timezone))::date
        FROM tenant.branch b JOIN tenant.business business ON business.id=b.business_id
+       JOIN runtime.operator_session os ON os.id=$3::uuid
        WHERE b.id=$2::uuid AND b.business_id=$1::uuid AND b.status='active'
-       ON CONFLICT (operator_session_id) WHERE status IN ('draft','prepared')
-       DO UPDATE SET updated_at=now()
+         AND os.business_id=$1::uuid AND os.branch_id=$2::uuid
+       ON CONFLICT (business_id,branch_id,operator_user_id) WHERE lifecycle_state IN
+         ('building_cart','ready_for_checkout','recovered')
+       DO UPDATE SET operator_session_id=excluded.operator_session_id,
+                     lifecycle_state='recovered',
+                     updated_at=now()
        RETURNING id::text`,
       [tenantId, branchId, operatorSessionId],
     );
@@ -83,7 +89,9 @@ export class PosCartRepository {
           await client.query<{ id: string }>(
             `SELECT id::text FROM tenant.pos_cart
              WHERE business_id=$1::uuid AND branch_id=$2::uuid
-               AND operator_session_id=$3::uuid AND status IN ('draft','prepared')`,
+               AND operator_session_id=$3::uuid
+               AND lifecycle_state IN
+                 ('building_cart','ready_for_checkout','recovered')`,
             [tenantId, branchId, operatorSessionId],
           )
         ).rows,
@@ -189,7 +197,9 @@ export class PosCartRepository {
     input: CartLineInput,
     priced: PricedSelection,
   ): Promise<boolean> {
-    if (!(await this.bump(client, tenantId, cartId, expectedVersion))) return false;
+    if (!(await this.bump(client, tenantId, cartId, expectedVersion, input.operatorSessionId))) {
+      return false;
+    }
     const modifierTotal = priced.modifiers.reduce(
       (sum, item) => sum + item.priceDelta * item.quantity,
       0,
@@ -249,8 +259,11 @@ export class PosCartRepository {
     cartId: string,
     lineId: string,
     expectedVersion: number,
+    operatorSessionId: string,
   ): Promise<boolean> {
-    if (!(await this.bump(client, tenantId, cartId, expectedVersion))) return false;
+    if (!(await this.bump(client, tenantId, cartId, expectedVersion, operatorSessionId))) {
+      return false;
+    }
     const result = await client.query(
       `DELETE FROM tenant.pos_cart_line WHERE business_id=$1::uuid AND cart_id=$2::uuid AND id=$3::uuid`,
       [tenantId, cartId, lineId],
@@ -268,7 +281,16 @@ export class PosCartRepository {
     input: CartLineInput,
     priced: PricedSelection,
   ): Promise<boolean> {
-    if (!(await this.remove(client, tenantId, cartId, lineId, expectedVersion))) {
+    if (
+      !(await this.remove(
+        client,
+        tenantId,
+        cartId,
+        lineId,
+        expectedVersion,
+        input.operatorSessionId,
+      ))
+    ) {
       return false;
     }
     return this.addOrMerge(
@@ -287,14 +309,37 @@ export class PosCartRepository {
     tenantId: string,
     cartId: string,
     expectedVersion: number,
+    operatorSessionId: string,
   ): Promise<boolean> {
     const { rowCount } = await client.query(
-      `UPDATE tenant.pos_cart SET status='prepared',version=version+1,updated_at=now()
-       WHERE business_id=$1::uuid AND id=$2::uuid AND version=$3 AND status='draft'
+      `UPDATE tenant.pos_cart SET status='prepared',lifecycle_state='ready_for_checkout',
+         version=version+1,updated_at=now()
+       WHERE business_id=$1::uuid AND id=$2::uuid AND version=$3
+         AND operator_session_id=$4::uuid
+         AND lifecycle_state IN ('building_cart','recovered')
+         AND status='draft'
          AND EXISTS(SELECT 1 FROM tenant.pos_cart_line WHERE cart_id=$2::uuid)`,
-      [tenantId, cartId, expectedVersion],
+      [tenantId, cartId, expectedVersion, operatorSessionId],
     );
     return (rowCount ?? 0) > 0;
+  }
+
+  async clear(
+    client: PoolClient,
+    tenantId: string,
+    cartId: string,
+    expectedVersion: number,
+    operatorSessionId: string,
+  ): Promise<boolean> {
+    if (!(await this.bump(client, tenantId, cartId, expectedVersion, operatorSessionId))) {
+      return false;
+    }
+    await client.query(
+      `DELETE FROM tenant.pos_cart_line
+       WHERE business_id=$1::uuid AND cart_id=$2::uuid`,
+      [tenantId, cartId],
+    );
+    return true;
   }
 
   private async bump(
@@ -302,11 +347,16 @@ export class PosCartRepository {
     tenantId: string,
     cartId: string,
     expectedVersion: number,
+    operatorSessionId: string,
   ) {
     const { rowCount } = await client.query(
-      `UPDATE tenant.pos_cart SET status='draft',version=version+1,updated_at=now()
-       WHERE business_id=$1::uuid AND id=$2::uuid AND version=$3 AND status IN ('draft','prepared')`,
-      [tenantId, cartId, expectedVersion],
+      `UPDATE tenant.pos_cart SET status='draft',lifecycle_state='building_cart',
+         version=version+1,updated_at=now()
+       WHERE business_id=$1::uuid AND id=$2::uuid AND version=$3
+         AND operator_session_id=$4::uuid
+         AND lifecycle_state IN ('building_cart','ready_for_checkout','recovered')
+         AND status IN ('draft','prepared')`,
+      [tenantId, cartId, expectedVersion, operatorSessionId],
     );
     return (rowCount ?? 0) > 0;
   }
@@ -330,7 +380,7 @@ export class PosCartRepository {
       tenantId: string;
       branchId: string;
       operatorSessionId: string;
-      status: 'draft' | 'prepared' | 'abandoned';
+      status: 'draft' | 'prepared' | 'committed' | 'abandoned';
       version: number;
       businessDate: string;
       updatedAt: string;

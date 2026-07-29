@@ -29,6 +29,7 @@ export interface CheckoutCart {
   tenantName: string;
   branchName: string;
   operatorName: string;
+  customerId: string | null;
   lines: CheckoutLine[];
 }
 
@@ -77,13 +78,15 @@ export class PosCheckoutRepository {
       `SELECT c.id::text,c.business_id::text AS "tenantId",c.branch_id::text AS "branchId",
               c.operator_session_id::text AS "operatorSessionId",c.version,
               c.business_date::text AS "businessDate",b.name AS "tenantName",
-              br.name AS "branchName",$6::text AS "operatorName"
+              br.name AS "branchName",$6::text AS "operatorName",
+              c.customer_id::text AS "customerId"
        FROM tenant.pos_cart c
        JOIN tenant.business b ON b.id=c.business_id
        JOIN tenant.branch br ON br.id=c.branch_id
        WHERE c.id=$1::uuid AND c.business_id=$2::uuid AND c.branch_id=$3::uuid
          AND c.operator_session_id=$4::uuid AND c.version=$5
          AND c.status IN ('draft','prepared')
+         AND c.lifecycle_state IN ('building_cart','ready_for_checkout','recovered')
        FOR UPDATE OF c`,
       [cartId, tenantId, branchId, operatorSessionId, expectedVersion, operatorName],
     );
@@ -209,11 +212,11 @@ export class PosCheckoutRepository {
   ): Promise<NonNullable<CheckoutResult['sale']>> {
     const order = await client.query<{ id: string }>(
       `INSERT INTO tenant.customer_order
-         (business_id,branch_id,source,fulfillment_type,status,external_ref)
-       VALUES ($1::uuid,$2::uuid,'pos','dine_in','placed',$3)
+         (business_id,branch_id,customer_id,source,fulfillment_type,status,external_ref)
+       VALUES ($1::uuid,$2::uuid,$3::uuid,'pos','dine_in','placed',$4)
        ON CONFLICT(business_id,external_ref) WHERE external_ref IS NOT NULL
        DO UPDATE SET external_ref=excluded.external_ref RETURNING id::text`,
-      [cart.tenantId, cart.branchId, `pos-cart:${cart.id}`],
+      [cart.tenantId, cart.branchId, cart.customerId, `pos-cart:${cart.id}`],
     );
     const orderId = order.rows[0].id;
     for (const [index, line] of receipt.lines.entries()) {
@@ -284,7 +287,8 @@ export class PosCheckoutRepository {
       [reservation.id],
     );
     await client.query(
-      `UPDATE tenant.pos_cart SET status='committed',updated_at=now()
+      `UPDATE tenant.pos_cart
+       SET status='committed',lifecycle_state='committed',updated_at=now()
        WHERE id=$1::uuid AND version=$2`,
       [cart.id, cart.version],
     );

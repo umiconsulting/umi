@@ -203,6 +203,8 @@ final class _CartRepository implements CartRepository {
   ) async => cart;
   @override
   Future<Cart> prepare(String tenantId, PrepareSaleRequest input) async => cart;
+  @override
+  Future<Cart> clear(String tenantId, ClearCartRequest input) async => cart;
 }
 
 CheckoutController _controller(_CheckoutRepository repository) =>
@@ -304,6 +306,7 @@ void main() {
                   checkout: checkout,
                   cart: cart,
                   entry: root.entry,
+                  sales: root.sales,
                 ),
                 child: const Text('open'),
               ),

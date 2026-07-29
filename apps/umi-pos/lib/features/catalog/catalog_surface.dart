@@ -12,6 +12,8 @@ import '../offline/connectivity_controller.dart';
 import '../offline/offline_journal.dart';
 import '../offline/recovery_center.dart';
 import '../offline/replay_engine.dart';
+import '../sale/sale_lifecycle_controller.dart';
+import '../sale/sale_surface.dart';
 import 'catalog_controller.dart';
 import 'catalog_repository.dart';
 
@@ -21,6 +23,7 @@ final class CatalogSurface extends StatefulWidget {
     required this.catalog,
     required this.cart,
     required this.checkout,
+    required this.sales,
     required this.connectivity,
     required this.telemetry,
     this.offlineJournal,
@@ -31,6 +34,7 @@ final class CatalogSurface extends StatefulWidget {
   final CatalogController catalog;
   final CartController cart;
   final CheckoutController checkout;
+  final SaleLifecycleController sales;
   final ConnectivityController connectivity;
   final Telemetry telemetry;
   final EncryptedOfflineJournal? offlineJournal;
@@ -42,13 +46,16 @@ final class CatalogSurface extends StatefulWidget {
 final class _CatalogSurfaceState extends State<CatalogSurface> {
   final _search = TextEditingController();
   final _scroll = ScrollController();
+  final _searchFocus = FocusNode();
   bool _initialLoadStarted = false;
+  String? _lastSaleErrorCode;
 
   @override
   void initState() {
     super.initState();
     widget.catalog.addListener(_changed);
     widget.cart.addListener(_changed);
+    widget.sales.addListener(_saleChanged);
     widget.connectivity.addListener(_changed);
     _scroll.addListener(() {
       if (_scroll.hasClients && _scroll.position.extentAfter < 700) {
@@ -81,7 +88,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       );
       widget.connectivity.apiReachable(authorityValid: true);
       if (entry.operator != null) {
-        await widget.cart.open(
+        await widget.sales.open(
           entry.selectedTenant!.id,
           entry.selectedBranch!.id,
           entry.operator!.id,
@@ -98,13 +105,51 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     if (mounted) setState(() {});
   }
 
+  void _saleChanged() {
+    if (!mounted) return;
+    setState(() {});
+    final errorCode = widget.sales.state.errorCode;
+    if (errorCode != null && errorCode != _lastSaleErrorCode) {
+      _lastSaleErrorCode = errorCode;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(AppLocalizations.of(context).saleLifecycleError),
+            ),
+          );
+        }
+      });
+    } else if (errorCode == null) {
+      _lastSaleErrorCode = null;
+    }
+    if (widget.sales.state.readyForNextCustomer) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _search.clear();
+          widget.catalog.search('');
+          _searchFocus.requestFocus();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context).readyForNextCustomerMessage,
+              ),
+            ),
+          );
+        }
+      });
+    }
+  }
+
   @override
   void dispose() {
     widget.catalog.removeListener(_changed);
     widget.cart.removeListener(_changed);
+    widget.sales.removeListener(_saleChanged);
     widget.connectivity.removeListener(_changed);
     _search.dispose();
     _scroll.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -125,6 +170,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                       controller: widget.cart,
                       checkout: widget.checkout,
                       entry: widget.entry,
+                      sales: widget.sales,
+                      onEdit: (item) => _showDetail(item.productId, item),
                     ),
                   ),
                 ),
@@ -155,6 +202,42 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             ),
           ),
           IconButton(
+            tooltip: l.saleHistoryTitle,
+            onPressed: () => showSaleCenter(context, widget.sales),
+            icon: const Icon(Icons.receipt_long_outlined),
+          ),
+          IconButton(
+            tooltip: l.currentCustomerLabel,
+            onPressed: () => showCustomerPicker(context, widget.sales),
+            icon: Badge(
+              isLabelVisible: widget.sales.state.sale?.customer != null,
+              child: const Icon(Icons.person_outline),
+            ),
+          ),
+          PopupMenuButton<String>(
+            tooltip: l.saleActionsTitle,
+            icon: const Icon(Icons.more_vert),
+            onSelected: (action) async {
+              switch (action) {
+                case 'new':
+                  await widget.sales.newSale();
+                case 'suspend':
+                  if (context.mounted) {
+                    await showSuspendSaleDialog(context, widget.sales);
+                  }
+                case 'cancel':
+                  if (context.mounted) {
+                    await showCancelSaleDialog(context, widget.sales);
+                  }
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'new', child: Text(l.newSaleAction)),
+              PopupMenuItem(value: 'suspend', child: Text(l.suspendSaleAction)),
+              PopupMenuItem(value: 'cancel', child: Text(l.cancelSaleAction)),
+            ],
+          ),
+          IconButton(
             tooltip: AppLocalizations.of(context).recoveryCenterTitle,
             onPressed: () {
               final scope = _scope();
@@ -172,6 +255,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                     Localizations.localeOf(context).languageCode,
                   ),
                   queryAmbiguousPayment: widget.checkout.queryUnknownPayment,
+                  beforeContextExit: widget.sales.prepareForOperatorExit,
                 );
               }
             },
@@ -180,12 +264,12 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           Center(child: Text(widget.entry.state.selectedBranch?.name ?? '—')),
           IconButton(
             tooltip: l.lockAction,
-            onPressed: widget.entry.lock,
+            onPressed: () => _leaveOperator(lock: true),
             icon: const Icon(Icons.lock_outline),
           ),
           IconButton(
             tooltip: l.logoutAction,
-            onPressed: widget.entry.logout,
+            onPressed: () => _leaveOperator(lock: false),
             icon: const Icon(Icons.logout),
           ),
         ],
@@ -200,6 +284,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                   children: [
                     TextField(
                       controller: _search,
+                      focusNode: _searchFocus,
                       onChanged: (value) {
                         widget.catalog.search(value);
                         setState(() {});
@@ -257,6 +342,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                     controller: widget.cart,
                     checkout: widget.checkout,
                     entry: widget.entry,
+                    sales: widget.sales,
+                    onEdit: (item) => _showDetail(item.productId, item),
                   ),
                 ),
               ],
@@ -265,6 +352,25 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         ),
       ),
     );
+  }
+
+  Future<void> _leaveOperator({required bool lock}) async {
+    final safe = await widget.sales.prepareForOperatorExit();
+    if (!safe || !mounted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context).saleLifecycleError),
+          ),
+        );
+      }
+      return;
+    }
+    if (lock) {
+      await widget.entry.lock();
+    } else {
+      await widget.entry.logout();
+    }
   }
 
   ReplayScope? _scope() {
@@ -353,7 +459,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     };
   }
 
-  Future<void> _showDetail(String id) async {
+  Future<void> _showDetail(String id, [CartItem? item]) async {
     try {
       final detail = await widget.catalog.detail(id);
       if (!mounted) return;
@@ -361,7 +467,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         context: context,
         isScrollControlled: true,
         constraints: const BoxConstraints(maxWidth: 760),
-        builder: (_) => _Detail(detail, cart: widget.cart),
+        builder: (_) => _Detail(detail, cart: widget.cart, item: item),
       );
     } catch (_) {
       if (mounted) {
@@ -490,9 +596,10 @@ final class _ProductCard extends StatelessWidget {
 }
 
 final class _Detail extends StatefulWidget {
-  const _Detail(this.detail, {required this.cart});
+  const _Detail(this.detail, {required this.cart, this.item});
   final CatalogProductDetail detail;
   final CartController cart;
+  final CartItem? item;
   @override
   State<_Detail> createState() => _DetailState();
 }
@@ -502,6 +609,20 @@ final class _DetailState extends State<_Detail> {
   final selectedModifiers = <String, int>{};
   final note = TextEditingController();
   int quantity = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    final item = widget.item;
+    if (item == null) return;
+    variantId = item.variant?['variantId'] as String?;
+    for (final modifier in item.modifiers) {
+      selectedModifiers[modifier['modifierId']! as String] =
+          (modifier['quantity']! as num).toInt();
+    }
+    note.text = item.note ?? '';
+    quantity = item.quantity;
+  }
 
   @override
   void dispose() {
@@ -633,23 +754,35 @@ final class _DetailState extends State<_Detail> {
                 onPressed: detail.variants.isNotEmpty && variantId == null
                     ? null
                     : () async {
-                        await widget.cart.add(
-                          productId: detail.id,
-                          variantId: variantId,
-                          modifiers: selectedModifiers.entries
-                              .map(
-                                (e) => {
-                                  'modifierId': e.key,
-                                  'quantity': e.value,
-                                },
-                              )
-                              .toList(),
-                          quantity: quantity,
-                          note: note.text,
-                        );
+                        final modifiers = selectedModifiers.entries
+                            .map(
+                              (e) => {'modifierId': e.key, 'quantity': e.value},
+                            )
+                            .toList();
+                        if (widget.item == null) {
+                          await widget.cart.add(
+                            productId: detail.id,
+                            variantId: variantId,
+                            modifiers: modifiers,
+                            quantity: quantity,
+                            note: note.text,
+                          );
+                        } else {
+                          await widget.cart.edit(
+                            item: widget.item!,
+                            variantId: variantId,
+                            modifiers: modifiers,
+                            quantity: quantity,
+                            note: note.text,
+                          );
+                        }
                         if (context.mounted) Navigator.pop(context);
                       },
-                child: Text(l.addToCartAction),
+                child: Text(
+                  widget.item == null
+                      ? l.addToCartAction
+                      : l.saveCartLineAction,
+                ),
               ),
               const SizedBox(height: UmiSpacing.md),
             ],
@@ -714,10 +847,14 @@ final class _CartPanel extends StatelessWidget {
     required this.controller,
     required this.checkout,
     required this.entry,
+    required this.sales,
+    required this.onEdit,
   });
   final CartController controller;
   final CheckoutController checkout;
   final EntryController entry;
+  final SaleLifecycleController sales;
+  final ValueChanged<CartItem> onEdit;
 
   String _money(Map<String, Object?> value) {
     final currency = value['currency'] as String? ?? '';
@@ -799,6 +936,11 @@ final class _CartPanel extends StatelessWidget {
                                   ),
                                   const Spacer(),
                                   IconButton(
+                                    tooltip: l.editCartLineAction,
+                                    onPressed: () => onEdit(item),
+                                    icon: const Icon(Icons.edit_outlined),
+                                  ),
+                                  IconButton(
                                     tooltip: l.removeFromCartAction,
                                     onPressed: () => controller.remove(item),
                                     icon: const Icon(Icons.delete_outline),
@@ -822,6 +964,35 @@ final class _CartPanel extends StatelessWidget {
             ),
             Text('${l.businessDateLabel}: ${totals.businessDate}'),
             const SizedBox(height: UmiSpacing.md),
+            OutlinedButton.icon(
+              onPressed: items.isEmpty
+                  ? null
+                  : () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (dialogContext) => AlertDialog(
+                          title: Text(l.confirmClearCartTitle),
+                          content: Text(l.confirmClearCartBody),
+                          actions: [
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.pop(dialogContext, false),
+                              child: Text(l.closeAction),
+                            ),
+                            FilledButton.tonal(
+                              onPressed: () =>
+                                  Navigator.pop(dialogContext, true),
+                              child: Text(l.clearCartAction),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed ?? false) await controller.clear();
+                    },
+              icon: const Icon(Icons.remove_shopping_cart_outlined),
+              label: Text(l.clearCartAction),
+            ),
+            const SizedBox(height: UmiSpacing.sm),
             FilledButton(
               onPressed: items.isEmpty
                   ? null
@@ -830,6 +1001,7 @@ final class _CartPanel extends StatelessWidget {
                       checkout: checkout,
                       cart: controller,
                       entry: entry,
+                      sales: sales,
                     ),
               child: Text(l.checkoutAction),
             ),

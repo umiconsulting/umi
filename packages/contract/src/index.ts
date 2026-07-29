@@ -10,6 +10,7 @@ export * from './pos-catalog';
 export * from './pos-cart';
 export * from './pos-checkout';
 export * from './pos-offline';
+export * from './pos-sale';
 export * from './catalog';
 // Zero-dep entitlement vocabulary. Also published as '@umi/contract/entitlements'
 // so the zod-free dashboard bundle can import it without pulling zod.

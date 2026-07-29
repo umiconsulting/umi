@@ -523,4 +523,136 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get recoverySupportDescription =>
       'Copia la referencia de diagnóstico segura sin exponer el contenido de la venta.';
+
+  @override
+  String get saleActionsTitle => 'Acciones de venta';
+
+  @override
+  String get newSaleAction => 'Nueva venta';
+
+  @override
+  String get suspendSaleAction => 'Suspender venta';
+
+  @override
+  String get resumeSaleAction => 'Reanudar venta';
+
+  @override
+  String get renameSaleAction => 'Cambiar nombre de venta suspendida';
+
+  @override
+  String get cancelSaleAction => 'Cancelar venta';
+
+  @override
+  String get suspendedSaleLabel => 'Nombre de la venta suspendida';
+
+  @override
+  String get cancelSaleReasonLabel => 'Motivo de cancelación';
+
+  @override
+  String get confirmCancelSaleTitle => '¿Cancelar esta venta?';
+
+  @override
+  String get confirmCancelSaleBody =>
+      'El carrito se cerrará sin pago ni recibo. La cancelación permanecerá en el historial de auditoría.';
+
+  @override
+  String get saleRestoredMessage => 'Tu venta activa se restauró.';
+
+  @override
+  String get readyForNextCustomerMessage => 'Listo para el siguiente cliente.';
+
+  @override
+  String get currentCustomerLabel => 'Cliente actual';
+
+  @override
+  String get anonymousCustomerLabel => 'Cliente anónimo';
+
+  @override
+  String get attachCustomerAction => 'Asignar cliente';
+
+  @override
+  String get detachCustomerAction => 'Usar cliente anónimo';
+
+  @override
+  String get searchCustomerHint => 'Buscar clientes';
+
+  @override
+  String get recentCustomersAction => 'Clientes recientes';
+
+  @override
+  String get saleHistoryTitle => 'Ventas';
+
+  @override
+  String get currentSaleLabel => 'Venta actual';
+
+  @override
+  String get suspendedSalesLabel => 'Ventas suspendidas';
+
+  @override
+  String get committedSalesLabel => 'Ventas completadas recientes';
+
+  @override
+  String get cancelledSalesLabel => 'Ventas canceladas';
+
+  @override
+  String get saleHistoryEmpty => 'No hay ventas para esta vista.';
+
+  @override
+  String get sortNewestLabel => 'Más recientes primero';
+
+  @override
+  String get sortOldestLabel => 'Más antiguas primero';
+
+  @override
+  String get loadMoreSalesAction => 'Cargar más ventas';
+
+  @override
+  String get saleStateBuilding => 'En curso';
+
+  @override
+  String get saleStateSuspended => 'Suspendida';
+
+  @override
+  String get saleStateCommitted => 'Completada';
+
+  @override
+  String get saleStateCancelled => 'Cancelada';
+
+  @override
+  String get saleStateRecovered => 'Recuperada';
+
+  @override
+  String get openReceiptAction => 'Abrir recibo';
+
+  @override
+  String get reprintReceiptAction => 'Ver para reimpresión';
+
+  @override
+  String get receiptAvailableMessage => 'Recibo disponible';
+
+  @override
+  String get saleLifecycleError =>
+      'No fue posible completar la acción de venta de forma segura.';
+
+  @override
+  String get saleSearchHint => 'Buscar por nombre, cliente o recibo';
+
+  @override
+  String get saleNameFallback => 'Venta';
+
+  @override
+  String get editCartLineAction => 'Editar producto';
+
+  @override
+  String get saveCartLineAction => 'Guardar cambios';
+
+  @override
+  String get clearCartAction => 'Vaciar carrito';
+
+  @override
+  String get confirmClearCartTitle => '¿Vaciar este carrito?';
+
+  @override
+  String get confirmClearCartBody =>
+      'Se eliminarán todos los productos de la venta actual.';
 }

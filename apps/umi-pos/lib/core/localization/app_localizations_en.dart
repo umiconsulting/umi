@@ -519,4 +519,136 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get recoverySupportDescription =>
       'Copy the safe diagnostic reference without exposing sale contents.';
+
+  @override
+  String get saleActionsTitle => 'Sale actions';
+
+  @override
+  String get newSaleAction => 'New sale';
+
+  @override
+  String get suspendSaleAction => 'Suspend sale';
+
+  @override
+  String get resumeSaleAction => 'Resume sale';
+
+  @override
+  String get renameSaleAction => 'Rename suspended sale';
+
+  @override
+  String get cancelSaleAction => 'Cancel sale';
+
+  @override
+  String get suspendedSaleLabel => 'Suspended sale name';
+
+  @override
+  String get cancelSaleReasonLabel => 'Cancellation reason';
+
+  @override
+  String get confirmCancelSaleTitle => 'Cancel this sale?';
+
+  @override
+  String get confirmCancelSaleBody =>
+      'The cart will close without payment or receipt. The cancellation remains in the audit history.';
+
+  @override
+  String get saleRestoredMessage => 'Your active sale was restored.';
+
+  @override
+  String get readyForNextCustomerMessage => 'Ready for the next customer.';
+
+  @override
+  String get currentCustomerLabel => 'Current customer';
+
+  @override
+  String get anonymousCustomerLabel => 'Anonymous customer';
+
+  @override
+  String get attachCustomerAction => 'Attach customer';
+
+  @override
+  String get detachCustomerAction => 'Use anonymous customer';
+
+  @override
+  String get searchCustomerHint => 'Search customers';
+
+  @override
+  String get recentCustomersAction => 'Recent customers';
+
+  @override
+  String get saleHistoryTitle => 'Sales';
+
+  @override
+  String get currentSaleLabel => 'Current sale';
+
+  @override
+  String get suspendedSalesLabel => 'Suspended sales';
+
+  @override
+  String get committedSalesLabel => 'Recent completed sales';
+
+  @override
+  String get cancelledSalesLabel => 'Cancelled sales';
+
+  @override
+  String get saleHistoryEmpty => 'No sales match this view.';
+
+  @override
+  String get sortNewestLabel => 'Newest first';
+
+  @override
+  String get sortOldestLabel => 'Oldest first';
+
+  @override
+  String get loadMoreSalesAction => 'Load more sales';
+
+  @override
+  String get saleStateBuilding => 'In progress';
+
+  @override
+  String get saleStateSuspended => 'Suspended';
+
+  @override
+  String get saleStateCommitted => 'Completed';
+
+  @override
+  String get saleStateCancelled => 'Cancelled';
+
+  @override
+  String get saleStateRecovered => 'Recovered';
+
+  @override
+  String get openReceiptAction => 'Open receipt';
+
+  @override
+  String get reprintReceiptAction => 'Reprint view';
+
+  @override
+  String get receiptAvailableMessage => 'Receipt available';
+
+  @override
+  String get saleLifecycleError =>
+      'The sale action could not be completed safely.';
+
+  @override
+  String get saleSearchHint => 'Search by name, customer, or receipt';
+
+  @override
+  String get saleNameFallback => 'Sale';
+
+  @override
+  String get editCartLineAction => 'Edit item';
+
+  @override
+  String get saveCartLineAction => 'Save changes';
+
+  @override
+  String get clearCartAction => 'Clear cart';
+
+  @override
+  String get confirmClearCartTitle => 'Clear this cart?';
+
+  @override
+  String get confirmClearCartBody =>
+      'All items will be removed from the current sale.';
 }

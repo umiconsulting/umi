@@ -10,11 +10,17 @@ Updated: 2026-07-29
 | 2C Read-only catalog                    | Complete                   | 2B, catalog contracts  | Maintain authoritative browsing                            | None                                                    | Contract, API, migration, Flutter, cache and web validation passed                                                       |
 | 2D Authoritative cart                   | Complete                   | 2C, cart contracts     | Maintain sale preparation                                  | None                                                    | Focused contract, API, Flutter, migration and web validation                                                             |
 | 2E Checkout and online sale commit      | Complete                   | 2D, command contracts  | Maintain authoritative online sale                         | None                                                    | Contract, API, migration, Flutter and web validation                                                                     |
-| 2F Offline journal and reconciliation   | Complete with observations | 2E, command envelopes  | Preserve certified offline boundary                        | Linux CMake, Ninja, Clang, and GTK prerequisites absent | Focused contract, API, Flutter, Web, migration and PostgreSQL negative checks passed                                     |
-| Later platform work                     | Planned                    | 2F                     | Cash, inventory, refunds, KDS, customer display, Assistant | Domain gates                                            | Not run                                                                                                                  |
+| 2F Offline journal and reconciliation   | Complete with observations | 2E, command envelopes  | Preserve certified offline boundary                        | Historical toolchain observation resolved in Gate 3A   | Focused contract, API, Flutter, Web, migration and PostgreSQL negative checks passed                                     |
+| 3A Sale lifecycle foundation            | Complete                   | 2F                     | Begin advanced checkout and payment experience             | None                                                    | Focused contract, API, Flutter, accessibility, localization, Linux, and PostgreSQL checks passed                         |
+| 3B Advanced checkout and payment        | Planned                    | 3A                     | Define the approved Gate 3B scope                          | Gate approval                                           | Not run                                                                                                                  |
+| Later platform work                     | Planned                    | 3B                     | Cash, inventory, refunds, KDS, customer display, Assistant | Domain gates                                            | Not run                                                                                                                  |
 
-The latest relevant revision for Gate 2F is the final closeout commit containing this document.
+The latest relevant revision is the Gate 3A commit containing this document.
 Native encrypted offline support covers the explicit allowlist and server-policy-authorized cash;
 Web sensitive journaling remains disabled. UMI remains the
 sole business authority; Flutter owns presentation, hardware integration, encrypted local state,
 and controlled future synchronization.
+
+Gate 3A adds one active cashier sale, suspend/resume, cancellation, restart recovery, customer
+attachment, paginated sale navigation, receipt navigation, and automatic next-sale creation.
+Its Linux debug build passed with the current workspace toolchain.

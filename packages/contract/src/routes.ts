@@ -60,10 +60,27 @@ export const routes = {
     cartLines: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/cart/lines`,
     cartLine: (tenantId: string, lineId: string): string =>
       `/api/pos/tenants/${enc(tenantId)}/cart/lines/${enc(lineId)}`,
+    clearCart: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/cart/clear`,
     prepareCart: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/cart/prepare`,
     checkout: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/checkout`,
     checkoutPayment: (tenantId: string, paymentId: string): string =>
       `/api/pos/tenants/${enc(tenantId)}/checkout/payments/${enc(paymentId)}`,
+    sales: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/sales`,
+    currentSale: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/sales/current`,
+    saleSuspend: (tenantId: string, saleId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/sales/${enc(saleId)}/suspend`,
+    saleResume: (tenantId: string, saleId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/sales/${enc(saleId)}/resume`,
+    saleRename: (tenantId: string, saleId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/sales/${enc(saleId)}/rename`,
+    saleCancel: (tenantId: string, saleId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/sales/${enc(saleId)}/cancel`,
+    saleCustomer: (tenantId: string, saleId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/sales/${enc(saleId)}/customer`,
+    saleReceipt: (tenantId: string, saleId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/sales/${enc(saleId)}/receipt`,
+    saleCustomers: (tenantId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/sales/customers`,
     offlineReplayBegin: (tenantId: string): string =>
       `/api/pos/tenants/${enc(tenantId)}/offline/replay/begin`,
     offlinePolicy: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/offline/policy`,

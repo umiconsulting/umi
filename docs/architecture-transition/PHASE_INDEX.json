@@ -92,6 +92,13 @@
       "id": "2F",
       "status": "complete_with_observations",
       "subject": "Encrypted offline checkout, serialized journal, ordered replay, recovery, and reconciliation"
+    },
+    {
+      "commit": "HEAD (Gate 3A commit)",
+      "id": "3A",
+      "status": "complete",
+      "stateMachineVersion": 1,
+      "subject": "Cashier sale lifecycle, suspension, recovery, customer attachment, and receipt navigation"
     }
   ]
 }

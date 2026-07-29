@@ -18,6 +18,8 @@ import 'package:umi_pos/features/entry/entry_controller.dart';
 import 'package:umi_pos/features/entry/entry_gateway.dart';
 import 'package:umi_pos/features/offline/connectivity_controller.dart';
 import 'package:umi_pos/features/offline/offline_journal.dart';
+import 'package:umi_pos/features/sale/sale_lifecycle_controller.dart';
+import 'package:umi_pos/features/sale/sale_repository.dart';
 
 final testConfig = AppConfig(
   environment: AppEnvironment.development,
@@ -100,6 +102,10 @@ AppCompositionRoot testRoot({
   );
   final credentials = CredentialVault(secureStorage);
   final api = TestApiClient();
+  final cart = CartController(
+    repository: ApiCartRepository(api),
+    telemetry: telemetry,
+  );
   return AppCompositionRoot(
     config: testConfig,
     controller: BootstrapController(
@@ -126,8 +132,10 @@ AppCompositionRoot testRoot({
       cache: CatalogCache(),
       telemetry: telemetry,
     ),
-    cart: CartController(
-      repository: ApiCartRepository(api),
+    cart: cart,
+    sales: SaleLifecycleController(
+      repository: ApiSaleRepository(api),
+      cart: cart,
       telemetry: telemetry,
     ),
     checkout: CheckoutController(

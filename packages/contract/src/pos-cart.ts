@@ -76,7 +76,7 @@ export const Cart = z
     tenantId: Uuid,
     branchId: Uuid,
     operatorSessionId: Uuid,
-    status: z.enum(['draft', 'prepared', 'abandoned']),
+    status: z.enum(['draft', 'prepared', 'committed', 'abandoned']),
     version: z.number().int().positive(),
     items: z.array(CartItem).max(250),
     totals: TotalsPreview,
@@ -114,6 +114,7 @@ export const RemoveCartLineRequest = z
     idempotencyKey: Idempotency,
   })
   .strict();
+export const ClearCartRequest = RemoveCartLineRequest;
 export const PrepareSaleRequest = z
   .object({
     cartId: Uuid,
@@ -130,6 +131,7 @@ export type CartItem = z.infer<typeof CartItem>;
 export type CartLineInput = z.infer<typeof CartLineInput>;
 export type CreateCartRequest = z.infer<typeof CreateCartRequest>;
 export type RemoveCartLineRequest = z.infer<typeof RemoveCartLineRequest>;
+export type ClearCartRequest = z.infer<typeof ClearCartRequest>;
 export type PrepareSaleRequest = z.infer<typeof PrepareSaleRequest>;
 export type CartQuery = z.infer<typeof CartQuery>;
 export const posCartModels = {
@@ -143,6 +145,7 @@ export const posCartModels = {
   CreateCartRequest,
   CartLineInput,
   RemoveCartLineRequest,
+  ClearCartRequest,
   PrepareSaleRequest,
   CartQuery,
 };

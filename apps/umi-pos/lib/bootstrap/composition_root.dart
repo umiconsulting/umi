@@ -19,6 +19,8 @@ import '../features/offline/offline_checkout_service.dart';
 import '../features/offline/offline_journal.dart';
 import '../features/offline/offline_policy.dart';
 import '../features/offline/replay_engine.dart';
+import '../features/sale/sale_lifecycle_controller.dart';
+import '../features/sale/sale_repository.dart';
 import 'bootstrap_controller.dart';
 
 final class AppCompositionRoot {
@@ -37,6 +39,7 @@ final class AppCompositionRoot {
     required this.catalog,
     required this.cart,
     required this.checkout,
+    required this.sales,
     required this.connectivity,
     required this.offlineJournal,
     this.offlineRecovery,
@@ -81,6 +84,10 @@ final class AppCompositionRoot {
       secureStorage: secureStorage,
       telemetry: telemetry,
     );
+    final cart = CartController(
+      repository: ApiCartRepository(apiClient),
+      telemetry: telemetry,
+    );
     return AppCompositionRoot(
       config: config,
       controller: controller,
@@ -102,8 +109,10 @@ final class AppCompositionRoot {
         cache: CatalogCache(),
         telemetry: telemetry,
       ),
-      cart: CartController(
-        repository: ApiCartRepository(apiClient),
+      cart: cart,
+      sales: SaleLifecycleController(
+        repository: ApiSaleRepository(apiClient),
+        cart: cart,
         telemetry: telemetry,
       ),
       checkout: CheckoutController(
@@ -132,6 +141,7 @@ final class AppCompositionRoot {
   final CatalogController catalog;
   final CartController cart;
   final CheckoutController checkout;
+  final SaleLifecycleController sales;
   final ConnectivityController connectivity;
   final EncryptedOfflineJournal offlineJournal;
   final OfflineRecoveryController? offlineRecovery;
@@ -142,6 +152,7 @@ final class AppCompositionRoot {
     catalog.dispose();
     cart.dispose();
     checkout.dispose();
+    sales.dispose();
     connectivity.dispose();
     offlineRecovery?.dispose();
     apiClient.dispose();

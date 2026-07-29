@@ -19,6 +19,7 @@ Future<void> showRecoveryCenter(
   required Telemetry telemetry,
   required Future<void> Function() refreshSnapshots,
   required Future<void> Function() queryAmbiguousPayment,
+  Future<bool> Function()? beforeContextExit,
 }) => showModalBottomSheet<void>(
   context: context,
   isScrollControlled: true,
@@ -34,6 +35,7 @@ Future<void> showRecoveryCenter(
       journal: journal,
       refreshSnapshots: refreshSnapshots,
       queryAmbiguousPayment: queryAmbiguousPayment,
+      beforeContextExit: beforeContextExit,
     ),
   ),
 );
@@ -239,14 +241,56 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
     );
     if (entries == null || entries.isEmpty) return;
     final entry = entries.last;
+    final rawSnapshot = entry.command.payload['snapshot'];
+    if (rawSnapshot is! Map<String, Object?>) return;
+    final checkoutSnapshot = OfflineCheckoutSnapshot.fromJson(rawSnapshot);
+    final cart = Cart.fromJson(checkoutSnapshot.cartSnapshot);
+    final totals = TotalsConfirmation.fromJson(checkoutSnapshot.totals);
+    final total = totals.totals['grandTotal']! as Map<String, Object?>;
+    final official = entry.officialCommit == null
+        ? null
+        : OfficialCommitResult.fromJson(entry.officialCommit!);
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(AppLocalizations.of(context).recoveryReceiptTitle),
-        content: Text(
-          entry.officialCommit == null
-              ? AppLocalizations.of(context).pendingSalesSecure
-              : AppLocalizations.of(context).officialReceiptAvailable,
+        content: SizedBox(
+          width: 520,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              Text(
+                official == null
+                    ? AppLocalizations.of(context).pendingSalesSecure
+                    : AppLocalizations.of(context).officialReceiptAvailable,
+              ),
+              SelectableText(
+                official?.officialReceiptNumber ??
+                    entry.command.provisionalId ??
+                    '#${entry.command.deviceSequence}',
+              ),
+              const Divider(),
+              for (final rawLine in cart.items)
+                Builder(
+                  builder: (_) {
+                    final line = CartItem.fromJson(rawLine);
+                    return ListTile(
+                      title: Text(line.productName),
+                      subtitle: line.variant == null
+                          ? null
+                          : Text(line.variant!['name'] as String),
+                      trailing: Text('${line.quantity}'),
+                    );
+                  },
+                ),
+              const Divider(),
+              Text(
+                _receiptMoney(total),
+                style: Theme.of(context).textTheme.titleLarge,
+                textAlign: TextAlign.end,
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -256,6 +300,12 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
         ],
       ),
     );
+  }
+
+  String _receiptMoney(Map<String, Object?> money) {
+    final currency = money['currency'] as String? ?? '';
+    final minorUnits = (money['minorUnits'] as num?)?.toInt() ?? 0;
+    return '$currency ${(minorUnits / 100).toStringAsFixed(2)}';
   }
 
   Future<String?> _managerCredential() async {
@@ -425,13 +475,15 @@ final class AppRecoveryActionExecutor implements RecoveryActionExecutor {
     required EncryptedOfflineJournal journal,
     required Future<void> Function() refreshSnapshots,
     required Future<void> Function() queryAmbiguousPayment,
+    Future<bool> Function()? beforeContextExit,
   }) : _recovery = recovery,
        _scope = scope,
        _entry = entry,
        _telemetry = telemetry,
        _journal = journal,
        _refreshSnapshots = refreshSnapshots,
-       _queryAmbiguousPayment = queryAmbiguousPayment;
+       _queryAmbiguousPayment = queryAmbiguousPayment,
+       _beforeContextExit = beforeContextExit;
 
   final OfflineRecoveryController _recovery;
   final ReplayScope _scope;
@@ -440,6 +492,7 @@ final class AppRecoveryActionExecutor implements RecoveryActionExecutor {
   final EncryptedOfflineJournal _journal;
   final Future<void> Function() _refreshSnapshots;
   final Future<void> Function() _queryAmbiguousPayment;
+  final Future<bool> Function()? _beforeContextExit;
 
   @override
   bool canExecute(RecoveryActionKind action) {
@@ -475,8 +528,22 @@ final class AppRecoveryActionExecutor implements RecoveryActionExecutor {
     try {
       switch (action) {
         case RecoveryActionKind.reauthenticate:
+          if (_beforeContextExit != null && !await _beforeContextExit()) {
+            await _journal.recordRecoveryAction(
+              descriptor,
+              'sale_transition_failed',
+            );
+            return RecoveryActionOutcome.failedSafely;
+          }
           await _entry.logout();
         case RecoveryActionKind.reselectBranch:
+          if (_beforeContextExit != null && !await _beforeContextExit()) {
+            await _journal.recordRecoveryAction(
+              descriptor,
+              'sale_transition_failed',
+            );
+            return RecoveryActionOutcome.failedSafely;
+          }
           await _entry.reselectBranch();
         case RecoveryActionKind.managerReview:
           if (authorizationInput == null ||

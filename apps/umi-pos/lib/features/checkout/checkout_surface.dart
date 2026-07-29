@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:umi_contract/umi_contract.dart';
 
@@ -6,6 +8,7 @@ import '../../core/theme/umi_theme.dart';
 import '../cart/cart_controller.dart';
 import '../entry/entry_controller.dart';
 import '../offline/offline_policy.dart';
+import '../sale/sale_lifecycle_controller.dart';
 import 'checkout_controller.dart';
 
 Future<void> showCheckoutSheet(
@@ -13,10 +16,16 @@ Future<void> showCheckoutSheet(
   required CheckoutController checkout,
   required CartController cart,
   required EntryController entry,
+  required SaleLifecycleController sales,
 }) => showModalBottomSheet<void>(
   context: context,
   isScrollControlled: true,
-  builder: (_) => _CheckoutSheet(checkout: checkout, cart: cart, entry: entry),
+  builder: (_) => _CheckoutSheet(
+    checkout: checkout,
+    cart: cart,
+    entry: entry,
+    sales: sales,
+  ),
 );
 
 final class _CheckoutSheet extends StatefulWidget {
@@ -24,10 +33,12 @@ final class _CheckoutSheet extends StatefulWidget {
     required this.checkout,
     required this.cart,
     required this.entry,
+    required this.sales,
   });
   final CheckoutController checkout;
   final CartController cart;
   final EntryController entry;
+  final SaleLifecycleController sales;
 
   @override
   State<_CheckoutSheet> createState() => _CheckoutSheetState();
@@ -36,6 +47,7 @@ final class _CheckoutSheet extends StatefulWidget {
 final class _CheckoutSheetState extends State<_CheckoutSheet> {
   String method = 'cash';
   final cashReceived = TextEditingController();
+  bool committed = false;
 
   @override
   void initState() {
@@ -47,12 +59,17 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   @override
   void dispose() {
     widget.checkout.removeListener(_changed);
+    if (!committed) widget.sales.checkoutStopped();
     cashReceived.dispose();
     super.dispose();
   }
 
   void _changed() {
     if (mounted) setState(() {});
+    if (widget.checkout.state.phase == CheckoutPhase.completed && !committed) {
+      committed = true;
+      unawaited(widget.sales.checkoutCommitted());
+    }
   }
 
   String _money(Map<String, Object?> value) {
@@ -176,6 +193,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                                     cart.totals,
                                   ).grandTotal['currency']!
                                   as String;
+                          widget.sales.checkoutStarted();
                           widget.checkout.preview(
                             tenantId: cart.tenantId,
                             branchId: cart.branchId,
@@ -403,12 +421,9 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         ),
         FilledButton(
           onPressed: () async {
-            final tenant = widget.entry.state.selectedTenant;
-            final branch = widget.entry.state.selectedBranch;
-            final operator = widget.entry.state.operator;
-            widget.cart.clearLocal();
-            if (tenant != null && branch != null && operator != null) {
-              await widget.cart.open(tenant.id, branch.id, operator.id);
+            if (!committed) {
+              committed = true;
+              await widget.sales.checkoutCommitted();
             }
             if (context.mounted) Navigator.pop(context);
           },

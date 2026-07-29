@@ -61,6 +61,13 @@ final class CartController extends ChangeNotifier {
     _event('cart_opened');
   }
 
+  void restore(Cart cart) {
+    _tenantId = cart.tenantId;
+    _branchId = cart.branchId;
+    _operatorSessionId = cart.operatorSessionId;
+    _set(CartState(phase: CartPhase.ready, cart: cart));
+  }
+
   Future<void> add({
     required String productId,
     String? variantId,
@@ -145,6 +152,54 @@ final class CartController extends ChangeNotifier {
         ),
       ),
       'product_removed',
+    );
+  }
+
+  Future<void> clear() async {
+    final cart = _state.cart;
+    if (cart == null || cart.items.isEmpty) return;
+    await _mutation(
+      () => _repository.clear(
+        _tenantId!,
+        ClearCartRequest(
+          cartId: cart.id,
+          branchId: _branchId!,
+          operatorSessionId: _operatorSessionId!,
+          expectedVersion: cart.version,
+          idempotencyKey: _uuid(),
+        ),
+      ),
+      'cart_cleared',
+    );
+  }
+
+  Future<void> edit({
+    required CartItem item,
+    required String? variantId,
+    required List<Map<String, Object?>> modifiers,
+    required int quantity,
+    required String? note,
+  }) async {
+    final cart = _state.cart;
+    if (cart == null) return;
+    await _mutation(
+      () => _repository.update(
+        _tenantId!,
+        item.id,
+        CartLineInput(
+          cartId: cart.id,
+          branchId: _branchId!,
+          operatorSessionId: _operatorSessionId!,
+          productId: item.productId,
+          variantId: variantId,
+          modifierSelections: modifiers,
+          quantity: quantity.clamp(1, 999).toInt(),
+          note: (note?.trim().isEmpty ?? true) ? null : note!.trim(),
+          expectedVersion: cart.version,
+          idempotencyKey: _uuid(),
+        ),
+      ),
+      'cart_line_edited',
     );
   }
 

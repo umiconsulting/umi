@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-07-29",
-  "latestRelevantCommit": "HEAD (Gate 2F final closeout commit)",
+  "latestRelevantCommit": "HEAD (Gate 3A commit)",
   "items": [
     {
       "id": "platform-certification",
@@ -56,8 +56,16 @@
       "status": "complete_with_observations",
       "dependencies": ["2E"],
       "nextObjective": "Preserve the certified offline authority boundary",
-      "blockers": ["External Linux native build prerequisites are unavailable in this runner"],
-      "validationState": "Focused contract, API, Flutter, Web, migration and PostgreSQL negative authorization checks passed; Linux native build prerequisites unavailable; Web sensitive journal unsupported"
+      "blockers": [],
+      "validationState": "Focused contract, API, Flutter, Web, migration and PostgreSQL negative authorization checks passed; the historical Linux runner observation was resolved during Gate 3A; Web sensitive journal unsupported"
+    },
+    {
+      "id": "3A",
+      "status": "complete",
+      "dependencies": ["2F"],
+      "nextObjective": "Begin Gate 3B Advanced Checkout & Payment Experience",
+      "blockers": [],
+      "validationState": "Focused contract, API, Flutter, accessibility, localization, Linux, and disposable PostgreSQL validation passed"
     }
   ]
 }

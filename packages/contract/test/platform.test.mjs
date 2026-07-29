@@ -19,7 +19,95 @@ const {
   CheckoutResult,
   OfflineCheckoutCommand,
   RecoveryAction,
+  SaleSnapshot,
+  SuspendSaleRequest,
+  CancelSaleRequest,
+  SaleHistoryQuery,
+  PosCustomerSearchQuery,
 } = require('../dist/index.cjs');
+const { routes } = require('../dist/routes.cjs');
+
+test('Gate 3A sale lifecycle contracts enforce explicit states and safe reasons', () => {
+  const id = '00000000-0000-4000-8000-000000000001';
+  const cart = {
+    id,
+    tenantId: id,
+    branchId: id,
+    operatorSessionId: id,
+    status: 'draft',
+    version: 1,
+    items: [],
+    totals: {
+      subtotal: { minorUnits: 0, currency: 'MXN' },
+      tax: { minorUnits: 0, currency: 'MXN' },
+      discounts: {
+        total: { minorUnits: 0, currency: 'MXN' },
+        entries: [],
+      },
+      grandTotal: { minorUnits: 0, currency: 'MXN' },
+      businessDate: '2026-07-29',
+    },
+    checkoutEnabled: false,
+    checkoutMessageCode: 'CHECKOUT_GATE_NOT_AVAILABLE',
+    updatedAt: '2026-07-29T12:00:00Z',
+  };
+  assert.ok(
+    SaleSnapshot.safeParse({
+      id,
+      state: 'building_cart',
+      cart,
+      label: null,
+      customer: null,
+      originalOperatorSessionId: id,
+      currentOperatorSessionId: id,
+      suspendedAt: null,
+      cancelledAt: null,
+      cancellationReason: null,
+      committedSaleId: null,
+      receiptId: null,
+      receiptRef: null,
+      updatedAt: '2026-07-29T12:00:00Z',
+    }).success,
+  );
+  assert.ok(
+    SuspendSaleRequest.safeParse({
+      branchId: id,
+      operatorSessionId: id,
+      expectedVersion: 1,
+      label: 'Mesa 4',
+      idempotencyKey: id,
+    }).success,
+  );
+  assert.equal(
+    CancelSaleRequest.safeParse({
+      branchId: id,
+      operatorSessionId: id,
+      expectedVersion: 1,
+      reason: '<script>',
+      idempotencyKey: id,
+    }).success,
+    false,
+  );
+  assert.ok(
+    SaleHistoryQuery.safeParse({
+      branchId: id,
+      operatorSessionId: id,
+      state: 'suspended',
+      search: 'Mesa',
+      sort: 'oldest',
+      limit: 20,
+    }).success,
+  );
+  assert.equal(
+    PosCustomerSearchQuery.parse({
+      branchId: id,
+      operatorSessionId: id,
+      recent: 'false',
+    }).recent,
+    false,
+  );
+  assert.equal(routes.pos.saleSuspend(id, id), `/api/pos/tenants/${id}/sales/${id}/suspend`);
+});
 
 test('Gate 2F checkout identity and recovery actions are typed and bounded', () => {
   const hash = 'a'.repeat(64);
@@ -259,6 +347,8 @@ test('neutral artifact has required models and a valid checksum', async () => {
     'ReconciliationResponse',
     'ReceiptSnapshot',
     'PaymentAmbiguity',
+    'SaleSnapshot',
+    'SaleHistoryPage',
   ]) {
     assert.ok(manifest.definitions[name], `missing ${name}`);
   }

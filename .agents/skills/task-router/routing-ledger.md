@@ -21,6 +21,19 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-07-29 - UmiPOS Gate 3A sale lifecycle
+- task type: cross-app commercial workflow implementation
+- request summary: add the cashier sale lifecycle without changes to offline or device authority
+- filesystem slice inspected: contracts, UMI API POS modules, UmiPOS sale/cart/checkout surfaces, migrations, and canonical product memory
+- chosen owner: UMI API for sale authority; UmiPOS for presentation and operator workflow
+- chosen path: direct focused implementation with contract-first TDD
+- skill or subagent used: `task-router`, `tdd`, `pr-gates`
+- files touched: sale contracts, sale API module, cart and checkout integration, Flutter sale feature, focused tests, one migration, runbook, and canonical memory
+- tools used: pnpm, Vitest, Flutter, Dart, ESLint, disposable PostgreSQL, and Linux build tools
+- outcome: one editable sale, suspend/resume, cancellation, recovery, customer attachment, receipt navigation, and automatic next sale passed focused validation
+- reusable pattern observed: operator identity must own active-sale uniqueness across operator session replacement
+- promotion follow-up: none
+
 ### 2026-07-29 - UmiPOS checkout and product dialog correction
 - task type: cross-app defect correction
 - request summary: fix the checkout HTTP 500 and the product dialog layout

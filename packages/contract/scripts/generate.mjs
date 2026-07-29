@@ -224,12 +224,32 @@ const dartRoutes = `abstract final class UmiRoutes {
       '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/cart/lines';
   static String posCartLine(String tenantId, String lineId) =>
       '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/cart/lines/\${Uri.encodeComponent(lineId)}';
+  static String posCartClear(String tenantId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/cart/clear';
   static String posCartPrepare(String tenantId) =>
       '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/cart/prepare';
   static String posCheckout(String tenantId) =>
       '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/checkout';
   static String posCheckoutPayment(String tenantId, String paymentId) =>
       '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/checkout/payments/\${Uri.encodeComponent(paymentId)}';
+  static String posSales(String tenantId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/sales';
+  static String posCurrentSale(String tenantId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/sales/current';
+  static String posSaleSuspend(String tenantId, String saleId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/sales/\${Uri.encodeComponent(saleId)}/suspend';
+  static String posSaleResume(String tenantId, String saleId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/sales/\${Uri.encodeComponent(saleId)}/resume';
+  static String posSaleRename(String tenantId, String saleId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/sales/\${Uri.encodeComponent(saleId)}/rename';
+  static String posSaleCancel(String tenantId, String saleId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/sales/\${Uri.encodeComponent(saleId)}/cancel';
+  static String posSaleCustomer(String tenantId, String saleId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/sales/\${Uri.encodeComponent(saleId)}/customer';
+  static String posSaleReceipt(String tenantId, String saleId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/sales/\${Uri.encodeComponent(saleId)}/receipt';
+  static String posSaleCustomers(String tenantId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/sales/customers';
   static String posOfflineReplayBegin(String tenantId) =>
       '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/offline/replay/begin';
   static String posOfflinePolicy(String tenantId) =>
