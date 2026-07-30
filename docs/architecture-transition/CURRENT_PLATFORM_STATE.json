@@ -20,7 +20,8 @@
     "2E",
     "2F",
     "3A",
-    "3B"
+    "3B",
+    "3C"
   ],
   "authorities": {
     "api": "apps/umi-api",
@@ -67,8 +68,8 @@
     "gate2AStatus": "complete",
     "flutterVersion": "3.44.6",
     "dartVersion": "3.12.2",
-    "contractVersion": "2.0.0",
-    "contractContentHash": "9fd5f48ec99fb9c71ecb52bf05a3966a3dce7b04dbfcdd9e0fe348957cb5145a",
+    "contractVersion": "2.1.0",
+    "contractContentHash": "7a2f560b1542e868d78869bc712e0f46385bda5f4b7dbc378681d548524d5c88",
     "stateManagement": "ChangeNotifier with one explicit composition root",
     "navigation": "central typed route guard",
     "secureStorage": "flutter_secure_storage with no plaintext fallback",
@@ -89,6 +90,21 @@
     "gate2FStatus": "complete_with_observations",
     "gate3AStatus": "complete",
     "gate3BStatus": "complete",
+    "gate3CStatus": "complete",
+    "cashShiftLifecycleVersion": 1,
+    "physicalRegister": "tenant and branch scoped physical cash location with one unresolved shift",
+    "cashShift": "register, device, credential, operator, currency, and server-derived business-date scoped lifecycle",
+    "openingFloat": "atomic immutable ledger fact with integer minor units and denomination validation",
+    "cashLedger": "append-only ordered facts; expected cash is reproducible and not a mutable authority",
+    "cashSalePosting": "cash tender net effect commits atomically with the sale; mixed tender posts cash only",
+    "cashMovements": ["paid_in", "paid_out", "safe_drop"],
+    "cashHandoff": "explicit PIN-authenticated responsibility transfer with required incoming PIN entry",
+    "cashBlindCount": "expected cash stays hidden until the immutable count is accepted",
+    "cashVariance": "server-calculated signed variance with policy tolerance and exact bound approval",
+    "cashReconciliation": "fixed ledger sequence, immutable count, reason, approval, and outcome",
+    "cashShiftClose": "atomic immutable close result with selected-count and threshold-approval binding; late ledger posting is rejected",
+    "cashShiftRecovery": "secure command identifiers support authoritative result query; API recovery restores the shift, count, variance resolution, reconciliation, and close result",
+    "gate3COfflineBoundary": "advanced shift operations are online-only; policy-authorized offline cash sales remain provisional",
     "checkoutLifecycleVersion": 1,
     "checkoutLifecycle": "one checkout per sale; authoritative repricing, tender collection, confirmation, recovery, receipt, and next sale",
     "supportedTenders": ["cash", "manual_terminal", "mixed_cash_manual_terminal"],
@@ -110,7 +126,7 @@
     "offlineCash": "default-deny server-issued branch policy; eligible native cash checkout is encrypted and provisional",
     "offlineRecovery": "generated-SDK gateway, serialized journal mutations, restart deduplication, ordered replay, typed recovery actions, response-loss query, reconciliation, immutable mapping, Recovery Center",
     "offlineDatabaseValidation": "clean migration chain plus tenant, branch, device, credential, immutability, revocation and rotation negative matrix passed in disposable PostgreSQL",
-    "nativeBuild": "Linux debug build passed during Gate 3B",
+    "nativeBuild": "Linux debug build passed during Gate 3C",
     "webOfflineCapability": "sensitive journaling unsupported; online operation only",
     "checkoutAuthority": "apps/umi-api/src/modules/pos-checkout",
     "checkoutMode": "online, immediately repriced, explicitly confirmed, idempotent",
@@ -135,9 +151,9 @@
     "pinFoundation": "tenant-unique personal PIN, keyed lookup, server-side scrypt verification, bounded attempts, and no client role selection",
     "managerApprovalFoundation": "single-action scoped five-minute elevation",
     "readyShell": true,
-    "latestLocalCommit": "HEAD (Gate 3B commit)",
-    "pushStatus": "PENDING GATE 3B PUBLICATION",
-    "pullRequestStatus": "PENDING GATE 3B PUBLICATION"
+    "latestLocalCommit": "HEAD (Gate 3C commit)",
+    "pushStatus": "PENDING GATE 3C PUBLICATION",
+    "pullRequestStatus": "PENDING GATE 3C PUBLICATION"
   },
-  "nextGate": "Scope approval required for the next commercial POS Gate"
+  "nextGate": "Scope approval required for the next commercial POS Gate after Gate 3C"
 }

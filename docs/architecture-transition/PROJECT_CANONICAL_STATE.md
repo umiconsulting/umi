@@ -44,6 +44,8 @@ Future clients use `packages/contract` and controlled UMI APIs.
   next-sale creation.
 - Gate 3B established one checkout lifecycle. It supports cash, manual terminal, mixed tender,
   policy-controlled tips and discounts, one-use manager approval, recovery, and receipt intent.
+- Gate 3C established the physical register and cash shift lifecycle. It supports opening float,
+  append-only cash facts, movements, handoff, blind count, variance, reconciliation, and close.
 
 ## Current implementation state
 
@@ -86,8 +88,8 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - UmiPOS uses a personal tenant-unique PIN after device trust. The API resolves the staff identity
   and current role without an email or client role selector.
 - `runtime.operator_session` separates operator presence from PIN authentication.
-- UmiPOS consumes contract version `2.0.0`, content hash
-  `9fd5f48ec99fb9c71ecb52bf05a3966a3dce7b04dbfcdd9e0fe348957cb5145a`.
+- UmiPOS consumes contract version `2.1.0`, content hash
+  `7a2f560b1542e868d78869bc712e0f46385bda5f4b7dbc378681d548524d5c88`.
 - Native UmiPOS journal schema version 1 uses AES-256-GCM with platform-secure key storage and
   separate ciphertext persistence. Replay is ordered per device credential version; Web sensitive
   journaling is unsupported.
@@ -104,6 +106,20 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Tips and discounts use a branch policy. Each sensitive permission requires a separate,
   short, one-use manager approval bound to the full tender fingerprint.
 - Recovery returns the immutable committed result and receipt after response loss or restart.
+- `tenant.physical_register` owns the physical cash location. One unresolved shift can use one
+  register.
+- `tenant.cash_shift` owns the register, device, operator, currency, and business date context.
+- The server derives the shift business date. The client cannot select this financial context.
+- `tenant.cash_ledger_entry` owns each immutable physical cash effect. Expected cash is a
+  reproducible projection.
+- Cash checkout posts the net cash effect in the same database transaction as the sale.
+- Blind counts remain separate from expected cash. Reconciliation uses one fixed ledger sequence.
+- Shift close is atomic and immutable. Closed shifts reject later cash facts.
+- Cash command recovery stores only command identifiers in secure storage. The API queries the
+  original command before a retry.
+- A close threshold requires a short, one-use manager approval bound to the selected count.
+- Advanced cash operations require online server authority. Offline cash sales keep the Gate 2F
+  policy and provisional receipt boundary.
 - POS refresh sessions require the active server device plus its installation and credential
   hashes. Revocation/replacement ends durable and operator sessions.
 
@@ -128,7 +144,7 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Certification date: `2026-07-27`
 - `BUILD_V3_CERTIFIED`: `true`
 - UmiPOS application creation: `YES WITH OBSERVATIONS`
-- Remote publication: Gate 3B publication follows the local commit through the PR gate.
+- Remote publication: Gate 3C publication follows the local commit through the PR gate.
 - Gate 2F: complete with the external native-toolchain observation. The full disposable PostgreSQL
   migration chain and negative authorization matrix passed. Linux debug compilation cannot start
   because the runner lacks CMake, Ninja, Clang, and GTK development headers; no code defect is
@@ -140,10 +156,13 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Gate 3B: complete. Checkout state version 1 supports cash, manual terminal, mixed tender,
   tips, discounts, recovery, and receipt intent.
 - Gate 3B produced successful Linux debug and Web compatibility builds.
+- Gate 3C: complete. Cash shift state version 1 supports register assignment, immutable cash
+  facts, handoff, blind count, variance approval, reconciliation, close, and restart recovery.
+- Gate 3C produced a successful Linux debug build and disposable PostgreSQL negative matrix.
 - Next gate: scope approval is required for the next commercial POS Gate.
 
-## Gate 3B decision basis
+## Gate 3C decision basis
 
-- Documented fact: the UMI API owns checkout, command idempotency, receipt snapshots, and audit.
-- Source-backed tradeoff: draft tender state remains separate from immutable committed facts.
-- Umi-specific inference: manual terminal confirmation proves an operator assertion only.
+- Documented fact: the UMI API owns checkout, cash facts, command idempotency, and audit.
+- Source-backed tradeoff: immutable ledger facts produce expected cash without a mutable authority.
+- Umi-specific inference: a software count records an operator observation, not physical custody.

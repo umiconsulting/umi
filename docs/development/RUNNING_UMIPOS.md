@@ -212,3 +212,54 @@ The digital receipt option is a contract foundation. Gate 3B does not send email
 Manual terminal success records an operator assertion. It is not provider proof.
 Offline checkout supports one policy-authorized cash tender only. Advanced tender, tip,
 discount, and live approval actions require connectivity.
+
+## Cash shift and register operations
+
+Apply migrations through `20260729000500_gate_3c_cash_shift.sql`.
+
+Run these focused commands from the workspace root:
+
+- Generate contracts: `pnpm --filter @umi/contract generate`.
+- Run cash API tests: `pnpm umi-pos:cash-api-tests`.
+- Run cash Flutter tests: `pnpm umi-pos:cash-tests`.
+- Run the disposable database matrix: `pnpm umi-pos:cash-db-check`.
+- Analyze Flutter: `cd apps/umi-pos && flutter analyze`.
+- Build Linux debug: `cd apps/umi-pos && flutter build linux --debug`.
+
+Create a development register through an authorized database seed or UMI administration flow.
+Use the active tenant, branch, device, and currency. Do not copy production identifiers.
+
+Test the operational flow:
+
+1. Start PostgreSQL and the UMI API with the normal local commands.
+2. Start UmiPOS with `flutter run -d linux` or `flutter run -d chrome`.
+3. Enroll the device and approve it in UMI.
+4. Sign in with a cashier PIN.
+5. Select the assigned register.
+6. Open a shift with a zero or total opening float.
+7. Complete an exact cash sale.
+8. Verify one `cash_sale` ledger fact for the active shift.
+9. Test cash received with change.
+10. Test mixed tender and verify that only the cash part changes expected cash.
+11. Record Paid In, Paid Out, and Safe Drop with safe reason codes.
+12. Suspend and resume the shift.
+13. Test handoff with an incoming operator PIN.
+14. Sign in again as the incoming operator.
+15. Submit a blind count. Confirm that expected cash was hidden before submission.
+16. Test recount and variance approval with a different manager PIN.
+17. Reconcile the fixed ledger sequence.
+18. Confirm the irreversible shift close.
+19. Verify that the closed shift rejects a new cash fact.
+
+To test recovery, stop UmiPOS after any command submission. Restart the app. The client queries
+the current server state and uses the original idempotent result. Do not create a replacement
+command after an unknown response.
+
+When the close threshold applies, enter a different manager PIN in the close dialog. The approval
+is short-lived and applies only to the selected count and ledger sequence.
+
+The Cash Center records a no-sale drawer request only. Gate 3C does not control drawer hardware.
+Advanced cash operations require connectivity. UmiPOS does not close or reconcile a shift offline.
+
+Use the disposable database script for destructive validation. The script creates and removes its
+own container. Do not point this command at a shared or production database.

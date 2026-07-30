@@ -62,6 +62,7 @@ final class CheckoutController extends ChangeNotifier {
   String? _branchId;
   String? _operatorSessionId;
   String? _cartId;
+  String? _cashShiftId;
   int? _cartVersion;
   String _paymentMethod = 'cash';
   Cart? _cart;
@@ -90,6 +91,7 @@ final class CheckoutController extends ChangeNotifier {
     required String cartId,
     required int cartVersion,
     required String paymentMethod,
+    String? cashShiftId,
     Cart? cart,
     OfflineAuthorityContext? authority,
     String branchName = '',
@@ -111,6 +113,7 @@ final class CheckoutController extends ChangeNotifier {
     _cartId = cartId;
     _cartVersion = cartVersion;
     _paymentMethod = paymentMethod;
+    _cashShiftId = cashShiftId;
     _cart = cart;
     _authority = authority;
     _branchName = branchName;
@@ -317,6 +320,7 @@ final class CheckoutController extends ChangeNotifier {
     _branchId = null;
     _operatorSessionId = null;
     _cartId = null;
+    _cashShiftId = null;
     _cartVersion = null;
     _paymentMethod = 'cash';
     _cart = null;
@@ -398,6 +402,7 @@ final class CheckoutController extends ChangeNotifier {
           discountDrafts: _discountDrafts,
           approvalIds: _approvalIds,
           receiptDelivery: _receiptDelivery,
+          cashShiftId: _cashShiftId,
         ),
       );
       final phase = switch (result.status) {
@@ -446,7 +451,10 @@ final class CheckoutController extends ChangeNotifier {
     final unsupportedTender =
         _tenderDrafts.length != 1 ||
         _tenderDrafts.any((tender) => tender['type'] != 'cash');
-    if (unsupportedTender || _tipDraft != null || _discountDrafts.isNotEmpty) {
+    if (unsupportedTender ||
+        _tipDraft != null ||
+        _discountDrafts.isNotEmpty ||
+        _cashShiftId == null) {
       _set(
         CheckoutState(
           phase: CheckoutPhase.failure,
@@ -485,6 +493,7 @@ final class CheckoutController extends ChangeNotifier {
             discountDrafts: _discountDrafts,
             approvalIds: const [],
             receiptDelivery: _receiptDelivery,
+            cashShiftId: _cashShiftId,
           ),
           cart: cart,
           totals: totals,

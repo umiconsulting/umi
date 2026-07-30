@@ -35,7 +35,10 @@
     "umi-pos:sale-db-check": "bash scripts/umi-pos-sale-db-check.sh",
     "umi-pos:checkout-db-check": "bash scripts/umi-pos-checkout-db-check.sh",
     "umi-pos:checkout-api-tests": "pnpm --filter @umi/api exec vitest run src/modules/pos-checkout/checkout-calculator.spec.ts src/modules/pos-checkout/pos-checkout.service.spec.ts src/modules/pos-checkout/pos-checkout.repository.spec.ts src/modules/pos-entry/pos-entry.service.spec.ts src/shared/database/gate-3b-checkout-migration.spec.ts",
-    "umi-pos:checkout-tests": "cd apps/umi-pos && flutter test test/checkout_test.dart test/sale_lifecycle_test.dart"
+    "umi-pos:checkout-tests": "cd apps/umi-pos && flutter test test/checkout_test.dart test/sale_lifecycle_test.dart",
+    "umi-pos:cash-api-tests": "pnpm --filter @umi/api exec vitest run src/modules/pos-cash/cash-domain.spec.ts src/modules/pos-cash/pos-cash.service.spec.ts src/shared/database/gate-3c-cash-migration.spec.ts src/modules/pos-checkout/pos-checkout.repository.spec.ts",
+    "umi-pos:cash-tests": "cd apps/umi-pos && flutter test test/cash_center_test.dart test/checkout_test.dart",
+    "umi-pos:cash-db-check": "bash scripts/umi-pos-cash-db-check.sh"
   },
   "devDependencies": {
     "prettier": "3.9.4",

@@ -357,6 +357,7 @@ export const CheckoutCommand = z
     cartId: Uuid,
     branchId: Uuid,
     operatorSessionId: Uuid,
+    cashShiftId: Uuid.nullable().optional(),
     expectedCartVersion: z.number().int().positive(),
     paymentMethod: PaymentMethod,
     totalsFingerprint: z

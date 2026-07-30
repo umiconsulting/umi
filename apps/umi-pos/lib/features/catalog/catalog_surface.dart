@@ -5,6 +5,8 @@ import '../../core/localization/app_localizations.dart';
 import '../../core/observability/telemetry.dart';
 import '../../core/theme/umi_theme.dart';
 import '../cart/cart_controller.dart';
+import '../cash/cash_controller.dart';
+import '../cash/cash_surface.dart';
 import '../checkout/checkout_controller.dart';
 import '../checkout/checkout_surface.dart';
 import '../entry/entry_controller.dart';
@@ -22,6 +24,7 @@ final class CatalogSurface extends StatefulWidget {
     required this.entry,
     required this.catalog,
     required this.cart,
+    required this.cash,
     required this.checkout,
     required this.sales,
     required this.connectivity,
@@ -33,6 +36,7 @@ final class CatalogSurface extends StatefulWidget {
   final EntryController entry;
   final CatalogController catalog;
   final CartController cart;
+  final CashController cash;
   final CheckoutController checkout;
   final SaleLifecycleController sales;
   final ConnectivityController connectivity;
@@ -48,6 +52,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   final _scroll = ScrollController();
   final _searchFocus = FocusNode();
   bool _initialLoadStarted = false;
+  bool _cashPromptShown = false;
   String? _lastSaleErrorCode;
 
   @override
@@ -55,6 +60,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     super.initState();
     widget.catalog.addListener(_changed);
     widget.cart.addListener(_changed);
+    widget.cash.addListener(_changed);
     widget.sales.addListener(_saleChanged);
     widget.connectivity.addListener(_changed);
     _scroll.addListener(() {
@@ -88,6 +94,24 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       );
       widget.connectivity.apiReachable(authorityValid: true);
       if (entry.operator != null) {
+        widget.cash.setContext(
+          tenantId: entry.selectedTenant!.id,
+          branchId: entry.selectedBranch!.id,
+          operatorSessionId: entry.operator!.id,
+        );
+        await widget.cash.load();
+        if (widget.cash.activeShiftId == null && !_cashPromptShown && mounted) {
+          _cashPromptShown = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              showCashCenter(
+                context,
+                controller: widget.cash,
+                onHandoffCompleted: widget.entry.lock,
+              );
+            }
+          });
+        }
         await widget.sales.open(
           entry.selectedTenant!.id,
           entry.selectedBranch!.id,
@@ -145,6 +169,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   void dispose() {
     widget.catalog.removeListener(_changed);
     widget.cart.removeListener(_changed);
+    widget.cash.removeListener(_changed);
     widget.sales.removeListener(_saleChanged);
     widget.connectivity.removeListener(_changed);
     _search.dispose();
@@ -169,6 +194,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                     child: _CartPanel(
                       controller: widget.cart,
                       checkout: widget.checkout,
+                      cash: widget.cash,
                       entry: widget.entry,
                       sales: widget.sales,
                       onEdit: (item) => _showDetail(item.productId, item),
@@ -199,6 +225,18 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                   _connectivityLabel(context, widget.connectivity.state),
                 ),
               ),
+            ),
+          ),
+          IconButton(
+            tooltip: l.cashCenterAction,
+            onPressed: () => showCashCenter(
+              context,
+              controller: widget.cash,
+              onHandoffCompleted: widget.entry.lock,
+            ),
+            icon: Badge(
+              isLabelVisible: widget.cash.activeShiftId == null,
+              child: const Icon(Icons.point_of_sale_outlined),
             ),
           ),
           IconButton(
@@ -341,6 +379,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                   child: _CartPanel(
                     controller: widget.cart,
                     checkout: widget.checkout,
+                    cash: widget.cash,
                     entry: widget.entry,
                     sales: widget.sales,
                     onEdit: (item) => _showDetail(item.productId, item),
@@ -846,12 +885,14 @@ final class _CartPanel extends StatelessWidget {
   const _CartPanel({
     required this.controller,
     required this.checkout,
+    required this.cash,
     required this.entry,
     required this.sales,
     required this.onEdit,
   });
   final CartController controller;
   final CheckoutController checkout;
+  final CashController cash;
   final EntryController entry;
   final SaleLifecycleController sales;
   final ValueChanged<CartItem> onEdit;
@@ -999,6 +1040,7 @@ final class _CartPanel extends StatelessWidget {
                   : () => showCheckoutSheet(
                       context,
                       checkout: checkout,
+                      cashShiftId: cash.activeShiftId,
                       cart: controller,
                       entry: entry,
                       sales: sales,

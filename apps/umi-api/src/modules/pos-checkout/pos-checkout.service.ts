@@ -317,6 +317,8 @@ export class PosCheckoutService {
           draft.id,
           reservation,
           receipt,
+          dto.cashShiftId ?? null,
+          context.commandId,
         );
         await context.appendFinancial(
           {
@@ -663,10 +665,10 @@ export class PosCheckoutService {
         correlationId,
         requiredPermission:
           code === 'APPROVAL_REQUIRED'
-            ? requiredPermission ??
+            ? (requiredPermission ??
               (command.discountDrafts.length
                 ? policy.discount.approvalPermission
-                : policy.manualTerminalApprovalPermission)
+                : policy.manualTerminalApprovalPermission))
             : null,
       },
       paymentSummary: summary,

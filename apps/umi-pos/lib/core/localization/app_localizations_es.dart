@@ -770,4 +770,171 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get confirmClearCartBody =>
       'Se eliminarán todos los productos de la venta actual.';
+
+  @override
+  String get cashCenterTitle => 'Centro de caja';
+
+  @override
+  String get cashCenterAction => 'Abrir Centro de caja';
+
+  @override
+  String get registerAvailableLabel => 'Caja disponible';
+
+  @override
+  String get registerAssignedLabel => 'Caja asignada';
+
+  @override
+  String get shiftRequiredMessage =>
+      'Abre un turno de caja antes de aceptar efectivo.';
+
+  @override
+  String get openShiftAction => 'Abrir turno de caja';
+
+  @override
+  String get openingFloatLabel => 'Fondo inicial';
+
+  @override
+  String get denominationCountLabel => 'Conteo por denominación';
+
+  @override
+  String get paidInAction => 'Entrada de efectivo';
+
+  @override
+  String get paidOutAction => 'Salida de efectivo';
+
+  @override
+  String get safeDropAction => 'Retiro a caja fuerte';
+
+  @override
+  String get drawerCorrectionAction => 'Corrección de caja';
+
+  @override
+  String get noSaleDrawerAction => 'Solicitar apertura de cajón';
+
+  @override
+  String get drawerRequestRecordedMessage =>
+      'La solicitud se registró. No se verificó una operación de hardware.';
+
+  @override
+  String get suspendShiftAction => 'Suspender turno';
+
+  @override
+  String get resumeShiftAction => 'Reanudar turno';
+
+  @override
+  String get handoffShiftAction => 'Entregar turno';
+
+  @override
+  String get incomingOperatorPinLabel => 'PIN del operador entrante';
+
+  @override
+  String get blindCountAction => 'Iniciar conteo ciego';
+
+  @override
+  String get recountAction => 'Iniciar reconteo';
+
+  @override
+  String get expectedCashLabel => 'Efectivo esperado';
+
+  @override
+  String get countedCashLabel => 'Efectivo contado';
+
+  @override
+  String get cashVarianceLabel => 'Diferencia';
+
+  @override
+  String get cashOverageLabel => 'Sobrante';
+
+  @override
+  String get cashShortageLabel => 'Faltante';
+
+  @override
+  String get cashToleranceLabel => 'Tolerancia';
+
+  @override
+  String get varianceReasonLabel => 'Motivo de la diferencia';
+
+  @override
+  String get cashApprovalAction => 'Solicitar aprobación de diferencia';
+
+  @override
+  String get reconcileShiftAction => 'Conciliar turno';
+
+  @override
+  String get closeShiftAction => 'Cerrar turno';
+
+  @override
+  String get shiftClosedMessage => 'El turno de caja está cerrado.';
+
+  @override
+  String get blockedShiftMessage =>
+      'Este turno está bloqueado. Sigue la guía de recuperación.';
+
+  @override
+  String get pendingCashPostingMessage =>
+      'Un movimiento pendiente debe terminar antes del cierre.';
+
+  @override
+  String get ambiguousCashEffectMessage =>
+      'Se desconoce un efecto de caja. Verifica la operación original.';
+
+  @override
+  String get cashRecoveryMessage =>
+      'Se restauró el estado guardado de la operación de caja.';
+
+  @override
+  String get shiftSummaryTitle => 'Resumen del turno';
+
+  @override
+  String get cashMovementAmountLabel => 'Importe del movimiento';
+
+  @override
+  String get cashMovementReasonLabel => 'Motivo del movimiento';
+
+  @override
+  String get submitCashMovementAction => 'Confirmar movimiento de caja';
+
+  @override
+  String get submitBlindCountAction => 'Enviar conteo ciego';
+
+  @override
+  String get cashOperationFailedMessage =>
+      'No fue posible completar la operación de caja de forma segura.';
+
+  @override
+  String get cashStatusOpen => 'Turno abierto';
+
+  @override
+  String get cashStatusSuspended => 'Turno suspendido';
+
+  @override
+  String get cashStatusCounting => 'Conteo de efectivo en curso';
+
+  @override
+  String get cashStatusReconciliation => 'Se requiere conciliación';
+
+  @override
+  String get cashStatusClosed => 'Turno cerrado';
+
+  @override
+  String get confirmCloseShiftTitle => '¿Cerrar este turno de caja?';
+
+  @override
+  String get confirmCloseShiftBody =>
+      'El cierre es definitivo. Los nuevos movimientos requieren otro turno.';
+
+  @override
+  String get varianceReasonNone => 'Sin diferencia';
+
+  @override
+  String get varianceReasonCounting => 'Error de conteo';
+
+  @override
+  String get varianceReasonChange => 'Error de cambio';
+
+  @override
+  String get varianceReasonHandling => 'Error de manejo de efectivo';
+
+  @override
+  String get varianceReasonUnknown => 'Diferencia operativa';
 }

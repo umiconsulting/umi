@@ -14,6 +14,7 @@ import 'checkout_controller.dart';
 Future<void> showCheckoutSheet(
   BuildContext context, {
   required CheckoutController checkout,
+  required String? cashShiftId,
   required CartController cart,
   required EntryController entry,
   required SaleLifecycleController sales,
@@ -22,6 +23,7 @@ Future<void> showCheckoutSheet(
   isScrollControlled: true,
   builder: (_) => _CheckoutSheet(
     checkout: checkout,
+    cashShiftId: cashShiftId,
     cart: cart,
     entry: entry,
     sales: sales,
@@ -31,11 +33,13 @@ Future<void> showCheckoutSheet(
 final class _CheckoutSheet extends StatefulWidget {
   const _CheckoutSheet({
     required this.checkout,
+    required this.cashShiftId,
     required this.cart,
     required this.entry,
     required this.sales,
   });
   final CheckoutController checkout;
+  final String? cashShiftId;
   final CartController cart;
   final EntryController entry;
   final SaleLifecycleController sales;
@@ -776,6 +780,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       authority: offlineAuthority,
       branchName: entry.selectedBranch?.name ?? '',
       operatorName: operator?.staffId ?? cart.operatorSessionId,
+      cashShiftId: widget.cashShiftId,
       cashReceivedMinorUnits: cashEnabled
           ? _minorUnits(cashReceived.text)
           : null,

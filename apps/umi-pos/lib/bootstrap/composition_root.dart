@@ -8,6 +8,9 @@ import '../core/security/credential_vault.dart';
 import '../core/storage/storage.dart';
 import '../features/cart/cart_controller.dart';
 import '../features/cart/cart_repository.dart';
+import '../features/cash/cash_controller.dart';
+import '../features/cash/cash_recovery_store.dart';
+import '../features/cash/cash_repository.dart';
 import '../features/catalog/catalog_controller.dart';
 import '../features/catalog/catalog_repository.dart';
 import '../features/checkout/checkout_controller.dart';
@@ -38,6 +41,7 @@ final class AppCompositionRoot {
     required this.entry,
     required this.catalog,
     required this.cart,
+    required this.cash,
     required this.checkout,
     required this.sales,
     required this.connectivity,
@@ -110,6 +114,10 @@ final class AppCompositionRoot {
         telemetry: telemetry,
       ),
       cart: cart,
+      cash: CashController(
+        repository: ApiCashRepository(apiClient),
+        recoveryStore: SecureCashRecoveryStore(secureStorage),
+      ),
       sales: SaleLifecycleController(
         repository: ApiSaleRepository(apiClient),
         cart: cart,
@@ -140,6 +148,7 @@ final class AppCompositionRoot {
   final EntryController entry;
   final CatalogController catalog;
   final CartController cart;
+  final CashController cash;
   final CheckoutController checkout;
   final SaleLifecycleController sales;
   final ConnectivityController connectivity;
@@ -151,6 +160,7 @@ final class AppCompositionRoot {
     entry.dispose();
     catalog.dispose();
     cart.dispose();
+    cash.dispose();
     checkout.dispose();
     sales.dispose();
     connectivity.dispose();

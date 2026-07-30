@@ -1501,6 +1501,324 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Se eliminarán todos los productos de la venta actual.'**
   String get confirmClearCartBody;
+
+  /// No description provided for @cashCenterTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Centro de caja'**
+  String get cashCenterTitle;
+
+  /// No description provided for @cashCenterAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Abrir Centro de caja'**
+  String get cashCenterAction;
+
+  /// No description provided for @registerAvailableLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Caja disponible'**
+  String get registerAvailableLabel;
+
+  /// No description provided for @registerAssignedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Caja asignada'**
+  String get registerAssignedLabel;
+
+  /// No description provided for @shiftRequiredMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Abre un turno de caja antes de aceptar efectivo.'**
+  String get shiftRequiredMessage;
+
+  /// No description provided for @openShiftAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Abrir turno de caja'**
+  String get openShiftAction;
+
+  /// No description provided for @openingFloatLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Fondo inicial'**
+  String get openingFloatLabel;
+
+  /// No description provided for @denominationCountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Conteo por denominación'**
+  String get denominationCountLabel;
+
+  /// No description provided for @paidInAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Entrada de efectivo'**
+  String get paidInAction;
+
+  /// No description provided for @paidOutAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Salida de efectivo'**
+  String get paidOutAction;
+
+  /// No description provided for @safeDropAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Retiro a caja fuerte'**
+  String get safeDropAction;
+
+  /// No description provided for @drawerCorrectionAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Corrección de caja'**
+  String get drawerCorrectionAction;
+
+  /// No description provided for @noSaleDrawerAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Solicitar apertura de cajón'**
+  String get noSaleDrawerAction;
+
+  /// No description provided for @drawerRequestRecordedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'La solicitud se registró. No se verificó una operación de hardware.'**
+  String get drawerRequestRecordedMessage;
+
+  /// No description provided for @suspendShiftAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Suspender turno'**
+  String get suspendShiftAction;
+
+  /// No description provided for @resumeShiftAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Reanudar turno'**
+  String get resumeShiftAction;
+
+  /// No description provided for @handoffShiftAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Entregar turno'**
+  String get handoffShiftAction;
+
+  /// No description provided for @incomingOperatorPinLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'PIN del operador entrante'**
+  String get incomingOperatorPinLabel;
+
+  /// No description provided for @blindCountAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Iniciar conteo ciego'**
+  String get blindCountAction;
+
+  /// No description provided for @recountAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Iniciar reconteo'**
+  String get recountAction;
+
+  /// No description provided for @expectedCashLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Efectivo esperado'**
+  String get expectedCashLabel;
+
+  /// No description provided for @countedCashLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Efectivo contado'**
+  String get countedCashLabel;
+
+  /// No description provided for @cashVarianceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Diferencia'**
+  String get cashVarianceLabel;
+
+  /// No description provided for @cashOverageLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Sobrante'**
+  String get cashOverageLabel;
+
+  /// No description provided for @cashShortageLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Faltante'**
+  String get cashShortageLabel;
+
+  /// No description provided for @cashToleranceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Tolerancia'**
+  String get cashToleranceLabel;
+
+  /// No description provided for @varianceReasonLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Motivo de la diferencia'**
+  String get varianceReasonLabel;
+
+  /// No description provided for @cashApprovalAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Solicitar aprobación de diferencia'**
+  String get cashApprovalAction;
+
+  /// No description provided for @reconcileShiftAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Conciliar turno'**
+  String get reconcileShiftAction;
+
+  /// No description provided for @closeShiftAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cerrar turno'**
+  String get closeShiftAction;
+
+  /// No description provided for @shiftClosedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El turno de caja está cerrado.'**
+  String get shiftClosedMessage;
+
+  /// No description provided for @blockedShiftMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Este turno está bloqueado. Sigue la guía de recuperación.'**
+  String get blockedShiftMessage;
+
+  /// No description provided for @pendingCashPostingMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Un movimiento pendiente debe terminar antes del cierre.'**
+  String get pendingCashPostingMessage;
+
+  /// No description provided for @ambiguousCashEffectMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Se desconoce un efecto de caja. Verifica la operación original.'**
+  String get ambiguousCashEffectMessage;
+
+  /// No description provided for @cashRecoveryMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Se restauró el estado guardado de la operación de caja.'**
+  String get cashRecoveryMessage;
+
+  /// No description provided for @shiftSummaryTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Resumen del turno'**
+  String get shiftSummaryTitle;
+
+  /// No description provided for @cashMovementAmountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Importe del movimiento'**
+  String get cashMovementAmountLabel;
+
+  /// No description provided for @cashMovementReasonLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Motivo del movimiento'**
+  String get cashMovementReasonLabel;
+
+  /// No description provided for @submitCashMovementAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirmar movimiento de caja'**
+  String get submitCashMovementAction;
+
+  /// No description provided for @submitBlindCountAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Enviar conteo ciego'**
+  String get submitBlindCountAction;
+
+  /// No description provided for @cashOperationFailedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'No fue posible completar la operación de caja de forma segura.'**
+  String get cashOperationFailedMessage;
+
+  /// No description provided for @cashStatusOpen.
+  ///
+  /// In es, this message translates to:
+  /// **'Turno abierto'**
+  String get cashStatusOpen;
+
+  /// No description provided for @cashStatusSuspended.
+  ///
+  /// In es, this message translates to:
+  /// **'Turno suspendido'**
+  String get cashStatusSuspended;
+
+  /// No description provided for @cashStatusCounting.
+  ///
+  /// In es, this message translates to:
+  /// **'Conteo de efectivo en curso'**
+  String get cashStatusCounting;
+
+  /// No description provided for @cashStatusReconciliation.
+  ///
+  /// In es, this message translates to:
+  /// **'Se requiere conciliación'**
+  String get cashStatusReconciliation;
+
+  /// No description provided for @cashStatusClosed.
+  ///
+  /// In es, this message translates to:
+  /// **'Turno cerrado'**
+  String get cashStatusClosed;
+
+  /// No description provided for @confirmCloseShiftTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'¿Cerrar este turno de caja?'**
+  String get confirmCloseShiftTitle;
+
+  /// No description provided for @confirmCloseShiftBody.
+  ///
+  /// In es, this message translates to:
+  /// **'El cierre es definitivo. Los nuevos movimientos requieren otro turno.'**
+  String get confirmCloseShiftBody;
+
+  /// No description provided for @varianceReasonNone.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin diferencia'**
+  String get varianceReasonNone;
+
+  /// No description provided for @varianceReasonCounting.
+  ///
+  /// In es, this message translates to:
+  /// **'Error de conteo'**
+  String get varianceReasonCounting;
+
+  /// No description provided for @varianceReasonChange.
+  ///
+  /// In es, this message translates to:
+  /// **'Error de cambio'**
+  String get varianceReasonChange;
+
+  /// No description provided for @varianceReasonHandling.
+  ///
+  /// In es, this message translates to:
+  /// **'Error de manejo de efectivo'**
+  String get varianceReasonHandling;
+
+  /// No description provided for @varianceReasonUnknown.
+  ///
+  /// In es, this message translates to:
+  /// **'Diferencia operativa'**
+  String get varianceReasonUnknown;
 }
 
 class _AppLocalizationsDelegate

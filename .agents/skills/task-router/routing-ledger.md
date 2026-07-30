@@ -21,6 +21,19 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-07-29 - UmiPOS Gate 3C cash shift operations
+- task type: product implementation and publication
+- request summary: Implement the physical register and cashier shift lifecycle.
+- filesystem slice inspected: UmiPOS, UMI API, contracts, migrations, scripts, and canonical product documents.
+- chosen owner: UMI API for cash authority and UmiPOS for the operator workflow.
+- chosen path: Extend the existing checkout, integrity, generated contract, and recovery boundaries.
+- skill or subagent used: task-router, workspace-boundary-check, tdd, code-review, and pr-gates.
+- files touched: Gate 3C contract, API, Flutter, migration, test, script, and canonical document files.
+- tools used: pnpm, Vitest, Flutter, Dart, Docker, PostgreSQL, Git, and GitHub CLI.
+- outcome: Gate 3C implementation and focused validation completed before publication.
+- reusable pattern observed: Store safe command identifiers and query the original command after response loss.
+- promotion follow-up: None.
+
 ### 2026-07-29 - UmiPOS Gate 3B advanced checkout
 - task type: product implementation and publication
 - request summary: Implement the advanced checkout and tender lifecycle.

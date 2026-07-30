@@ -189,14 +189,15 @@ export class PosCheckoutRepository {
       `INSERT INTO tenant.pos_checkout_draft
          (business_id,branch_id,cart_id,operator_session_id,device_id,state,
           command_fingerprint,tender_drafts,tip_draft,discount_drafts,
-          receipt_delivery,payment_summary,recovery_state)
-       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7,$8,$9,$10,$11,$12,$13)
+          receipt_delivery,payment_summary,recovery_state,cash_shift_id)
+       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7,$8,$9,$10,$11,$12,$13,$14::uuid)
        ON CONFLICT(business_id,cart_id) DO UPDATE SET
          state=excluded.state,version=tenant.pos_checkout_draft.version+1,
          command_fingerprint=excluded.command_fingerprint,
          tender_drafts=excluded.tender_drafts,tip_draft=excluded.tip_draft,
          discount_drafts=excluded.discount_drafts,receipt_delivery=excluded.receipt_delivery,
          payment_summary=excluded.payment_summary,recovery_state=excluded.recovery_state,
+         cash_shift_id=excluded.cash_shift_id,
          updated_at=now()
        WHERE tenant.pos_checkout_draft.state NOT IN ('completed','receipt_available','payment_unknown')
          AND tenant.pos_checkout_draft.operator_session_id=$4::uuid
@@ -230,6 +231,7 @@ export class PosCheckoutRepository {
         JSON.stringify(command.receiptDelivery),
         summary ? JSON.stringify(summary) : null,
         recoveryState,
+        command.cashShiftId,
       ],
     );
     if (!rows[0]) throw new Error('Checkout draft is immutable or belongs to another context.');
@@ -255,7 +257,8 @@ export class PosCheckoutRepository {
     ) {
       return {
         approved: false,
-        missingPermission: permissions[Math.min(approvalIds.length, permissions.length - 1)] ?? null,
+        missingPermission:
+          permissions[Math.min(approvalIds.length, permissions.length - 1)] ?? null,
       };
     }
     const matched = await client.query<{ id: string; permission: string }>(
@@ -285,14 +288,11 @@ export class PosCheckoutRepository {
       `UPDATE runtime.elevation_grant
        SET consumed_at=now(),consumed_by_command_id=$2::uuid
        WHERE id=ANY($1::uuid[]) AND consumed_at IS NULL`,
-      [
-        approvalIds,
-        input.commandId,
-      ],
+      [approvalIds, input.commandId],
     );
     return {
       approved: rowCount === permissions.length,
-      missingPermission: rowCount === permissions.length ? null : permissions[0] ?? null,
+      missingPermission: rowCount === permissions.length ? null : (permissions[0] ?? null),
     };
   }
 
@@ -582,7 +582,35 @@ export class PosCheckoutRepository {
     checkoutId: string,
     reservation: InventoryReservation,
     receipt: ReceiptSnapshot,
+    cashShiftId: string | null,
+    commandId: string,
   ): Promise<NonNullable<CheckoutResult['sale']>> {
+    const cashTenders = paymentSummary.tenders.filter((tender) => tender.type === 'cash');
+    if (cashTenders.length > 0 && cashShiftId === null) {
+      throw new Error('CASH_SHIFT_REQUIRED');
+    }
+    if (cashTenders.length > 1) {
+      throw new Error('MULTIPLE_CASH_TENDERS_NOT_ALLOWED');
+    }
+    if (cashShiftId) {
+      const eligible = await client.query(
+        `SELECT 1
+         FROM tenant.cash_shift s
+         JOIN tenant.pos_checkout_draft d ON d.id=$6::uuid AND d.cash_shift_id=s.id
+         WHERE s.id=$1::uuid AND s.business_id=$2::uuid AND s.branch_id=$3::uuid
+           AND s.operator_session_id=$4::uuid AND s.status='open' AND s.currency=$5
+         FOR UPDATE OF s`,
+        [
+          cashShiftId,
+          cart.tenantId,
+          cart.branchId,
+          cart.operatorSessionId,
+          confirmation.totals.grandTotal.currency,
+          checkoutId,
+        ],
+      );
+      if (!eligible.rows[0]) throw new Error('CASH_SHIFT_NOT_ELIGIBLE');
+    }
     const order = await client.query<{ id: string }>(
       `INSERT INTO tenant.customer_order
          (business_id,branch_id,customer_id,source,fulfillment_type,status,external_ref)
@@ -658,8 +686,8 @@ export class PosCheckoutRepository {
     const sale = await client.query<{ id: string; committedAt: string }>(
       `INSERT INTO tenant.pos_committed_sale
          (business_id,branch_id,cart_id,order_id,payment_attempt_id,
-          receipt_snapshot_id,totals_fingerprint)
-       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7)
+          receipt_snapshot_id,totals_fingerprint,cash_shift_id)
+       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7,$8::uuid)
        RETURNING id::text,committed_at::text AS "committedAt"`,
       [
         cart.tenantId,
@@ -669,8 +697,52 @@ export class PosCheckoutRepository {
         payments[0].attempt.id,
         receiptRow.rows[0].id,
         confirmation.fingerprint,
+        cashShiftId,
       ],
     );
+    if (cashShiftId && cashTenders[0]) {
+      const cash = cashTenders[0];
+      const shift = await client.query<{ sequence: string; registerId: string }>(
+        `SELECT (ledger_sequence+1)::text AS sequence,
+                register_id::text AS "registerId"
+         FROM tenant.cash_shift
+         WHERE id=$1::uuid AND status='open'
+         FOR UPDATE`,
+        [cashShiftId],
+      );
+      if (!shift.rows[0]) throw new Error('CASH_SHIFT_NOT_ELIGIBLE');
+      await client.query(
+        `INSERT INTO tenant.cash_ledger_entry
+           (business_id,branch_id,register_id,shift_id,sequence,entry_type,
+            amount_minor_units,cash_received_minor_units,change_given_minor_units,
+            currency,command_id,sale_id,tender_fact_id,business_date,public_data)
+         VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,'cash_sale',$6,$7,$8,$9,
+                 $10::uuid,$11::uuid,$12::uuid,$13::date,
+                 jsonb_build_object('checkoutId',$14::text))`,
+        [
+          cart.tenantId,
+          cart.branchId,
+          shift.rows[0].registerId,
+          cashShiftId,
+          shift.rows[0].sequence,
+          cash.applied.minorUnits,
+          cash.received?.minorUnits ?? cash.applied.minorUnits,
+          cash.change.minorUnits,
+          cash.applied.currency,
+          commandId,
+          sale.rows[0].id,
+          cash.tenderId,
+          cart.businessDate,
+          checkoutId,
+        ],
+      );
+      await client.query(
+        `UPDATE tenant.cash_shift
+         SET ledger_sequence=$2,version=version+1
+         WHERE id=$1::uuid`,
+        [cashShiftId, shift.rows[0].sequence],
+      );
+    }
     await client.query(
       `UPDATE tenant.inventory_reservation SET status='commit_prepared',updated_at=now()
        WHERE id=$1::uuid AND status='reserved'`,
@@ -750,23 +822,26 @@ export class PosCheckoutRepository {
       [tenantId, branchId, operatorSessionId, cartId, currentUserId, allowOtherOperator],
     );
     if (!scope.rows[0]) return null;
-    return this.pg.runWithTenant(tenantId, currentUserId, async (client) => {
-      const { rows } = await client.query<{
-        checkoutId: string;
-        cartId: string;
-        checkoutVersion: number;
-        state: CheckoutRecoverySnapshot['state'];
-        tenderDrafts: CheckoutRecoverySnapshot['tenderDrafts'];
-        tipDraft: CheckoutRecoverySnapshot['tipDraft'];
-        discountDrafts: CheckoutRecoverySnapshot['discountDrafts'];
-        receiptDelivery: CheckoutRecoverySnapshot['receiptDelivery'];
-        paymentSummary: CheckoutRecoverySnapshot['paymentSummary'];
-        recoveryState: CheckoutRecoverySnapshot['recoveryState'];
-        checkoutFingerprint: string | null;
-        result: CheckoutRecoverySnapshot['result'];
-        updatedAt: string;
-      }>(
-        `SELECT checkout.id::text AS "checkoutId",checkout.cart_id::text AS "cartId",
+    return this.pg.runWithTenant(
+      tenantId,
+      currentUserId,
+      async (client) => {
+        const { rows } = await client.query<{
+          checkoutId: string;
+          cartId: string;
+          checkoutVersion: number;
+          state: CheckoutRecoverySnapshot['state'];
+          tenderDrafts: CheckoutRecoverySnapshot['tenderDrafts'];
+          tipDraft: CheckoutRecoverySnapshot['tipDraft'];
+          discountDrafts: CheckoutRecoverySnapshot['discountDrafts'];
+          receiptDelivery: CheckoutRecoverySnapshot['receiptDelivery'];
+          paymentSummary: CheckoutRecoverySnapshot['paymentSummary'];
+          recoveryState: CheckoutRecoverySnapshot['recoveryState'];
+          checkoutFingerprint: string | null;
+          result: CheckoutRecoverySnapshot['result'];
+          updatedAt: string;
+        }>(
+          `SELECT checkout.id::text AS "checkoutId",checkout.cart_id::text AS "cartId",
                 checkout.version AS "checkoutVersion",checkout.state,
                 checkout.tender_drafts AS "tenderDrafts",
                 checkout.tip_draft AS "tipDraft",
@@ -783,22 +858,22 @@ export class PosCheckoutRepository {
          FROM tenant.pos_checkout_draft checkout
          WHERE checkout.business_id=$1::uuid AND checkout.branch_id=$2::uuid
            AND checkout.cart_id=$3::uuid`,
-        [tenantId, branchId, cartId],
-      );
-      const snapshot = rows[0];
-      if (!snapshot) return null;
-      const payment = await client.query<{
-        id: string;
-        method: PaymentMethod;
-        amountMinorUnits: string;
-        currency: string;
-        status: PaymentOutcome['attempt']['status'];
-        queryOnly: boolean;
-        correlationId: string;
-        expiresAt: string | null;
-        createdAt: string;
-      }>(
-        `SELECT id::text,method,amount_minor_units::text AS "amountMinorUnits",currency,
+          [tenantId, branchId, cartId],
+        );
+        const snapshot = rows[0];
+        if (!snapshot) return null;
+        const payment = await client.query<{
+          id: string;
+          method: PaymentMethod;
+          amountMinorUnits: string;
+          currency: string;
+          status: PaymentOutcome['attempt']['status'];
+          queryOnly: boolean;
+          correlationId: string;
+          expiresAt: string | null;
+          createdAt: string;
+        }>(
+          `SELECT id::text,method,amount_minor_units::text AS "amountMinorUnits",currency,
                 status,query_only AS "queryOnly",correlation_id AS "correlationId",
                 expires_at::text AS "expiresAt",created_at::text AS "createdAt"
          FROM tenant.pos_payment_attempt
@@ -806,36 +881,38 @@ export class PosCheckoutRepository {
            AND status IN ('unknown','timeout')
          ORDER BY created_at DESC
          LIMIT 1`,
-        [tenantId, branchId, cartId],
-      );
-      const row = payment.rows[0];
-      const paymentOutcome: PaymentOutcome | null = row
-        ? {
-            attempt: {
-              id: row.id,
-              method: row.method,
-              amount: {
-                minorUnits: Number(row.amountMinorUnits),
-                currency: row.currency,
+          [tenantId, branchId, cartId],
+        );
+        const row = payment.rows[0];
+        const paymentOutcome: PaymentOutcome | null = row
+          ? {
+              attempt: {
+                id: row.id,
+                method: row.method,
+                amount: {
+                  minorUnits: Number(row.amountMinorUnits),
+                  currency: row.currency,
+                },
+                status: row.status,
+                expiresAt: row.expiresAt,
+                queryOnly: row.queryOnly,
+                correlationId: row.correlationId,
+                createdAt: row.createdAt,
               },
-              status: row.status,
-              expiresAt: row.expiresAt,
-              queryOnly: row.queryOnly,
-              correlationId: row.correlationId,
-              createdAt: row.createdAt,
-            },
-            ambiguity: {
-              paymentRef: row.id,
-              status: 'unknown',
-              queryOnly: true,
-              canRetryAsNew: false,
-              queryAfter: row.expiresAt,
-              correlationId: row.correlationId,
-            },
-          }
-        : null;
-      return { ...snapshot, paymentOutcome };
-    }, branchId);
+              ambiguity: {
+                paymentRef: row.id,
+                status: 'unknown',
+                queryOnly: true,
+                canRetryAsNew: false,
+                queryAfter: row.expiresAt,
+                correlationId: row.correlationId,
+              },
+            }
+          : null;
+        return { ...snapshot, paymentOutcome };
+      },
+      branchId,
+    );
   }
 
   async cancelDraft(

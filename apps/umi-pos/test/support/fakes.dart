@@ -10,6 +10,8 @@ import 'package:umi_pos/core/security/credential_vault.dart';
 import 'package:umi_pos/core/storage/storage.dart';
 import 'package:umi_pos/features/cart/cart_controller.dart';
 import 'package:umi_pos/features/cart/cart_repository.dart';
+import 'package:umi_pos/features/cash/cash_controller.dart';
+import 'package:umi_pos/features/cash/cash_repository.dart';
 import 'package:umi_pos/features/catalog/catalog_controller.dart';
 import 'package:umi_pos/features/catalog/catalog_repository.dart';
 import 'package:umi_pos/features/checkout/checkout_controller.dart';
@@ -133,6 +135,7 @@ AppCompositionRoot testRoot({
       telemetry: telemetry,
     ),
     cart: cart,
+    cash: CashController(repository: ApiCashRepository(api)),
     sales: SaleLifecycleController(
       repository: ApiSaleRepository(api),
       cart: cart,

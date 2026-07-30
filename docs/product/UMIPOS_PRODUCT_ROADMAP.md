@@ -12,10 +12,11 @@ Updated: 2026-07-29
 | 2E Checkout and online sale commit      | Complete                   | 2D, command contracts  | Maintain authoritative online sale                         | None                                                    | Contract, API, migration, Flutter and web validation                                                                     |
 | 2F Offline journal and reconciliation   | Complete with observations | 2E, command envelopes  | Preserve certified offline boundary                        | Historical toolchain observation resolved in Gate 3A   | Focused contract, API, Flutter, Web, migration and PostgreSQL negative checks passed                                     |
 | 3A Sale lifecycle foundation            | Complete                   | 2F                     | Maintain cashier sale lifecycle                            | None                                                    | Focused contract, API, Flutter, accessibility, localization, Linux, and PostgreSQL checks passed                         |
-| 3B Advanced checkout and payment        | Complete                   | 3A                     | Approve the next commercial POS Gate                       | None                                                    | Focused contract, API, Flutter, accessibility, localization, Linux, and PostgreSQL checks passed                         |
-| Later platform work                     | Planned                    | 3B                     | Cash, inventory, refunds, KDS, customer display, Assistant | Next Gate scope approval                                | Not run                                                                                                                  |
+| 3B Advanced checkout and payment        | Complete                   | 3A                     | Maintain the checkout lifecycle                            | None                                                    | Focused contract, API, Flutter, accessibility, localization, Linux, and PostgreSQL checks passed                         |
+| 3C Cash shift and register operations   | Complete                   | 3B                     | Approve the next commercial POS Gate                       | None                                                    | Focused contract, API, Flutter, accessibility, localization, Linux, and PostgreSQL checks passed                         |
+| Later platform work                     | Planned                    | 3C                     | Inventory, refunds, KDS, customer display, Assistant       | Next Gate scope approval                                | Not run                                                                                                                  |
 
-The latest relevant revision is the Gate 3B commit containing this document.
+The latest relevant revision is the Gate 3C commit containing this document.
 Native encrypted offline support covers the explicit allowlist and server-policy-authorized cash;
 Web sensitive journaling remains disabled. UMI remains the
 sole business authority; Flutter owns presentation, hardware integration, encrypted local state,
@@ -27,3 +28,7 @@ Its Linux debug build passed with the current workspace toolchain.
 
 Gate 3B adds cash, manual terminal, mixed tender, tips, discounts, bound manager approval,
 payment recovery, receipt intent, and atomic sale, payment, and receipt commit.
+
+Gate 3C adds the physical register, cash shift, opening float, append-only cash ledger,
+cash movements, handoff, blind count, variance approval, reconciliation, and atomic close.
+Advanced cash operations remain online-only. A cash sale can use the Gate 2F offline policy.

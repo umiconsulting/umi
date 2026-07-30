@@ -119,3 +119,21 @@ Recommended Mac review sequence:
 - Review on tablet: mixed tender layout, tip controls, discount controls, and text scaling.
 - Review the English and Spanish recovery tone with cashiers and managers.
 - Owner approval remains pending. Gate 3B does not include final UX certification.
+
+## Gate 3C cash shift and register operations
+
+- Implemented: the assigned register and the current shift status remain visible.
+- Implemented: the opening flow supports zero or total opening float.
+- Implemented: Paid In, Paid Out, Safe Drop, suspend, resume, and no-sale requests.
+- Implemented: handoff authenticates the incoming operator by PIN and requires a new PIN entry.
+- Implemented: blind count hides expected cash until the server accepts the count.
+- Implemented: the variance view distinguishes expected, counted, tolerance, and difference.
+- Implemented: recount preserves each prior count and manager approval binds to one variance.
+- Implemented: reconciliation and close use explicit confirmation and immutable server results.
+- Implemented: restart recovery restores the current shift, count, variance, and reconciliation.
+- Implemented: response-loss recovery queries the original cash command before a retry.
+- Implemented: a policy threshold requests a manager PIN before final close.
+- Review on pilot hardware: opening speed, denomination density, and movement reason selection.
+- Review on tablet: Cash Center action density, count entry, text scaling, and dialog focus.
+- Review the English and Spanish terms for Paid Out, Safe Drop, and variance with operators.
+- Owner approval remains pending. Gate 3C does not include final UX certification.

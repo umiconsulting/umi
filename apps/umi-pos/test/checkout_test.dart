@@ -650,6 +650,7 @@ void main() {
                 onPressed: () => showCheckoutSheet(
                   context,
                   checkout: checkout,
+                  cashShiftId: null,
                   cart: cart,
                   entry: root.entry,
                   sales: root.sales,

@@ -69,6 +69,33 @@ export const routes = {
       `/api/pos/tenants/${enc(tenantId)}/checkout/carts/${enc(cartId)}`,
     checkoutCancel: (tenantId: string, cartId: string): string =>
       `/api/pos/tenants/${enc(tenantId)}/checkout/carts/${enc(cartId)}/cancel`,
+    cashCenter: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/cash`,
+    cashCommand: (tenantId: string, commandId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/cash/commands/${enc(commandId)}`,
+    cashRegisters: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/cash/registers`,
+    cashShifts: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/cash/shifts`,
+    cashShift: (tenantId: string, shiftId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}`,
+    cashMovement: (tenantId: string, shiftId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/movements`,
+    cashSuspend: (tenantId: string, shiftId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/suspend`,
+    cashResume: (tenantId: string, shiftId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/resume`,
+    cashHandoff: (tenantId: string, shiftId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/handoff`,
+    cashCount: (tenantId: string, shiftId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/counts`,
+    cashRecount: (tenantId: string, shiftId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/counts/recount`,
+    cashVariance: (tenantId: string, shiftId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/variance`,
+    cashReconcile: (tenantId: string, shiftId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/reconcile`,
+    cashClose: (tenantId: string, shiftId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/close`,
+    cashNoSale: (tenantId: string, shiftId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/no-sale`,
     sales: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/sales`,
     currentSale: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/sales/current`,
     saleSuspend: (tenantId: string, saleId: string): string =>

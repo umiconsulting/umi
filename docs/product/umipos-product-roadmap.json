@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-07-29",
-  "latestRelevantCommit": "HEAD (Gate 3B commit)",
+  "latestRelevantCommit": "HEAD (Gate 3C commit)",
   "items": [
     {
       "id": "platform-certification",
@@ -71,9 +71,17 @@
       "id": "3B",
       "status": "complete",
       "dependencies": ["3A"],
-      "nextObjective": "Approve the scope of the next commercial POS Gate",
+      "nextObjective": "Maintain the advanced checkout lifecycle",
       "blockers": [],
       "validationState": "Focused contract, API, Flutter, accessibility, localization, Linux, and disposable PostgreSQL validation passed"
+    },
+    {
+      "id": "3C",
+      "status": "complete",
+      "dependencies": ["3B"],
+      "nextObjective": "Approve the scope of the next commercial POS Gate",
+      "blockers": [],
+      "validationState": "Focused contract, API, Flutter, accessibility, localization, Linux, cash invariants, and disposable PostgreSQL validation passed"
     }
   ]
 }

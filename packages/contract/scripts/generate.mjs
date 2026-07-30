@@ -236,6 +236,32 @@ const dartRoutes = `abstract final class UmiRoutes {
       '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/checkout/carts/\${Uri.encodeComponent(cartId)}';
   static String posCheckoutCancel(String tenantId, String cartId) =>
       '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/checkout/carts/\${Uri.encodeComponent(cartId)}/cancel';
+  static String posCashCenter(String tenantId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/cash';
+  static String posCashCommand(String tenantId, String commandId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/cash/commands/\${Uri.encodeComponent(commandId)}';
+  static String posCashShifts(String tenantId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/cash/shifts';
+  static String posCashMovement(String tenantId, String shiftId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/cash/shifts/\${Uri.encodeComponent(shiftId)}/movements';
+  static String posCashSuspend(String tenantId, String shiftId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/cash/shifts/\${Uri.encodeComponent(shiftId)}/suspend';
+  static String posCashResume(String tenantId, String shiftId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/cash/shifts/\${Uri.encodeComponent(shiftId)}/resume';
+  static String posCashHandoff(String tenantId, String shiftId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/cash/shifts/\${Uri.encodeComponent(shiftId)}/handoff';
+  static String posCashCount(String tenantId, String shiftId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/cash/shifts/\${Uri.encodeComponent(shiftId)}/counts';
+  static String posCashRecount(String tenantId, String shiftId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/cash/shifts/\${Uri.encodeComponent(shiftId)}/counts/recount';
+  static String posCashVariance(String tenantId, String shiftId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/cash/shifts/\${Uri.encodeComponent(shiftId)}/variance';
+  static String posCashReconcile(String tenantId, String shiftId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/cash/shifts/\${Uri.encodeComponent(shiftId)}/reconcile';
+  static String posCashClose(String tenantId, String shiftId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/cash/shifts/\${Uri.encodeComponent(shiftId)}/close';
+  static String posCashNoSale(String tenantId, String shiftId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/cash/shifts/\${Uri.encodeComponent(shiftId)}/no-sale';
   static String posSales(String tenantId) =>
       '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/sales';
   static String posCurrentSale(String tenantId) =>

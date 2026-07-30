@@ -106,6 +106,13 @@
       "status": "complete",
       "stateMachineVersion": 1,
       "subject": "Advanced checkout, cash, manual terminal, mixed tender, policy actions, and payment recovery"
+    },
+    {
+      "commit": "HEAD (Gate 3C commit)",
+      "id": "3C",
+      "status": "complete",
+      "stateMachineVersion": 1,
+      "subject": "Physical register, cash shift, immutable ledger, blind count, reconciliation, and close"
     }
   ]
 }

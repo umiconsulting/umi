@@ -765,4 +765,171 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get confirmClearCartBody =>
       'All items will be removed from the current sale.';
+
+  @override
+  String get cashCenterTitle => 'Cash Center';
+
+  @override
+  String get cashCenterAction => 'Open Cash Center';
+
+  @override
+  String get registerAvailableLabel => 'Register available';
+
+  @override
+  String get registerAssignedLabel => 'Assigned register';
+
+  @override
+  String get shiftRequiredMessage =>
+      'Open a cash shift before you accept cash.';
+
+  @override
+  String get openShiftAction => 'Open cash shift';
+
+  @override
+  String get openingFloatLabel => 'Opening float';
+
+  @override
+  String get denominationCountLabel => 'Denomination count';
+
+  @override
+  String get paidInAction => 'Paid In';
+
+  @override
+  String get paidOutAction => 'Paid Out';
+
+  @override
+  String get safeDropAction => 'Safe Drop';
+
+  @override
+  String get drawerCorrectionAction => 'Drawer correction';
+
+  @override
+  String get noSaleDrawerAction => 'Request drawer opening';
+
+  @override
+  String get drawerRequestRecordedMessage =>
+      'The drawer opening request was recorded. Hardware operation is not verified.';
+
+  @override
+  String get suspendShiftAction => 'Suspend shift';
+
+  @override
+  String get resumeShiftAction => 'Resume shift';
+
+  @override
+  String get handoffShiftAction => 'Hand off shift';
+
+  @override
+  String get incomingOperatorPinLabel => 'Incoming operator PIN';
+
+  @override
+  String get blindCountAction => 'Start blind count';
+
+  @override
+  String get recountAction => 'Start recount';
+
+  @override
+  String get expectedCashLabel => 'Expected cash';
+
+  @override
+  String get countedCashLabel => 'Counted cash';
+
+  @override
+  String get cashVarianceLabel => 'Variance';
+
+  @override
+  String get cashOverageLabel => 'Overage';
+
+  @override
+  String get cashShortageLabel => 'Shortage';
+
+  @override
+  String get cashToleranceLabel => 'Tolerance';
+
+  @override
+  String get varianceReasonLabel => 'Variance reason';
+
+  @override
+  String get cashApprovalAction => 'Request variance approval';
+
+  @override
+  String get reconcileShiftAction => 'Reconcile shift';
+
+  @override
+  String get closeShiftAction => 'Close shift';
+
+  @override
+  String get shiftClosedMessage => 'The cash shift is closed.';
+
+  @override
+  String get blockedShiftMessage =>
+      'This shift is blocked. Follow the recovery guidance.';
+
+  @override
+  String get pendingCashPostingMessage =>
+      'A pending cash posting must finish before close.';
+
+  @override
+  String get ambiguousCashEffectMessage =>
+      'A cash effect is unknown. Verify the original operation.';
+
+  @override
+  String get cashRecoveryMessage =>
+      'The saved cash operation state was restored.';
+
+  @override
+  String get shiftSummaryTitle => 'Shift summary';
+
+  @override
+  String get cashMovementAmountLabel => 'Movement amount';
+
+  @override
+  String get cashMovementReasonLabel => 'Movement reason';
+
+  @override
+  String get submitCashMovementAction => 'Confirm cash movement';
+
+  @override
+  String get submitBlindCountAction => 'Submit blind count';
+
+  @override
+  String get cashOperationFailedMessage =>
+      'The cash operation could not complete safely.';
+
+  @override
+  String get cashStatusOpen => 'Shift open';
+
+  @override
+  String get cashStatusSuspended => 'Shift suspended';
+
+  @override
+  String get cashStatusCounting => 'Cash count in progress';
+
+  @override
+  String get cashStatusReconciliation => 'Reconciliation required';
+
+  @override
+  String get cashStatusClosed => 'Shift closed';
+
+  @override
+  String get confirmCloseShiftTitle => 'Close this cash shift?';
+
+  @override
+  String get confirmCloseShiftBody =>
+      'The close is final. New cash postings will require a new shift.';
+
+  @override
+  String get varianceReasonNone => 'No variance';
+
+  @override
+  String get varianceReasonCounting => 'Counting error';
+
+  @override
+  String get varianceReasonChange => 'Change error';
+
+  @override
+  String get varianceReasonHandling => 'Cash handling error';
+
+  @override
+  String get varianceReasonUnknown => 'Operational difference';
 }
