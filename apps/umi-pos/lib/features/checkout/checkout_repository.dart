@@ -9,6 +9,16 @@ abstract interface class CheckoutRepository {
     String paymentId,
     PaymentStatusQuery query,
   );
+  Future<CheckoutRecoverySnapshot> recovery(
+    String tenantId,
+    String cartId,
+    CheckoutRecoveryQuery query,
+  );
+  Future<CheckoutCancellationResult> cancel(
+    String tenantId,
+    String cartId,
+    CheckoutCancellationRequest request,
+  );
 }
 
 final class ApiCheckoutRepository implements CheckoutRepository {
@@ -42,6 +52,38 @@ final class ApiCheckoutRepository implements CheckoutRepository {
           'operatorSessionId': query.operatorSessionId,
         },
       ).toString(),
+    ),
+  );
+
+  @override
+  Future<CheckoutRecoverySnapshot> recovery(
+    String tenantId,
+    String cartId,
+    CheckoutRecoveryQuery query,
+  ) async => CheckoutRecoverySnapshot.fromJson(
+    await _api.request(
+      method: ApiMethod.get,
+      path: Uri(
+        path: UmiRoutes.posCheckoutRecovery(tenantId, cartId),
+        queryParameters: {
+          'branchId': query.branchId,
+          'operatorSessionId': query.operatorSessionId,
+        },
+      ).toString(),
+    ),
+  );
+
+  @override
+  Future<CheckoutCancellationResult> cancel(
+    String tenantId,
+    String cartId,
+    CheckoutCancellationRequest request,
+  ) async => CheckoutCancellationResult.fromJson(
+    await _api.request(
+      method: ApiMethod.post,
+      path: UmiRoutes.posCheckoutCancel(tenantId, cartId),
+      body: request.toJson(),
+      idempotent: true,
     ),
   );
 }

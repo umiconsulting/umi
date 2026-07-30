@@ -42,6 +42,8 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Gate 3A established one server-authoritative sale lifecycle. It supports start, suspend,
   resume, cancel, customer attachment, sale navigation, receipt navigation, and automatic
   next-sale creation.
+- Gate 3B established one checkout lifecycle. It supports cash, manual terminal, mixed tender,
+  policy-controlled tips and discounts, one-use manager approval, recovery, and receipt intent.
 
 ## Current implementation state
 
@@ -84,8 +86,8 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - UmiPOS uses a personal tenant-unique PIN after device trust. The API resolves the staff identity
   and current role without an email or client role selector.
 - `runtime.operator_session` separates operator presence from PIN authentication.
-- UmiPOS consumes contract version `1.9.0`, content hash
-  `13db86bce50686813f3f8a58e522653a8cabe26c5e598e085da8562f2ca6edb9`.
+- UmiPOS consumes contract version `2.0.0`, content hash
+  `9fd5f48ec99fb9c71ecb52bf05a3966a3dce7b04dbfcdd9e0fe348957cb5145a`.
 - Native UmiPOS journal schema version 1 uses AES-256-GCM with platform-secure key storage and
   separate ciphertext persistence. Replay is ordered per device credential version; Web sensitive
   journaling is unsupported.
@@ -95,8 +97,13 @@ Future clients use `packages/contract` and controlled UMI APIs.
   and operator identity can own only one editable sale. Terminal sales are immutable.
 - `tenant.pos_committed_sale` and `tenant.receipt_snapshot` are immutable checkout facts.
   `tenant.inventory_reservation` is a time-bounded preparation record and never decrements stock.
-- Cash checkout commits atomically through `tenant.business_command`; an external-terminal
-  unknown outcome is query-only and does not create an order, receipt, or financial event.
+- Checkout commits atomically through `tenant.business_command`. Cash and manual-terminal
+  tender facts use integer minor units. Mixed payment requires full server-confirmed coverage.
+- A manual-terminal result is an operator assertion. An unknown result remains query-only.
+  It does not create an order, a receipt, or a financial event.
+- Tips and discounts use a branch policy. Each sensitive permission requires a separate,
+  short, one-use manager approval bound to the full tender fingerprint.
+- Recovery returns the immutable committed result and receipt after response loss or restart.
 - POS refresh sessions require the active server device plus its installation and credential
   hashes. Revocation/replacement ends durable and operator sessions.
 
@@ -121,7 +128,7 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Certification date: `2026-07-27`
 - `BUILD_V3_CERTIFIED`: `true`
 - UmiPOS application creation: `YES WITH OBSERVATIONS`
-- Remote publication: Gate 3A publication follows the local commit through the PR gate.
+- Remote publication: Gate 3B publication follows the local commit through the PR gate.
 - Gate 2F: complete with the external native-toolchain observation. The full disposable PostgreSQL
   migration chain and negative authorization matrix passed. Linux debug compilation cannot start
   because the runner lacks CMake, Ninja, Clang, and GTK development headers; no code defect is
@@ -130,13 +137,13 @@ Future clients use `packages/contract` and controlled UMI APIs.
   automatic next-sale creation.
 - Gate 3A produced a successful Linux debug build. This resolves the earlier runner toolchain
   observation for the current workspace.
-- Next gate: 3B, Advanced Checkout and Payment Experience.
+- Gate 3B: complete. Checkout state version 1 supports cash, manual terminal, mixed tender,
+  tips, discounts, recovery, and receipt intent.
+- Gate 3B produced successful Linux debug and Web compatibility builds.
+- Next gate: scope approval is required for the next commercial POS Gate.
 
-## Gate 3A decision basis
+## Gate 3B decision basis
 
-- Documented fact: the UMI API already owns `tenant.pos_cart`, checkout, customers, and operator
-  sessions in this transition branch.
-- Source-backed tradeoff: the existing transaction, RLS, and generated-contract boundaries keep
-  sale authority in one service and one migration chain.
-- Umi-specific inference: tenant, branch, and operator identity form the active-sale uniqueness
-  key. An operator session can change after a restart.
+- Documented fact: the UMI API owns checkout, command idempotency, receipt snapshots, and audit.
+- Source-backed tradeoff: draft tender state remains separate from immutable committed facts.
+- Umi-specific inference: manual terminal confirmation proves an operator assertion only.

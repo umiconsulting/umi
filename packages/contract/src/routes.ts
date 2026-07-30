@@ -65,6 +65,10 @@ export const routes = {
     checkout: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/checkout`,
     checkoutPayment: (tenantId: string, paymentId: string): string =>
       `/api/pos/tenants/${enc(tenantId)}/checkout/payments/${enc(paymentId)}`,
+    checkoutRecovery: (tenantId: string, cartId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/checkout/carts/${enc(cartId)}`,
+    checkoutCancel: (tenantId: string, cartId: string): string =>
+      `/api/pos/tenants/${enc(tenantId)}/checkout/carts/${enc(cartId)}/cancel`,
     sales: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/sales`,
     currentSale: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/sales/current`,
     saleSuspend: (tenantId: string, saleId: string): string =>

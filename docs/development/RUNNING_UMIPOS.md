@@ -180,3 +180,35 @@ Test this cashier flow:
 
 Use the existing offline checkout path for a policy-authorized offline cash sale. Lifecycle
 commands require API authority. Gate 3A preserves the Gate 2F journal allowlist.
+
+## Advanced checkout
+
+Apply migrations through `20260729000400_gate_3b_advanced_checkout.sql`.
+
+Use these commands:
+
+- Run focused API tests: `pnpm umi-pos:checkout-api-tests`.
+- Run focused Flutter tests: `pnpm umi-pos:checkout-tests`.
+- Run the disposable PostgreSQL check: `pnpm umi-pos:checkout-db-check`.
+
+Test the online cashier flow:
+
+1. Enroll a development device and approve it in UMI.
+2. Sign in with a cashier PIN.
+3. Add products and open checkout.
+4. Test exact cash and cash with change.
+5. Review totals again after each tender, tip, or discount change.
+6. Test cash plus manual terminal.
+7. Mark a terminal result as failed. Confirm that the sale remains available.
+8. Mark a terminal result as unknown. Query the same result. Do not create another charge.
+9. Apply a preset tip and a custom tip.
+10. Apply a percentage or fixed order discount with a reason.
+11. Use a different manager PIN when approval is required.
+12. Select display, print-later, or no-receipt intent.
+13. Complete checkout and verify that one new empty sale starts.
+14. Restart during tender collection and verify the recovered draft.
+
+The digital receipt option is a contract foundation. Gate 3B does not send email or SMS.
+Manual terminal success records an operator assertion. It is not provider proof.
+Offline checkout supports one policy-authorized cash tender only. Advanced tender, tip,
+discount, and live approval actions require connectivity.

@@ -647,7 +647,7 @@ abstract class AppLocalizations {
   /// No description provided for @discountLabel.
   ///
   /// In es, this message translates to:
-  /// **'Vista previa de descuentos'**
+  /// **'Descuento'**
   String get discountLabel;
 
   /// No description provided for @totalLabel.
@@ -860,11 +860,227 @@ abstract class AppLocalizations {
   /// **'Efectivo recibido'**
   String get cashReceivedLabel;
 
+  /// No description provided for @tenderSelectionTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Selección de pago'**
+  String get tenderSelectionTitle;
+
+  /// No description provided for @cashTenderTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Efectivo'**
+  String get cashTenderTitle;
+
+  /// No description provided for @tenderAmountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Importe aplicado'**
+  String get tenderAmountLabel;
+
+  /// No description provided for @exactAmountAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Importe exacto'**
+  String get exactAmountAction;
+
+  /// No description provided for @manualTerminalLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Terminal manual'**
+  String get manualTerminalLabel;
+
+  /// No description provided for @terminalProcessingAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Procesando fuera del POS'**
+  String get terminalProcessingAction;
+
+  /// No description provided for @terminalSuccessAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirmar éxito'**
+  String get terminalSuccessAction;
+
+  /// No description provided for @terminalFailureAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Informar fallo'**
+  String get terminalFailureAction;
+
+  /// No description provided for @terminalUnknownAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Resultado desconocido'**
+  String get terminalUnknownAction;
+
+  /// No description provided for @tipLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Propina'**
+  String get tipLabel;
+
+  /// No description provided for @noTipAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin propina'**
+  String get noTipAction;
+
+  /// No description provided for @customTipPercentLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Porcentaje de propina personalizado'**
+  String get customTipPercentLabel;
+
+  /// No description provided for @customTipFixedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Importe de propina personalizado'**
+  String get customTipFixedLabel;
+
+  /// No description provided for @percentageDiscountAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Porcentaje'**
+  String get percentageDiscountAction;
+
+  /// No description provided for @fixedDiscountAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Importe fijo'**
+  String get fixedDiscountAction;
+
+  /// No description provided for @discountPercentLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Porcentaje de descuento'**
+  String get discountPercentLabel;
+
+  /// No description provided for @discountAmountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Importe del descuento'**
+  String get discountAmountLabel;
+
+  /// No description provided for @discountReasonLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Motivo del descuento'**
+  String get discountReasonLabel;
+
+  /// No description provided for @receiptDestinationLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Destino del recibo'**
+  String get receiptDestinationLabel;
+
+  /// No description provided for @displayReceiptAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Mostrar recibo'**
+  String get displayReceiptAction;
+
+  /// No description provided for @printLaterAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Imprimir después'**
+  String get printLaterAction;
+
+  /// No description provided for @noReceiptAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin recibo'**
+  String get noReceiptAction;
+
+  /// No description provided for @managerApprovalAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Solicitar aprobación'**
+  String get managerApprovalAction;
+
+  /// No description provided for @managerApprovalTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Se requiere aprobación del gerente'**
+  String get managerApprovalTitle;
+
+  /// No description provided for @managerPinLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'PIN del gerente'**
+  String get managerPinLabel;
+
+  /// No description provided for @managerApprovalDeniedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El PIN o el permiso del gerente no es válido para este cobro.'**
+  String get managerApprovalDeniedMessage;
+
+  /// No description provided for @approveAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Aprobar'**
+  String get approveAction;
+
+  /// No description provided for @insufficientCashMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El efectivo recibido no cubre el importe aplicado.'**
+  String get insufficientCashMessage;
+
+  /// No description provided for @remainingBalanceMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Agrega un pago para cubrir el saldo pendiente.'**
+  String get remainingBalanceMessage;
+
+  /// No description provided for @approvalRequiredMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Un gerente debe aprobar este cobro.'**
+  String get approvalRequiredMessage;
+
+  /// No description provided for @terminalFailureMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El pago de la terminal falló. Revisa los pagos.'**
+  String get terminalFailureMessage;
+
+  /// No description provided for @tipRejectedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'La política de propinas rechazó esta propina.'**
+  String get tipRejectedMessage;
+
+  /// No description provided for @discountRejectedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'La política de descuentos rechazó este descuento.'**
+  String get discountRejectedMessage;
+
   /// No description provided for @changeDueLabel.
   ///
   /// In es, this message translates to:
   /// **'Cambio'**
   String get changeDueLabel;
+
+  /// No description provided for @appliedAmountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Importe aplicado'**
+  String get appliedAmountLabel;
+
+  /// No description provided for @remainingBalanceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Saldo pendiente'**
+  String get remainingBalanceLabel;
+
+  /// No description provided for @offlineAdvancedTenderBlockedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Reconecta para usar la terminal manual, el pago mixto, las propinas o los descuentos. La venta se conserva.'**
+  String get offlineAdvancedTenderBlockedMessage;
 
   /// No description provided for @recoveryQueryTitle.
   ///

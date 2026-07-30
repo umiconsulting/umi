@@ -450,6 +450,32 @@ final class EntryController extends ChangeNotifier {
     }
   }
 
+  Future<String?> requestCheckoutApproval({
+    required String managerPin,
+    required String permission,
+    required String commandFingerprint,
+  }) async {
+    final operator = _state.operator;
+    final tenant = _state.selectedTenant;
+    final branch = _state.selectedBranch;
+    if (operator == null || tenant == null || branch == null) return null;
+    try {
+      final grant = await _gateway.requestManagerApproval(
+        operatorSessionId: operator.id,
+        managerPin: managerPin,
+        permission: permission,
+        tenantId: tenant.id,
+        branchId: branch.id,
+        commandFingerprint: commandFingerprint,
+      );
+      _event('checkout.approval_granted');
+      return grant.elevationId;
+    } on AppException catch (error) {
+      _event('checkout.approval_denied', error.code);
+      return null;
+    }
+  }
+
   Future<void> logout() async {
     final operator = _state.operator;
     if (operator != null) await _gateway.endOperator(operator.id);

@@ -309,7 +309,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taxLabel => 'Taxes';
 
   @override
-  String get discountLabel => 'Discount preview';
+  String get discountLabel => 'Discount';
 
   @override
   String get totalLabel => 'Total';
@@ -424,7 +424,121 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cashReceivedLabel => 'Cash received';
 
   @override
+  String get tenderSelectionTitle => 'Payment selection';
+
+  @override
+  String get cashTenderTitle => 'Cash';
+
+  @override
+  String get tenderAmountLabel => 'Amount applied';
+
+  @override
+  String get exactAmountAction => 'Exact amount';
+
+  @override
+  String get manualTerminalLabel => 'Manual terminal';
+
+  @override
+  String get terminalProcessingAction => 'Processing externally';
+
+  @override
+  String get terminalSuccessAction => 'Confirm success';
+
+  @override
+  String get terminalFailureAction => 'Report failure';
+
+  @override
+  String get terminalUnknownAction => 'Outcome unknown';
+
+  @override
+  String get tipLabel => 'Tip';
+
+  @override
+  String get noTipAction => 'No tip';
+
+  @override
+  String get customTipPercentLabel => 'Custom tip percent';
+
+  @override
+  String get customTipFixedLabel => 'Custom tip amount';
+
+  @override
+  String get percentageDiscountAction => 'Percentage';
+
+  @override
+  String get fixedDiscountAction => 'Fixed amount';
+
+  @override
+  String get discountPercentLabel => 'Discount percent';
+
+  @override
+  String get discountAmountLabel => 'Discount amount';
+
+  @override
+  String get discountReasonLabel => 'Discount reason';
+
+  @override
+  String get receiptDestinationLabel => 'Receipt destination';
+
+  @override
+  String get displayReceiptAction => 'Display receipt';
+
+  @override
+  String get printLaterAction => 'Print later';
+
+  @override
+  String get noReceiptAction => 'No receipt';
+
+  @override
+  String get managerApprovalAction => 'Request manager approval';
+
+  @override
+  String get managerApprovalTitle => 'Manager approval required';
+
+  @override
+  String get managerPinLabel => 'Manager PIN';
+
+  @override
+  String get managerApprovalDeniedMessage =>
+      'The manager PIN or permission is not valid for this checkout.';
+
+  @override
+  String get approveAction => 'Approve';
+
+  @override
+  String get insufficientCashMessage =>
+      'The cash received does not cover the applied cash amount.';
+
+  @override
+  String get remainingBalanceMessage =>
+      'Add a tender for the remaining balance.';
+
+  @override
+  String get approvalRequiredMessage => 'A manager must approve this checkout.';
+
+  @override
+  String get terminalFailureMessage =>
+      'The terminal payment failed. Review the tenders.';
+
+  @override
+  String get tipRejectedMessage => 'The branch tip policy rejected this tip.';
+
+  @override
+  String get discountRejectedMessage =>
+      'The branch discount policy rejected this discount.';
+
+  @override
   String get changeDueLabel => 'Change due';
+
+  @override
+  String get appliedAmountLabel => 'Applied amount';
+
+  @override
+  String get remainingBalanceLabel => 'Remaining balance';
+
+  @override
+  String get offlineAdvancedTenderBlockedMessage =>
+      'Reconnect to use manual terminal, mixed payment, tips, or discounts. The sale is preserved.';
 
   @override
   String get recoveryQueryTitle => 'Check saved result';

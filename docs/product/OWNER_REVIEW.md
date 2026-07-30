@@ -106,3 +106,16 @@ Recommended Mac review sequence:
 - Review on pilot hardware: consecutive-sale focus, suspend labels, cancellation wording, and
   receipt density.
 - Review keyboard and touch use on desktop and tablet. Owner approval remains pending.
+
+## Gate 3B advanced checkout
+
+- Implemented: cash entry, exact payment, denomination shortcuts, change, and server totals.
+- Implemented: manual terminal states. The UI does not claim provider authorization.
+- Implemented: mixed cash and manual-terminal tender with a visible server balance.
+- Implemented: preset and custom tips, order discounts, reasons, and manager approval.
+- Implemented: receipt destination, payment recovery, and automatic next-sale transition.
+- Implemented: unknown terminal outcomes remain visible and query-only after restart.
+- Review on pilot hardware: keypad speed, tender density, change emphasis, and dialog focus.
+- Review on tablet: mixed tender layout, tip controls, discount controls, and text scaling.
+- Review the English and Spanish recovery tone with cashiers and managers.
+- Owner approval remains pending. Gate 3B does not include final UX certification.

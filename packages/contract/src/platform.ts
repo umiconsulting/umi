@@ -372,6 +372,22 @@ export const ReceiptSnapshot = z
       })
       .strict()
       .optional(),
+    payments: z
+      .array(
+        z
+          .object({
+            tenderId: Uuid,
+            method: z.enum(['cash', 'manual_terminal']),
+            amount: Money,
+            received: Money.nullable(),
+            change: Money,
+          })
+          .strict(),
+      )
+      .max(8)
+      .optional(),
+    tip: Money.optional(),
+    receiptDestination: z.enum(['display', 'print_later', 'digital', 'none']).optional(),
     discountTotal: Money.optional(),
   })
   .strict();

@@ -201,6 +201,63 @@ begin
   end;
 end $$;
 
+insert into runtime.elevation_grant(
+  id,session_id,business_id,branch_id,permission_key,method,approved_by,
+  expires_at,command_fingerprint,consumed_at,consumed_by_command_id
+) values (
+  '83000000-0000-4000-8000-000000000001',
+  '60000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001',
+  'checkout.discount.approve','manager_approval',
+  '30000000-0000-4000-8000-000000000002',
+  now()+interval '5 minutes',repeat('b',64),now(),
+  '84000000-0000-4000-8000-000000000001'
+);
+
+do $$
+begin
+  begin
+    insert into runtime.elevation_grant(
+      session_id,business_id,branch_id,permission_key,method,approved_by,
+      expires_at,command_fingerprint
+    ) values (
+      '60000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+      '20000000-0000-4000-8000-000000000001',
+      'checkout.discount.approve','manager_approval',
+      '30000000-0000-4000-8000-000000000002',
+      now()+interval '5 minutes','invalid'
+    );
+    raise exception 'invalid approval fingerprint unexpectedly succeeded';
+  exception when check_violation then null; end;
+  insert into runtime.elevation_grant(
+    session_id,business_id,branch_id,permission_key,method,approved_by,
+    expires_at,command_fingerprint,consumed_at,consumed_by_command_id
+  ) values (
+    '60000000-0000-4000-8000-000000000001',
+    '10000000-0000-4000-8000-000000000001',
+    '20000000-0000-4000-8000-000000000001',
+    'checkout.terminal.approve','manager_approval',
+    '30000000-0000-4000-8000-000000000002',
+    now()+interval '5 minutes',repeat('c',64),now(),
+    '84000000-0000-4000-8000-000000000001'
+  );
+end $$;
+
+do $$
+begin
+  if exists (
+    select 1
+    from umi.role r
+    join umi.role_permission rp on rp.role_id=r.id
+    join umi.permission p on p.id=rp.permission_id
+    where r.key in ('cashier','staff') and p.key='checkout.terminal.approve'
+  ) then
+    raise exception 'cashier received terminal approval authority';
+  end if;
+end $$;
+
 set role api;
 select set_config('app.current_business','10000000-0000-4000-8000-000000000001',false);
 select set_config('app.current_branch','20000000-0000-4000-8000-000000000001',false);
@@ -216,6 +273,132 @@ begin
   if changed <> 0 then raise exception 'Cross-branch update succeeded'; end if;
 end $$;
 reset role;
+
+do $$
+declare missing integer;
+begin
+  select count(*) into missing
+  from (values ('pos_checkout_policy'),('pos_checkout_draft'),('pos_tender_fact')) expected(name)
+  where not exists (
+    select 1
+    from pg_class c
+    join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='tenant' and c.relname=expected.name
+      and c.relrowsecurity and c.relforcerowsecurity
+  );
+  if missing <> 0 then raise exception 'Gate 3B RLS and FORCE RLS check failed'; end if;
+end $$;
+
+insert into tenant.pos_checkout_policy(
+  business_id,branch_id,version,manual_terminal_enabled,mixed_tender_enabled,
+  maximum_tender_lines,manual_terminal_approval_threshold,tips_enabled,
+  maximum_tip_minor_units,discounts_enabled,maximum_discount_basis_points,
+  maximum_discount_minor_units,cashier_discount_threshold,currency
+) values (
+  '10000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000002',
+  'test-1',true,true,8,50000,true,5000,true,3000,10000,1000,'MXN'
+);
+
+insert into tenant.pos_checkout_draft(
+  id,business_id,branch_id,cart_id,operator_session_id,device_id,state,
+  command_fingerprint,receipt_delivery
+) values (
+  '81000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000002',
+  '80000000-0000-4000-8000-000000000002',
+  '70000000-0000-4000-8000-000000000002',
+  '50000000-0000-4000-8000-000000000002',
+  'collecting_payment',repeat('a',64),'{"destination":"display","channel":null,"customerContactId":null}'
+);
+
+insert into tenant.pos_tender_fact(
+  id,business_id,branch_id,checkout_id,cart_id,position,tender_type,status,
+  amount_minor_units,received_minor_units,change_minor_units,currency
+) values (
+  '82000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000002',
+  '81000000-0000-4000-8000-000000000001',
+  '80000000-0000-4000-8000-000000000002',
+  0,'cash','draft',1000,2000,1000,'MXN'
+);
+
+do $$
+begin
+  begin
+    insert into tenant.pos_checkout_draft(
+      business_id,branch_id,cart_id,operator_session_id,device_id,state,receipt_delivery
+    ) values (
+      '10000000-0000-4000-8000-000000000001',
+      '20000000-0000-4000-8000-000000000002',
+      '80000000-0000-4000-8000-000000000002',
+      '70000000-0000-4000-8000-000000000002',
+      '50000000-0000-4000-8000-000000000002',
+      'ready','{"destination":"display","channel":null,"customerContactId":null}'
+    );
+    raise exception 'duplicate checkout unexpectedly succeeded';
+  exception when unique_violation then null; end;
+  begin
+    insert into tenant.pos_tender_fact(
+      id,business_id,branch_id,checkout_id,cart_id,position,tender_type,status,
+      amount_minor_units,change_minor_units,currency
+    ) values (
+      gen_random_uuid(),'10000000-0000-4000-8000-000000000001',
+      '20000000-0000-4000-8000-000000000002',
+      '81000000-0000-4000-8000-000000000001',
+      '80000000-0000-4000-8000-000000000002',1,'cash','draft',0,0,'MXN'
+    );
+    raise exception 'zero tender unexpectedly succeeded';
+  exception when check_violation then null; end;
+end $$;
+
+set role api;
+select set_config('app.current_business','10000000-0000-4000-8000-000000000001',false);
+select set_config('app.current_branch','20000000-0000-4000-8000-000000000001',false);
+do $$
+begin
+  if (select count(*) from tenant.pos_checkout_draft) <> 0
+    or (select count(*) from tenant.pos_tender_fact) <> 0
+    or (select count(*) from tenant.pos_checkout_policy) <> 0 then
+    raise exception 'cross-branch checkout state was visible';
+  end if;
+  perform set_config('app.current_branch','20000000-0000-4000-8000-000000000002',false);
+  if (select count(*) from tenant.pos_checkout_draft) <> 1
+    or (select count(*) from tenant.pos_tender_fact) <> 1
+    or (select count(*) from tenant.pos_checkout_policy) <> 1 then
+    raise exception 'authorized checkout state was not visible';
+  end if;
+  perform set_config('app.current_business','10000000-0000-4000-8000-000000000002',false);
+  perform set_config('app.current_branch','20000000-0000-4000-8000-000000000003',false);
+  if (select count(*) from tenant.pos_checkout_draft) <> 0 then
+    raise exception 'cross-tenant checkout state was visible';
+  end if;
+end $$;
+reset role;
+
+update tenant.pos_tender_fact set status='committed',committed_at=now()
+where id='82000000-0000-4000-8000-000000000001';
+do $$
+begin
+  begin
+    update tenant.pos_tender_fact set amount_minor_units=2000
+    where id='82000000-0000-4000-8000-000000000001';
+    raise exception 'committed tender unexpectedly changed';
+  exception when raise_exception then
+    if sqlerrm='committed tender unexpectedly changed' then raise; end if;
+  end;
+  update tenant.pos_checkout_draft set state='completed'
+  where id='81000000-0000-4000-8000-000000000001';
+  begin
+    update tenant.pos_checkout_draft set recovery_state='checkout_conflict'
+    where id='81000000-0000-4000-8000-000000000001';
+    raise exception 'completed checkout unexpectedly changed';
+  exception when raise_exception then
+    if sqlerrm='completed checkout unexpectedly changed' then raise; end if;
+  end;
+end $$;
 SQL
 
-echo "Gate 3A disposable migration, lifecycle, uniqueness, and RLS checks passed."
+echo "Gate 3A and Gate 3B disposable migration, lifecycle, tender, and RLS checks passed."

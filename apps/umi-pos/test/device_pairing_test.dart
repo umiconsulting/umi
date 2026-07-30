@@ -553,5 +553,6 @@ final class _PairingGateway implements EntryGateway {
     required String permission,
     required String tenantId,
     required String branchId,
+    String? commandFingerprint,
   }) => throw UnimplementedError();
 }

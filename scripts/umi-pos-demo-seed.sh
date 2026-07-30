@@ -96,6 +96,11 @@ values
   ('offline.recovery.review', 'Approve one scoped offline recovery action'),
   ('sale.lifecycle', 'Manage the branch-scoped POS sale lifecycle'),
   ('sale.resume.any', 'Resume a suspended sale from another operator'),
+  ('checkout.discount.apply', 'Apply a checkout discount within branch policy'),
+  ('checkout.discount.approve', 'Approve a sensitive checkout discount'),
+  ('checkout.terminal.confirm', 'Confirm a manual terminal outcome'),
+  ('checkout.terminal.approve', 'Approve a sensitive manual terminal outcome'),
+  ('checkout.recover.any', 'Recover another operator checkout'),
   ('audit.read', 'Read tenant-visible, redacted audit events')
 on conflict (key) do update set description=excluded.description;
 
@@ -124,7 +129,8 @@ where rp.role_id=r.id
   and p.key in (
     'catalog.read','cart.write','checkout.commit','offline.cash.checkout',
     'offline.replay','offline.recovery.review','sale.lifecycle','sale.resume.any',
-    'audit.read'
+    'audit.read','checkout.discount.apply','checkout.discount.approve',
+    'checkout.terminal.confirm','checkout.terminal.approve','checkout.recover.any'
   );
 
 with grants(role_key, permission_key) as (
@@ -133,17 +139,27 @@ with grants(role_key, permission_key) as (
     ('owner','offline.cash.checkout'),('owner','offline.replay'),
     ('owner','offline.recovery.review'),('owner','sale.lifecycle'),
     ('owner','sale.resume.any'),('owner','audit.read'),
+    ('owner','checkout.discount.apply'),('owner','checkout.discount.approve'),
+    ('owner','checkout.terminal.confirm'),('owner','checkout.terminal.approve'),
+    ('owner','checkout.recover.any'),
     ('admin','catalog.read'),('admin','cart.write'),('admin','checkout.commit'),
     ('admin','offline.cash.checkout'),('admin','offline.replay'),
     ('admin','offline.recovery.review'),('admin','sale.lifecycle'),
     ('admin','sale.resume.any'),('admin','audit.read'),
+    ('admin','checkout.discount.apply'),('admin','checkout.discount.approve'),
+    ('admin','checkout.terminal.confirm'),('admin','checkout.terminal.approve'),
+    ('admin','checkout.recover.any'),
     ('manager','catalog.read'),('manager','cart.write'),('manager','checkout.commit'),
     ('manager','offline.cash.checkout'),('manager','offline.replay'),
     ('manager','offline.recovery.review'),('manager','sale.lifecycle'),
     ('manager','sale.resume.any'),('manager','audit.read'),
+    ('manager','checkout.discount.apply'),('manager','checkout.discount.approve'),
+    ('manager','checkout.terminal.confirm'),('manager','checkout.terminal.approve'),
+    ('manager','checkout.recover.any'),
     ('cashier','catalog.read'),('cashier','cart.write'),('cashier','checkout.commit'),
     ('cashier','offline.cash.checkout'),('cashier','offline.replay'),
-    ('cashier','sale.lifecycle'),
+    ('cashier','sale.lifecycle'),('cashier','checkout.discount.apply'),
+    ('cashier','checkout.terminal.confirm'),
     ('viewer','catalog.read')
 )
 insert into umi.role_permission(role_id, permission_id)
@@ -152,6 +168,37 @@ from grants g
 join umi.role r on r.key=g.role_key
 join umi.permission p on p.key=g.permission_key
 on conflict do nothing;
+
+insert into tenant.pos_checkout_policy(
+  business_id,branch_id,version,manual_terminal_enabled,mixed_tender_enabled,
+  maximum_tender_lines,manual_terminal_approval_threshold,tips_enabled,
+  tip_preset_basis_points,custom_tip_percentage_enabled,custom_tip_fixed_enabled,
+  maximum_tip_minor_units,discounts_enabled,maximum_discount_basis_points,
+  maximum_discount_minor_units,cashier_discount_threshold,
+  custom_discount_requires_approval,currency
+)
+values (
+  :'tenant_id',:'branch_id','demo-1',true,true,8,25000,true,
+  array[1000,1500,2000],true,true,5000,true,3000,10000,1500,true,'MXN'
+)
+on conflict(business_id,branch_id) do update set
+  version=excluded.version,
+  manual_terminal_enabled=excluded.manual_terminal_enabled,
+  mixed_tender_enabled=excluded.mixed_tender_enabled,
+  maximum_tender_lines=excluded.maximum_tender_lines,
+  manual_terminal_approval_threshold=excluded.manual_terminal_approval_threshold,
+  tips_enabled=excluded.tips_enabled,
+  tip_preset_basis_points=excluded.tip_preset_basis_points,
+  custom_tip_percentage_enabled=excluded.custom_tip_percentage_enabled,
+  custom_tip_fixed_enabled=excluded.custom_tip_fixed_enabled,
+  maximum_tip_minor_units=excluded.maximum_tip_minor_units,
+  discounts_enabled=excluded.discounts_enabled,
+  maximum_discount_basis_points=excluded.maximum_discount_basis_points,
+  maximum_discount_minor_units=excluded.maximum_discount_minor_units,
+  cashier_discount_threshold=excluded.cashier_discount_threshold,
+  custom_discount_requires_approval=excluded.custom_discount_requires_approval,
+  currency=excluded.currency,
+  updated_at=now();
 
 insert into umi.user(id,email,full_name,status)
 values

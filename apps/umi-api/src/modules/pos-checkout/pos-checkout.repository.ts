@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import type {
+  CheckoutCommand,
+  CheckoutPolicy,
+  CheckoutRecoverySnapshot,
   CheckoutResult,
   InventoryReservation,
   PaymentMethod,
   PaymentOutcome,
+  PaymentSummary,
   ReceiptSnapshot,
   TotalsConfirmation,
 } from '@umi/contract';
@@ -35,6 +39,7 @@ export interface CheckoutCart {
 
 export interface CheckoutAuthorization {
   operatorName: string;
+  permissions: string[];
 }
 
 @Injectable()
@@ -50,7 +55,7 @@ export class PosCheckoutRepository {
     operatorSessionId: string,
   ): Promise<CheckoutAuthorization | null> {
     const { rows } = await this.pg.worker.query<CheckoutAuthorization>(
-      `SELECT u.full_name AS "operatorName"
+      `SELECT u.full_name AS "operatorName",os.permissions
        FROM runtime.operator_session os
        JOIN tenant.device d ON d.id=os.device_id
        JOIN umi.user u ON u.id=os.user_id
@@ -63,6 +68,232 @@ export class PosCheckoutRepository {
       [userId, sessionId, deviceId, tenantId, branchId, operatorSessionId],
     );
     return rows[0] ?? null;
+  }
+
+  async policy(
+    client: PoolClient,
+    tenantId: string,
+    branchId: string,
+    currency: string,
+  ): Promise<CheckoutPolicy> {
+    const { rows } = await client.query<{
+      version: string;
+      manualTerminalEnabled: boolean;
+      mixedTenderEnabled: boolean;
+      maximumTenderLines: number;
+      manualTerminalApprovalThreshold: string;
+      tipsEnabled: boolean;
+      tipPresetBasisPoints: number[];
+      customTipPercentageEnabled: boolean;
+      customTipFixedEnabled: boolean;
+      maximumTipMinorUnits: string;
+      tipRequiredPermission: string | null;
+      discountsEnabled: boolean;
+      maximumDiscountBasisPoints: number;
+      maximumDiscountMinorUnits: string;
+      cashierDiscountThreshold: string;
+      customDiscountRequiresApproval: boolean;
+      policyCurrency: string;
+    }>(
+      `SELECT version,manual_terminal_enabled AS "manualTerminalEnabled",
+              mixed_tender_enabled AS "mixedTenderEnabled",
+              maximum_tender_lines AS "maximumTenderLines",
+              manual_terminal_approval_threshold::text AS "manualTerminalApprovalThreshold",
+              tips_enabled AS "tipsEnabled",
+              tip_preset_basis_points AS "tipPresetBasisPoints",
+              custom_tip_percentage_enabled AS "customTipPercentageEnabled",
+              custom_tip_fixed_enabled AS "customTipFixedEnabled",
+              maximum_tip_minor_units::text AS "maximumTipMinorUnits",
+              tip_required_permission AS "tipRequiredPermission",
+              discounts_enabled AS "discountsEnabled",
+              maximum_discount_basis_points AS "maximumDiscountBasisPoints",
+              maximum_discount_minor_units::text AS "maximumDiscountMinorUnits",
+              cashier_discount_threshold::text AS "cashierDiscountThreshold",
+              custom_discount_requires_approval AS "customDiscountRequiresApproval",
+              currency AS "policyCurrency"
+       FROM tenant.pos_checkout_policy
+       WHERE business_id=$1::uuid AND branch_id=$2::uuid AND currency=$3`,
+      [tenantId, branchId, currency],
+    );
+    const row = rows[0];
+    const money = (minorUnits: number) => ({ minorUnits, currency });
+    if (!row) {
+      return {
+        version: 'default-deny',
+        manualTerminalEnabled: false,
+        mixedTenderEnabled: false,
+        maximumTenderLines: 1,
+        manualTerminalApprovalThreshold: money(0),
+        manualTerminalApprovalPermission: 'checkout.terminal.approve',
+        tip: {
+          enabled: false,
+          presetBasisPoints: [],
+          customPercentageEnabled: false,
+          customFixedEnabled: false,
+          maximumTip: money(0),
+          requiredPermission: null,
+          version: 'default-deny',
+        },
+        discount: {
+          enabled: false,
+          maximumBasisPoints: 0,
+          maximumAmount: money(0),
+          cashierThreshold: money(0),
+          customRequiresApproval: true,
+          requiredPermission: 'checkout.discount.apply',
+          approvalPermission: 'checkout.discount.approve',
+          version: 'default-deny',
+        },
+      };
+    }
+    return {
+      version: row.version,
+      manualTerminalEnabled: row.manualTerminalEnabled,
+      mixedTenderEnabled: row.mixedTenderEnabled,
+      maximumTenderLines: row.maximumTenderLines,
+      manualTerminalApprovalThreshold: money(Number(row.manualTerminalApprovalThreshold)),
+      manualTerminalApprovalPermission: 'checkout.terminal.approve',
+      tip: {
+        enabled: row.tipsEnabled,
+        presetBasisPoints: row.tipPresetBasisPoints,
+        customPercentageEnabled: row.customTipPercentageEnabled,
+        customFixedEnabled: row.customTipFixedEnabled,
+        maximumTip: money(Number(row.maximumTipMinorUnits)),
+        requiredPermission: row.tipRequiredPermission,
+        version: row.version,
+      },
+      discount: {
+        enabled: row.discountsEnabled,
+        maximumBasisPoints: row.maximumDiscountBasisPoints,
+        maximumAmount: money(Number(row.maximumDiscountMinorUnits)),
+        cashierThreshold: money(Number(row.cashierDiscountThreshold)),
+        customRequiresApproval: row.customDiscountRequiresApproval,
+        requiredPermission: 'checkout.discount.apply',
+        approvalPermission: 'checkout.discount.approve',
+        version: row.version,
+      },
+    };
+  }
+
+  async saveDraft(
+    client: PoolClient,
+    userDeviceId: string,
+    cart: CheckoutCart,
+    command: CheckoutCommand,
+    state: CheckoutRecoverySnapshot['state'],
+    summary: PaymentSummary | null,
+    recoveryState: CheckoutRecoverySnapshot['recoveryState'],
+    fingerprint: string | null,
+  ): Promise<{ id: string; version: number }> {
+    const { rows } = await client.query<{ id: string; version: number }>(
+      `INSERT INTO tenant.pos_checkout_draft
+         (business_id,branch_id,cart_id,operator_session_id,device_id,state,
+          command_fingerprint,tender_drafts,tip_draft,discount_drafts,
+          receipt_delivery,payment_summary,recovery_state)
+       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7,$8,$9,$10,$11,$12,$13)
+       ON CONFLICT(business_id,cart_id) DO UPDATE SET
+         state=excluded.state,version=tenant.pos_checkout_draft.version+1,
+         command_fingerprint=excluded.command_fingerprint,
+         tender_drafts=excluded.tender_drafts,tip_draft=excluded.tip_draft,
+         discount_drafts=excluded.discount_drafts,receipt_delivery=excluded.receipt_delivery,
+         payment_summary=excluded.payment_summary,recovery_state=excluded.recovery_state,
+         updated_at=now()
+       WHERE tenant.pos_checkout_draft.state NOT IN ('completed','receipt_available','payment_unknown')
+         AND tenant.pos_checkout_draft.operator_session_id=$4::uuid
+         AND tenant.pos_checkout_draft.device_id=$5::uuid
+         AND NOT EXISTS (
+           SELECT 1
+           FROM jsonb_array_elements(tenant.pos_checkout_draft.tender_drafts) prior
+           WHERE prior->>'type'='manual_terminal'
+             AND prior->>'status'='confirmed_success'
+             AND NOT EXISTS (
+               SELECT 1
+               FROM jsonb_array_elements(excluded.tender_drafts) next
+               WHERE next->>'id'=prior->>'id'
+                 AND next->>'type'=prior->>'type'
+                 AND next->>'status'=prior->>'status'
+                 AND next->'amount'=prior->'amount'
+             )
+         )
+       RETURNING id::text,version`,
+      [
+        cart.tenantId,
+        cart.branchId,
+        cart.id,
+        cart.operatorSessionId,
+        userDeviceId,
+        state,
+        fingerprint,
+        JSON.stringify(command.tenderDrafts),
+        command.tipDraft ? JSON.stringify(command.tipDraft) : null,
+        JSON.stringify(command.discountDrafts),
+        JSON.stringify(command.receiptDelivery),
+        summary ? JSON.stringify(summary) : null,
+        recoveryState,
+      ],
+    );
+    if (!rows[0]) throw new Error('Checkout draft is immutable or belongs to another context.');
+    return rows[0];
+  }
+
+  async consumeApprovals(
+    client: PoolClient,
+    approvalIds: string[],
+    input: {
+      sessionId: string;
+      tenantId: string;
+      branchId: string;
+      permissions: string[];
+      fingerprint: string;
+      commandId: string;
+    },
+  ): Promise<{ approved: boolean; missingPermission: string | null }> {
+    const permissions = [...new Set(input.permissions)];
+    if (
+      approvalIds.length !== permissions.length ||
+      new Set(approvalIds).size !== approvalIds.length
+    ) {
+      return {
+        approved: false,
+        missingPermission: permissions[Math.min(approvalIds.length, permissions.length - 1)] ?? null,
+      };
+    }
+    const matched = await client.query<{ id: string; permission: string }>(
+      `SELECT id::text,permission_key AS permission
+       FROM runtime.elevation_grant
+       WHERE id=ANY($1::uuid[]) AND session_id=$2::uuid AND business_id=$3::uuid
+         AND branch_id=$4::uuid AND permission_key=ANY($5::text[])
+         AND command_fingerprint=$6 AND expires_at>now()
+         AND consumed_at IS NULL AND method='manager_approval'
+       FOR UPDATE`,
+      [
+        approvalIds,
+        input.sessionId,
+        input.tenantId,
+        input.branchId,
+        permissions,
+        input.fingerprint,
+      ],
+    );
+    const matchedPermissions = new Set(matched.rows.map((row) => row.permission));
+    const missingPermission =
+      permissions.find((permission) => !matchedPermissions.has(permission)) ?? null;
+    if (missingPermission || matched.rowCount !== permissions.length) {
+      return { approved: false, missingPermission: missingPermission ?? permissions[0] ?? null };
+    }
+    const { rowCount } = await client.query(
+      `UPDATE runtime.elevation_grant
+       SET consumed_at=now(),consumed_by_command_id=$2::uuid
+       WHERE id=ANY($1::uuid[]) AND consumed_at IS NULL`,
+      [
+        approvalIds,
+        input.commandId,
+      ],
+    );
+    return {
+      approved: rowCount === permissions.length,
+      missingPermission: rowCount === permissions.length ? null : permissions[0] ?? null,
+    };
   }
 
   async lockCart(
@@ -132,73 +363,213 @@ export class PosCheckoutRepository {
     };
   }
 
-  async payment(
+  async payments(
     client: PoolClient,
     cart: CheckoutCart,
-    method: PaymentMethod,
-    confirmation: TotalsConfirmation,
+    checkoutId: string,
+    summary: PaymentSummary,
+    correlationId: string,
+  ): Promise<PaymentOutcome[]> {
+    const outcomes: PaymentOutcome[] = [];
+    for (const [position, tender] of summary.tenders.entries()) {
+      const tenderFact = await client.query<{ id: string }>(
+        `INSERT INTO tenant.pos_tender_fact
+           (id,business_id,branch_id,checkout_id,cart_id,position,tender_type,status,
+            amount_minor_units,received_minor_units,change_minor_units,currency,correlation_id)
+         VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7,$8,$9,$10,$11,$12,$13)
+         ON CONFLICT(id) DO UPDATE SET id=excluded.id
+         WHERE tenant.pos_tender_fact.business_id=excluded.business_id
+           AND tenant.pos_tender_fact.branch_id=excluded.branch_id
+           AND tenant.pos_tender_fact.checkout_id=excluded.checkout_id
+           AND tenant.pos_tender_fact.cart_id=excluded.cart_id
+           AND tenant.pos_tender_fact.position=excluded.position
+           AND tenant.pos_tender_fact.tender_type=excluded.tender_type
+           AND tenant.pos_tender_fact.status=excluded.status
+           AND tenant.pos_tender_fact.amount_minor_units=excluded.amount_minor_units
+           AND tenant.pos_tender_fact.received_minor_units
+             IS NOT DISTINCT FROM excluded.received_minor_units
+           AND tenant.pos_tender_fact.change_minor_units=excluded.change_minor_units
+           AND tenant.pos_tender_fact.currency=excluded.currency
+         RETURNING id::text`,
+        [
+          tender.tenderId,
+          cart.tenantId,
+          cart.branchId,
+          checkoutId,
+          cart.id,
+          position,
+          tender.type,
+          tender.status,
+          tender.applied.minorUnits,
+          tender.received?.minorUnits ?? null,
+          tender.change.minorUnits,
+          tender.applied.currency,
+          correlationId,
+        ],
+      );
+      if (tenderFact.rowCount !== 1) {
+        throw new Error('Tender identity conflicts with another checkout.');
+      }
+      const method: PaymentMethod = tender.type === 'cash' ? 'cash' : 'external_terminal';
+      const { rows } = await client.query<{
+        id: string;
+        method: PaymentMethod;
+        amountMinorUnits: string;
+        currency: string;
+        status: 'succeeded';
+        queryOnly: boolean;
+        correlationId: string;
+        expiresAt: string | null;
+        createdAt: string;
+      }>(
+        `INSERT INTO tenant.pos_payment_attempt
+           (business_id,branch_id,cart_id,tender_id,method,amount_minor_units,currency,
+            status,query_only,correlation_id,resolved_at)
+         VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7,'succeeded',false,$8,now())
+         ON CONFLICT(business_id,cart_id,tender_id) DO UPDATE SET
+           tender_id=excluded.tender_id
+         WHERE tenant.pos_payment_attempt.branch_id=excluded.branch_id
+           AND tenant.pos_payment_attempt.method=excluded.method
+           AND tenant.pos_payment_attempt.amount_minor_units=excluded.amount_minor_units
+           AND tenant.pos_payment_attempt.currency=excluded.currency
+           AND tenant.pos_payment_attempt.status='succeeded'
+           AND tenant.pos_payment_attempt.query_only=false
+         RETURNING id::text,method,amount_minor_units::text AS "amountMinorUnits",
+                   currency,status,query_only AS "queryOnly",
+                   correlation_id AS "correlationId",expires_at::text AS "expiresAt",
+                   created_at::text AS "createdAt"`,
+        [
+          cart.tenantId,
+          cart.branchId,
+          cart.id,
+          tender.tenderId,
+          method,
+          tender.applied.minorUnits,
+          tender.applied.currency,
+          correlationId,
+        ],
+      );
+      const attempt = rows[0];
+      if (!attempt) {
+        throw new Error('Payment identity conflicts with another tender result.');
+      }
+      outcomes.push({
+        attempt: {
+          id: attempt.id,
+          method: attempt.method,
+          amount: {
+            minorUnits: Number(attempt.amountMinorUnits),
+            currency: attempt.currency,
+          },
+          status: attempt.status,
+          expiresAt: attempt.expiresAt,
+          correlationId: attempt.correlationId,
+          queryOnly: attempt.queryOnly,
+          createdAt: attempt.createdAt,
+        },
+        ambiguity: null,
+      });
+    }
+    return outcomes;
+  }
+
+  async unknownTerminal(
+    client: PoolClient,
+    cart: CheckoutCart,
+    checkoutId: string,
+    tender: PaymentSummary['tenders'][number],
     correlationId: string,
   ): Promise<PaymentOutcome> {
-    const amount = confirmation.totals.grandTotal;
-    const status = method === 'cash' ? 'succeeded' : 'unknown';
+    const tenderFact = await client.query<{ id: string }>(
+      `INSERT INTO tenant.pos_tender_fact
+         (id,business_id,branch_id,checkout_id,cart_id,position,tender_type,status,
+          amount_minor_units,received_minor_units,change_minor_units,currency,correlation_id)
+       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,0,'manual_terminal',
+               'outcome_unknown',$6,null,0,$7,$8)
+       ON CONFLICT(id) DO UPDATE SET id=excluded.id
+       WHERE tenant.pos_tender_fact.business_id=excluded.business_id
+         AND tenant.pos_tender_fact.branch_id=excluded.branch_id
+         AND tenant.pos_tender_fact.checkout_id=excluded.checkout_id
+         AND tenant.pos_tender_fact.cart_id=excluded.cart_id
+         AND tenant.pos_tender_fact.position=excluded.position
+         AND tenant.pos_tender_fact.tender_type=excluded.tender_type
+         AND tenant.pos_tender_fact.status=excluded.status
+         AND tenant.pos_tender_fact.amount_minor_units=excluded.amount_minor_units
+         AND tenant.pos_tender_fact.received_minor_units
+           IS NOT DISTINCT FROM excluded.received_minor_units
+         AND tenant.pos_tender_fact.change_minor_units=excluded.change_minor_units
+         AND tenant.pos_tender_fact.currency=excluded.currency
+       RETURNING id::text`,
+      [
+        tender.tenderId,
+        cart.tenantId,
+        cart.branchId,
+        checkoutId,
+        cart.id,
+        tender.applied.minorUnits,
+        tender.applied.currency,
+        correlationId,
+      ],
+    );
+    if (tenderFact.rowCount !== 1) {
+      throw new Error('Tender identity conflicts with another checkout.');
+    }
     const { rows } = await client.query<{
       id: string;
-      method: PaymentMethod;
       amountMinorUnits: string;
       currency: string;
-      status: 'succeeded' | 'unknown';
-      queryOnly: boolean;
       correlationId: string;
-      expiresAt: string | null;
+      expiresAt: string;
       createdAt: string;
     }>(
       `INSERT INTO tenant.pos_payment_attempt
-         (business_id,branch_id,cart_id,method,amount_minor_units,currency,status,
-          query_only,correlation_id,expires_at,resolved_at)
-       VALUES ($1::uuid,$2::uuid,$3::uuid,$4,$5,$6,$7,$7='unknown',$8,
-               CASE WHEN $7='unknown' THEN now()+interval '10 minutes' END,
-               CASE WHEN $7='succeeded' THEN now() END)
-       ON CONFLICT(business_id,cart_id) DO UPDATE SET cart_id=excluded.cart_id
-       RETURNING id::text,method,amount_minor_units::text AS "amountMinorUnits",currency,status,
-                 query_only AS "queryOnly",correlation_id AS "correlationId",
-                 expires_at::text AS "expiresAt",created_at::text AS "createdAt"`,
+         (business_id,branch_id,cart_id,tender_id,method,amount_minor_units,currency,
+          status,query_only,correlation_id,expires_at)
+       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,'external_terminal',$5,$6,
+               'unknown',true,$7,now()+interval '10 minutes')
+       ON CONFLICT(business_id,cart_id,tender_id) DO UPDATE SET tender_id=excluded.tender_id
+       WHERE tenant.pos_payment_attempt.branch_id=excluded.branch_id
+         AND tenant.pos_payment_attempt.method=excluded.method
+         AND tenant.pos_payment_attempt.amount_minor_units=excluded.amount_minor_units
+         AND tenant.pos_payment_attempt.currency=excluded.currency
+         AND tenant.pos_payment_attempt.status IN ('unknown','timeout')
+         AND tenant.pos_payment_attempt.query_only=true
+       RETURNING id::text,amount_minor_units::text AS "amountMinorUnits",currency,
+                 correlation_id AS "correlationId",expires_at::text AS "expiresAt",
+                 created_at::text AS "createdAt"`,
       [
         cart.tenantId,
         cart.branchId,
         cart.id,
-        method,
-        amount.minorUnits,
-        amount.currency,
-        status,
+        tender.tenderId,
+        tender.applied.minorUnits,
+        tender.applied.currency,
         correlationId,
       ],
     );
-    const attempt = rows[0];
+    const row = rows[0];
+    if (!row) {
+      throw new Error('Payment identity conflicts with another tender result.');
+    }
     return {
       attempt: {
-        id: attempt.id,
-        method: attempt.method,
-        amount: {
-          minorUnits: Number(attempt.amountMinorUnits),
-          currency: attempt.currency,
-        },
-        status: attempt.status,
-        expiresAt: attempt.expiresAt,
-        correlationId: attempt.correlationId,
-        queryOnly: attempt.queryOnly,
-        createdAt: attempt.createdAt,
+        id: row.id,
+        method: 'external_terminal',
+        amount: { minorUnits: Number(row.amountMinorUnits), currency: row.currency },
+        status: 'unknown',
+        expiresAt: row.expiresAt,
+        correlationId: row.correlationId,
+        queryOnly: true,
+        createdAt: row.createdAt,
       },
-      ambiguity:
-        attempt.status === 'unknown'
-          ? {
-              paymentRef: attempt.id,
-              status: 'unknown',
-              queryOnly: true,
-              canRetryAsNew: false,
-              queryAfter: attempt.expiresAt,
-              correlationId: attempt.correlationId,
-            }
-          : null,
+      ambiguity: {
+        paymentRef: row.id,
+        status: 'unknown',
+        queryOnly: true,
+        canRetryAsNew: false,
+        queryAfter: row.expiresAt,
+        correlationId: row.correlationId,
+      },
     };
   }
 
@@ -206,7 +577,9 @@ export class PosCheckoutRepository {
     client: PoolClient,
     cart: CheckoutCart,
     confirmation: TotalsConfirmation,
-    payment: PaymentOutcome,
+    payments: PaymentOutcome[],
+    paymentSummary: PaymentSummary,
+    checkoutId: string,
     reservation: InventoryReservation,
     receipt: ReceiptSnapshot,
   ): Promise<NonNullable<CheckoutResult['sale']>> {
@@ -241,28 +614,45 @@ export class PosCheckoutRepository {
        VALUES ($1::uuid,$2::uuid,$3,$4,$1::text,'captured',now())
        ON CONFLICT(id) DO NOTHING`,
       [
-        payment.attempt.id,
+        payments[0].attempt.id,
         orderId,
-        confirmation.totals.grandTotal.minorUnits,
-        payment.attempt.method === 'cash' ? 'cash' : 'card',
+        payments[0].attempt.amount.minorUnits,
+        payments[0].attempt.method === 'cash' ? 'cash' : 'card',
       ],
     );
+    for (const payment of payments.slice(1)) {
+      await client.query(
+        `INSERT INTO tenant.payment (id,order_id,amount,method,external_ref,status,paid_at)
+         VALUES ($1::uuid,$2::uuid,$3,$4,$1::text,'captured',now())
+         ON CONFLICT(id) DO NOTHING`,
+        [
+          payment.attempt.id,
+          orderId,
+          payment.attempt.amount.minorUnits,
+          payment.attempt.method === 'cash' ? 'cash' : 'card',
+        ],
+      );
+    }
     const receiptRow = await client.query<{ id: string }>(
       `INSERT INTO tenant.receipt_snapshot
          (business_id,branch_id,order_id,payment_attempt_id,receipt_number,
-          business_date,currency,grand_total,snapshot)
-       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6::date,$7,$8,$9)
+          business_date,currency,grand_total,snapshot,receipt_destination,delivery_intent)
+       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6::date,$7,$8,$9,$10,$11)
        RETURNING id::text`,
       [
         cart.tenantId,
         cart.branchId,
         orderId,
-        payment.attempt.id,
+        payments[0].attempt.id,
         receipt.receiptRef,
         receipt.businessDate,
         receipt.currency,
         receipt.grandTotal.minorUnits,
         receipt,
+        receipt.receiptDestination ?? 'display',
+        receipt.receiptDestination === 'digital'
+          ? JSON.stringify({ destination: 'digital', deliveryStatus: 'not_sent' })
+          : null,
       ],
     );
     const sale = await client.query<{ id: string; committedAt: string }>(
@@ -276,7 +666,7 @@ export class PosCheckoutRepository {
         cart.branchId,
         cart.id,
         orderId,
-        payment.attempt.id,
+        payments[0].attempt.id,
         receiptRow.rows[0].id,
         confirmation.fingerprint,
       ],
@@ -285,6 +675,18 @@ export class PosCheckoutRepository {
       `UPDATE tenant.inventory_reservation SET status='commit_prepared',updated_at=now()
        WHERE id=$1::uuid AND status='reserved'`,
       [reservation.id],
+    );
+    await client.query(
+      `UPDATE tenant.pos_tender_fact
+       SET status='committed',committed_at=now()
+       WHERE checkout_id=$1::uuid AND status IN ('draft','confirmed_success')`,
+      [checkoutId],
+    );
+    await client.query(
+      `UPDATE tenant.pos_checkout_draft
+       SET payment_summary=$2,updated_at=now()
+       WHERE id=$1::uuid AND state NOT IN ('completed','receipt_available')`,
+      [checkoutId, JSON.stringify({ ...paymentSummary, state: 'completed' })],
     );
     await client.query(
       `UPDATE tenant.pos_cart
@@ -301,6 +703,188 @@ export class PosCheckoutRepository {
       committedAt: sale.rows[0].committedAt,
       totals: confirmation.totals,
     };
+  }
+
+  async saveCommittedResult(
+    client: PoolClient,
+    checkoutId: string,
+    result: CheckoutResult,
+  ): Promise<void> {
+    const { rowCount } = await client.query(
+      `UPDATE tenant.pos_checkout_draft
+       SET state='completed',checkout_result=$2,updated_at=now()
+       WHERE id=$1::uuid AND state NOT IN ('completed','receipt_available')
+         AND checkout_result IS NULL`,
+      [checkoutId, JSON.stringify(result)],
+    );
+    if (rowCount !== 1) {
+      throw new Error('Committed checkout result was not persisted exactly once.');
+    }
+  }
+
+  async recovery(
+    tenantId: string,
+    branchId: string,
+    operatorSessionId: string,
+    cartId: string,
+    currentUserId: string,
+    allowOtherOperator: boolean,
+  ): Promise<CheckoutRecoverySnapshot | null> {
+    const scope = await this.pg.worker.query(
+      `SELECT 1
+       FROM tenant.pos_checkout_draft checkout
+       JOIN runtime.operator_session current_operator
+         ON current_operator.id=$3::uuid
+        AND current_operator.business_id=checkout.business_id
+        AND current_operator.branch_id=checkout.branch_id
+        AND current_operator.user_id=$5::uuid
+        AND current_operator.state='active'
+        AND current_operator.expires_at>now()
+       JOIN runtime.operator_session original_operator
+         ON original_operator.id=checkout.operator_session_id
+       WHERE checkout.business_id=$1::uuid AND checkout.branch_id=$2::uuid
+         AND checkout.cart_id=$4::uuid
+         AND (checkout.operator_session_id=$3::uuid
+           OR original_operator.user_id=current_operator.user_id
+           OR $6::boolean)`,
+      [tenantId, branchId, operatorSessionId, cartId, currentUserId, allowOtherOperator],
+    );
+    if (!scope.rows[0]) return null;
+    return this.pg.runWithTenant(tenantId, currentUserId, async (client) => {
+      const { rows } = await client.query<{
+        checkoutId: string;
+        cartId: string;
+        checkoutVersion: number;
+        state: CheckoutRecoverySnapshot['state'];
+        tenderDrafts: CheckoutRecoverySnapshot['tenderDrafts'];
+        tipDraft: CheckoutRecoverySnapshot['tipDraft'];
+        discountDrafts: CheckoutRecoverySnapshot['discountDrafts'];
+        receiptDelivery: CheckoutRecoverySnapshot['receiptDelivery'];
+        paymentSummary: CheckoutRecoverySnapshot['paymentSummary'];
+        recoveryState: CheckoutRecoverySnapshot['recoveryState'];
+        checkoutFingerprint: string | null;
+        result: CheckoutRecoverySnapshot['result'];
+        updatedAt: string;
+      }>(
+        `SELECT checkout.id::text AS "checkoutId",checkout.cart_id::text AS "cartId",
+                checkout.version AS "checkoutVersion",checkout.state,
+                checkout.tender_drafts AS "tenderDrafts",
+                checkout.tip_draft AS "tipDraft",
+                checkout.discount_drafts AS "discountDrafts",
+                checkout.receipt_delivery AS "receiptDelivery",
+                CASE WHEN checkout.payment_summary IS NULL THEN NULL
+                  ELSE jsonb_set(checkout.payment_summary,'{checkoutId}',
+                    to_jsonb(checkout.id::text),true)
+                END AS "paymentSummary",
+                checkout.recovery_state AS "recoveryState",
+                checkout.command_fingerprint AS "checkoutFingerprint",
+                checkout.checkout_result AS result,
+                checkout.updated_at::text AS "updatedAt"
+         FROM tenant.pos_checkout_draft checkout
+         WHERE checkout.business_id=$1::uuid AND checkout.branch_id=$2::uuid
+           AND checkout.cart_id=$3::uuid`,
+        [tenantId, branchId, cartId],
+      );
+      const snapshot = rows[0];
+      if (!snapshot) return null;
+      const payment = await client.query<{
+        id: string;
+        method: PaymentMethod;
+        amountMinorUnits: string;
+        currency: string;
+        status: PaymentOutcome['attempt']['status'];
+        queryOnly: boolean;
+        correlationId: string;
+        expiresAt: string | null;
+        createdAt: string;
+      }>(
+        `SELECT id::text,method,amount_minor_units::text AS "amountMinorUnits",currency,
+                status,query_only AS "queryOnly",correlation_id AS "correlationId",
+                expires_at::text AS "expiresAt",created_at::text AS "createdAt"
+         FROM tenant.pos_payment_attempt
+         WHERE business_id=$1::uuid AND branch_id=$2::uuid AND cart_id=$3::uuid
+           AND status IN ('unknown','timeout')
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [tenantId, branchId, cartId],
+      );
+      const row = payment.rows[0];
+      const paymentOutcome: PaymentOutcome | null = row
+        ? {
+            attempt: {
+              id: row.id,
+              method: row.method,
+              amount: {
+                minorUnits: Number(row.amountMinorUnits),
+                currency: row.currency,
+              },
+              status: row.status,
+              expiresAt: row.expiresAt,
+              queryOnly: row.queryOnly,
+              correlationId: row.correlationId,
+              createdAt: row.createdAt,
+            },
+            ambiguity: {
+              paymentRef: row.id,
+              status: 'unknown',
+              queryOnly: true,
+              canRetryAsNew: false,
+              queryAfter: row.expiresAt,
+              correlationId: row.correlationId,
+            },
+          }
+        : null;
+      return { ...snapshot, paymentOutcome };
+    }, branchId);
+  }
+
+  async cancelDraft(
+    client: PoolClient,
+    tenantId: string,
+    branchId: string,
+    operatorSessionId: string,
+    cartId: string,
+  ): Promise<{ id: string | null; blocked: boolean }> {
+    const { rows } = await client.query<{
+      id: string;
+      state: string;
+      tenderDrafts: CheckoutRecoverySnapshot['tenderDrafts'];
+    }>(
+      `SELECT id::text,state,tender_drafts AS "tenderDrafts"
+       FROM tenant.pos_checkout_draft
+       WHERE business_id=$1::uuid AND branch_id=$2::uuid
+         AND operator_session_id=$3::uuid AND cart_id=$4::uuid
+       FOR UPDATE`,
+      [tenantId, branchId, operatorSessionId, cartId],
+    );
+    const draft = rows[0];
+    if (!draft) return { id: null, blocked: false };
+    const terminalFactRequiresRecovery = draft.tenderDrafts.some(
+      (tender) =>
+        tender.type === 'manual_terminal' &&
+        (tender.status === 'confirmed_success' || tender.status === 'outcome_unknown'),
+    );
+    if (
+      draft.state === 'payment_unknown' ||
+      draft.state === 'completed' ||
+      terminalFactRequiresRecovery
+    ) {
+      return { id: draft.id, blocked: true };
+    }
+    await client.query(
+      `DELETE FROM tenant.pos_tender_fact
+       WHERE checkout_id=$1::uuid AND status NOT IN ('committed','outcome_unknown')`,
+      [draft.id],
+    );
+    await client.query(
+      `UPDATE tenant.pos_checkout_draft
+       SET state='ready',tender_drafts='[]',tip_draft=null,discount_drafts='[]',
+           payment_summary=null,recovery_state='none',command_fingerprint=null,
+           version=version+1,updated_at=now()
+       WHERE id=$1::uuid`,
+      [draft.id],
+    );
+    return { id: draft.id, blocked: false };
   }
 
   async paymentStatus(

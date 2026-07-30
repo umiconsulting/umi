@@ -311,7 +311,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get taxLabel => 'Impuestos';
 
   @override
-  String get discountLabel => 'Vista previa de descuentos';
+  String get discountLabel => 'Descuento';
 
   @override
   String get totalLabel => 'Total';
@@ -427,7 +427,122 @@ class AppLocalizationsEs extends AppLocalizations {
   String get cashReceivedLabel => 'Efectivo recibido';
 
   @override
+  String get tenderSelectionTitle => 'Selección de pago';
+
+  @override
+  String get cashTenderTitle => 'Efectivo';
+
+  @override
+  String get tenderAmountLabel => 'Importe aplicado';
+
+  @override
+  String get exactAmountAction => 'Importe exacto';
+
+  @override
+  String get manualTerminalLabel => 'Terminal manual';
+
+  @override
+  String get terminalProcessingAction => 'Procesando fuera del POS';
+
+  @override
+  String get terminalSuccessAction => 'Confirmar éxito';
+
+  @override
+  String get terminalFailureAction => 'Informar fallo';
+
+  @override
+  String get terminalUnknownAction => 'Resultado desconocido';
+
+  @override
+  String get tipLabel => 'Propina';
+
+  @override
+  String get noTipAction => 'Sin propina';
+
+  @override
+  String get customTipPercentLabel => 'Porcentaje de propina personalizado';
+
+  @override
+  String get customTipFixedLabel => 'Importe de propina personalizado';
+
+  @override
+  String get percentageDiscountAction => 'Porcentaje';
+
+  @override
+  String get fixedDiscountAction => 'Importe fijo';
+
+  @override
+  String get discountPercentLabel => 'Porcentaje de descuento';
+
+  @override
+  String get discountAmountLabel => 'Importe del descuento';
+
+  @override
+  String get discountReasonLabel => 'Motivo del descuento';
+
+  @override
+  String get receiptDestinationLabel => 'Destino del recibo';
+
+  @override
+  String get displayReceiptAction => 'Mostrar recibo';
+
+  @override
+  String get printLaterAction => 'Imprimir después';
+
+  @override
+  String get noReceiptAction => 'Sin recibo';
+
+  @override
+  String get managerApprovalAction => 'Solicitar aprobación';
+
+  @override
+  String get managerApprovalTitle => 'Se requiere aprobación del gerente';
+
+  @override
+  String get managerPinLabel => 'PIN del gerente';
+
+  @override
+  String get managerApprovalDeniedMessage =>
+      'El PIN o el permiso del gerente no es válido para este cobro.';
+
+  @override
+  String get approveAction => 'Aprobar';
+
+  @override
+  String get insufficientCashMessage =>
+      'El efectivo recibido no cubre el importe aplicado.';
+
+  @override
+  String get remainingBalanceMessage =>
+      'Agrega un pago para cubrir el saldo pendiente.';
+
+  @override
+  String get approvalRequiredMessage => 'Un gerente debe aprobar este cobro.';
+
+  @override
+  String get terminalFailureMessage =>
+      'El pago de la terminal falló. Revisa los pagos.';
+
+  @override
+  String get tipRejectedMessage =>
+      'La política de propinas rechazó esta propina.';
+
+  @override
+  String get discountRejectedMessage =>
+      'La política de descuentos rechazó este descuento.';
+
+  @override
   String get changeDueLabel => 'Cambio';
+
+  @override
+  String get appliedAmountLabel => 'Importe aplicado';
+
+  @override
+  String get remainingBalanceLabel => 'Saldo pendiente';
+
+  @override
+  String get offlineAdvancedTenderBlockedMessage =>
+      'Reconecta para usar la terminal manual, el pago mixto, las propinas o los descuentos. La venta se conserva.';
 
   @override
   String get recoveryQueryTitle => 'Consultar resultado guardado';

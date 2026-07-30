@@ -305,6 +305,11 @@ export const ManagerApprovalRequest = z
     permission: z.string().min(1).max(100),
     tenantId: Uuid,
     branchId: Uuid,
+    commandFingerprint: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .nullable()
+      .default(null),
   })
   .strict();
 export type ManagerApprovalRequest = z.infer<typeof ManagerApprovalRequest>;
@@ -316,6 +321,11 @@ export const ElevationGrantView = z
     branchId: Uuid,
     method: z.enum(['manager_approval', 'operator_pin']),
     expiresAt: IsoTimestamp,
+    commandFingerprint: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .nullable()
+      .default(null),
   })
   .strict();
 

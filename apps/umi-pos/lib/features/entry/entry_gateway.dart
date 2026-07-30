@@ -37,6 +37,7 @@ abstract interface class EntryGateway {
     required String permission,
     required String tenantId,
     required String branchId,
+    String? commandFingerprint,
   });
 }
 
@@ -252,6 +253,7 @@ final class ApiEntryGateway implements EntryGateway {
     required String permission,
     required String tenantId,
     required String branchId,
+    String? commandFingerprint,
   }) async => ElevationGrantView.fromJson(
     await _api.request(
       method: ApiMethod.post,
@@ -262,6 +264,7 @@ final class ApiEntryGateway implements EntryGateway {
         permission: permission,
         tenantId: tenantId,
         branchId: branchId,
+        commandFingerprint: commandFingerprint,
       ).toJson(),
     ),
   );

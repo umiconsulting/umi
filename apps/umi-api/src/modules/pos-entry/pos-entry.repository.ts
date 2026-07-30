@@ -236,6 +236,43 @@ export class PosEntryRepository {
     return rows[0] ?? null;
   }
 
+  async managerPinRecord(
+    lookupHash: string,
+    tenantId: string,
+    branchId: string,
+    permission: string,
+    operatorSessionId: string,
+  ) {
+    const { rows } = await this.pg.worker.query<{
+      staffId: string;
+      userId: string;
+      salt: string | null;
+      hash: string | null;
+      lockedUntil: Date | null;
+    }>(
+      `SELECT s.id::text AS "staffId",s.user_id::text AS "userId",
+              s.operator_pin_salt AS salt,s.operator_pin_hash AS hash,
+              s.pin_locked_until AS "lockedUntil"
+       FROM tenant.staff s
+       JOIN umi.user_role ur ON ur.user_id=s.user_id
+         AND (ur.business_id=s.business_id OR ur.business_id IS NULL)
+         AND (ur.branch_id IS NULL OR ur.branch_id=$3::uuid)
+       JOIN umi.role r ON r.id=ur.role_id
+       LEFT JOIN umi.role_permission rp ON rp.role_id=r.id
+       LEFT JOIN umi.permission p ON p.id=rp.permission_id
+       JOIN runtime.operator_session acting ON acting.id=$5::uuid
+         AND acting.business_id=s.business_id AND acting.branch_id=$3::uuid
+       WHERE s.business_id=$2::uuid AND (s.branch_id IS NULL OR s.branch_id=$3::uuid)
+         AND s.operator_pin_lookup_hash=$1 AND s.status='active'
+         AND acting.user_id<>s.user_id
+         AND r.key IN ('owner','admin','manager','supervisor','super_admin')
+         AND (p.key=$4 OR r.key='super_admin')
+       LIMIT 1`,
+      [lookupHash, tenantId, branchId, permission, operatorSessionId],
+    );
+    return rows[0] ?? null;
+  }
+
   async recordPinFailure(staffId: string): Promise<void> {
     await this.pg.worker.query(
       `UPDATE tenant.staff
@@ -302,6 +339,7 @@ export class PosEntryRepository {
     tenantId: string;
     branchId: string;
     permission: string;
+    commandFingerprint: string | null;
   }) {
     const { rows } = await this.pg.worker.query<{ id: string; expiresAt: Date }>(
       `WITH manager_allowed AS (
@@ -313,6 +351,7 @@ export class PosEntryRepository {
          WHERE ur.user_id = $1::uuid
            AND (ur.business_id = $3::uuid OR ur.business_id IS NULL)
            AND (ur.branch_id IS NULL OR ur.branch_id = $4::uuid)
+           AND r.key IN ('owner','admin','manager','supervisor','super_admin')
            AND (p.key = $5 OR r.key = 'super_admin')
        ), target AS (
          SELECT durable_session_id, user_id
@@ -324,9 +363,10 @@ export class PosEntryRepository {
          WHERE id = $6::uuid
        )
        INSERT INTO runtime.elevation_grant
-         (session_id, business_id, branch_id, permission_key, method, approved_by, expires_at)
+         (session_id, business_id, branch_id, permission_key, method, approved_by,
+          expires_at,command_fingerprint)
        SELECT target.durable_session_id, $3::uuid, $4::uuid, $5,
-              'manager_approval', $1::uuid, now() + interval '5 minutes'
+              'manager_approval', $1::uuid, now() + interval '5 minutes',$7
        FROM target, manager_allowed
        WHERE target.user_id <> $1::uuid
        RETURNING id::text, expires_at AS "expiresAt"`,
@@ -337,6 +377,7 @@ export class PosEntryRepository {
         input.branchId,
         input.permission,
         input.managerStaffId,
+        input.commandFingerprint,
       ],
     );
     if (rows[0]) {

@@ -1,5 +1,8 @@
 import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PasswordService } from '../../shared/auth/password.service';
+import { posPinLookupHash } from '../../shared/auth/pos-pin';
+import type { AppConfig } from '../../shared/config/config.schema';
 import type { AuthUser } from '../auth/auth.types';
 import { PosEntryRepository } from './pos-entry.repository';
 
@@ -8,6 +11,7 @@ export class PosEntryService {
   constructor(
     private readonly repo: PosEntryRepository,
     private readonly passwords: PasswordService,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
   entryContext(user: AuthUser) {
@@ -68,6 +72,7 @@ export class PosEntryService {
       branchId: dto.branchId,
       method: 'operator_pin' as const,
       expiresAt: grant.expiresAt.toISOString(),
+      commandFingerprint: null,
     };
   }
 
@@ -79,9 +84,18 @@ export class PosEntryService {
       permission: string;
       tenantId: string;
       branchId: string;
+      commandFingerprint: string | null;
     },
   ) {
-    const record = await this.repo.pinRecord(user.id, dto.tenantId);
+    const secret = this.config.get('JWT_SECRET', { infer: true });
+    if (!secret) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+    const record = await this.repo.managerPinRecord(
+      posPinLookupHash(secret, dto.tenantId, dto.managerPin),
+      dto.tenantId,
+      dto.branchId,
+      dto.permission,
+      dto.operatorSessionId,
+    );
     if (
       !record ||
       !record.salt ||
@@ -95,12 +109,13 @@ export class PosEntryService {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
     }
     const grant = await this.repo.grantManagerElevation({
-      managerUserId: user.id,
+      managerUserId: record.userId,
       managerStaffId: record.staffId,
       operatorSessionId: dto.operatorSessionId,
       tenantId: dto.tenantId,
       branchId: dto.branchId,
       permission: dto.permission,
+      commandFingerprint: dto.commandFingerprint,
     });
     if (!grant) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
     return {
@@ -110,6 +125,7 @@ export class PosEntryService {
       branchId: dto.branchId,
       method: 'manager_approval' as const,
       expiresAt: grant.expiresAt.toISOString(),
+      commandFingerprint: dto.commandFingerprint,
     };
   }
 }

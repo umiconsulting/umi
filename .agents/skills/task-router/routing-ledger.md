@@ -21,6 +21,19 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-07-29 - UmiPOS Gate 3B advanced checkout
+- task type: product implementation and publication
+- request summary: Implement the advanced checkout and tender lifecycle.
+- filesystem slice inspected: UmiPOS, UMI API, contracts, migrations, and canonical product documents.
+- chosen owner: UMI API for financial authority and UmiPOS for presentation.
+- chosen path: Extend the existing checkout module and generated contract boundary.
+- skill or subagent used: task-router, workspace-boundary-check, tdd, code-review, and pr-gates.
+- files touched: Gate 3B contract, API, Flutter, migration, test, script, and canonical document files.
+- tools used: pnpm, Vitest, Flutter, Dart, Docker, PostgreSQL, Git, and GitHub CLI.
+- outcome: Gate 3B implementation and focused validation completed before publication.
+- reusable pattern observed: Keep terminal assertions in a recoverable draft before financial commit.
+- promotion follow-up: None.
+
 ### 2026-07-29 - UmiPOS Gate 3A sale lifecycle
 - task type: cross-app commercial workflow implementation
 - request summary: add the cashier sale lifecycle without changes to offline or device authority

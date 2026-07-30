@@ -16,6 +16,8 @@ enum CheckoutPhase {
   repricing,
   confirmationRequired,
   processing,
+  collectingPayment,
+  awaitingApproval,
   paymentUnknown,
   completed,
   provisional,
@@ -52,6 +54,10 @@ final class CheckoutController extends ChangeNotifier {
   final Telemetry _telemetry;
   CheckoutState _state = const CheckoutState();
   CheckoutState get state => _state;
+  List<Map<String, Object?>> get tenderDrafts => _tenderDrafts;
+  Map<String, Object?>? get tipDraft => _tipDraft;
+  List<Map<String, Object?>> get discountDrafts => _discountDrafts;
+  Map<String, Object?> get receiptDelivery => _receiptDelivery;
   String? _tenantId;
   String? _branchId;
   String? _operatorSessionId;
@@ -63,6 +69,18 @@ final class CheckoutController extends ChangeNotifier {
   String _branchName = '';
   String _operatorName = '';
   int? _cashReceivedMinorUnits;
+  List<Map<String, Object?>> _tenderDrafts = const [];
+  Map<String, Object?>? _tipDraft;
+  List<Map<String, Object?>> _discountDrafts = const [];
+  List<String> _approvalIds = const [];
+  Map<String, Object?> _receiptDelivery = const {
+    'destination': 'display',
+    'channel': null,
+    'customerContactId': null,
+  };
+  Map<String, Object?>? _recoveredPaymentOutcome;
+  String? _commitCommandId;
+  String? _commitIdempotencyKey;
   final Map<String, CheckoutResult> _confirmationCache = {};
 
   Future<void> preview({
@@ -77,6 +95,15 @@ final class CheckoutController extends ChangeNotifier {
     String branchName = '',
     String operatorName = '',
     int? cashReceivedMinorUnits,
+    List<Map<String, Object?>> tenderDrafts = const [],
+    Map<String, Object?>? tipDraft,
+    List<Map<String, Object?>> discountDrafts = const [],
+    List<String> approvalIds = const [],
+    Map<String, Object?> receiptDelivery = const {
+      'destination': 'display',
+      'channel': null,
+      'customerContactId': null,
+    },
   }) async {
     _tenantId = tenantId;
     _branchId = branchId;
@@ -89,6 +116,13 @@ final class CheckoutController extends ChangeNotifier {
     _branchName = branchName;
     _operatorName = operatorName;
     _cashReceivedMinorUnits = cashReceivedMinorUnits;
+    _tenderDrafts = List.unmodifiable(tenderDrafts);
+    _tipDraft = tipDraft == null ? null : Map.unmodifiable(tipDraft);
+    _discountDrafts = List.unmodifiable(discountDrafts);
+    _approvalIds = List.unmodifiable(approvalIds);
+    _receiptDelivery = Map.unmodifiable(receiptDelivery);
+    _commitCommandId = _uuid();
+    _commitIdempotencyKey = _uuid();
     _set(const CheckoutState(phase: CheckoutPhase.repricing));
     _event('checkout_opened');
     if ((_connectivity?.state ?? PosConnectivity.online) !=
@@ -123,6 +157,91 @@ final class CheckoutController extends ChangeNotifier {
     await _submit(null);
   }
 
+  Future<void> recover({
+    required String tenantId,
+    required String branchId,
+    required String operatorSessionId,
+    required String cartId,
+    required int cartVersion,
+  }) async {
+    try {
+      _tenantId = tenantId;
+      _branchId = branchId;
+      _operatorSessionId = operatorSessionId;
+      _cartId = cartId;
+      _cartVersion = cartVersion;
+      final recovered = await _repository.recovery(
+        tenantId,
+        cartId,
+        CheckoutRecoveryQuery(
+          branchId: branchId,
+          operatorSessionId: operatorSessionId,
+        ),
+      );
+      _tenderDrafts = recovered.tenderDrafts;
+      _tipDraft = recovered.tipDraft;
+      _discountDrafts = recovered.discountDrafts;
+      _receiptDelivery = recovered.receiptDelivery;
+      _recoveredPaymentOutcome = recovered.paymentOutcome;
+      final recoveredAttempt =
+          recovered.paymentOutcome?['attempt'] as Map<String, Object?>?;
+      final committedResult = recovered.result == null
+          ? null
+          : CheckoutResult.fromJson(recovered.result!);
+      final recoveredResult =
+          committedResult ??
+          (recovered.state == 'payment_unknown'
+              ? CheckoutResult(
+                  status: 'payment_unknown',
+                  confirmation: const {},
+                  payment: recovered.paymentOutcome,
+                  payments: recovered.paymentOutcome == null
+                      ? const []
+                      : [recovered.paymentOutcome!],
+                  reservation: null,
+                  sale: null,
+                  receipt: null,
+                  failure: {
+                    'code': 'TERMINAL_OUTCOME_UNKNOWN',
+                    'retryable': false,
+                    'operatorGuidance': 'verify_terminal_outcome',
+                    'correlationId':
+                        recoveredAttempt?['correlationId'] as String? ??
+                        'checkout-recovery',
+                  },
+                  paymentSummary: recovered.paymentSummary,
+                  recoveryState: recovered.recoveryState,
+                  receiptDelivery: recovered.receiptDelivery,
+                  policy: null,
+                )
+              : null);
+      final phase = switch (recoveredResult?.status) {
+        'completed' => CheckoutPhase.completed,
+        'payment_unknown' => CheckoutPhase.paymentUnknown,
+        _ when recovered.state == 'completed' => CheckoutPhase.failure,
+        _ => CheckoutPhase.collectingPayment,
+      };
+      _set(
+        CheckoutState(
+          phase: phase,
+          result: recoveredResult,
+          errorCode: phase == CheckoutPhase.failure
+              ? 'receipt_pending'
+              : recovered.recoveryState,
+        ),
+      );
+      _event('checkout_recovered');
+    } on AppException catch (error) {
+      if (error.code != 'RESOURCE_NOT_FOUND') _failure(error);
+    }
+  }
+
+  void applyApproval(String approvalId) {
+    _approvalIds = List.unmodifiable({..._approvalIds, approvalId});
+    _commitCommandId = _uuid();
+    _commitIdempotencyKey = _uuid();
+  }
+
   Future<void> confirm() async {
     final fingerprint = _state.result?.confirmation['fingerprint'] as String?;
     if (fingerprint == null) return;
@@ -138,7 +257,7 @@ final class CheckoutController extends ChangeNotifier {
   }
 
   Future<void> queryUnknownPayment() async {
-    final payment = _state.result?.payment;
+    final payment = _state.result?.payment ?? _recoveredPaymentOutcome;
     if (payment == null ||
         _tenantId == null ||
         _branchId == null ||
@@ -157,8 +276,28 @@ final class CheckoutController extends ChangeNotifier {
           operatorSessionId: _operatorSessionId!,
         ),
       );
-      if (outcome.attempt['status'] == 'unknown') {
+      if (outcome.attempt['status'] == 'unknown' ||
+          outcome.attempt['status'] == 'timeout') {
+        final outcomeJson = outcome.toJson();
+        _recoveredPaymentOutcome = outcomeJson;
+        final current = _state.result;
+        final updated = current == null
+            ? null
+            : CheckoutResult.fromJson({
+                ...current.toJson(),
+                'status': 'payment_unknown',
+                'payment': outcomeJson,
+                'payments': [outcomeJson],
+                'recoveryState': 'terminal_outcome_unknown',
+              });
         _event('payment_unknown');
+        _set(
+          CheckoutState(
+            phase: CheckoutPhase.paymentUnknown,
+            result: updated,
+            errorCode: 'terminal_outcome_unknown',
+          ),
+        );
         return;
       }
       _set(
@@ -173,7 +312,64 @@ final class CheckoutController extends ChangeNotifier {
     }
   }
 
-  void reset() => _set(const CheckoutState());
+  void reset() {
+    _tenantId = null;
+    _branchId = null;
+    _operatorSessionId = null;
+    _cartId = null;
+    _cartVersion = null;
+    _paymentMethod = 'cash';
+    _cart = null;
+    _authority = null;
+    _branchName = '';
+    _operatorName = '';
+    _cashReceivedMinorUnits = null;
+    _tenderDrafts = const [];
+    _tipDraft = null;
+    _discountDrafts = const [];
+    _approvalIds = const [];
+    _receiptDelivery = const {
+      'destination': 'display',
+      'channel': null,
+      'customerContactId': null,
+    };
+    _recoveredPaymentOutcome = null;
+    _commitCommandId = null;
+    _commitIdempotencyKey = null;
+    _set(const CheckoutState());
+  }
+
+  Future<bool> cancel({String reason = 'operator_cancelled'}) async {
+    if (_tenantId == null ||
+        _branchId == null ||
+        _operatorSessionId == null ||
+        _cartId == null) {
+      reset();
+      return true;
+    }
+    if (_state.phase == CheckoutPhase.paymentUnknown) return false;
+    try {
+      await _repository.cancel(
+        _tenantId!,
+        _cartId!,
+        CheckoutCancellationRequest(
+          branchId: _branchId!,
+          operatorSessionId: _operatorSessionId!,
+          reason: reason,
+          checkoutFingerprint:
+              _state.result?.confirmation['fingerprint'] as String?,
+          approvalIds: _approvalIds,
+          idempotencyKey: _uuid(),
+        ),
+      );
+      _event('checkout_cancelled');
+      reset();
+      return true;
+    } on AppException catch (error) {
+      _failure(error);
+      return false;
+    }
+  }
 
   Future<void> _submit(String? fingerprint) async {
     if (_tenantId == null ||
@@ -187,22 +383,41 @@ final class CheckoutController extends ChangeNotifier {
       final result = await _repository.checkout(
         _tenantId!,
         CheckoutCommand(
+          commandId: fingerprint == null ? _uuid() : _commitCommandId,
           cartId: _cartId!,
           branchId: _branchId!,
           operatorSessionId: _operatorSessionId!,
           expectedCartVersion: _cartVersion!,
           paymentMethod: _paymentMethod,
           totalsFingerprint: fingerprint,
-          idempotencyKey: _uuid(),
+          idempotencyKey: fingerprint == null
+              ? _uuid()
+              : (_commitIdempotencyKey ?? _uuid()),
+          tenderDrafts: _tenderDrafts,
+          tipDraft: _tipDraft,
+          discountDrafts: _discountDrafts,
+          approvalIds: _approvalIds,
+          receiptDelivery: _receiptDelivery,
         ),
       );
       final phase = switch (result.status) {
         'confirmation_required' => CheckoutPhase.confirmationRequired,
         'payment_unknown' => CheckoutPhase.paymentUnknown,
         'completed' => CheckoutPhase.completed,
+        'payment_pending' when result.recoveryState == 'approval_required' =>
+          CheckoutPhase.awaitingApproval,
+        'payment_pending' => CheckoutPhase.collectingPayment,
         _ => CheckoutPhase.processing,
       };
-      _set(CheckoutState(phase: phase, result: result));
+      _set(
+        CheckoutState(
+          phase: phase,
+          result: result,
+          errorCode: result.recoveryState == 'none'
+              ? null
+              : result.recoveryState,
+        ),
+      );
       if (phase == CheckoutPhase.confirmationRequired && _cart != null) {
         _confirmationCache['${_cart!.id}:${_cart!.version}'] = result;
       }
@@ -228,6 +443,19 @@ final class CheckoutController extends ChangeNotifier {
         raw == null) {
       return;
     }
+    final unsupportedTender =
+        _tenderDrafts.length != 1 ||
+        _tenderDrafts.any((tender) => tender['type'] != 'cash');
+    if (unsupportedTender || _tipDraft != null || _discountDrafts.isNotEmpty) {
+      _set(
+        CheckoutState(
+          phase: CheckoutPhase.failure,
+          result: _state.result,
+          errorCode: 'OFFLINE_ADVANCED_TENDER_BLOCKED',
+        ),
+      );
+      return;
+    }
     final totals = TotalsConfirmation.fromJson(raw);
     final grandTotal = totals.totals['grandTotal']! as Map<String, Object?>;
     final amount = (grandTotal['minorUnits']! as num).toInt();
@@ -244,6 +472,7 @@ final class CheckoutController extends ChangeNotifier {
           provisionalSaleId: 'prov-$commandId',
           authority: authority,
           checkoutCommand: CheckoutCommand(
+            commandId: commandId,
             cartId: cart.id,
             branchId: cart.branchId,
             operatorSessionId: cart.operatorSessionId,
@@ -251,6 +480,11 @@ final class CheckoutController extends ChangeNotifier {
             paymentMethod: 'cash',
             totalsFingerprint: fingerprint,
             idempotencyKey: _uuid(),
+            tenderDrafts: _tenderDrafts,
+            tipDraft: _tipDraft,
+            discountDrafts: _discountDrafts,
+            approvalIds: const [],
+            receiptDelivery: _receiptDelivery,
           ),
           cart: cart,
           totals: totals,

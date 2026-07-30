@@ -232,6 +232,10 @@ const dartRoutes = `abstract final class UmiRoutes {
       '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/checkout';
   static String posCheckoutPayment(String tenantId, String paymentId) =>
       '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/checkout/payments/\${Uri.encodeComponent(paymentId)}';
+  static String posCheckoutRecovery(String tenantId, String cartId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/checkout/carts/\${Uri.encodeComponent(cartId)}';
+  static String posCheckoutCancel(String tenantId, String cartId) =>
+      '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/checkout/carts/\${Uri.encodeComponent(cartId)}/cancel';
   static String posSales(String tenantId) =>
       '/api/pos/tenants/\${Uri.encodeComponent(tenantId)}/sales';
   static String posCurrentSale(String tenantId) =>

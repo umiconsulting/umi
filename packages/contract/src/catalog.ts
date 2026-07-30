@@ -7,7 +7,7 @@ import { posCheckoutModels } from './pos-checkout';
 import { posOfflineModels } from './pos-offline';
 import { posSaleModels } from './pos-sale';
 
-export const CONTRACT_VERSION = '1.9.0';
+export const CONTRACT_VERSION = '2.0.0';
 export const API_MAJOR_VERSION = 1;
 
 export const errorCatalog = Object.fromEntries(
@@ -593,6 +593,43 @@ export const routeCatalog = {
     pin: false,
     approval: false,
     errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+  },
+  'GET /api/pos/tenants/:tenantId/checkout/carts/:cartId': {
+    request: 'CheckoutRecoveryQuery',
+    response: 'CheckoutRecoverySnapshot',
+    auth: 'device-session',
+    permission: 'checkout.commit',
+    idempotent: true,
+    tenantContext: true,
+    branchContext: true,
+    offline: false,
+    pin: false,
+    approval: false,
+    errors: [
+      'AUTHENTICATION_REQUIRED',
+      'PERMISSION_DENIED',
+      'RESOURCE_NOT_FOUND',
+      'DEVICE_REVOKED',
+    ],
+  },
+  'POST /api/pos/tenants/:tenantId/checkout/carts/:cartId/cancel': {
+    request: 'CheckoutCancellationRequest',
+    response: 'CheckoutCancellationResult',
+    auth: 'device-session',
+    permission: 'checkout.commit',
+    idempotent: true,
+    tenantContext: true,
+    branchContext: true,
+    offline: false,
+    pin: false,
+    approval: true,
+    errors: [
+      'AUTHENTICATION_REQUIRED',
+      'PERMISSION_DENIED',
+      'CONFLICT',
+      'PAYMENT_OUTCOME_UNKNOWN',
+      'DEVICE_REVOKED',
+    ],
   },
   'POST /api/pos/tenants/:tenantId/sales': {
     request: 'SaleContextRequest',

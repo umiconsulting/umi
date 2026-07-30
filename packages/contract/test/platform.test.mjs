@@ -17,6 +17,10 @@ const {
   CartLineInput,
   CheckoutCommand,
   CheckoutResult,
+  TenderDraft,
+  ManualTerminalOutcome,
+  PartialPaymentState,
+  ManagerApprovalRequest,
   OfflineCheckoutCommand,
   RecoveryAction,
   SaleSnapshot,
@@ -107,6 +111,55 @@ test('Gate 3A sale lifecycle contracts enforce explicit states and safe reasons'
     false,
   );
   assert.equal(routes.pos.saleSuspend(id, id), `/api/pos/tenants/${id}/sales/${id}/suspend`);
+});
+
+test('Gate 3B checkout contracts bound tenders, approvals, tips, discounts, and recovery', () => {
+  const cash = TenderDraft.parse({
+    id: '00000000-0000-4000-8000-000000000101',
+    type: 'cash',
+    amount: { minorUnits: 8500, currency: 'MXN' },
+    amountReceived: { minorUnits: 10000, currency: 'MXN' },
+    status: 'draft',
+    correlationId: null,
+  });
+  assert.equal(cash.amountReceived.minorUnits, 10000);
+  assert.throws(() =>
+    TenderDraft.parse({
+      ...cash,
+      amount: { minorUnits: 0, currency: 'MXN' },
+    }),
+  );
+  assert.throws(() =>
+    CheckoutCommand.parse({
+      cartId: '00000000-0000-4000-8000-000000000102',
+      branchId: '00000000-0000-4000-8000-000000000103',
+      operatorSessionId: '00000000-0000-4000-8000-000000000104',
+      expectedCartVersion: 1,
+      paymentMethod: 'cash',
+      totalsFingerprint: null,
+      idempotencyKey: '00000000-0000-4000-8000-000000000105',
+      commandId: '00000000-0000-4000-8000-000000000106',
+      tenderDrafts: Array.from({ length: 9 }, (_, index) => ({
+        ...cash,
+        id: `00000000-0000-4000-8000-${String(index + 200).padStart(12, '0')}`,
+      })),
+      discountDrafts: [],
+      approvalIds: [],
+      receiptDelivery: { destination: 'display', channel: null, customerContactId: null },
+    }),
+  );
+  assert.equal(ManualTerminalOutcome.parse('outcome_unknown'), 'outcome_unknown');
+  assert.equal(PartialPaymentState.parse('partially_covered'), 'partially_covered');
+  assert.throws(() =>
+    ManagerApprovalRequest.parse({
+      operatorSessionId: '00000000-0000-4000-8000-000000000104',
+      managerPin: '2468',
+      permission: 'checkout.discount.approve',
+      tenantId: '00000000-0000-4000-8000-000000000107',
+      branchId: '00000000-0000-4000-8000-000000000103',
+      commandFingerprint: 'not-a-fingerprint',
+    }),
+  );
 });
 
 test('Gate 2F checkout identity and recovery actions are typed and bounded', () => {

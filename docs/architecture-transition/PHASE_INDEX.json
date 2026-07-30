@@ -99,6 +99,13 @@
       "status": "complete",
       "stateMachineVersion": 1,
       "subject": "Cashier sale lifecycle, suspension, recovery, customer attachment, and receipt navigation"
+    },
+    {
+      "commit": "HEAD (Gate 3B commit)",
+      "id": "3B",
+      "status": "complete",
+      "stateMachineVersion": 1,
+      "subject": "Advanced checkout, cash, manual terminal, mixed tender, policy actions, and payment recovery"
     }
   ]
 }
