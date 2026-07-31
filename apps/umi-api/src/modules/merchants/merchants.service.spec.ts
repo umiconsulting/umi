@@ -1,23 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotFoundException } from '@nestjs/common';
-import { TenantsService } from './tenants.service';
-import type { TenantAccess } from '../auth/auth.types';
+import { MerchantsService } from './merchants.service';
+import type { MerchantAccess } from '../auth/auth.types';
 
 function make() {
   const repo = {
-    tenantsForUser: vi.fn(),
+    merchantsForUser: vi.fn(),
     loadProducts: vi.fn(),
     loadLocations: vi.fn(),
     loadBranding: vi.fn().mockResolvedValue({ brandColor: null, secondaryColor: null }),
     findActiveLocation: vi.fn(),
-    updateTenantSettings: vi.fn().mockResolvedValue(undefined),
+    updateMerchantSettings: vi.fn().mockResolvedValue(undefined),
     updateLocation: vi.fn(),
   };
-  return { svc: new TenantsService(repo as never), repo };
+  return { svc: new MerchantsService(repo as never), repo };
 }
 
-const ACCESS: TenantAccess = {
-  tenantId: 't1',
+const ACCESS: MerchantAccess = {
+  merchantId: 't1',
   slug: 'kala',
   name: 'Kala',
   timezone: 'America/Mexico_City',
@@ -32,7 +32,7 @@ const LOCS = [
   { id: 'l2', slug: 'chapultepec', name: 'Chapultepec', timezone: 'tz', status: 'active' },
 ];
 
-describe('TenantsService.buildCapabilities', () => {
+describe('MerchantsService.buildCapabilities', () => {
   let h: ReturnType<typeof make>;
   beforeEach(() => {
     h = make();
@@ -76,7 +76,7 @@ describe('TenantsService.buildCapabilities', () => {
   });
 });
 
-describe('TenantsService.buildSettings', () => {
+describe('MerchantsService.buildSettings', () => {
   it('defaults branding colors when the café has set none', async () => {
     const h = make();
     h.repo.loadLocations.mockResolvedValue([]);
@@ -94,7 +94,7 @@ describe('TenantsService.buildSettings', () => {
     expect(settings.secondaryColor).toBe('#E8C9A3');
   });
 
-  it('sources both colors from the typed tenant.business columns', async () => {
+  it('sources both colors from the typed merchant.merchant columns', async () => {
     const h = make();
     h.repo.loadLocations.mockResolvedValue([]);
     h.repo.loadProducts.mockResolvedValue({
@@ -111,7 +111,7 @@ describe('TenantsService.buildSettings', () => {
   });
 });
 
-describe('TenantsService.updateLocation', () => {
+describe('MerchantsService.updateLocation', () => {
   it('404s when the location does not exist (repo returns null)', async () => {
     const h = make();
     // No active-status pre-check: 404 comes from updateLocation returning null,

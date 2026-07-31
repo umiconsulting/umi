@@ -15,7 +15,7 @@ function make() {
     getUserPersonId: vi.fn().mockResolvedValue(null),
   };
   const repo = {
-    tenantConfig: vi.fn().mockResolvedValue({
+    merchantConfig: vi.fn().mockResolvedValue({
       name: 'Kala',
       timezone: 'America/Mexico_City',
       lifecycleCopy: {},

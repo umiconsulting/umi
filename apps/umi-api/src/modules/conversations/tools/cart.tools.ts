@@ -83,7 +83,7 @@ export class CartTools {
       temp: input.temp,
       milk: input.milk,
     });
-    const searchResults = await this.products.searchByQuery(ctx.tenantId, input.query, 10);
+    const searchResults = await this.products.searchByQuery(ctx.merchantId, input.query, 10);
     let products = chooseBestProductMatch(searchResults, input.query);
     let effectiveQuery = input.query;
 
@@ -95,7 +95,11 @@ export class CartTools {
         variantFilters.milk,
       );
       if (strippedQuery) {
-        const strippedResults = await this.products.searchByQuery(ctx.tenantId, strippedQuery, 10);
+        const strippedResults = await this.products.searchByQuery(
+          ctx.merchantId,
+          strippedQuery,
+          10,
+        );
         const strippedProducts = chooseBestProductMatch(strippedResults, strippedQuery);
         if (strippedProducts.length) {
           products = strippedProducts;
@@ -105,7 +109,7 @@ export class CartTools {
     }
 
     if (!products.length) {
-      const suggestions = await this.products.categorySuggestions(ctx.tenantId);
+      const suggestions = await this.products.categorySuggestions(ctx.merchantId);
       return {
         ...retryableToolError(
           `No encontré "${effectiveQuery}" en el menú.`,
@@ -234,7 +238,7 @@ export class CartTools {
           );
         }
         const target = matches[0];
-        const product = await this.products.getById(ctx.tenantId, target.product_id);
+        const product = await this.products.getById(ctx.merchantId, target.product_id);
         if (!product || product.available === false) {
           return retryableToolError(`El producto ${target.product_name} ya no está disponible.`, {
             tool: 'search_menu',

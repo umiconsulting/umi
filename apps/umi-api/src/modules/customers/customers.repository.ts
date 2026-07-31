@@ -14,16 +14,16 @@ export interface CustomerListQuery {
 export type Row = Record<string, any>;
 
 /**
- * Customer 360 reads (build-v3). Tenant-scoped → umi_app pool via `withTenant`
+ * Customer 360 reads (build-v3). Merchant-scoped → umi_app pool via `withMerchant`
  * (RLS). build-v3 collapses the identity spine to two tables:
- *   * the row entity is `tenant.customer` (`c`); its per-channel reachability lives
- *     in `tenant.contact` (`contact.customer_id → customer.id`, inverted from the old
+ *   * the row entity is `merchant.customer` (`c`); its per-channel reachability lives
+ *     in `merchant.contact` (`contact.customer_id → customer.id`, inverted from the old
  *     `contact_id` link). Cards, conversations, orders and facts key on `customer_id = c.id`.
- *   * reachability (`normalized_phone`/`email`) is DERIVED from `tenant.contact`
+ *   * reachability (`normalized_phone`/`email`) is DERIVED from `merchant.contact`
  *     (+ `umi.channel_type` for the "kind" via `ch.key`), not cached columns; loyalty
  *     totals derive (visits=COUNT(visit), balance=SUM(card_ledger)); an order's total is
- *     the derived `tenant.order_total` view.
- *   * customer facts → `tenant.customer_fact` (the CDP "memory" atom, was the misnamed
+ *     the derived `merchant.order_total` view.
+ *   * customer facts → `merchant.customer_fact` (the CDP "memory" atom, was the misnamed
  *     `customer_note`).
  *   * NO SOURCE in build-v3 (returned as 0/empty, like gift_card): merge candidates
  *     (`contact_merge_candidates` was a dead detector — dedup is `customer.merged_into_id`)
@@ -36,12 +36,12 @@ export class CustomersRepository {
 
   /** The platform customer list (one lateral-join rollup per customer). */
   async listCustomers(
-    tenantId: string,
+    merchantId: string,
     q: CustomerListQuery,
   ): Promise<{ rows: Row[]; total: number }> {
     const like = `%${q.search}%`;
     const skip = (q.page - 1) * q.limit;
-    return this.pg.withTenant(async (c) => {
+    return this.pg.withMerchant(async (c) => {
       const rows = (
         await c.query<Row>(
           `SELECT
@@ -65,12 +65,12 @@ export class CustomersRepository {
              0::int AS data_quality_count,
              COALESCE(merge_summary.merge_candidate_count, 0)::int AS merge_candidate_count,
              last_touch.last_touch_at
-           FROM tenant.customer AS c
+           FROM merchant.customer AS c
            LEFT JOIN LATERAL (
              SELECT ci.normalized_value
-             FROM tenant.contact AS ci
+             FROM merchant.contact AS ci
              JOIN umi.channel_type AS ch ON ch.id = ci.channel_id
-             WHERE ci.business_id = c.business_id AND ci.customer_id = c.id
+             WHERE ci.merchant_id = c.merchant_id AND ci.customer_id = c.id
                AND ch.key IN ('phone', 'whatsapp')
                AND ci.normalized_value IS NOT NULL
              ORDER BY CASE WHEN ch.key = 'phone' THEN 0 ELSE 1 END, ci.created_at ASC
@@ -78,9 +78,9 @@ export class CustomersRepository {
            ) AS phone_identity ON true
            LEFT JOIN LATERAL (
              SELECT ci.normalized_value
-             FROM tenant.contact AS ci
+             FROM merchant.contact AS ci
              JOIN umi.channel_type AS ch ON ch.id = ci.channel_id
-             WHERE ci.business_id = c.business_id AND ci.customer_id = c.id
+             WHERE ci.merchant_id = c.merchant_id AND ci.customer_id = c.id
                AND ch.key = 'email' AND ci.normalized_value IS NOT NULL
              ORDER BY ci.created_at ASC
              LIMIT 1
@@ -96,20 +96,20 @@ export class CustomersRepository {
                )
                ORDER BY ch.key, ci.created_at
              ) AS items
-             FROM tenant.contact AS ci
+             FROM merchant.contact AS ci
              JOIN umi.channel_type AS ch ON ch.id = ci.channel_id
-             WHERE ci.business_id = c.business_id AND ci.customer_id = c.id
+             WHERE ci.merchant_id = c.merchant_id AND ci.customer_id = c.id
            ) AS identities ON true
            LEFT JOIN LATERAL (
              SELECT
                count(lc.id) AS loyalty_count,
-               COALESCE((SELECT count(*) FROM tenant.loyalty_visit v
-                 WHERE v.business_id = c.business_id
-                   AND v.card_id IN (SELECT id FROM tenant.loyalty_card WHERE business_id = c.business_id AND customer_id = c.id)), 0) AS total_visits,
-               COALESCE((SELECT sum(l.delta) FROM tenant.loyalty_stored_value_ledger l
-                 WHERE l.business_id = c.business_id
-                   AND l.card_id IN (SELECT id FROM tenant.loyalty_card WHERE business_id = c.business_id AND customer_id = c.id)), 0) AS wallet_balance_cents,
-               -- Intentionally 0: tenant.loyalty_gift_card has no customer FK (it links to a
+               COALESCE((SELECT count(*) FROM merchant.loyalty_visit v
+                 WHERE v.merchant_id = c.merchant_id
+                   AND v.card_id IN (SELECT id FROM merchant.loyalty_card WHERE merchant_id = c.merchant_id AND customer_id = c.id)), 0) AS total_visits,
+               COALESCE((SELECT sum(l.delta) FROM merchant.loyalty_stored_value_ledger l
+                 WHERE l.merchant_id = c.merchant_id
+                   AND l.card_id IN (SELECT id FROM merchant.loyalty_card WHERE merchant_id = c.merchant_id AND customer_id = c.id)), 0) AS wallet_balance_cents,
+               -- Intentionally 0: merchant.loyalty_gift_card has no customer FK (it links to a
                -- person only via recipient email/phone PII, or via redeemed_card_id
                -- once redeemed), so a per-customer active-gift-card count can't be
                -- derived off this card-keyed lateral without fuzzy PII matching —
@@ -117,30 +117,30 @@ export class CustomersRepository {
                -- driven; gift-card attribution is a follow-up (PR4 writers).
                0 AS gift_card_count,
                max(lc.updated_at) AS last_cash_at
-             FROM tenant.loyalty_card AS lc
-             WHERE lc.business_id = c.business_id AND lc.customer_id = c.id
+             FROM merchant.loyalty_card AS lc
+             WHERE lc.merchant_id = c.merchant_id AND lc.customer_id = c.id
            ) AS cash_summary ON true
            LEFT JOIN LATERAL (
              SELECT
                count(cv.id) AS conversation_count,
                count(cv.id) FILTER (WHERE cv.status IN ('open', 'pending', 'active')) AS active_conversations,
                max(cv.last_message_at) AS last_conversation_at
-             FROM tenant.conversation AS cv
-             WHERE cv.business_id = c.business_id AND cv.customer_id = c.id
+             FROM merchant.conversation AS cv
+             WHERE cv.merchant_id = c.merchant_id AND cv.customer_id = c.id
            ) AS conversation_summary ON true
            LEFT JOIN LATERAL (
              SELECT
                count(o.id) AS orders_count,
                COALESCE(sum(ot.total), 0) AS total_spend_cents,
                max(o.created_at) AS last_order_at
-             FROM tenant.customer_order AS o
-             LEFT JOIN tenant.order_total AS ot ON ot.order_id = o.id
-             WHERE o.business_id = c.business_id AND o.customer_id = c.id
+             FROM merchant.customer_order AS o
+             LEFT JOIN merchant.order_total AS ot ON ot.order_id = o.id
+             WHERE o.merchant_id = c.merchant_id AND o.customer_id = c.id
            ) AS order_summary ON true
            LEFT JOIN LATERAL (
              SELECT count(cn.id) AS memory_count, max(cn.updated_at) AS last_memory_at
-             FROM tenant.customer_fact AS cn
-             WHERE cn.business_id = c.business_id AND cn.customer_id = c.id
+             FROM merchant.customer_fact AS cn
+             WHERE cn.merchant_id = c.merchant_id AND cn.customer_id = c.id
            ) AS memory_summary ON true
            LEFT JOIN LATERAL (
              -- No merge-candidate source in build-v3 (contact_merge_candidates was a dead
@@ -158,7 +158,7 @@ export class CustomersRepository {
                (merge_summary.last_merge_at)
              ) AS touch(ts)
            ) AS last_touch ON true
-           WHERE c.business_id = $1::uuid
+           WHERE c.merchant_id = $1::uuid
              AND ($2 = '' OR c.id = $3::uuid)
              AND (
                $4 = ''
@@ -175,38 +175,38 @@ export class CustomersRepository {
              )
            ORDER BY last_touch.last_touch_at DESC NULLS LAST, c.created_at DESC
            LIMIT $7 OFFSET $8`,
-          [tenantId, q.contactId, q.contactUuid, q.filter, q.search, like, q.limit, skip],
+          [merchantId, q.contactId, q.contactUuid, q.filter, q.search, like, q.limit, skip],
         )
       ).rows;
 
       const total = (
         await c.query<{ count: number }>(
           `SELECT count(*)::int AS count
-           FROM tenant.customer AS c
+           FROM merchant.customer AS c
            LEFT JOIN LATERAL (
              SELECT ci.normalized_value
-             FROM tenant.contact AS ci
+             FROM merchant.contact AS ci
              JOIN umi.channel_type AS ch ON ch.id = ci.channel_id
-             WHERE ci.business_id = c.business_id AND ci.customer_id = c.id
+             WHERE ci.merchant_id = c.merchant_id AND ci.customer_id = c.id
                AND ch.key IN ('phone', 'whatsapp')
                AND ci.normalized_value IS NOT NULL
              LIMIT 1
            ) AS phone_identity ON true
            LEFT JOIN LATERAL (
              SELECT ci.normalized_value
-             FROM tenant.contact AS ci
+             FROM merchant.contact AS ci
              JOIN umi.channel_type AS ch ON ch.id = ci.channel_id
-             WHERE ci.business_id = c.business_id AND ci.customer_id = c.id
+             WHERE ci.merchant_id = c.merchant_id AND ci.customer_id = c.id
                AND ch.key = 'email' AND ci.normalized_value IS NOT NULL
              LIMIT 1
            ) AS email_identity ON true
-           WHERE c.business_id = $1::uuid
+           WHERE c.merchant_id = $1::uuid
              AND ($2 = '' OR c.id = $3::uuid)
              AND (
                $4 = ''
-               OR ($4 = 'whatsapp' AND EXISTS (SELECT 1 FROM tenant.conversation AS cv WHERE cv.business_id = c.business_id AND cv.customer_id = c.id))
-               OR ($4 = 'cash' AND EXISTS (SELECT 1 FROM tenant.loyalty_card AS ca WHERE ca.business_id = c.business_id AND ca.customer_id = c.id))
-               OR ($4 = 'memory' AND EXISTS (SELECT 1 FROM tenant.customer_fact AS cn WHERE cn.business_id = c.business_id AND cn.customer_id = c.id))
+               OR ($4 = 'whatsapp' AND EXISTS (SELECT 1 FROM merchant.conversation AS cv WHERE cv.merchant_id = c.merchant_id AND cv.customer_id = c.id))
+               OR ($4 = 'cash' AND EXISTS (SELECT 1 FROM merchant.loyalty_card AS ca WHERE ca.merchant_id = c.merchant_id AND ca.customer_id = c.id))
+               OR ($4 = 'memory' AND EXISTS (SELECT 1 FROM merchant.customer_fact AS cn WHERE cn.merchant_id = c.merchant_id AND cn.customer_id = c.id))
                OR ($4 = 'review' AND false) -- no merge-candidate source in build-v3 (dedup = customer.merged_into_id)
              )
              AND (
@@ -215,7 +215,7 @@ export class CustomersRepository {
                OR phone_identity.normalized_value ILIKE $6
                OR email_identity.normalized_value ILIKE $6
              )`,
-          [tenantId, q.contactId, q.contactUuid, q.filter, q.search, like],
+          [merchantId, q.contactId, q.contactUuid, q.filter, q.search, like],
         )
       ).rows[0]?.count;
 
@@ -223,33 +223,33 @@ export class CustomersRepository {
     });
   }
 
-  async timeline(tenantId: string, contactId: string): Promise<Row[]> {
-    const { rows } = await this.pg.withTenant((c) =>
+  async timeline(merchantId: string, contactId: string): Promise<Row[]> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<Row>(
         `SELECT * FROM (
            SELECT 'whatsapp_message' AS type, m.id::text AS id, m.created_at AS occurred_at, m.sender AS label, COALESCE(m.body, '') AS detail, 'conversaflow' AS product
-           FROM tenant.message AS m
-           JOIN tenant.conversation AS cv ON cv.id = m.conversation_id
-           WHERE cv.customer_id = $1::uuid AND cv.business_id = $2::uuid
+           FROM merchant.message AS m
+           JOIN merchant.conversation AS cv ON cv.id = m.conversation_id
+           WHERE cv.customer_id = $1::uuid AND cv.merchant_id = $2::uuid
            UNION ALL
            SELECT 'order' AS type, o.id::text AS id, o.created_at AS occurred_at, o.status AS label, o.id::text AS detail, 'orders' AS product
-           FROM tenant.customer_order AS o
-           WHERE o.customer_id = $1::uuid AND o.business_id = $2::uuid
+           FROM merchant.customer_order AS o
+           WHERE o.customer_id = $1::uuid AND o.merchant_id = $2::uuid
            UNION ALL
            SELECT 'memory' AS type, cn.id::text AS id, cn.updated_at AS occurred_at, cn.source AS label, cn.key || ': ' || COALESCE(cn.value #>> '{}', cn.value::text) AS detail, 'conversaflow' AS product
-           FROM tenant.customer_fact AS cn
-           WHERE cn.customer_id = $1::uuid AND cn.business_id = $2::uuid
+           FROM merchant.customer_fact AS cn
+           WHERE cn.customer_id = $1::uuid AND cn.merchant_id = $2::uuid
          ) AS timeline
          ORDER BY occurred_at DESC
          LIMIT 80`,
-        [contactId, tenantId],
+        [contactId, merchantId],
       ),
     );
     return rows;
   }
 
-  async conversations(tenantId: string, contactId: string): Promise<Row[]> {
-    const { rows } = await this.pg.withTenant((c) =>
+  async conversations(merchantId: string, contactId: string): Promise<Row[]> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<Row>(
         `SELECT
            cv.id::text,
@@ -260,20 +260,20 @@ export class CustomersRepository {
            NULL::jsonb AS metadata,
            count(m.id)::int AS "messageCount",
            max(m.created_at) AS "lastMessageAt"
-         FROM tenant.conversation AS cv
-         LEFT JOIN tenant.message AS m ON m.conversation_id = cv.id
-         WHERE cv.customer_id = $1::uuid AND cv.business_id = $2::uuid
-         GROUP BY cv.business_id, cv.id
+         FROM merchant.conversation AS cv
+         LEFT JOIN merchant.message AS m ON m.conversation_id = cv.id
+         WHERE cv.customer_id = $1::uuid AND cv.merchant_id = $2::uuid
+         GROUP BY cv.merchant_id, cv.id
          ORDER BY cv.last_message_at DESC NULLS LAST
          LIMIT 40`,
-        [contactId, tenantId],
+        [contactId, merchantId],
       ),
     );
     return rows;
   }
 
-  async orders(tenantId: string, contactId: string): Promise<Row[]> {
-    const { rows } = await this.pg.withTenant((c) =>
+  async orders(merchantId: string, contactId: string): Promise<Row[]> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<Row>(
         `SELECT
            o.id::text,
@@ -285,25 +285,25 @@ export class CustomersRepository {
            o.created_at AS placed_at,
            o.created_at,
            o.updated_at
-         FROM tenant.customer_order AS o
-         LEFT JOIN tenant.order_total AS ot ON ot.order_id = o.id
-         WHERE o.customer_id = $1::uuid AND o.business_id = $2::uuid
+         FROM merchant.customer_order AS o
+         LEFT JOIN merchant.order_total AS ot ON ot.order_id = o.id
+         WHERE o.customer_id = $1::uuid AND o.merchant_id = $2::uuid
          ORDER BY o.created_at DESC
          LIMIT 40`,
-        [contactId, tenantId],
+        [contactId, merchantId],
       ),
     );
     return rows;
   }
 
-  async cash(tenantId: string, contactId: string): Promise<Row | null> {
-    const { rows } = await this.pg.withTenant((c) =>
+  async cash(merchantId: string, contactId: string): Promise<Row | null> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<Row>(
         // Loyalty state DERIVED (no account layer): the customer's active card +
         // balance=SUM(card_ledger), visits=COUNT(visit), cycle/pending vs the rule.
         `WITH vr AS (
-           SELECT COALESCE((SELECT stamps_required FROM tenant.loyalty_reward
-             WHERE business_id = $2::uuid AND active AND type = 'stamps_free_item'
+           SELECT COALESCE((SELECT stamps_required FROM merchant.loyalty_reward
+             WHERE merchant_id = $2::uuid AND active AND type = 'stamps_free_item'
              ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
          )
          SELECT
@@ -317,37 +317,37 @@ export class CustomersRepository {
            (agg.total_visits / vr.n - agg.redemptions)::int AS pending_rewards,
            lc.created_at,
            lc.updated_at
-         FROM tenant.loyalty_card AS lc
-         JOIN tenant.customer AS cu ON cu.business_id = lc.business_id AND cu.id = lc.customer_id
+         FROM merchant.loyalty_card AS lc
+         JOIN merchant.customer AS cu ON cu.merchant_id = lc.merchant_id AND cu.id = lc.customer_id
          CROSS JOIN vr
          CROSS JOIN LATERAL (
            SELECT
-             (SELECT count(*) FROM tenant.loyalty_visit v WHERE v.business_id = lc.business_id AND v.card_id = lc.id) AS total_visits,
-             (SELECT count(*) FROM tenant.loyalty_redemption r WHERE r.business_id = lc.business_id AND r.card_id = lc.id) AS redemptions,
-             COALESCE((SELECT sum(l.delta) FROM tenant.loyalty_stored_value_ledger l WHERE l.business_id = lc.business_id AND l.card_id = lc.id), 0) AS balance_cents
+             (SELECT count(*) FROM merchant.loyalty_visit v WHERE v.merchant_id = lc.merchant_id AND v.card_id = lc.id) AS total_visits,
+             (SELECT count(*) FROM merchant.loyalty_redemption r WHERE r.merchant_id = lc.merchant_id AND r.card_id = lc.id) AS redemptions,
+             COALESCE((SELECT sum(l.delta) FROM merchant.loyalty_stored_value_ledger l WHERE l.merchant_id = lc.merchant_id AND l.card_id = lc.id), 0) AS balance_cents
          ) AS agg
-         WHERE lc.customer_id = $1::uuid AND lc.business_id = $2::uuid
+         WHERE lc.customer_id = $1::uuid AND lc.merchant_id = $2::uuid
          ORDER BY lc.created_at DESC
          LIMIT 1`,
-        [contactId, tenantId],
+        [contactId, merchantId],
       ),
     );
     return rows[0] ?? null;
   }
 
-  /** Tenant-wide conversation list (admin view). */
+  /** Merchant-wide conversation list (admin view). */
   async conversationsList(
-    tenantId: string,
+    merchantId: string,
     limit: number,
     skip: number,
   ): Promise<{ rows: Row[]; total: number }> {
-    return this.pg.withTenant(async (c) => {
+    return this.pg.withMerchant(async (c) => {
       const rows = (
         await c.query<Row>(
           // current_state MOVED to the sealed runtime.conversation_state (not
           // readable on the umi_app pool) — dropped from this owner list; the
           // durable summary + thread attributes remain. customerName from
-          // tenant.customer, customerPhone from the identity spine.
+          // merchant.customer, customerPhone from the identity spine.
           `SELECT
              c.id::text,
              c.status,
@@ -358,28 +358,28 @@ export class CustomersRepository {
              ph.normalized_value AS "customerPhone",
              count(m.id)::int AS "messageCount",
              max(m.created_at) AS "lastMessageAt"
-           FROM tenant.conversation AS c
-           LEFT JOIN tenant.customer AS co ON co.business_id = c.business_id AND co.id = c.customer_id
+           FROM merchant.conversation AS c
+           LEFT JOIN merchant.customer AS co ON co.merchant_id = c.merchant_id AND co.id = c.customer_id
            LEFT JOIN LATERAL (
              SELECT ci.normalized_value
-             FROM tenant.contact AS ci
+             FROM merchant.contact AS ci
              JOIN umi.channel_type AS ch ON ch.id = ci.channel_id
-             WHERE ci.business_id = co.business_id AND ci.customer_id = co.id
+             WHERE ci.merchant_id = co.merchant_id AND ci.customer_id = co.id
                AND ch.key IN ('phone', 'whatsapp') AND ci.normalized_value IS NOT NULL
              ORDER BY ci.is_primary DESC, ci.updated_at DESC LIMIT 1
            ) AS ph ON true
-           LEFT JOIN tenant.message AS m ON m.conversation_id = c.id
-           WHERE c.business_id = $1::uuid
-           GROUP BY c.business_id, c.id, co.business_id, co.id, ph.normalized_value
+           LEFT JOIN merchant.message AS m ON m.conversation_id = c.id
+           WHERE c.merchant_id = $1::uuid
+           GROUP BY c.merchant_id, c.id, co.merchant_id, co.id, ph.normalized_value
            ORDER BY COALESCE(max(m.created_at), c.created_at) DESC
            OFFSET $2 LIMIT $3`,
-          [tenantId, skip, limit],
+          [merchantId, skip, limit],
         )
       ).rows;
       const total = (
         await c.query<Row>(
-          `SELECT count(*)::int AS total FROM tenant.conversation WHERE business_id = $1::uuid`,
-          [tenantId],
+          `SELECT count(*)::int AS total FROM merchant.conversation WHERE merchant_id = $1::uuid`,
+          [merchantId],
         )
       ).rows[0]?.total;
       return { rows, total: Number(total ?? 0) };
@@ -387,10 +387,10 @@ export class CustomersRepository {
   }
 
   async identity(
-    tenantId: string,
+    merchantId: string,
     contactId: string,
   ): Promise<{ identities: Row[]; candidates: Row[]; findings: Row[] }> {
-    return this.pg.withTenant(async (c) => {
+    return this.pg.withMerchant(async (c) => {
       // Reachability rows for the customer's contacts (per-channel). `kind` recovered
       // from the global channel catalog; the string verification contract is preserved.
       const identities = await c.query<Row>(
@@ -399,12 +399,12 @@ export class CustomersRepository {
                 ci.normalized_value,
                 CASE WHEN ci.verified THEN 'verified' ELSE 'unverified' END AS verification_status,
                 NULL::jsonb AS metadata, ci.created_at
-         FROM tenant.contact AS ci
+         FROM merchant.contact AS ci
          JOIN umi.channel_type AS ch ON ch.id = ci.channel_id
-         JOIN tenant.customer AS cu ON cu.business_id = ci.business_id AND cu.id = ci.customer_id
-         WHERE cu.id = $1::uuid AND ci.business_id = $2::uuid
+         JOIN merchant.customer AS cu ON cu.merchant_id = ci.merchant_id AND cu.id = ci.customer_id
+         WHERE cu.id = $1::uuid AND ci.merchant_id = $2::uuid
          ORDER BY ch.key, ci.created_at`,
-        [contactId, tenantId],
+        [contactId, merchantId],
       );
       return {
         identities: identities.rows,

@@ -65,7 +65,7 @@ test('Gate 2D cart contracts bound quantities, notes, and checkout authority', (
   const id = '00000000-0000-4000-8000-000000000001';
   const line = {
     cartId: id,
-    branchId: id,
+    locationId: id,
     operatorSessionId: id,
     productId: id,
     modifierSelections: [],
@@ -79,8 +79,8 @@ test('Gate 2D cart contracts bound quantities, notes, and checkout authority', (
   assert.ok(
     Cart.safeParse({
       id,
-      tenantId: id,
-      branchId: id,
+      merchantId: id,
+      locationId: id,
       operatorSessionId: id,
       status: 'draft',
       version: 1,
@@ -106,7 +106,7 @@ test('Gate 2E checkout requires explicit totals confirmation and safe ambiguity'
   const id = '00000000-0000-4000-8000-000000000001';
   const command = {
     cartId: id,
-    branchId: id,
+    locationId: id,
     operatorSessionId: id,
     expectedCartVersion: 1,
     paymentMethod: 'cash',
@@ -164,10 +164,10 @@ test('Money uses integer minor units and explicit currency', () => {
   assert.equal(Money.safeParse({ minorUnits: 1099, currency: 'mxn' }).success, false);
 });
 
-test('Gate 2C catalog contracts bound branch search and cursor pages', () => {
-  const branchId = '00000000-0000-4000-8000-000000000004';
-  assert.ok(CatalogQuery.safeParse({ branchId, search: 'cafe', limit: 40 }).success);
-  assert.equal(CatalogQuery.safeParse({ branchId, limit: 101 }).success, false);
+test('Gate 2C catalog contracts bound location search and cursor pages', () => {
+  const locationId = '00000000-0000-4000-8000-000000000004';
+  assert.ok(CatalogQuery.safeParse({ locationId, search: 'cafe', limit: 40 }).success);
+  assert.equal(CatalogQuery.safeParse({ locationId, limit: 101 }).success, false);
   assert.ok(
     CatalogPage.safeParse({
       items: [],
@@ -196,8 +196,8 @@ test('OfflineCommandEnvelope rejects unbounded identity and invalid fingerprints
   const command = {
     commandId: '00000000-0000-4000-8000-000000000001',
     deviceId: '00000000-0000-4000-8000-000000000002',
-    tenantId: '00000000-0000-4000-8000-000000000003',
-    branchId: '00000000-0000-4000-8000-000000000004',
+    merchantId: '00000000-0000-4000-8000-000000000003',
+    locationId: '00000000-0000-4000-8000-000000000004',
     operatorSessionId: '00000000-0000-4000-8000-000000000005',
     sequence: 1,
     issuedAt: '2026-07-25T12:00:00Z',
@@ -215,8 +215,8 @@ test('receipt and error envelopes validate public-safe shapes', () => {
   assert.ok(
     ReceiptSnapshot.safeParse({
       receiptRef: 'receipt-public-ref',
-      tenantId: '00000000-0000-4000-8000-000000000003',
-      branchId: '00000000-0000-4000-8000-000000000004',
+      merchantId: '00000000-0000-4000-8000-000000000003',
+      locationId: '00000000-0000-4000-8000-000000000004',
       issuedAt: '2026-07-25T12:00:00Z',
       businessDate: '2026-07-25',
       lines: [

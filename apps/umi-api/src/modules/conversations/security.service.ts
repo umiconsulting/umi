@@ -10,7 +10,7 @@ import { PgService } from '../../shared/database/pg.service';
  * The pure functions are exported standalone (no DI) so the turn loop and intent
  * extractor can call them without injecting the service. `checkRateLimit` is the
  * only DB-bound piece — rebound to canonical `comms.*` and run on the worker
- * pool (unauthenticated WhatsApp path), with explicit tenant predicates.
+ * pool (unauthenticated WhatsApp path), with explicit merchant predicates.
  */
 
 export const SECURITY_CONFIG = {
@@ -204,23 +204,23 @@ export class SecurityService {
 
   /**
    * Rate-limit a sender by counting their user messages in the last minute/hour
-   * on their most recent active conversation. Reads `tenant.conversation` +
-   * `tenant.message` (build-v2).
+   * on their most recent active conversation. Reads `merchant.conversation` +
+   * `merchant.message` (build-v2).
    */
   async checkRateLimit(
-    tenantId: string,
+    merchantId: string,
     personId: string,
   ): Promise<{ allowed: boolean; count: number }> {
     const conv = await this.pg.query<{ id: string }>(
       `SELECT id
-         FROM tenant.conversation
+         FROM merchant.conversation
         WHERE customer_id = $1
-          AND business_id = $2
+          AND merchant_id = $2
           AND status IN ('open', 'active', 'pending')
           AND last_message_at >= now() - interval '1 hour'
         ORDER BY last_message_at DESC
         LIMIT 1`,
-      [personId, tenantId],
+      [personId, merchantId],
     );
     if (!conv.rows[0]) return { allowed: true, count: 0 };
 
@@ -228,7 +228,7 @@ export class SecurityService {
       `SELECT
          count(*) FILTER (WHERE created_at >= now() - interval '1 minute') AS minute,
          count(*) FILTER (WHERE created_at >= now() - interval '1 hour')   AS hour
-       FROM tenant.message
+       FROM merchant.message
        WHERE conversation_id = $1 AND sender = 'customer'`,
       [conv.rows[0].id],
     );

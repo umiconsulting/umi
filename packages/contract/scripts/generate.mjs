@@ -66,8 +66,8 @@ const payload = stable({
   security: {
     internalIdsExposed: false,
     serviceRoleExposed: false,
-    tenantContextRequiredForTenantRoutes: true,
-    branchContextValidatedByApi: true,
+    merchantContextRequiredForMerchantRoutes: true,
+    locationContextValidatedByApi: true,
   },
 });
 const canonical = `${JSON.stringify(payload, null, 2)}\n`;
@@ -201,7 +201,7 @@ const dartRouteMembers = ROUTE_TABLE.filter((r) => r.dart !== null).sort((a, b) 
   a.dart.localeCompare(b.dart),
 );
 
-/** `/api/v1/pos/tenants/:tenantId/cart` → a Dart interpolated string literal. */
+/** `/api/v1/pos/merchants/:merchantId/cart` → a Dart interpolated string literal. */
 const dartPathLiteral = (path) =>
   `'${path.replace(/:([A-Za-z0-9_]+)/g, (_m, name) => `\${Uri.encodeComponent(${name})}`)}'`;
 

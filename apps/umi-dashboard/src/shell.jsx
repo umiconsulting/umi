@@ -35,8 +35,8 @@ const XSep = ({ dark = false, size = 7 }) => (
   </span>
 );
 
-const formatTenantGreetingName = (tenantName, maxLength = 30) => {
-  const name = String(tenantName || '')
+const formatMerchantGreetingName = (merchantName, maxLength = 30) => {
+  const name = String(merchantName || '')
     .trim()
     .replace(/\s+/g, ' ');
   return name.length > maxLength ? name.slice(0, maxLength) : name;
@@ -47,11 +47,11 @@ const Sidebar = ({
   onChange,
   collapsed,
   onToggleCollapse,
-  tenantName,
+  merchantName,
   navItems,
-  tenants,
-  selectedTenantId,
-  onTenantChange,
+  merchants,
+  selectedMerchantId,
+  onMerchantChange,
   onSignOut,
 }) => {
   const sections = [];
@@ -134,7 +134,7 @@ const Sidebar = ({
             <div className="uname" style={{ flex: 1 }}>
               <div>Owner</div>
               <div className="sm">
-                Admin <XSep dark /> {tenantName || '—'}
+                Admin <XSep dark /> {merchantName || '—'}
               </div>
             </div>
           )}
@@ -150,17 +150,17 @@ const Sidebar = ({
             </button>
           )}
         </div>
-        {!collapsed && tenants?.length > 1 && (
+        {!collapsed && merchants?.length > 1 && (
           <select
             className="select"
-            value={selectedTenantId || ''}
-            onChange={(e) => onTenantChange?.(e.target.value)}
-            aria-label="Tenant"
+            value={selectedMerchantId || ''}
+            onChange={(e) => onMerchantChange?.(e.target.value)}
+            aria-label="Merchant"
             style={{ width: '100%', height: 34, borderRadius: 8, fontSize: 12 }}
           >
-            {tenants.map((tenant) => (
-              <option key={tenant.id} value={tenant.id}>
-                {tenant.name}
+            {merchants.map((merchant) => (
+              <option key={merchant.id} value={merchant.id}>
+                {merchant.name}
               </option>
             ))}
           </select>
@@ -275,11 +275,11 @@ const NetIndicator = ({ status, latency, onRetry }) => {
 };
 
 const Topbar = ({
-  business,
+  merchant,
   status,
   onMenu,
   screen,
-  tenantName,
+  merchantName,
   locations = [],
   selectedLocationId,
   onLocationChange,
@@ -287,7 +287,7 @@ const Topbar = ({
 }) => {
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches';
-  const greetingName = formatTenantGreetingName(tenantName);
+  const greetingName = formatMerchantGreetingName(merchantName);
   const titles = {
     overview: { eyebrow: '01 / OPERACIONES', title: 'Panorama', en: 'Overview' },
     orders: { eyebrow: '02 / OPERACIONES', title: 'Pedidos WhatsApp', en: 'KDS tickets' },
@@ -309,15 +309,15 @@ const Topbar = ({
     },
   };
 
-  const branchScoped = ['orders', 'devices', 'hours'].includes(screen);
-  const showLocationSelect = branchScoped && locations.length > 1;
+  const locationScoped = ['orders', 'devices', 'hours'].includes(screen);
+  const showLocationSelect = locationScoped && locations.length > 1;
   const LocationSelect = () =>
     showLocationSelect ? (
       <select
         className="select"
         value={selectedLocationId || ''}
         onChange={(e) => onLocationChange?.(e.target.value)}
-        aria-label="Branch"
+        aria-label="Location"
         style={{ height: 42, borderRadius: 10, minWidth: 170, fontSize: 13 }}
       >
         {locations
@@ -360,7 +360,7 @@ const Topbar = ({
             {greet}
             {greetingName ? (
               <>
-                , <b title={tenantName}>{greetingName}</b>
+                , <b title={merchantName}>{greetingName}</b>
               </>
             ) : (
               ''
@@ -368,7 +368,7 @@ const Topbar = ({
             .
           </h1>
           <div className="meta" style={{ marginTop: 14, fontSize: 13.5 }}>
-            <span>{business}</span>
+            <span>{merchant}</span>
             <XSep />
             <span className="sub-pill">
               <span className="sd"></span> {status}

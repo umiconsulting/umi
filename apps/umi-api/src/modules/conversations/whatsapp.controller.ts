@@ -8,7 +8,7 @@ import { QUEUES } from '../../jobs/queues';
 import { QueueRepository } from '../../jobs/queue.repository';
 import { TraceService } from '../../shared/logging/trace.service';
 import { twimlMessage, emptyTwiml } from '../../shared/format/whatsapp';
-import { TenantResolutionService } from './tenant-resolution.service';
+import { MerchantResolutionService } from './merchant-resolution.service';
 import {
   SECURITY_CONFIG,
   SecurityService,
@@ -23,7 +23,7 @@ import { MessagesRepository, DUPLICATE_MESSAGE } from './messages.repository';
 /**
  * Twilio WhatsApp webhook ingress (spec §8.2). Port of `whatsapp-handler/index.ts`.
  * Validates the HMAC-SHA1 signature against the RAW form body (Fastify
- * form-urlencoded raw-body parser, registered in main.ts), resolves tenant +
+ * form-urlencoded raw-body parser, registered in main.ts), resolves merchant +
  * identity, gates duplicates via `runtime.inbound_event`, persists the user
  * message, enqueues `turn.integrity` (MessageSid = deterministic jobId), and
  * returns empty TwiML fast — the real reply arrives async via the outbound
@@ -38,7 +38,7 @@ export class WhatsappController {
 
   constructor(
     config: ConfigService<AppConfig, true>,
-    private readonly tenants: TenantResolutionService,
+    private readonly merchants: MerchantResolutionService,
     private readonly security: SecurityService,
     private readonly identity: IdentityRepository,
     private readonly conversations: ConversationsRepository,
@@ -98,17 +98,17 @@ export class WhatsappController {
       );
     }
 
-    // ── Tenant resolution (inbound business number → tenant) ──
-    const resolved = await this.tenants.resolveInboundTenant(toAddress);
+    // ── Merchant resolution (inbound merchant number → merchant) ──
+    const resolved = await this.merchants.resolveInboundMerchant(toAddress);
     if (!resolved) {
       this.logger.error(`unresolved inbound WhatsApp number; dropping. request_id=${requestId}`);
       return emptyTwiml();
     }
-    const { tenantId, locationId } = resolved;
+    const { merchantId, locationId } = resolved;
 
-    // ── Identity: resolve-or-create tenant.customer (federated graph) ──
+    // ── Identity: resolve-or-create merchant.customer (federated graph) ──
     const personId = await this.identity.resolveContact({
-      tenantId,
+      merchantId,
       kind: 'whatsapp',
       rawValue: phone,
       displayName: profileName,
@@ -119,7 +119,7 @@ export class WhatsappController {
     }
 
     // ── Rate limit + prompt-injection ──
-    const rate = await this.security.checkRateLimit(tenantId, personId);
+    const rate = await this.security.checkRateLimit(merchantId, personId);
     if (!rate.allowed) {
       await this.trace.logSecurityEvent({
         phone,
@@ -151,13 +151,13 @@ export class WhatsappController {
     // NOTE: this is NOT the authoritative dedup. It commits before the message
     // insert + enqueue, so hard-dropping on its `duplicate` flag would strand a
     // first attempt that crashed mid-flight (gate written, work not done). The
-    // durable, idempotent guards are below: tenant.message.provider_message_id
+    // durable, idempotent guards are below: merchant.message.provider_message_id
     // (UNIQUE) → DUPLICATE_MESSAGE, and the enqueue jobId=messageSid (BullMQ drops
     // a re-add). So we log a duplicate here and continue; the message-level dedup
     // is what actually prevents a double turn.
     if (messageSid) {
       const gate = await this.queue.registerInboundEvent({
-        tenantId,
+        merchantId,
         provider: 'twilio',
         providerEventId: messageSid,
         eventType: 'whatsapp_message',
@@ -170,11 +170,11 @@ export class WhatsappController {
       }
     }
 
-    const { conversation } = await this.conversations.getOrCreateConversation(tenantId, personId);
+    const { conversation } = await this.conversations.getOrCreateConversation(merchantId, personId);
 
     // ── Persist the user message (provider_message_id dedup backstop) ──
     const userMsgId = await this.messages.insertMessage({
-      tenantId,
+      merchantId,
       conversationId: conversation.id,
       role: 'user',
       content: message,
@@ -191,7 +191,7 @@ export class WhatsappController {
       {
         conversation_id: conversation.id,
         person_id: personId,
-        business_id: tenantId,
+        merchant_id: merchantId,
         location_id: locationId,
         request_id: requestId,
       },
@@ -201,7 +201,7 @@ export class WhatsappController {
     await this.trace.logPipelineTrace({
       trace_id: requestId,
       conversation_id: conversation.id,
-      business_id: tenantId,
+      merchant_id: merchantId,
       stage: 'inbound',
       event: 'enqueued',
       detail: { user_message_id: userMsgId, message_sid: messageSid ?? null },

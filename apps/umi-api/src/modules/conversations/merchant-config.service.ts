@@ -2,17 +2,17 @@ import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
 
 /**
- * Per-business voice + operating config. Ported from `_shared/business-config.ts`
- * and rebound to the TYPED `tenant.business` columns (`assistant_name` /
+ * Per-merchant voice + operating config. Ported from `_shared/merchant-config.ts`
+ * and rebound to the TYPED `merchant.merchant` columns (`assistant_name` /
  * `assistant_tone` / `locale`) — the legacy `config.voice` jsonb blob was dissolved
- * in build-v3. `fetchConfigRow` re-inflates the old BusinessConfig shape the resolver
+ * in build-v3. `fetchConfigRow` re-inflates the old MerchantConfig shape the resolver
  * and consumers expect. Read on the worker pool: the WhatsApp path is unauthenticated
- * (no member user → no RLS tenant context), and the query keys on the business `id`.
+ * (no member user → no RLS merchant context), and the query keys on the merchant `id`.
  *
  * `resolveVoiceConfig` NEVER throws: it fills sane defaults (assistant name from
- * the business name, locale `es-MX`, tone from the tenant's preset or a friendly
- * default) so a tenant that has not configured a voice can no longer dead-letter
- * a turn. Tone is tenant-configurable via `tone_preset` (the dashboard chips) with
+ * the merchant name, locale `es-MX`, tone from the merchant's preset or a friendly
+ * default) so a merchant that has not configured a voice can no longer dead-letter
+ * a turn. Tone is merchant-configurable via `tone_preset` (the dashboard chips) with
  * a freeform `tone` advanced override; see TONE_PRESETS.
  */
 
@@ -48,10 +48,10 @@ export const DEFAULT_TONE_PRESET: TonePreset = 'friendly';
 export const DEFAULT_LOCALE = 'es-MX';
 export const DEFAULT_ASSISTANT_NAME = 'Asistente';
 
-/** Defensive LENGTH caps for tenant-controlled voice text read on the worker
+/** Defensive LENGTH caps for merchant-controlled voice text read on the worker
  *  path, where legacy / hand-seeded rows bypass the DTO's MaxLength bounds.
- *  These bound length only (not content): voice is first-party config a tenant
- *  sets for their OWN assistant, so it is not a cross-tenant injection boundary
+ *  These bound length only (not content): voice is first-party config a merchant
+ *  sets for their OWN assistant, so it is not a cross-merchant injection boundary
  *  (unlike sanitizeCustomerFacts, which also content-filters). */
 const MAX_ASSISTANT_NAME_CHARS = 60;
 const MAX_LOCALE_CHARS = 20;
@@ -59,7 +59,7 @@ const MAX_TONE_CHARS = 280;
 const MAX_STYLE_NOTES = 8;
 const MAX_STYLE_NOTE_CHARS = 200;
 
-export interface BusinessConfig {
+export interface MerchantConfig {
   address?: string;
   whatsapp?: string;
   payment_methods?: string[];
@@ -72,10 +72,10 @@ export interface BusinessConfig {
   voice?: (Partial<VoiceConfig> & { tone_preset?: TonePreset }) | null;
 }
 
-export interface BusinessConfigRow {
+export interface MerchantConfigRow {
   id: string;
   name: string | null;
-  config: BusinessConfig | null;
+  config: MerchantConfig | null;
 }
 
 /**
@@ -100,19 +100,19 @@ function resolveToneText(
 /**
  * Never-throw voice resolver (replaces the old `requireVoiceConfig`). Always
  * returns a VoiceConfig with NON-EMPTY assistant_name/locale/tone so prompts.ts
- * never interpolates `undefined`. A tenant with no voice config can no longer
+ * never interpolates `undefined`. A merchant with no voice config can no longer
  * dead-letter a turn.
  */
 export function resolveVoiceConfig(
-  config: BusinessConfig | null | undefined,
+  config: MerchantConfig | null | undefined,
   businessName: string | null | undefined,
-  _tenantId: string, // kept for call-site symmetry/future logging; never used to throw
+  _merchantId: string, // kept for call-site symmetry/future logging; never used to throw
 ): VoiceConfig {
   const voice = (config?.voice ?? null) as
     (Partial<VoiceConfig> & { tone_preset?: unknown }) | null;
 
   // Cap to the same bounds as UpdateVoiceDto (assistant_name 60, locale 20) so a
-  // long business name or hand-seeded legacy row resolves to a value that still
+  // long merchant name or hand-seeded legacy row resolves to a value that still
   // round-trips cleanly back through the dashboard PATCH validator.
   const assistant_name = (
     (typeof voice?.assistant_name === 'string' && voice.assistant_name.trim()) ||
@@ -143,14 +143,14 @@ export function resolveVoiceConfig(
 }
 
 @Injectable()
-export class BusinessConfigService {
+export class MerchantConfigService {
   constructor(private readonly pg: PgService) {}
 
   /**
-   * Load the tenant's business config row (the single business per tenant in the
-   * current model). Returns null when the tenant has no `tenant.business` row.
+   * Load the merchant's merchant config row (the single merchant per merchant in the
+   * current model). Returns null when the merchant has no `merchant.merchant` row.
    */
-  async fetchConfigRow(tenantId: string): Promise<BusinessConfigRow | null> {
+  async fetchConfigRow(merchantId: string): Promise<MerchantConfigRow | null> {
     const { rows } = await this.pg.query<{
       id: string;
       name: string | null;
@@ -159,14 +159,14 @@ export class BusinessConfigService {
       locale: string | null;
     }>(
       `SELECT id::text, name, assistant_name, assistant_tone, locale
-         FROM tenant.business
+         FROM merchant.merchant
         WHERE id = $1
         LIMIT 1`,
-      [tenantId],
+      [merchantId],
     );
     const r = rows[0];
     if (!r) return null;
-    // Re-inflate the legacy BusinessConfig shape from the typed columns. Only the voice
+    // Re-inflate the legacy MerchantConfig shape from the typed columns. Only the voice
     // sub-object has typed homes today; the ordering/contact scalars (address, whatsapp,
     // payment_methods, …) have no column yet → left undefined, and the consumers default
     // safely (voice never-throws, business-hours fail-closed).

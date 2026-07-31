@@ -66,7 +66,7 @@ describe('KDS frozen contract', () => {
   // build-v3's CHECK (placed/preparing/ready/completed/canceled). The exhaustive
   // both-directions coverage lives in kds-status-map.spec.ts; this keeps the spot
   // checks that were already here.
-  it('maps kitchen_status → tenant.customer_order.status', () => {
+  it('maps kitchen_status → merchant.customer_order.status', () => {
     expect(mapKitchenToOrderStatus('new')).toBe('placed');
     expect(mapKitchenToOrderStatus('preparing')).toBe('preparing');
     expect(mapKitchenToOrderStatus('ready')).toBe('ready');

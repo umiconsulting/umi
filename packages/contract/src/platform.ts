@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const Uuid = z.string().uuid();
 export const IsoTimestamp = z.string().datetime({ offset: true });
-export const BusinessDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+export const MerchantDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 export const CurrencyCode = z.string().regex(/^[A-Z]{3}$/);
 export const CorrelationId = z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/);
 export const OpaqueCursor = z.string().min(1).max(512);
@@ -71,9 +71,9 @@ export const Membership = z
   .object({
     membershipId: Uuid.nullable(),
     userId: Uuid,
-    tenantId: Uuid,
-    branchIds: z.array(Uuid).max(500),
-    allBranches: z.boolean(),
+    merchantId: Uuid,
+    locationIds: z.array(Uuid).max(500),
+    allLocations: z.boolean(),
     roles: z.array(z.string().min(1).max(100)).max(50),
     permissions: z.array(z.string().min(1).max(100)).max(500),
   })
@@ -84,8 +84,8 @@ export const StaffIdentity = z
   .object({
     staffId: Uuid,
     identity: Identity,
-    tenantId: Uuid,
-    branchId: Uuid.nullable(),
+    merchantId: Uuid,
+    locationId: Uuid.nullable(),
     position: z.string().max(160).nullable(),
     status: z.enum(['active', 'inactive']),
   })
@@ -100,13 +100,13 @@ export const AuthorizationDecision = z
       'explicit_deny',
       'missing_permission',
       'missing_entitlement',
-      'tenant_scope',
-      'branch_scope',
+      'merchant_scope',
+      'location_scope',
       'elevation_required',
     ]),
     permission: z.string().min(1).max(100),
-    tenantId: Uuid,
-    branchId: Uuid.nullable(),
+    merchantId: Uuid,
+    locationId: Uuid.nullable(),
   })
   .strict();
 export type AuthorizationDecision = z.infer<typeof AuthorizationDecision>;
@@ -130,7 +130,7 @@ export const ElevationRequirement = z
   .strict();
 export type ElevationRequirement = z.infer<typeof ElevationRequirement>;
 
-export const BusinessFailureClass = z.enum([
+export const MerchantFailureClass = z.enum([
   'validation',
   'authorization',
   'conflict',
@@ -138,9 +138,9 @@ export const BusinessFailureClass = z.enum([
   'permanent',
   'unknown_outcome',
 ]);
-export type BusinessFailureClass = z.infer<typeof BusinessFailureClass>;
+export type MerchantFailureClass = z.infer<typeof MerchantFailureClass>;
 
-export const BusinessCommandResult = z
+export const MerchantCommandResult = z
   .object({
     commandId: Uuid,
     status: z.enum(['succeeded', 'failed']),
@@ -148,17 +148,17 @@ export const BusinessCommandResult = z
     retryable: z.boolean(),
     result: JsonPayload.nullable(),
     failureCode: z.string().min(1).max(100).nullable(),
-    failureClass: BusinessFailureClass.nullable(),
+    failureClass: MerchantFailureClass.nullable(),
     correlationId: CorrelationId,
   })
   .strict();
-export type BusinessCommandResult = z.infer<typeof BusinessCommandResult>;
+export type MerchantCommandResult = z.infer<typeof MerchantCommandResult>;
 
 export const AuditEventView = z
   .object({
     id: Uuid,
-    tenantId: Uuid,
-    branchId: Uuid.nullable(),
+    merchantId: Uuid,
+    locationId: Uuid.nullable(),
     eventType: z.string().min(1).max(160),
     entityType: z.string().min(1).max(160),
     entityId: Uuid.nullable(),
@@ -195,8 +195,8 @@ export const FinancialEvent = z
   .object({
     id: Uuid,
     commandId: Uuid,
-    tenantId: Uuid,
-    branchId: Uuid.nullable(),
+    merchantId: Uuid,
+    locationId: Uuid.nullable(),
     aggregateType: z.string().min(1).max(160),
     aggregateId: Uuid,
     aggregateVersion: z.number().int().positive(),
@@ -210,26 +210,26 @@ export const FinancialEvent = z
   .strict();
 export type FinancialEvent = z.infer<typeof FinancialEvent>;
 
-export const TenantContext = z
+export const MerchantContext = z
   .object({
-    tenantId: Uuid,
+    merchantId: Uuid,
   })
   .strict();
-export type TenantContext = z.infer<typeof TenantContext>;
+export type MerchantContext = z.infer<typeof MerchantContext>;
 
-export const BranchContext = TenantContext.extend({
-  branchId: Uuid,
+export const LocationContext = MerchantContext.extend({
+  locationId: Uuid,
 }).strict();
-export type BranchContext = z.infer<typeof BranchContext>;
+export type LocationContext = z.infer<typeof LocationContext>;
 
-export const OperatorContext = BranchContext.extend({
+export const OperatorContext = LocationContext.extend({
   operatorId: Uuid,
   operatorSessionId: Uuid,
   permissions: z.array(z.string().min(1).max(100)).max(200),
 }).strict();
 export type OperatorContext = z.infer<typeof OperatorContext>;
 
-export const TenantSummaryModel = z
+export const MerchantSummaryModel = z
   .object({
     id: Uuid,
     name: z.string().min(1).max(160),
@@ -238,18 +238,18 @@ export const TenantSummaryModel = z
     currency: CurrencyCode,
   })
   .strict();
-export type TenantSummaryModel = z.infer<typeof TenantSummaryModel>;
+export type MerchantSummaryModel = z.infer<typeof MerchantSummaryModel>;
 
-export const BranchSummaryModel = z
+export const LocationSummaryModel = z
   .object({
     id: Uuid,
-    tenantId: Uuid,
+    merchantId: Uuid,
     name: z.string().min(1).max(160),
     timezone: z.string().min(1).max(100).nullable(),
     status: z.enum(['active', 'closed']),
   })
   .strict();
-export type BranchSummaryModel = z.infer<typeof BranchSummaryModel>;
+export type LocationSummaryModel = z.infer<typeof LocationSummaryModel>;
 
 export const OptimisticVersion = z
   .object({
@@ -299,8 +299,8 @@ export const OfflineCommandEnvelope = z
   .object({
     commandId: Uuid,
     deviceId: Uuid,
-    tenantId: Uuid,
-    branchId: Uuid,
+    merchantId: Uuid,
+    locationId: Uuid,
     operatorSessionId: Uuid,
     sequence: z.number().int().positive(),
     issuedAt: IsoTimestamp,
@@ -350,18 +350,18 @@ export type ReceiptLineSnapshot = z.infer<typeof ReceiptLineSnapshot>;
 export const ReceiptSnapshot = z
   .object({
     receiptRef: z.string().min(1).max(100),
-    tenantId: Uuid,
-    branchId: Uuid,
+    merchantId: Uuid,
+    locationId: Uuid,
     issuedAt: IsoTimestamp,
-    businessDate: BusinessDate,
+    businessDate: MerchantDate,
     lines: z.array(ReceiptLineSnapshot).min(1).max(500),
     subtotal: Money,
     taxTotal: Money,
     grandTotal: Money,
     currency: CurrencyCode,
     version: z.number().int().positive(),
-    tenantName: z.string().min(1).max(240).optional(),
-    branchName: z.string().min(1).max(240).optional(),
+    merchantName: z.string().min(1).max(240).optional(),
+    locationName: z.string().min(1).max(240).optional(),
     operatorName: z.string().min(1).max(240).optional(),
     payment: z
       .object({
@@ -401,12 +401,12 @@ export const API_ERROR_CODES = [
   'VALIDATION_FAILED',
   'AUTHENTICATION_REQUIRED',
   'PERMISSION_DENIED',
-  'TENANT_NOT_FOUND',
-  'BRANCH_NOT_FOUND',
-  'BRANCH_REQUIRED',
-  // The caller is bound to a different branch than the one it addressed. A POS
-  // cannot transact at a branch where it is not enrolled.
-  'BRANCH_SCOPE_VIOLATION',
+  'MERCHANT_NOT_FOUND',
+  'LOCATION_NOT_FOUND',
+  'LOCATION_REQUIRED',
+  // The caller is bound to a different location than the one it addressed. A POS
+  // cannot transact at a location where it is not enrolled.
+  'LOCATION_SCOPE_VIOLATION',
   'CONFLICT',
   'IDEMPOTENCY_CONFLICT',
   // The idempotency key is older than the retention window (see
@@ -424,9 +424,9 @@ export const API_ERROR_CODES = [
   'ENROLLMENT_EXPIRED',
   'ENROLLMENT_REJECTED',
   'ENROLLMENT_ATTEMPTS_EXCEEDED',
-  'TENANT_DISABLED',
-  'BRANCH_DISABLED',
-  // The product is not active for this business, so the whole surface is closed.
+  'MERCHANT_DISABLED',
+  'LOCATION_DISABLED',
+  // The product is not active for this merchant, so the whole surface is closed.
   // What `EntitlementGuard(@RequireProduct('pos'))` returns.
   'ENTITLEMENT_DISABLED',
   'OPERATOR_SESSION_REQUIRED',
@@ -484,18 +484,18 @@ export const contractModels = {
   AuthorizationDecision,
   EffectiveEntitlement,
   ElevationRequirement,
-  BusinessFailureClass,
-  BusinessCommandResult,
+  MerchantFailureClass,
+  MerchantCommandResult,
   AuditEventView,
   AuditSearchRequest,
   AuditSearchResponse,
   FinancialEvent,
   CompensationRequest,
-  TenantContext,
-  BranchContext,
+  MerchantContext,
+  LocationContext,
   OperatorContext,
-  TenantSummaryModel,
-  BranchSummaryModel,
+  MerchantSummaryModel,
+  LocationSummaryModel,
   OptimisticVersion,
   IdempotencyMetadata,
   CorrelationMetadata,

@@ -9,14 +9,14 @@ import { PgService } from '../../shared/database/pg.service';
  * WHAT CHANGED. These were the last four keys of the n8n-era `config` blob on
  * `ops.businesses`, and build-v3 dissolves that blob into typed columns rather than
  * restoring it (CONVERSATION_MODEL.md §2c). They are now
- * `tenant.business.whatsapp_*`.
+ * `merchant.merchant.whatsapp_*`.
  *
  * The rename to build-v3 had left this file reading a table that no longer works that
- * way. It looked up `tenant.business WHERE business_id = $1 ORDER BY created_at LIMIT 1`
- * and upserted `ON CONFLICT (business_id)` — the shape of `ops.businesses`, which was a
- * CHILD of `core.tenants`, so a tenant could in principle have several and you took the
- * oldest. **In build-v3 the business IS the tenant**: `tenant.business.id` is the tenant
- * id, there is no `business_id` column on it, and there is exactly one row. So the
+ * way. It looked up `merchant.merchant WHERE merchant_id = $1 ORDER BY created_at LIMIT 1`
+ * and upserted `ON CONFLICT (merchant_id)` — the shape of `ops.businesses`, which was a
+ * CHILD of `core.tenants`, so a merchant could in principle have several and you took the
+ * oldest. **In build-v3 the merchant IS the merchant**: `merchant.merchant.id` is the merchant
+ * id, there is no `merchant_id` column on it, and there is exactly one row. So the
  * lookup, the ordering, the LIMIT and the create-if-missing upsert were all answering a
  * question that no longer exists. Reads and writes are now keyed on `id`.
  */
@@ -48,10 +48,10 @@ const SELECT_SQL = `
          whatsapp_order_cutoff_minutes,
          whatsapp_ordering_notice,
          whatsapp_bypass_phone
-    FROM tenant.business
+    FROM merchant.merchant
    WHERE id = $1::uuid`;
 
-/** Mirrors the DDL defaults, for the "no such business" case only. */
+/** Mirrors the DDL defaults, for the "no such merchant" case only. */
 const FALLBACK: OrderingSettings = {
   acceptsOrders: true,
   orderCutoffMinutes: 30,
@@ -90,16 +90,16 @@ export function canonicalizePhone(raw: string): string {
 export class OrderingSettingsRepository {
   constructor(private readonly pg: PgService) {}
 
-  /** Worker-pool read (bot path — unauthenticated, explicit tenant predicate). */
-  async readWorker(businessId: string): Promise<OrderingSettings> {
-    const { rows } = await this.pg.query<SettingsRow>(SELECT_SQL, [businessId]);
+  /** Worker-pool read (bot path — unauthenticated, explicit merchant predicate). */
+  async readWorker(merchantId: string): Promise<OrderingSettings> {
+    const { rows } = await this.pg.query<SettingsRow>(SELECT_SQL, [merchantId]);
     return toSettings(rows[0]);
   }
 
   /** RLS app-pool read (dashboard GET). */
-  async read(businessId: string): Promise<OrderingSettings> {
-    const rows = await this.pg.withTenant((c) =>
-      c.query<SettingsRow>(SELECT_SQL, [businessId]).then((r) => r.rows),
+  async read(merchantId: string): Promise<OrderingSettings> {
+    const rows = await this.pg.withMerchant((c) =>
+      c.query<SettingsRow>(SELECT_SQL, [merchantId]).then((r) => r.rows),
     );
     return toSettings(rows[0]);
   }
@@ -111,16 +111,16 @@ export class OrderingSettingsRepository {
    * clearing the notice means writing NULL, which COALESCE would read as "not sent" —
    * so a separate "was it provided" flag drives it.
    */
-  async updateOrdering(businessId: string, patch: OrderingPatch): Promise<void> {
+  async updateOrdering(merchantId: string, patch: OrderingPatch): Promise<void> {
     const noticeProvided = patch.specialNotice !== undefined;
     const phones =
       patch.bypassPhones === undefined
         ? null
         : patch.bypassPhones.map(canonicalizePhone).filter(Boolean);
 
-    await this.pg.withTenant((c) =>
+    await this.pg.withMerchant((c) =>
       c.query(
-        `UPDATE tenant.business
+        `UPDATE merchant.merchant
             SET whatsapp_ordering_enabled     = COALESCE($2::boolean, whatsapp_ordering_enabled),
                 whatsapp_order_cutoff_minutes = COALESCE($3::integer, whatsapp_order_cutoff_minutes),
                 whatsapp_ordering_notice      = CASE WHEN $4::boolean
@@ -130,7 +130,7 @@ export class OrderingSettingsRepository {
                 updated_at = now()
           WHERE id = $1::uuid`,
         [
-          businessId,
+          merchantId,
           patch.acceptsOrders ?? null,
           patch.orderCutoffMinutes ?? null,
           noticeProvided,

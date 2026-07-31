@@ -17,9 +17,9 @@ const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', '
 export class CashReadService {
   constructor(private readonly repo: CashRepository) {}
 
-  async getSettings(tenantId: string): Promise<Row> {
-    const t = await this.repo.branding(tenantId);
-    if (!t) throw new NotFoundException({ error: 'Tenant no encontrado' });
+  async getSettings(merchantId: string): Promise<Row> {
+    const t = await this.repo.branding(merchantId);
+    if (!t) throw new NotFoundException({ error: 'Merchant no encontrado' });
     return {
       name: t.name,
       city: t.city,
@@ -40,9 +40,9 @@ export class CashReadService {
     };
   }
 
-  async updateSettings(tenantId: string, d: Row): Promise<void> {
+  async updateSettings(merchantId: string, d: Row): Promise<void> {
     if (d.name !== undefined) {
-      await this.repo.updateTenantName(tenantId, d.name);
+      await this.repo.updateMerchantName(merchantId, d.name);
     }
     // Column-keyed patch (see CashRepository.updateProgram): only keys present here
     // change; a present key with null clears the column. card_prefix/pass_style keep the
@@ -65,14 +65,14 @@ export class CashReadService {
     if (d.lifecycleCopy !== undefined) patch.lifecycle_copy = d.lifecycleCopy ?? null;
 
     if (Object.keys(patch).length > 0) {
-      await this.repo.updateProgram(tenantId, patch);
+      await this.repo.updateProgram(merchantId, patch);
     }
   }
 
-  async getStats(tenantId: string): Promise<Row> {
+  async getStats(merchantId: string): Promise<Row> {
     const dayStart = new Date();
     dayStart.setHours(0, 0, 0, 0);
-    const { visits, topups, pending } = await this.repo.stats(tenantId, dayStart);
+    const { visits, topups, pending } = await this.repo.stats(merchantId, dayStart);
     return {
       visitsToday: Number(visits?.n ?? 0),
       topupsTodayCount: Number(topups?.n ?? 0),
@@ -81,7 +81,7 @@ export class CashReadService {
     };
   }
 
-  async getAnalytics(tenantId: string): Promise<Row> {
+  async getAnalytics(merchantId: string): Promise<Row> {
     const now = new Date();
     const thirtyDaysAgo = new Date(now);
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -91,7 +91,7 @@ export class CashReadService {
     eightWeeksAgo.setHours(0, 0, 0, 0);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const d = await this.repo.analytics(tenantId, { thirtyDaysAgo, eightWeeksAgo, monthStart });
+    const d = await this.repo.analytics(merchantId, { thirtyDaysAgo, eightWeeksAgo, monthStart });
 
     const visitCountByDay: Record<string, number> = {};
     for (const v of d.recentVisits as Row[]) {
@@ -178,7 +178,7 @@ export class CashReadService {
     };
   }
 
-  async getCustomers(tenantId: string, query: Row): Promise<Row> {
+  async getCustomers(merchantId: string, query: Row): Promise<Row> {
     const page = Math.max(1, parseInt(query.page || '1') || 1);
     const limit = Math.max(1, Math.min(parseInt(query.limit || '20') || 20, 100));
     const search = String(query.search || '')
@@ -187,7 +187,12 @@ export class CashReadService {
     const sort = query.sort || 'recent';
     const skip = (page - 1) * limit;
 
-    const { rows, total } = await this.repo.adminCustomers(tenantId, { search, sort, limit, skip });
+    const { rows, total } = await this.repo.adminCustomers(merchantId, {
+      search,
+      sort,
+      limit,
+      skip,
+    });
     const customers = rows.map((r) => ({
       id: r.id,
       name: r.name,
@@ -208,12 +213,12 @@ export class CashReadService {
     return { customers, total, page, totalPages: Math.max(1, Math.ceil(total / limit)) };
   }
 
-  async getRewardConfig(tenantId: string): Promise<Row> {
-    const { active, history } = await this.repo.rewardConfig(tenantId);
+  async getRewardConfig(merchantId: string): Promise<Row> {
+    const { active, history } = await this.repo.rewardConfig(merchantId);
     return { active: active[0] || null, history };
   }
 
-  async updateRewardConfig(tenantId: string, body: Row): Promise<Row> {
+  async updateRewardConfig(merchantId: string, body: Row): Promise<Row> {
     const { visitsRequired, rewardName, rewardDescription, rewardCostCentavos } = body;
     if (!visitsRequired || !rewardName) {
       throw new BadRequestException('visitsRequired and rewardName are required');
@@ -224,9 +229,9 @@ export class CashReadService {
     if (!Number.isInteger(visits) || visits <= 0) {
       throw new BadRequestException('visitsRequired must be a positive integer');
     }
-    const programId = await this.programId(tenantId);
-    if (!programId) throw new BadRequestException('tenant has no loyalty program');
-    const newConfig = await this.repo.upsertRewardConfig(tenantId, programId, {
+    const programId = await this.programId(merchantId);
+    if (!programId) throw new BadRequestException('merchant has no loyalty program');
+    const newConfig = await this.repo.upsertRewardConfig(merchantId, programId, {
       visitsRequired: visits,
       rewardName,
       rewardDescription: rewardDescription ?? null,
@@ -235,11 +240,11 @@ export class CashReadService {
     return { ok: true, newConfig };
   }
 
-  async getGiftCards(tenantId: string, query: Row): Promise<Row> {
+  async getGiftCards(merchantId: string, query: Row): Promise<Row> {
     const page = Math.max(1, parseInt(query.page || '1') || 1);
     const limit = Math.max(1, Math.min(parseInt(query.limit || '20') || 20, 100));
     const skip = (page - 1) * limit;
-    const { rows, total } = await this.repo.giftCards(tenantId, limit, skip);
+    const { rows, total } = await this.repo.giftCards(merchantId, limit, skip);
     const giftCards = rows.map((g) => ({
       id: g.id,
       code: g.code,
@@ -258,9 +263,9 @@ export class CashReadService {
     return { giftCards, total, page, totalPages: Math.max(1, Math.ceil(total / limit)) };
   }
 
-  /** Program id for the tenant (reward-config write needs it). */
-  async programId(tenantId: string): Promise<string | null> {
-    const t = await this.repo.branding(tenantId);
+  /** Program id for the merchant (reward-config write needs it). */
+  async programId(merchantId: string): Promise<string | null> {
+    const t = await this.repo.branding(merchantId);
     return (t?.programId as string) ?? null;
   }
 }

@@ -16,7 +16,7 @@ export interface StaffRow {
 }
 
 // The role/permissions/invited/disabled columns aren't stored on
-// tenant.staff — role is derived from name, the rest are DTO-synthesized.
+// merchant.staff — role is derived from name, the rest are DTO-synthesized.
 // Kept identical to server.js so the dashboard renders unchanged.
 const PROJECTION = `
   id::text,
@@ -34,40 +34,40 @@ const PROJECTION = `
 export class StaffRepository {
   constructor(private readonly pg: PgService) {}
 
-  async list(tenantId: string): Promise<StaffRow[]> {
-    const { rows } = await this.pg.withTenant((c) =>
+  async list(merchantId: string): Promise<StaffRow[]> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<StaffRow>(
         `SELECT ${PROJECTION}, NULL::timestamptz AS "disabledAt"
-         FROM tenant.staff
-         WHERE business_id = $1::uuid
+         FROM merchant.staff
+         WHERE merchant_id = $1::uuid
          ORDER BY
            CASE WHEN lower(name) = 'admin' THEN 0 ELSE 1 END,
            CASE status WHEN 'active' THEN 0 WHEN 'invited' THEN 1 ELSE 2 END,
            created_at ASC`,
-        [tenantId],
+        [merchantId],
       ),
     );
     return rows;
   }
 
   async insert(
-    tenantId: string,
+    merchantId: string,
     locationId: string | null,
     data: { name: string; phone: string | null; email: string | null; status: string },
   ): Promise<StaffRow> {
-    const { rows } = await this.pg.withTenant((c) =>
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<StaffRow>(
-        `INSERT INTO tenant.staff (business_id, branch_id, name, phone, email, status)
+        `INSERT INTO merchant.staff (merchant_id, location_id, name, phone, email, status)
          VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6)
          RETURNING ${PROJECTION}, NULL::timestamptz AS "disabledAt"`,
-        [tenantId, locationId, data.name, data.phone, data.email, data.status],
+        [merchantId, locationId, data.name, data.phone, data.email, data.status],
       ),
     );
     return rows[0];
   }
 
   async update(
-    tenantId: string,
+    merchantId: string,
     staffId: string,
     patch: {
       name?: string;
@@ -76,19 +76,19 @@ export class StaffRepository {
       status?: string | null;
     },
   ): Promise<StaffRow | null> {
-    const { rows } = await this.pg.withTenant((c) =>
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<StaffRow>(
-        `UPDATE tenant.staff
+        `UPDATE merchant.staff
          SET name = COALESCE($3, name),
              phone = CASE WHEN $4::boolean THEN $5 ELSE phone END,
              email = CASE WHEN $6::boolean THEN $7 ELSE email END,
              status = COALESCE($8, status),
              updated_at = now()
-         WHERE id = $2::uuid AND business_id = $1::uuid
+         WHERE id = $2::uuid AND merchant_id = $1::uuid
          RETURNING ${PROJECTION},
            CASE WHEN status = 'disabled' THEN updated_at ELSE NULL END AS "disabledAt"`,
         [
-          tenantId,
+          merchantId,
           staffId,
           patch.name ?? null,
           patch.phone !== undefined,
@@ -102,14 +102,14 @@ export class StaffRepository {
     return rows[0] ?? null;
   }
 
-  async softDelete(tenantId: string, staffId: string): Promise<boolean> {
-    const { rows } = await this.pg.withTenant((c) =>
+  async softDelete(merchantId: string, staffId: string): Promise<boolean> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<{ id: string }>(
-        `UPDATE tenant.staff
+        `UPDATE merchant.staff
          SET status = 'disabled', updated_at = now()
-         WHERE id = $2::uuid AND business_id = $1::uuid
+         WHERE id = $2::uuid AND merchant_id = $1::uuid
          RETURNING id::text`,
-        [tenantId, staffId],
+        [merchantId, staffId],
       ),
     );
     return rows.length > 0;

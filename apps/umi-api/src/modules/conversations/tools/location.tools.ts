@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { TenantsRepository } from '../../tenants/tenants.repository';
+import { MerchantsRepository } from '../../merchants/merchants.repository';
 import { ConversationsRepository } from '../conversations.repository';
 import type { ToolContext, ToolResult } from '../turn.types';
 import { needsInputToolError } from './tool-errors';
 
 /**
- * Lenient branch-name normalization: lowercase, strip accents/punctuation,
+ * Lenient location-name normalization: lowercase, strip accents/punctuation,
  * collapse whitespace. Makes "Chapultepec", "chapultepec." and "CHAPULTEPEC"
  * compare equal, and lets a customer's "chapu" prefix-match "chapultepec".
  */
@@ -32,12 +32,12 @@ const FUZZY_CONFIRM_MIN_MARGIN = 0.25;
 const FUZZY_ASK_MIN_SIM = 0.4;
 
 /**
- * `set_branch` — records which branch a customer wants for the in-flight order.
- * The prompt only advertises it to multi-branch tenants that still need a choice
+ * `set_location` — records which location a customer wants for the in-flight order.
+ * The prompt only advertises it to multi-location merchants that still need a choice
  * (see OrderLocationResolver / the `# SUCURSALES` block). The LLM does the fuzzy
- * read and passes a branch name; this tool VALIDATES it against the tenant's real
- * active branches and persists the pick to
- * `runtime.conversation_state.selected_location_id`. It never invents a branch.
+ * read and passes a location name; this tool VALIDATES it against the merchant's real
+ * active locations and persists the pick to
+ * `runtime.conversation_state.selected_location_id`. It never invents a location.
  *
  * Matching (Phase 2) combines two votes over `name + owner-curated aliases`:
  *   - a deterministic literal match (exact > prefix > substring). A UNIQUE literal
@@ -49,17 +49,17 @@ const FUZZY_ASK_MIN_SIM = 0.4;
  *     always voiced by the LLM (needs_input), never a hardcoded customer string.
  */
 @Injectable()
-export class BranchTools {
+export class LocationTools {
   constructor(
-    private readonly tenants: TenantsRepository,
+    private readonly merchants: MerchantsRepository,
     private readonly conversations: ConversationsRepository,
   ) {}
 
-  async setBranch(ctx: ToolContext, input: { branch?: string }): Promise<ToolResult> {
-    const raw = (input.branch ?? '').trim();
-    const candidates = await this.tenants.matchBranchCandidates(ctx.tenantId, raw);
+  async setLocation(ctx: ToolContext, input: { location?: string }): Promise<ToolResult> {
+    const raw = (input.location ?? '').trim();
+    const candidates = await this.merchants.matchLocationCandidates(ctx.merchantId, raw);
     if (candidates.length <= 1) {
-      // Single-branch: nothing to choose (defensive — prompt won't offer this).
+      // Single-location: nothing to choose (defensive — prompt won't offer this).
       return { success: true, message: 'El negocio tiene una sola sucursal.' };
     }
     const names = candidates.map((c) => c.name);
@@ -96,7 +96,7 @@ export class BranchTools {
       // Strong, clearly-separated fuzzy match → CONFIRM, never auto (typo territory).
       return needsInputToolError(
         `¿Te refieres a la sucursal ${s1.c.name}?`,
-        `Confírmale al cliente si se refiere a la sucursal ${s1.c.name}. Si dice que sí, vuelve a llamar set_branch con "${s1.c.name}". Si no, muéstrale: ${names.join(', ')}.`,
+        `Confírmale al cliente si se refiere a la sucursal ${s1.c.name}. Si dice que sí, vuelve a llamar set_location con "${s1.c.name}". Si no, muéstrale: ${names.join(', ')}.`,
       );
     }
     if (s1.sim >= FUZZY_ASK_MIN_SIM) {
@@ -114,15 +114,15 @@ export class BranchTools {
     await this.conversations.setSelectedLocationWorker(ctx.conversationId, loc.id);
     return {
       success: true,
-      branch: loc.name,
+      location: loc.name,
       message: `Sucursal seleccionada: ${loc.name}. Continúa con el pedido del cliente en esta sucursal.`,
     };
   }
 
-  private ask(branchNames: string[]): ToolResult {
+  private ask(locationNames: string[]): ToolResult {
     return needsInputToolError(
       'Hay que aclarar la sucursal.',
-      `Pídele al cliente que elija entre: ${branchNames.join(', ')}.`,
+      `Pídele al cliente que elija entre: ${locationNames.join(', ')}.`,
     );
   }
 }

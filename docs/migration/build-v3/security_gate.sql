@@ -12,10 +12,10 @@ create temp table gate(label text, status text);
 insert into gate
 select * from (values
   -- RLS enablement & FORCE ---------------------------------------------------
-  ('tenant: every base table RLS+FORCE',
+  ('merchant: every base table RLS+FORCE',
     (select case when count(*)=0 then 'PASS' else 'FAIL' end from pg_class c
        join pg_namespace n on n.oid=c.relnamespace
-       where n.nspname='tenant' and c.relkind='r'
+       where n.nspname='merchant' and c.relkind='r'
          and not (c.relrowsecurity and c.relforcerowsecurity))),
   ('umi per-café tables RLS+FORCE (5)',
     (select case when count(*)=5 then 'PASS' else 'FAIL' end from pg_class c
@@ -29,51 +29,51 @@ select * from (values
   ('api cannot UPDATE derived columns (normalized_value, business_date)',
     (select case when bool_and(not has_column_privilege('api', t, c, 'UPDATE'))
                  then 'PASS' else 'FAIL' end
-       from (values ('tenant.contact','normalized_value'),
-                    ('tenant.customer_order','business_date'),
-                    ('tenant.pos_cart','business_date')) as v(t,c))),
+       from (values ('merchant.contact','normalized_value'),
+                    ('merchant.customer_order','business_date'),
+                    ('merchant.pos_cart','business_date')) as v(t,c))),
   -- SWEPT, not listed. This was a hardcoded pair of table names, so every runtime
   -- table added to the request path afterwards was invisible to it: the check passed
   -- while the new tables went unchecked. Stated as a universal instead — if a runtime
-  -- row belongs to a business and the request path can touch it, it is isolated.
-  -- Deliberate exceptions carry no business_id and are therefore not matched:
+  -- row belongs to a merchant and the request path can touch it, it is isolated.
+  -- Deliberate exceptions carry no merchant_id and are therefore not matched:
   -- idempotency_key (a global dedup key) and product_embedding (isolation comes from
-  -- the join to tenant.product, which is under RLS).
-  ('every api-reachable runtime table with business_id has RLS+FORCE',
+  -- the join to merchant.product, which is under RLS).
+  ('every api-reachable runtime table with merchant_id has RLS+FORCE',
     (select case when count(*)=0 then 'PASS' else 'FAIL' end
        from pg_class c
        join pg_namespace n on n.oid = c.relnamespace
        where n.nspname = 'runtime' and c.relkind = 'r'
          and exists (select 1 from information_schema.columns col
                       where col.table_schema='runtime' and col.table_name=c.relname
-                        and col.column_name='business_id')
+                        and col.column_name='merchant_id')
          and exists (select 1 from information_schema.role_table_grants g
                       where g.table_schema='runtime' and g.table_name=c.relname
                         and g.grantee='api')
          and not (c.relrowsecurity and c.relforcerowsecurity))),
   -- Views: security_invoker -------------------------------------------------
-  -- EVERY view in umi/tenant must enforce the caller's RLS. An owner-rights view
-  -- leaks cross-tenant (the audit reproduced this on conversation_analytics: 0
-  -- base rows, 11 cross-tenant view rows). Assert none is missing the option —
+  -- EVERY view in umi/merchant must enforce the caller's RLS. An owner-rights view
+  -- leaks cross-merchant (the audit reproduced this on conversation_analytics: 0
+  -- base rows, 11 cross-merchant view rows). Assert none is missing the option —
   -- count-agnostic, so adding a view (order_total/order_ticket) can't silently pass.
-  ('every umi/tenant view is security_invoker',
+  ('every umi/merchant view is security_invoker',
     (select case when count(*)=0 then 'PASS' else 'FAIL' end from pg_class c
        join pg_namespace n on n.oid=c.relnamespace
-       where c.relkind='v' and n.nspname in ('umi','tenant')
+       where c.relkind='v' and n.nspname in ('umi','merchant')
          and not (coalesce(c.reloptions,'{}') @> array['security_invoker=true']))),
   -- The invoker check is count-agnostic, so it can't notice a contract view being
   -- dropped. Assert the two order projections that consumers depend on still exist.
   ('build-v3 order views exist (order_total, order_ticket)',
     (select case when count(*)=2 then 'PASS' else 'FAIL' end from pg_class c
        join pg_namespace n on n.oid=c.relnamespace
-       where c.relkind='v' and n.nspname='tenant'
+       where c.relkind='v' and n.nspname='merchant'
          and c.relname in ('order_total','order_ticket'))),
   ('api holds no DML on any view',
     (select case when bool_or(has_table_privilege('api',c.oid,'insert')
                            or has_table_privilege('api',c.oid,'update')
                            or has_table_privilege('api',c.oid,'delete')) then 'FAIL' else 'PASS' end
        from pg_class c join pg_namespace n on n.oid=c.relnamespace
-       where c.relkind='v' and n.nspname in ('umi','tenant'))),
+       where c.relkind='v' and n.nspname in ('umi','merchant'))),
   -- Credentials never on the request path -----------------------------------
   ('api CANNOT read umi.user.password_hash',
     case when has_column_privilege('api','umi.user','password_hash','select') then 'FAIL' else 'PASS' end),
@@ -104,7 +104,7 @@ select * from (values
   ('no api/worker* default ACL leaks (api locked)',
     (select case when count(*)=0 then 'PASS' else 'FAIL' end from pg_default_acl d
        join pg_namespace n on n.oid=d.defaclnamespace
-       where n.nspname in ('umi','tenant','runtime')
+       where n.nspname in ('umi','merchant','runtime')
          and array_to_string(d.defaclacl,',') ~ '(^|,)api=')),
   -- public schema hardening -------------------------------------------------
   ('PUBLIC cannot CREATE in schema public',
@@ -113,7 +113,7 @@ select * from (values
   ('no role holds UPDATE/DELETE on audit_log',
     (select case when bool_or(p) then 'FAIL' else 'PASS' end from (
        select has_table_privilege(r,'umi.audit_log','update')
-           or has_table_privilege(r,'tenant.audit_log','delete') p
+           or has_table_privilege(r,'merchant.audit_log','delete') p
        from unnest(array['api','worker','readonly']) r) x)),
   -- Trigger function search_path pinned -------------------------------------
   ('trigger funcs have pinned search_path',
@@ -134,7 +134,7 @@ select * from (values
     (select case when count(*)=0 then 'PASS' else 'FAIL' end from umi."user"
        where email like '%@umi.invalid' and status='active')),
   ('no Slack ids in café-readable audit_log',
-    (select case when count(*)=0 then 'PASS' else 'FAIL' end from tenant.audit_log
+    (select case when count(*)=0 then 'PASS' else 'FAIL' end from merchant.audit_log
        where before ? 'slack_channel_id' or after ? 'slack_channel_id'
           or before ? 'slack_channel_name' or after ? 'slack_channel_name')),
   ('no historical webhook PII in runtime',
@@ -147,35 +147,35 @@ select * from (values
 \echo '================= STRUCTURAL GATE ================='
 select status, label from gate order by (status='FAIL') desc, label;
 
--- capture business ids for behavioral tests (as superuser)
-select id as kalala from tenant.business where name='Kalala Café' \gset
-select id as egr    from tenant.business where name='El Gran Ribera' \gset
+-- capture merchant ids for behavioral tests (as superuser)
+select id as kalala from merchant.merchant where name='Kalala Café' \gset
+select id as egr    from merchant.merchant where name='El Gran Ribera' \gset
 
 \echo ''
 \echo '================= BEHAVIORAL GATE (as role api) ================='
 set role api;
 
--- fail-closed: no tenant context => zero rows, no error
+-- fail-closed: no merchant context => zero rows, no error
 do $$ begin
-  perform set_config('app.current_business','',false);
-  if (select count(*) from tenant.business) <> 0 then raise exception 'FAIL: empty GUC did not fail closed'; end if;
+  perform set_config('app.current_merchant','',false);
+  if (select count(*) from merchant.merchant) <> 0 then raise exception 'FAIL: empty GUC did not fail closed'; end if;
 end $$;
-\echo 'PASS: empty/missing app.current_business -> 0 rows, no error (fail-closed)'
+\echo 'PASS: empty/missing app.current_merchant -> 0 rows, no error (fail-closed)'
 
 -- scoped to El Gran Ribera: sees only its own, and the VIEW does not leak Kalala
-select set_config('app.current_business', :'egr', false);
+select set_config('app.current_merchant', :'egr', false);
 do $$ begin
-  if (select count(*) from tenant.business)               <> 1 then raise exception 'FAIL: EGR sees <>1 business'; end if;
-  if (select count(*) from tenant.conversation)           <> 0 then raise exception 'FAIL: EGR sees foreign conversations'; end if;
-  if (select count(*) from tenant.conversation_analytics) <> 0 then raise exception 'FAIL: conversation_analytics VIEW leaks cross-tenant to EGR'; end if;
+  if (select count(*) from merchant.merchant)               <> 1 then raise exception 'FAIL: EGR sees <>1 merchant'; end if;
+  if (select count(*) from merchant.conversation)           <> 0 then raise exception 'FAIL: EGR sees foreign conversations'; end if;
+  if (select count(*) from merchant.conversation_analytics) <> 0 then raise exception 'FAIL: conversation_analytics VIEW leaks cross-merchant to EGR'; end if;
   if (select count(*) from umi.effective_entitlement)     <> 2 then raise exception 'FAIL: EGR effective_entitlement <>2 (leak or wrong scope)'; end if;
 end $$;
-\echo 'PASS: EGR scope isolated; conversation_analytics + effective_entitlement do NOT leak cross-tenant'
+\echo 'PASS: EGR scope isolated; conversation_analytics + effective_entitlement do NOT leak cross-merchant'
 
 -- scoped to Kalala: sees its own 11 conversations and 4 entitlements
-select set_config('app.current_business', :'kalala', false);
+select set_config('app.current_merchant', :'kalala', false);
 do $$ begin
-  if (select count(*) from tenant.conversation_analytics) <> 11 then raise exception 'FAIL: Kalala analytics <>11'; end if;
+  if (select count(*) from merchant.conversation_analytics) <> 11 then raise exception 'FAIL: Kalala analytics <>11'; end if;
   if (select count(*) from umi.effective_entitlement)     <> 4  then raise exception 'FAIL: Kalala entitlements <>4'; end if;
 end $$;
 \echo 'PASS: Kalala scope sees exactly its own rows'

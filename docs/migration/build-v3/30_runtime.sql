@@ -1,8 +1,8 @@
 -- ============================================================================
 -- build-v3 · schema: runtime
 -- The machine's WORKING MEMORY. Every table here is READ BACK by running code to
--- decide its next action (the read-back test). Nothing here is a business fact.
--- SEALED (grants in 90_rls). Built AFTER umi + tenant, so all FKs are inline.
+-- decide its next action (the read-back test). Nothing here is a merchant fact.
+-- SEALED (grants in 90_rls). Built AFTER umi + merchant, so all FKs are inline.
 --
 -- NOT here (deliberately): device_event, traces/spans/costs
 --   -> those are write-once TELEMETRY nothing reads back -> external OTel, not the DB.
@@ -19,20 +19,20 @@ create schema if not exists runtime;
 -- (dashboard/POS login), a CUSTOMER 'person' (umi-cash refresh token), and a
 -- DEVICE (a KDS iPad). The principal is (principal_type, principal_id) — a SOFT
 -- ref, deliberately no FK, because principal_id points into three different
--- tables by type: umi.user, tenant.customer, tenant.device. Two live writers
+-- tables by type: umi.user, merchant.customer, merchant.device. Two live writers
 -- already depend on exactly this shape — cash/customer-session.service.ts
 -- ('person'/'user') and kds.repository.ts ('device') — so a user_id-only table
 -- could represent neither a device nor a customer session. token_hash is UNIQUE:
 -- the cash path relies on it to 409 a double-submit instead of 500.
 --   Worker-only (90_rls): api gets NO grant, so no RLS policy is needed;
---   business_id is still carried, to scope the worker's own reads.
+--   merchant_id is still carried, to scope the worker's own reads.
 create table runtime.session (
   id             uuid primary key default gen_random_uuid(),
-  business_id    uuid not null references tenant.business(id) on delete cascade,
+  merchant_id    uuid not null references merchant.merchant(id) on delete cascade,
   principal_type text not null check (principal_type in ('user','device','person')),
   principal_id   uuid not null,                        -- soft ref, resolved by principal_type
   token_hash     text not null,
-  station_id     uuid references tenant.station(id),   -- device sessions: current station
+  station_id     uuid references merchant.station(id),   -- device sessions: current station
   device_name    text,                                 -- device sessions: display name
   is_active      boolean not null default true,
   metadata       jsonb not null default '{}'::jsonb,   -- device sessions park location_id + last ip
@@ -54,7 +54,7 @@ create table runtime.session (
   constraint session_revocation_ck check (is_active = (revoked_at is null))
 );
 create unique index session_token_hash_uidx on runtime.session (token_hash);
-create index session_live_idx on runtime.session (business_id, principal_type) where is_active;
+create index session_live_idx on runtime.session (merchant_id, principal_type) where is_active;
 -- "Every live session of this device" — what revocation walks when a terminal is lost.
 -- Expressed through principal_type/principal_id because that is how this schema models
 -- a session's subject; there is no separate device_id column and adding one would put
@@ -97,15 +97,15 @@ create table runtime.password_reset_token (
 -- plaintext `code` was the only unhashed secret in this schema); attempt_count/
 -- max_attempts bound brute force. A device_id would be premature at request time —
 -- the device row does not exist until approval — so the request carries where the
--- device WILL live (business_id/location_id/station_id/device_name). The device_id
+-- device WILL live (merchant_id/location_id/station_id/device_name). The device_id
 -- is filled in the instant the pairing is claimed, and the CHECK makes that
 -- structural: a 'used' pairing HAS produced a device, any other status has not.
 create table runtime.pairing (
   id             uuid primary key default gen_random_uuid(),
-  business_id    uuid not null references tenant.business(id) on delete cascade,
-  location_id    uuid references tenant.branch(id),
-  station_id     uuid references tenant.station(id),
-  device_id      uuid references tenant.device(id) on delete cascade,   -- the outcome (see CHECK)
+  merchant_id    uuid not null references merchant.merchant(id) on delete cascade,
+  location_id    uuid references merchant.location(id),
+  station_id     uuid references merchant.station(id),
+  device_id      uuid references merchant.device(id) on delete cascade,   -- the outcome (see CHECK)
   device_name    text not null,
   requested_name text,
   pin_hash       text not null,
@@ -147,11 +147,11 @@ create index pairing_pending_idx on runtime.pairing (status, expires_at) where s
 -- clean; the live queue regenerates.
 create table runtime.outbox_event (
   id              uuid primary key default gen_random_uuid(),
-  business_id     uuid not null references tenant.business(id) on delete cascade,
+  merchant_id     uuid not null references merchant.merchant(id) on delete cascade,
   topic           text not null,          -- 'twilio.status_notification', 'twilio.reply', ...
   aggregate_id    uuid,                   -- the row this is about (an order, a conversation)
   -- EXACTLY-ONCE. Deterministic at the call site (e.g. kds:notify:<order>:<status>:<seq>),
-  -- so a replayed transaction collides instead of duplicating. Scoped per business: one
+  -- so a replayed transaction collides instead of duplicating. Scoped per merchant: one
   -- café's key space cannot collide with another's.
   idempotency_key text not null,
   payload         jsonb not null,         -- the message to deliver
@@ -167,7 +167,7 @@ create table runtime.outbox_event (
   delivered_at    timestamptz,
   error           text,                   -- last failure, so a 'dead' row is debuggable
   created_at      timestamptz not null default now(),
-  constraint outbox_event_business_key_uq unique (business_id, idempotency_key)
+  constraint outbox_event_merchant_key_uq unique (merchant_id, idempotency_key)
 );
 -- The relay's claim query: ready rows oldest-first, plus stale leases to reclaim.
 create index outbox_event_claim_idx on runtime.outbox_event (status, available_at, created_at);
@@ -184,13 +184,13 @@ create index outbox_event_claim_idx on runtime.outbox_event (status, available_a
 -- name rather than on a missing constraint. Renaming the column makes the existing
 -- index the one the code was always addressing.
 -- `whatsapp.controller` documents this as observability, NOT authoritative dedup: the
--- durable guards are tenant.message.provider_message_id and the BullMQ jobId.
+-- durable guards are merchant.message.provider_message_id and the BullMQ jobId.
 create table runtime.inbound_event (
   id           uuid primary key default gen_random_uuid(),
   -- Soft ref, and NULLABLE: a webhook is recorded as it arrives, which can be before
   -- (or without) resolving which café it belongs to. Attribution is not a precondition
   -- for observing that something arrived.
-  business_id  uuid,
+  merchant_id  uuid,
   provider     text not null,              -- 'twilio','zettle','google_wallet',...
   provider_event_id text,                  -- the provider's own event id
   event_type   text,
@@ -211,30 +211,30 @@ create unique index inbound_event_provider_ext_uq
 -- request fingerprint and no response, so a retry carrying the same key with a
 -- DIFFERENT body looks identical to a genuine replay, and a caller that reuses a key
 -- gets silence instead of a conflict. For anything that moves money or creates an
--- order, use tenant.business_command, which keeps the fingerprint and the recorded
+-- order, use merchant.business_command, which keeps the fingerprint and the recorded
 -- result and answers IDEMPOTENCY_CONFLICT when they disagree.
 create table runtime.idempotency_key (
-  -- RESTORED to a TENANT-SCOPED key. `key` alone as the primary key put every café in
-  -- one namespace: two businesses whose upstream hands them the same provider id would
+  -- RESTORED to a MERCHANT-SCOPED key. `key` alone as the primary key put every café in
+  -- one namespace: two merchants whose upstream hands them the same provider id would
   -- collide, and one café's write could answer another café's "already done?".
-  business_id  uuid not null references tenant.business(id) on delete cascade,
+  merchant_id  uuid not null references merchant.merchant(id) on delete cascade,
   scope        text not null,
   key          text not null,              -- read BEFORE processing: "already done?"
   created_at   timestamptz not null default now(),
   expires_at   timestamptz,
-  primary key (business_id, scope, key)
+  primary key (merchant_id, scope, key)
 );
 
 -- The exhausted-job sink. RESTORED: `source text` collapsed four facts the operator
 -- surface needs into one concatenated string ('bullmq.turns:turn.process'), and dropped
--- the business entirely — a dead letter nobody can attribute to a café is not
+-- the merchant entirely — a dead letter nobody can attribute to a café is not
 -- actionable, it is just a log line.
 --
--- business_id is NOT NULL and FKs tenant.business, which dead-letter.service.ts already
--- states as the reason infra jobs with no tenant are log-only rather than persisted.
+-- merchant_id is NOT NULL and FKs merchant.merchant, which dead-letter.service.ts already
+-- states as the reason infra jobs with no merchant are log-only rather than persisted.
 create table runtime.dead_letter (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete cascade,
+  merchant_id   uuid not null references merchant.merchant(id) on delete cascade,
   source_schema text,                      -- 'bullmq'
   source_table  text,                      -- 'turns'
   source_id     text,                      -- the job id
@@ -245,7 +245,7 @@ create table runtime.dead_letter (
   failed_at     timestamptz not null default now(),
   created_at    timestamptz not null default now()
 );
-create index dead_letter_business_time_idx on runtime.dead_letter (business_id, failed_at desc);
+create index dead_letter_merchant_time_idx on runtime.dead_letter (merchant_id, failed_at desc);
 
 -- ----------------------------------------------------------------------------
 -- LIVE CONVERSATION   → read to resume the bot / prevent double-sends
@@ -253,19 +253,19 @@ create index dead_letter_business_time_idx on runtime.dead_letter (business_id, 
 
 -- The bot's IN-FLIGHT ORDER (was runtime.conversation_state, minus the FSM). One row per
 -- conversation, last-write-wins — NO current_state enum, NO version cursors, NO CAS. `cart` is
--- the structured DraftCart (items); `selected_branch_id` is which branch this order is for (asked
+-- the structured DraftCart (items); `selected_location_id` is which location this order is for (asked
 -- at checkout). Both materialize into customer_order + order_item at confirmation, then the row is
 -- cleared. The dialog "state" label is DERIVED from cart-presence each turn, never stored here.
 create table runtime.conversation_cart (
-  conversation_id    uuid primary key references tenant.conversation(id) on delete cascade,
-  business_id        uuid not null references tenant.business(id) on delete cascade,
+  conversation_id    uuid primary key references merchant.conversation(id) on delete cascade,
+  merchant_id        uuid not null references merchant.merchant(id) on delete cascade,
   cart               jsonb,                                  -- structured DraftCart, or null when empty
-  selected_branch_id uuid references tenant.branch(id) on delete set null,
+  selected_location_id uuid references merchant.location(id) on delete set null,
   updated_at         timestamptz not null default now(),
   created_at         timestamptz not null default now()
 );
 comment on table runtime.conversation_cart is
-  'The bot''s in-flight order (cart + chosen branch), last-write-wins. Replaces the deleted '
+  'The bot''s in-flight order (cart + chosen location), last-write-wins. Replaces the deleted '
   'conversation_state FSM; materializes to customer_order at confirmation, then cleared.';
 
 -- The fragment-merge / debounce buffer: WhatsApp customers send an order in pieces ("two coffees"
@@ -274,8 +274,8 @@ comment on table runtime.conversation_cart is
 -- reconcile columns (those existed only to reconcile against the deleted FSM).
 create table runtime.conversation_turn (
   id                 uuid primary key default gen_random_uuid(),
-  business_id        uuid not null references tenant.business(id) on delete cascade,
-  conversation_id    uuid not null references tenant.conversation(id) on delete cascade,
+  merchant_id        uuid not null references merchant.merchant(id) on delete cascade,
+  conversation_id    uuid not null references merchant.conversation(id) on delete cascade,
   status             text not null default 'pending'
                        check (status in ('pending','processing','completed','failed','superseded')),
   source_message_ids uuid[] not null default '{}',           -- the fragments merged into this turn
@@ -295,24 +295,24 @@ comment on table runtime.conversation_turn is
 
 create table runtime.reminder_sent (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete cascade,
-  card_id       uuid not null references tenant.loyalty_card(id) on delete cascade,
+  merchant_id   uuid not null references merchant.merchant(id) on delete cascade,
+  card_id       uuid not null references merchant.loyalty_card(id) on delete cascade,
   reminder_type text not null
                   check (reminder_type in ('reward_expiring','welcome_no_visit',
                                            'winback_inactive','streak_recognition')),
   sent_at       timestamptz not null default now(),
   created_at    timestamptz not null default now(),
-  unique (business_id, card_id, reminder_type)
+  unique (merchant_id, card_id, reminder_type)
 );
 comment on table runtime.reminder_sent is
-  'Dedup guard read BEFORE a lifecycle nudge (was nudge_sent). The message itself is tenant.message.';
+  'Dedup guard read BEFORE a lifecycle nudge (was nudge_sent). The message itself is merchant.message.';
 
 -- ----------------------------------------------------------------------------
 -- INTEGRATION   → read to resume a sync / route a wallet push
 -- ----------------------------------------------------------------------------
 
 create table runtime.integration_sync (
-  integration_id uuid primary key references tenant.integration(id) on delete cascade,
+  integration_id uuid primary key references merchant.integration(id) on delete cascade,
   cursor         text,                       -- read to resume the Zettle/wallet sync
   last_synced_at timestamptz,
   last_error     text,
@@ -322,7 +322,7 @@ create table runtime.integration_sync (
 
 create table runtime.pass_device (
   id             uuid primary key default gen_random_uuid(),
-  wallet_pass_id uuid not null references tenant.loyalty_wallet_pass(id) on delete cascade,
+  wallet_pass_id uuid not null references merchant.loyalty_wallet_pass(id) on delete cascade,
   device_identifier text not null,           -- Apple/Google device id
   push_token     text,                        -- read to push a pass update to the device
   registered_at  timestamptz not null default now(),
@@ -336,21 +336,21 @@ create table runtime.pass_device (
 -- ----------------------------------------------------------------------------
 
 create table runtime.product_embedding (
-  product_id   uuid primary key references tenant.product(id) on delete cascade,
+  product_id   uuid primary key references merchant.product(id) on delete cascade,
   embedding    extensions.vector(1024) not null,
   model        text not null,
   created_at   timestamptz not null default now()
 );
 
 create table runtime.message_embedding (
-  message_id   uuid primary key references tenant.message(id) on delete cascade,
+  message_id   uuid primary key references merchant.message(id) on delete cascade,
   embedding    extensions.vector(1024) not null,
   model        text not null,
   created_at   timestamptz not null default now()
 );
 
 create table runtime.knowledge_embedding (
-  chunk_id     uuid primary key references tenant.knowledge_chunk(id) on delete cascade,
+  chunk_id     uuid primary key references merchant.knowledge_chunk(id) on delete cascade,
   embedding    extensions.vector(1024) not null,
   model        text not null,
   created_at   timestamptz not null default now()
@@ -358,21 +358,21 @@ create table runtime.knowledge_embedding (
 
 -- ============================================================================
 -- DEVICE TRUST + OPERATOR PRESENCE
--- Machinery, not business fact: a café never reads these, and they are sealed
--- from every tenant role in 90_rls.
+-- Machinery, not merchant fact: a café never reads these, and they are sealed
+-- from every merchant role in 90_rls.
 -- ============================================================================
 
 -- A one-time, expiring enrolment challenge. The owner generates it in the dashboard,
 -- reads a short code to whoever is holding the tablet, and the tablet exchanges it for
 -- a credential. Only the HASH is stored: the code is shown once and is unrecoverable.
 --
--- `idempotency_key` exists because of a defect our own audit recorded on the branch:
+-- `idempotency_key` exists because of a defect our own audit recorded on the location:
 -- if a lost response consumes the challenge, the device is stranded with no way back.
 -- A retry must return the same challenge, not burn it.
 create table runtime.device_enrollment_challenge (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete cascade,
-  branch_id     uuid references tenant.branch(id) on delete cascade,
+  merchant_id   uuid not null references merchant.merchant(id) on delete cascade,
+  location_id     uuid references merchant.location(id) on delete cascade,
   display_name  text not null,
   device_kind   text not null check (device_kind in ('kds','pos_terminal')),
   platform      text not null
@@ -383,9 +383,9 @@ create table runtime.device_enrollment_challenge (
   attempts      integer not null default 0 check (attempts between 0 and 5),
   consumed_at   timestamptz,
   created_by    uuid not null references umi.user(id),
-  replaces_device_id uuid references tenant.device(id),
+  replaces_device_id uuid references merchant.device(id),
   created_at    timestamptz not null default now(),
-  unique (business_id, idempotency_key)
+  unique (merchant_id, idempotency_key)
 );
 create index device_enrollment_active_idx
   on runtime.device_enrollment_challenge (id, expires_at) where consumed_at is null;
@@ -404,10 +404,10 @@ create table runtime.operator_session (
   id            uuid primary key default gen_random_uuid(),
   durable_session_id uuid not null references runtime.session(id) on delete cascade,
   user_id       uuid not null references umi.user(id),
-  staff_id      uuid not null references tenant.staff(id),
-  device_id     uuid not null references tenant.device(id),
-  business_id   uuid not null references tenant.business(id),
-  branch_id     uuid not null references tenant.branch(id),
+  staff_id      uuid not null references merchant.staff(id),
+  device_id     uuid not null references merchant.device(id),
+  merchant_id   uuid not null references merchant.merchant(id),
+  location_id     uuid not null references merchant.location(id),
   state         text not null default 'active' check (state in ('active','locked','ended')),
   permissions   text[] not null default '{}',
   entitlements  jsonb not null default '[]'::jsonb,
@@ -416,8 +416,8 @@ create table runtime.operator_session (
   expires_at    timestamptz not null,
   ended_at      timestamptz,
   constraint operator_session_end_ck check ((state = 'ended') = (ended_at is not null)),
-  constraint operator_session_branch_same_business_fk
-    foreign key (business_id, branch_id) references tenant.branch (business_id, id)
+  constraint operator_session_location_same_merchant_fk
+    foreign key (merchant_id, location_id) references merchant.location (merchant_id, id)
 );
 -- One live operator per authenticated device session.
 create unique index operator_session_one_active_per_durable
@@ -432,8 +432,8 @@ comment on table runtime.operator_session is
 create table runtime.elevation_grant (
   id            uuid primary key default gen_random_uuid(),
   session_id    uuid not null references runtime.session(id) on delete cascade,
-  business_id   uuid not null references tenant.business(id) on delete cascade,
-  branch_id     uuid references tenant.branch(id) on delete cascade,
+  merchant_id   uuid not null references merchant.merchant(id) on delete cascade,
+  location_id     uuid references merchant.location(id) on delete cascade,
   permission_key text not null,
   method        text not null check (method in ('manager_approval','operator_pin')),
   approved_by   uuid references umi.user(id),
@@ -442,18 +442,18 @@ create table runtime.elevation_grant (
   created_at    timestamptz not null default now()
 );
 create index elevation_grant_active_idx
-  on runtime.elevation_grant (session_id, business_id, permission_key, expires_at)
+  on runtime.elevation_grant (session_id, merchant_id, permission_key, expires_at)
   where consumed_at is null;
 
 -- Internal security decisions: denials, lockouts, credential failures. Deliberately NOT
--- tenant.audit_event — a café must not be able to read the shape of our auth defences,
--- and a failed login attempt on someone else's account is not their business fact.
+-- merchant.audit_event — a café must not be able to read the shape of our auth defences,
+-- and a failed login attempt on someone else's account is not their merchant fact.
 create table runtime.security_audit_event (
   id            uuid primary key default gen_random_uuid(),
   actor_user_id uuid references umi.user(id) on delete set null,
   session_id    uuid references runtime.session(id) on delete set null,
-  business_id   uuid,   -- soft ref: audit exhaust must outlive the row it describes
-  branch_id     uuid,   -- soft ref, same reason
+  merchant_id   uuid,   -- soft ref: audit exhaust must outlive the row it describes
+  location_id     uuid,   -- soft ref, same reason
   event_type    text not null,
   entity_type   text not null,
   entity_id     uuid,
@@ -465,16 +465,16 @@ create table runtime.security_audit_event (
 );
 create index security_audit_actor_time_idx
   on runtime.security_audit_event (actor_user_id, occurred_at desc);
-create index security_audit_business_time_idx
-  on runtime.security_audit_event (business_id, occurred_at desc);
+create index security_audit_merchant_time_idx
+  on runtime.security_audit_event (merchant_id, occurred_at desc);
 comment on table runtime.security_audit_event is
-  'Append-only internal security decisions. No tenant role can read this table.';
+  'Append-only internal security decisions. No merchant role can read this table.';
 
--- The unredacted half of a tenant.audit_event. The café reads public_data on the event;
+-- The unredacted half of a merchant.audit_event. The café reads public_data on the event;
 -- everything that must exist for an investigation but must not be shown lives here.
 create table runtime.audit_event_internal (
-  audit_event_id uuid primary key references tenant.audit_event(id) on delete restrict,
-  business_id   uuid not null references tenant.business(id) on delete restrict,
+  audit_event_id uuid primary key references merchant.audit_event(id) on delete restrict,
+  merchant_id   uuid not null references merchant.merchant(id) on delete restrict,
   metadata      jsonb not null default '{}'::jsonb,
   created_at    timestamptz not null default now()
 );

@@ -4,8 +4,8 @@
 export const CFG = {
   supabaseUrl: import.meta.env.VITE_SUPABASE_URL || '',
   supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-  businessId: import.meta.env.VITE_BUSINESS_ID || '',
-  businessSlug: import.meta.env.VITE_BUSINESS_SLUG || '',
+  merchantId: import.meta.env.VITE_MERCHANT_ID || '',
+  merchantSlug: import.meta.env.VITE_MERCHANT_SLUG || '',
   // 'supabase' | 'local' (server.js, X-UMI-User-ID header) | 'cookie' (umi-api, httpOnly cookie)
   authMode: import.meta.env.VITE_AUTH_MODE || 'supabase',
   // Origin of the API backend. '' = same-origin (Vite proxy / server.js). For the umi-api
@@ -15,12 +15,12 @@ export const CFG = {
   cashApiBase: '',
 };
 
-export const LIVE = !!(CFG.supabaseUrl && CFG.supabaseAnonKey && CFG.businessId);
-export const CASH_LIVE = !!CFG.businessSlug;
+export const LIVE = !!(CFG.supabaseUrl && CFG.supabaseAnonKey && CFG.merchantId);
+export const CASH_LIVE = !!CFG.merchantSlug;
 
 // umi-api backend: auth lives in an httpOnly cookie, requests are cross-origin with credentials.
 export const COOKIE_AUTH = CFG.authMode === 'cookie';
-// Both 'local' and 'cookie' keep the session *display data* (user/tenants) in localStorage.
+// Both 'local' and 'cookie' keep the session *display data* (user/merchants) in localStorage.
 export const LOCAL_SESSION = CFG.authMode === 'local' || COOKIE_AUTH;
 
 /** Resolve an app-relative API path against the configured backend origin. */

@@ -7,7 +7,7 @@ import { roleToSender } from './message-vocab';
  * The message vocabulary bridge, and the regression guard for the bug that killed the
  * WhatsApp bot SILENTLY.
  *
- * `tenant.message.sender` speaks the café domain vocabulary — customer | bot | staff |
+ * `merchant.message.sender` speaks the café domain vocabulary — customer | bot | staff |
  * system. The LLM/turn engine speaks the Anthropic API vocabulary — user | assistant.
  * Writing an LLM word into the column violates the CHECK (the insert fails), and
  * FILTERING on one matches nothing (no error at all — just a bot that never replies and
@@ -65,9 +65,9 @@ describe('message vocabulary (DB domain words vs LLM API words)', () => {
     const badInsert = /VALUES\s*\([^)]*'(user|assistant)'/i;
     for (const file of productionSources()) {
       const text = readFileSync(file, 'utf8');
-      if (!/tenant\.message|\bsender\b/.test(text)) continue;
+      if (!/merchant\.message|\bsender\b/.test(text)) continue;
       for (const [i, line] of text.split('\n').entries()) {
-        if (bad.test(line) || (badInsert.test(line) && /tenant\.message/.test(text))) {
+        if (bad.test(line) || (badInsert.test(line) && /merchant\.message/.test(text))) {
           offenders.push(`${relative(SRC, file)}:${i + 1}: ${line.trim()}`);
         }
       }

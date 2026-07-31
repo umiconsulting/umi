@@ -9,7 +9,7 @@ import { CashRegisterService } from './cash-register.service';
 
 function make() {
   const repo = {
-    tenantConfig: vi.fn().mockResolvedValue({
+    merchantConfig: vi.fn().mockResolvedValue({
       name: 'Kala',
       loyaltyConfigured: true,
       cardPrefix: null,
@@ -47,8 +47,8 @@ describe('CashRegisterService.register', () => {
     expect(cardNumber).toMatch(/^LYL-\d{10}$/);
   });
 
-  it('uses the tenant card prefix when configured', async () => {
-    h.repo.tenantConfig.mockResolvedValue({
+  it('uses the merchant card prefix when configured', async () => {
+    h.repo.merchantConfig.mockResolvedValue({
       name: 'Egret',
       loyaltyConfigured: true,
       cardPrefix: 'EGR',
@@ -59,7 +59,7 @@ describe('CashRegisterService.register', () => {
   });
 
   it('403 when self-registration is disabled', async () => {
-    h.repo.tenantConfig.mockResolvedValue({
+    h.repo.merchantConfig.mockResolvedValue({
       name: 'X',
       loyaltyConfigured: true,
       cardPrefix: null,
@@ -68,8 +68,8 @@ describe('CashRegisterService.register', () => {
     await expect(h.svc.register('t1', 'X', INPUT, null)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('500 when the tenant has no loyalty program', async () => {
-    h.repo.tenantConfig.mockResolvedValue({
+  it('500 when the merchant has no loyalty program', async () => {
+    h.repo.merchantConfig.mockResolvedValue({
       name: 'X',
       loyaltyConfigured: false,
       cardPrefix: null,

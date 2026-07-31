@@ -121,7 +121,7 @@ test('session schemas (auth surface) — representative parse', () => {
     SessionResponse.safeParse({
       session: {
         user: { id: '1', email: 'a@b.co', displayName: null },
-        tenants: [{ id: 't', slug: 's', name: 'n', roles: ['owner'] }],
+        merchants: [{ id: 't', slug: 's', name: 'n', roles: ['owner'] }],
         provider: 'local',
         accessExpiresIn: 1800,
       },

@@ -4,7 +4,7 @@ import type { MessageRunItem } from './turn.types';
 
 /**
  * Queries for `runtime.conversation_turn` — the fragment-merge / debounce buffer,
- * plus the trailing-user-run read over `tenant.message`. The turn is slimmed to that
+ * plus the trailing-user-run read over `merchant.message`. The turn is slimmed to that
  * job: NO integrity/reconcile/base_state_version columns (they existed only to
  * reconcile against the deleted FSM). Worker pool — the WhatsApp path is unauthenticated.
  *
@@ -56,7 +56,7 @@ function mapTurn(row: TurnRow): TurnRecord {
 
 export interface UpsertTurnParams {
   existingTurnId?: string | null;
-  tenantId: string;
+  merchantId: string;
   conversationId: string;
   status: TurnStatus;
   sourceMessageIds: string[];
@@ -79,7 +79,7 @@ export class ConversationTurnsRepository {
               CASE sender WHEN 'customer' THEN 'user' WHEN 'bot' THEN 'assistant'
                           WHEN 'staff' THEN 'assistant' ELSE 'system' END AS role,
               COALESCE(body, '') AS content, created_at
-         FROM tenant.message
+         FROM merchant.message
         WHERE conversation_id = $1
         ORDER BY created_at DESC
         LIMIT $2`,
@@ -102,14 +102,14 @@ export class ConversationTurnsRepository {
   ): Promise<boolean> {
     // `afterTimestamp` is the turn's last_message_at, which round-trips through a
     // JS Date and is truncated to MILLISECOND precision, while
-    // tenant.message.created_at keeps Postgres MICROSECOND precision. A strict
+    // merchant.message.created_at keeps Postgres MICROSECOND precision. A strict
     // `created_at > $2` then treats the turn's own newest message as "newer"
     // (e.g. .62592 > .625), so the turn supersedes + re-queues forever. Excluding
     // the turn's source message ids makes the check precision-immune: a genuinely
     // newer message is one that is not already part of this turn.
     const { rows } = await this.pg.query(
       `SELECT 1
-         FROM tenant.message
+         FROM merchant.message
         WHERE conversation_id = $1 AND sender = 'customer' AND created_at > $2
           AND id <> ALL ($3::uuid[])
         LIMIT 1`,
@@ -141,7 +141,7 @@ export class ConversationTurnsRepository {
 
   async upsertTurn(params: UpsertTurnParams): Promise<TurnRecord> {
     const cols = [
-      params.tenantId,
+      params.merchantId,
       params.conversationId,
       params.status,
       params.sourceMessageIds,
@@ -156,7 +156,7 @@ export class ConversationTurnsRepository {
     if (params.existingTurnId) {
       const { rows } = await this.pg.query<TurnRow>(
         `UPDATE runtime.conversation_turn SET
-            business_id = $1::uuid, conversation_id = $2::uuid, status = $3,
+            merchant_id = $1::uuid, conversation_id = $2::uuid, status = $3,
             source_message_ids = $4::uuid[], merged_user_text = $5,
             first_message_at = $6, last_message_at = $7, hold_until = $8,
             released_at = $9, superseded_at = $10
@@ -171,7 +171,7 @@ export class ConversationTurnsRepository {
 
     const { rows } = await this.pg.query<TurnRow>(
       `INSERT INTO runtime.conversation_turn
-         (business_id, conversation_id, status, source_message_ids, merged_user_text,
+         (merchant_id, conversation_id, status, source_message_ids, merged_user_text,
           first_message_at, last_message_at, hold_until, released_at, superseded_at)
        VALUES ($1::uuid,$2::uuid,$3,$4::uuid[],$5,$6,$7,$8,$9,$10)
        RETURNING ${TURN_COLUMNS}`,

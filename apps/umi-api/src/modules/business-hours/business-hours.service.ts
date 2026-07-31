@@ -5,24 +5,24 @@ import {
   type OrderingSettings,
   type OrderingPatch,
 } from './ordering-settings.repository';
-import { TenantsRepository } from '../tenants/tenants.repository';
+import { MerchantsRepository } from '../merchants/merchants.repository';
 import { DAY_KEYS, fromGrid, toGrid, type HoursGrid, type OpenHours } from './open-hours';
 
 /**
  * Business hours — the SINGLE source every consumer reads: the dashboard Hours screen,
  * the WhatsApp bot (through `conversations/ordering-window.service`), and the register.
- * Weekly hours come from `tenant.business.open_hours` with the `tenant.branch.open_hours`
- * override (BusinessHoursRepository), the timezone from `tenant.business.timezone`
- * (TenantsRepository), and the per-channel ordering knobs from the typed
- * `business.whatsapp_*` columns (OrderingSettingsRepository). Nothing here is
+ * Weekly hours come from `merchant.merchant.open_hours` with the `merchant.location.open_hours`
+ * override (BusinessHoursRepository), the timezone from `merchant.merchant.timezone`
+ * (MerchantsRepository), and the per-channel ordering knobs from the typed
+ * `merchant.whatsapp_*` columns (OrderingSettingsRepository). Nothing here is
  * café-specific or hardcoded.
  *
  * `business_hours` is Square's name for the field (`Location.business_hours`). The column
- * stays `open_hours` because `business.business_hours` would stutter, and `open-hours.ts`
+ * stays `open_hours` because `merchant.business_hours` would stutter, and `open-hours.ts`
  * is named for the column it serializes.
  *
- * We take the NAME from Square, not the PLACEMENT — see `20_tenant.sql` for why the
- * document sits on the business with a branch override, which is not what Square, Google,
+ * We take the NAME from Square, not the PLACEMENT — see `20_merchant.sql` for why the
+ * document sits on the merchant with a location override, which is not what Square, Google,
  * Toast or DoorDash do.
  */
 
@@ -64,38 +64,38 @@ export class BusinessHoursService {
   constructor(
     private readonly repo: BusinessHoursRepository,
     private readonly ordering: OrderingSettingsRepository,
-    private readonly tenants: TenantsRepository,
+    private readonly merchants: MerchantsRepository,
   ) {}
 
   /** Dashboard GET: weekly grid + timezone + ordering settings. */
   async getHours(
-    businessId: string,
-    branchId: string | null,
-    tenantTimezone: string | null,
+    merchantId: string,
+    locationId: string | null,
+    merchantTimezone: string | null,
   ): Promise<{
     hours: HoursGrid;
     timezone: string;
-    businessId: string;
+    merchantId: string;
     ordering: OrderingSettings;
-    /** Whether this branch keeps its own hours or inherits the café's. */
-    hoursLevel: 'branch' | 'business';
+    /** Whether this location keeps its own hours or inherits the café's. */
+    hoursLevel: 'location' | 'merchant';
   }> {
     const [effective, ordering] = await Promise.all([
-      this.repo.read(businessId, branchId),
-      this.ordering.read(businessId),
+      this.repo.read(merchantId, locationId),
+      this.ordering.read(merchantId),
     ]);
     return {
       hours: { ...suggestedGrid(), ...toGrid(effective.hours) },
-      timezone: tenantTimezone || DEFAULT_TZ,
-      businessId,
+      timezone: merchantTimezone || DEFAULT_TZ,
+      merchantId,
       ordering,
       hoursLevel: effective.level,
     };
   }
 
   /** Weekly-hours-only write (kept for back-compat callers). */
-  async updateHours(businessId: string, branchId: string | null, hours: unknown): Promise<void> {
-    await this.writeHours(businessId, branchId, hours);
+  async updateHours(merchantId: string, locationId: string | null, hours: unknown): Promise<void> {
+    await this.writeHours(merchantId, locationId, hours);
   }
 
   /**
@@ -109,25 +109,25 @@ export class BusinessHoursService {
    * user re-saves, which is a no-op for whatever already landed.
    */
   async updateAll(
-    businessId: string,
-    branchId: string | null,
+    merchantId: string,
+    locationId: string | null,
     input: UpdateAllInput,
   ): Promise<void> {
     if (input.hours !== undefined) {
-      await this.writeHours(businessId, branchId, input.hours);
+      await this.writeHours(merchantId, locationId, input.hours);
     }
     if (input.timezone) {
-      // Reuse the existing tenant-settings writer (tenant.business.timezone) — DRY.
-      await this.tenants.updateTenantSettings(businessId, { timezone: input.timezone });
+      // Reuse the existing merchant-settings writer (merchant.merchant.timezone) — DRY.
+      await this.merchants.updateMerchantSettings(merchantId, { timezone: input.timezone });
     }
     if (input.ordering !== undefined) {
-      await this.ordering.updateOrdering(businessId, input.ordering);
+      await this.ordering.updateOrdering(merchantId, input.ordering);
     }
   }
 
   private async writeHours(
-    businessId: string,
-    branchId: string | null,
+    merchantId: string,
+    locationId: string | null,
     hours: unknown,
   ): Promise<void> {
     if (!hours || typeof hours !== 'object') {
@@ -137,26 +137,29 @@ export class BusinessHoursService {
     // one window per day and no exceptions. `fromGrid` folds the submitted days onto
     // what is stored, so a partial save leaves untouched days alone and a full save
     // still cannot delete a holiday closure or the evening half of a split shift.
-    const existing = await this.repo.read(businessId, branchId);
+    const existing = await this.repo.read(merchantId, locationId);
     const next = fromGrid(hours as HoursGrid, existing.hours);
-    await this.repo.write(businessId, branchId, next);
+    await this.repo.write(merchantId, locationId, next);
   }
 
   /**
-   * Bot path (worker pool, unauthenticated). Resolves the SAME branch the dashboard
+   * Bot path (worker pool, unauthenticated). Resolves the SAME location the dashboard
    * writes to, then returns the effective document + timezone + ordering settings.
    * No café default: a café that has set nothing reads as having no windows, and every
    * consumer treats that as closed.
    */
   async getEffectiveHoursForBot(
-    businessId: string,
-    requestedBranchId: string | null,
+    merchantId: string,
+    requestedLocationId: string | null,
   ): Promise<BotHours> {
-    const branchId = await this.tenants.resolveLocationIdWorker(businessId, requestedBranchId);
+    const locationId = await this.merchants.resolveLocationIdWorker(
+      merchantId,
+      requestedLocationId,
+    );
     const [effective, ordering, tz] = await Promise.all([
-      this.repo.readWorker(businessId, branchId),
-      this.ordering.readWorker(businessId),
-      this.tenants.getTenantTimezoneWorker(businessId),
+      this.repo.readWorker(merchantId, locationId),
+      this.ordering.readWorker(merchantId),
+      this.merchants.getMerchantTimezoneWorker(merchantId),
     ]);
     return { timezone: tz || DEFAULT_TZ, hours: effective.hours, ordering };
   }

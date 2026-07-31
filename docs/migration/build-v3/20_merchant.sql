@@ -1,15 +1,15 @@
 -- ============================================================================
--- build-v3 · schema: tenant
--- The café's business. RLS-scoped per business (policies in 90_rls.sql).
+-- build-v3 · schema: merchant
+-- The café's merchant. RLS-scoped per merchant (policies in 90_rls.sql).
 -- Conventions: see 10_umi.sql header.
--- tenant->umi FKs are INLINE here (umi is built first). Only the circular
--- umi->tenant FKs are deferred (50_cross_schema_fk.sql).
+-- merchant->umi FKs are INLINE here (umi is built first). Only the circular
+-- umi->merchant FKs are deferred (50_cross_schema_fk.sql).
 -- ============================================================================
 
-create schema if not exists tenant;
+create schema if not exists merchant;
 
 -- Shared guard: money ledgers are immutable once written.
-create or replace function tenant.tg_append_only() returns trigger
+create or replace function merchant.tg_append_only() returns trigger
   language plpgsql
   set search_path = pg_catalog as $$   -- pinned: no writable schema on the path
 begin
@@ -21,7 +21,7 @@ end $$;
 -- ROOT
 -- ----------------------------------------------------------------------------
 
-create table tenant.business (
+create table merchant.merchant (
   id                uuid primary key default gen_random_uuid(),
   name              text not null,
   legal_name        text,
@@ -41,7 +41,7 @@ create table tenant.business (
   -- "which cafés are open now" — so the row table was splitting an atom that is never
   -- accessed in pieces, and charging the bot's hot path a second query for it.
   -- It also could not express things a café actually has: a split shift (its UNIQUE
-  -- index on (tenant, location, day) FORBADE a second window), a date exception, or a
+  -- index on (merchant, location, day) FORBADE a second window), a date exception, or a
   -- window that runs past midnight. The one thing it did better — DB-typed `time` —
   -- comes back as the CHECK below plus validation on the write path.
   --
@@ -69,7 +69,7 @@ create table tenant.business (
   -- silently override it — one cutoff, one source.
   whatsapp_order_cutoff_minutes integer not null default 30
                                   check (whatsapp_order_cutoff_minutes between 0 and 1440),
-  -- Free text the bot adds to its hours answer ("today we close early"). Tenant
+  -- Free text the bot adds to its hours answer ("today we close early"). Merchant
   -- authored, so it is content, not configuration.
   whatsapp_ordering_notice      text,
   -- Numbers that may order outside the window — staff testing the bot, the owner.
@@ -83,8 +83,8 @@ create table tenant.business (
   logo_url          text,
   brand_color       text,   -- primary brand color (dashboard theming + wallet pass)
   secondary_color   text,   -- accent color (dashboard theming)
-  -- Conversational assistant voice (tenant-configurable from the dashboard). Two knobs:
-  -- assistant_name overrides the display persona (null -> business name); assistant_tone is
+  -- Conversational assistant voice (merchant-configurable from the dashboard). Two knobs:
+  -- assistant_name overrides the display persona (null -> merchant name); assistant_tone is
   -- the tone preset (casual|friendly|formal), rendered as the prompt's tone line. Freeform
   -- tone + extra instructions were deferred (no injection point decided) — add columns then.
   assistant_name    text,
@@ -92,77 +92,77 @@ create table tenant.business (
   -- When the trading day rolls over. A café that serves until 01:00 counts that sale as
   -- belonging to the previous day, and its cash-up, its revenue report and its receipt
   -- must all agree about which day that is. Midnight is the safe default; a late-night
-  -- business sets 04:00. EVERY business_date in this schema is derived from this column
-  -- plus `timezone` by tenant.tg_business_date, so they cannot disagree with each other.
+  -- merchant sets 04:00. EVERY business_date in this schema is derived from this column
+  -- plus `timezone` by merchant.tg_business_date, so they cannot disagree with each other.
   business_day_start time not null default '00:00',
   status            text not null default 'active'
                       check (status in ('active','suspended')),
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
 );
-comment on table  tenant.business is 'The café. Root of the tenant schema (was tenant.tenant).';
-comment on column tenant.business.open_hours is
+comment on table  merchant.merchant is 'The café. Root of the merchant schema (was merchant.merchant).';
+comment on column merchant.merchant.open_hours is
   'Weekly hours + date exceptions as one jsonb column — hours are an attribute, not a table. '
-  'A branch may override it (tenant.branch.open_hours); read COALESCE(branch, business).';
-comment on column tenant.business.whatsapp_ordering_enabled is
+  'A location may override it (merchant.location.open_hours); read COALESCE(location, merchant).';
+comment on column merchant.merchant.whatsapp_ordering_enabled is
   'The pause switch for conversational ordering. Does NOT gate the POS or the counter.';
 
 -- ----------------------------------------------------------------------------
 -- PLACES & PEOPLE-WHO-WORK
 -- ----------------------------------------------------------------------------
 
-create table tenant.branch (
+create table merchant.location (
   id           uuid primary key default gen_random_uuid(),
-  business_id  uuid not null references tenant.business(id) on delete cascade,
+  merchant_id  uuid not null references merchant.merchant(id) on delete cascade,
   name         text not null,
   address      text,
   lat          numeric(9,6),          -- captured pin (all prod locations have coords); not derived
   lng          numeric(10,6),
-  timezone     text,                  -- null = inherit business.timezone
-  -- Same inherit rule as `timezone` one line up, for the same reason: a branch is
-  -- usually the café's hours and sometimes not (a mall branch closes with the mall).
-  -- NULL = inherit business.open_hours; '{}' is NOT the same thing — that is an
-  -- explicit "no windows", i.e. closed. Same jsonb shape as business.open_hours.
+  timezone     text,                  -- null = inherit merchant.timezone
+  -- Same inherit rule as `timezone` one line up, for the same reason: a location is
+  -- usually the café's hours and sometimes not (a mall location closes with the mall).
+  -- NULL = inherit merchant.open_hours; '{}' is NOT the same thing — that is an
+  -- explicit "no windows", i.e. closed. Same jsonb shape as merchant.open_hours.
   --
   -- WE DIVERGE FROM THE INDUSTRY HERE, deliberately. Square has no hours on `Merchant`
   -- at all — only `Location.business_hours`. Google puts `regularHours` on the Location,
   -- Toast on the restaurant, DoorDash on the store. None of them inherit; the physical
-  -- place always carries its own hours. We inherit because (a) `branch.timezone` one line
+  -- place always carries its own hours. We inherit because (a) `location.timezone` one line
   -- up already does, and two adjacent columns with opposite rules is worse than one
-  -- unusual rule; (b) almost every tenant is a single café, and per-branch-only means
+  -- unusual rule; (b) almost every merchant is a single café, and per-location-only means
   -- every one of them writes an override that says nothing; (c) the dashboard has ONE
   -- Hours screen, so a chain with uniform hours edits one row, not N. The cost is real
-  -- and already paid: reconcile_v3 carries a `pointless_branch_overrides` invariant that
+  -- and already paid: reconcile_v3 carries a `pointless_location_overrides` invariant that
   -- only exists because this shape can produce them, and the API returns `hoursLevel` so
   -- a reader always knows which level answered.
-  open_hours   jsonb                  -- null = inherit business.open_hours
+  open_hours   jsonb                  -- null = inherit merchant.open_hours
                  check (open_hours is null or jsonb_typeof(open_hours) = 'object'),
   status       text not null default 'active' check (status in ('active','closed')),
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
   -- Redundant against the PK, and load-bearing: it lets child tables carry a COMPOSITE
-  -- foreign key (business_id, branch_id) so the database itself refuses a row whose
-  -- branch belongs to another café. A device charging at someone else's branch is the
+  -- foreign key (merchant_id, location_id) so the database itself refuses a row whose
+  -- location belongs to another café. A device charging at someone else's location is the
   -- exact failure this prevents.
-  unique (business_id, id)
+  unique (merchant_id, id)
 );
 -- Search via expression index, NOT a stored search_text column.
-create index branch_name_lower on tenant.branch (lower(name));
-comment on column tenant.branch.open_hours is
-  'This branch''s hours, or NULL to inherit tenant.business.open_hours. Mirrors branch.timezone.';
+create index location_name_lower on merchant.location (lower(name));
+comment on column merchant.location.open_hours is
+  'This location''s hours, or NULL to inherit merchant.merchant.open_hours. Mirrors location.timezone.';
 
 -- A KDS station: the board a device pairs to. CONFIG — the owner creates and renames
 -- these at business cadence, never by migration (ORDER_MODEL.md §5). The order itself
 -- carries no station; the KDS scopes by the device's paired station at query time.
 --
--- This table was built with only (branch_id, name) and the backfill dropped the rest as
+-- This table was built with only (location_id, name) and the backfill dropped the rest as
 -- "no target col". That was wrong on all four counts — every dropped column has a live
 -- consumer in kds.repository.ts, and the shape was wrong besides:
---   business_id -> the repository scopes EVERY station query by tenant, and without the
---     column the only isolation was a join through branch, which cannot express a
---     station that belongs to no branch (below).
---   branch_id is NULLABLE -> NULL means "every branch". listStations/loadStation treat a
---     missing location as unscoped, and findActiveStationByKey matches the branch with
+--   merchant_id -> the repository scopes EVERY station query by merchant, and without the
+--     column the only isolation was a join through location, which cannot express a
+--     station that belongs to no location (below).
+--   location_id is NULLABLE -> NULL means "every location". listStations/loadStation treat a
+--     missing location as unscoped, and findActiveStationByKey matches the location with
 --     `IS NOT DISTINCT FROM` precisely to reach these. NOT NULL made them unrepresentable.
 --   key -> the stable config handle the dashboard creates and looks stations up by
 --     (findActiveStationByKey). Named `key`, not `station_key`: no stutter inside its own
@@ -174,10 +174,10 @@ comment on column tenant.branch.open_hours is
 --   sort_order -> the board order the owner sets; listStations orders by it.
 -- `metadata` is deliberately NOT carried (the one source row's is empty, and a jsonb junk
 -- drawer is exactly what the naming rules forbid).
-create table tenant.station (
+create table merchant.station (
   id          uuid primary key default gen_random_uuid(),
-  business_id uuid not null references tenant.business(id) on delete cascade,
-  branch_id   uuid references tenant.branch(id) on delete cascade,  -- NULL = every branch
+  merchant_id uuid not null references merchant.merchant(id) on delete cascade,
+  location_id   uuid references merchant.location(id) on delete cascade,  -- NULL = every location
   key         text not null,
   name        text not null,
   status      text not null default 'active'
@@ -186,17 +186,17 @@ create table tenant.station (
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
--- One live station per key per branch scope. NULLS NOT DISTINCT (pg15+) is what makes
--- the tenant-wide scope work: with default NULL semantics two branch-less stations could
+-- One live station per key per location scope. NULLS NOT DISTINCT (pg15+) is what makes
+-- the merchant-wide scope work: with default NULL semantics two location-less stations could
 -- both claim key 'cafe', and findActiveStationByKey would return an arbitrary one.
 -- Archived rows are excluded so a key can be reused after the station is retired.
-create unique index station_business_branch_key_uidx
-  on tenant.station (business_id, branch_id, key) nulls not distinct
+create unique index station_merchant_location_key_uidx
+  on merchant.station (merchant_id, location_id, key) nulls not distinct
   where status <> 'archived';
 
-create table tenant.integration (
+create table merchant.integration (
   id                  uuid primary key default gen_random_uuid(),
-  business_id         uuid not null references tenant.business(id) on delete cascade,
+  merchant_id         uuid not null references merchant.merchant(id) on delete cascade,
   provider            text not null
                         check (provider in ('zettle','square','umi_pos','twilio',
                                             'google_wallet','apple_wallet','voyage')),
@@ -207,28 +207,28 @@ create table tenant.integration (
   connected_at        timestamptz not null default now(),
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now(),
-  unique (business_id, provider),
-  -- Cross-tenant guard: two businesses may NEVER claim the same external account.
+  unique (merchant_id, provider),
+  -- Cross-merchant guard: two merchants may NEVER claim the same external account.
   -- For provider='twilio' that account IS the inbound WhatsApp sender number, so a
   -- collision would route one café's customer messages to another café. NULLs stay
-  -- distinct in Postgres, so a business with no number yet is unaffected.
+  -- distinct in Postgres, so a merchant with no number yet is unaffected.
   unique (provider, external_account_id)
 );
-comment on table tenant.integration is
+comment on table merchant.integration is
   'Generic external connection (POS sync / message sender / wallet issuer / AI). '
   'Umi''s own POS is just provider=''umi_pos''. Sync cursor lives in runtime.integration_sync.';
 
-create table tenant.staff (
+create table merchant.staff (
   id           uuid primary key default gen_random_uuid(),
-  business_id  uuid not null references tenant.business(id) on delete cascade,
-  branch_id    uuid references tenant.branch(id),
+  merchant_id  uuid not null references merchant.merchant(id) on delete cascade,
+  location_id    uuid references merchant.location(id),
   user_id      uuid not null references umi.user(id),   -- credentials live on umi.user
   position     text,
   hired_at     date,
   status       text not null default 'active' check (status in ('active','inactive')),
   -- ---- Operator PIN ----------------------------------------------------------
   -- The till PIN. It is NOT a second password: the enrolled DEVICE authorizes the
-  -- channel (may this terminal transact at all, at this branch), and the PIN authorizes
+  -- channel (may this terminal transact at all, at this location), and the PIN authorizes
   -- the privileged ACTION — void, refund, over-threshold discount, drawer open — and
   -- names the actor for the audit chain. Salt and hash are stored; the PIN itself never
   -- is, and never reaches the device's disk.
@@ -238,7 +238,7 @@ create table tenant.staff (
   pin_locked_until     timestamptz,   -- set on lockout; a til cannot be brute-forced
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
-  unique (business_id, user_id),
+  unique (merchant_id, user_id),
   constraint staff_operator_pin_hash_ck
     check (operator_pin_hash is null or operator_pin_hash ~ '^[a-f0-9]{128}$'),
   constraint staff_operator_pin_salt_ck
@@ -249,25 +249,25 @@ create table tenant.staff (
     check ((operator_pin_salt is null) = (operator_pin_hash is null)),
   constraint staff_pin_failed_attempts_ck check (pin_failed_attempts between 0 and 10)
 );
-comment on table tenant.staff is
+comment on table merchant.staff is
   'Café employment fact. Login/credentials on umi.user; role/authority on umi.user_role.';
 
 -- ----------------------------------------------------------------------------
 -- CUSTOMER  ·  the person  →  contact  ·  how to reach them
 -- ----------------------------------------------------------------------------
 
-create table tenant.customer (
+create table merchant.customer (
   id             uuid primary key default gen_random_uuid(),
-  business_id    uuid not null references tenant.business(id) on delete cascade,
+  merchant_id    uuid not null references merchant.merchant(id) on delete cascade,
   name           text,
   birthday       date,                       -- was born_at (a date, not a timestamp)
   loyalty_status text not null default 'active'
                    check (loyalty_status in ('active','inactive')),
-  merged_into_id uuid references tenant.customer(id),   -- soft-key dedup target
+  merged_into_id uuid references merchant.customer(id),   -- soft-key dedup target
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
 );
-comment on column tenant.customer.merged_into_id is
+comment on column merchant.customer.merged_into_id is
   'Non-null = this duplicate was merged into that customer (phone is an unverified soft key).';
 
 -- Resolve a customer to the SURVIVOR at the end of its merge chain. Reads must never
@@ -276,25 +276,25 @@ comment on column tenant.customer.merged_into_id is
 -- Nothing writes merged_into_id yet (there is no merge flow), so the read side has to
 -- be the robust one. Depth-capped: a cycle (A->B->A) can only ever be created by a bug,
 -- and this must degrade to a wrong-but-terminating answer, never an infinite walk.
-create or replace function tenant.customer_survivor(p_customer_id uuid) returns uuid
+create or replace function merchant.customer_survivor(p_customer_id uuid) returns uuid
   language sql stable
   set search_path = pg_catalog as $$
   with recursive walk(id, merged_into_id, depth) as (
     select c.id, c.merged_into_id, 0
-      from tenant.customer c where c.id = p_customer_id
+      from merchant.customer c where c.id = p_customer_id
     union all
     select c.id, c.merged_into_id, w.depth + 1
       from walk w
-      join tenant.customer c on c.id = w.merged_into_id
+      join merchant.customer c on c.id = w.merged_into_id
      where w.merged_into_id is not null and w.depth < 16
   )
   select id from walk order by depth desc limit 1;
 $$;
 
-create table tenant.contact (
+create table merchant.contact (
   id                uuid primary key default gen_random_uuid(),
-  business_id       uuid not null references tenant.business(id) on delete cascade,
-  customer_id       uuid not null references tenant.customer(id) on delete cascade,
+  merchant_id       uuid not null references merchant.merchant(id) on delete cascade,
+  customer_id       uuid not null references merchant.customer(id) on delete cascade,
   channel_id        uuid not null references umi.channel_type(id),
   raw_phone_number  text,     -- exactly what the customer gave us (phone/whatsapp/sms)
   raw_value         text,     -- non-phone channels (email, ig handle, ...)
@@ -311,26 +311,26 @@ create table tenant.contact (
   constraint contact_verified_needs_proof
     check (not verified or verified_via = 'whatsapp_inbound')
 );
-comment on table  tenant.contact is
+comment on table  merchant.contact is
   'Reachability per channel. NOT uniquely keyed on phone — umi-cash collects an UNVERIFIED '
   'phone (SMS verification disabled, too costly in MX), so numbers are a soft identifier.';
-comment on column tenant.contact.verified is
+comment on column merchant.contact.verified is
   'true only when proven (verified_via=whatsapp_inbound). Gates who is safe to proactively message.';
-create index contact_lookup_idx on tenant.contact (business_id, normalized_value);
+create index contact_lookup_idx on merchant.contact (merchant_id, normalized_value);
 
-create table tenant.customer_fact (
+create table merchant.customer_fact (
   id           uuid primary key default gen_random_uuid(),
-  business_id  uuid not null references tenant.business(id) on delete cascade,
-  customer_id  uuid not null references tenant.customer(id) on delete cascade,
+  merchant_id  uuid not null references merchant.merchant(id) on delete cascade,
+  customer_id  uuid not null references merchant.customer(id) on delete cascade,
   source       text not null default 'preferences'
                  check (source in ('preferences','staff')),
   key          text not null,            -- fact name: 'usual', 'allergies', 'birthday_month'…
   value        jsonb not null,           -- fact value (string or list); jsonb for round-trip fidelity
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
-  unique (business_id, customer_id, source, key)
+  unique (merchant_id, customer_id, source, key)
 );
-comment on table tenant.customer_fact is
+comment on table merchant.customer_fact is
   'The CDP knowledge atom: durable AI-remembered facts about a customer (usuals, allergies, '
   '"birthday in March"). Renamed + reshaped from customer_note, whose ONLY consumer was this '
   'facts path; the order note it was confused with lives on customer_order.notes. Customer 360 '
@@ -340,8 +340,8 @@ comment on table tenant.customer_fact is
 -- LOYALTY
 -- ----------------------------------------------------------------------------
 
-create table tenant.loyalty_program (
-  business_id             uuid primary key references tenant.business(id) on delete cascade,
+create table merchant.loyalty_program (
+  merchant_id             uuid primary key references merchant.merchant(id) on delete cascade,
   card_prefix             text,
   topup_enabled           boolean not null default false,  -- does this café sell stored value (Saldo)?
   stamps_per_reward       integer,                          -- e.g. 8 visits -> 1 reward
@@ -365,13 +365,13 @@ create table tenant.loyalty_program (
   created_at              timestamptz not null default now(),
   updated_at              timestamptz not null default now()
 );
-comment on table tenant.loyalty_program is
+comment on table merchant.loyalty_program is
   '1:1 loyalty config + wallet-pass presentation for a café (was loyalty_settings).';
 
-create table tenant.loyalty_card (
+create table merchant.loyalty_card (
   id                   uuid primary key default gen_random_uuid(),
-  business_id          uuid not null references tenant.business(id) on delete cascade,
-  customer_id          uuid not null references tenant.customer(id) on delete cascade,
+  merchant_id          uuid not null references merchant.merchant(id) on delete cascade,
+  customer_id          uuid not null references merchant.customer(id) on delete cascade,
   card_number          text,          -- human-facing loyalty number (displayed)
   qr_token             text,          -- rotatable SCAN secret; distinct from card_number (a scan re-rolls it)
   qr_issued_at         timestamptz,
@@ -381,49 +381,49 @@ create table tenant.loyalty_card (
   issued_at            timestamptz not null default now(),
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now(),
-  unique (business_id, card_number),
-  unique (business_id, qr_token)
+  unique (merchant_id, card_number),
+  unique (merchant_id, qr_token)
 );
-comment on table tenant.loyalty_card is
+comment on table merchant.loyalty_card is
   'IDENTITY + scan/pass state. No cached BALANCE or VISIT count — those DERIVE from the '
   'ledger/visits. qr_token is the rotatable scan secret; lifecycle_message is the last '
   'wallet moment copy (written on scan, read by the pass).';
 
-create table tenant.loyalty_stored_value_ledger (
+create table merchant.loyalty_stored_value_ledger (
   id               uuid primary key default gen_random_uuid(),
-  business_id      uuid not null references tenant.business(id) on delete cascade,
-  card_id          uuid not null references tenant.loyalty_card(id) on delete cascade,
+  merchant_id      uuid not null references merchant.merchant(id) on delete cascade,
+  card_id          uuid not null references merchant.loyalty_card(id) on delete cascade,
   delta            bigint not null,                 -- centavos; +topup / -purchase
   reason           text not null
                      check (reason in ('migration_initial_balance','topup','purchase',
                                        'adjustment','gift_card_redeem','refund')),
   idempotency_key  text,
-  staff_id         uuid references tenant.staff(id),
+  staff_id         uuid references merchant.staff(id),
   external_ref     text,                            -- Zettle payment uuid (was in metadata)
   -- The sale this money movement belongs to. Same reasoning as loyalty_visit.order_id:
   -- a balance that moved for a reason nobody can name is not auditable. NULL for a
   -- top-up at the counter or a migration row, which have no order.
-  -- FK added below, after tenant.customer_order exists (forward reference in this file).
+  -- FK added below, after merchant.customer_order exists (forward reference in this file).
   order_id         uuid,
   note             text,
   occurred_at      timestamptz not null default now(),
   created_at       timestamptz not null default now(),
-  unique (business_id, idempotency_key)
+  unique (merchant_id, idempotency_key)
 );
 create index loyalty_ledger_order_idx
-  on tenant.loyalty_stored_value_ledger (business_id, order_id) where order_id is not null;
-comment on table tenant.loyalty_stored_value_ledger is
+  on merchant.loyalty_stored_value_ledger (merchant_id, order_id) where order_id is not null;
+comment on table merchant.loyalty_stored_value_ledger is
   'MONEY (Saldo). balance = SUM(delta). Append-only. Was misnamed card_ledger.';
 create trigger stored_value_ledger_append_only
-  before update or delete on tenant.loyalty_stored_value_ledger
-  for each row execute function tenant.tg_append_only();
+  before update or delete on merchant.loyalty_stored_value_ledger
+  for each row execute function merchant.tg_append_only();
 
-create table tenant.loyalty_visit (
+create table merchant.loyalty_visit (
   id           uuid primary key default gen_random_uuid(),
-  business_id  uuid not null references tenant.business(id) on delete cascade,
-  card_id      uuid not null references tenant.loyalty_card(id) on delete cascade,
-  branch_id    uuid references tenant.branch(id),
-  staff_id     uuid references tenant.staff(id),
+  merchant_id  uuid not null references merchant.merchant(id) on delete cascade,
+  card_id      uuid not null references merchant.loyalty_card(id) on delete cascade,
+  location_id    uuid references merchant.location(id),
+  staff_id     uuid references merchant.staff(id),
   source       text not null default 'scan'
                  check (source in ('scan','manual','migration','pos')),
   -- WHAT THE STAMP BOUGHT. Until this column existed a visit knew that someone came in
@@ -431,19 +431,19 @@ create table tenant.loyalty_visit (
   -- no basket could ever be attributed to a member. A POS sale writes the order here in
   -- the same transaction that mints the stamp. NULL for every non-POS source: a scan at
   -- the counter has no order behind it, and inventing one would be a lie.
-  -- FK added below, after tenant.customer_order exists (forward reference in this file).
+  -- FK added below, after merchant.customer_order exists (forward reference in this file).
   order_id     uuid,
   occurred_at  timestamptz not null default now(),
   created_at   timestamptz not null default now()
 );
 -- "Which visits came from a sale, newest first" — the attribution read.
-create index loyalty_visit_order_idx on tenant.loyalty_visit (business_id, order_id)
+create index loyalty_visit_order_idx on merchant.loyalty_visit (merchant_id, order_id)
   where order_id is not null;
-comment on table tenant.loyalty_visit is 'One row per stamp. Stamp count = count(*), never a cached column.';
+comment on table merchant.loyalty_visit is 'One row per stamp. Stamp count = count(*), never a cached column.';
 
-create table tenant.loyalty_reward (
+create table merchant.loyalty_reward (
   id               uuid primary key default gen_random_uuid(),
-  business_id      uuid not null references tenant.business(id) on delete cascade,
+  merchant_id      uuid not null references merchant.merchant(id) on delete cascade,
   name             text not null,
   description      text,      -- café-authored copy for the reward (umi-cash reward config)
   type             text not null
@@ -455,21 +455,21 @@ create table tenant.loyalty_reward (
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
 );
-comment on table tenant.loyalty_reward is
+comment on table merchant.loyalty_reward is
   'The rewards a café offers (was reward_rule). "birthday" is a TYPE here, not a separate table.';
 
-create table tenant.loyalty_redemption (
+create table merchant.loyalty_redemption (
   id           uuid primary key default gen_random_uuid(),
-  business_id  uuid not null references tenant.business(id) on delete cascade,
-  card_id      uuid not null references tenant.loyalty_card(id) on delete cascade,
-  reward_id    uuid references tenant.loyalty_reward(id),
+  merchant_id  uuid not null references merchant.merchant(id) on delete cascade,
+  card_id      uuid not null references merchant.loyalty_card(id) on delete cascade,
+  reward_id    uuid references merchant.loyalty_reward(id),
   reason       text not null check (reason in ('stamps','birthday','manual')),
   value        bigint,        -- centavos granted
-  staff_id     uuid references tenant.staff(id),
+  staff_id     uuid references merchant.staff(id),
   occurred_at  timestamptz not null default now(),
   created_at   timestamptz not null default now()
 );
-comment on table tenant.loyalty_redemption is
+comment on table merchant.loyalty_redemption is
   'A reward was consumed (the event). Birthday once-per-year is enforced by the app/a partial unique.';
 
 -- A per-card BIRTHDAY entitlement, distinct from loyalty_reward (the rule) and from
@@ -480,48 +480,48 @@ comment on table tenant.loyalty_redemption is
 -- loyalty_redemption row: birthday claims would corrupt the stamp-reward count (pending =
 -- floor(visits/n) - COUNT(redemption)). ISSUANCE (reading the birthday, once/day) is the
 -- legacy umi-cash wallet-push cron, not yet ported — this table is only read/redeemed here.
-create table tenant.loyalty_birthday_grant (
+create table merchant.loyalty_birthday_grant (
   id          uuid primary key default gen_random_uuid(),
-  business_id uuid not null references tenant.business(id) on delete cascade,
-  card_id     uuid not null references tenant.loyalty_card(id) on delete cascade,
+  merchant_id uuid not null references merchant.merchant(id) on delete cascade,
+  card_id     uuid not null references merchant.loyalty_card(id) on delete cascade,
   year        integer not null,          -- the birthday year this grant is for
   status      text not null default 'active' check (status in ('active','redeemed','expired')),
   issued_at   timestamptz not null default now(),
   expires_at  timestamptz not null,
   redeemed_at timestamptz,
   created_at  timestamptz not null default now(),
-  unique (business_id, card_id, year)     -- one birthday grant per card per year
+  unique (merchant_id, card_id, year)     -- one birthday grant per card per year
 );
 create index loyalty_birthday_grant_active_idx
-  on tenant.loyalty_birthday_grant (business_id, card_id)
+  on merchant.loyalty_birthday_grant (merchant_id, card_id)
   where status = 'active';
 
-create table tenant.loyalty_gift_card (
+create table merchant.loyalty_gift_card (
   id           uuid primary key default gen_random_uuid(),
-  business_id  uuid not null references tenant.business(id) on delete cascade,
+  merchant_id  uuid not null references merchant.merchant(id) on delete cascade,
   code         text not null,
   status       text not null default 'active' check (status in ('active','redeemed','void')),
   issued_at    timestamptz not null default now(),
   created_at   timestamptz not null default now(),
-  unique (business_id, code)
+  unique (merchant_id, code)
 );
 
-create table tenant.loyalty_gift_card_ledger (
+create table merchant.loyalty_gift_card_ledger (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete cascade,
-  gift_card_id  uuid not null references tenant.loyalty_gift_card(id) on delete cascade,
+  merchant_id   uuid not null references merchant.merchant(id) on delete cascade,
+  gift_card_id  uuid not null references merchant.loyalty_gift_card(id) on delete cascade,
   delta         bigint not null,   -- centavos
   reason        text not null check (reason in ('issue','redeem','adjustment')),
   occurred_at   timestamptz not null default now(),
   created_at    timestamptz not null default now()
 );
 create trigger gift_card_ledger_append_only
-  before update or delete on tenant.loyalty_gift_card_ledger
-  for each row execute function tenant.tg_append_only();
+  before update or delete on merchant.loyalty_gift_card_ledger
+  for each row execute function merchant.tg_append_only();
 
-create table tenant.loyalty_wallet_pass (
+create table merchant.loyalty_wallet_pass (
   id                 uuid primary key default gen_random_uuid(),
-  card_id            uuid not null references tenant.loyalty_card(id) on delete cascade,
+  card_id            uuid not null references merchant.loyalty_card(id) on delete cascade,
   platform           text not null check (platform in ('apple','google')),
   external_object_id text,          -- Google object id / Apple serial
   status             text not null default 'active' check (status in ('active','removed')),
@@ -534,9 +534,9 @@ create table tenant.loyalty_wallet_pass (
 -- COMMERCE  (generic — no "menu")
 -- ----------------------------------------------------------------------------
 
-create table tenant.product_category (
+create table merchant.product_category (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete cascade,
+  merchant_id   uuid not null references merchant.merchant(id) on delete cascade,
   name          text not null,
   display_order integer not null default 0,
   created_at    timestamptz not null default now()
@@ -544,14 +544,14 @@ create table tenant.product_category (
 -- The catalog sync gets-or-creates a category BY NAME on every run. build-v2 keyed
 -- that on a slug column (`key`) which build-v3 correctly does not have — the name is
 -- the identity. Without this, the upsert has no conflict target and a re-sync forks
--- a second "Bebidas". 0 duplicate (business_id, name) pairs in the source.
-create unique index product_category_business_name_uidx
-  on tenant.product_category (business_id, name);
+-- a second "Bebidas". 0 duplicate (merchant_id, name) pairs in the source.
+create unique index product_category_merchant_name_uidx
+  on merchant.product_category (merchant_id, name);
 
-create table tenant.product (
+create table merchant.product (
   id           uuid primary key default gen_random_uuid(),
-  business_id  uuid not null references tenant.business(id) on delete cascade,
-  category_id  uuid references tenant.product_category(id),
+  merchant_id  uuid not null references merchant.merchant(id) on delete cascade,
+  category_id  uuid references merchant.product_category(id),
   name         text not null,
   description  text,
   price        bigint not null default 0,   -- centavos
@@ -569,44 +569,44 @@ create table tenant.product (
 );
 -- Scanning a barcode must resolve to exactly one product, or the till has to ask the
 -- cashier which one — which is not a thing a queue tolerates.
-create unique index product_business_sku_uidx
-  on tenant.product (business_id, sku) where sku is not null;
-create unique index product_business_barcode_uidx
-  on tenant.product (business_id, barcode) where barcode is not null;
+create unique index product_merchant_sku_uidx
+  on merchant.product (merchant_id, sku) where sku is not null;
+create unique index product_merchant_barcode_uidx
+  on merchant.product (merchant_id, barcode) where barcode is not null;
 -- The Zettle sync identifies a product by its external id. build-v2 kept that in
 -- `metadata->>'zettle_uuid'` with no constraint, so the sync had to SELECT-then-write
 -- and two concurrent runs could both miss and both INSERT. external_ref is the typed
 -- home; this makes the upsert atomic. Partial: hand-created products have no ref.
 -- 136/136 source products carry one, with 0 duplicates.
 create unique index product_external_ref_uidx
-  on tenant.product (business_id, external_ref)
+  on merchant.product (merchant_id, external_ref)
   where external_ref is not null;
-comment on column tenant.product.price is
+comment on column merchant.product.price is
   'Centavos. Name embeddings live in runtime.product_embedding, not here.';
 
-create table tenant.product_option_group (
+create table merchant.product_option_group (
   id          uuid primary key default gen_random_uuid(),
-  product_id  uuid not null references tenant.product(id) on delete cascade,
+  product_id  uuid not null references merchant.product(id) on delete cascade,
   name        text not null,
   min_select  integer not null default 0,
   max_select  integer,
   created_at  timestamptz not null default now()
 );
 
-create table tenant.product_modifier (
+create table merchant.product_modifier (
   id              uuid primary key default gen_random_uuid(),
-  option_group_id uuid not null references tenant.product_option_group(id) on delete cascade,
+  option_group_id uuid not null references merchant.product_option_group(id) on delete cascade,
   name            text not null,
   price_delta     bigint not null default 0,   -- centavos
   created_at      timestamptz not null default now()
 );
 
-create table tenant.product_branch_availability (
-  product_id  uuid not null references tenant.product(id) on delete cascade,
-  branch_id   uuid not null references tenant.branch(id) on delete cascade,
+create table merchant.product_location_availability (
+  product_id  uuid not null references merchant.product(id) on delete cascade,
+  location_id   uuid not null references merchant.location(id) on delete cascade,
   -- ONE availability column. This replaced a boolean `available`, because "not
   -- available" turned out to be four different answers the till has to show
-  -- differently: 86'd until tomorrow, not on this branch's menu at all, disabled by
+  -- differently: 86'd until tomorrow, not on this location's menu at all, disabled by
   -- the owner, or not on sale yet. A boolean plus a reason column would be the same
   -- fact in two places.
   status      text not null default 'enabled'
@@ -614,21 +614,21 @@ create table tenant.product_branch_availability (
                                   'out_of_assortment','future_availability')),
   available_from timestamptz,   -- only meaningful with status='future_availability'
   updated_at  timestamptz not null default now(),
-  primary key (product_id, branch_id),
+  primary key (product_id, location_id),
   constraint product_availability_future_ck
     check ((status = 'future_availability') = (available_from is not null))
 );
-comment on table tenant.product_branch_availability is
-  'Per-branch "86''d" state. Absent row = available (default).';
+comment on table merchant.product_location_availability is
+  'Per-location "86''d" state. Absent row = available (default).';
 
 -- ----------------------------------------------------------------------------
 -- MESSAGING  (channel_account dissolved: customer reach = contact, sender = integration)
 -- ----------------------------------------------------------------------------
 
-create table tenant.conversation (
+create table merchant.conversation (
   id              uuid primary key default gen_random_uuid(),
-  business_id     uuid not null references tenant.business(id) on delete cascade,
-  customer_id     uuid references tenant.customer(id),
+  merchant_id     uuid not null references merchant.merchant(id) on delete cascade,
+  customer_id     uuid references merchant.customer(id),
   channel_id      uuid not null references umi.channel_type(id),
   status          text not null default 'open' check (status in ('open','closed')),
   outcome         text check (outcome in ('converted','abandoned','resolved','unresolved')),
@@ -639,9 +639,9 @@ create table tenant.conversation (
   created_at      timestamptz not null default now()
 );
 
-create table tenant.message (
+create table merchant.message (
   id                  uuid primary key default gen_random_uuid(),
-  conversation_id     uuid not null references tenant.conversation(id) on delete cascade,
+  conversation_id     uuid not null references merchant.conversation(id) on delete cascade,
   direction           text not null check (direction in ('inbound','outbound')),
   sender              text not null check (sender in ('customer','bot','staff','system')),
   body                text,
@@ -650,16 +650,16 @@ create table tenant.message (
   occurred_at         timestamptz not null default now(),
   created_at          timestamptz not null default now()
 );
-comment on column tenant.message.body is 'Body embeddings live in runtime.message_embedding, not here.';
+comment on column merchant.message.body is 'Body embeddings live in runtime.message_embedding, not here.';
 -- provider_message_id (Twilio SID) is the crash-safe ingress idempotency key: the user-message
 -- INSERT catches this unique violation to drop a re-delivered webhook. runtime.inbound_event is
 -- only an observability gate (written before the work), so it cannot be the authoritative dedup.
 create unique index message_provider_message_id_uidx
-  on tenant.message (provider_message_id) where provider_message_id is not null;
+  on merchant.message (provider_message_id) where provider_message_id is not null;
 
-create table tenant.knowledge_document (
+create table merchant.knowledge_document (
   id           uuid primary key default gen_random_uuid(),
-  business_id  uuid not null references tenant.business(id) on delete cascade,
+  merchant_id  uuid not null references merchant.merchant(id) on delete cascade,
   title        text not null,
   source       text,
   uri          text,
@@ -667,9 +667,9 @@ create table tenant.knowledge_document (
   updated_at   timestamptz not null default now()
 );
 
-create table tenant.knowledge_chunk (
+create table merchant.knowledge_chunk (
   id           uuid primary key default gen_random_uuid(),
-  document_id  uuid not null references tenant.knowledge_document(id) on delete cascade,
+  document_id  uuid not null references merchant.knowledge_document(id) on delete cascade,
   ordinal      integer not null,
   body         text not null,
   created_at   timestamptz not null default now(),
@@ -680,12 +680,12 @@ create table tenant.knowledge_chunk (
 -- ORDERS
 -- ----------------------------------------------------------------------------
 
-create table tenant.customer_order (
+create table merchant.customer_order (
   id               uuid primary key default gen_random_uuid(),
-  business_id      uuid not null references tenant.business(id) on delete cascade,
-  branch_id        uuid references tenant.branch(id),
-  customer_id      uuid references tenant.customer(id),      -- null = anonymous walk-in
-  conversation_id  uuid references tenant.conversation(id),  -- set when the order came from a chat
+  merchant_id      uuid not null references merchant.merchant(id) on delete cascade,
+  location_id        uuid references merchant.location(id),
+  customer_id      uuid references merchant.customer(id),      -- null = anonymous walk-in
+  conversation_id  uuid references merchant.conversation(id),  -- set when the order came from a chat
   source           text not null check (source in ('whatsapp','pos','web','dashboard')),
   fulfillment_type text check (fulfillment_type in ('pickup','dine_in','delivery')),
   status           text not null default 'placed'
@@ -704,8 +704,8 @@ create table tenant.customer_order (
   pickup_person    text,                          -- who collects the order, when not the buyer
   external_ref     text,                          -- Zettle order id when synced; also the bot's idempotency key
   placed_at        timestamptz not null default now(),
-  -- WHICH TRADING DAY THIS SALE BELONGS TO. Derived by tenant.tg_business_date from
-  -- placed_at, the business timezone and business.business_day_start — never supplied
+  -- WHICH TRADING DAY THIS SALE BELONGS TO. Derived by merchant.tg_business_date from
+  -- placed_at, the merchant timezone and merchant.business_day_start — never supplied
   -- by a caller, because a till whose clock has drifted must not be able to move a sale
   -- into yesterday.
   --
@@ -718,16 +718,16 @@ create table tenant.customer_order (
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
   -- NOTE: no stored `total`. The order's working/owed total is DERIVED (Σ live
-  -- lines) via tenant.order_total below — it cannot drift and self-heals on a
-  -- void. Money-truth for a settled order lives on tenant.payment, not here.
+  -- lines) via merchant.order_total below — it cannot drift and self-heals on a
+  -- void. Money-truth for a settled order lives on merchant.payment, not here.
 );
-comment on column tenant.customer_order.notes is
+comment on column merchant.customer_order.notes is
   'Order-level note captured at checkout. This is the NAMED column ORDER_MODEL.md §5 sanctions '
   '("add a named customer_order.notes when a real consumer earns it") — NOT a revived free-text '
   'blob. Both ends exist today: the WhatsApp checkout writes it, and the FROZEN iPad KDS ticket '
   'renders it to the barista as `customer_note`. Per-line customization belongs on '
-  'order_item.notes; a lasting customer preference belongs on tenant.customer_fact.';
-comment on column tenant.customer_order.pickup_person is
+  'order_item.notes; a lasting customer preference belongs on merchant.customer_fact.';
+comment on column merchant.customer_order.pickup_person is
   'Who collects the order, when that is not the buyer. Also a frozen KDS ticket field. Never '
   'populated in the source (0/51) but written by the WhatsApp checkout, so it gets a real column '
   'rather than a hard-coded null in the contract.';
@@ -746,7 +746,7 @@ comment on column tenant.customer_order.pickup_person is
 -- Partial, so the many orders with no external ref are unconstrained.
 -- ORIGIN IDENTITY, not a retry key. `external_ref` answers "which record is this in
 -- the system the order came FROM" (a Zettle payment id, an aggregator's order number),
--- and it is unique per business because one source record is one order.
+-- and it is unique per merchant because one source record is one order.
 --
 -- It is NOT the idempotency key, though it was pressed into service as one when the
 -- WhatsApp checkout turned out to be a live injection path with nothing to ON CONFLICT
@@ -754,17 +754,17 @@ comment on column tenant.customer_order.pickup_person is
 -- have to agree on a namespace for a column that means "their id, not ours", and a
 -- retry key must be chosen by the CALLER before the call, which an origin id is not.
 --
--- Retry identity lives in tenant.business_command — `unique (business_id,
+-- Retry identity lives in merchant.business_command — `unique (merchant_id,
 -- idempotency_key)` plus a request fingerprint, so a replay with a different body is a
 -- conflict rather than a second charge. Order writes go through it.
 create unique index customer_order_external_ref_uidx
-  on tenant.customer_order (business_id, external_ref)
+  on merchant.customer_order (merchant_id, external_ref)
   where external_ref is not null;
 
-create table tenant.order_item (
+create table merchant.order_item (
   id            uuid primary key default gen_random_uuid(),
-  order_id      uuid not null references tenant.customer_order(id) on delete cascade,
-  product_id    uuid references tenant.product(id),
+  order_id      uuid not null references merchant.customer_order(id) on delete cascade,
+  product_id    uuid references merchant.product(id),
   name          text not null,              -- snapshot at order time
   variant_name  text,                       -- the CHOSEN variant, snapshot ("Grande", "Oat milk")
   quantity      integer not null default 1 check (quantity > 0),
@@ -775,7 +775,7 @@ create table tenant.order_item (
   -- device login because the device IS a station; a POS rings up a latte (bar) and a
   -- panini (grill) on one ticket, away from either, so the routing has to live on the
   -- line. The §2 grain ruling always said it belonged here.
-  station_id    uuid references tenant.station(id),
+  station_id    uuid references merchant.station(id),
   voided_at     timestamptz,                -- void tombstone; a live line = voided_at IS NULL
   void_reason   text,                       -- why: mistake · duplicate · customer_changed · test
   notes         text,
@@ -788,14 +788,14 @@ create table tenant.order_item (
   -- inventory is real: a VOID returns the item to stock because it was never made, a
   -- COMP does not because you served it and ate the cost. Encoding both as a void makes
   -- a free-text reason load-bearing for inventory. A comp is a 100%-off discount and
-  -- now lives in tenant.order_discount, exactly as ORDER_MODEL §3 describes it.
+  -- now lives in merchant.order_discount, exactly as ORDER_MODEL §3 describes it.
   constraint order_item_comp_is_not_a_void
     check (void_reason is null or lower(void_reason) <> 'comp')
 );
-create index order_item_station_idx on tenant.order_item (station_id)
+create index order_item_station_idx on merchant.order_item (station_id)
   where station_id is not null and voided_at is null;
-create index tenant_order_item_order_idx on tenant.order_item (order_id);
-comment on column tenant.order_item.name is
+create index merchant_order_item_order_idx on merchant.order_item (order_id);
+comment on column merchant.order_item.name is
   'Snapshot at order time — a line must not change if the product is later renamed.';
 -- variant_name + display_order are NAMED columns for the same reason customer_order
 -- gained notes/pickup_person (2026-07-21): a live reader had already earned them.
@@ -814,14 +814,14 @@ comment on column tenant.order_item.name is
 --     the ticket SCRAMBLED. It is also the harder failure: the frozen Swift model decodes
 --     it as a NON-OPTIONAL Int, so a missing value fails the whole payload and the KDS
 --     goes BLANK rather than mis-ordered.
-comment on column tenant.order_item.variant_name is
+comment on column merchant.order_item.variant_name is
   'The chosen variant, snapshot at order time. Read by the frozen iPad ticket and by the '
   'reorder re-pricer, which matches it against the live catalog — so it is its own column, '
   'never folded into notes.';
-comment on column tenant.order_item.display_order is
+comment on column merchant.order_item.display_order is
   'Line position on the ticket, 0-based. Carried, not derived: source insert timestamps tie '
   'within an order, so any derived ordinal falls back to random uuid order.';
-comment on column tenant.order_item.voided_at is
+comment on column merchant.order_item.voided_at is
   'A line is a void (Toast/Square term), not an order cancel. Amendments never edit a line: '
   'void the old (set this), add a new line. NULL = live. Voided lines survive as waste/history '
   'and fall out of the derived order total. A void of an ALREADY-FIRED line (see order_event) '
@@ -834,9 +834,9 @@ comment on column tenant.order_item.voided_at is
 -- A priced line is an immutable snapshot; the ONLY change allowed is voiding it ONCE
 -- (voided_at NULL -> set, with a reason). Amendments are void-then-add, never an
 -- in-place edit, and a line is never DELETED — voiding preserves the waste/history the
--- owner must see (same append-only stance tenant.tg_append_only enforces on the money
+-- owner must see (same append-only stance merchant.tg_append_only enforces on the money
 -- ledgers, which likewise block delete despite an on-delete-cascade parent).
-create or replace function tenant.tg_order_item_void_only() returns trigger
+create or replace function merchant.tg_order_item_void_only() returns trigger
   language plpgsql
   set search_path = pg_catalog as $$   -- pinned: no writable schema on the path
 begin
@@ -860,13 +860,13 @@ begin
   return new;   -- permitted: set voided_at / void_reason (the void), or edit notes
 end $$;
 create trigger order_item_void_only
-  before update or delete on tenant.order_item
-  for each row execute function tenant.tg_order_item_void_only();
+  before update or delete on merchant.order_item
+  for each row execute function merchant.tg_order_item_void_only();
 
 -- ONE place increments the version: any update of the order row, whatever caused it.
 -- The order_item trigger below therefore does not increment directly — it touches the
 -- parent and lets this fire, so a line change cannot double-bump.
-create or replace function tenant.tg_customer_order_version() returns trigger
+create or replace function merchant.tg_customer_order_version() returns trigger
   language plpgsql
   set search_path = pg_catalog as $$
 begin
@@ -874,8 +874,8 @@ begin
   return new;
 end $$;
 create trigger customer_order_version
-  before update on tenant.customer_order
-  for each row execute function tenant.tg_customer_order_version();
+  before update on merchant.customer_order
+  for each row execute function merchant.tg_customer_order_version();
 
 -- A LINE change is a change to the ticket, and the kitchen has to learn about it. This
 -- is a trigger rather than app code on purpose: the order has FOUR writers today or soon
@@ -889,31 +889,31 @@ create trigger customer_order_version
 -- are not amendments. Once the ticket exists for the kitchen, an added line IS one. That
 -- test is intrinsic ("is this order visible to a consumer yet"), not a dependency on
 -- which statement the application happens to run first.
-create or replace function tenant.tg_order_item_signal_change() returns trigger
+create or replace function merchant.tg_order_item_signal_change() returns trigger
   language plpgsql
   set search_path = pg_catalog as $$
 declare
   has_events boolean;
 begin
-  select exists (select 1 from tenant.order_event e where e.order_id = new.order_id)
+  select exists (select 1 from merchant.order_event e where e.order_id = new.order_id)
     into has_events;
   if not has_events then
     return null;                      -- initial assembly, not an amendment
   end if;
   -- Touch the parent: bumps version via customer_order_version, and updated_at via the
   -- shared touch trigger. Not an increment here — see above.
-  update tenant.customer_order set updated_at = now() where id = new.order_id;
-  insert into tenant.order_event (order_id, kind) values (new.order_id, 'order_upserted');
+  update merchant.customer_order set updated_at = now() where id = new.order_id;
+  insert into merchant.order_event (order_id, kind) values (new.order_id, 'order_upserted');
   return null;                        -- AFTER trigger; return value is ignored
 end $$;
 create trigger order_item_signal_change
-  after insert or update on tenant.order_item
-  for each row execute function tenant.tg_order_item_signal_change();
+  after insert or update on merchant.order_item
+  for each row execute function merchant.tg_order_item_signal_change();
 
-create table tenant.order_event (
+create table merchant.order_event (
   id          uuid primary key default gen_random_uuid(),
   sequence    bigint generated always as identity,
-  order_id    uuid not null references tenant.customer_order(id) on delete cascade,
+  order_id    uuid not null references merchant.customer_order(id) on delete cascade,
   -- What KIND of change this row records. Two, and deliberately only two:
   --   status_changed — the order advanced along its lifecycle. Carries `status`.
   --   order_upserted — the order's LINES changed (a void, or an added line on an
@@ -926,14 +926,14 @@ create table tenant.order_event (
                 check (kind in ('status_changed','order_upserted')),
   status      text
                 check (status in ('placed','preparing','ready','completed','canceled')),
-  staff_id    uuid references tenant.staff(id),
+  staff_id    uuid references merchant.staff(id),
   occurred_at timestamptz not null default now(),
   -- A transition without a status is meaningless; an upsert with one is a lie. Making
   -- the pairing a constraint means a consumer can trust `kind` without re-checking.
   constraint order_event_status_matches_kind
     check ((kind = 'status_changed') = (status is not null))
 );
-comment on table tenant.order_event is
+comment on table merchant.order_event is
   'The ordered change FEED for pullers: status transitions plus line-level upserts. Still '
   'not a catch-all log — two kinds, both real changes to what a consumer sees. The four '
   'kinds the source table carried were three parts sync-ingestion noise (order_upserted / '
@@ -948,14 +948,14 @@ comment on table tenant.order_event is
 -- source events, 63 occurred_at values are TIED, so a `> timestamp` cursor silently
 -- skips or replays events at every tie — the KDS would drop ticket transitions with
 -- nothing raising an error. Monotonic bigint, assigned by the database, never reused.
-create index tenant_order_event_sequence_idx on tenant.order_event (sequence);
-comment on column tenant.order_event.sequence is
+create index merchant_order_event_sequence_idx on merchant.order_event (sequence);
+comment on column merchant.order_event.sequence is
   'Monotonic cursor for incremental polling (frozen KDS `after_sequence`). Ordering only — '
   'gaps are expected and meaningless; never treat it as a count.';
 
-create table tenant.payment (
+create table merchant.payment (
   id           uuid primary key default gen_random_uuid(),
-  order_id     uuid not null references tenant.customer_order(id) on delete cascade,
+  order_id     uuid not null references merchant.customer_order(id) on delete cascade,
   amount       bigint not null,   -- centavos
   method       text not null check (method in ('cash','card','stored_value','gift_card')),
   external_ref text,               -- Zettle payment uuid
@@ -965,9 +965,9 @@ create table tenant.payment (
   created_at   timestamptz not null default now()
 );
 
-create table tenant.refund (
+create table merchant.refund (
   id          uuid primary key default gen_random_uuid(),
-  payment_id  uuid not null references tenant.payment(id) on delete cascade,
+  payment_id  uuid not null references merchant.payment(id) on delete cascade,
   amount      bigint not null,   -- centavos
   reason      text,
   refunded_at timestamptz not null default now(),
@@ -984,12 +984,12 @@ create table tenant.refund (
 --
 -- A COMP is the 100%-off case, per ORDER_MODEL §3 ("a comp is really a 100 %-off
 -- discount"), and it is always line-level: you comp a dish, not an order.
-create table tenant.order_discount (
+create table merchant.order_discount (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete cascade,
-  order_id      uuid not null references tenant.customer_order(id) on delete cascade,
+  merchant_id   uuid not null references merchant.merchant(id) on delete cascade,
+  order_id      uuid not null references merchant.customer_order(id) on delete cascade,
   -- NULL = the discount applies to the whole order; set = to this one line.
-  order_item_id uuid references tenant.order_item(id) on delete cascade,
+  order_item_id uuid references merchant.order_item(id) on delete cascade,
   kind          text not null check (kind in ('discount','comp','promo')),
   code          text not null,     -- machine key, mirrors DiscountPreview.entries[].code
   label         text not null,     -- what the receipt prints
@@ -1002,31 +1002,31 @@ create table tenant.order_discount (
   constraint order_discount_comp_is_line_level
     check (kind <> 'comp' or order_item_id is not null)
 );
-create index order_discount_order_idx on tenant.order_discount (order_id);
-comment on table tenant.order_discount is
+create index order_discount_order_idx on merchant.order_discount (order_id);
+comment on table merchant.order_discount is
   'Applied discount FACTS (incl. comps as the 100%-off case). The promo RULE engine is '
   'still deferred; this is what a receipt prints and what a total subtracts.';
 
 -- ---- Per-modifier money breakdown ------------------------------------------
 -- Deferred until "a receipt needs \'$4 latte + $0.50 oat\' split out". A POS receipt
--- does. The POS already models this at cart grain in tenant.pos_cart_line_modifier;
+-- does. The POS already models this at cart grain in merchant.pos_cart_line_modifier;
 -- without this table the breakdown collapses into order_item.unit_price at commit and
 -- survives only inside receipt_snapshot.snapshot jsonb — money structure demoted to a
 -- blob the moment it becomes money.
-create table tenant.order_item_modifier (
+create table merchant.order_item_modifier (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete cascade,
-  order_item_id uuid not null references tenant.order_item(id) on delete cascade,
+  merchant_id   uuid not null references merchant.merchant(id) on delete cascade,
+  order_item_id uuid not null references merchant.order_item(id) on delete cascade,
   -- Snapshots, like the line itself: renaming a modifier tomorrow must not rewrite a
   -- receipt printed today. The catalog refs are for analytics, and may go NULL.
-  modifier_id   uuid references tenant.product_modifier(id) on delete set null,
+  modifier_id   uuid references merchant.product_modifier(id) on delete set null,
   name          text not null,
   quantity      integer not null default 1 check (quantity > 0),
   price_delta   bigint not null,   -- centavos, signed: a modifier can subtract
   created_at    timestamptz not null default now()
 );
-create index order_item_modifier_line_idx on tenant.order_item_modifier (order_item_id);
-comment on table tenant.order_item_modifier is
+create index order_item_modifier_line_idx on merchant.order_item_modifier (order_item_id);
+comment on table merchant.order_item_modifier is
   'The receipt-level split of a line price. order_item.unit_price stays the line total; '
   'this explains it.';
 
@@ -1035,19 +1035,19 @@ comment on table tenant.order_item_modifier is
 -- earlier in this file than the order cluster. `on delete set null`: deleting an order
 -- must never delete the stamp a customer earned — they still came in, they still
 -- bought something, and the reward they are owed does not evaporate.
-alter table tenant.loyalty_visit
+alter table merchant.loyalty_visit
   add constraint loyalty_visit_order_fk
-  foreign key (order_id) references tenant.customer_order(id) on delete set null;
-alter table tenant.loyalty_stored_value_ledger
+  foreign key (order_id) references merchant.customer_order(id) on delete set null;
+alter table merchant.loyalty_stored_value_ledger
   add constraint loyalty_ledger_order_fk
-  foreign key (order_id) references tenant.customer_order(id) on delete set null;
+  foreign key (order_id) references merchant.customer_order(id) on delete set null;
 
 -- ----------------------------------------------------------------------------
 -- DERIVED: order projections (see ORDER_MODEL.md §1, §4)
 -- The order carries no stored total and the "ticket" is not a KDS-private query:
 -- both are VIEWS so there is one definition and it cannot drift. security_invoker
 -- so the caller's RLS is enforced on the base tables (an owner-rights view would
--- leak every café's orders to any api session — the audit's cross-tenant leak).
+-- leak every café's orders to any api session — the audit's cross-merchant leak).
 -- ----------------------------------------------------------------------------
 
 -- Working / owed total: Σ live lines (voided_at IS NULL), per order, ANY status.
@@ -1057,21 +1057,21 @@ alter table tenant.loyalty_stored_value_ledger
 -- order it is notional value that did NOT convert (no cash moved). It is deliberately
 -- NOT zeroed for canceled orders (the source keeps that value; the backfill reconciles
 -- against it). It is NOT revenue — never sum it across statuses; revenue aggregates
--- tenant.payment. Consumers wanting "owed right now" filter to open orders (as
+-- merchant.payment. Consumers wanting "owed right now" filter to open orders (as
 -- order_ticket does).
 -- Gross of live lines, minus applied discounts. The two halves are summed in separate
 -- subqueries rather than one join: joining both children to the order multiplies the
 -- rows, and an order with two lines and one discount would count the discount twice.
-create view tenant.order_total with (security_invoker = true) as
+create view merchant.order_total with (security_invoker = true) as
   select o.id          as order_id,
-         o.business_id,
+         o.merchant_id,
          coalesce(li.gross, 0)::bigint                          as gross,
          coalesce(di.discount, 0)::bigint                       as discount,
          (coalesce(li.gross, 0) - coalesce(di.discount, 0))::bigint as total
-    from tenant.customer_order o
+    from merchant.customer_order o
     left join lateral (
       select sum(i.unit_price * i.quantity) as gross
-        from tenant.order_item i
+        from merchant.order_item i
        where i.order_id = o.id and i.voided_at is null
     ) li on true
     left join lateral (
@@ -1085,8 +1085,8 @@ create view tenant.order_total with (security_invoker = true) as
       -- VISIBLE on purpose: it means the pricing path allowed a discount larger than the
       -- bill, which is a service bug worth seeing rather than a number worth clamping.
       select sum(d.amount) as discount
-        from tenant.order_discount d
-        left join tenant.order_item i on i.id = d.order_item_id
+        from merchant.order_discount d
+        left join merchant.order_item i on i.id = d.order_item_id
        where d.order_id = o.id
          and (d.order_item_id is null or i.voided_at is null)
     ) di on true;
@@ -1124,10 +1124,10 @@ create view tenant.order_total with (security_invoker = true) as
 -- prunes an unused subquery from the target list (a header-only read plans with no
 -- SubPlan at all) but does NOT prune a LEFT JOIN to an aggregating view. So a consumer
 -- that wants only the header pays nothing for the lines.
-create view tenant.order_ticket with (security_invoker = true) as
+create view merchant.order_ticket with (security_invoker = true) as
   select o.id            as ticket_id,
-         o.business_id,
-         o.branch_id,
+         o.merchant_id,
+         o.location_id,
          o.customer_id,
          o.conversation_id,
          o.source,
@@ -1143,7 +1143,7 @@ create view tenant.order_ticket with (security_invoker = true) as
          o.updated_at,
          -- The puller's cursor: the highest change this ticket has emitted.
          coalesce((select max(e.sequence)
-                     from tenant.order_event e
+                     from merchant.order_event e
                     where e.order_id = o.id), 0)          as last_event_sequence,
          coalesce((select jsonb_agg(jsonb_build_object(
                             'item_id',       i.id,
@@ -1156,19 +1156,19 @@ create view tenant.order_ticket with (security_invoker = true) as
                             'void_reason',   i.void_reason,
                             'notes',         i.notes)
                           order by i.display_order, i.created_at)
-                     from tenant.order_item i
+                     from merchant.order_item i
                     where i.order_id = o.id), '[]'::jsonb) as items
-    from tenant.customer_order o;
+    from merchant.customer_order o;
 
 -- ----------------------------------------------------------------------------
 -- DEVICES (the physical KDS iPad; sessions/pairing are runtime machinery)
 -- ----------------------------------------------------------------------------
 
-create table tenant.device (
+create table merchant.device (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete cascade,
-  branch_id     uuid references tenant.branch(id),
-  station_id    uuid references tenant.station(id),   -- the station this device serves (re-assignable)
+  merchant_id   uuid not null references merchant.merchant(id) on delete cascade,
+  location_id     uuid references merchant.location(id),
+  station_id    uuid references merchant.station(id),   -- the station this device serves (re-assignable)
   name          text not null,
   kind          text not null default 'kds' check (kind in ('kds','pos_terminal')),
   -- The device's own identifier for the outside world. `id` never leaves the server:
@@ -1189,7 +1189,7 @@ create table tenant.device (
   last_seen_at  timestamptz,
   revoked_at    timestamptz,
   revocation_reason  text,
-  replacement_device_id uuid references tenant.device(id),
+  replacement_device_id uuid references merchant.device(id),
   registered_at timestamptz not null default now(),
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
@@ -1207,7 +1207,7 @@ create table tenant.device (
 -- rotate or revoke the old row; two active rows for one tablet is how a revoked
 -- terminal keeps charging.
 create unique index device_active_installation_uq
-  on tenant.device (installation_hash)
+  on merchant.device (installation_hash)
   where installation_hash is not null and status in ('active','rotation_required');
 
 -- ----------------------------------------------------------------------------
@@ -1217,22 +1217,22 @@ create unique index device_active_installation_uq
 -- Append-only (grant-revoke in 90_rls); soft entity_id so it outlives the row.
 -- ----------------------------------------------------------------------------
 
-create table tenant.audit_log (
+create table merchant.audit_log (
   id             uuid primary key default gen_random_uuid(),
-  business_id    uuid not null references tenant.business(id) on delete cascade,
+  merchant_id    uuid not null references merchant.merchant(id) on delete cascade,
   actor_user_id  uuid references umi.user(id) on delete set null,
   action         text not null
                    check (action in ('create','update','delete','grant','revoke','void','adjust')),
-  entity         text not null,   -- 'business','product','loyalty_program','loyalty_reward','staff'
+  entity         text not null,   -- 'merchant','product','loyalty_program','loyalty_reward','staff'
   entity_id      uuid,            -- soft ref, no FK
   before         jsonb,
   after          jsonb,
   at             timestamptz not null default now()
 );
-create index tenant_audit_log_business_time_idx on tenant.audit_log (business_id, at desc);
-create index tenant_audit_log_entity_idx        on tenant.audit_log (business_id, entity, at desc);
-comment on table tenant.audit_log is
-  'Café-facing audit ("who changed my settings/prices/roles"). RLS-scoped per business. Append-only.';
+create index merchant_audit_log_merchant_time_idx on merchant.audit_log (merchant_id, at desc);
+create index merchant_audit_log_entity_idx        on merchant.audit_log (merchant_id, entity, at desc);
+comment on table merchant.audit_log is
+  'Café-facing audit ("who changed my settings/prices/roles"). RLS-scoped per merchant. Append-only.';
 
 -- ----------------------------------------------------------------------------
 -- DERIVED: conversation analytics (was observability.conversation_outcome — now
@@ -1241,16 +1241,16 @@ comment on table tenant.audit_log is
 
 -- security_invoker: enforce the caller's RLS on the base tables. Without it the
 -- view is owner-rights and leaks every café's conversations to any api session
--- (reproduced in the security audit: 0 base rows but 11 cross-tenant view rows).
-create view tenant.conversation_analytics with (security_invoker = true) as
+-- (reproduced in the security audit: 0 base rows but 11 cross-merchant view rows).
+create view merchant.conversation_analytics with (security_invoker = true) as
   select c.id          as conversation_id,
-         c.business_id,
+         c.merchant_id,
          c.outcome,
          count(m.id)                                                        as turn_count,
          extract(epoch from (max(m.occurred_at) - c.started_at))::int       as duration_seconds
-    from tenant.conversation c
-    left join tenant.message m on m.conversation_id = c.id
-   group by c.id, c.business_id, c.outcome, c.started_at;
+    from merchant.conversation c
+    left join merchant.message m on m.conversation_id = c.id
+   group by c.id, c.merchant_id, c.outcome, c.started_at;
 
 -- ============================================================================
 -- INTEGRITY — the substrate every money-writing command runs on.
@@ -1262,10 +1262,10 @@ create view tenant.conversation_analytics with (security_invoker = true) as
 --
 -- Supersedes runtime.idempotency_key for business commands. That table survives for
 -- webhook/inbound dedup and says so in its own comment.
-create table tenant.business_command (
+create table merchant.business_command (
   id                uuid primary key default gen_random_uuid(),
-  business_id       uuid not null references tenant.business(id) on delete restrict,
-  branch_id         uuid references tenant.branch(id),
+  merchant_id       uuid not null references merchant.merchant(id) on delete restrict,
+  location_id         uuid references merchant.location(id),
   command_id        uuid not null,     -- the client's id for this command
   idempotency_key   text not null,
   command_type      text not null,
@@ -1284,16 +1284,16 @@ create table tenant.business_command (
   -- offline for a whole trading day, so 24h would strand a legitimate replay. Past the
   -- window the API answers IDEMPOTENCY_EXPIRED and the client must query the command.
   expires_at        timestamptz,
-  unique (business_id, command_id),
-  unique (business_id, idempotency_key),
+  unique (merchant_id, command_id),
+  unique (merchant_id, idempotency_key),
   -- "Finished" and "has a finish time" are one fact.
   check ((status = 'processing') = (completed_at is null))
 );
 create index business_command_lookup_idx
-  on tenant.business_command (business_id, command_type, started_at desc);
+  on merchant.business_command (merchant_id, command_type, started_at desc);
 create index business_command_expiry_idx
-  on tenant.business_command (expires_at) where expires_at is not null;
-comment on table tenant.business_command is
+  on merchant.business_command (expires_at) where expires_at is not null;
+comment on table merchant.business_command is
   'Canonical idempotency record. Same fingerprint replays the stored result; a different '
   'fingerprint conflicts. Never a second charge.';
 
@@ -1302,32 +1302,32 @@ comment on table tenant.business_command is
 -- SCOPE RULE, enforced not documented: customer_order and pos_cart each own a `version`
 -- column maintained beside their data, and registering them here as well would put one
 -- fact in two places — the duplicate-derived-state trap this schema exists to avoid.
-create table tenant.aggregate_version (
-  business_id     uuid not null references tenant.business(id) on delete restrict,
+create table merchant.aggregate_version (
+  merchant_id     uuid not null references merchant.merchant(id) on delete restrict,
   aggregate_type  text not null,
   aggregate_id    uuid not null,
   version         bigint not null default 0 check (version >= 0),
   updated_at      timestamptz not null default now(),
-  primary key (business_id, aggregate_type, aggregate_id),
+  primary key (merchant_id, aggregate_type, aggregate_id),
   constraint aggregate_version_no_self_versioned_ck
     check (aggregate_type not in ('customer_order', 'pos_cart'))
 );
-comment on table tenant.aggregate_version is
+comment on table merchant.aggregate_version is
   'Optimistic version for aggregates without their own version column. customer_order '
   'and pos_cart carry theirs inline and are refused here by CHECK.';
 
--- The tamper-evident business event chain. Hash-linked per business, append-only,
--- readable by the café through GET /api/tenants/:id/audit.
+-- The tamper-evident merchant event chain. Hash-linked per merchant, append-only,
+-- readable by the café through GET /api/merchants/:id/audit.
 --
--- NOT the same table as tenant.audit_log, and the boundary is by QUESTION ANSWERED:
+-- NOT the same table as merchant.audit_log, and the boundary is by QUESTION ANSWERED:
 --   audit_log   — "who changed this record, from what to what" (before/after diffs)
---   audit_event — "what happened in this business, provably unaltered" (money, access,
+--   audit_event — "what happened in this merchant, provably unaltered" (money, access,
 --                 device trust). An auditor reads this one.
 -- No fact belongs in both.
-create table tenant.audit_event (
+create table merchant.audit_event (
   id              uuid primary key default gen_random_uuid(),
-  business_id     uuid not null references tenant.business(id) on delete restrict,
-  branch_id       uuid references tenant.branch(id),
+  merchant_id     uuid not null references merchant.merchant(id) on delete restrict,
+  location_id       uuid references merchant.location(id),
   actor_user_id   uuid references umi.user(id) on delete set null,
   command_id      uuid,
   event_type      text not null,
@@ -1336,30 +1336,30 @@ create table tenant.audit_event (
   outcome         text not null check (outcome in ('success','denied','failure')),
   reason_code     text,
   -- Redacted by construction: what a café may read. Anything sensitive goes to
-  -- runtime.audit_event_internal, which no tenant role can select.
+  -- runtime.audit_event_internal, which no merchant role can select.
   public_data     jsonb not null default '{}'::jsonb,
   correlation_id  text not null,
-  previous_hash   text,          -- set by trigger; NULL only for a business's first event
+  previous_hash   text,          -- set by trigger; NULL only for a merchant's first event
   event_hash      text not null, -- set by trigger
   occurred_at     timestamptz not null default now()   -- overwritten by trigger with clock_timestamp()
 );
 create index audit_event_search_idx
-  on tenant.audit_event (business_id, occurred_at desc, event_type);
+  on merchant.audit_event (merchant_id, occurred_at desc, event_type);
 create index audit_event_entity_idx
-  on tenant.audit_event (business_id, entity_type, entity_id, occurred_at desc);
+  on merchant.audit_event (merchant_id, entity_type, entity_id, occurred_at desc);
 create index audit_event_correlation_idx
-  on tenant.audit_event (business_id, correlation_id);
-comment on table tenant.audit_event is
-  'Hash-chained tenant audit. Server timestamps, redacted payloads, append-only.';
+  on merchant.audit_event (merchant_id, correlation_id);
+comment on table merchant.audit_event is
+  'Hash-chained merchant audit. Server timestamps, redacted payloads, append-only.';
 
 -- Neutral immutable money history, independent of any product ledger. The loyalty
 -- ledger stays authoritative for loyalty; this is the cross-domain record an auditor
 -- reconciles against. A correction is a NEW row pointing at what it compensates —
 -- never an UPDATE.
-create table tenant.financial_event (
+create table merchant.financial_event (
   id                  uuid primary key default gen_random_uuid(),
-  business_id         uuid not null references tenant.business(id) on delete restrict,
-  branch_id           uuid references tenant.branch(id),
+  merchant_id         uuid not null references merchant.merchant(id) on delete restrict,
+  location_id           uuid references merchant.location(id),
   command_id          uuid not null,
   aggregate_type      text not null,
   aggregate_id        uuid not null,
@@ -1367,27 +1367,27 @@ create table tenant.financial_event (
   event_type          text not null,
   amount_minor_units  bigint not null,     -- centavos; signed. Never a float.
   currency            text not null check (currency ~ '^[A-Z]{3}$'),
-  compensates_event_id uuid references tenant.financial_event(id),
+  compensates_event_id uuid references merchant.financial_event(id),
   public_data         jsonb not null default '{}'::jsonb,
   correlation_id      text not null,
   occurred_at         timestamptz not null default now(),
   -- One event per aggregate version: the same version cannot be written twice.
-  unique (business_id, aggregate_type, aggregate_id, aggregate_version),
+  unique (merchant_id, aggregate_type, aggregate_id, aggregate_version),
   check (compensates_event_id is null or compensates_event_id <> id)
 );
-create index financial_event_command_idx on tenant.financial_event (business_id, command_id);
-create index financial_event_time_idx    on tenant.financial_event (business_id, occurred_at desc);
-comment on table tenant.financial_event is
+create index financial_event_command_idx on merchant.financial_event (merchant_id, command_id);
+create index financial_event_time_idx    on merchant.financial_event (merchant_id, occurred_at desc);
+comment on table merchant.financial_event is
   'Neutral immutable financial history. Product ledgers stay authoritative for their domain.';
 
 -- ============================================================================
 -- CATALOG EXTENSION — what a till needs that a WhatsApp menu did not.
 -- ============================================================================
 
-create table tenant.product_media (
+create table merchant.product_media (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete cascade,
-  product_id    uuid not null references tenant.product(id) on delete cascade,
+  merchant_id   uuid not null references merchant.merchant(id) on delete cascade,
+  product_id    uuid not null references merchant.product(id) on delete cascade,
   -- https only: a till on a café's wifi must not be talked into loading plaintext.
   url           text not null check (length(url) <= 2048 and url ~ '^https://'),
   alt_text      text check (length(alt_text) <= 240),
@@ -1400,10 +1400,10 @@ create table tenant.product_media (
 
 -- A sellable variation with its own price delta (Small/Medium/Large). Distinct from
 -- product_modifier, which ADDS to a line (oat milk); a variant IS the line.
-create table tenant.product_variant (
+create table merchant.product_variant (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete cascade,
-  product_id    uuid not null references tenant.product(id) on delete cascade,
+  merchant_id   uuid not null references merchant.merchant(id) on delete cascade,
+  product_id    uuid not null references merchant.product(id) on delete cascade,
   name          text not null,
   attributes    jsonb not null default '{}'::jsonb,
   price_delta   bigint not null default 0,   -- centavos, signed
@@ -1418,38 +1418,38 @@ create table tenant.product_variant (
 -- POS CART — mutable preparation. NEVER an order, a payment or a kitchen ticket.
 -- ============================================================================
 
-create table tenant.pos_cart (
+create table merchant.pos_cart (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete cascade,
-  branch_id     uuid not null references tenant.branch(id),
-  -- xfk-> runtime.operator_session (runtime is built after tenant; see 50_cross_schema_fk)
+  merchant_id   uuid not null references merchant.merchant(id) on delete cascade,
+  location_id     uuid not null references merchant.location(id),
+  -- xfk-> runtime.operator_session (runtime is built after merchant; see 50_cross_schema_fk)
   operator_session_id uuid not null,
   status        text not null default 'draft'
                   check (status in ('draft','prepared','committed','abandoned')),
   -- The cart's own change marker, for the client's expectedVersion check. Registering
-  -- it in tenant.aggregate_version as well is refused by CHECK there.
+  -- it in merchant.aggregate_version as well is refused by CHECK there.
   version       integer not null default 1 check (version > 0),
   -- Server-derived, never client-supplied: a café's day ends at 04:00, not midnight,
   -- and a till whose clock drifted must not be able to move a sale into yesterday.
   business_date date not null,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
-  -- The (business_id, branch_id) composite FK is added by the sweep at the end of this
-  -- file, together with every other tenant table that carries both columns.
+  -- The (merchant_id, location_id) composite FK is added by the sweep at the end of this
+  -- file, together with every other merchant table that carries both columns.
 );
 -- One open cart per operator session. Two live carts on one till is how a sale gets
 -- rung into the wrong basket.
 create unique index pos_cart_active_operator_uidx
-  on tenant.pos_cart (operator_session_id) where status in ('draft','prepared');
-comment on table tenant.pos_cart is
+  on merchant.pos_cart (operator_session_id) where status in ('draft','prepared');
+comment on table merchant.pos_cart is
   'Mutable POS preparation state. Never payment, receipt, inventory, KDS or committed order truth.';
 
-create table tenant.pos_cart_line (
+create table merchant.pos_cart_line (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete cascade,
-  cart_id       uuid not null references tenant.pos_cart(id) on delete cascade,
-  product_id    uuid not null references tenant.product(id),
-  variant_id    uuid references tenant.product_variant(id),
+  merchant_id   uuid not null references merchant.merchant(id) on delete cascade,
+  cart_id       uuid not null references merchant.pos_cart(id) on delete cascade,
+  product_id    uuid not null references merchant.product(id),
+  variant_id    uuid references merchant.product_variant(id),
   -- sha256 over product + variant + modifier selection + note. Two identical drinks
   -- collapse into one line with quantity 2; a different note makes a different line.
   identity_key  text not null check (identity_key ~ '^[a-f0-9]{64}$'),
@@ -1468,20 +1468,20 @@ create table tenant.pos_cart_line (
   updated_at    timestamptz not null default now(),
   unique (cart_id, identity_key)
 );
-create index pos_cart_line_cart_idx on tenant.pos_cart_line (cart_id);
+create index pos_cart_line_cart_idx on merchant.pos_cart_line (cart_id);
 
-create table tenant.pos_cart_line_modifier (
+create table merchant.pos_cart_line_modifier (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete cascade,
-  line_id       uuid not null references tenant.pos_cart_line(id) on delete cascade,
-  group_id      uuid not null references tenant.product_option_group(id),
-  modifier_id   uuid not null references tenant.product_modifier(id),
+  merchant_id   uuid not null references merchant.merchant(id) on delete cascade,
+  line_id       uuid not null references merchant.pos_cart_line(id) on delete cascade,
+  group_id      uuid not null references merchant.product_option_group(id),
+  modifier_id   uuid not null references merchant.product_modifier(id),
   name          text not null,      -- snapshot, same reasoning as pos_cart_line
   quantity      integer not null check (quantity between 1 and 99),
   price_delta   bigint not null,
   unique (line_id, modifier_id)
 );
-create index pos_cart_modifier_line_idx on tenant.pos_cart_line_modifier (line_id);
+create index pos_cart_modifier_line_idx on merchant.pos_cart_line_modifier (line_id);
 
 -- ============================================================================
 -- CHECKOUT — where a cart becomes money.
@@ -1489,11 +1489,11 @@ create index pos_cart_modifier_line_idx on tenant.pos_cart_line_modifier (line_i
 
 -- Reservation semantics ONLY. This table never decrements stock; it records that a
 -- cart is holding items while payment resolves, and expires on its own.
-create table tenant.inventory_reservation (
+create table merchant.inventory_reservation (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete restrict,
-  branch_id     uuid not null references tenant.branch(id),
-  cart_id       uuid not null references tenant.pos_cart(id) on delete restrict,
+  merchant_id   uuid not null references merchant.merchant(id) on delete restrict,
+  location_id     uuid not null references merchant.location(id),
+  cart_id       uuid not null references merchant.pos_cart(id) on delete restrict,
   status        text not null check (status in ('reserved','released','expired','commit_prepared')),
   cart_version  integer not null check (cart_version > 0),
   line_snapshot jsonb not null,
@@ -1502,17 +1502,17 @@ create table tenant.inventory_reservation (
   updated_at    timestamptz not null default now(),
   unique (cart_id)
 );
-comment on table tenant.inventory_reservation is
+comment on table merchant.inventory_reservation is
   'Checkout reservation only. This table never decrements or synchronizes inventory.';
 
 -- One payment attempt per cart. `unknown` and `timeout` are first-class outcomes:
 -- when a terminal stops answering, the sale becomes QUERY-ONLY. It must never be
 -- retried into a second charge — the rule our own records call out by name.
-create table tenant.pos_payment_attempt (
+create table merchant.pos_payment_attempt (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete restrict,
-  branch_id     uuid not null references tenant.branch(id),
-  cart_id       uuid not null references tenant.pos_cart(id) on delete restrict,
+  merchant_id   uuid not null references merchant.merchant(id) on delete restrict,
+  location_id     uuid not null references merchant.location(id),
+  cart_id       uuid not null references merchant.pos_cart(id) on delete restrict,
   method        text not null check (method in ('cash','external_terminal')),
   amount_minor_units bigint not null check (amount_minor_units >= 0),
   currency      text not null check (currency ~ '^[A-Z]{3}$'),
@@ -1524,7 +1524,7 @@ create table tenant.pos_payment_attempt (
   expires_at    timestamptz,
   created_at    timestamptz not null default now(),
   resolved_at   timestamptz,
-  unique (business_id, cart_id),
+  unique (merchant_id, cart_id),
   -- An ambiguous outcome is query-only. Enforced here so no service can forget it.
   constraint payment_attempt_ambiguity_ck
     check (status not in ('unknown','timeout') or query_only)
@@ -1532,35 +1532,35 @@ create table tenant.pos_payment_attempt (
 
 -- The receipt as issued, frozen. Reports read this and never recompute a historical
 -- total from today's prices.
-create table tenant.receipt_snapshot (
+create table merchant.receipt_snapshot (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete restrict,
-  branch_id     uuid not null references tenant.branch(id),
-  order_id      uuid not null references tenant.customer_order(id) on delete restrict,
-  payment_attempt_id uuid not null references tenant.pos_payment_attempt(id) on delete restrict,
+  merchant_id   uuid not null references merchant.merchant(id) on delete restrict,
+  location_id     uuid not null references merchant.location(id),
+  order_id      uuid not null references merchant.customer_order(id) on delete restrict,
+  payment_attempt_id uuid not null references merchant.pos_payment_attempt(id) on delete restrict,
   receipt_number text not null,
   business_date date not null,
   currency      text not null check (currency ~ '^[A-Z]{3}$'),
   grand_total   bigint not null check (grand_total >= 0),
   snapshot      jsonb not null,
   issued_at     timestamptz not null default now(),
-  unique (business_id, receipt_number),
+  unique (merchant_id, receipt_number),
   unique (order_id)
 );
-comment on table tenant.receipt_snapshot is
+comment on table merchant.receipt_snapshot is
   'Immutable receipt fact. Reports read this snapshot and never reconstruct historical totals.';
 
 -- The join that says "this cart became this order, paid by this attempt, on this
 -- receipt". Every column is UNIQUE: one cart cannot become two sales, and one order
 -- cannot be claimed by two carts.
-create table tenant.pos_committed_sale (
+create table merchant.pos_committed_sale (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete restrict,
-  branch_id     uuid not null references tenant.branch(id),
-  cart_id       uuid not null references tenant.pos_cart(id) on delete restrict,
-  order_id      uuid not null references tenant.customer_order(id) on delete restrict,
-  payment_attempt_id uuid not null references tenant.pos_payment_attempt(id) on delete restrict,
-  receipt_snapshot_id uuid not null references tenant.receipt_snapshot(id) on delete restrict,
+  merchant_id   uuid not null references merchant.merchant(id) on delete restrict,
+  location_id     uuid not null references merchant.location(id),
+  cart_id       uuid not null references merchant.pos_cart(id) on delete restrict,
+  order_id      uuid not null references merchant.customer_order(id) on delete restrict,
+  payment_attempt_id uuid not null references merchant.pos_payment_attempt(id) on delete restrict,
+  receipt_snapshot_id uuid not null references merchant.receipt_snapshot(id) on delete restrict,
   totals_fingerprint text not null check (totals_fingerprint ~ '^[a-f0-9]{64}$'),
   committed_at  timestamptz not null default now(),
   unique (cart_id), unique (order_id), unique (payment_attempt_id), unique (receipt_snapshot_id)
@@ -1572,9 +1572,9 @@ create table tenant.pos_committed_sale (
 -- ============================================================================
 
 -- What a device is allowed to do while disconnected. Cash is OFF by default and stays
--- off until a business is certified for it through pos_offline_cash_policy.
-create table tenant.pos_offline_policy (
-  business_id   uuid primary key references tenant.business(id) on delete cascade,
+-- off until a merchant is certified for it through pos_offline_cash_policy.
+create table merchant.pos_offline_policy (
+  merchant_id   uuid primary key references merchant.merchant(id) on delete cascade,
   version       text not null default '1',
   issued_at     timestamptz not null default clock_timestamp(),
   expires_at    timestamptz not null default (clock_timestamp() + interval '24 hours'),
@@ -1587,12 +1587,12 @@ create table tenant.pos_offline_policy (
   updated_at    timestamptz not null default clock_timestamp()
 );
 
--- Per-branch offline cash limits. Every bound the till enforces locally is ALSO stored
+-- Per-location offline cash limits. Every bound the till enforces locally is ALSO stored
 -- here, because a client-side limit is a suggestion.
-create table tenant.pos_offline_cash_policy (
+create table merchant.pos_offline_cash_policy (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete restrict,
-  branch_id     uuid not null references tenant.branch(id) on delete restrict,
+  merchant_id   uuid not null references merchant.merchant(id) on delete restrict,
+  location_id     uuid not null references merchant.location(id) on delete restrict,
   enabled       boolean not null default false,
   version       text not null,
   currency      text not null check (currency ~ '^[A-Z]{3}$'),
@@ -1614,17 +1614,17 @@ create table tenant.pos_offline_cash_policy (
   issued_at     timestamptz not null default clock_timestamp(),
   expires_at    timestamptz not null,
   updated_at    timestamptz not null default clock_timestamp(),
-  unique (business_id, branch_id),
+  unique (merchant_id, location_id),
   check (expires_at > issued_at)
 );
 
 -- How far the server has accepted this device's ordered command stream. Keyed by
 -- credential version: rotating a credential starts a new stream, so a replay signed by
 -- the old credential can never be accepted against the new one.
-create table tenant.device_replay_cursor (
-  business_id   uuid not null references tenant.business(id) on delete cascade,
-  branch_id     uuid not null references tenant.branch(id),
-  device_id     uuid not null references tenant.device(id),
+create table merchant.device_replay_cursor (
+  merchant_id   uuid not null references merchant.merchant(id) on delete cascade,
+  location_id     uuid not null references merchant.location(id),
+  device_id     uuid not null references merchant.device(id),
   credential_version integer not null check (credential_version > 0),
   last_accepted_sequence bigint not null default 0 check (last_accepted_sequence >= 0),
   reconciliation_required boolean not null default false,
@@ -1633,10 +1633,10 @@ create table tenant.device_replay_cursor (
 );
 
 -- The accepted commands themselves. Immutable: an accepted offline sale is history.
-create table tenant.offline_replay_command (
-  business_id   uuid not null references tenant.business(id) on delete restrict,
-  branch_id     uuid not null references tenant.branch(id),
-  device_id     uuid not null references tenant.device(id),
+create table merchant.offline_replay_command (
+  merchant_id   uuid not null references merchant.merchant(id) on delete restrict,
+  location_id     uuid not null references merchant.location(id),
+  device_id     uuid not null references merchant.device(id),
   credential_version integer not null,
   device_sequence bigint not null check (device_sequence > 0),
   command_id    uuid primary key,
@@ -1655,14 +1655,14 @@ create table tenant.offline_replay_command (
   official_id   uuid,
   -- The ordered stream: one command per sequence number per credential version.
   unique (device_id, credential_version, device_sequence),
-  unique (business_id, idempotency_key)
+  unique (merchant_id, idempotency_key)
 );
 
-create table tenant.offline_reconciliation (
+create table merchant.offline_reconciliation (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete restrict,
-  branch_id     uuid not null references tenant.branch(id),
-  device_id     uuid not null references tenant.device(id),
+  merchant_id   uuid not null references merchant.merchant(id) on delete restrict,
+  location_id     uuid not null references merchant.location(id),
+  device_id     uuid not null references merchant.device(id),
   credential_version integer not null,
   summary       jsonb not null,
   created_at    timestamptz not null default clock_timestamp(),
@@ -1670,11 +1670,11 @@ create table tenant.offline_reconciliation (
 );
 
 -- What could not be replayed, and what a human must do about it.
-create table tenant.offline_replay_conflict (
+create table merchant.offline_replay_conflict (
   id            uuid primary key default gen_random_uuid(),
-  business_id   uuid not null references tenant.business(id) on delete restrict,
-  branch_id     uuid not null references tenant.branch(id) on delete restrict,
-  device_id     uuid not null references tenant.device(id) on delete restrict,
+  merchant_id   uuid not null references merchant.merchant(id) on delete restrict,
+  location_id     uuid not null references merchant.location(id) on delete restrict,
+  device_id     uuid not null references merchant.device(id) on delete restrict,
   command_id    uuid not null,
   device_sequence bigint not null check (device_sequence > 0),
   classification text not null,
@@ -1690,45 +1690,45 @@ create table tenant.offline_replay_conflict (
   resolution_state text not null default 'open'
                   check (resolution_state in ('open','acknowledged','resolved')),
   resolution_acknowledged_at timestamptz,
-  unique (business_id, device_id, command_id)
+  unique (merchant_id, device_id, command_id)
 );
 
 -- provisional receipt -> official receipt. Append-only and unique in every direction:
 -- the same offline sale can never be promoted twice, which is how a disconnected shift
 -- would otherwise double-count itself on reconnect.
-create table tenant.offline_provisional_mapping (
-  business_id   uuid not null references tenant.business(id) on delete restrict,
-  branch_id     uuid not null references tenant.branch(id) on delete restrict,
-  device_id     uuid not null references tenant.device(id) on delete restrict,
-  command_id    uuid not null references tenant.offline_replay_command(command_id) on delete restrict,
+create table merchant.offline_provisional_mapping (
+  merchant_id   uuid not null references merchant.merchant(id) on delete restrict,
+  location_id     uuid not null references merchant.location(id) on delete restrict,
+  device_id     uuid not null references merchant.device(id) on delete restrict,
+  command_id    uuid not null references merchant.offline_replay_command(command_id) on delete restrict,
   provisional_id uuid not null,
-  official_sale_id uuid not null references tenant.pos_committed_sale(id) on delete restrict,
-  official_receipt_id uuid not null references tenant.receipt_snapshot(id) on delete restrict,
+  official_sale_id uuid not null references merchant.pos_committed_sale(id) on delete restrict,
+  official_receipt_id uuid not null references merchant.receipt_snapshot(id) on delete restrict,
   official_receipt_number text not null,
   reconciliation_reference uuid not null,
   mapped_at     timestamptz not null default clock_timestamp(),
-  primary key (business_id, provisional_id),
-  unique (business_id, official_sale_id),
-  unique (business_id, official_receipt_id),
+  primary key (merchant_id, provisional_id),
+  unique (merchant_id, official_sale_id),
+  unique (merchant_id, official_receipt_id),
   unique (command_id)
 );
 
 -- ============================================================================
--- BRANCH BELONGS TO BUSINESS — enforced by the database, not by hope.
+-- LOCATION BELONGS TO MERCHANT — enforced by the database, not by hope.
 -- ============================================================================
--- Every tenant table that carries BOTH business_id and branch_id gets a composite
--- foreign key (business_id, branch_id) -> tenant.branch (business_id, id).
+-- Every merchant table that carries BOTH merchant_id and location_id gets a composite
+-- foreign key (merchant_id, location_id) -> merchant.location (merchant_id, id).
 --
--- Without it, a plain `branch_id references tenant.branch(id)` happily accepts a branch
+-- Without it, a plain `location_id references merchant.location(id)` happily accepts a location
 -- belonging to a DIFFERENT café. RLS scopes what a request can read, but the row is
 -- already malformed by then, and a malformed row outlives the bug that wrote it: a sale
--- filed against another business's branch corrupts both cafés' day.
+-- filed against another merchant's location corrupts both cafés' day.
 --
--- This became free the moment `tenant.branch` gained `unique (business_id, id)` for the
+-- This became free the moment `merchant.location` gained `unique (merchant_id, id)` for the
 -- POS. It costs one index lookup per insert and removes a whole class of write bug.
 --
--- MATCH SIMPLE (the default) is what we want: where branch_id is NULL — a business-wide
--- row — the constraint is not checked at all, so "no branch" stays legal.
+-- MATCH SIMPLE (the default) is what we want: where location_id is NULL — a merchant-wide
+-- row — the constraint is not checked at all, so "no location" stays legal.
 --
 -- Swept rather than listed, for the same reason as the RLS policies: a hand-maintained
 -- list is a list someone forgets to extend, and forgetting here fails OPEN.
@@ -1740,19 +1740,19 @@ begin
     select c.relname
       from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
-     where n.nspname = 'tenant' and c.relkind = 'r'
-       and c.relname <> 'branch'
+     where n.nspname = 'merchant' and c.relkind = 'r'
+       and c.relname <> 'location'
        and exists (select 1 from information_schema.columns col
-                    where col.table_schema='tenant' and col.table_name=c.relname
-                      and col.column_name='business_id')
+                    where col.table_schema='merchant' and col.table_name=c.relname
+                      and col.column_name='merchant_id')
        and exists (select 1 from information_schema.columns col
-                    where col.table_schema='tenant' and col.table_name=c.relname
-                      and col.column_name='branch_id')
+                    where col.table_schema='merchant' and col.table_name=c.relname
+                      and col.column_name='location_id')
      order by c.relname
   loop
     execute format(
-      'alter table tenant.%I add constraint %I foreign key (business_id, branch_id)
-         references tenant.branch (business_id, id)',
-      t.relname, t.relname || '_branch_same_business_fk');
+      'alter table merchant.%I add constraint %I foreign key (merchant_id, location_id)
+         references merchant.location (merchant_id, id)',
+      t.relname, t.relname || '_location_same_merchant_fk');
   end loop;
 end $$;

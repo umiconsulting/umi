@@ -36,26 +36,26 @@ export const SessionUser = z.object({
 });
 export type SessionUser = z.infer<typeof SessionUser>;
 
-/** Tenant membership as embedded in a session (login/refresh/me). Mirrors
- *  auth.repository TenantMembershipSummary. */
-export const TenantMembership = z.object({
+/** Merchant membership as embedded in a session (login/refresh/me). Mirrors
+ *  auth.repository MerchantMembershipSummary. */
+export const MerchantMembership = z.object({
   id: z.string(),
   slug: z.string(),
   name: z.string(),
   roles: z.array(z.string()),
 });
-export type TenantMembership = z.infer<typeof TenantMembership>;
+export type MerchantMembership = z.infer<typeof MerchantMembership>;
 
-/** GET /api/me/tenants row — membership plus timezone. Mirrors tenants.repository
- *  TenantSummary. */
-export const TenantSummary = TenantMembership.extend({
+/** GET /api/me/merchants row — membership plus timezone. Mirrors merchants.repository
+ *  MerchantSummary. */
+export const MerchantSummary = MerchantMembership.extend({
   timezone: z.string().nullable(),
 });
-export type TenantSummary = z.infer<typeof TenantSummary>;
+export type MerchantSummary = z.infer<typeof MerchantSummary>;
 
 export const SessionEnvelope = z.object({
   user: SessionUser,
-  tenants: z.array(TenantMembership),
+  merchants: z.array(MerchantMembership),
   provider: z.literal('local'),
   accessExpiresIn: z.number(),
 });
@@ -71,9 +71,9 @@ export type SessionResponse = z.infer<typeof SessionResponse>;
 export const LoginResponse = SessionResponse;
 export type LoginResponse = SessionResponse;
 
-/** GET /api/me/tenants. */
-export const MeTenantsResponse = z.object({ tenants: z.array(TenantSummary) });
-export type MeTenantsResponse = z.infer<typeof MeTenantsResponse>;
+/** GET /api/me/merchants. */
+export const MeMerchantsResponse = z.object({ merchants: z.array(MerchantSummary) });
+export type MeMerchantsResponse = z.infer<typeof MeMerchantsResponse>;
 
 /** logout / forgot-password / reset-password. */
 export const OkResponse = z.object({ ok: z.literal(true) });
@@ -93,7 +93,7 @@ export const CreateStaffRequest = z
     name: z.string().trim().min(1).max(160),
     email: z.string().trim().email(),
     role: z.string().min(1).max(100),
-    branchId: z.string().uuid().nullable().optional(),
+    locationId: z.string().uuid().nullable().optional(),
     position: z.string().trim().max(160).nullable().optional(),
   })
   .strict();
@@ -103,7 +103,7 @@ export type CreateStaffRequest = z.infer<typeof CreateStaffRequest>;
 export const UpdateStaffRequest = z
   .object({
     role: z.string().min(1).max(100).optional(),
-    branchId: z.string().uuid().nullable().optional(),
+    locationId: z.string().uuid().nullable().optional(),
     position: z.string().trim().max(160).nullable().optional(),
     status: z.enum(['active', 'inactive']).optional(),
   })
@@ -114,7 +114,7 @@ export type UpdateStaffRequest = z.infer<typeof UpdateStaffRequest>;
 // Mirror the live umi-api DTOs 1:1 (apps/umi-api/src/modules/cash/dto/*), so the
 // server (class-validator) and both clients (dashboard, umi-cash frontend) share
 // one shape. Both surfaces call these: slug-scoped `/api/:slug/...` (umi-cash) and
-// tenant-scoped `/api/tenants/:tenantId/cash/...` (dashboard) — see routes.ts.
+// merchant-scoped `/api/merchants/:merchantId/cash/...` (dashboard) — see routes.ts.
 
 /** A real YYYY-MM-DD calendar date — rejects impossible days (e.g. 2026-02-30),
  *  matching the DTO's `@IsISO8601({ strict: true })`. */
@@ -227,11 +227,11 @@ export const httpModels = {
   ForgotPasswordRequest,
   ResetPasswordRequest,
   SessionUser,
-  TenantMembership,
-  TenantSummary,
+  MerchantMembership,
+  MerchantSummary,
   SessionEnvelope,
   SessionResponse,
-  MeTenantsResponse,
+  MeMerchantsResponse,
   OkResponse,
   GlobalLogoutRequest,
   CreateStaffRequest,

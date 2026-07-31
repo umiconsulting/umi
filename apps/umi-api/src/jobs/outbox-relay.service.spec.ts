@@ -9,11 +9,11 @@ import { JobPriority } from './job-options';
 function event(overrides: Partial<OutboxEventRow> = {}): OutboxEventRow {
   return {
     id: 'evt-1',
-    tenantId: 't1',
+    merchantId: 't1',
     eventType: 'turn.completed',
     aggregateId: null,
     idempotencyKey: 'idem-1',
-    payload: { tenantId: 't1', turnId: 'x' },
+    payload: { merchantId: 't1', turnId: 'x' },
     attempts: 0,
     maxAttempts: 5,
     ...overrides,
@@ -64,7 +64,7 @@ describe('OutboxRelayService', () => {
     expect(enqueue.enqueue).toHaveBeenCalledWith(
       QUEUES.outbound,
       'twilio.reply',
-      { tenantId: 't1', turnId: 'x' },
+      { merchantId: 't1', turnId: 'x' },
       expect.objectContaining({
         priority: JobPriority.Interactive,
         jobId: 'idem-1', // defaults to the row idempotency_key

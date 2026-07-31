@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest';
  *
  * How: walk production source with the TypeScript compiler and fail if any
  * app-pool call site references the substrate. An app-pool call site is
- *   - `withTenant(cb)` / `runWithTenant(id, uid, cb)` — the pooled client is
+ *   - `withMerchant(cb)` / `runWithMerchant(id, uid, cb)` — the pooled client is
  *     passed INTO the callback, so the callback's SQL is lexically inside the
  *     call node — or
  *   - a direct `.app.query(...)` / `.app.connect(...)`.
@@ -37,7 +37,7 @@ const AUTH_SUBSTRATE: readonly RegExp[] = [
   /(?<![\w"])"?(?:password_hash|password_salt)"?(?![\w"])/i,
 ];
 
-const APP_POOL_METHODS = new Set(['withTenant', 'runWithTenant']);
+const APP_POOL_METHODS = new Set(['withMerchant', 'runWithMerchant']);
 
 const SRC = resolve(process.cwd(), 'src');
 
@@ -80,7 +80,7 @@ function sqlLiteralsWithin(node: ts.Node): string {
 
 type AppPoolKind =
   | 'none'
-  /** SQL lives in the call's own args — `withTenant(cb)` / `.app.query(sql)`. */
+  /** SQL lives in the call's own args — `withMerchant(cb)` / `.app.query(sql)`. */
   | 'call'
   /** `.app.connect()` hands a client to the enclosing scope — scan that scope. */
   | 'connect';
@@ -149,7 +149,7 @@ for (const file of files) {
           ? node.expression.name.text
           : '<app>';
         // For `.app.connect()` the SQL is elsewhere in the scope; scan the whole
-        // enclosing function. For `withTenant`/`.app.query` it's in the call args.
+        // enclosing function. For `withMerchant`/`.app.query` it's in the call args.
         const scanNode = kind === 'connect' ? enclosingScope(node, sf) : node;
         const sql = sqlLiteralsWithin(scanNode);
         for (const rx of AUTH_SUBSTRATE) {
@@ -174,12 +174,12 @@ for (const file of files) {
 describe('D11 · auth substrate is off the app pool (static)', () => {
   it('the scanner found app-pool call sites (detection is not vacuous)', () => {
     expect(files.length).toBeGreaterThan(0);
-    // withTenant/runWithTenant/.app usages exist across the repositories; if this
+    // withMerchant/runWithMerchant/.app usages exist across the repositories; if this
     // ever hits 0 the detection has silently broken and the invariant is unguarded.
     expect(appPoolSites).toBeGreaterThan(0);
   });
 
-  it('no withTenant / runWithTenant / .app path references the auth substrate', () => {
+  it('no withMerchant / runWithMerchant / .app path references the auth substrate', () => {
     const report = violations
       .map((v) => `  ${v.file}:${v.line} (${v.method}) → "${v.match}"`)
       .join('\n');
@@ -219,7 +219,7 @@ describe('D11 · AUTH_SUBSTRATE regexes', () => {
     // the camelCase DTO field (no underscore) — TS identifier, not SQL
     'const passwordHash = row.passwordHash;',
     // unrelated table on the app pool is fine
-    'from tenant.customer where business_id = $1',
+    'from merchant.customer where merchant_id = $1',
   ])('does not flag: %s', (sql) => {
     expect(hits(sql)).toBe(false);
   });

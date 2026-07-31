@@ -1,6 +1,6 @@
 -- ============================================================================
 -- build-v3 · schema: umi
--- Umi's OWN SaaS business + identity + entitlement.
+-- Umi's OWN SaaS merchant + identity + entitlement.
 -- SEALED: no café ever writes here; Umi owns every fact in this schema.
 -- ----------------------------------------------------------------------------
 -- HOUSE CONVENTIONS (whole build-v3):
@@ -11,7 +11,7 @@
 --   * controlled vocab   text + CHECK (native ENUM: never; see enum decision memo)
 --   * lookup table  only where a value carries attributes  → umi.role, umi.channel_type
 --   * names         singular, snake_case
---   * cross-schema FK (umi <-> tenant is circular) is DEFERRED to
+--   * cross-schema FK (umi <-> merchant is circular) is DEFERRED to
 --                   50_cross_schema_fk.sql; such columns are marked  -- xfk-> below
 -- ============================================================================
 
@@ -21,7 +21,7 @@ create schema if not exists umi;
 -- IDENTITY
 -- One login identity per human who can authenticate (café staff + Umi operators).
 -- Customers NEVER authenticate (umi-cash collects an unverified phone only) — so
--- nothing here references tenant.customer.
+-- nothing here references merchant.customer.
 -- ----------------------------------------------------------------------------
 
 create table umi.user (
@@ -76,15 +76,15 @@ create table umi.user_role (
   id           uuid primary key default gen_random_uuid(),
   user_id      uuid not null references umi.user(id) on delete cascade,
   role_id      uuid not null references umi.role(id),
-  business_id  uuid,        -- xfk-> tenant.business ; NULL = platform-wide grant (superadmin)
-  branch_id    uuid,        -- xfk-> tenant.branch   ; NULL = all branches of the business
+  merchant_id  uuid,        -- xfk-> merchant.merchant ; NULL = platform-wide grant (superadmin)
+  location_id    uuid,        -- xfk-> merchant.location   ; NULL = all locations of the merchant
   granted_by   uuid references umi.user(id),
   created_at   timestamptz not null default now(),
-  unique (user_id, role_id, business_id, branch_id)
+  unique (user_id, role_id, merchant_id, location_id)
 );
 comment on table umi.user_role is
-  'GRANT: one human holds many roles across scopes. Null business = platform-wide. '
-  'This replaces the old polymorphic tenant.login; there is no principal_type discriminator.';
+  'GRANT: one human holds many roles across scopes. Null merchant = platform-wide. '
+  'This replaces the old polymorphic merchant.login; there is no principal_type discriminator.';
 
 -- A result that a role grant cannot express: a temporary allow, or a deny that must
 -- beat every role the human holds. A POS needs both — suspend one cashier's refund
@@ -96,15 +96,15 @@ create table umi.user_permission_override (
   id             uuid primary key default gen_random_uuid(),
   user_id        uuid not null references umi.user(id) on delete cascade,
   permission_id  uuid not null references umi.permission(id) on delete cascade,
-  business_id    uuid,        -- xfk-> tenant.business ; NULL = every business
-  branch_id      uuid,        -- xfk-> tenant.branch   ; NULL = every branch of the business
+  merchant_id    uuid,        -- xfk-> merchant.merchant ; NULL = every merchant
+  location_id      uuid,        -- xfk-> merchant.location   ; NULL = every location of the merchant
   effect         text not null check (effect in ('allow','deny')),
   expires_at     timestamptz, -- NULL = until revoked
   granted_by     uuid references umi.user(id),
   created_at     timestamptz not null default now(),
-  -- A branch without a business is not a scope, it is a bug.
-  constraint permission_override_branch_scope_ck
-    check (branch_id is null or business_id is not null)
+  -- A location without a merchant is not a scope, it is a bug.
+  constraint permission_override_location_scope_ck
+    check (location_id is null or merchant_id is not null)
 );
 -- One row per (human, permission, scope). The coalesce sentinels make NULL scopes
 -- collide the way a plain UNIQUE would not: without them a user could hold two
@@ -112,8 +112,8 @@ create table umi.user_permission_override (
 create unique index user_permission_override_scope_uq
   on umi.user_permission_override
   (user_id, permission_id,
-   coalesce(business_id, '00000000-0000-0000-0000-000000000000'::uuid),
-   coalesce(branch_id,   '00000000-0000-0000-0000-000000000000'::uuid));
+   coalesce(merchant_id, '00000000-0000-0000-0000-000000000000'::uuid),
+   coalesce(location_id,   '00000000-0000-0000-0000-000000000000'::uuid));
 comment on table umi.user_permission_override is
   'Explicit permission result for one human. A deny always beats role grants and allows.';
 
@@ -128,7 +128,7 @@ create table umi.audit_retention_policy (
   created_at        timestamptz not null default now()
 );
 comment on table umi.audit_retention_policy is
-  'Minimum retention per audit class. Sealed: no tenant role may read or write it.';
+  'Minimum retention per audit class. Sealed: no merchant role may read or write it.';
 
 -- ----------------------------------------------------------------------------
 -- PLATFORM VOCABULARY
@@ -151,8 +151,8 @@ comment on table umi.channel_type is
 create table umi.feature (
   id           uuid primary key default gen_random_uuid(),
   key          text not null unique,   -- module flag = the bare module name ('kds','cash');
-                                        --   finer features are dotted under it ('kds.multi_branch',
-                                        --   'cash.gift_cards','cash.max_branches')
+                                        --   finer features are dotted under it ('kds.multi_location',
+                                        --   'cash.gift_cards','cash.max_locations')
   module       text not null
                  check (module in ('cash','dashboard','conversaflow','kds','pos')),
   name         text not null,
@@ -192,7 +192,7 @@ comment on table umi.plan_feature is 'Which features each plan grants, and at wh
 
 create table umi.subscription (
   id                    uuid primary key default gen_random_uuid(),
-  business_id           uuid not null,     -- xfk-> tenant.business
+  merchant_id           uuid not null,     -- xfk-> merchant.merchant
   plan_id               uuid not null references umi.plan(id),
   status                text not null default 'trialing'
                           check (status in ('trialing','active','past_due','canceled')),
@@ -202,7 +202,7 @@ create table umi.subscription (
   canceled_at           timestamptz,
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now(),
-  unique (business_id)                     -- one current subscription per café (history via change_log)
+  unique (merchant_id)                     -- one current subscription per café (history via change_log)
 );
 
 create table umi.entitlement_override (
@@ -234,7 +234,7 @@ create table umi.subscription_item (
 
 create table umi.invoice (
   id           uuid primary key default gen_random_uuid(),
-  business_id  uuid not null,              -- xfk-> tenant.business
+  merchant_id  uuid not null,              -- xfk-> merchant.merchant
   amount       bigint not null,            -- centavos
   currency     text not null default 'MXN',
   status       text not null default 'draft'
@@ -254,7 +254,7 @@ create table umi.invoice (
 -- drip) or a human is working it (a "prospect" — notes/calls). So this table
 -- carries both halves: the CRM spine + the funnel-automation fields the
 -- landing-page sequence engine (modules/leads) drives. Sealed/service-role
--- (worker BYPASSRLS); business_id is NULL by design (Umi-internal, no tenant).
+-- (worker BYPASSRLS); merchant_id is NULL by design (Umi-internal, no merchant).
 create table umi.prospect (
   id                 uuid primary key default gen_random_uuid(),
   business_name      text,                       -- a landing lead may not give a company
@@ -296,7 +296,7 @@ create table umi.prospect_event (
 -- ----------------------------------------------------------------------------
 -- AUDIT (Umi-internal, sealed)
 -- Platform-privileged actions: superadmin ops, plan/feature/entitlement changes,
--- creating/suspending a business, cross-tenant work. NEVER café-facing.
+-- creating/suspending a merchant, cross-merchant work. NEVER café-facing.
 -- Soft refs (no FK) so the trail outlives what it describes; actor is the one FK.
 -- Append-only (enforced by grant-revoke in 90_rls, not a trigger).
 -- ----------------------------------------------------------------------------
@@ -306,9 +306,9 @@ create table umi.audit_log (
   actor_user_id  uuid references umi.user(id) on delete set null,
   action         text not null
                    check (action in ('create','update','delete','grant','revoke','suspend','restore')),
-  entity         text not null,   -- soft descriptor: 'plan','entitlement_override','business','user_role'
+  entity         text not null,   -- soft descriptor: 'plan','entitlement_override','merchant','user_role'
   entity_id      uuid,            -- soft ref, no FK
-  business_id    uuid,            -- soft: which tenant it affected (nullable)
+  merchant_id    uuid,            -- soft: which merchant it affected (nullable)
   before         jsonb,
   after          jsonb,
   at             timestamptz not null default now()
@@ -324,11 +324,11 @@ comment on table umi.audit_log is
 -- ----------------------------------------------------------------------------
 
 -- security_invoker: the view runs with the CALLER's rights so RLS on the base
--- tables (umi.subscription) is enforced per business — without this the view runs
--- as owner and returns every tenant's entitlements to any api session.
+-- tables (umi.subscription) is enforced per merchant — without this the view runs
+-- as owner and returns every merchant's entitlements to any api session.
 create view umi.effective_entitlement with (security_invoker = true) as
   -- features the plan grants (an override may modify or revoke them)
-  select s.business_id,
+  select s.merchant_id,
          f.key                                   as feature_key,
          coalesce(o.enabled, true)               as enabled,
          coalesce(o.limit_value, pf.limit_value) as limit_value
@@ -342,7 +342,7 @@ create view umi.effective_entitlement with (security_invoker = true) as
    where s.status in ('trialing','active')
   union all
   -- features an override GRANTS that the plan does not include
-  select s.business_id,
+  select s.merchant_id,
          f.key,
          o.enabled,
          o.limit_value
@@ -375,11 +375,11 @@ insert into umi.channel_type (key, name, supports_outbound) values
 on conflict (key) do nothing;
 
 -- Retention floors. Financial history outlives everything else because a tax
--- authority can ask for it ten years later; security and business events follow the
+-- authority can ask for it ten years later; security and merchant events follow the
 -- seven-year commercial default.
 insert into umi.audit_retention_policy (event_class, minimum_days) values
   ('security',  2555),
-  ('business',  2555),
+  ('merchant',  2555),
   ('financial', 3650)
 on conflict (event_class) do nothing;
 
@@ -388,14 +388,14 @@ on conflict (event_class) do nothing;
 -- created by application code so that a fresh database can authorize a POS before any
 -- request has ever run.
 insert into umi.permission (key, description) values
-  ('device.enroll',            'Enrol a POS or KDS device for a branch'),
-  ('catalog.read',             'Read the operator-safe branch catalog'),
-  ('cart.write',               'Prepare a branch-scoped POS cart'),
-  ('checkout.commit',          'Commit a branch-scoped POS sale'),
+  ('device.enroll',            'Enrol a POS or KDS device for a location'),
+  ('catalog.read',             'Read the operator-safe location catalog'),
+  ('cart.write',               'Prepare a location-scoped POS cart'),
+  ('checkout.commit',          'Commit a location-scoped POS sale'),
   ('offline.replay',           'Replay and reconcile device-authenticated offline commands'),
   ('offline.cash.checkout',    'Create a policy-authorized provisional cash sale'),
   ('offline.recovery.review',  'Approve one scoped offline recovery action'),
-  ('audit.read',               'Read tenant-visible, redacted audit events')
+  ('audit.read',               'Read merchant-visible, redacted audit events')
 on conflict (key) do update set description = excluded.description;
 
 -- ⚠️ NO role->permission grants here. This file runs BEFORE any role exists — the role
@@ -403,8 +403,8 @@ on conflict (key) do update set description = excluded.description;
 -- against an empty umi.role and silently inserts nothing. The POS grants live in
 -- backfill/seed_rbac.sql, which runs after the roles do.
 
--- The POS offline-cash flag. Off until a business is explicitly certified for it;
--- `tenant.pos_offline_cash_policy` then carries the limits.
+-- The POS offline-cash flag. Off until a merchant is explicitly certified for it;
+-- `merchant.pos_offline_cash_policy` then carries the limits.
 insert into umi.feature (key, module, name, description, kind) values
   ('pos.offline_cash', 'pos', 'POS offline cash',
    'Policy-controlled provisional cash checkout', 'flag')

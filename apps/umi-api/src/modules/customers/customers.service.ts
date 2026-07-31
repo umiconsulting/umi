@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { formatMxn, iso } from '../../shared/format/money';
 import { isProductStatusActive } from '@umi/contract';
-import { TenantsRepository } from '../tenants/tenants.repository';
+import { MerchantsRepository } from '../merchants/merchants.repository';
 import { CustomersRepository, type Row } from './customers.repository';
 
 type Products = Record<string, { status?: string } | undefined>;
@@ -31,18 +31,18 @@ function normalizeCustomerPhone(phone: string | null): string | null {
 /**
  * Customer 360 read service. Maps repository rows into the exact dashboard DTOs
  * (server.js `platformCustomerDto` + the per-domain detail mappers). Product
- * availability is derived from the tenant's `product_instances`.
+ * availability is derived from the merchant's `product_instances`.
  */
 @Injectable()
 export class CustomersService {
   constructor(
     private readonly repo: CustomersRepository,
-    private readonly tenants: TenantsRepository,
+    private readonly merchants: MerchantsRepository,
   ) {}
 
-  /** Tenant product map (drives availability flags in the DTOs). */
-  loadProducts(tenantId: string): Promise<Products> {
-    return this.tenants.loadProducts(tenantId);
+  /** Merchant product map (drives availability flags in the DTOs). */
+  loadProducts(merchantId: string): Promise<Products> {
+    return this.merchants.loadProducts(merchantId);
   }
 
   private customerDto(row: Row, products: Products) {
@@ -117,7 +117,7 @@ export class CustomersService {
   }
 
   async list(
-    tenantId: string,
+    merchantId: string,
     products: Products,
     options: {
       page?: string;
@@ -136,9 +136,9 @@ export class CustomersService {
       .trim()
       .slice(0, 24);
     const contactId = String(options.contactId || '').trim();
-    const contactUuid = isUuid(contactId) ? contactId : tenantId;
+    const contactUuid = isUuid(contactId) ? contactId : merchantId;
 
-    const { rows, total } = await this.repo.listCustomers(tenantId, {
+    const { rows, total } = await this.repo.listCustomers(merchantId, {
       page,
       limit,
       search,
@@ -152,32 +152,32 @@ export class CustomersService {
       total,
       page,
       totalPages: Math.max(1, Math.ceil(total / limit)),
-      source: 'tenant.customer',
+      source: 'merchant.customer',
     };
   }
 
-  async detail(tenantId: string, products: Products, contactId: string) {
+  async detail(merchantId: string, products: Products, contactId: string) {
     if (!isUuid(contactId)) return null;
-    const list = await this.list(tenantId, products, { page: '1', limit: '1', contactId });
+    const list = await this.list(merchantId, products, { page: '1', limit: '1', contactId });
     const customer = list.customers[0] || null;
     if (!customer) return null;
     const [timeline, conversations, orders, cash, identity] = await Promise.all([
-      this.timeline(tenantId, contactId),
-      this.conversations(tenantId, contactId),
-      this.orders(tenantId, contactId),
-      this.cash(tenantId, products, contactId),
-      this.identity(tenantId, contactId),
+      this.timeline(merchantId, contactId),
+      this.conversations(merchantId, contactId),
+      this.orders(merchantId, contactId),
+      this.cash(merchantId, products, contactId),
+      this.identity(merchantId, contactId),
     ]);
     return { customer, timeline, conversations, orders, cash, identity };
   }
 
-  async timeline(tenantId: string, contactId: string) {
-    const rows = await this.repo.timeline(tenantId, contactId);
+  async timeline(merchantId: string, contactId: string) {
+    const rows = await this.repo.timeline(merchantId, contactId);
     return rows.map((row) => ({ ...row, occurredAt: iso(row.occurred_at) }));
   }
 
-  async conversations(tenantId: string, contactId: string) {
-    const rows = await this.repo.conversations(tenantId, contactId);
+  async conversations(merchantId: string, contactId: string) {
+    const rows = await this.repo.conversations(merchantId, contactId);
     return rows.map((row) => ({
       id: row.id,
       status: row.status,
@@ -190,8 +190,8 @@ export class CustomersService {
     }));
   }
 
-  async orders(tenantId: string, contactId: string) {
-    const rows = await this.repo.orders(tenantId, contactId);
+  async orders(merchantId: string, contactId: string) {
+    const rows = await this.repo.orders(merchantId, contactId);
     return rows.map((row) => ({
       id: row.id,
       orderNumber: row.order_number,
@@ -205,8 +205,8 @@ export class CustomersService {
     }));
   }
 
-  async cash(tenantId: string, products: Products, contactId: string) {
-    const row = await this.repo.cash(tenantId, contactId);
+  async cash(merchantId: string, products: Products, contactId: string) {
+    const row = await this.repo.cash(merchantId, contactId);
     const available = productActive(products, 'cash');
     if (!row) return { available, source: 'cash', account: null };
     return {
@@ -228,8 +228,8 @@ export class CustomersService {
     };
   }
 
-  async identity(tenantId: string, contactId: string) {
-    const { identities, candidates, findings } = await this.repo.identity(tenantId, contactId);
+  async identity(merchantId: string, contactId: string) {
+    const { identities, candidates, findings } = await this.repo.identity(merchantId, contactId);
     return {
       identities: identities.map((row) => ({ ...row, createdAt: iso(row.created_at) })),
       mergeCandidates: candidates.map((row) => ({
@@ -245,11 +245,11 @@ export class CustomersService {
     };
   }
 
-  async conversationsList(tenantId: string, query: { page?: string; limit?: string }) {
+  async conversationsList(merchantId: string, query: { page?: string; limit?: string }) {
     const page = Math.max(1, parseInt(query.page || '1') || 1);
     const limit = Math.max(1, Math.min(parseInt(query.limit || '20') || 20, 100));
     const skip = (page - 1) * limit;
-    const { rows, total } = await this.repo.conversationsList(tenantId, limit, skip);
+    const { rows, total } = await this.repo.conversationsList(merchantId, limit, skip);
     return {
       conversations: rows,
       total,
@@ -258,8 +258,8 @@ export class CustomersService {
     };
   }
 
-  async insights(tenantId: string, products: Products) {
-    const payload = await this.list(tenantId, products, { page: '1', limit: '100' });
+  async insights(merchantId: string, products: Products) {
+    const payload = await this.list(merchantId, products, { page: '1', limit: '100' });
     const customers = payload.customers || [];
     const whatsappCustomers = customers.filter((c) => c.products?.whatsapp?.active).length;
     const cashCustomers = customers.filter((c) => c.products?.cash?.active).length;

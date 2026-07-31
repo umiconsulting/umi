@@ -9,8 +9,8 @@ import {
 } from './module-registry.js';
 import { routes } from '@umi/contract/routes';
 
-const TenantContext = createContext(null);
-const SELECTED_TENANT_KEY = 'umi-dashboard-selected-tenant';
+const MerchantContext = createContext(null);
+const SELECTED_MERCHANT_KEY = 'umi-dashboard-selected-merchant';
 const SELECTED_LOCATION_KEY = 'umi-dashboard-selected-location';
 
 async function apiGet(path) {
@@ -21,10 +21,10 @@ async function apiGet(path) {
   return payload;
 }
 
-export function TenantProvider({ children }) {
-  const [tenants, setTenants] = useState([]);
-  const [selectedTenantId, setSelectedTenantIdState] = useState(
-    () => window.localStorage.getItem(SELECTED_TENANT_KEY) || '',
+export function MerchantProvider({ children }) {
+  const [merchants, setMerchants] = useState([]);
+  const [selectedMerchantId, setSelectedMerchantIdState] = useState(
+    () => window.localStorage.getItem(SELECTED_MERCHANT_KEY) || '',
   );
   const [selectedLocationId, setSelectedLocationIdState] = useState(
     () => window.localStorage.getItem(SELECTED_LOCATION_KEY) || '',
@@ -37,22 +37,22 @@ export function TenantProvider({ children }) {
     let active = true;
     setLoading(true);
     setError(null);
-    apiGet(routes.me.tenants)
+    apiGet(routes.me.merchants)
       .then((payload) => {
         if (!active) return;
-        const nextTenants = payload.tenants || [];
-        setTenants(nextTenants);
-        const stored = window.localStorage.getItem(SELECTED_TENANT_KEY);
-        const nextSelected = nextTenants.some((tenant) => tenant.id === stored)
+        const nextMerchants = payload.merchants || [];
+        setMerchants(nextMerchants);
+        const stored = window.localStorage.getItem(SELECTED_MERCHANT_KEY);
+        const nextSelected = nextMerchants.some((merchant) => merchant.id === stored)
           ? stored
-          : nextTenants[0]?.id || '';
-        setSelectedTenantIdState(nextSelected);
-        if (nextSelected) window.localStorage.setItem(SELECTED_TENANT_KEY, nextSelected);
+          : nextMerchants[0]?.id || '';
+        setSelectedMerchantIdState(nextSelected);
+        if (nextSelected) window.localStorage.setItem(SELECTED_MERCHANT_KEY, nextSelected);
       })
       .catch((err) => {
         if (!active) return;
         setError(err.message);
-        setTenants([]);
+        setMerchants([]);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -63,7 +63,7 @@ export function TenantProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    if (!selectedTenantId) {
+    if (!selectedMerchantId) {
       setCapabilities(null);
       return undefined;
     }
@@ -71,7 +71,7 @@ export function TenantProvider({ children }) {
     setLoading(true);
     setError(null);
     const qs = selectedLocationId ? `?locationId=${encodeURIComponent(selectedLocationId)}` : '';
-    apiGet(`/api/tenants/${encodeURIComponent(selectedTenantId)}/capabilities${qs}`)
+    apiGet(`/api/merchants/${encodeURIComponent(selectedMerchantId)}/capabilities${qs}`)
       .then((payload) => {
         if (!active) return;
         const next = { ...payload, modules: payload.modules || buildModuleAvailability(payload) };
@@ -95,12 +95,12 @@ export function TenantProvider({ children }) {
     return () => {
       active = false;
     };
-  }, [selectedTenantId, selectedLocationId]);
+  }, [selectedMerchantId, selectedLocationId]);
 
-  const setSelectedTenantId = (tenantId) => {
-    setSelectedTenantIdState(tenantId);
+  const setSelectedMerchantId = (merchantId) => {
+    setSelectedMerchantIdState(merchantId);
     setSelectedLocationIdState('');
-    if (tenantId) window.localStorage.setItem(SELECTED_TENANT_KEY, tenantId);
+    if (merchantId) window.localStorage.setItem(SELECTED_MERCHANT_KEY, merchantId);
     window.localStorage.removeItem(SELECTED_LOCATION_KEY);
   };
 
@@ -111,54 +111,58 @@ export function TenantProvider({ children }) {
   };
 
   // useCallback + an explicit dep so the memo below can track it. It closes over
-  // selectedTenantId; today that value is also in the memo's deps, so the closure
+  // selectedMerchantId; today that value is also in the memo's deps, so the closure
   // happens to stay fresh — but nothing enforced that. The moment this reads one more
   // reactive value, every context consumer would silently receive a stale function.
-  const updateSelectedTenant = useCallback(
+  const updateSelectedMerchant = useCallback(
     (patch) => {
-      if (!selectedTenantId || !patch) return;
-      setTenants((prev) =>
-        prev.map((tenant) => (tenant.id === selectedTenantId ? { ...tenant, ...patch } : tenant)),
+      if (!selectedMerchantId || !patch) return;
+      setMerchants((prev) =>
+        prev.map((merchant) =>
+          merchant.id === selectedMerchantId ? { ...merchant, ...patch } : merchant,
+        ),
       );
       setCapabilities((prev) =>
-        prev?.tenant ? { ...prev, tenant: { ...prev.tenant, ...patch } } : prev,
+        prev?.merchant ? { ...prev, merchant: { ...prev.merchant, ...patch } } : prev,
       );
     },
-    [selectedTenantId],
+    [selectedMerchantId],
   );
 
   const value = useMemo(
     () => ({
-      tenants,
-      selectedTenantId,
+      merchants,
+      selectedMerchantId,
       selectedLocationId,
-      selectedTenant:
-        tenants.find((tenant) => tenant.id === selectedTenantId) || capabilities?.tenant || null,
+      selectedMerchant:
+        merchants.find((merchant) => merchant.id === selectedMerchantId) ||
+        capabilities?.merchant ||
+        null,
       selectedLocation: capabilities?.selectedLocation || null,
       capabilities,
       loading,
       error,
-      setSelectedTenantId,
+      setSelectedMerchantId,
       setSelectedLocationId,
-      updateSelectedTenant,
+      updateSelectedMerchant,
       isProductActive: (productKey) => isProductActive(productKey, capabilities),
       canShowModule: (moduleKey) => canShowModule(moduleKey, capabilities),
       visibleModules: getVisibleModules(capabilities),
     }),
     [
-      tenants,
-      selectedTenantId,
+      merchants,
+      selectedMerchantId,
       selectedLocationId,
       capabilities,
       loading,
       error,
-      updateSelectedTenant,
+      updateSelectedMerchant,
     ],
   );
 
-  return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;
+  return <MerchantContext.Provider value={value}>{children}</MerchantContext.Provider>;
 }
 
-export function useTenant() {
-  return useContext(TenantContext);
+export function useMerchant() {
+  return useContext(MerchantContext);
 }

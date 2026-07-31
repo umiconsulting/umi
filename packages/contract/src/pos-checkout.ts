@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  BusinessDate,
+  MerchantDate,
   CorrelationId,
   CurrencyCode,
   IsoTimestamp,
@@ -82,7 +82,7 @@ export const TotalsConfirmation = z
 export const CheckoutCommand = z
   .object({
     cartId: Uuid,
-    branchId: Uuid,
+    locationId: Uuid,
     operatorSessionId: Uuid,
     expectedCartVersion: z.number().int().positive(),
     paymentMethod: PaymentMethod,
@@ -140,7 +140,7 @@ export const CheckoutResult = z
   .strict();
 export const PaymentStatusQuery = z
   .object({
-    branchId: Uuid,
+    locationId: Uuid,
     operatorSessionId: Uuid,
   })
   .strict();
@@ -171,5 +171,5 @@ export const posCheckoutModels = {
   PaymentStatusQuery,
   CartItem,
   CurrencyCode,
-  BusinessDate,
+  MerchantDate,
 };

@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from './auth.guard';
-import { TenantAccessGuard } from './tenant-access.guard';
+import { MerchantAccessGuard } from './merchant-access.guard';
 import { EntitlementGuard } from './entitlement.guard';
 import { RolesGuard } from './roles.guard';
 import { REQUIRE_PRODUCT } from './require-product.decorator';
@@ -55,23 +55,23 @@ describe('AuthGuard', () => {
   });
 });
 
-describe('TenantAccessGuard', () => {
+describe('MerchantAccessGuard', () => {
   it('404s when the user has no active membership', async () => {
     const repo = {
       findMembershipAccess: vi.fn().mockResolvedValue(null),
-      tenantIdForSlug: vi.fn(),
+      merchantIdForSlug: vi.fn(),
     };
-    const guard = new TenantAccessGuard(repo as never);
-    const req = { authUser: { id: 'u1' }, params: { tenantId: ACCESS } };
+    const guard = new MerchantAccessGuard(repo as never);
+    const req = { authUser: { id: 'u1' }, params: { merchantId: ACCESS } };
     await expect(guard.canActivate(ctxFor(req))).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('resolves a slug → tenant and attaches membership access', async () => {
+  it('resolves a slug → merchant and attaches membership access', async () => {
     const repo = {
-      tenantIdForSlug: vi.fn().mockResolvedValue(ACCESS),
+      merchantIdForSlug: vi.fn().mockResolvedValue(ACCESS),
       findMembershipAccess: vi.fn().mockResolvedValue({
         membershipId: 'm1',
-        tenantId: ACCESS,
+        merchantId: ACCESS,
         slug: 'kala',
         name: 'Kala',
         timezone: 'America/Mexico_City',
@@ -79,14 +79,14 @@ describe('TenantAccessGuard', () => {
         permissions: ['cash.read'],
       }),
     };
-    const guard = new TenantAccessGuard(repo as never);
+    const guard = new MerchantAccessGuard(repo as never);
     const req: Record<string, unknown> = {
       authUser: { id: 'u1' },
       params: { slug: 'kala' },
     };
     expect(await guard.canActivate(ctxFor(req))).toBe(true);
-    expect(repo.tenantIdForSlug).toHaveBeenCalledWith('kala');
-    expect((req.tenantAccess as { role: string }).role).toBe('owner');
+    expect(repo.merchantIdForSlug).toHaveBeenCalledWith('kala');
+    expect((req.merchantAccess as { role: string }).role).toBe('owner');
   });
 });
 
@@ -105,7 +105,7 @@ describe('EntitlementGuard', () => {
     );
     const repo = { productStatus: vi.fn().mockResolvedValue('canceled') };
     const guard = new EntitlementGuard(reflector, repo as never);
-    const req = { tenantAccess: { tenantId: ACCESS } };
+    const req = { merchantAccess: { merchantId: ACCESS } };
     await expect(guard.canActivate(ctxFor(req))).rejects.toBeInstanceOf(ForbiddenException);
   });
 
@@ -115,7 +115,7 @@ describe('EntitlementGuard', () => {
     );
     const repo = { productStatus: vi.fn().mockResolvedValue('trialing') };
     const guard = new EntitlementGuard(reflector, repo as never);
-    expect(await guard.canActivate(ctxFor({ tenantAccess: { tenantId: ACCESS } }))).toBe(true);
+    expect(await guard.canActivate(ctxFor({ merchantAccess: { merchantId: ACCESS } }))).toBe(true);
   });
 });
 
@@ -127,7 +127,7 @@ describe('RolesGuard', () => {
       k === ROLES_KEY ? ['owner'] : undefined,
     );
     const guard = new RolesGuard(reflector);
-    const req = { tenantAccess: { roles: ['staff'], permissions: [] } };
+    const req = { merchantAccess: { roles: ['staff'], permissions: [] } };
     expect(() => guard.canActivate(ctxFor(req))).toThrow(ForbiddenException);
   });
 
@@ -136,7 +136,7 @@ describe('RolesGuard', () => {
       k === ROLES_KEY ? ['owner', 'admin'] : undefined,
     );
     const guard = new RolesGuard(reflector);
-    const req = { tenantAccess: { roles: ['admin'], permissions: [] } };
+    const req = { merchantAccess: { roles: ['admin'], permissions: [] } };
     expect(guard.canActivate(ctxFor(req))).toBe(true);
   });
 });

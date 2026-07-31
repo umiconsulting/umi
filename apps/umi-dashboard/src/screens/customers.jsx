@@ -493,7 +493,7 @@ function CustomerProfile({ customerId }) {
       <section className="customer-profile placeholder danger-state">
         <I.AlertTriangle size={30} />
         <strong>Customer not found</strong>
-        <span>{error || 'The selected customer is not available for this tenant.'}</span>
+        <span>{error || 'The selected customer is not available for this merchant.'}</span>
         <Link className="btn btn-secondary btn-sm" to="/customers">
           Back to Customers
         </Link>

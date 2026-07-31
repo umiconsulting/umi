@@ -5,7 +5,7 @@
 
 -- Roles (cluster-global; no 'umi_' prefix). Load-bearing distinction:
 --   api      = request path, RLS-ENFORCED (no bypass)
---   worker   = background jobs, BYPASSRLS (cross-tenant machinery)
+--   worker   = background jobs, BYPASSRLS (cross-merchant machinery)
 --   readonly = reporting / diagnostics
 do $$
 begin
@@ -16,13 +16,13 @@ end $$;
 
 -- Schemas
 create schema if not exists umi;
-create schema if not exists tenant;
+create schema if not exists merchant;
 create schema if not exists runtime;
 
 -- Extensions (own schema, matches Supabase layout)
 create schema if not exists extensions;
 create extension if not exists vector schema extensions;   -- pgvector -> runtime.*_embedding
--- digest() for the tenant.audit_event hash chain. Same schema discipline as pgvector:
+-- digest() for the merchant.audit_event hash chain. Same schema discipline as pgvector:
 -- it lives in `extensions` and is always called qualified (extensions.digest), so the
 -- search_path can never decide which implementation a security-definer trigger gets.
 create extension if not exists pgcrypto schema extensions;
@@ -41,7 +41,7 @@ create extension if not exists pgcrypto schema extensions;
 -- at every call site, which is noise nobody will maintain.
 --
 -- `extensions` goes LAST on the path, after the app schemas, so an extension can never
--- shadow a umi/tenant/runtime object. SECURITY DEFINER functions are unaffected: they
+-- shadow a umi/merchant/runtime object. SECURITY DEFINER functions are unaffected: they
 -- pin `search_path = pg_catalog` individually.
 --
 -- Set on the DATABASE, not on the roles. `alter role ... set search_path` applies to the
@@ -69,7 +69,7 @@ end $$;
 -- have (BACKFILL_METHODOLOGY L15).
 --
 -- ⚠️ This deliberately does NOT reproduce prod `core.normalize_phone`. That function
--- (and customers.service.ts) carry an identical FATAL branch —
+-- (and customers.service.ts) carry an identical FATAL location —
 --   length(d)=11 AND left(d,1)='1' -> '+52'||right(d,10)
 -- — which strips the `+` BEFORE deciding the country, so a real NANP number
 -- (+1 480 401 6182) is rewritten into a Mexican number that belongs to nobody.
@@ -110,18 +110,18 @@ create or replace function umi.e164(p_raw text) returns text
 $$;
 
 -- Compatibility wrapper: the canonical implementation is umi.e164 (single source).
-create or replace function tenant.normalize_phone(p_phone text) returns text
+create or replace function merchant.normalize_phone(p_phone text) returns text
   language sql immutable
   set search_path = pg_catalog as $$ select umi.e164(p_phone) $$;
 
 -- Per-channel normalization dispatch. phone-family -> E.164; email -> lowercased;
 -- everything else -> trimmed raw (NULL when empty). Called by identity.resolver.
-create or replace function tenant.normalize_identity(p_channel text, p_value text) returns text
+create or replace function merchant.normalize_identity(p_channel text, p_value text) returns text
   language sql immutable
   set search_path = pg_catalog as $$
   select case
     when p_value is null or btrim(p_value) = '' then null
-    when p_channel in ('phone', 'whatsapp', 'sms')  then tenant.normalize_phone(p_value)
+    when p_channel in ('phone', 'whatsapp', 'sms')  then merchant.normalize_phone(p_value)
     when p_channel = 'email'                         then lower(btrim(p_value))
     else nullif(btrim(p_value), '')
   end;

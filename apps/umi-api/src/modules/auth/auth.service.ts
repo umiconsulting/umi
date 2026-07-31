@@ -5,7 +5,7 @@ import { PasswordService } from '../../shared/auth/password.service';
 import { JwtService } from '../../shared/auth/jwt.service';
 import { EmailAdapter } from '../../shared/adapters/email.adapter';
 import type { AppConfig } from '../../shared/config/config.schema';
-import { AuthRepository, type TenantMembershipSummary } from './auth.repository';
+import { AuthRepository, type MerchantMembershipSummary } from './auth.repository';
 
 export interface SessionUser {
   id: string;
@@ -20,7 +20,7 @@ export interface TokenPair {
 
 export interface LoginResult extends TokenPair {
   user: SessionUser;
-  tenants: TenantMembershipSummary[];
+  merchants: MerchantMembershipSummary[];
 }
 
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 min, mirrors the dashboard
@@ -62,11 +62,11 @@ export class AuthService {
       email: credential.email,
       displayName: credential.displayName,
     };
-    const [tenants, tokens] = await Promise.all([
-      this.repo.findTenantsForUser(user.id),
+    const [merchants, tokens] = await Promise.all([
+      this.repo.findMerchantsForUser(user.id),
       this.issueTokens(user),
     ]);
-    return { user, tenants, ...tokens };
+    return { user, merchants, ...tokens };
   }
 
   /** Rotate the access token from a valid refresh token. */
@@ -79,27 +79,27 @@ export class AuthService {
       email: summary.email,
       displayName: summary.displayName,
     };
-    const [tenants, tokens] = await Promise.all([
-      this.repo.findTenantsForUser(user.id),
+    const [merchants, tokens] = await Promise.all([
+      this.repo.findMerchantsForUser(user.id),
       this.issueTokens(user),
     ]);
-    return { user, tenants, ...tokens };
+    return { user, merchants, ...tokens };
   }
 
   /** Rehydrate the session for `/me` from a verified access cookie. */
   async session(
     userId: string,
-  ): Promise<{ user: SessionUser; tenants: TenantMembershipSummary[] }> {
+  ): Promise<{ user: SessionUser; merchants: MerchantMembershipSummary[] }> {
     const summary = await this.repo.findUserById(userId);
     if (!summary) throw new UnauthorizedException('invalid_token');
-    const [tenants] = await Promise.all([this.repo.findTenantsForUser(userId)]);
+    const [merchants] = await Promise.all([this.repo.findMerchantsForUser(userId)]);
     return {
       user: {
         id: summary.userId,
         email: summary.email,
         displayName: summary.displayName,
       },
-      tenants,
+      merchants,
     };
   }
 

@@ -41,7 +41,7 @@ describe('VoiceService.getVoiceSettings', () => {
   let h: ReturnType<typeof make>;
   beforeEach(() => (h = make()));
 
-  it('shapes a stored voice row: preset + name + business-name default', async () => {
+  it('shapes a stored voice row: preset + name + merchant-name default', async () => {
     h.repo.read.mockResolvedValue({
       businessName: 'Kalala',
       voice: { assistant_name: 'Kala', tone_preset: 'formal' },

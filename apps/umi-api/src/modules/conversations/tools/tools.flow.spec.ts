@@ -5,7 +5,7 @@ import type { ProductRecord } from './product-search';
 import type { ToolContext } from '../turn.types';
 
 const CTX: ToolContext = {
-  tenantId: 't1',
+  merchantId: 't1',
   personId: 'p1',
   conversationId: 'c1',
   turnId: 'turn-9',
@@ -102,7 +102,7 @@ describe('CheckoutTools.confirmOrder', () => {
       isWithinOrderHours: vi.fn().mockResolvedValue(true),
       getOrdersClosedMessage: vi.fn().mockResolvedValue('cerrado'),
     };
-    // Default: a single-branch tenant that resolves to its sole location.
+    // Default: a single-location merchant that resolves to its sole location.
     locations = {
       resolve: vi.fn().mockResolvedValue({
         kind: 'resolved',
@@ -126,7 +126,7 @@ describe('CheckoutTools.confirmOrder', () => {
     expect(conversations.setDraftCart).toHaveBeenCalledWith('c1', null);
   });
 
-  it('writes the branch the fulfillment policy resolved', async () => {
+  it('writes the location the fulfillment policy resolved', async () => {
     locations.resolve.mockResolvedValue({
       kind: 'resolved',
       locationId: 'loc-b',
@@ -137,10 +137,10 @@ describe('CheckoutTools.confirmOrder', () => {
     expect(orders.createOrder.mock.calls[0][0].locationId).toBe('loc-b');
   });
 
-  it('asks which branch (needs_input) when the policy needs a selection, without writing or losing the order', async () => {
+  it('asks which location (needs_input) when the policy needs a selection, without writing or losing the order', async () => {
     locations.resolve.mockResolvedValue({
       kind: 'needs_selection',
-      branches: [
+      locations: [
         { id: 'loc-a', name: 'Roma' },
         { id: 'loc-b', name: 'Condesa' },
       ],
@@ -149,11 +149,11 @@ describe('CheckoutTools.confirmOrder', () => {
     expect(r.success).toBe(false);
     expect(r.error_type).toBe('needs_input');
     expect(orders.createOrder).not.toHaveBeenCalled();
-    // Order preserved: the draft cart is NOT cleared while we ask for the branch.
+    // Order preserved: the draft cart is NOT cleared while we ask for the location.
     expect(conversations.setDraftCart).not.toHaveBeenCalled();
   });
 
-  it('degrades to a NULL location (never blocks the order) when the tenant has no active branch', async () => {
+  it('degrades to a NULL location (never blocks the order) when the merchant has no active location', async () => {
     locations.resolve.mockResolvedValue({ kind: 'none' });
     const r = await build().confirmOrder(CTX, {});
     expect(r.success).toBe(true);
@@ -220,7 +220,7 @@ describe('CheckoutTools.reorderLastOrder', () => {
       isWithinOrderHours: vi.fn().mockResolvedValue(true),
       getOrdersClosedMessage: vi.fn().mockResolvedValue('cerrado'),
     };
-    // Default: a single-branch tenant that resolves to its sole location.
+    // Default: a single-location merchant that resolves to its sole location.
     locations = {
       resolve: vi.fn().mockResolvedValue({
         kind: 'resolved',
@@ -231,7 +231,7 @@ describe('CheckoutTools.reorderLastOrder', () => {
     };
   });
 
-  it('stamps the sole location for a single-branch tenant', async () => {
+  it('stamps the sole location for a single-location merchant', async () => {
     const r = await build().reorderLastOrder(CTX, {});
     expect(r.success).toBe(true);
     expect(orders.createOrder).toHaveBeenCalledTimes(1);
@@ -242,7 +242,7 @@ describe('CheckoutTools.reorderLastOrder', () => {
     );
   });
 
-  it('writes the branch the fulfillment policy resolved', async () => {
+  it('writes the location the fulfillment policy resolved', async () => {
     locations.resolve.mockResolvedValue({
       kind: 'resolved',
       locationId: 'loc-b',
@@ -253,10 +253,10 @@ describe('CheckoutTools.reorderLastOrder', () => {
     expect(orders.createOrder.mock.calls[0][0].locationId).toBe('loc-b');
   });
 
-  it('asks which branch (needs_input) when the policy needs a selection, without recreating the order', async () => {
+  it('asks which location (needs_input) when the policy needs a selection, without recreating the order', async () => {
     locations.resolve.mockResolvedValue({
       kind: 'needs_selection',
-      branches: [
+      locations: [
         { id: 'loc-a', name: 'Roma' },
         { id: 'loc-b', name: 'Condesa' },
       ],
@@ -268,7 +268,7 @@ describe('CheckoutTools.reorderLastOrder', () => {
     expect(conversations.setDraftCart).not.toHaveBeenCalled();
   });
 
-  it('degrades to a NULL location (never blocks the reorder) when the tenant has no active branch', async () => {
+  it('degrades to a NULL location (never blocks the reorder) when the merchant has no active location', async () => {
     locations.resolve.mockResolvedValue({ kind: 'none' });
     const r = await build().reorderLastOrder(CTX, {});
     expect(r.success).toBe(true);

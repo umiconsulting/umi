@@ -1,16 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { TenantAccess } from '../auth/auth.types';
+import type { MerchantAccess } from '../auth/auth.types';
 import {
-  TenantsRepository,
+  MerchantsRepository,
   type LocationRow,
   type LocationProfileRow,
   type ProductInstance,
-  type TenantSummary,
-} from './tenants.repository';
+  type MerchantSummary,
+} from './merchants.repository';
 import { buildModuleAvailability, type ModuleAvailability } from './module-registry';
 
 export interface Capabilities {
-  tenant: {
+  merchant: {
     id: string;
     slug: string;
     name: string;
@@ -32,27 +32,27 @@ export interface Capabilities {
 }
 
 /**
- * Tenant shell: the `/me/tenants` switcher, the `capabilities` payload the
+ * Merchant shell: the `/me/merchants` switcher, the `capabilities` payload the
  * dashboard loads on entry (products + locations + module availability), and
  * settings/location admin writes. Membership comes from the guard-resolved
- * `TenantAccess` — no re-query.
+ * `MerchantAccess` — no re-query.
  */
 @Injectable()
-export class TenantsService {
-  constructor(private readonly repo: TenantsRepository) {}
+export class MerchantsService {
+  constructor(private readonly repo: MerchantsRepository) {}
 
-  listUserTenants(userId: string): Promise<TenantSummary[]> {
-    return this.repo.tenantsForUser(userId);
+  listUserMerchants(userId: string): Promise<MerchantSummary[]> {
+    return this.repo.merchantsForUser(userId);
   }
 
   async buildCapabilities(
-    access: TenantAccess,
+    access: MerchantAccess,
     selectedLocationId: string | null,
   ): Promise<Capabilities> {
     const [products, locations, branding] = await Promise.all([
-      this.repo.loadProducts(access.tenantId),
-      this.repo.loadLocations(access.tenantId),
-      this.repo.loadBranding(access.tenantId),
+      this.repo.loadProducts(access.merchantId),
+      this.repo.loadLocations(access.merchantId),
+      this.repo.loadBranding(access.merchantId),
     ]);
 
     const selectedLocation = selectedLocationId
@@ -66,8 +66,8 @@ export class TenantsService {
       permissions: access.permissions,
     };
     const base = {
-      tenant: {
-        id: access.tenantId,
+      merchant: {
+        id: access.merchantId,
         slug: access.slug,
         name: access.name,
         timezone: access.timezone,
@@ -84,7 +84,7 @@ export class TenantsService {
 
   /**
    * The dashboard settings/theming payload. Branding comes from the build-v3
-   * home — the typed `tenant.business.brand_color` / `secondary_color` columns —
+   * home — the typed `merchant.merchant.brand_color` / `secondary_color` columns —
    * NOT the dead per-product `config` (build-v3's entitlement view carries none,
    * so that was structurally always the default). `subscriptionStatus` is the
    * café's real status from the entitlement view. Defaults apply only when a café
@@ -93,27 +93,27 @@ export class TenantsService {
   buildSettings(capabilities: Capabilities): Record<string, unknown> {
     const dashboard = capabilities.products.dashboard;
     return {
-      id: capabilities.tenant.id,
-      name: capabilities.tenant.name,
-      slug: capabilities.tenant.slug,
-      timezone: capabilities.tenant.timezone,
+      id: capabilities.merchant.id,
+      name: capabilities.merchant.name,
+      slug: capabilities.merchant.slug,
+      timezone: capabilities.merchant.timezone,
       subscriptionStatus: dashboard?.status?.toUpperCase?.() ?? 'ACTIVE',
-      primaryColor: capabilities.tenant.brandColor ?? '#B5605A',
-      secondaryColor: capabilities.tenant.secondaryColor ?? '#E8C9A3',
+      primaryColor: capabilities.merchant.brandColor ?? '#B5605A',
+      secondaryColor: capabilities.merchant.secondaryColor ?? '#E8C9A3',
       products: capabilities.products,
       locations: capabilities.locations,
     };
   }
 
   async updateSettings(
-    tenantId: string,
+    merchantId: string,
     patch: { name?: string; timezone?: string },
   ): Promise<void> {
-    await this.repo.updateTenantSettings(tenantId, patch);
+    await this.repo.updateMerchantSettings(merchantId, patch);
   }
 
   async updateLocation(
-    tenantId: string,
+    merchantId: string,
     locationId: string,
     patch: {
       name?: string;
@@ -123,16 +123,16 @@ export class TenantsService {
       descriptor?: string;
     },
   ): Promise<LocationProfileRow> {
-    // Don't pre-filter on status: updateLocation already scopes by tenant+id and
+    // Don't pre-filter on status: updateLocation already scopes by merchant+id and
     // returns null when absent, and gating on `active` would 404 any patch to an
     // inactive location — including reactivating it with status:'active'.
-    const updated = await this.repo.updateLocation(tenantId, locationId, patch);
+    const updated = await this.repo.updateLocation(merchantId, locationId, patch);
     if (!updated) throw new NotFoundException({ error: 'location_not_found' });
     return updated;
   }
 
-  /** Per-branch profiles (aliases + descriptor) for the dashboard branch editor. */
-  async listLocationProfiles(tenantId: string): Promise<LocationProfileRow[]> {
-    return this.repo.listLocationProfiles(tenantId);
+  /** Per-location profiles (aliases + descriptor) for the dashboard location editor. */
+  async listLocationProfiles(merchantId: string): Promise<LocationProfileRow[]> {
+    return this.repo.listLocationProfiles(merchantId);
   }
 }

@@ -1,5 +1,5 @@
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
-import { TONE_PRESET_KEYS, type TonePreset } from '../../conversations/business-config.service';
+import { TONE_PRESET_KEYS, type TonePreset } from '../../conversations/merchant-config.service';
 
 /**
  * Voice PATCH body — flat + every field optional (matches UpdateHoursDto idiom,

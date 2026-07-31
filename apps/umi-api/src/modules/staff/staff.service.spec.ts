@@ -9,8 +9,8 @@ function make() {
     update: vi.fn(),
     softDelete: vi.fn(),
   };
-  const tenants = { resolveLocationId: vi.fn().mockResolvedValue('loc-1') };
-  return { svc: new StaffService(repo as never, tenants as never), repo, tenants };
+  const merchants = { resolveLocationId: vi.fn().mockResolvedValue('loc-1') };
+  return { svc: new StaffService(repo as never, merchants as never), repo, merchants };
 }
 
 const ROW = {
@@ -44,7 +44,7 @@ describe('StaffService.create', () => {
       kds: true,
     });
     expect(dto.createdAt).toBe('2026-01-01T00:00:00.000Z');
-    expect(h.tenants.resolveLocationId).toHaveBeenCalledWith('t1', null);
+    expect(h.merchants.resolveLocationId).toHaveBeenCalledWith('t1', null);
   });
 
   it('requires a name', async () => {

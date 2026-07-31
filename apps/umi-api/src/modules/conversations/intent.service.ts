@@ -14,7 +14,7 @@ import { sanitizeOutput } from './security.service';
 export type IntentType =
   | 'location'
   | 'business_hours'
-  | 'business_info'
+  | 'merchant_info'
   | 'menu_search'
   | 'product_info'
   | 'add_to_cart'
@@ -42,7 +42,7 @@ export interface ExtractedIntent {
     | 'confirm_order_changes'
     | 'cancel_order'
     | 'reorder_last_order'
-    | 'get_business_info'
+    | 'get_merchant_info'
     | 'get_business_hours'
     | 'get_recent_customer_orders'
     | 'talk_only'
@@ -246,14 +246,14 @@ export function applyClarificationHeuristics(
 const INTENT_SYSTEM_PROMPT = `You extract structured intent from short WhatsApp messages for a cafe ordering assistant.
 Return ONLY valid JSON with this exact shape:
 {
-  "intent_type": "location | business_hours | business_info | menu_search | product_info | add_to_cart | modify_cart | confirm_order | cancel_order | repeat_last_order | clarification_response | unknown",
+  "intent_type": "location | business_hours | merchant_info | menu_search | product_info | add_to_cart | modify_cart | confirm_order | cancel_order | repeat_last_order | clarification_response | unknown",
   "confidence": "high | medium | low",
   "complete": true,
   "ambiguous": false,
   "is_revision": false,
   "references_prior_state": false,
   "clarification_target": "product | variant | pickup_person | confirmation | cancel_reason | unknown | null",
-  "tool_hint": "search_menu | add_to_cart | confirm_order | confirm_order_changes | cancel_order | reorder_last_order | get_business_info | get_business_hours | get_recent_customer_orders | talk_only | null",
+  "tool_hint": "search_menu | add_to_cart | confirm_order | confirm_order_changes | cancel_order | reorder_last_order | get_merchant_info | get_business_hours | get_recent_customer_orders | talk_only | null",
   "entities": {
     "query": "string optional",
     "quantity": 1,

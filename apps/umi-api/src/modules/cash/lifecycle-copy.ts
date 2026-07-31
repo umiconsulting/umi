@@ -7,11 +7,11 @@ export type LifecycleJourneyKey =
   'first_visit' | 'milestone_halfway' | 'milestone_one_left' | 'reward_earned';
 
 export const DEFAULT_LIFECYCLE_COPY: Record<LifecycleJourneyKey, string> = {
-  first_visit: '¡Bienvenido a {tenant}, {name}! 🎉 Acumulaste tu primer sello.',
+  first_visit: '¡Bienvenido a {merchant}, {name}! 🎉 Acumulaste tu primer sello.',
   milestone_halfway:
-    '¡Vas a la mitad! {visitsThisCycle}/{visitsRequired} sellos hacia tu {rewardName} en {tenant}.',
+    '¡Vas a la mitad! {visitsThisCycle}/{visitsRequired} sellos hacia tu {rewardName} en {merchant}.',
   milestone_one_left: '¡{name}, solo te falta 1 visita para tu {rewardName}! 🚀',
-  reward_earned: '🎉 ¡Ganaste {rewardName}! Pasa a canjearla en {tenant}.',
+  reward_earned: '🎉 ¡Ganaste {rewardName}! Pasa a canjearla en {merchant}.',
 };
 
 /** `{var}` interpolation; unknown vars are left literally in place (bug signal). */
@@ -22,7 +22,7 @@ export function renderTemplate(template: string, vars: Record<string, string | n
   });
 }
 
-/** Tenant override (programs.branding.lifecycle_copy[journey]) else the default. */
+/** Merchant override (programs.branding.lifecycle_copy[journey]) else the default. */
 export function resolveJourneyTemplate(
   lifecycleCopy: unknown,
   journey: LifecycleJourneyKey,

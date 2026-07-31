@@ -17,10 +17,10 @@ import { needsInputToolError, retryableToolError, terminalToolError } from './to
 /**
  * Checkout tools: confirm_order, reorder_last_order, cancel_order. Ported from
  * `tools.ts`; orders rebound from the legacy `transactions` table to
- * `tenant.customer_order`+`tenant.order_item` (OrdersRepository). Idempotent on
+ * `merchant.customer_order`+`merchant.order_item` (OrdersRepository). Idempotent on
  * `conversaflow:turn:<turn_id>` (the bug fix — a retried turn never duplicates an
  * order). Partial-cancellation (`confirm_order_changes`, the partial cancel
- * branch) is KDS-owned → deferred to Phase 4 (inert here).
+ * location) is KDS-owned → deferred to Phase 4 (inert here).
  *
  * `personal_message` is no longer collected: it never had a column (it rode in the
  * dropped `details` blob), appears on 0 of 51 source orders, and its only display was
@@ -43,19 +43,19 @@ export class CheckoutTools {
   }
 
   /**
-   * The branch a WhatsApp order is written to — the write side of the
+   * The location a WhatsApp order is written to — the write side of the
    * fulfillment-location policy (see OrderLocationResolver). Resolved by data:
-   * a bound number / sole branch / prior customer choice writes directly; a
-   * multi-branch tenant with no choice returns `{ ok: false, ask }` so the bot
+   * a bound number / sole location / prior customer choice writes directly; a
+   * multi-location merchant with no choice returns `{ ok: false, ask }` so the bot
    * asks "¿de qué sucursal?" before any write, leaving the in-flight order
-   * intact. A tenant with no active branch degrades to a NULL location rather
+   * intact. A merchant with no active location degrades to a NULL location rather
    * than blocking the order.
    */
   private async resolveOrderLocation(
     ctx: ToolContext,
   ): Promise<{ ok: true; locationId: string | null } | { ok: false; ask: ToolResult }> {
     const resolution = await this.locations.resolve({
-      tenantId: ctx.tenantId,
+      merchantId: ctx.merchantId,
       conversationId: ctx.conversationId,
       channelLocationId: ctx.locationId ?? null,
     });
@@ -63,29 +63,29 @@ export class CheckoutTools {
       return { ok: true, locationId: resolution.locationId };
     }
     if (resolution.kind === 'none') {
-      // Misconfigured tenant (no active branch) — never block ordering over it.
+      // Misconfigured merchant (no active location) — never block ordering over it.
       return { ok: true, locationId: null };
     }
-    const names = resolution.branches.map((b) => b.name).join(', ');
+    const names = resolution.locations.map((b) => b.name).join(', ');
     return {
       ok: false,
       ask: needsInputToolError(
         'Falta elegir la sucursal para este pedido.',
-        `Pregúntale al cliente de qué sucursal quiere ordenar (opciones: ${names}) y usa set_branch. No pierdas su pedido.`,
+        `Pregúntale al cliente de qué sucursal quiere ordenar (opciones: ${names}) y usa set_location. No pierdas su pedido.`,
       ),
     };
   }
 
   /** Re-validate + re-price cart items against the live catalog (pesos). */
   private async validateItems(
-    tenantId: string,
+    merchantId: string,
     items: DraftCart['items'],
   ): Promise<
     { ok: true; items: OrderItemSnapshot[]; total: number } | { ok: false; error: ToolResult }
   > {
     if (!items.length)
       return { ok: false, error: terminalToolError('No hay productos en la orden.') };
-    const productMap = await this.products.getByIds(tenantId, [
+    const productMap = await this.products.getByIds(merchantId, [
       ...new Set(items.map((it) => it.product_id)),
     ]);
     const validated: OrderItemSnapshot[] = [];
@@ -126,21 +126,21 @@ export class CheckoutTools {
   }
 
   private async assertOrderingOpen(ctx: ToolContext): Promise<ToolResult | null> {
-    const orderingCheck = await this.hours.checkOrderingEnabled(ctx.tenantId);
+    const orderingCheck = await this.hours.checkOrderingEnabled(ctx.merchantId);
     if (!orderingCheck.enabled) {
       return terminalToolError(
         orderingCheck.disabledMessage ?? 'Los pedidos por WhatsApp están temporalmente pausados.',
       );
     }
     const within = await this.hours.isWithinOrderHours(
-      ctx.tenantId,
+      ctx.merchantId,
       ctx.locationId ?? null,
       new Date(),
       ctx.customerPhone,
     );
     if (!within) {
       return terminalToolError(
-        await this.hours.getOrdersClosedMessage(ctx.tenantId, ctx.locationId ?? null),
+        await this.hours.getOrdersClosedMessage(ctx.merchantId, ctx.locationId ?? null),
       );
     }
     return null;
@@ -163,18 +163,18 @@ export class CheckoutTools {
     const closed = await this.assertOrderingOpen(ctx);
     if (closed) return closed;
 
-    const validation = await this.validateItems(ctx.tenantId, cart.items);
+    const validation = await this.validateItems(ctx.merchantId, cart.items);
     if (!validation.ok) return validation.error;
 
-    // Branch gate: for a multi-branch tenant with no chosen branch yet, this
-    // returns an "ask the customer which branch" result. Returning before
+    // Location gate: for a multi-location merchant with no chosen location yet, this
+    // returns an "ask the customer which location" result. Returning before
     // createOrder leaves the draft cart intact (it is cleared only after a
     // successful write), so the order is not forgotten.
     const location = await this.resolveOrderLocation(ctx);
     if (!location.ok) return location.ask;
 
     const result = await this.orders.createOrder({
-      tenantId: ctx.tenantId,
+      merchantId: ctx.merchantId,
       personId: ctx.personId,
       locationId: location.locationId,
       items: validation.items,
@@ -201,7 +201,7 @@ export class CheckoutTools {
     const closed = await this.assertOrderingOpen(ctx);
     if (closed) return closed;
 
-    const recent = await this.orders.recentOrders(ctx.tenantId, ctx.personId, 5);
+    const recent = await this.orders.recentOrders(ctx.merchantId, ctx.personId, 5);
     const last = recent.find((o) => o.status !== 'canceled' && o.items.length > 0);
     if (!last) {
       return terminalToolError('No encontré una orden previa reutilizable para repetir.');
@@ -210,14 +210,14 @@ export class CheckoutTools {
     // Re-validate + re-price the historical items against the LIVE catalog (same
     // path confirmOrder uses) so a reorder never recreates a discontinued variant
     // or a stale price.
-    const revalidated = await this.validateItems(ctx.tenantId, last.items);
+    const revalidated = await this.validateItems(ctx.merchantId, last.items);
     if (!revalidated.ok) return revalidated.error;
 
     const location = await this.resolveOrderLocation(ctx);
     if (!location.ok) return location.ask;
 
     const result = await this.orders.createOrder({
-      tenantId: ctx.tenantId,
+      merchantId: ctx.merchantId,
       personId: ctx.personId,
       locationId: location.locationId,
       items: revalidated.items,
@@ -240,9 +240,9 @@ export class CheckoutTools {
   }
 
   async cancelOrder(ctx: ToolContext, reason: string): Promise<ToolResult> {
-    // A draft cart (an order still being ASSEMBLED, not yet placed in tenant."order")
+    // A draft cart (an order still being ASSEMBLED, not yet placed in merchant."order")
     // is what "cancel" means while the customer is still building their order.
-    // Clear it FIRST: cancel_order used to only touch confirmed tenant."order", so a
+    // Clear it FIRST: cancel_order used to only touch confirmed merchant."order", so a
     // cancel left the in-progress cart intact and it reappeared on the next add.
     const conv = await this.conversations.loadById(ctx.conversationId);
     const draftCart = (conv?.draftCart as DraftCart | null) ?? null;
@@ -257,7 +257,7 @@ export class CheckoutTools {
     }
 
     // No draft cart → cancel the most recent confirmed order the kitchen hasn't started.
-    const recent = await this.orders.recentOrders(ctx.tenantId, ctx.personId, 5);
+    const recent = await this.orders.recentOrders(ctx.merchantId, ctx.personId, 5);
     if (!recent.length) {
       return terminalToolError('No encontré ningún pedido activo para tu cuenta.');
     }
@@ -279,7 +279,7 @@ export class CheckoutTools {
       );
     }
 
-    await this.orders.markCancelled(ctx.tenantId, cancellable.id, reason);
+    await this.orders.markCancelled(ctx.merchantId, cancellable.id, reason);
     const trimmedReason = reason?.trim();
     const replyBody = trimmedReason
       ? `Tu pedido fue cancelado exitosamente.\nMotivo: ${trimmedReason}`

@@ -3,8 +3,8 @@ import { PgService } from '../../shared/database/pg.service';
 import { writeOrder } from '../../shared/orders/order-writer';
 
 /**
- * `tenant.customer_order` + `tenant.order_item` + `tenant.order_event` reads/writes
- * for the bot checkout (build-v3; was `tenant."order"`, and `ops.orders` before that).
+ * `merchant.customer_order` + `merchant.order_item` + `merchant.order_event` reads/writes
+ * for the bot checkout (build-v3; was `merchant."order"`, and `ops.orders` before that).
  *
  * What the build-v3 order model changed here (see ORDER_MODEL.md):
  *
@@ -14,21 +14,21 @@ import { writeOrder } from '../../shared/orders/order-writer';
  *   code wrote `'cancelled'`, which this CHECK rejects). `order_event` is the status
  *   spine, a thin `(order_id, status)` transition journal with a monotonic `sequence`
  *   for the polling KDS — not the former catch-all event log.
- * - **The total is DERIVED**, not stored: `tenant.order_total` sums the live lines, so
+ * - **The total is DERIVED**, not stored: `merchant.order_total` sums the live lines, so
  *   it cannot drift and self-heals when a line is voided.
  * - **The `details` jsonb is gone.** It held a denormalized copy of the lines plus a
  *   duplicate of the customer note. Lines now come from `order_item` (the only copy),
  *   and the note / `pickup_person` are named columns.
  * - **`source_transaction_id` → `external_ref`**, still the bot's idempotency key: the
- *   partial unique index on `(business_id, external_ref)` is what makes a retried turn
+ *   partial unique index on `(merchant_id, external_ref)` is what makes a retried turn
  *   return the same order instead of creating a duplicate.
  *
  * Money boundary: the tool layer is in PESOS; this is where it converts to CENTAVOS
  * (`order_item.unit_price`, `order_total.total`) and back.
  *
- * Pool: the RLS-ENFORCED app pool, scoped by an explicit tenant id. The WhatsApp path is
- * unauthenticated, so there is no request context to inherit — `runWithTenant` takes the
- * business the turn already resolved. A forgotten `business_id` predicate then returns
+ * Pool: the RLS-ENFORCED app pool, scoped by an explicit merchant id. The WhatsApp path is
+ * unauthenticated, so there is no request context to inherit — `runWithMerchant` takes the
+ * merchant the turn already resolved. A forgotten `merchant_id` predicate then returns
  * zero rows instead of another café's order.
  */
 
@@ -42,7 +42,7 @@ export interface OrderItemSnapshot {
 }
 
 export interface CreateOrderParams {
-  tenantId: string;
+  merchantId: string;
   personId: string;
   locationId: string | null;
   items: OrderItemSnapshot[]; // unit_price in PESOS
@@ -93,7 +93,7 @@ const ITEMS_JSON = `COALESCE(
             'quantity',     i.quantity,
             'unit_price',   i.unit_price / 100.0)
           ORDER BY i.display_order, i.created_at)
-     FROM tenant.order_item i
+     FROM merchant.order_item i
     WHERE i.order_id = o.id
       AND i.voided_at IS NULL
       AND i.product_id IS NOT NULL),
@@ -104,31 +104,31 @@ export class OrdersRepository {
   constructor(private readonly pg: PgService) {}
 
   /**
-   * Create a confirmed WhatsApp order: `tenant.customer_order` (status='placed') + its
+   * Create a confirmed WhatsApp order: `merchant.customer_order` (status='placed') + its
    * `order_item` lines + the opening `order_event`, in one transaction.
    *
    * Idempotent on `external_ref`: a retried turn conflicts on the partial unique index,
    * inserts nothing, and returns the existing order. The old code needed a second
    * idempotency key on the event to survive a partial commit; it no longer does, because
-   * the lines and the event are written only on the branch where the ORDER was created,
+   * the lines and the event are written only on the location where the ORDER was created,
    * inside that same transaction.
    */
   async createOrder(params: CreateOrderParams): Promise<CreateOrderResult> {
     // Each line's cents computed ONCE, then summed — so the number the customer is told
-    // matches what tenant.order_total will derive from the rows just written.
+    // matches what merchant.order_total will derive from the rows just written.
     const itemCents = params.items.map((it) => toCents(it.unit_price));
     const totalCents = params.items.reduce((s, it, i) => s + it.quantity * itemCents[i], 0);
 
-    return this.pg.runWithTenant(params.tenantId, null, async (client) => {
+    return this.pg.runWithMerchant(params.merchantId, null, async (client) => {
       // The order, its lines and its opening `order_event` are written by the shared
       // writer, not here. Forgetting that event makes an order invisible to the kitchen
       // silently, so it is not something a channel gets to remember for itself — the POS
       // is the second producer and this is now a seam rather than a convention.
       const written = await writeOrder(client, {
-        businessId: params.tenantId,
+        merchantId: params.merchantId,
         source: 'whatsapp',
         fulfillmentType: 'pickup',
-        branchId: params.locationId,
+        locationId: params.locationId,
         customerId: params.personId,
         externalRef: params.sourceTransactionId,
         notes: params.customerNote ?? null,
@@ -147,7 +147,7 @@ export class OrdersRepository {
         // rather than the one just computed — the two differ if the order was amended
         // (a line voided) between the original turn and this retry.
         const existing = await client.query<{ total: string | number }>(
-          `SELECT t.total FROM tenant.order_total t WHERE t.order_id = $1::uuid`,
+          `SELECT t.total FROM merchant.order_total t WHERE t.order_id = $1::uuid`,
           [written.orderId],
         );
         const row = existing.rows[0];
@@ -163,7 +163,7 @@ export class OrdersRepository {
   }
 
   /** Recent orders for a customer (newest first), with their live lines in PESOS. */
-  async recentOrders(tenantId: string, personId: string, limit: number): Promise<OrderSummary[]> {
+  async recentOrders(merchantId: string, personId: string, limit: number): Promise<OrderSummary[]> {
     const safeLimit = Math.max(1, Math.min(Number(limit) || 3, 10));
     const { rows } = await this.pg.tquery<{
       id: string;
@@ -174,7 +174,7 @@ export class OrdersRepository {
       ordered_at: string;
       items: OrderItemSnapshot[] | null;
     }>(
-      tenantId,
+      merchantId,
       `SELECT o.id::text,
               o.status,
               t.total,
@@ -182,12 +182,12 @@ export class OrdersRepository {
               o.pickup_person,
               COALESCE(o.placed_at, o.created_at) AS ordered_at,
               ${ITEMS_JSON}
-         FROM tenant.customer_order o
-         JOIN tenant.order_total t ON t.order_id = o.id
-        WHERE o.business_id = $1::uuid AND o.customer_id = $2::uuid
+         FROM merchant.customer_order o
+         JOIN merchant.order_total t ON t.order_id = o.id
+        WHERE o.merchant_id = $1::uuid AND o.customer_id = $2::uuid
         ORDER BY COALESCE(o.placed_at, o.created_at) DESC
         LIMIT $3`,
-      [tenantId, personId, safeLimit],
+      [merchantId, personId, safeLimit],
     );
     return rows.map((r) => ({
       id: r.id,
@@ -206,18 +206,18 @@ export class OrdersRepository {
    * Cancel an order: set `status='canceled'` + the reason, and append the matching
    * transition to the spine. One transaction.
    */
-  async markCancelled(tenantId: string, orderId: string, reason: string): Promise<boolean> {
-    return this.pg.runWithTenant(tenantId, null, async (client) => {
+  async markCancelled(merchantId: string, orderId: string, reason: string): Promise<boolean> {
+    return this.pg.runWithMerchant(merchantId, null, async (client) => {
       const res = await client.query(
-        `UPDATE tenant.customer_order
+        `UPDATE merchant.customer_order
             SET status = 'canceled', cancel_reason = $3, updated_at = now()
-          WHERE business_id = $1::uuid AND id = $2::uuid`,
-        [tenantId, orderId, reason?.trim() || null],
+          WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+        [merchantId, orderId, reason?.trim() || null],
       );
       if ((res.rowCount ?? 0) === 0) return false;
 
       await client.query(
-        `INSERT INTO tenant.order_event (order_id, status) VALUES ($1::uuid, 'canceled')`,
+        `INSERT INTO merchant.order_event (order_id, status) VALUES ($1::uuid, 'canceled')`,
         [orderId],
       );
       return true;

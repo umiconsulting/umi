@@ -123,10 +123,10 @@ export const configSchema = z
     ALLOW_INSECURE_TWILIO_WEBHOOK: booleanFromEnv.default(false),
     // Location-pin tool (geo). Optional; the tool degrades to text when unset.
     GOOGLE_MAPS_API_KEY: z.string().optional(),
-    // Tenant-resolution fallback (Phase 3): when an inbound WhatsApp number has no
-    // matching tenant.whatsapp_number row, messages resolve to this tenant. Lets the
-    // single live tenant keep working before its number is seeded in channel_accounts.
-    DEFAULT_TENANT_ID: z.string().uuid().optional(),
+    // Merchant-resolution fallback (Phase 3): when an inbound WhatsApp number has no
+    // matching merchant.whatsapp_number row, messages resolve to this merchant. Lets the
+    // single live merchant keep working before its number is seeded in channel_accounts.
+    DEFAULT_MERCHANT_ID: z.string().uuid().optional(),
     ZETTLE_CLIENT_ID: z.string().optional(),
     ZETTLE_API_KEY: z.string().optional(),
     SMTP_HOST: z.string().optional(),
