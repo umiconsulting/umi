@@ -17,7 +17,8 @@ export class UpdateHoursDto {
   @IsString()
   timezone?: string;
 
-  // Ordering-window settings → tenant.business.config (accepts/cutoff/notice/bypass).
+  // Ordering-window settings → the typed tenant.business.whatsapp_* columns
+  // (ordering_enabled / order_cutoff_minutes / ordering_notice / bypass_phone).
   @IsOptional()
   @IsObject()
   ordering?: OrderingPatch;

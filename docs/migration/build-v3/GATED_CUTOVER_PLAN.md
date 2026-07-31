@@ -105,20 +105,45 @@ Legend: ✅ done · 🔄 in flight · ⏳ pending · ◑ partial
   customer case as the `'person'` principal. Nothing to build. (Confirmed 2026-07-28 while
   reading this plan against the UmiPOS integration; `runtime.operator_session` follows the
   same discipline — a distinct presence table rather than another overload of `session`.)
-- ⏳ **hours** — typed `tenant.business_hours` + fold `open_hours`; drop the `business.config` read.
-  Two facts recovered from a stash 2026-07-29, both of which change the shape of this item:
-  **(1) There is real source data.** `docs/migration/2026-06-26-hours-unification.sql` was marked
-  GATED / not applied, and it had in fact been applied to production on 2026-06-27 — Kalala Café
-  has 7 `ops.business_hours` rows at its oldest active location. Whatever `tenant.business_hours`
-  becomes has to carry them; the header now records this.
-  **(2) The client half of the ordering window was never written.** `hours.service.ts` and both
-  controllers accept an `ordering` block, and `ordering-settings.repository` merge-writes it into
-  `tenant.business.config` — but `saveBusinessHours(hours, timezone)` in the dashboard takes two
-  arguments and there is no third. **`updateOrdering` has no caller.** The screen also hardcodes
-  its own state (a 45-minute cutoff, a Spanish notice string, three `+52` numbers as the bypass
-  list, and a permanent `badge: 'PAUSED'` in `shell.jsx`), so it shows an operator a bot
-  configuration that nothing reads or writes. Settle that contract in the SAME pass that moves
-  `business.config` — doing it afterwards means doing it across a column move.
+- ✅ **hours** — **DONE 2026-07-29.** 8 preflight failures cleared; `tenant.open_hours` and
+  `business.config` have no readers left. Not the shape this line originally predicted: there is
+  no `tenant.business_hours` table. Hours are the jsonb COLUMN build-v3 already chose, with a
+  branch override.
+  - **Shape.** `tenant.business.open_hours` + `tenant.branch.open_hours` (NULL = inherit),
+    mirroring `branch.timezone` one line above it. Derived from use: every reader wants the whole
+    week for one place and evaluates it in app code, and nothing filters on hours in SQL — so the
+    unit of read equals the unit of write, which is a document. The row table also could not
+    express a split shift (its UNIQUE index on `(tenant, location, day)` FORBADE the second
+    window), a date exception, or a window past midnight — the last one contradicting
+    `business_day_start`, which exists because businesses run past midnight.
+  - **`business.config` dissolved** into typed `business.whatsapp_*` columns per
+    CONVERSATION_MODEL §2c. Named for the channel deliberately: a neutral `ordering_enabled`
+    would eventually be wired to pause the POS too, and a café that stops taking WhatsApp orders
+    is still selling at the counter.
+  - **One evaluator.** `modules/business-hours/open-hours.ts` owns the document's meaning; the bot, the
+    dashboard and `cash-scan.isAfterHours` all call it. The register used to compare times in SQL,
+    which could not represent a café open past midnight — `01:00 >= closes_at` holds for every
+    window, so every late scan read as after-hours.
+  - **`ordering-settings.repository` was dead, not merely stale.** It looked up
+    `tenant.business WHERE business_id = $1 ORDER BY created_at LIMIT 1` and upserted
+    `ON CONFLICT (business_id)` — the shape of `ops.businesses`, a CHILD of `core.tenants`. In
+    build-v3 the business IS the tenant, so every part of that (the column, the ordering, the
+    LIMIT, the create-if-missing) answered a question that no longer exists.
+  - **The backfill was losing branches.** §3's fold grouped by `tenant_id` alone over a source
+    keyed by `(tenant, LOCATION, day)`, so a café with hours at two locations produced duplicate
+    day keys and `jsonb_object_agg` kept one arbitrarily, with no error. Demonstrated on a fixture:
+    two branches at 07:00–19:00 and 11:00–21:00 folded to 11:00–21:00 alone. Production had
+    already made that distinction — part 2b-bis of the 2026-06-26 migration exists because of it.
+    Now one document per location, and 4 reconcile invariants that count cafés and distinct
+    schedules rather than rows, because the loss was invisible in a row count.
+  - **The client half exists now.** `updateOrdering` had no caller: the dashboard's
+    `saveBusinessHours` took two arguments. It takes three, the pause persists on its own confirm,
+    and the screen no longer ships a hardcoded cutoff, notice, three real `+52` numbers, or a
+    permanent `badge: 'PAUSED'` in `shell.jsx` that told every café ordering was paused.
+  - ⏳ Left open: no dashboard affordance yet CREATES a branch override — the backfill is its only
+    writer, and `write()` deliberately saves where the value already lives so a routine save can
+    never silently fork a branch off the café's hours. `cash-scan.isAfterHours` reads café-level
+    hours because a staff scan carries no branch; revisit when the register carries its device's.
 - ⏳ **identity dissolution** — `contact_identity` / `channel` / `whatsapp_number` → the build-v3 model.
 - ⏳ **`90_rls.sql` booby-trap** — delete the hard-coded child-list rows in the _same_ commit that adds
   `business_id` to `station`/`order_event` (else `42710` aborts the whole RLS rebuild).
@@ -258,14 +283,15 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
   building `00→90` into a throwaway database and running the gate against it — no prod snapshot
   needed, so this number is reproducible on any machine with a Postgres. It is NOT comparable to
   the 81 below, which was measured against `umi_backfill_v3` with the source schemas present.
-  The remaining 26 are **four buckets, each owned by a named phase**:
+  **18 as of 2026-07-29** (was 26 — the hours bucket closed). Three buckets left, each
+  owned by a named phase:
 
-  | bucket     | n   | cause                                                                                    | owner              |
-  | ---------- | --- | ---------------------------------------------------------------------------------------- | ------------------ |
-  | gift cards | 8   | `loyalty_gift_card.amount_cents` / `redeemed_at`, `loyalty_gift_card_ledger.source_type` | P4 (cash deferred) |
-  | hours      | 8   | `tenant.open_hours` missing, `business.config`                                           | P1 hours           |
-  | slug       | 7   | `business.slug`, `branch.slug` / `aliases`                                               | P5                 |
-  | staff      | 3   | `staff.name` → `umi.user`                                                                | P1 (new)           |
+  | bucket     | n     | cause                                                                                    | owner              |
+  | ---------- | ----- | ---------------------------------------------------------------------------------------- | ------------------ |
+  | gift cards | 8     | `loyalty_gift_card.amount_cents` / `redeemed_at`, `loyalty_gift_card_ledger.source_type` | P4 (cash deferred) |
+  | slug       | 7     | `business.slug`, `branch.slug` / `aliases`                                               | P5                 |
+  | staff      | 3     | `staff.name` → `umi.user`                                                                | P1                 |
+  | ~~hours~~  | ~~8~~ | ~~`tenant.open_hours` missing, `business.config`~~ — **closed 2026-07-29**               | P1 ✅              |
 
   ⚠️ **The gate was over-reporting.** It scanned backtick spans over raw file text, so a doc
   comment that QUOTES SQL counted as a statement: `kds.repository.ts` explains a rewrite with

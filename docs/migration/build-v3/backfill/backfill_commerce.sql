@@ -107,9 +107,15 @@ where p.name_embedding is not null;
 --    open_hours COLUMN built from the typed ops.business_hours rows (Kalala only).
 --    DROPPED (no build-v3 home, deliberately not modeled): id, business_type,
 --      branding.{strip_image_url,pass_style,promo_message},  -- secondary_color now folded to a typed column
---      config.{payment_methods,order_cutoff_time,slack_channel_id,
---      slack_channel_name,accepts_whatsapp_orders,bypass_phones,special_notice},
+--      config.{payment_methods,slack_channel_id,slack_channel_name},
+--      config.order_cutoff_time — the LEGACY ABSOLUTE cutoff, deliberately not
+--        carried: it and order_cutoff_minutes are two answers to one question, and
+--        the live code already nulls it whenever the slider is set. One cutoff.
 --      config.hours/open_times (redundant with business_hours below).
+--    NOW CARRIED (they were on this dropped list until the hours track gave them
+--      typed columns — CONVERSATION_MODEL.md §2c dissolves `config`, it does not
+--      discard it): config.{accepts_whatsapp_orders, order_cutoff_minutes,
+--      special_notice, bypass_phones} -> tenant.business.whatsapp_*.
 --    FLAGGED to OTHER domains:
 --      config.whatsapp -> tenant.integration(provider='twilio')  [FOLDED BELOW, 3b]
 --      config.address  -> tenant.branch.address
@@ -121,6 +127,33 @@ update tenant.business b set
   secondary_color = coalesce(o.branding->>'secondary_color', b.secondary_color),
   assistant_name = coalesce(o.config->'voice'->>'assistant_name', b.assistant_name),
   assistant_tone = coalesce(o.config->'voice'->>'tone_preset', b.assistant_tone),
+  -- The ordering window, out of the blob and into typed columns. Each keeps the DDL
+  -- default when the blob is silent, which is why every one is a coalesce onto `b.*`.
+  whatsapp_ordering_enabled =
+    coalesce((o.config->>'accepts_whatsapp_orders')::boolean, b.whatsapp_ordering_enabled),
+  -- Guarded by the same 0..1440 the CHECK enforces: a blob value outside it would
+  -- abort the whole backfill, and the sane read of a nonsense cutoff is "unset".
+  whatsapp_order_cutoff_minutes = coalesce(
+    (select v from (select nullif(btrim(o.config->>'order_cutoff_minutes'), '')::integer as v) t
+      where t.v between 0 and 1440),
+    b.whatsapp_order_cutoff_minutes),
+  whatsapp_ordering_notice =
+    coalesce(nullif(btrim(o.config->>'special_notice'), ''), b.whatsapp_ordering_notice),
+  -- Canonicalized to `+<digits>` here, exactly as canonicalizePhone() does on write.
+  -- Production holds them as '+52 667 312 4480'; an inbound WhatsApp number arrives
+  -- as '+526673124480'. Carried verbatim the list would never match a single number,
+  -- and a bypass that never fires reports nothing to anybody.
+  whatsapp_bypass_phone = coalesce(
+    (select array_agg(
+              case when btrim(p) like '+%' then '+' || regexp_replace(p, '\D', '', 'g')
+                   else regexp_replace(p, '\D', '', 'g') end
+              order by ord)
+       from jsonb_array_elements_text(
+              case when jsonb_typeof(o.config->'bypass_phones') = 'array'
+                   then o.config->'bypass_phones' else '[]'::jsonb end
+            ) with ordinality as t(p, ord)
+      where regexp_replace(p, '\D', '', 'g') <> ''),
+    b.whatsapp_bypass_phone),
   updated_at  = now()
 from ops.businesses o
 where b.id = o.tenant_id;
@@ -143,24 +176,77 @@ select o.tenant_id,
 from ops.businesses o
 where nullif(btrim(coalesce(o.config->>'whatsapp', '')), '') is not null;
 
-with oh as (
-  select tenant_id,
+-- 3c. ops.business_hours -> tenant.business.open_hours + tenant.branch.open_hours
+--
+--     ⚠️ This USED to `group by tenant_id` alone. `ops.business_hours` is keyed by
+--     (tenant, LOCATION, day), so a café with hours at two locations produced two
+--     'mon' keys in one jsonb_object_agg — and jsonb_object_agg keeps the last one it
+--     happens to see, without an error. One branch's hours silently overwrote the
+--     other's, and nothing downstream could tell. Production has already made that
+--     distinction: part 2b-bis of docs/migration/2026-06-26-hours-unification.sql
+--     exists precisely BECAUSE rows lived at more than one location.
+--
+--     So: one document per (tenant, location). The café's own hours come from the
+--     branch the dashboard and the bot both resolve — the OLDEST ACTIVE one, mirroring
+--     resolveLocationIdWorker — falling back to location-less rows. A branch keeps an
+--     override ONLY where its document actually differs; anywhere it agrees it stays
+--     NULL and inherits, so an override means something when you see one.
+--
+--     A closed day is `[]` — a STATED closure, distinct from a missing key, which
+--     means the café never said. Both read as closed; only the second invites a
+--     writer to fill it in. `opens_at = closes_at` is the row table's old 00:00→00:00
+--     closed encoding and lands as `[]` too.
+with doc as (
+  select bh.tenant_id,
+         bh.location_id,
          jsonb_object_agg(
-           case day_of_week
-             when 0 then 'sun' when 1 then 'mon' when 2 then 'tue' when 3 then 'wed'
-             when 4 then 'thu' when 5 then 'fri' when 6 then 'sat' end,
-           case when is_closed or opens_at is null then '[]'::jsonb
+           (array['sun','mon','tue','wed','thu','fri','sat'])[bh.day_of_week + 1],
+           case when bh.is_closed
+                  or bh.opens_at is null or bh.closes_at is null
+                  or bh.opens_at = bh.closes_at then '[]'::jsonb
                 else jsonb_build_array(jsonb_build_object(
-                       'open',  to_char(opens_at,  'HH24:MI'),
-                       'close', to_char(closes_at, 'HH24:MI'))) end
+                       'open',  to_char(bh.opens_at,  'HH24:MI'),
+                       'close', to_char(bh.closes_at, 'HH24:MI'))) end
          ) as hours
-  from ops.business_hours
-  group by tenant_id
+    from ops.business_hours bh
+   where bh.day_of_week between 0 and 6
+   group by bh.tenant_id, bh.location_id
+),
+default_loc as (
+  select distinct on (tenant_id) tenant_id, id as location_id
+    from core.locations
+   where status = 'active'
+   order by tenant_id, created_at asc, id asc
+),
+business_doc as (
+  -- Preference order: the resolved branch, then location-less rows, then whatever
+  -- exists. The last case is a café whose only hours sit at a non-default branch —
+  -- it still gets real hours rather than an empty document, and the branch that
+  -- supplied them then compares equal and takes no override.
+  select d.tenant_id,
+         (array_agg(d.hours order by
+            (d.location_id is not distinct from dl.location_id) desc,
+            (d.location_id is null) desc,
+            d.location_id))[1] as hours
+    from doc d
+    left join default_loc dl on dl.tenant_id = d.tenant_id
+   group by d.tenant_id
+),
+set_business as (
+  update tenant.business b
+     set open_hours = bd.hours, updated_at = now()
+    from business_doc bd
+   where b.id = bd.tenant_id
+     and bd.hours is not null
+  returning b.id as business_id, bd.hours as hours
 )
-update tenant.business b
-   set open_hours = oh.hours, updated_at = now()
-from oh
-where b.id = oh.tenant_id;
+update tenant.branch br
+   set open_hours = d.hours, updated_at = now()
+  from doc d
+  join set_business sb on sb.business_id = d.tenant_id
+ where br.business_id = d.tenant_id
+   and br.id = d.location_id
+   and d.hours is distinct from sb.hours;
 
 -- ----------------------------------------------------------------------------
 -- 4. ops.orders  ->  tenant.customer_order   (MAP)

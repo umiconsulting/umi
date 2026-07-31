@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { HoursModule } from '../hours/hours.module';
+import { BusinessHoursModule } from '../business-hours/business-hours.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { WhatsappController } from './whatsapp.controller';
 import { ChannelRepository } from './channel.repository';
@@ -11,7 +11,7 @@ import { IdentityRepository } from './identity.repository';
 import { ConversationTurnsRepository } from './conversation-turns.repository';
 import { TurnCommitRepository } from './turn-commit.repository';
 import { BusinessConfigService } from './business-config.service';
-import { BusinessHoursService } from './business-hours.service';
+import { OrderingWindowService } from './ordering-window.service';
 import { SecurityService } from './security.service';
 import { IntentService } from './intent.service';
 import { MemoryService } from './memory.service';
@@ -43,7 +43,7 @@ import { OrderLocationResolver } from './order-location.resolver';
  * provides the real tool implementations.
  */
 @Module({
-  imports: [HoursModule, TenantsModule],
+  imports: [BusinessHoursModule, TenantsModule],
   // The Twilio webhook ingress (web process only; the worker imports this module
   // for the services and never instantiates controllers).
   controllers: [WhatsappController],
@@ -60,7 +60,7 @@ import { OrderLocationResolver } from './order-location.resolver';
     TurnCommitRepository,
     // leaf services (3a)
     BusinessConfigService,
-    BusinessHoursService,
+    OrderingWindowService,
     SecurityService,
     IntentService,
     MemoryService,
@@ -90,7 +90,7 @@ import { OrderLocationResolver } from './order-location.resolver';
     ConversationTurnsRepository,
     TurnCommitRepository,
     BusinessConfigService,
-    BusinessHoursService,
+    OrderingWindowService,
     SecurityService,
     IntentService,
     MemoryService,

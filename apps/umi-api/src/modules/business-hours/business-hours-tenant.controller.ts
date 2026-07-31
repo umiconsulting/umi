@@ -4,19 +4,21 @@ import { TenantAccessGuard } from '../auth/tenant-access.guard';
 import { Tenant } from '../auth/current-user.decorator';
 import type { TenantAccess } from '../auth/auth.types';
 import { TenantsRepository } from '../tenants/tenants.repository';
-import { HoursService } from './hours.service';
+import { BusinessHoursService } from './business-hours.service';
 import { UpdateHoursDto } from './dto/update-hours.dto';
 
 /**
- * Business hours over `tenant.open_hours` (one row per day_of_week). Slug-routed
- * + membership-checked. Hours are stored per tenant/location; the effective
- * location is resolved from `?locationId` or the tenant default.
+ * Tenant-routed hours façade the dashboard SPA calls
+ * (`/api/tenants/:tenantId/conversaflow/hours`). Dispatches directly to the same
+ * BusinessHoursService as the slug route, mirroring CashTenantController. Without it the
+ * SPA's tenant-routed hours calls 404 against umi-api in cookie mode. The
+ * `:tenantId` is resolved + membership-checked by the same guard stack.
  */
 @UseGuards(AuthGuard, TenantAccessGuard)
-@Controller('api/:slug/admin/hours')
-export class HoursController {
+@Controller('api/tenants/:tenantId/conversaflow/hours')
+export class BusinessHoursTenantController {
   constructor(
-    private readonly hours: HoursService,
+    private readonly hours: BusinessHoursService,
     private readonly tenants: TenantsRepository,
   ) {}
 

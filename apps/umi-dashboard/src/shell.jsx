@@ -9,14 +9,9 @@ const NAV = [
   { id: 'customers', label: 'Customers', icon: 'Users2', section: 'OPERATIONS' },
   { id: 'members', label: 'Loyalty', icon: 'CreditCard', section: 'GROWTH' },
   { id: 'gift-cards', label: 'Gift Cards', icon: 'Gift', section: 'GROWTH' },
-  {
-    id: 'hours',
-    label: 'Hours & Availability',
-    icon: 'Clock',
-    section: 'CONFIGURATION',
-    badge: 'PAUSED',
-    badgeKind: 'warn',
-  },
+  // No badge: 'PAUSED' was hardcoded here, so the nav told every operator of every
+  // café that ordering was paused, permanently and regardless of the actual flag.
+  { id: 'hours', label: 'Hours & Availability', icon: 'Clock', section: 'CONFIGURATION' },
   { id: 'settings', label: 'Settings', icon: 'Settings', section: 'CONFIGURATION' },
 ];
 

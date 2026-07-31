@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ProductsRepository } from '../products.repository';
-import { BusinessHoursService } from '../business-hours.service';
+import { OrderingWindowService } from '../ordering-window.service';
 import type { ToolContext, ToolResult } from '../turn.types';
 import {
   formatProductDisplay,
@@ -14,13 +14,13 @@ import {
 /**
  * Catalog tools: search_menu (browse / exact / near-miss) + get_business_info /
  * get_business_hours. Ported from `tools.ts`; product reads rebound to
- * ProductsRepository (tenant.product), hours/info to BusinessHoursService.
+ * ProductsRepository (tenant.product), hours/info to OrderingWindowService.
  */
 @Injectable()
 export class CatalogTools {
   constructor(
     private readonly products: ProductsRepository,
-    private readonly hours: BusinessHoursService,
+    private readonly hours: OrderingWindowService,
   ) {}
 
   async getBusinessInfo(ctx: ToolContext): Promise<ToolResult> {
@@ -34,7 +34,7 @@ export class CatalogTools {
   }
 
   async getBusinessHours(ctx: ToolContext): Promise<ToolResult> {
-    return this.hours.getBusinessHours(
+    return this.hours.getOrderingWindow(
       ctx.tenantId,
       ctx.locationId ?? null,
       new Date(),

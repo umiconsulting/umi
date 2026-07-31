@@ -15,7 +15,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { StaffModule } from './modules/staff/staff.module';
-import { HoursModule } from './modules/hours/hours.module';
+import { BusinessHoursModule } from './modules/business-hours/business-hours.module';
 import { VoiceModule } from './modules/voice/voice.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { CashModule } from './modules/cash/cash.module';
@@ -42,7 +42,7 @@ import { LeadsModule } from './modules/leads/leads.module';
     IdentityModule,
     TenantsModule,
     StaffModule,
-    HoursModule,
+    BusinessHoursModule,
     VoiceModule,
     CustomersModule,
     CashModule,
