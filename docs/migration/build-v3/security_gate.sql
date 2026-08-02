@@ -22,11 +22,35 @@ select * from (values
        join pg_namespace n on n.oid=c.relnamespace
        where n.nspname='umi' and c.relrowsecurity and c.relforcerowsecurity
          and c.relname in ('subscription','subscription_item','invoice','entitlement_override','user_role'))),
-  ('runtime request-path tables RLS+FORCE (2)',
-    (select case when count(*)=2 then 'PASS' else 'FAIL' end from pg_class c
-       join pg_namespace n on n.oid=c.relnamespace
-       where n.nspname='runtime' and c.relrowsecurity and c.relforcerowsecurity
-         and c.relname in ('conversation_cart','reminder_sent'))),
+  -- Derived columns must be genuinely un-writable by the request path. This check
+  -- exists because 90_rls asserted it with a statement that does nothing:
+  -- `revoke update (col)` is a no-op while api holds table-level UPDATE, so the
+  -- much-commented "UNFORGEABLE" guard on contact.normalized_value never bound.
+  ('api cannot UPDATE derived columns (normalized_value, business_date)',
+    (select case when bool_and(not has_column_privilege('api', t, c, 'UPDATE'))
+                 then 'PASS' else 'FAIL' end
+       from (values ('tenant.contact','normalized_value'),
+                    ('tenant.customer_order','business_date'),
+                    ('tenant.pos_cart','business_date')) as v(t,c))),
+  -- SWEPT, not listed. This was a hardcoded pair of table names, so every runtime
+  -- table added to the request path afterwards was invisible to it: the check passed
+  -- while the new tables went unchecked. Stated as a universal instead — if a runtime
+  -- row belongs to a business and the request path can touch it, it is isolated.
+  -- Deliberate exceptions carry no business_id and are therefore not matched:
+  -- idempotency_key (a global dedup key) and product_embedding (isolation comes from
+  -- the join to tenant.product, which is under RLS).
+  ('every api-reachable runtime table with business_id has RLS+FORCE',
+    (select case when count(*)=0 then 'PASS' else 'FAIL' end
+       from pg_class c
+       join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = 'runtime' and c.relkind = 'r'
+         and exists (select 1 from information_schema.columns col
+                      where col.table_schema='runtime' and col.table_name=c.relname
+                        and col.column_name='business_id')
+         and exists (select 1 from information_schema.role_table_grants g
+                      where g.table_schema='runtime' and g.table_name=c.relname
+                        and g.grantee='api')
+         and not (c.relrowsecurity and c.relforcerowsecurity))),
   -- Views: security_invoker -------------------------------------------------
   -- EVERY view in umi/tenant must enforce the caller's RLS. An owner-rights view
   -- leaks cross-tenant (the audit reproduced this on conversation_analytics: 0

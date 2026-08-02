@@ -21,3 +21,25 @@ alter table umi.subscription
 alter table umi.invoice
   add constraint invoice_business_fk foreign key (business_id)
   references tenant.business(id) on delete cascade;
+
+-- ---- umi -> tenant (permission overrides) ----------------------------------
+alter table umi.user_permission_override
+  add constraint permission_override_business_fk foreign key (business_id)
+  references tenant.business(id) on delete cascade;
+
+alter table umi.user_permission_override
+  add constraint permission_override_branch_fk foreign key (branch_id)
+  references tenant.branch(id) on delete cascade;
+
+-- ---- tenant -> runtime (POS operator sessions) -----------------------------
+-- These point the other way from the block above: `runtime` is built AFTER `tenant`,
+-- so a tenant table cannot reference an operator session inline. `on delete restrict`
+-- on the command: an accepted offline sale must not become unattributable because
+-- someone's shift row was cleaned up.
+alter table tenant.pos_cart
+  add constraint pos_cart_operator_session_fk foreign key (operator_session_id)
+  references runtime.operator_session(id) on delete restrict;
+
+alter table tenant.offline_replay_command
+  add constraint offline_replay_command_operator_session_fk foreign key (operator_session_id)
+  references runtime.operator_session(id) on delete restrict;

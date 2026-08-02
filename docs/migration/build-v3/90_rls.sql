@@ -17,6 +17,32 @@ $$;
 comment on function umi.current_business() is
   'The request''s tenant scope. NULL when unset/empty so RLS fails CLOSED (0 rows), never errors.';
 
+-- ---- Branch scope: OPTIONAL. NULL means "all branches of the current business" ----
+-- The dashboard reads across branches, so a NULL branch must not empty the result set.
+-- Branch policies therefore read `umi.current_branch() is null or branch_id = ...`.
+-- This is a narrowing key, not an authorization key: `current_business()` is what
+-- keeps one café out of another's data.
+create or replace function umi.current_branch() returns uuid
+  language sql stable
+  set search_path = pg_catalog as $$
+  select nullif(current_setting('app.current_branch', true), '')::uuid
+$$;
+comment on function umi.current_branch() is
+  'The request''s branch narrowing. NULL = every branch of the current business (dashboard reads).';
+
+-- ---- Device scope: REQUIRED wherever it appears. NULL -> zero rows ----
+-- The offline-replay tables are the device's own journal on the server. A request with
+-- no proven device has no business reading or writing any of them, so those policies
+-- demand `umi.current_device() is not null` and fail closed rather than falling back to
+-- business scope. That asymmetry with current_branch() is deliberate.
+create or replace function umi.current_device() returns uuid
+  language sql stable
+  set search_path = pg_catalog as $$
+  select nullif(current_setting('app.current_device', true), '')::uuid
+$$;
+comment on function umi.current_device() is
+  'The request''s enrolled device. NULL when unset so device-scoped RLS fails CLOSED (0 rows).';
+
 -- ---- No ambient authority: lock schema public (CVE-2018-1058) and our schemas ----
 revoke create on schema public from public;
 revoke all on all tables in schema umi, tenant, runtime from public;
@@ -70,7 +96,37 @@ end $$;
 --   never supplied. Revoking the column makes it UNFORGEABLE: an app can no longer write a
 --   hand-rolled normalization into it, which is exactly how the L15 corruption stayed
 --   self-consistent (same broken function on read and write). raw is the truth.
-revoke update (normalized_value) on tenant.contact from api;
+--   ⚠️ `revoke update (col) on t from api` DOES NOT WORK once api holds table-level
+--   UPDATE — and it does, from the blanket grant above (`api=arwd`). PostgreSQL treats a
+--   table-level privilege as covering every column, and a column-level REVOKE cannot
+--   subtract from it. This file carried exactly that statement for
+--   tenant.contact.normalized_value with a long comment about making the column
+--   UNFORGEABLE; the statement had never had any effect. Only its trigger, which fires
+--   on INSERT **or UPDATE**, was actually protecting the column.
+--
+--   The working form is: revoke the table-level UPDATE, then grant UPDATE back on every
+--   column except the protected one. Generated rather than listed, so a new column is
+--   grantable automatically and cannot silently become read-only.
+do $$
+declare
+  r record;
+  cols text;
+begin
+  for r in select * from (values
+    -- table,                  protected column,  why
+    ('contact',        'normalized_value'),  -- derived by tg_contact_normalize; raw is the truth
+    ('customer_order', 'business_date'),     -- decides which day's revenue and cash-up a sale lands in
+    ('pos_cart',       'business_date')
+  ) as v(tbl, col)
+  loop
+    select string_agg(quote_ident(column_name), ', ' order by ordinal_position)
+      into cols
+      from information_schema.columns
+     where table_schema = 'tenant' and table_name = r.tbl and column_name <> r.col;
+    execute format('revoke update on tenant.%I from api', r.tbl);
+    execute format('grant update (%s) on tenant.%I to api', cols, r.tbl);
+  end loop;
+end $$;
 
 --   runtime — only the machinery the request path legitimately serves, scoped:
 grant select, insert, update, delete on runtime.conversation_cart to api;  -- live in-flight cart
@@ -248,6 +304,16 @@ create policy tenant_isolation on runtime.conversation_cart
   with check (exists (select 1 from tenant.conversation cv where cv.id = conversation_cart.conversation_id
                    and cv.business_id = umi.current_business()));
 
+-- Tenant-scoped the moment it gained a business_id (2026-07-29, queue-cluster restore).
+-- `api` holds select+insert on it for request dedup, and the universal gate check caught
+-- this within one run of adding the column — which is the whole argument for stating a
+-- check as a universal rather than a list of table names.
+alter table runtime.idempotency_key enable row level security;
+alter table runtime.idempotency_key force  row level security;
+create policy tenant_isolation on runtime.idempotency_key
+  using      (business_id = umi.current_business())
+  with check (business_id = umi.current_business());
+
 alter table runtime.conversation_turn enable row level security;
 alter table runtime.conversation_turn force  row level security;
 create policy tenant_isolation on runtime.conversation_turn
@@ -255,3 +321,210 @@ create policy tenant_isolation on runtime.conversation_turn
                    and cv.business_id = umi.current_business()))
   with check (exists (select 1 from tenant.conversation cv where cv.id = conversation_turn.conversation_id
                    and cv.business_id = umi.current_business()));
+
+-- ===========================================================================
+-- RLS — POS: branch narrowing and device scoping
+-- ===========================================================================
+-- These are RESTRICTIVE policies. PERMISSIVE policies OR together; RESTRICTIVE ones
+-- AND with everything else. So the tenant_isolation policy created by the sweep above
+-- still decides WHICH BUSINESS, and these can only narrow it further — a branch or
+-- device policy can never widen access to another café's rows.
+--
+-- Why two different postures:
+--   BRANCH is a narrowing. The dashboard reads across every branch and sets no branch
+--   GUC, so NULL must mean "all branches", not "no rows". Making branch fail closed
+--   would blank the owner's own reports.
+--   DEVICE is authorization. The replay tables are one terminal's journal held on the
+--   server. A request that cannot prove which device it is has no business reading any
+--   of them, so NULL means zero rows.
+
+-- ---- Branch narrowing: SWEPT, with a recorded opt-OUT ----
+-- This was an opt-IN list of table names, which is the booby-trap this file already
+-- warns about for the child-table list: a new tenant table with a branch_id that
+-- nobody remembers to add gets NO narrowing, silently, and the failure is open. The
+-- sweep inverts it — forgetting now yields narrowing, which is the safe direction.
+--
+-- ONE predicate serves both column shapes. Where branch_id is NOT NULL the
+-- `branch_id is null` disjunct is simply never true, so it costs nothing; where it is
+-- nullable, a business-wide row (no branch) stays visible to a branch-scoped caller,
+-- which is what "this fact belongs to the whole café" means.
+--
+-- The opt-out list is short and each entry is a claim about the DATA, not a
+-- convenience:
+--   staff          — manager approval reaches ACROSS branches. Narrowing staff would
+--                    make a manager at another branch unreachable to authorize a void,
+--                    which is precisely when you need one.
+--   loyalty_visit  — a stamp count is a property of the CARD, business-wide. A café
+--                    with two branches would undercount a customer's stamps the moment
+--                    a till set its branch, and quietly deny an earned reward.
+do $$
+declare
+  t record;
+  skip constant text[] := array['staff', 'loyalty_visit'];
+begin
+  for t in
+    select c.relname
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'tenant' and c.relkind = 'r'          -- base tables only; a view has no policies
+       and exists (select 1 from information_schema.columns col
+                    where col.table_schema = 'tenant' and col.table_name = c.relname
+                      and col.column_name = 'branch_id')
+       and not (c.relname = any(skip))
+     order by c.relname
+  loop
+    execute format($f$create policy branch_narrowing on tenant.%I as restrictive
+      using      (umi.current_branch() is null or branch_id is null
+                  or branch_id = umi.current_branch())
+      with check (umi.current_branch() is null or branch_id is null
+                  or branch_id = umi.current_branch())$f$, t.relname);
+  end loop;
+end $$;
+
+-- ---- Device scoping: FAIL CLOSED. No proven device, no rows. ----
+-- This is the policy set that was inert on the source branch: the API never set
+-- app.current_device, and the repositories ran on the BYPASSRLS worker pool, so
+-- nothing ever evaluated these predicates. pg.service.ts now sets the GUC and the POS
+-- repositories run as `api`, which is what makes this real rather than decorative.
+--
+-- Deliberately opt-IN, unlike branch narrowing above. Device scoping is the strongest
+-- restriction in this file — it hides a row from everyone who cannot prove which
+-- terminal they are — so applying it by sweep would silently blind the dashboard to
+-- any future device-related table it legitimately reads. Opt-in, plus the assertion
+-- below so that forgetting is LOUD instead of silent.
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'device_replay_cursor', 'offline_replay_command', 'offline_reconciliation',
+    'offline_replay_conflict', 'offline_provisional_mapping'
+  ] loop
+    execute format($f$create policy device_scoping on tenant.%I as restrictive
+      using      (umi.current_device() is not null and device_id = umi.current_device())
+      with check (umi.current_device() is not null and device_id = umi.current_device())$f$, t);
+  end loop;
+end $$;
+
+-- Every tenant table carrying a device_id must have made a DECISION about device
+-- scoping — either it is scoped above, or it is named here as deliberately not. A new
+-- table that does neither aborts the build rather than shipping unscoped.
+do $$
+declare
+  undecided text[];
+  -- Empty today: every tenant table with a device_id is device-scoped. Add a name here
+  -- WITH A REASON when one legitimately is not — e.g. a dashboard-readable device
+  -- inventory or a telemetry roll-up. The cast is required: Postgres cannot infer the
+  -- element type of an empty array literal.
+  not_device_scoped constant text[] := array[]::text[];
+begin
+  select array_agg(c.relname order by c.relname) into undecided
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'tenant' and c.relkind = 'r'
+     and exists (select 1 from information_schema.columns col
+                  where col.table_schema = 'tenant' and col.table_name = c.relname
+                    and col.column_name = 'device_id')
+     and not exists (select 1 from pg_policy p
+                      where p.polrelid = c.oid and p.polname = 'device_scoping')
+     and not (c.relname = any(not_device_scoped));
+  if undecided is not null then
+    raise exception
+      'tenant tables carry device_id with no device-scoping decision: %. Scope them or name them in not_device_scoped.',
+      undecided;
+  end if;
+end $$;
+
+-- ===========================================================================
+-- RLS — runtime.*  POS device trust and operator presence
+-- ===========================================================================
+-- These join the two request-path runtime tables above. They are on the request path
+-- because the POS runs as `api`, not as the worker: an operator session that only the
+-- BYPASSRLS pool can write is an operator session with no tenant isolation at all.
+alter table runtime.operator_session enable row level security;
+alter table runtime.operator_session force  row level security;
+create policy tenant_isolation on runtime.operator_session
+  using      (business_id = umi.current_business())
+  with check (business_id = umi.current_business());
+create policy branch_narrowing on runtime.operator_session as restrictive
+  using      (umi.current_branch() is null or branch_id = umi.current_branch())
+  with check (umi.current_branch() is null or branch_id = umi.current_branch());
+
+alter table runtime.device_enrollment_challenge enable row level security;
+alter table runtime.device_enrollment_challenge force  row level security;
+create policy tenant_isolation on runtime.device_enrollment_challenge
+  using      (business_id = umi.current_business())
+  with check (business_id = umi.current_business());
+
+alter table runtime.elevation_grant enable row level security;
+alter table runtime.elevation_grant force  row level security;
+create policy tenant_isolation on runtime.elevation_grant
+  using      (business_id = umi.current_business())
+  with check (business_id = umi.current_business());
+
+-- The two write-only audit tables. api holds INSERT and nothing else, but INSERT alone
+-- is enough to forge a security event against another café — WITH CHECK is what stops
+-- that. `business_id is null` is permitted because these are soft refs: a platform-level
+-- security event (a login attempt against an account with no business yet) has no
+-- business to name, and audit exhaust must outlive whatever it describes.
+alter table runtime.security_audit_event enable row level security;
+alter table runtime.security_audit_event force  row level security;
+create policy tenant_isolation on runtime.security_audit_event
+  using      (business_id is null or business_id = umi.current_business())
+  with check (business_id is null or business_id = umi.current_business());
+
+alter table runtime.audit_event_internal enable row level security;
+alter table runtime.audit_event_internal force  row level security;
+create policy tenant_isolation on runtime.audit_event_internal
+  using      (business_id = umi.current_business())
+  with check (business_id = umi.current_business());
+
+-- ===========================================================================
+-- GRANTS — the POS request path
+-- ===========================================================================
+-- tenant.* is already granted to api by the blanket grant above and confined by RLS.
+-- runtime.* is sealed by default, so every POS need is listed explicitly here.
+
+--   Operator presence: the POS starts, locks and ends shifts on the request path.
+grant select, insert, update on runtime.operator_session to api;
+--   Elevation: request a grant, then consume it. Never delete one — a consumed
+--   approval is evidence.
+grant select, insert, update on runtime.elevation_grant to api;
+--   Enrolment: the dashboard creates the challenge, the device consumes it.
+grant select, insert, update on runtime.device_enrollment_challenge to api;
+--   Security decisions and the unredacted half of an audit event are WRITE-ONLY for
+--   the request path. The POS records a denial; it must never be able to read back
+--   another café's denials, or its own investigators' notes.
+grant insert on runtime.security_audit_event to api;
+grant insert on runtime.audit_event_internal to api;
+revoke select, update, delete on runtime.security_audit_event from api;
+revoke select, update, delete on runtime.audit_event_internal from api;
+--   readonly must not see the auth substrate either.
+revoke select on runtime.operator_session, runtime.device_enrollment_challenge,
+                 runtime.elevation_grant, runtime.security_audit_event,
+                 runtime.audit_event_internal from readonly;
+
+-- ---- Append-only: history that can be edited is not history ----
+-- The triggers in 60_triggers refuse the write; these revokes mean the attempt never
+-- reaches a trigger. Belt and braces, because this is the money.
+revoke update, delete on
+  tenant.audit_event, tenant.financial_event, tenant.receipt_snapshot,
+  tenant.pos_committed_sale, tenant.offline_replay_command,
+  tenant.offline_provisional_mapping
+  from api, worker, readonly;
+revoke update, delete on runtime.security_audit_event, runtime.audit_event_internal
+  from worker;
+
+-- ---- Policies are read-only to everyone but the platform ----
+-- A café cannot raise its own offline cash limit; that is the entire point of a limit.
+revoke insert, update, delete on tenant.pos_offline_policy, tenant.pos_offline_cash_policy
+  from api, readonly;
+revoke all on umi.audit_retention_policy from api, readonly;
+revoke insert, update, delete on umi.user_permission_override from api, readonly;
+grant  select on umi.user_permission_override to api;
+
+-- ---- The offline reconciliation acknowledgement is the ONE column a device may set ----
+revoke update on tenant.offline_reconciliation from api;
+grant  update (acknowledged_at) on tenant.offline_reconciliation to api;
+revoke update on tenant.offline_replay_conflict from api;
+grant  update (last_observed_at, resolution_state, resolution_acknowledged_at)
+  on tenant.offline_replay_conflict to api;

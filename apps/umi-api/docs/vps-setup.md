@@ -1,9 +1,13 @@
 # umi-api — VPS setup + deploy runbook
 
-> **Current state (2026-06-25): Phase 2 is LIVE in production** at
-> `https://api.umiconsulting.co`, and the umi-dashboard SPA is cut over to it
-> (httpOnly-cookie auth). For day-to-day deploys and the realized role/env model,
-> jump to **[Phase 2 — live deployment](#phase-2--live-deployment-current-state)**.
+> **Current state: Phases 0–3 are LIVE in production** at
+> `https://api.umiconsulting.co` — the umi-dashboard SPA on httpOnly-cookie auth,
+> cash writing canonical `loyalty.*`, and the WhatsApp pipeline cut over to the VPS.
+> **Phase 4 (KDS) and Phase 5 (landing-page leads) are merged and deployed but
+> DORMANT** behind their flags — see
+> **[Phases 3–5 — env, flags, and the remaining cutovers](#phases-35--env-flags-and-the-remaining-cutovers)**.
+> For day-to-day deploys and the realized role/env model, jump to
+> **[Phase 2 — live deployment](#phase-2--live-deployment-current-state)**.
 > The Steps below are the original Phase 0 bring-up, kept for history.
 
 Goal: get `umi-api` running on the VPS and `GET /health` returning green.
@@ -186,6 +190,106 @@ VITE_API_BASE=https://api.umiconsulting.co
 
 **Rollback:** delete those two vars → redeploy → the SPA is back on `server.js`
 (same-origin, `X-UMI-User-ID` header) with zero backend change.
+
+---
+
+## Phases 3–5 — env, flags, and the remaining cutovers
+
+Phase 3 (the ConversaFlow WhatsApp engine — ingress → turn → tools → reply, plus
+enrichment, Zettle catalog sync and lifecycle nudges) is **live**. Phase 4 (KDS
+endpoints) and Phase 5 (landing-page leads) are merged and deployed but **dormant**:
+the code runs, and the customer-visible half of each stays off until a flag flips.
+
+[`src/shared/config/config.schema.ts`](../src/shared/config/config.schema.ts) is the
+contract. This section describes it; it does not replace it. Only three values are
+required — `DATABASE_URL_APP`, `DATABASE_URL_WORKER`, `REDIS_URL` — so a missing key
+degrades one feature rather than failing boot. That cuts both ways: an absent
+`VOYAGE_API_KEY` silently drops semantic product search back to lexical.
+
+### `.env` — additions over Phase 2
+
+```ini
+# Conversational engine
+ANTHROPIC_API_KEY=<inference key sk-ant-… — NOT an admin key>
+VOYAGE_API_KEY=<embeddings; without it semantic product search degrades to lexical>
+GOOGLE_MAPS_API_KEY=<optional — the location-pin tool degrades to text>
+
+# WhatsApp ingress
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=          # the webhook FAILS CLOSED without this
+TWILIO_WHATSAPP_FROM=whatsapp:+…
+TWILIO_WEBHOOK_URL=https://api.umiconsulting.co/conversations/whatsapp   # the EXACT signed URL
+DEFAULT_TENANT_ID=<fallback tenant when an inbound number has no channel_account row>
+
+# Catalog sync
+ZETTLE_CLIENT_ID=
+ZETTLE_API_KEY=             # the adapter wants a bearer token; prod holds CLIENT_ID+SECRET (OAuth)
+
+# Leads (Phase 5)
+SMTP_HOST= / SMTP_PORT= / SMTP_USER= / SMTP_PASSWORD= / EMAIL_FROM=
+CONTACT_TO_EMAIL=<falls back to EMAIL_FROM, then hola@umiconsulting.co>
+LEADS_WEBHOOK_SECRET=<HMAC-SHA256 for /api/leads/webhook/email-response>
+```
+
+### The four rollout flags — and why three are OFF
+
+| Flag                        | Default  | Why                                                                                                                                                                                 |
+| --------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OUTBOX_RELAY_ENABLED`      | **true** | Reply delivery. Worker-only and idempotent (deterministic jobIds). Set false only to pause delivery in an emergency.                                                                |
+| `LIFECYCLE_CRONS_ENABLED`   | false    | umi-cash still runs the same journeys. Flipping this before umi-cash stops **double-sends to customers**.                                                                           |
+| `KDS_STATUS_NOTIFY_ENABLED` | false    | The iPad still calls the Supabase edge functions, whose `kds.transition_ticket` RPC already enqueues these. Transitions still execute when off — only the customer notify is gated. |
+| `LEADS_SEQUENCE_ENABLED`    | false    | The landing page still runs its own SQLite/Vercel cron. Public contact/diagnostic routes stay live either way; only the background sequence tick is gated.                          |
+
+The three OFF flags are off for one reason: **a second sender still exists.** So each
+remaining cutover is "turn the old sender off, _then_ flip" — never just "flip".
+
+A typo cannot silently disable a flag. `booleanFromEnv` accepts only
+`1/true/yes/on` and `0/false/no/off`; anything else fails boot loudly, so
+`LIFECYCLE_CRONS_ENABLED=ture` never ships as a quiet `false`.
+
+### Two things the API refuses to boot with
+
+`config.schema.ts`'s `superRefine` rejects, under `NODE_ENV=production`:
+
+- **`ALLOW_INSECURE_TWILIO_WEBHOOK=true`** — it disables Twilio signature validation.
+  It is a local-dev escape hatch and cannot reach production. Separately, the webhook
+  **fails closed** when `TWILIO_AUTH_TOKEN` is unset: it drops the request instead of
+  processing unsigned input. There is no unsigned-ingress path.
+- **`LEADS_SEQUENCE_ENABLED=true` with no `LEADS_WEBHOOK_SECRET`** — without the
+  secret the email-response webhook is rejected in production, so reply-driven
+  `mark_responded` / unsubscribe never lands and we keep mailing people who already
+  replied or opted out.
+
+### TLS to Postgres
+
+`PGSSLROOTCERT` — a path to, or an inline PEM of, the Postgres server's root CA —
+puts **both** pools on `verify-full` (CA + hostname + `rejectUnauthorized`). Unset
+means plaintext, which is right for local dev against localhost and wrong here. Do
+**not** put `sslmode` in the connection URLs; this variable governs TLS. It is an
+open item on the build-v3 deploy gate (see `docs/migration/build-v3/SECURITY_GATE.md`).
+
+### Ad-hoc prod SQL
+
+Through the **Supabase CLI**, linked to `xbudknbimkgjjgohnjgp`:
+
+```sh
+supabase db query --linked "SELECT …"                  # Management API, no DB password
+supabase db query --db-url "$DIRECT_DATABASE_URL" …    # direct conn (DDL / CREATE INDEX CONCURRENTLY)
+```
+
+`db query` speaks the extended protocol — **one command per call**. A multi-statement
+file errors `42601`, so a gated migration is run statement by statement.
+
+### The two remaining phase cutovers
+
+- **KDS (Phase 4).** Repoint the iPad's `Info.plist` at `api.umiconsulting.co`,
+  decommission the `kds-command` / `kds-board` / `kds-pairing` edge functions, _then_
+  set `KDS_STATUS_NOTIFY_ENABLED=true`. **Rollback:** point the iPad back.
+- **Leads (Phase 5).** Apply `003_grow_grants.sql` (a no-op on prod) → set
+  `NEXT_PUBLIC_UMI_API_BASE=https://api.umiconsulting.co` on the landing Vercel
+  project and add its origin to `CORS_ORIGINS` → disable the landing SQLite/Vercel
+  cron **and** set `LEADS_SEQUENCE_ENABLED=true` together → retire SQLite.
+  **Rollback:** unset the base var and re-enable the landing cron.
 
 ### Not yet done
 

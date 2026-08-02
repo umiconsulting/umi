@@ -99,12 +99,49 @@ Legend: ✅ done · 🔄 in flight · ⏳ pending · ◑ partial
   `idempotency_key` + `UNIQUE (business_id, idempotency_key)`, and `available_at`/`leased_at`
   split apart (one column was serving as both backoff and lease).
 - ⏳ **`runtime.conversation_turn` RESTORE** (5 live read paths; it is load-bearing, not telemetry).
-- ⏳ **customer-session home** (`runtime.session` has no place for a `tenant.customer`; `app` CHECK
-  excludes `'cash'`).
+- ✅ **customer-session home** — **RESOLVED.** This line described the old `app`-CHECK session
+  shape. Current build-v3 `runtime.session` is keyed by `(principal_type, principal_id)` with
+  `principal_type in ('user','device','person')`, and its own comment names the umi-cash
+  customer case as the `'person'` principal. Nothing to build. (Confirmed 2026-07-28 while
+  reading this plan against the UmiPOS integration; `runtime.operator_session` follows the
+  same discipline — a distinct presence table rather than another overload of `session`.)
 - ⏳ **hours** — typed `tenant.business_hours` + fold `open_hours`; drop the `business.config` read.
+  Two facts recovered from a stash 2026-07-29, both of which change the shape of this item:
+  **(1) There is real source data.** `docs/migration/2026-06-26-hours-unification.sql` was marked
+  GATED / not applied, and it had in fact been applied to production on 2026-06-27 — Kalala Café
+  has 7 `ops.business_hours` rows at its oldest active location. Whatever `tenant.business_hours`
+  becomes has to carry them; the header now records this.
+  **(2) The client half of the ordering window was never written.** `hours.service.ts` and both
+  controllers accept an `ordering` block, and `ordering-settings.repository` merge-writes it into
+  `tenant.business.config` — but `saveBusinessHours(hours, timezone)` in the dashboard takes two
+  arguments and there is no third. **`updateOrdering` has no caller.** The screen also hardcodes
+  its own state (a 45-minute cutoff, a Spanish notice string, three `+52` numbers as the bypass
+  list, and a permanent `badge: 'PAUSED'` in `shell.jsx`), so it shows an operator a bot
+  configuration that nothing reads or writes. Settle that contract in the SAME pass that moves
+  `business.config` — doing it afterwards means doing it across a column move.
 - ⏳ **identity dissolution** — `contact_identity` / `channel` / `whatsapp_number` → the build-v3 model.
 - ⏳ **`90_rls.sql` booby-trap** — delete the hard-coded child-list rows in the _same_ commit that adds
   `business_id` to `station`/`order_event` (else `42710` aborts the whole RLS rebuild).
+  ⚠️ **The same species bit again 2026-07-28**: the POS branch-narrowing policies were written as
+  an opt-IN list of table names, so a new tenant table with a `branch_id` got no narrowing,
+  silently, failing OPEN. Now swept with a recorded opt-out (`staff`, `loyalty_visit`), which
+  also picked up four tables that had none — `customer_order`, `device`, `station`,
+  `product_branch_availability`. **Rule: in this file, sweep and exclude; never list and include.**
+- ✅ **Queue cluster RESTORED (2026-07-29)** — `runtime.inbound_event` / `dead_letter` /
+  `idempotency_key`, the three siblings of the `outbox_event` restore above. Same loss, same
+  cause: the from-scratch DDL simplified past what the live worker writes, and nothing noticed
+  because the statements resolved against nothing. `inbound_event.external_id` → the
+  `provider_event_id` the code has always written (so the existing UNIQUE is the one
+  `ON CONFLICT` was addressing) plus `business_id`/`event_type`/`payload_hash`;
+  `dead_letter` gets back `business_id` (NOT NULL, which `dead-letter.service.ts` already cites
+  as why untenanted jobs are log-only) and the four facts `source text` had concatenated;
+  `idempotency_key` becomes tenant-scoped `(business_id, scope, key)` — a global `key` PK put
+  every café in one namespace. **This cluster was not on this list**; it was found by running
+  the preflight rather than reading the plan. Zero backfill impact: all three tables' rows are
+  dropped by the 2026-07-12 security decision.
+- ⏳ **`tenant.staff.name`** — `staff.repository` reads/writes `staff.name`/`phone`/`email`, which
+  build-v3 moved onto `umi.user` (staff carries `user_id`). 3 preflight failures. **Also not
+  previously on this list.**
 - ⏳ **Backfill rewrite to PRESERVE** — extend the reconcile to field-level for each new carry.
 
 > **Why P1 is "in progress" while P2 already shipped:** the order cluster was the cleanly-separable
@@ -217,8 +254,29 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
   `loyalty_program` branding layer (typed columns + `lifecycle_copy` jsonb + the partial/clear write).
   Deferred by decision: gift-card gifting model, `open_hours` (hours track), the branding read (P5 slug),
   and the birthday ISSUANCE cron (a wallet-push journey still in legacy umi-cash, not yet ported).
-- **Preflight:** **81** unresolved · **0** `42883`. Measured against `umi_backfill_v3` rebuilt with the
-  device- and loyalty-cluster deltas.
+- **Preflight (2026-07-29, PRISTINE build):** **26** unresolved · **0** `42883`. Measured by
+  building `00→90` into a throwaway database and running the gate against it — no prod snapshot
+  needed, so this number is reproducible on any machine with a Postgres. It is NOT comparable to
+  the 81 below, which was measured against `umi_backfill_v3` with the source schemas present.
+  The remaining 26 are **four buckets, each owned by a named phase**:
+
+  | bucket     | n   | cause                                                                                    | owner              |
+  | ---------- | --- | ---------------------------------------------------------------------------------------- | ------------------ |
+  | gift cards | 8   | `loyalty_gift_card.amount_cents` / `redeemed_at`, `loyalty_gift_card_ledger.source_type` | P4 (cash deferred) |
+  | hours      | 8   | `tenant.open_hours` missing, `business.config`                                           | P1 hours           |
+  | slug       | 7   | `business.slug`, `branch.slug` / `aliases`                                               | P5                 |
+  | staff      | 3   | `staff.name` → `umi.user`                                                                | P1 (new)           |
+
+  ⚠️ **The gate was over-reporting.** It scanned backtick spans over raw file text, so a doc
+  comment that QUOTES SQL counted as a statement: `kds.repository.ts` explains a rewrite with
+  "Replaces the old \`SELECT kitchen_status FROM ops.orders FOR UPDATE\`" and the gate reported it
+  as unresolved against a table that is supposed to be gone. Comments are now blanked before
+  scanning, preserving offsets so line numbers stay true. This matters because P1's DoD is
+  **0 unresolved**, and a false positive makes that unreachable except by deleting a correct
+  comment — a gate that cannot reach zero is one people learn to read past.
+
+- **Preflight (2026-07-25, historical):** **81** unresolved · **0** `42883`. Measured against
+  `umi_backfill_v3` rebuilt with the device- and loyalty-cluster deltas.
   ⚠️ **The earlier jump 140 → 171 was the gate no longer under-reporting, not a regression** — the 46
   interpolated statements were counted but unlooked-at, and `products.repository.ts` was failing every
   one (it read `p.price_cents`/`p.variants` where build-v3 has `price` and relational variants); the

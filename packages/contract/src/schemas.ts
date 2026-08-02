@@ -14,6 +14,19 @@ export const LoginRequest = z.object({
 });
 export type LoginRequest = z.infer<typeof LoginRequest>;
 
+/** POST /api/auth/local/forgot-password — mirrors umi-api ForgotPasswordDto. */
+export const ForgotPasswordRequest = z.object({
+  email: z.string().email(),
+});
+export type ForgotPasswordRequest = z.infer<typeof ForgotPasswordRequest>;
+
+/** POST /api/auth/local/reset-password — mirrors umi-api ResetPasswordDto. */
+export const ResetPasswordRequest = z.object({
+  token: z.string().min(1),
+  password: z.string().min(8),
+});
+export type ResetPasswordRequest = z.infer<typeof ResetPasswordRequest>;
+
 // ── Shared shapes ─────────────────────────────────────────────────────────
 
 export const SessionUser = z.object({
@@ -65,6 +78,37 @@ export type MeTenantsResponse = z.infer<typeof MeTenantsResponse>;
 /** logout / forgot-password / reset-password. */
 export const OkResponse = z.object({ ok: z.literal(true) });
 export type OkResponse = z.infer<typeof OkResponse>;
+
+/** POST .../global-logout — revoke every session of the caller. `exceptCurrent`
+ *  keeps the session that issued the request, so "sign out my other devices" does
+ *  not sign the caller out of the device they are holding. */
+export const GlobalLogoutRequest = z.object({
+  exceptCurrent: z.boolean().default(false),
+});
+export type GlobalLogoutRequest = z.infer<typeof GlobalLogoutRequest>;
+
+/** POST /api/:slug/admin/staff — mirrors umi-api CreateStaffDto. */
+export const CreateStaffRequest = z
+  .object({
+    name: z.string().trim().min(1).max(160),
+    email: z.string().trim().email(),
+    role: z.string().min(1).max(100),
+    branchId: z.string().uuid().nullable().optional(),
+    position: z.string().trim().max(160).nullable().optional(),
+  })
+  .strict();
+export type CreateStaffRequest = z.infer<typeof CreateStaffRequest>;
+
+/** PATCH /api/:slug/admin/staff/:staffId — mirrors umi-api UpdateStaffDto. */
+export const UpdateStaffRequest = z
+  .object({
+    role: z.string().min(1).max(100).optional(),
+    branchId: z.string().uuid().nullable().optional(),
+    position: z.string().trim().max(160).nullable().optional(),
+    status: z.enum(['active', 'inactive']).optional(),
+  })
+  .strict();
+export type UpdateStaffRequest = z.infer<typeof UpdateStaffRequest>;
 
 // ── Cash / loyalty product-write requests ─────────────────────────────────
 // Mirror the live umi-api DTOs 1:1 (apps/umi-api/src/modules/cash/dto/*), so the
@@ -173,3 +217,29 @@ export const GiftRedeemRequest = z.object({
   email: z.string().optional(),
 });
 export type GiftRedeemRequest = z.infer<typeof GiftRedeemRequest>;
+
+// ── Model catalogue ───────────────────────────────────────────────────────
+// The browser-surface half of `modelCatalog`. Names here are what `routeCatalog`
+// refers to, so a route can only name a model that exists.
+
+export const httpModels = {
+  LoginRequest,
+  ForgotPasswordRequest,
+  ResetPasswordRequest,
+  SessionUser,
+  TenantMembership,
+  TenantSummary,
+  SessionEnvelope,
+  SessionResponse,
+  MeTenantsResponse,
+  OkResponse,
+  GlobalLogoutRequest,
+  CreateStaffRequest,
+  UpdateStaffRequest,
+  ScanRequest,
+  TopupRequest,
+  PurchaseRequest,
+  GiftCardCreateRequest,
+  RegisterMemberRequest,
+  GiftRedeemRequest,
+} as const;

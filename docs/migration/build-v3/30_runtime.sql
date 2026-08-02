@@ -38,10 +38,30 @@ create table runtime.session (
   metadata       jsonb not null default '{}'::jsonb,   -- device sessions park location_id + last ip
   expires_at     timestamptz,                          -- cash sets 30d; a device token does not expire
   last_used_at   timestamptz,                          -- liveness heartbeat (KDS board/command polls)
-  created_at     timestamptz not null default now()
+  -- ---- Refresh family + revocation --------------------------------------------
+  -- Every session minted from one login shares a family id. Detecting a replayed
+  -- refresh token means killing the FAMILY, not just the one row: a stolen refresh
+  -- token that rotates once has already forked the chain, and revoking a single
+  -- session leaves the thief holding the other fork.
+  refresh_family_id uuid not null default gen_random_uuid(),
+  replaced_by_id    uuid references runtime.session(id),
+  -- WHY it ended, and WHEN. `is_active` stays the single authority on whether the
+  -- session works; these two explain it. The CHECK ties them together so a row can
+  -- never claim to be live while carrying a revocation timestamp.
+  revoked_at        timestamptz,
+  revoked_reason    text,
+  created_at     timestamptz not null default now(),
+  constraint session_revocation_ck check (is_active = (revoked_at is null))
 );
 create unique index session_token_hash_uidx on runtime.session (token_hash);
 create index session_live_idx on runtime.session (business_id, principal_type) where is_active;
+-- "Every live session of this device" — what revocation walks when a terminal is lost.
+-- Expressed through principal_type/principal_id because that is how this schema models
+-- a session's subject; there is no separate device_id column and adding one would put
+-- the same fact in two places.
+create index session_device_idx on runtime.session (principal_id)
+  where principal_type = 'device' and is_active;
+create index session_family_idx on runtime.session (refresh_family_id);
 
 create table runtime.otp (
   id           uuid primary key default gen_random_uuid(),
@@ -152,10 +172,29 @@ create table runtime.outbox_event (
 -- The relay's claim query: ready rows oldest-first, plus stale leases to reclaim.
 create index outbox_event_claim_idx on runtime.outbox_event (status, available_at, created_at);
 
+-- The ingress observability gate. RESTORED to the shape the worker actually writes
+-- (same class of loss as runtime.outbox_event: the from-scratch DDL simplified past
+-- what the live code needs, and the statements resolved against nothing).
+--
+-- `provider_event_id` was called `external_id` here, which is the same fact under a
+-- different name — the code has always written `provider_event_id`.
+--
+-- The UNIQUE below already existed; it indexed the column under its old name, so the
+-- `ON CONFLICT (provider, provider_event_id)` in queue.repository failed on the column
+-- name rather than on a missing constraint. Renaming the column makes the existing
+-- index the one the code was always addressing.
+-- `whatsapp.controller` documents this as observability, NOT authoritative dedup: the
+-- durable guards are tenant.message.provider_message_id and the BullMQ jobId.
 create table runtime.inbound_event (
   id           uuid primary key default gen_random_uuid(),
+  -- Soft ref, and NULLABLE: a webhook is recorded as it arrives, which can be before
+  -- (or without) resolving which café it belongs to. Attribution is not a precondition
+  -- for observing that something arrived.
+  business_id  uuid,
   provider     text not null,              -- 'twilio','zettle','google_wallet',...
-  external_id  text,                        -- provider's event id (for dedup)
+  provider_event_id text,                  -- the provider's own event id
+  event_type   text,
+  payload_hash text,                       -- cheap equality check without re-reading payload
   payload      jsonb not null,             -- honest jsonb: the raw webhook envelope
   status       text not null default 'received'
                  check (status in ('received','processed','failed')),
@@ -164,23 +203,49 @@ create table runtime.inbound_event (
   created_at   timestamptz not null default now()
 );
 create unique index inbound_event_provider_ext_uq
-  on runtime.inbound_event (provider, external_id) where external_id is not null;
+  on runtime.inbound_event (provider, provider_event_id) where provider_event_id is not null;
 
+-- Inbound dedup only: "have I already seen this webhook / this provider callback?"
+--
+-- ⚠️ NOT for business commands. This table records that a key was SEEN; it stores no
+-- request fingerprint and no response, so a retry carrying the same key with a
+-- DIFFERENT body looks identical to a genuine replay, and a caller that reuses a key
+-- gets silence instead of a conflict. For anything that moves money or creates an
+-- order, use tenant.business_command, which keeps the fingerprint and the recorded
+-- result and answers IDEMPOTENCY_CONFLICT when they disagree.
 create table runtime.idempotency_key (
-  key          text primary key,           -- read BEFORE processing: "already done?"
+  -- RESTORED to a TENANT-SCOPED key. `key` alone as the primary key put every café in
+  -- one namespace: two businesses whose upstream hands them the same provider id would
+  -- collide, and one café's write could answer another café's "already done?".
+  business_id  uuid not null references tenant.business(id) on delete cascade,
   scope        text not null,
+  key          text not null,              -- read BEFORE processing: "already done?"
   created_at   timestamptz not null default now(),
-  expires_at   timestamptz
+  expires_at   timestamptz,
+  primary key (business_id, scope, key)
 );
 
+-- The exhausted-job sink. RESTORED: `source text` collapsed four facts the operator
+-- surface needs into one concatenated string ('bullmq.turns:turn.process'), and dropped
+-- the business entirely — a dead letter nobody can attribute to a café is not
+-- actionable, it is just a log line.
+--
+-- business_id is NOT NULL and FKs tenant.business, which dead-letter.service.ts already
+-- states as the reason infra jobs with no tenant are log-only rather than persisted.
 create table runtime.dead_letter (
-  id           uuid primary key default gen_random_uuid(),
-  source       text not null,
-  payload      jsonb,
-  error        text,
-  failed_at    timestamptz not null default now(),
-  created_at   timestamptz not null default now()
+  id            uuid primary key default gen_random_uuid(),
+  business_id   uuid not null references tenant.business(id) on delete cascade,
+  source_schema text,                      -- 'bullmq'
+  source_table  text,                      -- 'turns'
+  source_id     text,                      -- the job id
+  event_type    text,                      -- 'turn.process'
+  payload       jsonb,
+  error         text,
+  attempts      integer not null default 0 check (attempts >= 0),
+  failed_at     timestamptz not null default now(),
+  created_at    timestamptz not null default now()
 );
+create index dead_letter_business_time_idx on runtime.dead_letter (business_id, failed_at desc);
 
 -- ----------------------------------------------------------------------------
 -- LIVE CONVERSATION   → read to resume the bot / prevent double-sends
@@ -289,4 +354,127 @@ create table runtime.knowledge_embedding (
   embedding    extensions.vector(1024) not null,
   model        text not null,
   created_at   timestamptz not null default now()
+);
+
+-- ============================================================================
+-- DEVICE TRUST + OPERATOR PRESENCE
+-- Machinery, not business fact: a café never reads these, and they are sealed
+-- from every tenant role in 90_rls.
+-- ============================================================================
+
+-- A one-time, expiring enrolment challenge. The owner generates it in the dashboard,
+-- reads a short code to whoever is holding the tablet, and the tablet exchanges it for
+-- a credential. Only the HASH is stored: the code is shown once and is unrecoverable.
+--
+-- `idempotency_key` exists because of a defect our own audit recorded on the branch:
+-- if a lost response consumes the challenge, the device is stranded with no way back.
+-- A retry must return the same challenge, not burn it.
+create table runtime.device_enrollment_challenge (
+  id            uuid primary key default gen_random_uuid(),
+  business_id   uuid not null references tenant.business(id) on delete cascade,
+  branch_id     uuid references tenant.branch(id) on delete cascade,
+  display_name  text not null,
+  device_kind   text not null check (device_kind in ('kds','pos_terminal')),
+  platform      text not null
+                  check (platform in ('android','ios','linux','macos','windows','web')),
+  code_hash     text not null check (code_hash ~ '^[a-f0-9]{64}$'),
+  idempotency_key uuid not null,
+  expires_at    timestamptz not null,
+  attempts      integer not null default 0 check (attempts between 0 and 5),
+  consumed_at   timestamptz,
+  created_by    uuid not null references umi.user(id),
+  replaces_device_id uuid references tenant.device(id),
+  created_at    timestamptz not null default now(),
+  unique (business_id, idempotency_key)
+);
+create index device_enrollment_active_idx
+  on runtime.device_enrollment_challenge (id, expires_at) where consumed_at is null;
+comment on table runtime.device_enrollment_challenge is
+  'One-time expiring device enrolment challenges. Only hashes are persisted.';
+
+-- WHO IS AT THE TILL RIGHT NOW. Separate from runtime.session, which is durable
+-- authentication, because they answer different questions and end at different times:
+-- a cashier locks the screen and walks away (operator session ends) while the device
+-- stays authenticated (durable session lives on).
+--
+-- `permissions` and `entitlements` are RESOLVED AT START and frozen for the session, so
+-- that a mid-shift role change cannot silently widen what the person at the counter can
+-- do. Widening requires a new session; narrowing happens by revocation.
+create table runtime.operator_session (
+  id            uuid primary key default gen_random_uuid(),
+  durable_session_id uuid not null references runtime.session(id) on delete cascade,
+  user_id       uuid not null references umi.user(id),
+  staff_id      uuid not null references tenant.staff(id),
+  device_id     uuid not null references tenant.device(id),
+  business_id   uuid not null references tenant.business(id),
+  branch_id     uuid not null references tenant.branch(id),
+  state         text not null default 'active' check (state in ('active','locked','ended')),
+  permissions   text[] not null default '{}',
+  entitlements  jsonb not null default '[]'::jsonb,
+  started_at    timestamptz not null default now(),
+  last_activity_at timestamptz not null default now(),
+  expires_at    timestamptz not null,
+  ended_at      timestamptz,
+  constraint operator_session_end_ck check ((state = 'ended') = (ended_at is not null)),
+  constraint operator_session_branch_same_business_fk
+    foreign key (business_id, branch_id) references tenant.branch (business_id, id)
+);
+-- One live operator per authenticated device session.
+create unique index operator_session_one_active_per_durable
+  on runtime.operator_session (durable_session_id) where state in ('active','locked');
+create index operator_session_device_idx
+  on runtime.operator_session (device_id) where state <> 'ended';
+comment on table runtime.operator_session is
+  'Server-authoritative operator presence, separate from durable device authentication.';
+
+-- A short-lived grant to do ONE privileged thing: void a line, refund, discount past a
+-- threshold. Consumed on use — an approval that can be replayed is not an approval.
+create table runtime.elevation_grant (
+  id            uuid primary key default gen_random_uuid(),
+  session_id    uuid not null references runtime.session(id) on delete cascade,
+  business_id   uuid not null references tenant.business(id) on delete cascade,
+  branch_id     uuid references tenant.branch(id) on delete cascade,
+  permission_key text not null,
+  method        text not null check (method in ('manager_approval','operator_pin')),
+  approved_by   uuid references umi.user(id),
+  expires_at    timestamptz not null,
+  consumed_at   timestamptz,
+  created_at    timestamptz not null default now()
+);
+create index elevation_grant_active_idx
+  on runtime.elevation_grant (session_id, business_id, permission_key, expires_at)
+  where consumed_at is null;
+
+-- Internal security decisions: denials, lockouts, credential failures. Deliberately NOT
+-- tenant.audit_event — a café must not be able to read the shape of our auth defences,
+-- and a failed login attempt on someone else's account is not their business fact.
+create table runtime.security_audit_event (
+  id            uuid primary key default gen_random_uuid(),
+  actor_user_id uuid references umi.user(id) on delete set null,
+  session_id    uuid references runtime.session(id) on delete set null,
+  business_id   uuid,   -- soft ref: audit exhaust must outlive the row it describes
+  branch_id     uuid,   -- soft ref, same reason
+  event_type    text not null,
+  entity_type   text not null,
+  entity_id     uuid,
+  outcome       text not null check (outcome in ('success','denied','failure')),
+  reason_code   text,
+  request_id    text,
+  metadata      jsonb not null default '{}'::jsonb,
+  occurred_at   timestamptz not null default now()
+);
+create index security_audit_actor_time_idx
+  on runtime.security_audit_event (actor_user_id, occurred_at desc);
+create index security_audit_business_time_idx
+  on runtime.security_audit_event (business_id, occurred_at desc);
+comment on table runtime.security_audit_event is
+  'Append-only internal security decisions. No tenant role can read this table.';
+
+-- The unredacted half of a tenant.audit_event. The café reads public_data on the event;
+-- everything that must exist for an investigation but must not be shown lives here.
+create table runtime.audit_event_internal (
+  audit_event_id uuid primary key references tenant.audit_event(id) on delete restrict,
+  business_id   uuid not null references tenant.business(id) on delete restrict,
+  metadata      jsonb not null default '{}'::jsonb,
+  created_at    timestamptz not null default now()
 );
