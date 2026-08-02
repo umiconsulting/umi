@@ -54,9 +54,6 @@
     }
   },
   "src/screens/hours.jsx": {
-    "no-unused-vars": {
-      "count": 2
-    },
     "react-hooks/set-state-in-effect": {
       "count": 1
     }

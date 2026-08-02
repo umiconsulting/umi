@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { I } from '@/icons.jsx';
 import { XSep } from '@/shell.jsx';
 import { useBusinessHours, saveBusinessHours } from '@/data.jsx';
@@ -134,7 +134,7 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
       setSavedJson(JSON.stringify({ hours, cutoff, notice, bypass }));
       setSaveMsg('saved');
       setTimeout(() => setSaveMsg(null), 3000);
-    } catch (e) {
+    } catch {
       setSaveMsg('error');
     } finally {
       setSaving(false);
@@ -161,7 +161,7 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
         specialNotice: notice,
         bypassPhones: bypass,
       });
-    } catch (e) {
+    } catch {
       setSaveMsg('error');
     }
   };
