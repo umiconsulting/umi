@@ -9,9 +9,10 @@ import { PgService } from './pg.service';
  * SQL PREFLIGHT — the column-level gate.
  *
  * The schema-parity gate only checks TABLE NAMES. It is blind to columns, to
- * quoted identifiers, and to function calls — which is why 488 `tenant_id`
- * references (build-v3 has ZERO `tenant_id` columns), a missing
- * `tenant.normalize_phone()`, and an `ON CONFLICT` on a non-existent unique
+ * quoted identifiers, and to function calls — which is why 488 references to a
+ * column the schema does not have (the backend said `tenant_id`; the schema has
+ * only ever had one merchant key, now `merchant_id`), a missing
+ * `merchant.normalize_phone()`, and an `ON CONFLICT` on a non-existent unique
  * index all sailed through it while every gate reported green.
  *
  * This harness PREPAREs every SQL statement the backend issues against the live
@@ -37,7 +38,7 @@ import { PgService } from './pg.service';
  * bucket. A blind spot that large stops being a caveat and becomes a hiding place.
  *
  * So interpolated statements are now RECONSTRUCTED before being given up on:
- *   1. Same-file SQL fragment constants (`const FROM = \`FROM tenant.product p …\``)
+ *   1. Same-file SQL fragment constants (`const FROM = \`FROM merchant.product p …\``)
  *      are substituted, recursively — this is the dominant pattern by far.
  *   2. Any `${…}` still left is a runtime value (an optional clause, a sort
  *      direction). It is blanked, which yields the statement's MINIMAL form.
@@ -163,7 +164,7 @@ function sourceFiles(root: string): string[] {
 }
 
 /**
- * Module-level SQL fragment constants in one file: `const FROM = \`FROM tenant.x\``.
+ * Module-level SQL fragment constants in one file: `const FROM = \`FROM merchant.x\``.
  * These are how this codebase shares a projection or a join across several queries,
  * and they are the single biggest reason a statement is not literal.
  */

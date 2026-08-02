@@ -4,7 +4,7 @@
 **Companion docs:** [`SECURITY_GATE.md`](./SECURITY_GATE.md) (the gate) · [`ORDER_MODEL.md`](./ORDER_MODEL.md) · [`backend-convergence-map.md`](./backend-convergence-map.md)
 
 > **What this is.** The tracked roadmap for converging `apps/umi-api` **and** the data-migration
-> mechanism onto **build-v3** (3 schemas: `umi` sealed SaaS/identity/entitlement, `tenant` café facts
+> mechanism onto **build-v3** (3 schemas: `umi` sealed SaaS/identity/entitlement, `merchant` café facts
 > under RLS, `runtime` sealed machinery) and driving to a **coordinated production cutover**.
 >
 > **This is a living document.** Each phase below carries both its Definition of Done **and** its
@@ -44,7 +44,7 @@ Two consequences shape this roadmap:
 
 1. The **`sql-preflight` gate** (`fa9277d`) was built as the real baseline. It found **191 of 215**
    backend statements did not resolve — the largest single cause being **488 `tenant_id` refs against a
-   schema with zero `tenant_id` columns** (everything is `business_id`). This was in no prior phase and
+   schema with zero `tenant_id` columns** (everything is `merchant_id`). This was in no prior phase and
    invisible to every gate.
 2. The spine is ordered by **DDL truth**, not by code tidiness. We fix the schema deltas the backend
    depends on, then sweep code onto them, then complete features by domain. Progress is counted in
@@ -90,13 +90,13 @@ Legend: ✅ done · 🔄 in flight · ⏳ pending · ◑ partial
 **Goal.** Reshape the schema so the backend's SQL _can_ resolve — applied as one atomic migration set.
 **Scope.**
 
-- ✅ **Order cluster** — `PR #49` (`fed8c08`). `tenant.customer_order` / `order_item` / `order_event`
+- ✅ **Order cluster** — `PR #49` (`fed8c08`). `merchant.customer_order` / `order_item` / `order_event`
   (+ `payment`), **derived** order total (no stored `total`), void model (`voided_at`/`void_reason` +
   immutability trigger), `order_total` / `order_ticket` views. See `ORDER_MODEL.md`.
-- ⏳ **DB functions** `tenant.normalize_phone` / `normalize_identity` (3 × `42883` today).
-- ⏳ **`tenant.contact` unique constraint** (resolver `ON CONFLICT` = `42P10`; 0 data violations).
-- ✅ **`runtime.outbox_event` exactly-once RESTORED** — `business_id`/`topic`/`aggregate_id`/
-  `idempotency_key` + `UNIQUE (business_id, idempotency_key)`, and `available_at`/`leased_at`
+- ⏳ **DB functions** `merchant.normalize_phone` / `normalize_identity` (3 × `42883` today).
+- ⏳ **`merchant.contact` unique constraint** (resolver `ON CONFLICT` = `42P10`; 0 data violations).
+- ✅ **`runtime.outbox_event` exactly-once RESTORED** — `merchant_id`/`topic`/`aggregate_id`/
+  `idempotency_key` + `UNIQUE (merchant_id, idempotency_key)`, and `available_at`/`leased_at`
   split apart (one column was serving as both backoff and lease).
 - ⏳ **`runtime.conversation_turn` RESTORE** (5 live read paths; it is load-bearing, not telemetry).
 - ✅ **customer-session home** — **RESOLVED.** This line described the old `app`-CHECK session
@@ -105,18 +105,18 @@ Legend: ✅ done · 🔄 in flight · ⏳ pending · ◑ partial
   customer case as the `'person'` principal. Nothing to build. (Confirmed 2026-07-28 while
   reading this plan against the UmiPOS integration; `runtime.operator_session` follows the
   same discipline — a distinct presence table rather than another overload of `session`.)
-- ✅ **hours** — **DONE 2026-07-29.** 8 preflight failures cleared; `tenant.open_hours` and
-  `business.config` have no readers left. Not the shape this line originally predicted: there is
-  no `tenant.business_hours` table. Hours are the jsonb COLUMN build-v3 already chose, with a
-  branch override.
-  - **Shape.** `tenant.business.open_hours` + `tenant.branch.open_hours` (NULL = inherit),
-    mirroring `branch.timezone` one line above it. Derived from use: every reader wants the whole
+- ✅ **hours** — **DONE 2026-07-29.** 8 preflight failures cleared; `merchant.open_hours` and
+  `merchant.config` have no readers left. Not the shape this line originally predicted: there is
+  no `merchant.business_hours` table. Hours are the jsonb COLUMN build-v3 already chose, with a
+  location override.
+  - **Shape.** `merchant.merchant.open_hours` + `merchant.location.open_hours` (NULL = inherit),
+    mirroring `location.timezone` one line above it. Derived from use: every reader wants the whole
     week for one place and evaluates it in app code, and nothing filters on hours in SQL — so the
     unit of read equals the unit of write, which is a document. The row table also could not
-    express a split shift (its UNIQUE index on `(tenant, location, day)` FORBADE the second
+    express a split shift (its UNIQUE index on `(merchant, location, day)` FORBADE the second
     window), a date exception, or a window past midnight — the last one contradicting
-    `business_day_start`, which exists because businesses run past midnight.
-  - **`business.config` dissolved** into typed `business.whatsapp_*` columns per
+    `business_day_start`, which exists because merchants run past midnight.
+  - **`merchant.config` dissolved** into typed `merchant.whatsapp_*` columns per
     CONVERSATION_MODEL §2c. Named for the channel deliberately: a neutral `ordering_enabled`
     would eventually be wired to pause the POS too, and a café that stops taking WhatsApp orders
     is still selling at the counter.
@@ -125,14 +125,14 @@ Legend: ✅ done · 🔄 in flight · ⏳ pending · ◑ partial
     which could not represent a café open past midnight — `01:00 >= closes_at` holds for every
     window, so every late scan read as after-hours.
   - **`ordering-settings.repository` was dead, not merely stale.** It looked up
-    `tenant.business WHERE business_id = $1 ORDER BY created_at LIMIT 1` and upserted
-    `ON CONFLICT (business_id)` — the shape of `ops.businesses`, a CHILD of `core.tenants`. In
-    build-v3 the business IS the tenant, so every part of that (the column, the ordering, the
+    `merchant.merchant WHERE merchant_id = $1 ORDER BY created_at LIMIT 1` and upserted
+    `ON CONFLICT (merchant_id)` — the shape of `ops.businesses`, a CHILD of `core.tenants`. In
+    build-v3 the merchant IS the merchant, so every part of that (the column, the ordering, the
     LIMIT, the create-if-missing) answered a question that no longer exists.
-  - **The backfill was losing branches.** §3's fold grouped by `tenant_id` alone over a source
-    keyed by `(tenant, LOCATION, day)`, so a café with hours at two locations produced duplicate
+  - **The backfill was losing locations.** §3's fold grouped by `tenant_id` alone over a source
+    keyed by `(merchant, LOCATION, day)`, so a café with hours at two locations produced duplicate
     day keys and `jsonb_object_agg` kept one arbitrarily, with no error. Demonstrated on a fixture:
-    two branches at 07:00–19:00 and 11:00–21:00 folded to 11:00–21:00 alone. Production had
+    two locations at 07:00–19:00 and 11:00–21:00 folded to 11:00–21:00 alone. Production had
     already made that distinction — part 2b-bis of the 2026-06-26 migration exists because of it.
     Now one document per location, and 4 reconcile invariants that count cafés and distinct
     schedules rather than rows, because the loss was invisible in a row count.
@@ -140,31 +140,31 @@ Legend: ✅ done · 🔄 in flight · ⏳ pending · ◑ partial
     `saveBusinessHours` took two arguments. It takes three, the pause persists on its own confirm,
     and the screen no longer ships a hardcoded cutoff, notice, three real `+52` numbers, or a
     permanent `badge: 'PAUSED'` in `shell.jsx` that told every café ordering was paused.
-  - ⏳ Left open: no dashboard affordance yet CREATES a branch override — the backfill is its only
+  - ⏳ Left open: no dashboard affordance yet CREATES a location override — the backfill is its only
     writer, and `write()` deliberately saves where the value already lives so a routine save can
-    never silently fork a branch off the café's hours. `cash-scan.isAfterHours` reads café-level
-    hours because a staff scan carries no branch; revisit when the register carries its device's.
+    never silently fork a location off the café's hours. `cash-scan.isAfterHours` reads café-level
+    hours because a staff scan carries no location; revisit when the register carries its device's.
 - ⏳ **identity dissolution** — `contact_identity` / `channel` / `whatsapp_number` → the build-v3 model.
 - ⏳ **`90_rls.sql` booby-trap** — delete the hard-coded child-list rows in the _same_ commit that adds
-  `business_id` to `station`/`order_event` (else `42710` aborts the whole RLS rebuild).
-  ⚠️ **The same species bit again 2026-07-28**: the POS branch-narrowing policies were written as
-  an opt-IN list of table names, so a new tenant table with a `branch_id` got no narrowing,
+  `merchant_id` to `station`/`order_event` (else `42710` aborts the whole RLS rebuild).
+  ⚠️ **The same species bit again 2026-07-28**: the POS location-narrowing policies were written as
+  an opt-IN list of table names, so a new merchant table with a `location_id` got no narrowing,
   silently, failing OPEN. Now swept with a recorded opt-out (`staff`, `loyalty_visit`), which
   also picked up four tables that had none — `customer_order`, `device`, `station`,
-  `product_branch_availability`. **Rule: in this file, sweep and exclude; never list and include.**
+  `product_location_availability`. **Rule: in this file, sweep and exclude; never list and include.**
 - ✅ **Queue cluster RESTORED (2026-07-29)** — `runtime.inbound_event` / `dead_letter` /
   `idempotency_key`, the three siblings of the `outbox_event` restore above. Same loss, same
   cause: the from-scratch DDL simplified past what the live worker writes, and nothing noticed
   because the statements resolved against nothing. `inbound_event.external_id` → the
   `provider_event_id` the code has always written (so the existing UNIQUE is the one
-  `ON CONFLICT` was addressing) plus `business_id`/`event_type`/`payload_hash`;
-  `dead_letter` gets back `business_id` (NOT NULL, which `dead-letter.service.ts` already cites
-  as why untenanted jobs are log-only) and the four facts `source text` had concatenated;
-  `idempotency_key` becomes tenant-scoped `(business_id, scope, key)` — a global `key` PK put
+  `ON CONFLICT` was addressing) plus `merchant_id`/`event_type`/`payload_hash`;
+  `dead_letter` gets back `merchant_id` (NOT NULL, which `dead-letter.service.ts` already cites
+  as why unmerchanted jobs are log-only) and the four facts `source text` had concatenated;
+  `idempotency_key` becomes merchant-scoped `(merchant_id, scope, key)` — a global `key` PK put
   every café in one namespace. **This cluster was not on this list**; it was found by running
   the preflight rather than reading the plan. Zero backfill impact: all three tables' rows are
   dropped by the 2026-07-12 security decision.
-- ⏳ **`tenant.staff.name`** — `staff.repository` reads/writes `staff.name`/`phone`/`email`, which
+- ⏳ **`merchant.staff.name`** — `staff.repository` reads/writes `staff.name`/`phone`/`email`, which
   build-v3 moved onto `umi.user` (staff carries `user_id`). 3 preflight failures. **Also not
   previously on this list.**
 - ⏳ **Backfill rewrite to PRESERVE** — extend the reconcile to field-level for each new carry.
@@ -179,14 +179,14 @@ preflight failures; `security_gate.sql` + `reconcile_v3.sql` stay PASS.
 
 ### P2 — Mechanical name sweep ✅ DONE
 
-**Goal.** `tenant_id` → `business_id` across the backend (488 refs; the single largest preflight cause).
+**Goal.** `tenant_id` → `merchant_id` across the backend (488 refs; the single largest preflight cause).
 **Delivered.** `PR #50` (`f843e2e` / `b83c5c3`) — 387 renames across 37 files. **Preserved:** the
-`app.tenant_id` GUC (`pg.service.ts` dual-sets it with `app.current_business`) and the **frozen iPad
+`app.tenant_id` GUC (`pg.service.ts` dual-sets it with `app.current_merchant`) and the **frozen iPad
 `device_session.tenant_id` wire key** (now sourced from the renamed column). tsc clean, 325 tests pass.
 **Result.** Preflight **191 → 160** (only 31 retired directly — most `tenant_id` refs sit in statements
 that _also_ hit a missing table/column, so they clear only when P1/P3/P4 land).
-**⚠️ Invariant.** The worker pool is `BYPASSRLS`; dropping one `business_id` predicate = a **silent
-cross-tenant read** nothing catches. Every touched query keeps its predicate.
+**⚠️ Invariant.** The worker pool is `BYPASSRLS`; dropping one `merchant_id` predicate = a **silent
+cross-merchant read** nothing catches. Every touched query keeps its predicate.
 
 ### P3 — Identity / RBAC / WhatsApp / entitlement / POS ✅ DONE (self-contained)
 
@@ -198,9 +198,9 @@ cross-tenant read** nothing catches. Every touched query keeps its predicate.
 - ✅ **Identity → the FLAT model** (owner decision 2026-07-09, see
   `docs/architecture/2026-07-09-enterprise-conceptual-review.md`). The resolver had been written against
   a federated graph the DDL never built; that code was 3 days stale, not the spec. `umi.e164` +
-  `tenant.normalize_identity` added, `contact.normalized_value` made DERIVED (BEFORE trigger) and
+  `merchant.normalize_identity` added, `contact.normalized_value` made DERIVED (BEFORE trigger) and
   UNFORGEABLE (`REVOKE UPDATE`), repairing the L15 fatal branch.
-- ✅ **RBAC** — the access queries read build-v2 `tenant_access`/`login_id` and a nonexistent
+- ✅ **RBAC** — the access queries read build-v2 `merchant_access`/`login_id` and a nonexistent
   `rp.permission_key`, all INTERPOLATED so preflight never saw them (login would return
   `permissions=[]`). Rewritten onto `umi.user_role` + `seed_rbac.sql`; `super_admin` made real as a
   PLATFORM-WIDE grant (owner decision 2026-07-21 — a deliberate privilege change: the operator goes
@@ -208,11 +208,11 @@ cross-tenant read** nothing catches. Every touched query keeps its predicate.
 - ✅ **WhatsApp sender vocabulary** — DB speaks `(customer,bot,staff,system)`, the LLM speaks
   `user/assistant`; bridged at the repository boundary with a red-green-verified regression test.
 - ⚠️ **Staff writes → `workerTx`** — NOT done, carried to P4. **Never**
-  `grant insert/update on umi.user to api` (no RLS on `umi.user` → cross-tenant write primitive).
+  `grant insert/update on umi.user to api` (no RLS on `umi.user` → cross-merchant write primitive).
 
 **Residuals moved to P4 (they are P4-entangled, not P3 leftovers):** Customer 360
-(`customers.repository` mixes `contact_identity` + `tenant."order"` + `customer.contact_id` in single
-statements) and the message-pipeline schema (`tenant.message` has no `business_id`/`message_index`/
+(`customers.repository` mixes `contact_identity` + `merchant."order"` + `customer.contact_id` in single
+statements) and the message-pipeline schema (`merchant.message` has no `merchant_id`/`message_index`/
 `twilio_message_sid`/`intent`/`body_embedding`), so end-to-end WhatsApp needs P4 too.
 
 **DoD.** Entitlement returns the same set as `product_instances` for the seeded cafés; login yields real
@@ -226,10 +226,10 @@ identity/entitlement failures; gate stays green.
 recorded in [`CONVERSATION_MODEL.md`](./CONVERSATION_MODEL.md): **delete `conversation_state`** (no FSM —
 a cheap-but-capable LLM + recent messages _is_ the state), **slim `conversation_turn` to a merge buffer**
 (the fragmented-WhatsApp-message problem is real; the integrity/reconcile machinery is not), **dissolve
-`business.config`** into the typed `business.bot_*` / `open_hours` columns it already became, point
+`merchant.config`** into the typed `merchant.bot_*` / `open_hours` columns it already became, point
 message embeddings at `runtime.message_embedding`, and elevate customer facts into the CDP (read as
-Customer 360). `GET /hours` off `business.open_hours` jsonb; **order repos** rewritten to
-`tenant.customer_order`.
+Customer 360). `GET /hours` off `merchant.open_hours` jsonb; **order repos** rewritten to
+`merchant.customer_order`.
 **KDS DONE** (#63/#65) · **cash DONE** (#66 vocabulary/card/branding + #67 birthday grant — cash 34→9;
 the 9 remaining deferred: gift cards, `open_hours`, P5 slug). Remaining P4: **conversation pipeline**
 (per `CONVERSATION_MODEL.md`), **hours**, **Customer 360** (`customers`), **growth** (`leads`).
@@ -237,7 +237,7 @@ the 9 remaining deferred: gift cards, `open_hours`, P5 slug). Remaining P4: **co
 
 ### P5 — 4-repo lockstep slug release ⏳ PENDING
 
-**Goal.** Route businesses **by id**; drop `slug` — but **keep `tenant.business.handle`** (the `.pkpass`
+**Goal.** Route merchants **by id**; drop `slug` — but **keep `merchant.merchant.handle`** (the `.pkpass`
 files already on customers' phones bake `/api/{handle}/passes/apple`; dropping the URL kills wallet-pass
 updates forever). Requires a coordinated `@umi/contract` **MAJOR** release across the 4 consumers.
 **DoD.** All 4 repos build against the new contract; wallet-pass URLs still resolve.
@@ -261,7 +261,7 @@ reusing `reconcile_v3.sql` unchanged. **D8**: zero foreign servers/user-mappings
 smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and the WhatsApp bot**).
 **Cutover.** Gate + reconcile run **against prod** and pass **before** the flip; the app repoints
 `DATABASE_URL_APP/_WORKER` at the `api`/`worker` login roles (env change) and drops `app.tenant_id` from
-`runWithTenant`.
+`runWithMerchant`.
 **DoD.** Prod `security_gate.sql` PASS; both clients live on build-v3.
 
 ---
@@ -272,7 +272,7 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
   track (catalog + `tquery` + the bot checkout) → **#63** P4 KDS (the board-killer, stations, the
   line-change signal, exactly-once) → **#64** platform-architecture presentation → **#65** KDS auth
   substrate (`runtime.session` polymorphic, `runtime.pairing` lifecycle, `runtime.device_session` dropped).
-- **In flight:** `feat/p4-cash-birthday` — the per-card birthday grant. `tenant.loyalty_birthday_grant`
+- **In flight:** `feat/p4-cash-birthday` — the per-card birthday grant. `merchant.loyalty_birthday_grant`
   (a PENDING entitlement an event can't hold — grant, not `loyalty_redemption`); the scan checks a cheap
   `card_id` lookup, never the birthday. Prior cash work (merged #66): (1) loyalty vocabulary renames,
   (2) the card scan/pass layer (`qr_token`/`lifecycle_message`; incumbent scan secrets carried), (3) the
@@ -289,9 +289,9 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
   | bucket     | n     | cause                                                                                    | owner              |
   | ---------- | ----- | ---------------------------------------------------------------------------------------- | ------------------ |
   | gift cards | 8     | `loyalty_gift_card.amount_cents` / `redeemed_at`, `loyalty_gift_card_ledger.source_type` | P4 (cash deferred) |
-  | slug       | 7     | `business.slug`, `branch.slug` / `aliases`                                               | P5                 |
+  | slug       | 7     | `merchant.slug`, `location.slug` / `aliases`                                             | P5                 |
   | staff      | 3     | `staff.name` → `umi.user`                                                                | P1                 |
-  | ~~hours~~  | ~~8~~ | ~~`tenant.open_hours` missing, `business.config`~~ — **closed 2026-07-29**               | P1 ✅              |
+  | ~~hours~~  | ~~8~~ | ~~`merchant.open_hours` missing, `merchant.config`~~ — **closed 2026-07-29**             | P1 ✅              |
 
   ⚠️ **The gate was over-reporting.** It scanned backtick spans over raw file text, so a doc
   comment that QUOTES SQL counted as a statement: `kds.repository.ts` explains a rewrite with
@@ -308,11 +308,11 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
   one (it read `p.price_cents`/`p.variants` where build-v3 has `price` and relational variants); the
   detail report also caps each error code at 40, so a sample read like a worklist. From 171: catalog
   −13, checkout −7 (both files gone from the rollup), then **#63 retired the KDS read/write half and this
-  branch the auth half — `kds/kds.repository.ts` is now absent from the rollup entirely (40 → 0).**
+  location the auth half — `kds/kds.repository.ts` is now absent from the rollup entirely (40 → 0).**
 
 - **Units:** 366 · **Gate:** `security_gate.sql` PASS (25 structural + 3 behavioral) ·
   `reconcile_v3.sql` PASS on the snapshot backfill.
-- **Branch protection (2026-07-21):** `build-v3` requires a branch to be UP TO DATE with base before
+- **Location protection (2026-07-21):** `build-v3` requires a branch to be UP TO DATE with base before
   merging (`strict: true`), enforced for admins. Closes the stale-base hole: the tree CI tested is the
   tree that lands.
 - ✅ **The checks are now REQUIRED** (`lint`, `build-and-test`, `contract`, `tokens`). Until this landed,
@@ -326,7 +326,7 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
 - ✅ **Post-merge CI now runs** (`chore/post-merge-ci`). Every workflow used to be `pull_request`-only,
   and `umi-api-deploy.yml` is scoped to `main`, so a merge into `build-v3` triggered nothing — the PR was
   tested, the merge result never was. `umi-api-ci`, `contract-ci` and `tokens-ci` gain
-  `push: branches: [build-v3]`; `main` stays off the push list because `umi-api-deploy.yml` re-runs the
+  `push: locations: [build-v3]`; `main` stays off the push list because `umi-api-deploy.yml` re-runs the
   same gate before it ships. **pr-gates gate 5 is CLOSED — confirmed, not assumed:** merge commit
   `01e28b8` fired all four workflows on `push` and all four passed (`umi-api CI` 36s, `lint` 29s,
   `contract CI` 25s, `tokens CI` 10s). First checked merge into `build-v3`.
@@ -366,13 +366,13 @@ therefore under-counted. `npm run test:integration` now prints this rollup untru
 | `leads/leads.repository.ts`                        |     **10** | growth — previously invisible      |
 | `customers/customers.repository.ts`                |          9 | Customer 360 (identity-entangled)  |
 | `cash/cash-write.repository.ts`                    |          6 | gift-card gifting (deferred)       |
-| `conversation-turns` · `memory` · `tenants`        |     5 each | pipeline / P5                      |
+| `conversation-turns` · `memory` · `merchants`      |     5 each | pipeline / P5                      |
 | `jobs/queue.repository.ts` · `hours` · `lifecycle` |     4 each | outbox tail / P4 hours / lifecycle |
 | `messages` · `ordering-settings` · `staff`         |     3 each | pipeline / hours                   |
 | `cash/cash.repository.ts`                          |          2 | branding read (P5 slug) + gift     |
 | `auth` · `turn-commit` · `voice-settings`          |     2 each | P5 slug / pipeline                 |
 | `cash/cash-scan.repository.ts`                     |          1 | `open_hours` (hours track)         |
-| `business-config`                                  |          1 | —                                  |
+| `merchant-config`                                  |          1 | —                                  |
 
 **`kds/kds.repository.ts` (whole KDS) and `cash-register` are absent from the rollup.** The KDS
 read/write half (#63) + auth half (#65) retired all 40; the cash vocabulary + card + branding groups
@@ -383,7 +383,7 @@ separately). **`42883` remains 0** (`umi.e164` resolved the normalize functions)
 > ### ✅ RESOLVED: the KDS auth substrate was three thin tables, not a rename
 >
 > The pairing/session/device cluster looked like a column rename but was the same "built to the
-> wrong guess" defect as `tenant.station`, on the sealed auth substrate:
+> wrong guess" defect as `merchant.station`, on the sealed auth substrate:
 >
 > - **`runtime.session`** shipped `user_id NOT NULL` + `app` — a login model NOTHING uses. The
 >   live writers (`kds.repository.ts` `'device'`, `cash/customer-session.service.ts` `'person'`/`'user'`)
@@ -393,7 +393,7 @@ separately). **`42883` remains 0** (`umi.e164` resolved the normalize functions)
 >   the approval workflow, and `device_id` NULLABLE under `CHECK ((status='used') = (device_id IS NOT NULL))`.
 > - **`runtime.device_session`** had zero code readers — a speculative device home the code never used
 >   (device sessions live in `runtime.session`). Dropped, and removed from the `90_rls`/`security_gate` seal.
-> - **`tenant.device`** lacked `station_id`/`updated_at` its writers set, and used `kind`/`retired`
+> - **`merchant.device`** lacked `station_id`/`updated_at` its writers set, and used `kind`/`retired`
 >   where the code said `device_type`/`archived` — adapted at the query boundary (backend, not schema).
 >
 > The auth substrate stayed sealed throughout (`security_gate.sql` 25+3 PASS: `api` has zero privilege
@@ -417,18 +417,18 @@ separately). **`42883` remains 0** (`umi.e164` resolved the normalize functions)
 > retired.
 
 Still uncovered after reconstruction: **15** statements —`lifecycle`×4, `trace.service`×4,
-`auth`×2, `kds`×2, `cash`×1, `conversation-turns`×1, `tenants`×1. Named, not just counted.
+`auth`×2, `kds`×2, `cash`×1, `conversation-turns`×1, `merchants`×1. Named, not just counted.
 
 ---
 
 ## 6 · Out of scope / accepted residuals
 
-- **Per-policy `session_can_access_business()`** — rejected as over-engineering for 5 cafés; the GUC
-  choke-point suffices. Revisit if tenant count / role complexity grows.
+- **Per-policy `session_can_access_merchant()`** — rejected as over-engineering for 5 cafés; the GUC
+  choke-point suffices. Revisit if merchant count / role complexity grows.
 - **`runtime.otp`** — stays as an unused future table (WhatsApp-OTP).
-- **Outbound-message enqueue** — worker-only until a SECURITY DEFINER stamps origin `business_id`
+- **Outbound-message enqueue** — worker-only until a SECURITY DEFINER stamps origin `merchant_id`
   (`api` has no `runtime.outbox_event` DML by design).
-- **`umi.user` row enumeration** — credentials column-locked; identity columns readable cross-tenant
+- **`umi.user` row enumeration** — credentials column-locked; identity columns readable cross-merchant
   unless routed through the scoped staff join. Low sensitivity.
 
 ---

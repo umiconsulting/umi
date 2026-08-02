@@ -13,7 +13,7 @@ import { QueueModule } from './jobs/queue.module';
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { IdentityModule } from './modules/identity/identity.module';
-import { TenantsModule } from './modules/tenants/tenants.module';
+import { MerchantsModule } from './modules/merchants/merchants.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { BusinessHoursModule } from './modules/business-hours/business-hours.module';
 import { VoiceModule } from './modules/voice/voice.module';
@@ -40,7 +40,7 @@ import { LeadsModule } from './modules/leads/leads.module';
     HealthModule,
     AuthModule,
     IdentityModule,
-    TenantsModule,
+    MerchantsModule,
     StaffModule,
     BusinessHoursModule,
     VoiceModule,
@@ -57,9 +57,9 @@ import { LeadsModule } from './modules/leads/leads.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    // Establish the per-request AsyncLocalStorage context (tenant/user/requestId)
+    // Establish the per-request AsyncLocalStorage context (merchant/user/requestId)
     // for the whole request, so repositories can set RLS context. The AuthGuard
-    // (Phase 2) populates tenant/user into this context after authentication.
+    // (Phase 2) populates merchant/user into this context after authentication.
     // NestJS 11 uses path-to-regexp v8 — the bare '*' wildcard is deprecated;
     // '{*splat}' matches all paths including the root.
     consumer.apply(RequestContextMiddleware).forRoutes('{*splat}');

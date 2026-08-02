@@ -3,9 +3,9 @@ import { PgService } from '../../shared/database/pg.service';
 import { roleToSender } from './message-vocab';
 
 /**
- * Queries for `tenant.message` (build-v3; was `comms.messages`). Column rebind:
- * `role → sender`, `content → body`. The message has NO business_id — it scopes to
- * the tenant via its `conversation`; body embeddings live in a sibling
+ * Queries for `merchant.message` (build-v3; was `comms.messages`). Column rebind:
+ * `role → sender`, `content → body`. The message has NO merchant_id — it scopes to
+ * the merchant via its `conversation`; body embeddings live in a sibling
  * `runtime.message_embedding` row, not on the message. Reads that feed the prompt
  * still expose `{ role, content }` via aliases so callers stay put.
  *
@@ -35,7 +35,7 @@ export class MessagesRepository {
    * sentinel if `providerMessageId` was already ingested, or null on any other failure.
    */
   async insertMessage(params: {
-    tenantId: string; // accepted for call-site symmetry; the message scopes via conversation
+    merchantId: string; // accepted for call-site symmetry; the message scopes via conversation
     conversationId: string;
     role: 'user' | 'assistant' | 'system' | 'tool';
     content: string;
@@ -43,7 +43,7 @@ export class MessagesRepository {
   }): Promise<string | null> {
     try {
       const { rows } = await this.pg.query<{ id: string }>(
-        `INSERT INTO tenant.message
+        `INSERT INTO merchant.message
            (conversation_id, sender, body, provider_message_id)
          VALUES ($1, $2, $3, $4)
          RETURNING id`,
@@ -77,7 +77,7 @@ export class MessagesRepository {
       `SELECT CASE sender WHEN 'customer' THEN 'user' WHEN 'bot' THEN 'assistant'
                           WHEN 'staff' THEN 'assistant' ELSE 'system' END AS role,
               COALESCE(body, '') AS content
-         FROM tenant.message
+         FROM merchant.message
         WHERE conversation_id = $1
         ORDER BY created_at DESC
         LIMIT $2`,
@@ -96,7 +96,7 @@ export class MessagesRepository {
       `SELECT CASE sender WHEN 'customer' THEN 'user' WHEN 'bot' THEN 'assistant'
                           WHEN 'staff' THEN 'assistant' ELSE 'system' END AS role,
               COALESCE(body, '') AS content
-         FROM tenant.message
+         FROM merchant.message
         WHERE conversation_id = $1
         ORDER BY created_at DESC
         OFFSET $2 LIMIT $3`,
@@ -105,28 +105,28 @@ export class MessagesRepository {
     return rows;
   }
 
-  /** Messages with no embedding row yet (embed.backfill). Tenant-scoped if given. */
+  /** Messages with no embedding row yet (embed.backfill). Merchant-scoped if given. */
   async listNeedingEmbedding(
     limit: number,
-    tenantId?: string,
+    merchantId?: string,
   ): Promise<Array<{ id: string; content: string }>> {
     const { rows } = await this.pg.query<{ id: string; content: string }>(
       `SELECT m.id::text, COALESCE(m.body, '') AS content
-         FROM tenant.message m
-         JOIN tenant.conversation c ON c.id = m.conversation_id
+         FROM merchant.message m
+         JOIN merchant.conversation c ON c.id = m.conversation_id
     LEFT JOIN runtime.message_embedding me ON me.message_id = m.id
         WHERE me.message_id IS NULL
           AND m.body IS NOT NULL
-          AND ($2::uuid IS NULL OR c.business_id = $2::uuid)
+          AND ($2::uuid IS NULL OR c.merchant_id = $2::uuid)
         LIMIT $1`,
-      [limit, tenantId ?? null],
+      [limit, merchantId ?? null],
     );
     return rows;
   }
 
   async countMessages(conversationId: string): Promise<number> {
     const { rows } = await this.pg.query<{ n: string }>(
-      `SELECT count(*)::text AS n FROM tenant.message WHERE conversation_id = $1`,
+      `SELECT count(*)::text AS n FROM merchant.message WHERE conversation_id = $1`,
       [conversationId],
     );
     return Number(rows[0]?.n ?? 0);

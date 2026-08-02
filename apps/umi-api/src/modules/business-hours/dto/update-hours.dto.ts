@@ -12,12 +12,12 @@ export class UpdateHoursDto {
   @IsObject()
   hours?: Record<string, { open: boolean; from: string; to: string }>;
 
-  // IANA timezone → tenant.business.timezone.
+  // IANA timezone → merchant.merchant.timezone.
   @IsOptional()
   @IsString()
   timezone?: string;
 
-  // Ordering-window settings → the typed tenant.business.whatsapp_* columns
+  // Ordering-window settings → the typed merchant.merchant.whatsapp_* columns
   // (ordering_enabled / order_cutoff_minutes / ordering_notice / bypass_phone).
   @IsOptional()
   @IsObject()

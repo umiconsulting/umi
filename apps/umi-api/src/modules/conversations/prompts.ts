@@ -1,4 +1,4 @@
-import type { VoiceConfig } from './business-config.service';
+import type { VoiceConfig } from './merchant-config.service';
 import type { CustomerFacts, WorkingMemory } from './memory.service';
 import type { PartialCancelledOrderContext } from './conversation.types';
 
@@ -192,31 +192,31 @@ Si \`match_type = "browse"\`, usa los ejemplos de \`data_summary.categories\` pa
 }
 
 /**
- * Multi-branch instruction block. Present ONLY when the tenant has >1 active
- * location and branch resolution is enabled. When no branch is chosen yet it
- * makes the bot ask once (in the business voice) before taking/confirming an
- * order and call `set_branch`; once chosen it tells the bot to stop asking.
+ * Multi-location instruction block. Present ONLY when the merchant has >1 active
+ * location and location resolution is enabled. When no location is chosen yet it
+ * makes the bot ask once (in the merchant voice) before taking/confirming an
+ * order and call `set_location`; once chosen it tells the bot to stop asking.
  */
-export interface BranchPromptContext {
-  branches: string[];
-  selectedBranch: string | null;
+export interface LocationPromptContext {
+  locations: string[];
+  selectedLocation: string | null;
 }
 
-function buildBranchSection(branch: BranchPromptContext | null | undefined): string {
-  if (!branch) return '';
-  if (branch.selectedBranch) {
+function buildLocationSection(location: LocationPromptContext | null | undefined): string {
+  if (!location) return '';
+  if (location.selectedLocation) {
     return `
 # SUCURSAL
-El cliente ya eligió la sucursal: ${branch.selectedBranch}. No vuelvas a preguntar por la sucursal; continúa con su pedido normalmente.
+El cliente ya eligió la sucursal: ${location.selectedLocation}. No vuelvas a preguntar por la sucursal; continúa con su pedido normalmente.
 `;
   }
-  if (branch.branches.length < 2) return '';
-  const list = branch.branches.map((b) => `- ${b}`).join('\n');
+  if (location.locations.length < 2) return '';
+  const list = location.locations.map((b) => `- ${b}`).join('\n');
   return `
 # SUCURSALES
 Este negocio tiene varias sucursales:
 ${list}
-Antes de agregar productos o confirmar un pedido, DEBES preguntar de qué sucursal quiere ordenar el cliente. Haz UNA sola pregunta, en la voz del negocio. Cuando el cliente indique la sucursal —aunque use un apodo o abreviación como "chapu" por "Chapultepec"— llama a la herramienta \`set_branch\` con el nombre. Si no queda claro a cuál se refiere, vuelve a preguntar mostrando las opciones. No olvides lo que el cliente ya pidió: después de fijar la sucursal, continúa con ese pedido.
+Antes de agregar productos o confirmar un pedido, DEBES preguntar de qué sucursal quiere ordenar el cliente. Haz UNA sola pregunta, en la voz del negocio. Cuando el cliente indique la sucursal —aunque use un apodo o abreviación como "chapu" por "Chapultepec"— llama a la herramienta \`set_location\` con el nombre. Si no queda claro a cuál se refiere, vuelve a preguntar mostrando las opciones. No olvides lo que el cliente ya pidió: después de fijar la sucursal, continúa con ese pedido.
 `;
 }
 
@@ -226,14 +226,14 @@ export function buildHarnessSystemPrompt(params: {
   workingMemory?: WorkingMemory;
   partialCancelledOrder?: PartialCancelledOrderContext | null;
   voice: VoiceConfig;
-  branchContext?: BranchPromptContext | null;
+  locationContext?: LocationPromptContext | null;
 }): string {
   const basePrompt = buildVoiceSystemPrompt(params);
-  const branchSection = buildBranchSection(params.branchContext);
+  const locationSection = buildLocationSection(params.locationContext);
 
   return `
 ${basePrompt}
-${branchSection}
+${locationSection}
 # HERRAMIENTAS
 Usa herramientas cuando necesites verificar información operativa o afectar el pedido.
 - \`search_menu\`: para productos, categorías, disponibilidad aproximada y búsquedas vagas como "comida", "algo dulce" o "otra bebida".
@@ -244,7 +244,7 @@ Usa herramientas cuando necesites verificar información operativa o afectar el 
 - \`get_recent_customer_orders\`: para revisar pedidos previos antes de repetirlos.
 - \`reorder_last_order\`: solo después de confirmar explícitamente que quiere repetir el último pedido.
 - \`get_business_hours\`: para horarios o si todavía reciben pedidos.
-- \`get_business_info\`: para dirección, pagos y datos operativos.
+- \`get_merchant_info\`: para dirección, pagos y datos operativos.
 
 # REGLAS DE ORQUESTACIÓN
 - La historia reciente ya contiene contexto conversacional. Úsala para resolver referencias como "el cappuccino también grande", "lo mismo" o "otra cosa".

@@ -1,6 +1,6 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import type { AuthUser, AuthedRequest, TenantAccess } from './auth.types';
-import type { PublicTenant } from './public-tenant.guard';
+import type { AuthUser, AuthedRequest, MerchantAccess } from './auth.types';
+import type { PublicMerchant } from './public-merchant.guard';
 
 /** Injects the authenticated principal (set by AuthGuard). */
 export const CurrentUser = createParamDecorator(
@@ -9,17 +9,17 @@ export const CurrentUser = createParamDecorator(
   },
 );
 
-/** Injects the resolved tenant membership (set by TenantAccessGuard). */
-export const Tenant = createParamDecorator(
-  (_data: unknown, ctx: ExecutionContext): TenantAccess | undefined => {
-    return ctx.switchToHttp().getRequest<AuthedRequest>().tenantAccess;
+/** Injects the resolved merchant membership (set by MerchantAccessGuard). */
+export const Merchant = createParamDecorator(
+  (_data: unknown, ctx: ExecutionContext): MerchantAccess | undefined => {
+    return ctx.switchToHttp().getRequest<AuthedRequest>().merchantAccess;
   },
 );
 
-/** Injects the public tenant (set by PublicTenantGuard) for no-login routes. */
-export const PubTenant = createParamDecorator(
-  (_data: unknown, ctx: ExecutionContext): PublicTenant | undefined => {
-    return ctx.switchToHttp().getRequest<AuthedRequest & { publicTenant?: PublicTenant }>()
-      .publicTenant;
+/** Injects the public merchant (set by PublicMerchantGuard) for no-login routes. */
+export const PubMerchant = createParamDecorator(
+  (_data: unknown, ctx: ExecutionContext): PublicMerchant | undefined => {
+    return ctx.switchToHttp().getRequest<AuthedRequest & { publicMerchant?: PublicMerchant }>()
+      .publicMerchant;
   },
 );

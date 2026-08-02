@@ -2,8 +2,8 @@
 
 > Developer presentation · Goal architecture · build-v3 is the database source of truth
 
-Umi is one platform with several product surfaces. One backend owns all business writes.
-Thin clients use versioned contracts and shared projections. Each business fact has one owner.
+Umi is one platform with several product surfaces. One backend owns all merchant writes.
+Thin clients use versioned contracts and shared projections. Each merchant fact has one owner.
 
 ## 1. The architecture in one view
 
@@ -40,7 +40,7 @@ flowchart TB
   subgraph Store["Supabase PostgreSQL · build-v3"]
     direction LR
     Umi[("umi<br/>identity + access + commercial terms")]:::data
-    Tenant[("tenant<br/>café business facts")]:::data
+    Merchant[("merchant<br/>café merchant facts")]:::data
     Runtime[("runtime<br/>machine state + delivery")]:::data
   end
 
@@ -60,13 +60,13 @@ flowchart TB
   KDS --> Contract
   Contract --> Web
 
-  POS <-->|"branch LAN · mTLS"| KDS
+  POS <-->|"location LAN · mTLS"| KDS
 
   Web --> Umi
-  Web --> Tenant
+  Web --> Merchant
   Web --> Runtime
   Worker --> Umi
-  Worker --> Tenant
+  Worker --> Merchant
   Worker --> Runtime
 
   Worker --> Channel
@@ -88,12 +88,12 @@ They consume one API and one data model. The POS and KDS also have a local resil
 | Product or package      | Owns                                                                     | Does not own                                      | Main communication                               |
 | ----------------------- | ------------------------------------------------------------------------ | ------------------------------------------------- | ------------------------------------------------ |
 | `apps/umi-api`          | Business rules, writes, authorization, queues, adapters, and projections | Product UI and device hardware                    | HTTPS, PostgreSQL, BullMQ, provider APIs         |
-| `apps/umi-dashboard`    | Owner and manager workflows                                              | Business data or financial rules                  | Cookie-authenticated API calls                   |
+| `apps/umi-dashboard`    | Owner and manager workflows                                              | Merchant data or financial rules                  | Cookie-authenticated API calls                   |
 | Umi Cash experience     | Customer registration, QR, loyalty display, and wallet delivery          | Loyalty balance truth or ledger rules             | Public and authenticated API calls               |
 | `apps/umi-landing-page` | Marketing, lead capture, and diagnostics                                 | Prospect storage and email workflow state         | Public API calls                                 |
 | `apps/umi-pos`          | Terminal UI, hardware ports, encrypted local state, and offline journal  | Authoritative prices, money, orders, or loyalty   | Versioned API and paired-KDS LAN                 |
 | `apps/umi-kds`          | Kitchen board, ticket actions, and local ticket journal                  | Order truth, payment truth, or customer messaging | Versioned API, event cursor, and POS LAN         |
-| Operations UI           | Trace search, health, incidents, and reconciliation                      | Business facts                                    | OpenTelemetry, Sentry, and read-only diagnostics |
+| Operations UI           | Trace search, health, incidents, and reconciliation                      | Merchant facts                                    | OpenTelemetry, Sentry, and read-only diagnostics |
 | `packages/contract`     | Routes, payload schemas, errors, versions, and product keys              | Business logic                                    | TypeScript package and neutral JSON artifact     |
 | `packages/tokens`       | Shared brand primitives and generated app tokens                         | Product layout decisions                          | Generated CSS, JavaScript, and JSON              |
 | root `supabase/`        | Ordered database migrations                                              | Runtime business logic                            | Supabase CLI and PostgreSQL                      |
@@ -101,7 +101,7 @@ They consume one API and one data model. The POS and KDS also have a local resil
 The Umi Cash capability can change its repository shape. Its business owner stays `umi-api`.
 The public wallet URL must remain stable because printed QR codes depend on it.
 
-### Business lifecycle
+### Merchant lifecycle
 
 ```mermaid
 flowchart LR
@@ -111,8 +111,8 @@ flowchart LR
 
   Lead["Landing lead"]:::phase --> Prospect["umi.prospect<br/>+ prospect_event"]:::fact
   Prospect --> Sale["Umi sales process"]:::phase
-  Sale --> Access["business + subscription<br/>+ effective_entitlement"]:::fact
-  Access --> Setup["Dashboard setup<br/>branch · staff · catalog · devices"]:::phase
+  Sale --> Access["merchant + subscription<br/>+ effective_entitlement"]:::fact
+  Access --> Setup["Dashboard setup<br/>location · staff · catalog · devices"]:::phase
   Setup --> Reach["Customer reach<br/>WhatsApp · wallet · walk-in"]:::phase
   Reach --> Order["customer_order<br/>items · events · payment"]:::fact
   Order --> Kitchen["KDS fulfillment"]:::value
@@ -124,7 +124,7 @@ flowchart LR
   Insight --> Retain["Lifecycle messages<br/>and repeat visits"]:::value
 ```
 
-The flow starts before a café becomes a tenant. It ends with an auditable customer and business outcome.
+The flow starts before a café becomes a merchant. It ends with an auditable customer and merchant outcome.
 Each step writes facts once and exposes them through the next product surface.
 
 ## 3. Target workspace shape
@@ -171,7 +171,7 @@ flowchart TB
   end
 
   subgraph P3["3 · Projection plane"]
-    Facts["tenant facts"]:::core
+    Facts["merchant facts"]:::core
     Views["security_invoker views<br/>order_ticket · order_total · analytics"]:::plane
     Facts --> Views
   end
@@ -228,7 +228,7 @@ flowchart TB
   Redis --> Processor["Processor"]:::async
   Processor --> Adapter["One adapter per provider"]:::shared
 
-  Context["Request context<br/>business · user · request"]:::shared -.-> Pg
+  Context["Request context<br/>merchant · user · request"]:::shared -.-> Pg
   Config["Validated config"]:::shared -.-> Controller
   Logging["Structured logs + traces"]:::shared -.-> Controller
   Logging -.-> Processor
@@ -238,7 +238,7 @@ flowchart TB
 
 | Module group          | Modules                                                          | Purpose                                                              |
 | --------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------- |
-| Platform access       | `auth`, `identity`, `tenants`, `staff`                           | Login, role grants, business scope, and staff employment             |
+| Platform access       | `auth`, `identity`, `merchants`, `staff`                         | Login, role grants, merchant scope, and staff employment             |
 | Customer platform     | `customers`, `cash`, `lifecycle`                                 | Customer 360, loyalty, stored value, rewards, and lifecycle messages |
 | Conversation          | `conversations`, `voice`, `hours`                                | WhatsApp ingress, AI turns, tools, voice, and availability           |
 | Operations            | `kds`, `pos`, `leads`                                            | Kitchen, point of sale, prospects, and lead workflows                |
@@ -261,7 +261,7 @@ build-v3 uses schemas for authorship, not for product modules. Product domains l
 ```mermaid
 flowchart LR
   classDef umi fill:#eef2ff,stroke:#4f46e5,color:#1e1b4b,stroke-width:2px
-  classDef tenant fill:#ecfdf5,stroke:#059669,color:#022c22,stroke-width:2px
+  classDef merchant fill:#ecfdf5,stroke:#059669,color:#022c22,stroke-width:2px
   classDef runtime fill:#fff7ed,stroke:#ea580c,color:#431407,stroke-width:2px
   classDef derived fill:#f8fafc,stroke:#64748b,color:#0f172a
 
@@ -273,14 +273,14 @@ flowchart LR
     PlatformAudit["audit_log"]:::umi
   end
 
-  subgraph T["tenant · café-authored facts"]
-    Org["business · branch · station · integration · staff"]:::tenant
-    Customer["customer · contact · customer_note"]:::tenant
-    Loyalty["loyalty_program · card · visits<br/>rewards · ledgers · wallet_pass"]:::tenant
-    Commerce["product · options · modifiers · availability"]:::tenant
-    Conversation["conversation · message · knowledge"]:::tenant
-    Order["customer_order · order_item<br/>order_event · payment · refund"]:::tenant
-    Device["device · tenant.audit_log"]:::tenant
+  subgraph T["merchant · café-authored facts"]
+    Org["merchant · location · station · integration · staff"]:::merchant
+    Customer["customer · contact · customer_note"]:::merchant
+    Loyalty["loyalty_program · card · visits<br/>rewards · ledgers · wallet_pass"]:::merchant
+    Commerce["product · options · modifiers · availability"]:::merchant
+    Conversation["conversation · message · knowledge"]:::merchant
+    Order["customer_order · order_item<br/>order_event · payment · refund"]:::merchant
+    Device["device · merchant.audit_log"]:::merchant
   end
 
   subgraph R["runtime · machine state"]
@@ -321,8 +321,8 @@ flowchart LR
 
 | Schema       | Question it answers                              | Access rule                                          |
 | ------------ | ------------------------------------------------ | ---------------------------------------------------- |
-| `umi`        | What does Umi know and grant?                    | Umi controls writes. Selected business rows use RLS. |
-| `tenant`     | What happened inside a café?                     | Every business fact uses business scope and RLS.     |
+| `umi`        | What does Umi know and grant?                    | Umi controls writes. Selected merchant rows use RLS. |
+| `merchant`   | What happened inside a café?                     | Every merchant fact uses merchant scope and RLS.     |
 | `runtime`    | What must the machine read to continue?          | The backend and worker control access.               |
 | `extensions` | Which PostgreSQL capabilities support the model? | Application roles receive usage only.                |
 
@@ -336,13 +336,13 @@ flowchart TB
   WorkerLogin["Worker login role"] --> Worker["worker<br/>NOLOGIN · BYPASSRLS"]
   AnalystLogin["Diagnostic login role"] --> Readonly["readonly<br/>NOLOGIN · read only"]
 
-  API -->|"SET LOCAL app.current_business"| Tenant["tenant rows for one business"]
-  Worker -->|"explicit business predicates"| All["cross-business jobs + sealed runtime"]
+  API -->|"SET LOCAL app.current_merchant"| Merchant["merchant rows for one merchant"]
+  Worker -->|"explicit merchant predicates"| All["cross-merchant jobs + sealed runtime"]
   Readonly --> Safe["non-secret diagnostics"]
 ```
 
-The request role sets `app.current_business` inside the same transaction. RLS applies to each request.
-The worker can cross businesses only for trusted background work. Secret tables remain sealed.
+The request role sets `app.current_merchant` inside the same transaction. RLS applies to each request.
+The worker can cross merchants only for trusted background work. Secret tables remain sealed.
 
 ## 7. Shared packages
 
@@ -396,20 +396,20 @@ The token package centralizes stable brand values. It keeps product-specific typ
 
 The package shares real brand facts only. It does not force all products to look identical.
 
-## 8. Business channels
+## 8. Merchant channels
 
-| Channel         | User intent                                       | Trust proof                                               | Durable entry                       | Main result                            |
-| --------------- | ------------------------------------------------- | --------------------------------------------------------- | ----------------------------------- | -------------------------------------- |
-| WhatsApp        | Ask, order, or receive status                     | Twilio signature and sender resolution                    | `runtime.inbound_event`             | Conversation, order, or outbound reply |
-| Dashboard       | Configure and inspect the business                | User cookie, role, business scope, entitlement            | API transaction                     | Config, audit fact, or report          |
-| Landing         | Submit interest or a diagnostic                   | Public validation and abuse controls                      | `umi.prospect` and `prospect_event` | Sales follow-up                        |
-| Wallet          | Register, scan, top up, redeem, or receive a pass | Customer flow or staff authorization                      | Loyalty facts and ledgers           | Updated loyalty state                  |
-| POS             | Sell, tender, refund, or manage a shift           | Device proof, operator session, role, branch, entitlement | Idempotent POS command              | Atomic sale and receipt                |
-| KDS             | Read and advance kitchen work                     | Enrolled device and station scope                         | Ordered event command               | Fulfillment change and notification    |
-| POS ↔ KDS LAN   | Continue kitchen work offline                     | Branch certificate, mTLS, signature, sequence             | Local durable journals              | Ticket delivery and signed ACK         |
-| Email           | Send lead, reset, or lifecycle messages           | Server-held provider credentials                          | Outbox or scheduled job             | Provider delivery result               |
-| Wallet provider | Create and update passes                          | Server-held signing material                              | Wallet pass and device state        | Apple or Google pass update            |
-| Telemetry       | Explain behavior and failures                     | Service identity and redaction                            | OTel/Sentry event                   | Trace, metric, log, or alert           |
+| Channel         | User intent                                       | Trust proof                                                 | Durable entry                       | Main result                            |
+| --------------- | ------------------------------------------------- | ----------------------------------------------------------- | ----------------------------------- | -------------------------------------- |
+| WhatsApp        | Ask, order, or receive status                     | Twilio signature and sender resolution                      | `runtime.inbound_event`             | Conversation, order, or outbound reply |
+| Dashboard       | Configure and inspect the merchant                | User cookie, role, merchant scope, entitlement              | API transaction                     | Config, audit fact, or report          |
+| Landing         | Submit interest or a diagnostic                   | Public validation and abuse controls                        | `umi.prospect` and `prospect_event` | Sales follow-up                        |
+| Wallet          | Register, scan, top up, redeem, or receive a pass | Customer flow or staff authorization                        | Loyalty facts and ledgers           | Updated loyalty state                  |
+| POS             | Sell, tender, refund, or manage a shift           | Device proof, operator session, role, location, entitlement | Idempotent POS command              | Atomic sale and receipt                |
+| KDS             | Read and advance kitchen work                     | Enrolled device and station scope                           | Ordered event command               | Fulfillment change and notification    |
+| POS ↔ KDS LAN   | Continue kitchen work offline                     | Location certificate, mTLS, signature, sequence             | Local durable journals              | Ticket delivery and signed ACK         |
+| Email           | Send lead, reset, or lifecycle messages           | Server-held provider credentials                            | Outbox or scheduled job             | Provider delivery result               |
+| Wallet provider | Create and update passes                          | Server-held signing material                                | Wallet pass and device state        | Apple or Google pass update            |
+| Telemetry       | Explain behavior and failures                     | Service identity and redaction                              | OTel/Sentry event                   | Trace, metric, log, or alert           |
 
 ### Catalog and menu flow
 
@@ -422,10 +422,10 @@ flowchart LR
 
   Dashboard["Dashboard authoring"]:::source --> API["umi-api catalog module"]:::api
   Sync["Zettle, Square, or POS sync"]:::source --> API
-  Authority["business.menu_source<br/>dashboard or pos_sync"]:::fact --> API
+  Authority["merchant.menu_source<br/>dashboard or pos_sync"]:::fact --> API
 
   API --> Catalog["product_category · product<br/>option_group · modifier"]:::fact
-  API --> Availability["product_branch_availability"]:::fact
+  API --> Availability["product_location_availability"]:::fact
   Catalog --> Embed["runtime.product_embedding"]:::fact
 
   Catalog --> WA["WhatsApp tools"]:::consumer
@@ -456,7 +456,7 @@ sequenceDiagram
 
   C->>T: WhatsApp message
   T->>A: Signed webhook
-  A->>A: Verify signature and resolve business
+  A->>A: Verify signature and resolve merchant
   A->>D: Insert runtime.inbound_event
   A->>Q: Enqueue turn.integrity
   A-->>T: Fast acknowledgement
@@ -482,7 +482,7 @@ sequenceDiagram
 ```
 
 The webhook stays fast. Slow model work runs in the worker.
-The database commits the business fact before the worker sends an external message.
+The database commits the merchant fact before the worker sends an external message.
 
 ## 10. The order model
 
@@ -501,10 +501,10 @@ flowchart TB
 
   subgraph TX["One authoritative transaction"]
     Checkout["pos_checkout<br/>draft and quote state"]:::tx
-    Order["tenant.customer_order<br/>fulfillment + version"]:::tx
-    Items["tenant.order_item<br/>immutable line snapshots"]:::tx
-    Event["tenant.order_event<br/>ordered change feed"]:::tx
-    Payment["tenant.payment / refund<br/>settled money facts"]:::tx
+    Order["merchant.customer_order<br/>fulfillment + version"]:::tx
+    Items["merchant.order_item<br/>immutable line snapshots"]:::tx
+    Event["merchant.order_event<br/>ordered change feed"]:::tx
+    Payment["merchant.payment / refund<br/>settled money facts"]:::tx
     Outbox["runtime.outbox_event<br/>side-effect intent"]:::tx
 
     Checkout -->|"commit"| Order
@@ -518,8 +518,8 @@ flowchart TB
   POS --> Checkout
   WEB --> Order
 
-  Order --> Ticket["tenant.order_ticket<br/>order + nested lines · no total"]:::view
-  Items --> Total["tenant.order_total<br/>sum of live lines"]:::view
+  Order --> Ticket["merchant.order_ticket<br/>order + nested lines · no total"]:::view
+  Items --> Total["merchant.order_total<br/>sum of live lines"]:::view
   Payment --> Receipt["Receipt snapshot<br/>belongs to payment"]:::view
 
   Ticket --> KDS["KDS board"]:::consumer
@@ -565,10 +565,10 @@ stateDiagram-v2
 
 | Question                             | Source                                       |
 | ------------------------------------ | -------------------------------------------- |
-| What must the kitchen prepare?       | `tenant.order_ticket`                        |
-| What do the current live lines cost? | `tenant.order_total`                         |
-| What did the customer pay?           | `tenant.payment`                             |
-| What money returned later?           | `tenant.refund`                              |
+| What must the kitchen prepare?       | `merchant.order_ticket`                      |
+| What do the current live lines cost? | `merchant.order_total`                       |
+| What did the customer pay?           | `merchant.payment`                           |
+| What money returned later?           | `merchant.refund`                            |
 | What appears on the receipt?         | Immutable receipt snapshot linked to payment |
 
 This split prevents a later line void from rewriting historical revenue.
@@ -588,14 +588,14 @@ sequenceDiagram
   participant W as Worker
 
   S->>P: Start sale
-  P->>A: Device proof + operator session + branch
+  P->>A: Device proof + operator session + location
   A->>D: Validate user, device, role, and entitlement
   A-->>P: Signed bootstrap and catalog
 
   S->>P: Build cart and select tenders
   P->>A: Versioned command + Idempotency-Key
   A->>D: Load or create command result
-  A->>D: Derive price, tax, policy, and business date
+  A->>D: Derive price, tax, policy, and merchant date
 
   opt External card tender
     A->>X: Create or query payment intent
@@ -631,7 +631,7 @@ sequenceDiagram
   Note over P,A: Internet becomes unavailable
   P->>P: Persist cart and command before tender
   P->>P: Commit eligible local sale
-  P->>K: Signed ticket over branch mTLS
+  P->>K: Signed ticket over location mTLS
   K->>K: Persist ticket before ACK
   K-->>P: Signed ACK with message hash
   P->>P: Print provisional receipt
@@ -698,13 +698,13 @@ flowchart TB
 
   Owner["Owner"]:::actor -->|"creates enrollment"| Pair["runtime.pairing"]:::data
   Device["POS or KDS"]:::actor -->|"non-exportable P-256 public key"| Pair
-  Pair --> Registered["tenant.device<br/>business + branch + kind"]:::data
+  Pair --> Registered["merchant.device<br/>merchant + location + kind"]:::data
   Registered --> Session["runtime.device_session / session"]:::data
 
   User["Staff user"]:::actor --> Login["umi.user"]:::data
   Login --> Role["umi.user_role + permission"]:::data
 
-  Command["Signed command"]:::proof --> DeviceGate["Device + branch + version gate"]:::gate
+  Command["Signed command"]:::proof --> DeviceGate["Device + location + version gate"]:::gate
   Session --> DeviceGate
   DeviceGate --> UserGate["Operator + role + entitlement gate"]:::gate
   Role --> UserGate
@@ -714,14 +714,14 @@ flowchart TB
 
 ### Trust by surface
 
-| Surface         | Proof                                                 | Scope                                     |
-| --------------- | ----------------------------------------------------- | ----------------------------------------- |
-| Dashboard       | Rotating httpOnly session cookies and CSRF protection | User roles and business                   |
-| POS             | Device signature plus short operator session          | One device, business, branch, and shift   |
-| KDS             | Enrolled device proof and paired station              | One device, business, branch, and station |
-| WhatsApp        | Twilio signature and sender account                   | Resolved business and customer channel    |
-| Worker          | Trusted worker role                                   | Explicit cross-business job scope         |
-| Read-only tools | Restricted diagnostic role                            | Non-secret reporting data                 |
+| Surface         | Proof                                                 | Scope                                       |
+| --------------- | ----------------------------------------------------- | ------------------------------------------- |
+| Dashboard       | Rotating httpOnly session cookies and CSRF protection | User roles and merchant                     |
+| POS             | Device signature plus short operator session          | One device, merchant, location, and shift   |
+| KDS             | Enrolled device proof and paired station              | One device, merchant, location, and station |
+| WhatsApp        | Twilio signature and sender account                   | Resolved merchant and customer channel      |
+| Worker          | Trusted worker role                                   | Explicit cross-merchant job scope           |
+| Read-only tools | Restricted diagnostic role                            | Non-secret reporting data                   |
 
 No client receives database credentials. A device revocation fails the next online command.
 
@@ -732,7 +732,7 @@ No client receives database credentials. A device revocation fails the next onli
 | Library or service                        | Job                                                              | Why Umi uses it                                                         |
 | ----------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | Node.js                                   | Backend runtime                                                  | It supports the TypeScript service, workers, and shared package tools.  |
-| NestJS                                    | Module, dependency, guard, and lifecycle structure               | It gives each business domain an explicit module boundary.              |
+| NestJS                                    | Module, dependency, guard, and lifecycle structure               | It gives each merchant domain an explicit module boundary.              |
 | Fastify                                   | HTTP transport                                                   | It provides a small, fast server and exact webhook body control.        |
 | `@fastify/cookie`                         | Cookie parsing and response helpers                              | Dashboard sessions use signed httpOnly cookies.                         |
 | BullMQ                                    | Queue workers, retries, priorities, and schedules                | Slow work cannot block inbound HTTP requests.                           |
@@ -767,8 +767,8 @@ No client receives database credentials. A device revocation fails the next onli
 | Anthropic SDK      | Model calls and tool selection | It powers the conversational order assistant.                  |
 | Voyage AI          | Embeddings                     | It supports semantic product, memory, and knowledge retrieval. |
 | Nodemailer         | SMTP email                     | One adapter sends reset, lead, and lifecycle email.            |
-| Zettle adapter     | Catalog integration            | It imports an external menu source when a business selects it. |
-| OpenTelemetry      | Traces, metrics, and logs      | It keeps telemetry outside the business database.              |
+| Zettle adapter     | Catalog integration            | It imports an external menu source when a merchant selects it. |
+| OpenTelemetry      | Traces, metrics, and logs      | It keeps telemetry outside the merchant database.              |
 | Sentry             | Client and service failures    | It adds crash context and release correlation.                 |
 | Docker Compose     | Runtime packaging              | One image runs the web and worker commands.                    |
 | Caddy              | TLS and reverse proxy          | It terminates public HTTPS for the API.                        |
@@ -820,7 +820,7 @@ flowchart LR
 ```
 
 The web and worker share code, modules, adapters, and configuration. They scale independently.
-PostgreSQL remains the business source of truth. Redis never becomes business storage.
+PostgreSQL remains the merchant source of truth. Redis never becomes merchant storage.
 
 ## 17. Core invariants
 
@@ -833,7 +833,7 @@ PostgreSQL remains the business source of truth. Redis never becomes business st
 - Keep financial ledgers append-only.
 - Use compensating facts for corrections.
 - Keep receipts immutable after commit.
-- Keep telemetry outside business schemas.
+- Keep telemetry outside merchant schemas.
 
 ### Orders
 
@@ -856,8 +856,8 @@ PostgreSQL remains the business source of truth. Redis never becomes business st
 ### Security
 
 - Keep database credentials out of every client.
-- Enforce business scope through RLS.
-- Bind a POS or KDS device to one branch.
+- Enforce merchant scope through RLS.
+- Bind a POS or KDS device to one location.
 - Keep device private keys non-exportable.
 - Revoke access on the next online command.
 - Redact customer, device, token, and card data from telemetry.
@@ -882,13 +882,13 @@ flowchart LR
   Clients --> Verify["6 · contract + integration + flow tests"]
 ```
 
-1. Define the business fact and its owner.
+1. Define the merchant fact and its owner.
 2. Extend `packages/contract`.
 3. Add the narrowest `umi-api` module change.
 4. Add a build-v3 migration when the fact needs storage.
 5. Add an outbox route for an external side effect.
 6. Generate or consume the client contract.
-7. Verify the complete business flow.
+7. Verify the complete merchant flow.
 
 ## 19. Decision basis and references
 
@@ -896,7 +896,7 @@ flowchart LR
 
 - [build-v3 foundation](../migration/build-v3/00_foundation.sql)
 - [build-v3 Umi schema](../migration/build-v3/10_umi.sql)
-- [build-v3 tenant schema](../migration/build-v3/20_tenant.sql)
+- [build-v3 merchant schema](../migration/build-v3/20_merchant.sql)
 - [build-v3 runtime schema](../migration/build-v3/30_runtime.sql)
 - [build-v3 RLS and grants](../migration/build-v3/90_rls.sql)
 - [build-v3 order model](../migration/build-v3/ORDER_MODEL.md)

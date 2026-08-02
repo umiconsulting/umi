@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { BranchTools } from './branch.tools';
+import { LocationTools } from './location.tools';
 import type { ToolContext } from '../turn.types';
 
 const CTX: ToolContext = {
-  tenantId: 't1',
+  merchantId: 't1',
   personId: 'p1',
   conversationId: 'c1',
   turnId: 'turn-1',
@@ -13,21 +13,21 @@ const CTX: ToolContext = {
 
 type Cand = { id: string; name: string; aliases: string[]; sim: number };
 
-describe('BranchTools.setBranch', () => {
-  let tenants: { matchBranchCandidates: ReturnType<typeof vi.fn> };
+describe('LocationTools.setLocation', () => {
+  let merchants: { matchLocationCandidates: ReturnType<typeof vi.fn> };
   let conversations: { setSelectedLocationWorker: ReturnType<typeof vi.fn> };
 
-  const build = () => new BranchTools(tenants as never, conversations as never);
-  const withCandidates = (c: Cand[]) => tenants.matchBranchCandidates.mockResolvedValue(c);
+  const build = () => new LocationTools(merchants as never, conversations as never);
+  const withCandidates = (c: Cand[]) => merchants.matchLocationCandidates.mockResolvedValue(c);
 
   beforeEach(() => {
-    tenants = { matchBranchCandidates: vi.fn() };
+    merchants = { matchLocationCandidates: vi.fn() };
     conversations = { setSelectedLocationWorker: vi.fn().mockResolvedValue(undefined) };
   });
 
-  it('no-op success for a single-branch tenant', async () => {
+  it('no-op success for a single-location merchant', async () => {
     withCandidates([{ id: 'loc-only', name: 'Centro', aliases: [], sim: 0 }]);
-    const r = await build().setBranch(CTX, { branch: 'lo que sea' });
+    const r = await build().setLocation(CTX, { location: 'lo que sea' });
     expect(r.success).toBe(true);
     expect(conversations.setSelectedLocationWorker).not.toHaveBeenCalled();
   });
@@ -37,7 +37,7 @@ describe('BranchTools.setBranch', () => {
       { id: 'loc-chapu', name: 'Chapultepec', aliases: [], sim: 1 },
       { id: 'loc-roma', name: 'Roma', aliases: [], sim: 0 },
     ]);
-    const r = await build().setBranch(CTX, { branch: 'chapultepec' });
+    const r = await build().setLocation(CTX, { location: 'chapultepec' });
     expect(r.success).toBe(true);
     expect(conversations.setSelectedLocationWorker).toHaveBeenCalledWith('c1', 'loc-chapu');
   });
@@ -47,7 +47,7 @@ describe('BranchTools.setBranch', () => {
       { id: 'loc-chapu', name: 'Chapultepec', aliases: ['chapu', 'chapus'], sim: 0.5 },
       { id: 'loc-roma', name: 'Roma', aliases: [], sim: 0 },
     ]);
-    const r = await build().setBranch(CTX, { branch: 'chapu' });
+    const r = await build().setLocation(CTX, { location: 'chapu' });
     expect(r.success).toBe(true);
     expect(conversations.setSelectedLocationWorker).toHaveBeenCalledWith('c1', 'loc-chapu');
   });
@@ -57,7 +57,7 @@ describe('BranchTools.setBranch', () => {
       { id: 'loc-chapu', name: 'Chapultepec', aliases: [], sim: 0.6 },
       { id: 'loc-roma', name: 'Roma', aliases: [], sim: 0 },
     ]);
-    const r = await build().setBranch(CTX, { branch: 'chapu' });
+    const r = await build().setLocation(CTX, { location: 'chapu' });
     expect(r.success).toBe(true);
     expect(conversations.setSelectedLocationWorker).toHaveBeenCalledWith('c1', 'loc-chapu');
   });
@@ -67,7 +67,7 @@ describe('BranchTools.setBranch', () => {
       { id: 'loc-1', name: 'Centro Roma', aliases: [], sim: 0.5 },
       { id: 'loc-2', name: 'Centro Condesa', aliases: [], sim: 0.5 },
     ]);
-    const r = await build().setBranch(CTX, { branch: 'centro' });
+    const r = await build().setLocation(CTX, { location: 'centro' });
     expect(r.success).toBe(false);
     expect(r.error_type).toBe('needs_input');
     expect(conversations.setSelectedLocationWorker).not.toHaveBeenCalled();
@@ -78,7 +78,7 @@ describe('BranchTools.setBranch', () => {
       { id: 'loc-chapu', name: 'Chapultepec', aliases: [], sim: 0.82 },
       { id: 'loc-roma', name: 'Roma', aliases: [], sim: 0.1 },
     ]);
-    const r = await build().setBranch(CTX, { branch: 'chapultpec' }); // typo, no literal hit
+    const r = await build().setLocation(CTX, { location: 'chapultpec' }); // typo, no literal hit
     expect(r.success).toBe(false);
     expect(r.error_type).toBe('needs_input');
     expect(String(r.error)).toContain('Chapultepec');
@@ -90,7 +90,7 @@ describe('BranchTools.setBranch', () => {
       { id: 'loc-chapu', name: 'Chapultepec', aliases: [], sim: 0.1 },
       { id: 'loc-roma', name: 'Roma', aliases: [], sim: 0.05 },
     ]);
-    const r = await build().setBranch(CTX, { branch: 'polanco' });
+    const r = await build().setLocation(CTX, { location: 'polanco' });
     expect(r.success).toBe(false);
     expect(r.error_type).toBe('needs_input');
     expect(conversations.setSelectedLocationWorker).not.toHaveBeenCalled();

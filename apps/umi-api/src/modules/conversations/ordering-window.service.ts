@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { BusinessConfigService } from './business-config.service';
+import { MerchantConfigService } from './merchant-config.service';
 import { BusinessHoursService } from '../business-hours/business-hours.service';
 import {
   activeWindowAt,
@@ -15,7 +15,7 @@ import { canonicalizePhone } from '../business-hours/ordering-settings.repositor
  * narrower than when the doors are open. A thin consumer of `modules/business-hours`,
  * which owns the hours themselves.
  *
- * The two are separate on purpose, and the industry agrees: Google Business Profile
+ * The two are separate on purpose, and the industry agrees: Google Merchant Profile
  * carries per-service hours in `moreHours` beside `regularHours`, Toast serves online
  * ordering from a separate `/orderingSchedule`, schema.org hangs `hoursAvailable` off
  * the Service rather than the Place, and DoorDash derives ordering hours by subtracting
@@ -133,11 +133,11 @@ export interface OrderingWindowResult {
 export class OrderingWindowService {
   constructor(
     private readonly hours: BusinessHoursService,
-    private readonly businessConfig: BusinessConfigService,
+    private readonly merchantConfig: MerchantConfigService,
   ) {}
 
-  async getBusinessInfo(
-    tenantId: string,
+  async getMerchantInfo(
+    merchantId: string,
     locationId: string | null = null,
   ): Promise<{
     name: string;
@@ -150,8 +150,8 @@ export class OrderingWindowService {
     specialNotice: string | null;
   }> {
     const [bot, row] = await Promise.all([
-      this.hours.getEffectiveHoursForBot(tenantId, locationId),
-      this.businessConfig.fetchConfigRow(tenantId),
+      this.hours.getEffectiveHoursForBot(merchantId, locationId),
+      this.merchantConfig.fetchConfigRow(merchantId),
     ]);
     const config = row?.config ?? {};
 
@@ -168,14 +168,14 @@ export class OrderingWindowService {
   }
 
   async getOrderingWindow(
-    tenantId: string,
+    merchantId: string,
     locationId: string | null = null,
     now = new Date(),
     phone?: string,
   ): Promise<OrderingWindowResult> {
     const [bot, row] = await Promise.all([
-      this.hours.getEffectiveHoursForBot(tenantId, locationId),
-      this.businessConfig.fetchConfigRow(tenantId),
+      this.hours.getEffectiveHoursForBot(merchantId, locationId),
+      this.merchantConfig.fetchConfigRow(merchantId),
     ]);
     const name = row?.name ?? 'El café';
     const tz = bot.timezone;
@@ -248,20 +248,20 @@ export class OrderingWindowService {
   }
 
   async isWithinOrderHours(
-    tenantId: string,
+    merchantId: string,
     locationId: string | null = null,
     now = new Date(),
     phone?: string,
   ): Promise<boolean> {
-    const hours = await this.getOrderingWindow(tenantId, locationId, now, phone);
+    const hours = await this.getOrderingWindow(merchantId, locationId, now, phone);
     return hours.isAcceptingOrders;
   }
 
   /** The pause flag (accepts_whatsapp_orders) — independent of the hours window. */
   async checkOrderingEnabled(
-    tenantId: string,
+    merchantId: string,
   ): Promise<{ enabled: boolean; disabledMessage: string | null }> {
-    const bot = await this.hours.getEffectiveHoursForBot(tenantId, null);
+    const bot = await this.hours.getEffectiveHoursForBot(merchantId, null);
     if (!bot.ordering.acceptsOrders) {
       return {
         enabled: false,
@@ -273,10 +273,10 @@ export class OrderingWindowService {
   }
 
   async getOrdersClosedMessage(
-    tenantId: string,
+    merchantId: string,
     locationId: string | null = null,
   ): Promise<string> {
-    const hours = await this.getOrderingWindow(tenantId, locationId);
+    const hours = await this.getOrderingWindow(merchantId, locationId);
     if (!hours.isOpenToday) {
       return 'Estamos fuera del horario del local por hoy. Escríbenos mañana y con gusto te ayudamos.';
     }

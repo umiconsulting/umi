@@ -16,7 +16,7 @@ export interface UserSummary {
   displayName: string | null;
 }
 
-export interface TenantMembershipSummary {
+export interface MerchantMembershipSummary {
   id: string;
   slug: string;
   name: string;
@@ -24,11 +24,11 @@ export interface TenantMembershipSummary {
 }
 
 export interface MembershipAccess {
-  // null for a SYNTHESIZED global-super_admin access (no explicit tenant_access
-  // edge in the requested tenant). Only ever surfaced to the client as an
+  // null for a SYNTHESIZED global-super_admin access (no explicit merchant_access
+  // edge in the requested merchant). Only ever surfaced to the client as an
   // informational membership id — never a DB write key.
   membershipId: string | null;
-  tenantId: string;
+  merchantId: string;
   slug: string;
   name: string;
   timezone: string | null;
@@ -44,26 +44,26 @@ export interface ResetTokenRecord {
 }
 
 /**
- * Auth/membership/entitlement reads. These run BEFORE any tenant RLS context
- * exists (login resolves which tenants a user has), so they use the worker pool
- * (`query`) with explicit parameterized predicates — never `withTenant`. The
+ * Auth/membership/entitlement reads. These run BEFORE any merchant RLS context
+ * exists (login resolves which merchants a user has), so they use the worker pool
+ * (`query`) with explicit parameterized predicates — never `withMerchant`. The
  * worker pool is also MANDATORY here because the entitlement + RBAC-policy sources
  * (`umi.effective_entitlement`, `umi.role_permission`) live in the SEALED `umi`
  * schema that `umi_app` has no USAGE on.
  *
  * build-v3 model: staff credentials + identity live on `umi.user` (email + hash +
- * `full_name`); grants are `umi.user_role` (user×role×business, FK role_id) read
+ * `full_name`); grants are `umi.user_role` (user×role×merchant, FK role_id) read
  * against the sealed `umi.role_permission` (role_id×permission_id) catalog.
- * `super_admin` is Umi's cross-tenant operator: a user holding ANY `umi.user_role`
- * with role `super_admin` can select/access EVERY active business.
+ * `super_admin` is Umi's cross-merchant operator: a user holding ANY `umi.user_role`
+ * with role `super_admin` can select/access EVERY active merchant.
  *
- * DONE: `findTenantsForUser` / `findMembershipAccess` now read `umi.user_role` joined
- * to the `umi.role` catalog (multi-role, aggregated), and a `business_id IS NULL`
+ * DONE: `findMerchantsForUser` / `findMembershipAccess` now read `umi.user_role` joined
+ * to the `umi.role` catalog (multi-role, aggregated), and a `merchant_id IS NULL`
  * grant is platform-wide.
  *
- * STILL PENDING (P5, "route by id"): `tenantIdForSlug` / `tenantBySlug` read the
- * dropped `slug` column, and the queries above return the business id AS "slug" as an
- * interim. Closing both halves changes the /me/tenants + tenant-access API contract,
+ * STILL PENDING (P5, "route by id"): `merchantIdForSlug` / `merchantBySlug` read the
+ * dropped `slug` column, and the queries above return the merchant id AS "slug" as an
+ * interim. Closing both halves changes the /me/merchants + merchant-access API contract,
  * so it lands as a coordinated @umi/contract release with the dashboard.
  */
 @Injectable()
@@ -101,13 +101,13 @@ export class AuthRepository {
   }
 
   /**
-   * Active tenant memberships + role for the login response body / tenant picker.
-   * Single role per (login, tenant) now. A global super_admin (any active
-   * super_admin edge) sees EVERY active tenant, tagged with its explicit role
+   * Active merchant memberships + role for the login response body / merchant picker.
+   * Single role per (login, merchant) now. A global super_admin (any active
+   * super_admin edge) sees EVERY active merchant, tagged with its explicit role
    * where one exists, else 'super_admin'.
    */
-  async findTenantsForUser(userId: string): Promise<TenantMembershipSummary[]> {
-    const { rows } = await this.pg.query<TenantMembershipSummary>(
+  async findMerchantsForUser(userId: string): Promise<MerchantMembershipSummary[]> {
+    const { rows } = await this.pg.query<MerchantMembershipSummary>(
       `WITH ${SUPER_ADMIN_SA_CTE}
        SELECT
          t.id::text AS "id",
@@ -115,9 +115,9 @@ export class AuthRepository {
          t.name     AS "name",
          COALESCE(array_agg(r.key) FILTER (WHERE r.key IS NOT NULL),
                   ARRAY['super_admin']) AS "roles"
-       FROM tenant.business AS t
+       FROM merchant.merchant AS t
        LEFT JOIN umi.user_role AS ur
-         ON ur.business_id = t.id AND ur.user_id = $1::uuid
+         ON ur.merchant_id = t.id AND ur.user_id = $1::uuid
        LEFT JOIN umi.role AS r ON r.id = ur.role_id
        WHERE t.status = 'active'
          AND (ur.id IS NOT NULL OR (SELECT is_sa FROM sa))
@@ -129,30 +129,30 @@ export class AuthRepository {
   }
 
   /**
-   * Membership + role + permissions for one (user, tenant). Drives
-   * TenantAccessGuard. Null ⇒ no active access (404 tenant_not_found).
+   * Membership + role + permissions for one (user, merchant). Drives
+   * MerchantAccessGuard. Null ⇒ no active access (404 merchant_not_found).
    * Permissions come from the sealed `umi.role_permission` catalog. A global
    * super_admin with no explicit edge here is SYNTHESIZED as
    * {membershipId:null, role:'super_admin', permissions:['*']} so the guard
    * grants it (never 404s Umi's own operator).
    */
-  async findMembershipAccess(userId: string, tenantId: string): Promise<MembershipAccess | null> {
+  async findMembershipAccess(userId: string, merchantId: string): Promise<MembershipAccess | null> {
     const { rows } = await this.pg.query<MembershipAccess>(
       `WITH ${SUPER_ADMIN_SA_CTE},
        grants AS (
-         -- business_id IS NULL is a PLATFORM-WIDE grant (umi.user_role: 'NULL =
-         -- platform-wide grant (superadmin)'), so it applies to every business —
+         -- merchant_id IS NULL is a PLATFORM-WIDE grant (umi.user_role: 'NULL =
+         -- platform-wide grant (superadmin)'), so it applies to every merchant —
          -- otherwise a super_admin would be capped by whatever lesser role they happen
          -- to hold on a given café, or locked out of one they hold no grant on.
          SELECT ur.id, r.key AS role_key
          FROM umi.user_role AS ur
          JOIN umi.role AS r ON r.id = ur.role_id
          WHERE ur.user_id = $1::uuid
-           AND (ur.business_id = $2::uuid OR ur.business_id IS NULL)
+           AND (ur.merchant_id = $2::uuid OR ur.merchant_id IS NULL)
        )
        SELECT
          (SELECT id::text FROM grants ORDER BY id LIMIT 1) AS "membershipId",
-         t.id::text  AS "tenantId",
+         t.id::text  AS "merchantId",
          t.id::text  AS "slug",
          t.name      AS "name",
          t.timezone  AS "timezone",
@@ -166,54 +166,54 @@ export class AuthRepository {
              WHERE r.key IN (SELECT role_key FROM grants)),
            '{}'
          ) AS "permissions"
-       FROM tenant.business AS t
+       FROM merchant.merchant AS t
        WHERE t.id = $2::uuid
          AND t.status = 'active'
          AND (EXISTS (SELECT 1 FROM grants) OR (SELECT is_sa FROM sa))
        LIMIT 1`,
-      [userId, tenantId],
+      [userId, merchantId],
     );
     return rows[0] ?? null;
   }
 
-  /** Resolve a tenant id from its slug (for the legacy `/:slug/...` routes). */
-  async tenantIdForSlug(slug: string): Promise<string | null> {
+  /** Resolve a merchant id from its slug (for the legacy `/:slug/...` routes). */
+  async merchantIdForSlug(slug: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ id: string }>(
-      `SELECT id::text AS id FROM tenant.business WHERE slug = $1 LIMIT 1`,
+      `SELECT id::text AS id FROM merchant.merchant WHERE slug = $1 LIMIT 1`,
       [slug],
     );
     return rows[0]?.id ?? null;
   }
 
-  /** Resolve tenant id + name from a slug (public routes need the name). */
-  async tenantBySlug(slug: string): Promise<{ id: string; name: string; slug: string } | null> {
+  /** Resolve merchant id + name from a slug (public routes need the name). */
+  async merchantBySlug(slug: string): Promise<{ id: string; name: string; slug: string } | null> {
     const { rows } = await this.pg.query<{ id: string; name: string; slug: string }>(
-      `SELECT id::text AS id, name, slug FROM tenant.business WHERE slug = $1 LIMIT 1`,
+      `SELECT id::text AS id, name, slug FROM merchant.merchant WHERE slug = $1 LIMIT 1`,
       [slug],
     );
     return rows[0] ?? null;
   }
 
   /**
-   * Tenant-level product entitlement status — the SINGLE SOURCE is the derived
+   * Merchant-level product entitlement status — the SINGLE SOURCE is the derived
    * `umi.effective_entitlement` view (plan_feature overlaid by override, already
    * filtered to trialing/active subscriptions). A feature is entitled iff an
    * `enabled` row exists for it; we join `umi.subscription` back for the café's
    * real status so the guard keeps its `active`/`trialing` vocabulary. Read on the
    * worker pool, which is BYPASSRLS — the view is `security_invoker`, so RLS does
-   * NOT scope it here; the explicit `business_id` predicate does. Returns null when
+   * NOT scope it here; the explicit `merchant_id` predicate does. Returns null when
    * the feature is absent/disabled (→ `product_not_active`).
    */
-  async productStatus(tenantId: string, productKey: string): Promise<string | null> {
+  async productStatus(merchantId: string, productKey: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ status: string }>(
       `SELECT s.status
          FROM umi.effective_entitlement AS ee
-         JOIN umi.subscription          AS s ON s.business_id = ee.business_id
-        WHERE ee.business_id = $1::uuid
+         JOIN umi.subscription          AS s ON s.merchant_id = ee.merchant_id
+        WHERE ee.merchant_id = $1::uuid
           AND ee.feature_key = $2
           AND ee.enabled
         LIMIT 1`,
-      [tenantId, productKey],
+      [merchantId, productKey],
     );
     return rows[0]?.status ?? null;
   }

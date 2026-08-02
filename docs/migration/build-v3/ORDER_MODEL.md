@@ -1,32 +1,32 @@
 # The order model — decision record
 
-_build-v3 · `tenant` schema · order cluster · 2026-07-15_
+_build-v3 · `merchant` schema · order cluster · 2026-07-15_
 
 How build-v3 represents an order, why it is shaped that way, and the small delta the
 current DDL still needs. Grounded in two things: the real production data (the prod
 snapshot, 51 orders) and how mature commerce/POS systems model the same problem
 (Square, Toast, Vendure, Medusa, Deliverect). Companion to
 [`BACKFILL_METHODOLOGY.md`](./BACKFILL_METHODOLOGY.md); the DDL lives in
-[`20_tenant.sql:397`](./20_tenant.sql).
+[`20_merchant.sql:397`](./20_merchant.sql).
 
 ---
 
 ## 1. The principle
 
 An order is the most universal commerce primitive there is — a cinema, a gym, a
-barber, a café all have one. So the order is modelled as a **business-neutral spine**
+barber, a café all have one. So the order is modelled as a **merchant-neutral spine**
 with the café-specific parts quarantined to one seam. Genericity lives in the
 **decomposition**, never in the vocabulary: the nouns stay readable (`order`, `item`,
-`station`), and a non-café tenant costs a `CHECK` value, not a migration.
+`station`), and a non-café merchant costs a `CHECK` value, not a migration.
 
 Three separable facts, each at the grain where it is actually true:
 
-| fact                        | entity                  | grain     | why this grain                                                                                                 |
-| --------------------------- | ----------------------- | --------- | -------------------------------------------------------------------------------------------------------------- |
-| the commercial agreement    | `tenant.customer_order` | order     | one agreement to buy                                                                                           |
-| what was bought             | `tenant.order_item`     | line      | a line is one product at one price                                                                             |
-| where each item is prepared | `order_item.station_id` | **line**  | a station is a _preparation locus_; a latte is made at the bar, a panini at the grill — two loci for one order |
-| how far along the ticket is | `tenant.order_event`    | **order** | the ticket advances as a unit (see §3)                                                                         |
+| fact                        | entity                    | grain     | why this grain                                                                                                 |
+| --------------------------- | ------------------------- | --------- | -------------------------------------------------------------------------------------------------------------- |
+| the commercial agreement    | `merchant.customer_order` | order     | one agreement to buy                                                                                           |
+| what was bought             | `merchant.order_item`     | line      | a line is one product at one price                                                                             |
+| where each item is prepared | `order_item.station_id`   | **line**  | a station is a _preparation locus_; a latte is made at the bar, a panini at the grill — two loci for one order |
+| how far along the ticket is | `merchant.order_event`    | **order** | the ticket advances as a unit (see §3)                                                                         |
 
 The KDS is a **projection** over this — it groups lines by order, tags each line's
 station, and advances through `order_event`. It is **not the owner** of the order.
@@ -73,7 +73,7 @@ the other.
 > **Amendment (2026-07-24) — ONE live projection.** There were briefly two ticket views: a
 > line-grain `order_ticket` and an order-grain `kds_ticket`. That was a defect inside the
 > database, not a client concern — two renderings of one concept drift, which is the exact
-> thing this section argues against. They are collapsed into a single `tenant.order_ticket`
+> thing this section argues against. They are collapsed into a single `merchant.order_ticket`
 > (order-grain, lines nested, **no status filter** — "live" is a WHERE clause, not a schema
 > fact) and it carries **no order total**, because a total is a money question with two
 > different answers (§4). Anything a specific client needs in a specific shape — a
@@ -152,12 +152,12 @@ logged in with**.
 
 ```mermaid
 flowchart LR
-  OWNER["owner<br/>(dashboard)"] -->|creates| ST["<b>tenant.station</b><br/>key · name · status · sort_order<br/>branch_id NULL = every branch"]
+  OWNER["owner<br/>(dashboard)"] -->|creates| ST["<b>merchant.station</b><br/>key · name · status · sort_order<br/>location_id NULL = every location"]
   OWNER -->|"issues pairing<br/>(carries station_id)"| PAIR["runtime.pairing"]
   IPAD["iPad"] -->|claims with PIN| PAIR
   PAIR -->|"creates"| SESS["runtime.session<br/><b>station_id</b>"]
   SESS -.->|"station_id carried, NOT yet used to filter"| KDS["<b>order_ticket</b>"]
-  SESS -->|"boardSnapshot(tenant)"| KDS
+  SESS -->|"boardSnapshot(merchant)"| KDS
   ST -.->|referenced by| PAIR
   ST -.->|referenced by| SESS
 ```
@@ -223,7 +223,7 @@ But the ruling is about _where_, not _whether to build now_. `order_item.station
 null on **every** source line (the source `order_items` has no station column at all), so
 deferring it deletes no data and adding it later is a plain nullable `ALTER` — nothing to
 retrofit, because the "can't re-grain populated history" cost only bites when there _is_
-history. **This is only about the per-line FK.** The `tenant.station` _table_ itself is a
+history. **This is only about the per-line FK.** The `merchant.station` _table_ itself is a
 different thing: the KDS device pairs to it and tickets are tagged with it
 (`kds.repository.ts` reads it today), and the iPad KDS contract is frozen — so the table
 **stays, as config** (§5). Do not conflate the two.
@@ -242,7 +242,7 @@ line/station split is a _future config_, not a schema change.
 delete) + add the new line.** The current order the customer/KDS sees is a
 **derivation** — lines where `voided_at IS NULL`. The full set of lines is the
 history. This is enforced, not just documented: a `BEFORE UPDATE OR DELETE` trigger
-(`tenant.tg_order_item_void_only`) rejects any edit to a priced line, freezes it once
+(`merchant.tg_order_item_void_only`) rejects any edit to a priced line, freezes it once
 voided, and **rejects DELETE outright** — the only permitted mutation is setting
 `voided_at` (+ `void_reason`) once. An app bug cannot silently rewrite or erase a fired
 line and corrupt the waste or money truth (the same append-only stance build-v3 already
@@ -314,7 +314,7 @@ status enums stay tiny.
 returns the item to stock because it was never made, a **comp** does not because you served
 it and absorbed the cost. Encoding both as a void makes a free-text reason decide inventory.
 
-A comp is now a line-scoped `tenant.order_discount` row with `kind='comp'`, and
+A comp is now a line-scoped `merchant.order_discount` row with `kind='comp'`, and
 `order_item.void_reason = 'comp'` is refused by CHECK. The discount FACT table landed; the
 promo RULE engine (definitions, eligibility, stacking) stays Phase-3+, unchanged.
 
@@ -364,8 +364,8 @@ different.
 
 **Not built, deliberately.** `payment` and `refund` are referenced by **zero** backend code
 today and by no gate invariant, so there is nothing to hang receipt fields off yet. The
-column shape is also not obvious: receipt NUMBERING is a business policy (per-business
-sequence? per-day? per-branch?) and in Mexico it sits next to the separate question of
+column shape is also not obvious: receipt NUMBERING is a merchant policy (per-merchant
+sequence? per-day? per-location?) and in Mexico it sits next to the separate question of
 whether a customer wants a **factura/CFDI**, which is a different document from a sales
 receipt with different legal requirements. Deciding numbering before that question is
 answered would be guessing. Recorded here so the placement decision is not re-litigated;
@@ -415,7 +415,7 @@ discount as rows in _one_ table, and `CUSTOM_ATTRIBUTE_DEFINITION` extends witho
 change. Sorting the whole cluster this way keeps the order **structure** to four small
 tables — `customer_order`, `order_item`, `order_event` (the status spine), `payment` — of
 which only **two are touched** (columns added / total derived). `station` and the whole
-catalog are **config that already exists** in `20_tenant.sql` and is already correct.
+catalog are **config that already exists** in `20_merchant.sql` and is already correct.
 
 **The reusable test:** if a café changing it would force a migration and cafés change it,
 it's in the wrong bucket; if you'll ever filter/sum/join on it, it's structure — no
@@ -424,12 +424,12 @@ matter how tempting the blob.
 ### Structure — schema (two tables touched)
 
 ```
-customer_order   id · business_id · branch_id · customer_id · conversation_id
+customer_order   id · merchant_id · location_id · customer_id · conversation_id
                  source⟨check⟩ · fulfillment_type⟨check⟩ · status⟨check⟩
                  cancel_reason · notes · pickup_person · external_ref
                  placed_at · created_at · updated_at
                  total  →  DERIVED (Σ live lines), not a stored column
-                 UNIQUE (business_id, external_ref) WHERE NOT NULL — injection idempotency
+                 UNIQUE (merchant_id, external_ref) WHERE NOT NULL — injection idempotency
                  (notes/pickup_person are the NAMED columns this section sanctions —
                   frozen KDS ticket fields with a live writer and reader. The untyped
                   details/metadata blobs stay dead. personal_message is deferred.)
@@ -460,8 +460,8 @@ notifications today.
 ### Config — already exists, owner edits, business cadence
 
 `product` (price/active) · `product_category` · `product_option_group` (e.g. "Milk",
-min/max) · `product_modifier` (e.g. "Oat milk" +$0.50) · `product_branch_availability`
-(86'd) · `branch` · `business_hours`. **`tenant.station` lives here too** — it is the KDS
+min/max) · `product_modifier` (e.g. "Oat milk" +$0.50) · `product_location_availability`
+(86'd) · `location` · `business_hours`. **`merchant.station` lives here too** — it is the KDS
 station a device pairs to and a ticket is tagged with (`kds.repository.ts`
 `loadStation` / `listStations`; the iPad KDS contract is frozen), and the owner sets up
 stations at business cadence. One row today, but it has a real consumer — it is **kept**,
@@ -482,7 +482,7 @@ in `unit_price`, so a customization rides as a value, **not** a column-per-varia
 | --------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `cancellation_reason/_code/_note` + `partial_*` (6) | 6 → 2    | `customer_order.cancel_reason` (order) + `order_item.voided_at` (line; partial split used **0×**). Line-level `void_reason` is added as new structure, carried **NULL** — the source reasons are contaminated                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `kitchen_status` (order + line)                     | collapse | `status` field (0/51 ever diverged)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `ops.orders.station_id` · `station_name`            | drop     | the _order_ carries no station; the KDS ticket derives it from the device login. Both were null on all 51 orders anyway. (`tenant.station` the table is kept — see Config.)                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `ops.orders.station_id` · `station_name`            | drop     | the _order_ carries no station; the KDS ticket derives it from the device login. Both were null on all 51 orders anyway. (`merchant.station` the table is kept — see Config.)                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `metadata` · `details` (order blobs)                | 2 → 0    | dropped — untyped junk drawers. `details.items` is a denormalized cache of `order_items`; `details.customer_note` is a duplicate of the `notes` column                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `notes` · `pickup_person`                           | 2 → 2    | **kept as NAMED columns** (2026-07-21). This row previously read "dropped, order-level free text is unmodeled" and called the notes contaminated. Both were wrong: the frozen iPad ticket **renders both** (`kds.service.ts:730-731`) and the checkout **writes both**, so a real consumer had already earned them under this section's own rule; and the 7 populated notes are clean (5 drink specs, 1 size, 1 preference), not contaminated. Carried as-is rather than re-routed to `order_item.notes` / `customer_note`, because these 51 orders are **test data** — inventing a line attribution for a test string is fabrication, not fidelity |
 | `order_item.metadata jsonb` · `variant_name`        | fold     | into `name` / `notes`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
@@ -495,10 +495,10 @@ in `unit_price`, so a customization rides as a value, **not** a column-per-varia
   KDS could infer a station from the device login because a KDS device _is_ a station; a
   POS rings a latte (bar) and a panini (grill) onto one ticket from neither, so the routing
   has to live on the line — which is what the §2 grain ruling always said. ⚠️
-  **`tenant.station` the table was never deferred** — it is a live KDS consumer, kept as config.
+  **`merchant.station` the table was never deferred** — it is a live KDS consumer, kept as config.
 - ~~**`order_item_modifier`**~~ — **LANDED 2026-07-28 (UmiPOS integration).** The deferral
   condition was "when a receipt needs '$4 latte + $0.50 oat' split out". A POS receipt does.
-  The POS already modelled it at cart grain (`tenant.pos_cart_line_modifier`); without the
+  The POS already modelled it at cart grain (`merchant.pos_cart_line_modifier`); without the
   order-grain table the breakdown collapsed into `order_item.unit_price` at commit and
   survived only inside `receipt_snapshot.snapshot` jsonb — money structure demoted to a blob
   at the exact moment it became money. `unit_price` remains the line total; the new table
@@ -516,11 +516,11 @@ in `unit_price`, so a customization rides as a value, **not** a column-per-varia
   KDS ticket fields with a live reader, and `notes` carries 7 real rows.
 - **discount / comp cluster** — **SPLIT 2026-07-28 (UmiPOS integration).** The FACTS landed;
   the RULES are still deferred.
-  - **Landed:** `tenant.order_discount` — the fact that a discount, promo or comp was applied,
+  - **Landed:** `merchant.order_discount` — the fact that a discount, promo or comp was applied,
     with `code` / `label` / `amount`, line-scoped or order-scoped. It had to: `@umi/contract`
     already declares `DiscountPreview` and `DiscountBreakdown` on every cart and checkout
     total, so the contract was describing money the schema could not store, and a receipt has
-    to print what was taken off. `tenant.order_total` now returns `gross`, `discount` and
+    to print what was taken off. `merchant.order_total` now returns `gross`, `discount` and
     `total`, and a discount attached to a voided line falls out with the line.
   - **Still deferred:** the promo RULE engine — definitions, eligibility, stacking. Phase-3+,
     unchanged.
@@ -539,7 +539,7 @@ in `unit_price`, so a customization rides as a value, **not** a column-per-varia
 `void_reason` (line) + a `CHECK (quantity>0, unit_price>=0)` + the
 `tg_order_item_void_only` immutability trigger; **derive** `total` (view); **keep**
 `order_event` (status spine — customer status notifications consume it, earned independent
-of the KDS roadmap), `tenant.station` (KDS config), `payment`; **defer** the per-line
+of the KDS roadmap), `merchant.station` (KDS config), `payment`; **defer** the per-line
 `order_item.station_id` FK, `order_item_modifier`, `replaces_id`, `personal_message`, and
 the **discount/comp cluster**; **add** the `order_total` + `order_ticket` views over order +
 live lines. The delta is small and drops **no** live consumer.
@@ -552,7 +552,7 @@ the KDS/checkout code against the DDL before rewriting it, and none was visible 
    listo push"), which needs no cursor. The frozen iPad **pulls** — `after_sequence` in, `WHERE
 sequence > $n` out. `occurred_at` cannot substitute: **63 source timestamps are tied**, so a
    `> timestamp` cursor silently skips or replays events.
-2. **`UNIQUE (business_id, external_ref)`.** §6 deferred an idempotency key to "when the
+2. **`UNIQUE (merchant_id, external_ref)`.** §6 deferred an idempotency key to "when the
    injection path is built" — the WhatsApp checkout **is** one, and it is live. Its
    `ON CONFLICT` had no constraint to land on, so a retried turn would create a duplicate order.
 3. **`notes` + `pickup_person` kept, `personal_message` deferred** — see the collapse table
@@ -563,11 +563,11 @@ sequence > $n` out. `occurred_at` cannot substitute: **63 source timestamps are 
 Applied to the build-v3 migration sources on branch `feat/order-cluster-ddl` and **verified
 locally** against the prod snapshot (port 5233) — **not** on prod:
 
-- `20_tenant.sql` — `customer_order` drops stored `total`, adds `cancel_reason`;
+- `20_merchant.sql` — `customer_order` drops stored `total`, adds `cancel_reason`;
   `order_item` drops `station_id`, adds `voided_at` + `void_reason` + a `CHECK
 (quantity>0, unit_price>=0)` + an `(order_id)` index + the `tg_order_item_void_only`
-  immutability trigger; two `security_invoker` views `tenant.order_total` (Σ live lines,
-  with its meaning-by-status contract) and `tenant.order_ticket` — **one** live projection,
+  immutability trigger; two `security_invoker` views `merchant.order_total` (Σ live lines,
+  with its meaning-by-status contract) and `merchant.order_ticket` — **one** live projection,
   order-grain with its lines nested, no status filter and no order total, which
   **includes** voided lines so the KDS renders VOID. (It was briefly line-grain and
   in-flight-only, with a second `kds_ticket` beside it; see the §1 amendment for why the
@@ -578,11 +578,11 @@ locally** against the prod snapshot (port 5233) — **not** on prod:
 - `backfill/reconcile_v3.sql` — order counts + two money invariants, hardened to
   **per-order** (derived vs source total) and **per-item** (`is_cancelled ⟺ voided_at`, by
   id, NULL-safe) checks; `90_rls.sql` revokes api DML on the two new views;
-  `security_gate.sql` — view check is count-agnostic ("every umi/tenant view is
+  `security_gate.sql` — view check is count-agnostic ("every umi/merchant view is
   `security_invoker`") + asserts the two contract views exist + counts the new trigger fn.
 
 **Proof of lossless:** the derived total reproduces the stored source total to the centavo
-across all 51 orders — `Σ(ops.orders.total_cents)` = `Σ(tenant.order_total.total)` =
+across all 51 orders — `Σ(ops.orders.total_cents)` = `Σ(merchant.order_total.total)` =
 **590 300**, the stored total having already excluded the 3 voided lines (all-lines sum =
 612 600); per-order and per-item mismatch counts are both **0**. The immutability trigger was
 exercised: voiding a live line once succeeds, editing a priced field or an already-voided
@@ -602,16 +602,16 @@ grows into the POS, it becomes the **injection target**, so its order must be ab
 (a) _receive_ orders tagged by origin (`source ∈ whatsapp · pos · web · dashboard`, and
 later `aggregator`) and (b) _emit_ status outward. `source` + `external_ref` are the
 origin-tagging fields that make an order injection-ready, and are **already present**; a
-tenant-scoped `idempotency_key` (with a uniqueness constraint) was the **planned** third.
+merchant-scoped `idempotency_key` (with a uniqueness constraint) was the **planned** third.
 
 **Resolved 2026-07-28 (UmiPOS integration), and not where this section expected.** The
-§1 amendment already had to press `UNIQUE (business_id, external_ref)` into service as an
+§1 amendment already had to press `UNIQUE (merchant_id, external_ref)` into service as an
 idempotency key when the WhatsApp checkout turned out to be a live injection path. With the
 POS as a _second_ path that overload breaks down: two producers would have to agree on a
 namespace for a column that means "_their_ id, not ours", and a retry key is chosen by the
 caller **before** the call, which an origin id is not. So the two are now separate —
-`external_ref` is origin identity, and retry identity lives in `tenant.business_command`
-(`unique (business_id, idempotency_key)` **plus a request fingerprint**, so a replay with a
+`external_ref` is origin identity, and retry identity lives in `merchant.business_command`
+(`unique (merchant_id, idempotency_key)` **plus a request fingerprint**, so a replay with a
 different body is a conflict rather than a second charge). `runtime.idempotency_key` keeps
 inbound webhook dedup and is explicitly not for business commands: it stores no fingerprint
 and no response, so a reused key returns silence instead of a conflict.

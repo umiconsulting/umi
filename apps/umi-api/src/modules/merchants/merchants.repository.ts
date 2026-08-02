@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
 import { SUPER_ADMIN_SA_CTE } from '../auth/rbac.sql';
 
-export interface TenantSummary {
+export interface MerchantSummary {
   id: string;
   slug: string;
   name: string;
@@ -24,37 +24,37 @@ export interface LocationRow {
   status: string;
 }
 
-/** LocationRow + the branch-resolution profile fields (Phase 2). */
+/** LocationRow + the location-resolution profile fields (Phase 2). */
 export interface LocationProfileRow extends LocationRow {
   aliases: string[];
   descriptor: string | null;
 }
 
 /**
- * Tenant/branch/product reads + admin writes. Tenant-scoped queries run on the
- * request path after TenantAccessGuard set the RLS context, so they go through
- * `withTenant` (umi_app, RLS) while still carrying explicit `business_id`
- * predicates (defense in depth). The cross-tenant `/me/tenants` list and product
+ * Merchant/location/product reads + admin writes. Merchant-scoped queries run on the
+ * request path after MerchantAccessGuard set the RLS context, so they go through
+ * `withMerchant` (umi_app, RLS) while still carrying explicit `merchant_id`
+ * predicates (defense in depth). The cross-merchant `/me/merchants` list and product
  * ENTITLEMENTS use the worker pool — the latter is MANDATORY because entitlements
  * live in the SEALED `umi` schema (no umi_app USAGE on `umi`).
  *
- * build-v3 model: core.tenants -> tenant.business, core.locations -> tenant.branch,
+ * build-v3 model: core.tenants -> merchant.merchant, core.locations -> merchant.location,
  * core.product_instances -> the entitlement cluster read via
- * `umi.effective_entitlement` (business granularity — no location_id),
+ * `umi.effective_entitlement` (merchant granularity — no location_id),
  * RBAC -> `umi.user_role` grants joined to the `umi.role` catalog (a user may hold
- * several roles per business, so roles come back as an array).
+ * several roles per merchant, so roles come back as an array).
  */
 @Injectable()
-export class TenantsRepository {
+export class MerchantsRepository {
   constructor(private readonly pg: PgService) {}
 
   /**
-   * Active memberships for the authed user (the `/me/tenants` list). Single role
-   * per (login, tenant). A global super_admin (any active super_admin edge) sees
-   * EVERY active tenant, tagged with its explicit role where one exists.
+   * Active memberships for the authed user (the `/me/merchants` list). Single role
+   * per (login, merchant). A global super_admin (any active super_admin edge) sees
+   * EVERY active merchant, tagged with its explicit role where one exists.
    */
-  async tenantsForUser(userId: string): Promise<TenantSummary[]> {
-    const { rows } = await this.pg.query<TenantSummary>(
+  async merchantsForUser(userId: string): Promise<MerchantSummary[]> {
+    const { rows } = await this.pg.query<MerchantSummary>(
       `WITH ${SUPER_ADMIN_SA_CTE}
        SELECT
          t.id::text AS "id",
@@ -63,9 +63,9 @@ export class TenantsRepository {
          t.timezone AS "timezone",
          COALESCE(array_agg(r.key) FILTER (WHERE r.key IS NOT NULL),
                   ARRAY['super_admin']) AS "roles"
-       FROM tenant.business AS t
+       FROM merchant.merchant AS t
        LEFT JOIN umi.user_role AS ur
-         ON ur.business_id = t.id AND ur.user_id = $1::uuid
+         ON ur.merchant_id = t.id AND ur.user_id = $1::uuid
        LEFT JOIN umi.role AS r ON r.id = ur.role_id
        WHERE t.status = 'active'
          AND (ur.id IS NOT NULL OR (SELECT is_sa FROM sa))
@@ -77,27 +77,27 @@ export class TenantsRepository {
   }
 
   /**
-   * Tenant-level product entitlements — the SINGLE SOURCE is the derived
+   * Merchant-level product entitlements — the SINGLE SOURCE is the derived
    * `umi.effective_entitlement` view (same source the EntitlementGuard reads), so
    * the capabilities map and per-request gating can never disagree. Each `enabled`
    * feature becomes a product keyed by `feature_key`, carrying the café's real
    * subscription status (joined from `umi.subscription`). Read on the WORKER pool
-   * (BYPASSRLS): the view is `security_invoker`, so the explicit `business_id`
-   * predicate — not RLS — scopes it. `locationId` stays null (tenant-grained) and
+   * (BYPASSRLS): the view is `security_invoker`, so the explicit `merchant_id`
+   * predicate — not RLS — scopes it. `locationId` stays null (merchant-grained) and
    * `config` is `{}` (build-v3 carries no per-product config in this view).
    */
-  async loadProducts(tenantId: string): Promise<Record<string, ProductInstance>> {
+  async loadProducts(merchantId: string): Promise<Record<string, ProductInstance>> {
     const { rows } = await this.pg.query<{
       productKey: string;
       status: string;
     }>(
       `SELECT ee.feature_key AS "productKey", s.status
          FROM umi.effective_entitlement AS ee
-         JOIN umi.subscription          AS s ON s.business_id = ee.business_id
-        WHERE ee.business_id = $1::uuid
+         JOIN umi.subscription          AS s ON s.merchant_id = ee.merchant_id
+        WHERE ee.merchant_id = $1::uuid
           AND ee.enabled
         ORDER BY ee.feature_key`,
-      [tenantId],
+      [merchantId],
     );
     return Object.fromEntries(
       rows.map((r) => [r.productKey, { status: r.status, locationId: null, config: {} }]),
@@ -105,82 +105,82 @@ export class TenantsRepository {
   }
 
   /**
-   * Tenant branding for the dashboard settings/theming payload. build-v3 keeps
-   * branding as TYPED columns on `tenant.business` (`brand_color`,
+   * Merchant branding for the dashboard settings/theming payload. build-v3 keeps
+   * branding as TYPED columns on `merchant.merchant` (`brand_color`,
    * `secondary_color`, `logo_url` — "add columns rather than a catch-all blob").
-   * Runs on the RLS app pool (`withTenant`) with an explicit `business_id`
-   * predicate, like the other tenant reads.
+   * Runs on the RLS app pool (`withMerchant`) with an explicit `merchant_id`
+   * predicate, like the other merchant reads.
    */
   async loadBranding(
-    tenantId: string,
+    merchantId: string,
   ): Promise<{ brandColor: string | null; secondaryColor: string | null }> {
-    const { rows } = await this.pg.withTenant((c) =>
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<{ brandColor: string | null; secondaryColor: string | null }>(
         `SELECT brand_color AS "brandColor", secondary_color AS "secondaryColor"
-         FROM tenant.business
+         FROM merchant.merchant
          WHERE id = $1::uuid
          LIMIT 1`,
-        [tenantId],
+        [merchantId],
       ),
     );
     return rows[0] ?? { brandColor: null, secondaryColor: null };
   }
 
-  /** Branches with the (tenant) timezone, oldest first (tenant-neutral, deterministic). */
-  async loadLocations(tenantId: string): Promise<LocationRow[]> {
-    const { rows } = await this.pg.withTenant((c) =>
+  /** Locations with the (merchant) timezone, oldest first (merchant-neutral, deterministic). */
+  async loadLocations(merchantId: string): Promise<LocationRow[]> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<LocationRow>(
         `SELECT l.id::text, l.slug, l.name, t.timezone, l.status
-         FROM tenant.branch AS l
-         JOIN tenant.business AS t ON t.id = l.business_id
-         WHERE l.business_id = $1::uuid
+         FROM merchant.location AS l
+         JOIN merchant.merchant AS t ON t.id = l.merchant_id
+         WHERE l.merchant_id = $1::uuid
          ORDER BY l.created_at ASC, l.id ASC`,
-        [tenantId],
+        [merchantId],
       ),
     );
     return rows;
   }
 
   /**
-   * Resolve the effective location id for a tenant: the requested active
+   * Resolve the effective location id for a merchant: the requested active
    * location, else the default active one — the OLDEST active location
-   * (created_at, then id). Tenant-neutral and deterministic: no hardcoded branch
-   * name (branches can be renamed/deleted; the platform is multi-tenant). Null
-   * when the tenant has no active location.
+   * (created_at, then id). Merchant-neutral and deterministic: no hardcoded location
+   * name (locations can be renamed/deleted; the platform is multi-merchant). Null
+   * when the merchant has no active location.
    */
   async resolveLocationId(
-    tenantId: string,
+    merchantId: string,
     requestedLocationId: string | null,
   ): Promise<string | null> {
     if (requestedLocationId) {
-      const loc = await this.findActiveLocation(tenantId, requestedLocationId);
+      const loc = await this.findActiveLocation(merchantId, requestedLocationId);
       if (loc) return loc.id;
-      // Stale/invalid requested id (renamed/deleted/wrong tenant) → fall through
+      // Stale/invalid requested id (renamed/deleted/wrong merchant) → fall through
       // to the deterministic default rather than returning null (which would make
-      // hours resolve tenant-wide instead of at the canonical active location).
+      // hours resolve merchant-wide instead of at the canonical active location).
     }
-    const { rows } = await this.pg.withTenant((c) =>
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<{ id: string }>(
         `SELECT id::text AS id
-         FROM tenant.branch
-         WHERE business_id = $1::uuid AND status = 'active'
+         FROM merchant.location
+         WHERE merchant_id = $1::uuid AND status = 'active'
          ORDER BY created_at ASC, id ASC
          LIMIT 1`,
-        [tenantId],
+        [merchantId],
       ),
     );
     return rows[0]?.id ?? null;
   }
 
-  /** Verify a location belongs to the tenant and is active. */
-  async findActiveLocation(tenantId: string, locationId: string): Promise<LocationRow | null> {
-    const { rows } = await this.pg.withTenant((c) =>
+  /** Verify a location belongs to the merchant and is active. */
+  async findActiveLocation(merchantId: string, locationId: string): Promise<LocationRow | null> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<LocationRow>(
         `SELECT id::text, slug, name, NULL::text AS timezone, status
-         FROM tenant.branch
-         WHERE business_id = $1::uuid AND id = $2::uuid AND status = 'active'
+         FROM merchant.location
+         WHERE merchant_id = $1::uuid AND id = $2::uuid AND status = 'active'
          LIMIT 1`,
-        [tenantId, locationId],
+        [merchantId, locationId],
       ),
     );
     return rows[0] ?? null;
@@ -188,21 +188,21 @@ export class TenantsRepository {
 
   /**
    * Worker-pool (BYPASSRLS) variant of resolveLocationId — for the unauthenticated
-   * WhatsApp path, which has no member user and so can't use withTenant. MUST use
-   * the SAME tenant-neutral resolution as the dashboard (oldest active location),
+   * WhatsApp path, which has no member user and so can't use withMerchant. MUST use
+   * the SAME merchant-neutral resolution as the dashboard (oldest active location),
    * so the bot reads hours at the SAME location_id the dashboard wrote.
    */
   async resolveLocationIdWorker(
-    tenantId: string,
+    merchantId: string,
     requestedLocationId: string | null,
   ): Promise<string | null> {
     if (requestedLocationId) {
       const { rows } = await this.pg.query<{ id: string }>(
         `SELECT id::text AS id
-         FROM tenant.branch
-         WHERE business_id = $1::uuid AND id = $2::uuid AND status = 'active'
+         FROM merchant.location
+         WHERE merchant_id = $1::uuid AND id = $2::uuid AND status = 'active'
          LIMIT 1`,
-        [tenantId, requestedLocationId],
+        [merchantId, requestedLocationId],
       );
       if (rows[0]) return rows[0].id;
       // Stale/invalid requested id → fall through to the deterministic default
@@ -211,41 +211,43 @@ export class TenantsRepository {
     }
     const { rows } = await this.pg.query<{ id: string }>(
       `SELECT id::text AS id
-       FROM tenant.branch
-       WHERE business_id = $1::uuid AND status = 'active'
+       FROM merchant.location
+       WHERE merchant_id = $1::uuid AND status = 'active'
        ORDER BY created_at ASC, id ASC
        LIMIT 1`,
-      [tenantId],
+      [merchantId],
     );
     return rows[0]?.id ?? null;
   }
 
   /**
-   * Worker-pool list of the tenant's ACTIVE locations (id + name), oldest-first.
-   * Feeds branch resolution: the `# SUCURSALES` prompt block, `set_branch`
-   * validation, and the checkout branch gate.
+   * Worker-pool list of the merchant's ACTIVE locations (id + name), oldest-first.
+   * Feeds location resolution: the `# SUCURSALES` prompt block, `set_location`
+   * validation, and the checkout location gate.
    */
-  async listActiveLocationsWorker(tenantId: string): Promise<Array<{ id: string; name: string }>> {
+  async listActiveLocationsWorker(
+    merchantId: string,
+  ): Promise<Array<{ id: string; name: string }>> {
     const { rows } = await this.pg.query<{ id: string; name: string }>(
       `SELECT id::text AS id, name
-       FROM tenant.branch
-       WHERE business_id = $1::uuid AND status = 'active'
+       FROM merchant.location
+       WHERE merchant_id = $1::uuid AND status = 'active'
        ORDER BY created_at ASC, id ASC`,
-      [tenantId],
+      [merchantId],
     );
     return rows;
   }
 
   /**
-   * Rank a tenant's ACTIVE branches against free customer text for branch
-   * resolution (Phase 2). Returns every active branch with its owner-curated
+   * Rank a merchant's ACTIVE locations against free customer text for location
+   * resolution (Phase 2). Returns every active location with its owner-curated
    * `aliases` and a pg_trgm `word_similarity` score of the (accent-stripped,
    * lowercased) query against `search_text` (= name + aliases). Worker pool
-   * (unauthenticated WhatsApp path). `set_branch` combines this fuzzy score with
+   * (unauthenticated WhatsApp path). `set_location` combines this fuzzy score with
    * a deterministic name/alias match to decide auto-select vs. ask.
    */
-  async matchBranchCandidates(
-    tenantId: string,
+  async matchLocationCandidates(
+    merchantId: string,
     query: string,
   ): Promise<Array<{ id: string; name: string; aliases: string[]; sim: number }>> {
     const { rows } = await this.pg.query<{
@@ -258,10 +260,10 @@ export class TenantsRepository {
               name,
               aliases,
               word_similarity(lower($2), search_text) AS sim
-         FROM tenant.branch
-        WHERE business_id = $1::uuid AND status = 'active'
+         FROM merchant.location
+        WHERE merchant_id = $1::uuid AND status = 'active'
         ORDER BY sim DESC, created_at ASC`,
-      [tenantId, query],
+      [merchantId, query],
     );
     return rows.map((r) => ({
       id: r.id,
@@ -271,33 +273,33 @@ export class TenantsRepository {
     }));
   }
 
-  /** Worker-pool read of the tenant's canonical timezone (`tenant.business.timezone`). */
-  async getTenantTimezoneWorker(tenantId: string): Promise<string | null> {
+  /** Worker-pool read of the merchant's canonical timezone (`merchant.merchant.timezone`). */
+  async getMerchantTimezoneWorker(merchantId: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ timezone: string | null }>(
-      `SELECT timezone FROM tenant.business WHERE id = $1::uuid`,
-      [tenantId],
+      `SELECT timezone FROM merchant.merchant WHERE id = $1::uuid`,
+      [merchantId],
     );
     return rows[0]?.timezone ?? null;
   }
 
-  async updateTenantSettings(
-    tenantId: string,
+  async updateMerchantSettings(
+    merchantId: string,
     patch: { name?: string; timezone?: string },
   ): Promise<void> {
-    await this.pg.withTenant((c) =>
+    await this.pg.withMerchant((c) =>
       c.query(
-        `UPDATE tenant.business
+        `UPDATE merchant.merchant
          SET name = COALESCE($2, name),
              timezone = COALESCE($3, timezone),
              updated_at = now()
          WHERE id = $1::uuid`,
-        [tenantId, patch.name ?? null, patch.timezone ?? null],
+        [merchantId, patch.name ?? null, patch.timezone ?? null],
       ),
     );
   }
 
   async updateLocation(
-    tenantId: string,
+    merchantId: string,
     locationId: string,
     patch: {
       name?: string;
@@ -311,19 +313,19 @@ export class TenantsRepository {
     // (COALESCE alone could never null it out); aliases pass through COALESCE so
     // an omitted field is untouched while an explicit [] clears the list.
     const setDescriptor = Object.prototype.hasOwnProperty.call(patch, 'descriptor');
-    const { rows } = await this.pg.withTenant((c) =>
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<LocationProfileRow>(
-        `UPDATE tenant.branch
+        `UPDATE merchant.location
          SET name = COALESCE($3, name),
              timezone = COALESCE($4, timezone),
              status = COALESCE($5, status),
              aliases = COALESCE($6::text[], aliases),
              descriptor = CASE WHEN $7::boolean THEN $8 ELSE descriptor END,
              updated_at = now()
-         WHERE id = $2::uuid AND business_id = $1::uuid
+         WHERE id = $2::uuid AND merchant_id = $1::uuid
          RETURNING id::text, slug, name, timezone, status, aliases, descriptor`,
         [
-          tenantId,
+          merchantId,
           locationId,
           patch.name ?? null,
           patch.timezone ?? null,
@@ -338,19 +340,19 @@ export class TenantsRepository {
   }
 
   /**
-   * Per-branch profiles for the dashboard branch editor: name + owner-curated
+   * Per-location profiles for the dashboard location editor: name + owner-curated
    * aliases + descriptor. Reads the Phase 2 columns, so it is a dedicated read
    * (NOT folded into loadLocations / buildCapabilities) — a pre-migration deploy
-   * only breaks the branch-settings section, never the whole dashboard.
+   * only breaks the location-settings section, never the whole dashboard.
    */
-  async listLocationProfiles(tenantId: string): Promise<LocationProfileRow[]> {
-    const { rows } = await this.pg.withTenant((c) =>
+  async listLocationProfiles(merchantId: string): Promise<LocationProfileRow[]> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<LocationProfileRow>(
         `SELECT id::text, slug, name, NULL::text AS timezone, status, aliases, descriptor
-         FROM tenant.branch
-         WHERE business_id = $1::uuid AND status <> 'archived'
+         FROM merchant.location
+         WHERE merchant_id = $1::uuid AND status <> 'archived'
          ORDER BY created_at ASC, id ASC`,
-        [tenantId],
+        [merchantId],
       ),
     );
     return rows;

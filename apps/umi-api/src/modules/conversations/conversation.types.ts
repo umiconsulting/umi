@@ -4,7 +4,7 @@
  * `docs/migration/2026-06-25-phase3-conversaflow-binding-preflight.md` §2.
  *
  * Legacy → canonical renames carried here: `customer_id → person_id`,
- * `business_id → business_id`, `body → content`.
+ * `merchant_id → merchant_id`, `body → content`.
  */
 
 /** A single line item in the conversation's draft cart (`runtime.conversation_cart.cart`). */
@@ -24,13 +24,13 @@ export interface DraftCart {
 
 /**
  * The conversation, as the turn engine reads it: the durable thread
- * (`tenant.conversation`) plus its in-flight cart (`runtime.conversation_cart`).
+ * (`merchant.conversation`) plus its in-flight cart (`runtime.conversation_cart`).
  * The FSM is gone — there is no `currentState` / `stateVersion` / `pendingClarification`;
  * the dialog-state label is DERIVED from cart-presence, and the cart is last-write-wins.
  */
 export interface ConversationRecord {
   id: string;
-  tenantId: string;
+  merchantId: string;
   personId: string;
   status: string;
   summary: string | null;

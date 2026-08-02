@@ -11,7 +11,7 @@ import type { ProductVariant } from '../modules/conversations/tools/product-sear
 
 /**
  * Integrations queue consumer (Phase 3d) — `zettle.sync`. Pulls the Zettle
- * catalog via the adapter and upserts `tenant.product` (rebound from the legacy
+ * catalog via the adapter and upserts `merchant.product` (rebound from the legacy
  * `transactions`/`products` columns): price_cents = Zettle minor units (centavos)
  * direct; variant prices = amount/100 (pesos, Zettle-native jsonb); category
  * get-or-create; absent products marked unavailable. Then enqueues `product.embed`
@@ -33,8 +33,8 @@ export class IntegrationsProcessor extends BaseProcessor {
       this.logger.warn(`unknown integrations job: ${job.name} #${job.id}`);
       return;
     }
-    const tenantId = String((job.data as Record<string, unknown>)?.business_id ?? '');
-    if (!tenantId) throw new Error('zettle.sync requires business_id');
+    const merchantId = String((job.data as Record<string, unknown>)?.merchant_id ?? '');
+    if (!merchantId) throw new Error('zettle.sync requires merchant_id');
 
     const catalog = await this.zettle.fetchProducts();
     if (catalog === null) return; // not configured — deliberate skip (adapter logged)
@@ -50,10 +50,10 @@ export class IntegrationsProcessor extends BaseProcessor {
         const firstVariantCents = product.variants?.[0]?.price?.amount;
         const priceCents = firstVariantCents ?? product.price?.amount ?? 0; // centavos
         const categoryId = await this.products.getOrCreateCategory(
-          tenantId,
+          merchantId,
           product.category?.name ?? null,
         );
-        await this.products.upsertFromZettle(tenantId, {
+        await this.products.upsertFromZettle(merchantId, {
           zettleUuid: product.uuid,
           name: product.name,
           description: product.description ?? null,
@@ -71,19 +71,19 @@ export class IntegrationsProcessor extends BaseProcessor {
     }
 
     const uuids = catalog.map((p) => p.uuid);
-    if (uuids.length > 0) await this.products.markUnavailableExcept(tenantId, uuids);
+    if (uuids.length > 0) await this.products.markUnavailableExcept(merchantId, uuids);
 
     // (Re)embed changed/new products (the upsert nulled name_embedding on change).
     await this.enqueue.enqueue(
       QUEUES.enrichment,
       'product.embed',
-      { business_id: tenantId },
+      { merchant_id: merchantId },
       { priority: JobPriority.Background },
     );
 
     if (errors > 0) {
       throw new Error(`zettle.sync completed with ${errors}/${catalog.length} product errors`);
     }
-    this.logger.log(`zettle_sync_complete synced=${catalog.length} tenant=${tenantId}`);
+    this.logger.log(`zettle_sync_complete synced=${catalog.length} merchant=${merchantId}`);
   }
 }

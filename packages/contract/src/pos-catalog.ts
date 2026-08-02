@@ -97,7 +97,7 @@ export const CatalogCategoriesResponse = z
   .strict();
 export const CatalogQuery = z
   .object({
-    branchId: Uuid,
+    locationId: Uuid,
     categoryId: Uuid.optional(),
     search: z.string().trim().min(1).max(120).optional(),
     barcode: z.string().trim().min(1).max(160).optional(),

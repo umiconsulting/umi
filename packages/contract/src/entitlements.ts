@@ -10,7 +10,7 @@
 // bundle) can consume it exactly like it consumes '@umi/contract/routes'.
 
 /**
- * Products a tenant can be entitled to — the values `@RequireProduct(...)` gates
+ * Products a merchant can be entitled to — the values `@RequireProduct(...)` gates
  * on, and the `product` field in the dashboard module registry.
  *
  * Note: the entitlement catalog (`umi.feature`) additionally permits internal/

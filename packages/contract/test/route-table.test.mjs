@@ -35,7 +35,7 @@ const PENDING = new Map([
   ['auth.posGlobalLogout', 'Gate 2.3: auth.controller POS routes'],
   ['auth.globalLogout', 'Gate 2.3: auth.controller global logout'],
   // Gate 2.3 — modules/integrity
-  ['tenants.audit', 'Gate 2.3: modules/integrity'],
+  ['merchants.audit', 'Gate 2.3: modules/integrity'],
   // Gate 2.3 — the POS surface proper
   ...[
     'pos.entryContext',

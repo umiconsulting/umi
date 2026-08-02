@@ -10,7 +10,7 @@ import {
  * The KDS status vocabulary guard.
  *
  * These two lists are TRANSCRIBED from things this test cannot import:
- *   ORDER_STATUSES   = the CHECK on tenant.customer_order.status (20_tenant.sql)
+ *   ORDER_STATUSES   = the CHECK on merchant.customer_order.status (20_merchant.sql)
  *   KITCHEN_STATUSES = the Swift enum KitchenStatus (apps/umi-kds KitchenModels.swift)
  *
  * That is the whole point. A Postgres CHECK and a Swift enum have no common type

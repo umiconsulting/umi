@@ -7,7 +7,7 @@ import { CatalogTools } from './tools/catalog.tools';
 import { CartTools } from './tools/cart.tools';
 import { CheckoutTools } from './tools/checkout.tools';
 import { CustomerTools } from './tools/customer.tools';
-import { BranchTools } from './tools/branch.tools';
+import { LocationTools } from './tools/location.tools';
 import { terminalToolError } from './tools/tool-errors';
 
 /**
@@ -23,7 +23,7 @@ export class RealToolsService extends ToolsService {
     private readonly cart: CartTools,
     private readonly checkout: CheckoutTools,
     private readonly customer: CustomerTools,
-    private readonly branch: BranchTools,
+    private readonly location: LocationTools,
   ) {
     super();
   }
@@ -35,10 +35,10 @@ export class RealToolsService extends ToolsService {
   execute(name: string, input: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult> {
     const str = (v: unknown): string => sanitizeInput(typeof v === 'string' ? v : '');
     switch (name) {
-      case 'set_branch':
-        return this.branch.setBranch(ctx, { branch: str(input.branch) });
-      case 'get_business_info':
-        return this.catalog.getBusinessInfo(ctx);
+      case 'set_location':
+        return this.location.setLocation(ctx, { location: str(input.location) });
+      case 'get_merchant_info':
+        return this.catalog.getMerchantInfo(ctx);
       case 'get_business_hours':
         return this.catalog.getBusinessHours(ctx);
       case 'search_menu':

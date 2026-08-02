@@ -8,7 +8,7 @@ import type { AppConfig } from '../config/config.schema';
 // integrations processor; this adapter only fetches.
 //
 // Auth: the live system uses a single static ZETTLE_API_KEY as the bearer token
-// against the `organizations/self` (single-account) endpoint. Per-tenant OAuth
+// against the `organizations/self` (single-account) endpoint. Per-merchant OAuth
 // token exchange (`zettle-oauth-setup` — no live source to port) is deferred
 // until multi-account Zettle is needed (port analysis §5).
 const ZETTLE_PRODUCTS_API = 'https://products.izettle.com/organizations/self/products/v2';

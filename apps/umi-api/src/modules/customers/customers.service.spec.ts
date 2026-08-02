@@ -10,8 +10,8 @@ function make() {
     cash: vi.fn(),
     identity: vi.fn(),
   };
-  const tenants = { loadProducts: vi.fn() };
-  return { svc: new CustomersService(repo as never, tenants as never), repo, tenants };
+  const merchants = { loadProducts: vi.fn() };
+  return { svc: new CustomersService(repo as never, merchants as never), repo, merchants };
 }
 
 const PRODUCTS = {
@@ -74,7 +74,7 @@ describe('CustomersService.list → customerDto', () => {
     await h.svc.list('t1', PRODUCTS, { limit: '500', contactId: 'not-a-uuid' });
     const q = h.repo.listCustomers.mock.calls[0][1];
     expect(q.limit).toBe(100);
-    expect(q.contactUuid).toBe('t1'); // falls back to tenant id → matches nobody
+    expect(q.contactUuid).toBe('t1'); // falls back to merchant id → matches nobody
   });
 });
 

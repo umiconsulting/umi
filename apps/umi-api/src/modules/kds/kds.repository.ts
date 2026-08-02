@@ -15,36 +15,36 @@ import {
 
 /**
  * All KDS SQL. Everything runs on the **worker pool** (`pg.query` / `pg.workerTx`)
- * with an explicit `business_id = $1` predicate in every statement — NOT the RLS
- * `withTenant` path — for three reasons (spec §9.1/§11.2):
+ * with an explicit `merchant_id = $1` predicate in every statement — NOT the RLS
+ * `withMerchant` path — for three reasons (spec §9.1/§11.2):
  *   1. the iPad path has no authenticated member user, so RLS would hide rows;
  *   2. sessions/pairing live in the SEALED `runtime` schema (auth secrets
  *      `token_hash`/`pin_hash`/`pin_salt`) with NO `umi_app` USAGE;
  *   3. transitions write `runtime.outbox_event` (service-role-only schema).
- * Cross-tenant isolation is enforced by the explicit predicate + the guard stack
+ * Cross-merchant isolation is enforced by the explicit predicate + the guard stack
  * on the dashboard routes / the device-session scope on the iPad routes — the
  * same model the public cash routes use.
  *
- * build-v2 mapping: stations `kitchen.stations`→`tenant.station`, devices
- * `device.devices`→`tenant.device`, sessions `device.sessions`→`runtime.session`
+ * build-v2 mapping: stations `kitchen.stations`→`merchant.station`, devices
+ * `device.devices`→`merchant.device`, sessions `device.sessions`→`runtime.session`
  * (`device_id`→`principal_id`, `principal_type='device'`), pairing
- * `device.pairing_requests`→`runtime.pairing`. Tickets are the `tenant.order_ticket`
+ * `device.pairing_requests`→`runtime.pairing`. Tickets are the `merchant.order_ticket`
  * projection over `customer_order`/`order_item` — ONE live projection, read here with
  * the frozen iPad's shape applied on top (see TICKET_SELECT). The kitchen lifecycle is
- * COLLAPSED onto `customer_order.status`; `tenant.order_event` is the ordered change
+ * COLLAPSED onto `customer_order.status`; `merchant.order_event` is the ordered change
  * FEED a puller reads, carrying status transitions AND line-level upserts.
  */
 
 export interface StationRow {
   id: string;
-  business_id: string;
+  merchant_id: string;
   location_id: string | null;
   name: string;
 }
 
 export interface PairingRow {
   id: string;
-  business_id: string;
+  merchant_id: string;
   location_id: string | null;
   station_id: string | null;
   device_name: string;
@@ -65,7 +65,7 @@ export interface PairingPollRow {
 
 export interface PairingStatusRow {
   id: string;
-  business_id: string;
+  merchant_id: string;
   location_id: string | null;
   station_id: string | null;
   device_name: string;
@@ -77,7 +77,7 @@ export interface PairingStatusRow {
 
 export interface SessionRow {
   id: string;
-  business_id: string;
+  merchant_id: string;
   station_id: string | null;
   device_name: string | null;
   is_active: boolean;
@@ -86,7 +86,7 @@ export interface SessionRow {
 
 export interface OrderScopeRow {
   id: string;
-  business_id: string;
+  merchant_id: string;
   location_id: string | null;
   station_id: string | null;
   kitchen_status: KitchenStatus | null;
@@ -94,11 +94,11 @@ export interface OrderScopeRow {
   source_transaction_id: string | null;
 }
 
-/** A tenant.order_ticket row shaped for the frozen contract. Remapped in the service. */
+/** A merchant.order_ticket row shaped for the frozen contract. Remapped in the service. */
 export interface TicketRow {
   ticket_id: string;
   source_transaction_id: string | null;
-  business_id: string;
+  merchant_id: string;
   source_channel: string | null;
   status: KitchenStatus;
   station_id: string | null;
@@ -117,7 +117,7 @@ export interface TicketRow {
 export interface EventRow {
   sequence: string | number;
   ticket_id: string;
-  business_id: string;
+  merchant_id: string;
   source_transaction_id: string | null;
   kind: string | null;
   status: string | null;
@@ -138,18 +138,18 @@ export interface DeviceListRow {
   metadata: Record<string, unknown>;
 }
 
-// The customer name (tenant.customer) + best reply phone (tenant.contact) for a
+// The customer name (merchant.customer) + best reply phone (merchant.contact) for a
 // ticket — prefers the WhatsApp as-received raw_phone_number (avoids Twilio 63015),
 // else the phone-channel normalized E.164. Shared by board reads.
 // REPLY channels are ('whatsapp','phone') — deliberately NOT the identity dedup family
 // ('phone','whatsapp','sms'): we never reply over SMS.
-const CUSTOMER_NAME_PHONE_JOIN = `LEFT JOIN tenant.customer cu
-    ON cu.business_id = t.business_id AND cu.id = t.customer_id
+const CUSTOMER_NAME_PHONE_JOIN = `LEFT JOIN merchant.customer cu
+    ON cu.merchant_id = t.merchant_id AND cu.id = t.customer_id
   LEFT JOIN LATERAL (
     SELECT COALESCE(ct.raw_phone_number, ct.normalized_value) AS phone
-      FROM tenant.contact ct
+      FROM merchant.contact ct
       JOIN umi.channel_type pch ON pch.id = ct.channel_id
-     WHERE ct.business_id = cu.business_id AND ct.customer_id = cu.id
+     WHERE ct.merchant_id = cu.merchant_id AND ct.customer_id = cu.id
        AND pch.key IN ('whatsapp', 'phone')
      ORDER BY (pch.key = 'whatsapp') DESC, ct.is_primary DESC, ct.updated_at DESC
      LIMIT 1
@@ -171,12 +171,12 @@ const CUSTOMER_NAME_PHONE_JOIN = `LEFT JOIN tenant.customer cu
  *              is written by the KDS.
  *   payload -> the old actor/reason blob is gone. Empty object, not null: Swift decodes
  *              a dictionary, and null fails the whole payload.
- * `business_id` comes from the parent order — `order_event` deliberately has no
- * business_id (RLS reaches it through customer_order), which is also why every query
- * here filters on `o.business_id`, not `e.business_id`.
+ * `merchant_id` comes from the parent order — `order_event` deliberately has no
+ * merchant_id (RLS reaches it through customer_order), which is also why every query
+ * here filters on `o.merchant_id`, not `e.merchant_id`.
  */
 /**
- * The frozen `KDSSnapshotRow` projection over tenant.order_ticket.
+ * The frozen `KDSSnapshotRow` projection over merchant.order_ticket.
  *
  * These four columns are the ADAPTER — they exist because of what the iPad's Swift model
  * declares, and for no other reason, so they live here rather than in the schema:
@@ -187,12 +187,12 @@ const CUSTOMER_NAME_PHONE_JOIN = `LEFT JOIN tenant.customer cu
  *       scopes by the device's paired station at query time. The frozen contract has the
  *       keys, so they are emitted as nulls (both are optional in Swift).
  *   total_amount -> the ticket carries NO money (ORDER_MODEL §4). Callers that legitimately
- *       need a total join tenant.order_total themselves; the board passes null, which is
+ *       need a total join merchant.order_total themselves; the board passes null, which is
  *       what a kitchen ticket is.
  */
 const TICKET_SELECT = `t.ticket_id,
               COALESCE(t.external_ref, t.ticket_id::text) AS source_transaction_id,
-              t.business_id        AS business_id,
+              t.merchant_id        AS merchant_id,
               t.source             AS source_channel,
               t.status,
               NULL::uuid           AS station_id,
@@ -207,7 +207,7 @@ const TICKET_SELECT = `t.ticket_id,
 
 const EVENT_SELECT = `e.sequence,
               e.order_id                           AS ticket_id,
-              o.business_id                        AS business_id,
+              o.merchant_id                        AS merchant_id,
               COALESCE(o.external_ref, o.id::text) AS source_transaction_id,
               e.kind,
               e.status,
@@ -219,23 +219,23 @@ const EVENT_SELECT = `e.sequence,
 export class KdsRepository {
   constructor(private readonly pg: PgService) {}
 
-  // ── Stations (tenant.station; location_id -> branch_id) ─────────────────────
+  // ── Stations (merchant.station; location_id -> location_id) ─────────────────────
 
-  /** Active station within the tenant (+ optional location scope). */
+  /** Active station within the merchant (+ optional location scope). */
   async loadStation(
-    tenantId: string,
+    merchantId: string,
     locationId: string | null,
     stationId: string,
   ): Promise<StationRow | null> {
     // A missing locationId means "unscoped" (match the station at any location) —
     // NOT "root-location only". listStations() returns all-location stations, so
-    // forcing branch_id IS NULL here would reject a valid dashboard selection.
-    const locClause = locationId ? 'AND branch_id = $3' : '';
-    const params = locationId ? [stationId, tenantId, locationId] : [stationId, tenantId];
+    // forcing location_id IS NULL here would reject a valid dashboard selection.
+    const locClause = locationId ? 'AND location_id = $3' : '';
+    const params = locationId ? [stationId, merchantId, locationId] : [stationId, merchantId];
     const { rows } = await this.pg.query<StationRow>(
-      `SELECT id, business_id, branch_id AS location_id, name
-         FROM tenant.station
-        WHERE id = $1 AND business_id = $2 AND status = 'active' ${locClause}
+      `SELECT id, merchant_id, location_id AS location_id, name
+         FROM merchant.station
+        WHERE id = $1 AND merchant_id = $2 AND status = 'active' ${locClause}
         LIMIT 1`,
       params,
     );
@@ -243,7 +243,7 @@ export class KdsRepository {
   }
 
   async listStations(
-    tenantId: string,
+    merchantId: string,
     locationId: string | null,
   ): Promise<
     Array<{
@@ -255,12 +255,12 @@ export class KdsRepository {
       location_id: string | null;
     }>
   > {
-    const locClause = locationId ? 'AND branch_id = $2' : '';
-    const params = locationId ? [tenantId, locationId] : [tenantId];
+    const locClause = locationId ? 'AND location_id = $2' : '';
+    const params = locationId ? [merchantId, locationId] : [merchantId];
     const { rows } = await this.pg.query(
-      `SELECT id, key AS station_key, name, status, sort_order, branch_id AS location_id
-         FROM tenant.station
-        WHERE business_id = $1 AND status = 'active' ${locClause}
+      `SELECT id, key AS station_key, name, status, sort_order, location_id AS location_id
+         FROM merchant.station
+        WHERE merchant_id = $1 AND status = 'active' ${locClause}
         ORDER BY sort_order ASC, name ASC`,
       params,
     );
@@ -277,30 +277,30 @@ export class KdsRepository {
   /**
    * Active (non-archived) station with this key in the same location scope.
    * `IS NOT DISTINCT FROM` makes the location match NULL-safe, so this closes
-   * the tenant-wide (`branch_id IS NULL`) gap that the DB's
+   * the merchant-wide (`location_id IS NULL`) gap that the DB's
    * partial-unique indexes handle only when non-null.
    */
   async findActiveStationByKey(
-    tenantId: string,
+    merchantId: string,
     locationId: string | null,
     stationKey: string,
   ): Promise<{ id: string } | null> {
     const { rows } = await this.pg.query<{ id: string }>(
       `SELECT id
-         FROM tenant.station
-        WHERE business_id = $1
+         FROM merchant.station
+        WHERE merchant_id = $1
           AND key = $2
-          AND branch_id IS NOT DISTINCT FROM $3
+          AND location_id IS NOT DISTINCT FROM $3
           AND status <> 'archived'
         LIMIT 1`,
-      [tenantId, stationKey, locationId],
+      [merchantId, stationKey, locationId],
     );
     return rows[0] ?? null;
   }
 
   /** Create an active station. `sort_order` defaults to 0 (DB default). */
   async createStation(input: {
-    tenantId: string;
+    merchantId: string;
     locationId: string | null;
     name: string;
     stationKey: string;
@@ -313,10 +313,10 @@ export class KdsRepository {
     location_id: string | null;
   }> {
     const { rows } = await this.pg.query(
-      `INSERT INTO tenant.station (business_id, branch_id, key, name)
+      `INSERT INTO merchant.station (merchant_id, location_id, key, name)
          VALUES ($1, $2, $3, $4)
-       RETURNING id, key AS station_key, name, status, sort_order, branch_id AS location_id`,
-      [input.tenantId, input.locationId, input.stationKey, input.name],
+       RETURNING id, key AS station_key, name, status, sort_order, location_id AS location_id`,
+      [input.merchantId, input.locationId, input.stationKey, input.name],
     );
     return rows[0] as {
       id: string;
@@ -329,7 +329,7 @@ export class KdsRepository {
   }
 
   /** Rename an active/disabled station. Returns null if not found. */
-  async updateStation(input: { tenantId: string; stationId: string; name: string }): Promise<{
+  async updateStation(input: { merchantId: string; stationId: string; name: string }): Promise<{
     id: string;
     station_key: string;
     name: string;
@@ -338,11 +338,11 @@ export class KdsRepository {
     location_id: string | null;
   } | null> {
     const { rows } = await this.pg.query(
-      `UPDATE tenant.station
+      `UPDATE merchant.station
           SET name = $3, updated_at = now()
-        WHERE id = $1 AND business_id = $2 AND status <> 'archived'
-      RETURNING id, key AS station_key, name, status, sort_order, branch_id AS location_id`,
-      [input.stationId, input.tenantId, input.name],
+        WHERE id = $1 AND merchant_id = $2 AND status <> 'archived'
+      RETURNING id, key AS station_key, name, status, sort_order, location_id AS location_id`,
+      [input.stationId, input.merchantId, input.name],
     );
     return (
       (rows[0] as {
@@ -362,12 +362,12 @@ export class KdsRepository {
    * while hiding it from the active list. Returns false if not found / already
    * archived.
    */
-  async archiveStation(tenantId: string, stationId: string): Promise<boolean> {
+  async archiveStation(merchantId: string, stationId: string): Promise<boolean> {
     const { rowCount } = await this.pg.query(
-      `UPDATE tenant.station
+      `UPDATE merchant.station
           SET status = 'archived', updated_at = now()
-        WHERE id = $1 AND business_id = $2 AND status <> 'archived'`,
-      [stationId, tenantId],
+        WHERE id = $1 AND merchant_id = $2 AND status <> 'archived'`,
+      [stationId, merchantId],
     );
     return (rowCount ?? 0) > 0;
   }
@@ -375,7 +375,7 @@ export class KdsRepository {
   // ── Pairing (runtime.pairing) ──────────────────────────────────────────────
 
   async insertPairingRequest(input: {
-    tenantId: string;
+    merchantId: string;
     locationId: string | null;
     stationId: string;
     deviceName: string;
@@ -386,13 +386,13 @@ export class KdsRepository {
   }): Promise<PairingRow> {
     const { rows } = await this.pg.query<PairingRow>(
       `INSERT INTO runtime.pairing
-         (business_id, location_id, station_id, device_name,
+         (merchant_id, location_id, station_id, device_name,
           pin_hash, pin_salt, status, max_attempts, expires_at)
        VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8)
-       RETURNING id, business_id, location_id, station_id, device_name,
+       RETURNING id, merchant_id, location_id, station_id, device_name,
                  status, expires_at, created_at`,
       [
-        input.tenantId,
+        input.merchantId,
         input.locationId,
         input.stationId,
         input.deviceName,
@@ -406,19 +406,19 @@ export class KdsRepository {
   }
 
   async listPairingRequests(
-    tenantId: string,
+    merchantId: string,
     locationId: string | null,
     limit: number,
   ): Promise<Record<string, unknown>[]> {
     const locClause = locationId ? 'AND location_id = $2' : 'AND location_id IS NULL';
-    const params = locationId ? [tenantId, locationId, limit] : [tenantId, limit];
+    const params = locationId ? [merchantId, locationId, limit] : [merchantId, limit];
     const limitParam = locationId ? '$3' : '$2';
     const { rows } = await this.pg.query(
-      `SELECT id, business_id, location_id, station_id, device_name, requested_name,
+      `SELECT id, merchant_id, location_id, station_id, device_name, requested_name,
               status, attempt_count, max_attempts, expires_at,
               approved_by, approved_at, used_at, denied_at, created_at
          FROM runtime.pairing
-        WHERE business_id = $1 AND status IN ('pending', 'approved') ${locClause}
+        WHERE merchant_id = $1 AND status IN ('pending', 'approved') ${locClause}
         ORDER BY created_at DESC
         LIMIT ${limitParam}`,
       params,
@@ -429,7 +429,7 @@ export class KdsRepository {
   /** Set a pairing pending→approved/denied. Returns null if not still pending. */
   async dispositionPairing(
     pairingId: string,
-    tenantId: string,
+    merchantId: string,
     action: 'approve' | 'deny',
     adminUserId: string | null,
   ): Promise<{ id: string; status: string } | null> {
@@ -438,7 +438,7 @@ export class KdsRepository {
         ? `status = 'approved', approved_by = $3, approved_at = now(), updated_at = now()`
         : `status = 'denied', denied_at = now(), updated_at = now()`;
     const params =
-      action === 'approve' ? [pairingId, tenantId, adminUserId] : [pairingId, tenantId];
+      action === 'approve' ? [pairingId, merchantId, adminUserId] : [pairingId, merchantId];
     // Approve requires a still-valid window. Deny is a dismissal, so it also
     // clears pending requests already past expires_at — those linger in the
     // list (status is still 'pending' until dismissed) and would otherwise be
@@ -447,7 +447,7 @@ export class KdsRepository {
     const { rows } = await this.pg.query<{ id: string; status: string }>(
       `UPDATE runtime.pairing
           SET ${patch}
-        WHERE id = $1 AND business_id = $2 AND status = 'pending'
+        WHERE id = $1 AND merchant_id = $2 AND status = 'pending'
           ${freshnessClause}
         RETURNING id, status`,
       params,
@@ -481,7 +481,7 @@ export class KdsRepository {
   /** Read a pairing by id only (the iPad polls by pairing_id). */
   async getPairing(pairingId: string): Promise<PairingStatusRow | null> {
     const { rows } = await this.pg.query<PairingStatusRow>(
-      `SELECT id, business_id, location_id, station_id, device_name, requested_name,
+      `SELECT id, merchant_id, location_id, station_id, device_name, requested_name,
               status, expires_at, used_at
          FROM runtime.pairing
         WHERE id = $1
@@ -518,25 +518,25 @@ export class KdsRepository {
     return rows.length > 0;
   }
 
-  // ── Device sessions (runtime.session + tenant.device) ──────────────────────
+  // ── Device sessions (runtime.session + merchant.device) ──────────────────────
 
   /**
    * Provision a device for a claimed pairing in ONE worker transaction: a durable
-   * `tenant.device` registry row (typed `kds`) + a `runtime.session` row
+   * `merchant.device` registry row (typed `kds`) + a `runtime.session` row
    * (`principal_type='device'`, `principal_id` = the registry id). Returns the
    * one-time plaintext token (never stored — only its sha256 hash is) and the
    * registry id (`device_registry_id`) for race cleanup. The session `id` stays the
    * frozen `device_session.device_id` the iPad sees. `runtime.session` has no
-   * `branch_id`, so the location is parked in `metadata`.
+   * `location_id`, so the location is parked in `metadata`.
    */
   async createDeviceSession(input: {
-    tenantId: string;
+    merchantId: string;
     locationId: string | null;
     stationId: string | null;
     deviceName: string;
   }): Promise<{
     id: string;
-    business_id: string;
+    merchant_id: string;
     station_id: string | null;
     device_name: string | null;
     token: string;
@@ -546,27 +546,27 @@ export class KdsRepository {
     const tokenHash = sha256Hex(token);
     return this.pg.workerTx(async (client) => {
       const dev = await client.query<{ id: string }>(
-        `INSERT INTO tenant.device
-           (business_id, branch_id, station_id, name, kind, status)
+        `INSERT INTO merchant.device
+           (merchant_id, location_id, station_id, name, kind, status)
          VALUES ($1, $2, $3, $4, 'kds', 'active')
          RETURNING id`,
-        [input.tenantId, input.locationId, input.stationId, input.deviceName],
+        [input.merchantId, input.locationId, input.stationId, input.deviceName],
       );
       const deviceRegistryId = dev.rows[0].id;
       const sess = await client.query<{
         id: string;
-        business_id: string;
+        merchant_id: string;
         station_id: string | null;
         device_name: string | null;
       }>(
         `INSERT INTO runtime.session
-           (business_id, principal_type, principal_id, station_id, device_name,
+           (merchant_id, principal_type, principal_id, station_id, device_name,
             token_hash, is_active, metadata)
          VALUES ($1, 'device', $2, $3, $4, $5, true,
                  jsonb_build_object('location_id', $6::text))
-         RETURNING id, business_id, station_id, device_name`,
+         RETURNING id, merchant_id, station_id, device_name`,
         [
-          input.tenantId,
+          input.merchantId,
           deviceRegistryId,
           input.stationId,
           input.deviceName,
@@ -590,14 +590,14 @@ export class KdsRepository {
           WHERE principal_type = 'device' AND principal_id = $1`,
         [deviceRegistryId],
       );
-      await client.query(`DELETE FROM tenant.device WHERE id = $1`, [deviceRegistryId]);
+      await client.query(`DELETE FROM merchant.device WHERE id = $1`, [deviceRegistryId]);
     });
   }
 
   /** Device-auth lookup by token hash (the token itself is never stored). */
   async findSessionByToken(tokenHash: string): Promise<SessionRow | null> {
     const { rows } = await this.pg.query<SessionRow>(
-      `SELECT id, business_id, station_id, device_name, is_active, metadata
+      `SELECT id, merchant_id, station_id, device_name, is_active, metadata
          FROM runtime.session
         WHERE token_hash = $1 AND principal_type = 'device'
         LIMIT 1`,
@@ -625,19 +625,19 @@ export class KdsRepository {
     return (rowCount ?? 0) > 0;
   }
 
-  async listDevices(tenantId: string, locationId: string | null): Promise<DeviceListRow[]> {
+  async listDevices(merchantId: string, locationId: string | null): Promise<DeviceListRow[]> {
     const locClause = locationId ? `AND s.metadata->>'location_id' = $2` : '';
-    const params = locationId ? [tenantId, locationId] : [tenantId];
+    const params = locationId ? [merchantId, locationId] : [merchantId];
     const { rows } = await this.pg.query<DeviceListRow>(
       `SELECT s.id AS device_id, s.principal_id AS device_registry_id,
               dv.kind AS device_type, s.station_id, st.name AS station_name,
               s.device_name, s.last_used_at, s.is_active, s.metadata
          FROM runtime.session s
-         LEFT JOIN tenant.device dv
-           ON dv.business_id = s.business_id AND dv.id = s.principal_id
-         LEFT JOIN tenant.station st
-           ON st.business_id = s.business_id AND st.id = s.station_id
-        WHERE s.business_id = $1 AND s.is_active = true
+         LEFT JOIN merchant.device dv
+           ON dv.merchant_id = s.merchant_id AND dv.id = s.principal_id
+         LEFT JOIN merchant.station st
+           ON st.merchant_id = s.merchant_id AND st.id = s.station_id
+        WHERE s.merchant_id = $1 AND s.is_active = true
           AND s.principal_type = 'device' ${locClause}
         ORDER BY s.last_used_at DESC NULLS LAST, s.created_at DESC`,
       params,
@@ -646,21 +646,21 @@ export class KdsRepository {
   }
 
   /** Deactivate the session and archive its registry device row (one tx). */
-  async revokeSession(tenantId: string, deviceId: string): Promise<boolean> {
+  async revokeSession(merchantId: string, deviceId: string): Promise<boolean> {
     return this.pg.workerTx(async (client) => {
       const sess = await client.query(
         `UPDATE runtime.session SET is_active = false
-          WHERE id = $1 AND business_id = $2
+          WHERE id = $1 AND merchant_id = $2
         RETURNING principal_id`,
-        [deviceId, tenantId],
+        [deviceId, merchantId],
       );
       if (sess.rowCount === 0) return false;
       const registryId = sess.rows[0]?.principal_id;
       if (registryId) {
         await client.query(
-          `UPDATE tenant.device SET status = 'retired', updated_at = now()
-            WHERE id = $1 AND business_id = $2`,
-          [registryId, tenantId],
+          `UPDATE merchant.device SET status = 'retired', updated_at = now()
+            WHERE id = $1 AND merchant_id = $2`,
+          [registryId, merchantId],
         );
       }
       return true;
@@ -669,7 +669,7 @@ export class KdsRepository {
 
   /** Update the session's display fields and keep the registry row in sync. */
   async updateSession(
-    tenantId: string,
+    merchantId: string,
     deviceId: string,
     patch: { deviceName?: string | null; stationId?: string | null },
   ): Promise<boolean> {
@@ -681,30 +681,30 @@ export class KdsRepository {
         `UPDATE runtime.session
             SET device_name = COALESCE($3, device_name),
                 station_id  = CASE WHEN $5 THEN $4 ELSE station_id END
-          WHERE id = $1 AND business_id = $2
+          WHERE id = $1 AND merchant_id = $2
         RETURNING principal_id`,
-        [deviceId, tenantId, patch.deviceName ?? null, patch.stationId ?? null, setStation],
+        [deviceId, merchantId, patch.deviceName ?? null, patch.stationId ?? null, setStation],
       );
       if (sess.rowCount === 0) return false;
       const registryId = sess.rows[0]?.principal_id;
       if (registryId) {
         await client.query(
-          `UPDATE tenant.device
+          `UPDATE merchant.device
               SET name = COALESCE($3, name),
                   station_id = CASE WHEN $5 THEN $4 ELSE station_id END,
                   updated_at = now()
-            WHERE id = $1 AND business_id = $2`,
-          [registryId, tenantId, patch.deviceName ?? null, patch.stationId ?? null, setStation],
+            WHERE id = $1 AND merchant_id = $2`,
+          [registryId, merchantId, patch.deviceName ?? null, patch.stationId ?? null, setStation],
         );
       }
       return true;
     });
   }
 
-  // ── Board reads (tenant.order_ticket + tenant.order_event) ──────────────────
+  // ── Board reads (merchant.order_ticket + merchant.order_event) ──────────────────
 
   /**
-   * Board snapshot for a device: tenant.order_ticket filtered to the on-board
+   * Board snapshot for a device: merchant.order_ticket filtered to the on-board
    * (non-terminal) statuses, plus the customer's name and reply phone.
    *
    * No station argument, for the same reason ticketEvents has none: the order carries no
@@ -715,25 +715,25 @@ export class KdsRepository {
    * view stores build-v3's.
    */
   async boardSnapshot(
-    tenantId: string,
+    merchantId: string,
     statuses: KitchenStatus[] = BOARD_ACTIVE_STATUSES,
   ): Promise<TicketRow[]> {
     const { rows } = await this.pg.query<TicketRow>(
       `SELECT ${TICKET_SELECT},
               NULL::numeric        AS total_amount,
               t.last_event_sequence
-         FROM tenant.order_ticket t
+         FROM merchant.order_ticket t
          ${CUSTOMER_NAME_PHONE_JOIN}
-        WHERE t.business_id = $1
+        WHERE t.merchant_id = $1
           AND t.status = ANY($2::text[])
         ORDER BY t.created_at ASC`,
-      [tenantId, statuses.map(mapKitchenToOrderStatus)],
+      [merchantId, statuses.map(mapKitchenToOrderStatus)],
     );
     return rows;
   }
 
   /**
-   * Event stream cursor (`tenant.order_event` ordered by its identity `sequence`).
+   * Event stream cursor (`merchant.order_event` ordered by its identity `sequence`).
    *
    * The station filter is GONE, not forgotten. It used to read `o.station_id`, and in
    * build-v3 an order carries no station at all (ORDER_MODEL §5 — the KDS derives a
@@ -745,42 +745,46 @@ export class KdsRepository {
    * because it reads like a security boundary. It returns when per-line routing lands
    * (deferred `order_item.station_id`), and then it belongs on the LINE, not the order.
    */
-  async ticketEvents(tenantId: string, afterSequence: number, limit: number): Promise<EventRow[]> {
+  async ticketEvents(
+    merchantId: string,
+    afterSequence: number,
+    limit: number,
+  ): Promise<EventRow[]> {
     const { rows } = await this.pg.query<EventRow>(
       `SELECT ${EVENT_SELECT}
-         FROM tenant.order_event e
-         JOIN tenant.customer_order o ON o.id = e.order_id
-        WHERE o.business_id = $1
+         FROM merchant.order_event e
+         JOIN merchant.customer_order o ON o.id = e.order_id
+        WHERE o.merchant_id = $1
           AND e.sequence > $2
         ORDER BY e.sequence ASC
         LIMIT LEAST(GREATEST($3, 1), 1000)`,
-      [tenantId, afterSequence, limit],
+      [merchantId, afterSequence, limit],
     );
     return rows;
   }
 
   /** Most-recent events for the dashboard ticker. */
-  async recentEvents(tenantId: string, limit: number): Promise<EventRow[]> {
+  async recentEvents(merchantId: string, limit: number): Promise<EventRow[]> {
     const { rows } = await this.pg.query<EventRow>(
       `SELECT ${EVENT_SELECT}
-         FROM tenant.order_event e
-         JOIN tenant.customer_order o ON o.id = e.order_id
-        WHERE o.business_id = $1
+         FROM merchant.order_event e
+         JOIN merchant.customer_order o ON o.id = e.order_id
+        WHERE o.merchant_id = $1
         ORDER BY e.sequence DESC
         LIMIT LEAST(GREATEST($2, 1), 200)`,
-      [tenantId, limit],
+      [merchantId, limit],
     );
     return rows;
   }
 
   /** Dashboard order list (status filter + recent window). */
   async listOrders(
-    tenantId: string,
+    merchantId: string,
     statuses: KitchenStatus[] | null,
     locationId: string | null,
     sinceHours: number,
   ): Promise<TicketRow[]> {
-    const params: unknown[] = [tenantId, sinceHours];
+    const params: unknown[] = [merchantId, sinceHours];
     let statusClause = '';
     if (statuses && statuses.length) {
       // The caller filters in the iPad's vocabulary; the view speaks build-v3's.
@@ -792,27 +796,27 @@ export class KdsRepository {
     let locClause = '';
     if (locationId) {
       params.push(locationId);
-      // NULL-escape the branch filter: WhatsApp orders arrive with
-      // branch_id = NULL (the channel account isn't branch-bound), and the
-      // dashboard always sends a selected branch (it defaults to the
-      // oldest-active location). A plain `branch_id = $N` therefore hides every
-      // WhatsApp ticket. Unrouted (NULL) orders are tenant-wide and must surface
-      // on any branch — same reason the iPad boardSnapshot query carries no
+      // NULL-escape the location filter: WhatsApp orders arrive with
+      // location_id = NULL (the channel account isn't location-bound), and the
+      // dashboard always sends a selected location (it defaults to the
+      // oldest-active location). A plain `location_id = $N` therefore hides every
+      // WhatsApp ticket. Unrouted (NULL) orders are merchant-wide and must surface
+      // on any location — same reason the iPad boardSnapshot query carries no
       // location filter at all.
-      locClause = `AND (o.branch_id = $${params.length} OR o.branch_id IS NULL)`;
+      locClause = `AND (o.location_id = $${params.length} OR o.location_id IS NULL)`;
     }
     // This one is the HISTORY consumer, so it is the one that legitimately wants money —
-    // and it joins tenant.order_total itself rather than the ticket carrying a total for
+    // and it joins merchant.order_total itself rather than the ticket carrying a total for
     // everyone. When the settled projection exists this moves to payment/refund (§4).
     const { rows } = await this.pg.query<TicketRow>(
       `SELECT ${TICKET_SELECT},
               (tot.total::numeric / 100) AS total_amount,
               t.last_event_sequence
-         FROM tenant.order_ticket t
-         JOIN tenant.customer_order o ON o.id = t.ticket_id
-         LEFT JOIN tenant.order_total tot ON tot.order_id = t.ticket_id
+         FROM merchant.order_ticket t
+         JOIN merchant.customer_order o ON o.id = t.ticket_id
+         LEFT JOIN merchant.order_total tot ON tot.order_id = t.ticket_id
          ${CUSTOMER_NAME_PHONE_JOIN}
-        WHERE t.business_id = $1
+        WHERE t.merchant_id = $1
           AND t.created_at >= now() - make_interval(hours => $2)
           ${statusClause}
           ${locClause}
@@ -824,27 +828,27 @@ export class KdsRepository {
 
   // ── Command writes (transition / partial cancel) ───────────────────────────
 
-  /** Load an order for the device-scope check (tenant-scoped; by id or source tx). */
+  /** Load an order for the device-scope check (merchant-scoped; by id or source tx). */
   async loadOrderForScope(
-    tenantId: string,
+    merchantId: string,
     ticketId: string,
     ticketUuid: string | null,
   ): Promise<OrderScopeRow | null> {
     const { rows } = await this.pg.query<OrderScopeRow & { status: string }>(
-      `SELECT o.id, o.business_id, o.branch_id AS location_id,
+      `SELECT o.id, o.merchant_id, o.location_id AS location_id,
               NULL::uuid AS station_id,
               o.status,
               o.customer_id AS person_id,
               COALESCE(o.external_ref, o.id::text) AS source_transaction_id
-         FROM tenant.customer_order o
-        WHERE o.business_id = $3
+         FROM merchant.customer_order o
+        WHERE o.merchant_id = $3
           AND (($2::uuid IS NOT NULL AND o.id = $2::uuid)
                OR o.external_ref = $1)
         ORDER BY CASE
           WHEN $2::uuid IS NOT NULL AND o.id = $2::uuid THEN 0 ELSE 1
         END
         LIMIT 1`,
-      [ticketId, ticketUuid, tenantId],
+      [ticketId, ticketUuid, merchantId],
     );
     const row = rows[0];
     if (!row) return null;
@@ -859,17 +863,17 @@ export class KdsRepository {
    * Lock the order row (FOR UPDATE, serializing concurrent transitions) and derive
    * its current kitchen status from the latest journal event. Returns null when the
    * order does not exist. Replaces the old `SELECT kitchen_status FROM ops.orders
-   * FOR UPDATE` now that kitchen status lives in `tenant.order_event`.
+   * FOR UPDATE` now that kitchen status lives in `merchant.order_event`.
    */
   private async lockOrderAndStatus(
     client: PoolClient,
     orderId: string,
-    tenantId: string,
+    merchantId: string,
   ): Promise<{ kitchenStatus: KitchenStatus | null } | null> {
     const locked = await client.query<{ status: string }>(
-      `SELECT status FROM tenant.customer_order
-        WHERE id = $1 AND business_id = $2 FOR UPDATE`,
-      [orderId, tenantId],
+      `SELECT status FROM merchant.customer_order
+        WHERE id = $1 AND merchant_id = $2 FOR UPDATE`,
+      [orderId, merchantId],
     );
     const row = locked.rows[0];
     if (!row) return null;
@@ -882,32 +886,32 @@ export class KdsRepository {
 
   private async customerPhone(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     personId: string | null,
   ): Promise<string | null> {
     if (!personId) return null;
-    // personId is a tenant.customer.id; the reply address is the customer's best
+    // personId is a merchant.customer.id; the reply address is the customer's best
     // reachability value — WhatsApp as-received display_value (avoids Twilio
     // 63015) else the phone E.164.
     const { rows } = await client.query<{ phone: string | null }>(
       `SELECT COALESCE(ct.raw_phone_number, ct.normalized_value) AS phone
-         FROM tenant.customer cu
-         JOIN tenant.contact ct
-           ON ct.business_id = cu.business_id AND ct.customer_id = cu.id
+         FROM merchant.customer cu
+         JOIN merchant.contact ct
+           ON ct.merchant_id = cu.merchant_id AND ct.customer_id = cu.id
          JOIN umi.channel_type ch ON ch.id = ct.channel_id
-        WHERE cu.id = $1 AND cu.business_id = $2
+        WHERE cu.id = $1 AND cu.merchant_id = $2
           AND ch.key IN ('whatsapp', 'phone')
         ORDER BY (ch.key = 'whatsapp') DESC, ct.is_primary DESC, ct.updated_at DESC
         LIMIT 1`,
-      [personId, tenantId],
+      [personId, merchantId],
     );
     return rows[0]?.phone ?? null;
   }
 
   /**
    * Transition a ticket's kitchen_status in ONE worker transaction: set the
-   * order's business status + propagate to line items, APPEND the
-   * `tenant.order_event` journal row (carrying the new `kitchen_status` — the
+   * order's merchant status + propagate to line items, APPEND the
+   * `merchant.order_event` journal row (carrying the new `kitchen_status` — the
    * de-overloaded source of truth), and (when `notify` resolves a body) enqueue a
    * `twilio.status_notification` outbox row. The append-only journal + the
    * deterministic outbox idempotency key make re-runs safe.
@@ -926,7 +930,7 @@ export class KdsRepository {
       // Lock + derive current status so a concurrent transition can't make this one
       // overwrite stale state or emit a wrong old_status. The service pre-checks
       // against a pre-transaction snapshot; this is the authoritative re-check.
-      const locked = await this.lockOrderAndStatus(client, order.id, order.business_id);
+      const locked = await this.lockOrderAndStatus(client, order.id, order.merchant_id);
       if (!locked) {
         throw new KdsHttpError(404, { error: 'ticket_not_found' });
       }
@@ -941,18 +945,18 @@ export class KdsRepository {
       // customer_order.status, so there is no per-line kitchen_status to propagate — the
       // old second UPDATE is gone, and with it the window where the two could disagree.
       await client.query(
-        `UPDATE tenant.customer_order
+        `UPDATE merchant.customer_order
             SET status = $3,
                 cancel_reason = CASE WHEN $4::text IS NOT NULL THEN $4 ELSE cancel_reason END,
                 updated_at = now()
-          WHERE id = $1 AND business_id = $2`,
-        [order.id, order.business_id, orderStatus, isCancel ? input.cancellationReasonCode : null],
+          WHERE id = $1 AND merchant_id = $2`,
+        [order.id, order.merchant_id, orderStatus, isCancel ? input.cancellationReasonCode : null],
       );
 
       // The spine. `sequence` is an identity column, so the old MAX+1-under-advisory-lock
       // allocation is gone: Postgres hands out the number, and it cannot collide.
       const ev = await client.query<{ sequence: string }>(
-        `INSERT INTO tenant.order_event (order_id, kind, status)
+        `INSERT INTO merchant.order_event (order_id, kind, status)
          VALUES ($1::uuid, 'status_changed', $2)
          RETURNING sequence`,
         [order.id, orderStatus],
@@ -960,15 +964,15 @@ export class KdsRepository {
       const seq = Number(ev.rows[0]?.sequence ?? 0);
 
       if (input.notifyBody) {
-        const phone = await this.customerPhone(client, order.business_id, order.person_id);
+        const phone = await this.customerPhone(client, order.merchant_id, order.person_id);
         if (phone) {
           await client.query(
             `INSERT INTO runtime.outbox_event
-               (business_id, topic, aggregate_id, idempotency_key, payload)
+               (merchant_id, topic, aggregate_id, idempotency_key, payload)
              VALUES ($1, 'twilio.status_notification', $2, $3, $4::jsonb)
-             ON CONFLICT (business_id, idempotency_key) DO NOTHING`,
+             ON CONFLICT (merchant_id, idempotency_key) DO NOTHING`,
             [
-              order.business_id,
+              order.merchant_id,
               order.id,
               `kds:notify:${order.id}:${targetStatus}:${seq}`,
               JSON.stringify({
@@ -990,7 +994,7 @@ export class KdsRepository {
 
   /**
    * Partial-cancel specific line items in ONE worker transaction: flag the
-   * items, recompute the order total, set the order's business status
+   * items, recompute the order total, set the order's merchant status
    * (partial_cancelled, or cancelled when nothing remains) + APPEND a
    * `partial_cancellation` journal row (carrying the new kitchen_status + reason),
    * and enqueue a `twilio.cancel_notification` outbox row.
@@ -1011,7 +1015,7 @@ export class KdsRepository {
     return this.pg.workerTx(async (client) => {
       // Lock + derive current status so a transition that committed just before this
       // lock can't be overwritten and the event can't carry a stale old_status.
-      const locked = await this.lockOrderAndStatus(client, order.id, order.business_id);
+      const locked = await this.lockOrderAndStatus(client, order.id, order.merchant_id);
       if (!locked) {
         throw new KdsHttpError(404, { error: 'ticket_not_found' });
       }
@@ -1028,13 +1032,13 @@ export class KdsRepository {
       // total on its own. The order_item trigger appends the `order_upserted` event and
       // bumps the order's version, so this loop does not have to remember to.
       const cancelled = await client.query<{ quantity: number; name: string }>(
-        `UPDATE tenant.order_item
+        `UPDATE merchant.order_item
             SET voided_at = now(), void_reason = $4
           WHERE order_id = $1::uuid AND id = ANY($3::uuid[]) AND voided_at IS NULL
-            AND EXISTS (SELECT 1 FROM tenant.customer_order o
-                         WHERE o.id = order_id AND o.business_id = $2::uuid)
+            AND EXISTS (SELECT 1 FROM merchant.customer_order o
+                         WHERE o.id = order_id AND o.merchant_id = $2::uuid)
         RETURNING quantity, name`,
-        [order.id, order.business_id, input.itemIds, input.reasonCode],
+        [order.id, order.merchant_id, input.itemIds, input.reasonCode],
       );
       // Every requested id must have matched an active line on this order;
       // otherwise roll back rather than mutate the order / notify the customer.
@@ -1044,45 +1048,45 @@ export class KdsRepository {
 
       // Remaining (non-cancelled) items → drives total + whole-order status.
       const remaining = await client.query<{ quantity: number; name: string }>(
-        `SELECT i.quantity, i.name FROM tenant.order_item i
-           JOIN tenant.customer_order o ON o.id = i.order_id
-          WHERE i.order_id = $1::uuid AND o.business_id = $2::uuid AND i.voided_at IS NULL`,
-        [order.id, order.business_id],
+        `SELECT i.quantity, i.name FROM merchant.order_item i
+           JOIN merchant.customer_order o ON o.id = i.order_id
+          WHERE i.order_id = $1::uuid AND o.merchant_id = $2::uuid AND i.voided_at IS NULL`,
+        [order.id, order.merchant_id],
       );
 
       const newStatus: KitchenStatus =
         remaining.rows.length === 0 ? 'cancelled' : 'partial_cancelled';
 
-      // NO total recompute. The total is derived (tenant.order_total sums live lines), so
+      // NO total recompute. The total is derived (merchant.order_total sums live lines), so
       // voiding the lines above already moved it — recomputing a stored copy is what this
       // model removed.
       await client.query(
-        `UPDATE tenant.customer_order
+        `UPDATE merchant.customer_order
             SET status = $3, updated_at = now()
-          WHERE id = $1::uuid AND business_id = $2::uuid`,
-        [order.id, order.business_id, mapKitchenToOrderStatus(newStatus)],
+          WHERE id = $1::uuid AND merchant_id = $2::uuid`,
+        [order.id, order.merchant_id, mapKitchenToOrderStatus(newStatus)],
       );
 
       const ev = await client.query<{ sequence: string }>(
-        `INSERT INTO tenant.order_event (order_id, kind, status)
+        `INSERT INTO merchant.order_event (order_id, kind, status)
          VALUES ($1::uuid, 'status_changed', $2)
          RETURNING sequence`,
         [order.id, mapKitchenToOrderStatus(newStatus)],
       );
       const seq = Number(ev.rows[0]?.sequence ?? 0);
 
-      const phone = await this.customerPhone(client, order.business_id, order.person_id);
+      const phone = await this.customerPhone(client, order.merchant_id, order.person_id);
       // Only emit when notifications are enabled (buildNotifyBody returns null
       // when KDS_STATUS_NOTIFY_ENABLED is off) AND a customer phone exists.
       const body = phone ? input.buildNotifyBody(cancelled.rows, remaining.rows) : null;
       if (phone && body) {
         await client.query(
           `INSERT INTO runtime.outbox_event
-             (business_id, topic, aggregate_id, idempotency_key, payload)
+             (merchant_id, topic, aggregate_id, idempotency_key, payload)
            VALUES ($1, 'twilio.cancel_notification', $2, $3, $4::jsonb)
-           ON CONFLICT (business_id, idempotency_key) DO NOTHING`,
+           ON CONFLICT (merchant_id, idempotency_key) DO NOTHING`,
           [
-            order.business_id,
+            order.merchant_id,
             order.id,
             `kds:cancel:${order.id}:${seq}`,
             JSON.stringify({ to: phone, body, ticket_id: order.id }),

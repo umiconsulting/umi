@@ -116,7 +116,7 @@ function hasDraftCart(draftCart: unknown): boolean {
   return Array.isArray(items) && items.length > 0;
 }
 
-function isBusinessInfoIntent(text: string): boolean {
+function isMerchantInfoIntent(text: string): boolean {
   return /\b(transferencia|transferir|pago|pagar|tarjeta|efectivo|direccion|ubicacion|ubicados|numero|telefono|contacto|whatsapp)\b/.test(
     normalizeTurnText(text),
   );
@@ -211,7 +211,7 @@ function isConcreteOrderIntent(text: string): boolean {
   const normalized = normalizeTurnText(text);
   if (!isAddIntent(text)) return false;
   if (
-    isBusinessInfoIntent(text) ||
+    isMerchantInfoIntent(text) ||
     isHumanHandoffIntent(text) ||
     isRepeatIntent(text) ||
     isRevisionIntent(text) ||
@@ -309,7 +309,7 @@ function answersPendingClarification(
   return (
     !isAddIntent(text) &&
     !isRevisionIntent(text) &&
-    !isBusinessInfoIntent(text) &&
+    !isMerchantInfoIntent(text) &&
     !isStrongConfirmation(text)
   );
 }
@@ -324,7 +324,7 @@ function shouldIncludePendingClarification(
   if (
     isAddIntent(text) ||
     isRevisionIntent(text) ||
-    isBusinessInfoIntent(text) ||
+    isMerchantInfoIntent(text) ||
     isRepeatIntent(text) ||
     isQuestionLike(text)
   ) {
@@ -429,15 +429,15 @@ export class ToolLoopService {
       }
     }
 
-    if (isBusinessInfoIntent(params.userTurnText)) {
-      const result = await this.tools.execute('get_business_info', {}, params.toolContext);
+    if (isMerchantInfoIntent(params.userTurnText)) {
+      const result = await this.tools.execute('get_merchant_info', {}, params.toolContext);
       return {
-        toolName: 'get_business_info',
+        toolName: 'get_merchant_info',
         toolUseId: `${baseId}_bizinfo`,
         input: {},
         result,
-        observation: compactToolObservation('get_business_info', result),
-        stopReasonHint: 'forced_business_info_tool',
+        observation: compactToolObservation('get_merchant_info', result),
+        stopReasonHint: 'forced_merchant_info_tool',
       };
     }
 

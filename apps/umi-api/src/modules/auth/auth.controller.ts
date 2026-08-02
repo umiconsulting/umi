@@ -166,7 +166,7 @@ export class AuthController {
 function toSession(result: LoginResult, accessExpiresIn: number): SessionEnvelope {
   return {
     user: result.user,
-    tenants: result.tenants,
+    merchants: result.merchants,
     provider: 'local',
     accessExpiresIn,
   };

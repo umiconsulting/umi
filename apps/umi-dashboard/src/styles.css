@@ -1147,7 +1147,7 @@ textarea.input {
   box-shadow: 0 24px 52px -28px rgba(31, 20, 16, 0.64);
 }
 .wallet-pass {
-  --wallet-bg: var(--tenant-brand);
+  --wallet-bg: var(--merchant-brand);
   --wallet-label: #faebdc;
   width: 324px;
   min-height: 504px;

@@ -2,7 +2,7 @@
 <style>
   :root{
     --umi:#2a6fdb; --umi-soft:#eaf1fd; --umi-ink:#1b4fa8;
-    --tenant:#12996b; --tenant-soft:#e6f6ef; --tenant-ink:#0c6f4d;
+    --merchant:#12996b; --merchant-soft:#e6f6ef; --merchant-ink:#0c6f4d;
     --runtime:#c9871e; --runtime-soft:#fbf1de; --runtime-ink:#8f5f10;
     --bg:#f6f7f9; --panel:#ffffff; --panel-2:#fbfcfd;
     --ink:#161a20; --ink-2:#41505f; --ink-3:#6b7a89;
@@ -15,7 +15,7 @@
   @media (prefers-color-scheme:dark){
     :root{
       --umi:#5f9bff; --umi-soft:#12233f; --umi-ink:#9cc0ff;
-      --tenant:#3ec392; --tenant-soft:#0e2b21; --tenant-ink:#7fe0bb;
+      --merchant:#3ec392; --merchant-soft:#0e2b21; --merchant-ink:#7fe0bb;
       --runtime:#e6ac4e; --runtime-soft:#2e2410; --runtime-ink:#f0c785;
       --bg:#0d1013; --panel:#161b21; --panel-2:#12161b;
       --ink:#e7ecf1; --ink-2:#aeb9c5; --ink-3:#7f8c9a;
@@ -26,7 +26,7 @@
   }
   :root[data-theme="dark"]{
     --umi:#5f9bff; --umi-soft:#12233f; --umi-ink:#9cc0ff;
-    --tenant:#3ec392; --tenant-soft:#0e2b21; --tenant-ink:#7fe0bb;
+    --merchant:#3ec392; --merchant-soft:#0e2b21; --merchant-ink:#7fe0bb;
     --runtime:#e6ac4e; --runtime-soft:#2e2410; --runtime-ink:#f0c785;
     --bg:#0d1013; --panel:#161b21; --panel-2:#12161b;
     --ink:#e7ecf1; --ink-2:#aeb9c5; --ink-3:#7f8c9a;
@@ -36,7 +36,7 @@
   }
   :root[data-theme="light"]{
     --umi:#2a6fdb; --umi-soft:#eaf1fd; --umi-ink:#1b4fa8;
-    --tenant:#12996b; --tenant-soft:#e6f6ef; --tenant-ink:#0c6f4d;
+    --merchant:#12996b; --merchant-soft:#e6f6ef; --merchant-ink:#0c6f4d;
     --runtime:#c9871e; --runtime-soft:#fbf1de; --runtime-ink:#8f5f10;
     --bg:#f6f7f9; --panel:#ffffff; --panel-2:#fbfcfd;
     --ink:#161a20; --ink-2:#41505f; --ink-3:#6b7a89;
@@ -82,7 +82,7 @@
   .lane{background:var(--panel);border:1px solid var(--line);border-radius:16px;
         box-shadow:var(--shadow);overflow:hidden}
   .lane.umi{--c:var(--umi);--c-soft:var(--umi-soft);--c-ink:var(--umi-ink)}
-  .lane.tenant{--c:var(--tenant);--c-soft:var(--tenant-soft);--c-ink:var(--tenant-ink)}
+  .lane.merchant{--c:var(--merchant);--c-soft:var(--merchant-soft);--c-ink:var(--merchant-ink)}
   .lane.runtime{--c:var(--runtime);--c-soft:var(--runtime-soft);--c-ink:var(--runtime-ink)}
   .lane-hd{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
            padding:13px 18px;border-left:5px solid var(--c);background:var(--c-soft)}
@@ -143,7 +143,7 @@
   <h1>build-v3 <span>· schema map · </span><b>v1 swimlanes</b></h1>
   <div class="leg">
     <span class="k"><i class="dot" style="background:var(--umi)"></i>umi · sealed</span>
-    <span class="k"><i class="dot" style="background:var(--tenant)"></i>tenant · RLS</span>
+    <span class="k"><i class="dot" style="background:var(--merchant)"></i>merchant · RLS</span>
     <span class="k"><i class="dot" style="background:var(--runtime)"></i>runtime</span>
     <span class="k"><span class="m ao" style="font-size:8.5px;padding:2px 5px;border-radius:5px">append-only</span></span>
     <span class="k"><span class="m money" style="font-size:8.5px;padding:2px 5px;border-radius:5px">money</span></span>
@@ -165,11 +165,11 @@
     <div class="intro">
       <div class="ey">read this first · the design thesis is the layout</div>
       <p>Three schemas become three lanes. <b>umi</b> is sealed authority (Umi owns every fact; no café writes here),
-      <b>tenant</b> is the café's durable business facts under row-level security, and <b>runtime</b> is sealed working
+      <b>merchant</b> is the café's durable merchant facts under row-level security, and <b>runtime</b> is sealed working
       memory the running code <b>reads back</b> to act next. The bands between lanes are the <b>only</b> cross-schema
       foreign keys: identity flows <b>up</b> into one <code>umi.user</code>; ownership flows <b>down</b> via
-      <code>business_id</code>. Money &amp; stamps live in tenant append-only ledgers (balance = SUM, never cached);
-      embeddings &amp; FSM state live in runtime, never in tenant.</p>
+      <code>merchant_id</code>. Money &amp; stamps live in merchant append-only ledgers (balance = SUM, never cached);
+      embeddings &amp; FSM state live in runtime, never in merchant.</p>
     </div>
     <div id="lanes"></div>
   </div>
@@ -190,9 +190,9 @@ const DATA = [
     { hd:'Sales', tables:[ {n:'prospect'}, {n:'prospect_event'} ] },
     { hd:'Audit', sub:'Umi-internal actions', tables:[ {n:'audit_log', m:'ao'} ] },
   ]},
-  { key:'tenant', badge:'RLS · PER BUSINESS', thesis:'the café’s business = the durable facts', clusters:[
+  { key:'merchant', badge:'RLS · PER MERCHANT', thesis:'the café’s merchant = the durable facts', clusters:[
     { hd:'Root & org', span2:true, tables:[
-      {n:'business', m:'root'}, {n:'branch'}, {n:'station'}, {n:'integration'}, {n:'device'} ] },
+      {n:'merchant', m:'root'}, {n:'location'}, {n:'station'}, {n:'integration'}, {n:'device'} ] },
     { hd:'People', sub:'staff log in; customers don’t', tables:[
       {n:'staff'}, {n:'customer'}, {n:'contact'}, {n:'customer_note'} ] },
     { hd:'Loyalty', sub:'identity + append-only ledgers', span2:true, tables:[
@@ -203,7 +203,7 @@ const DATA = [
       {n:'loyalty_wallet_pass'} ] },
     { hd:'Commerce', sub:'generic — no “menu”', tables:[
       {n:'product_category'}, {n:'product'}, {n:'product_option_group'},
-      {n:'product_modifier'}, {n:'product_branch_availability'} ] },
+      {n:'product_modifier'}, {n:'product_location_availability'} ] },
     { hd:'Knowledge', tables:[ {n:'knowledge_document'}, {n:'knowledge_chunk'} ] },
     { hd:'Messaging', tables:[
       {n:'conversation'}, {n:'message'}, {n:'conversation_analytics', view:true} ] },
@@ -226,20 +226,20 @@ const DATA = [
 ];
 
 const SEAMS = {
-  0:{ title:'seam · umi ⇄ tenant  (cross-schema FKs)',
+  0:{ title:'seam · umi ⇄ merchant  (cross-schema FKs)',
     rows:[
       {dir:'↑ identity', t:'<code>staff.user_id</code>, <code>integration.connected_by</code>, <code>user_role.granted_by</code> → <code>umi.user</code>'},
       {dir:'↑ vocab', t:'<code>contact.channel_id</code>, <code>conversation.channel_id</code> → <code>umi.channel_type</code>'},
-      {dir:'↓ scope', t:'<code>user_role.business_id / branch_id</code> → <code>tenant.business / branch</code> <i>(deferred xfk)</i>'},
-      {dir:'↓ billing', t:'<code>subscription.business_id</code>, <code>invoice.business_id</code> → <code>tenant.business</code>'},
+      {dir:'↓ scope', t:'<code>user_role.merchant_id / location_id</code> → <code>merchant.merchant / location</code> <i>(deferred xfk)</i>'},
+      {dir:'↓ billing', t:'<code>subscription.merchant_id</code>, <code>invoice.merchant_id</code> → <code>merchant.merchant</code>'},
     ]},
-  1:{ title:'seam · runtime → tenant / umi  (runtime reads facts back, owns none)',
+  1:{ title:'seam · runtime → merchant / umi  (runtime reads facts back, owns none)',
     rows:[
       {dir:'reads', t:'<code>device_session→device</code>, <code>conversation_state→conversation</code>, <code>reminder_sent→loyalty_card</code>, <code>integration_sync→integration</code>, <code>pass_device→loyalty_wallet_pass</code>'},
       {dir:'reads', t:'<code>product_embedding→product</code>, <code>message_embedding→message</code>, <code>knowledge_embedding→knowledge_chunk</code>'},
       {dir:'↑ actor', t:'<code>session.user_id</code>, <code>otp</code>, <code>password_reset_token</code> → <code>umi.user</code>'},
     ],
-    note:'“Sealed” = no café / RLS access — but the api &amp; worker roles DO write here. Sealed from tenants, not from Umi.' },
+    note:'“Sealed” = no café / RLS access — but the api &amp; worker roles DO write here. Sealed from merchants, not from Umi.' },
 };
 
 function chipEl(t){
@@ -285,7 +285,7 @@ DATA.forEach((lane,i)=>{
 });
 
 document.getElementById('foot').innerHTML=
-  `<b>65 tables</b> · umi 16 · tenant 33 · runtime 16 &nbsp;+&nbsp; 2 views &nbsp;·&nbsp; `+
+  `<b>65 tables</b> · umi 16 · merchant 33 · runtime 16 &nbsp;+&nbsp; 2 views &nbsp;·&nbsp; `+
   `faithful to <b>docs/migration/build-v3/*.sql</b>. Vertical seams are the complete set of cross-schema FKs. `+
   `<b>NOT in runtime:</b> device_event, traces, spans, costs — write-once telemetry lives in OTel, not the DB.`;
 

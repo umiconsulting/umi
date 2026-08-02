@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { iso } from '../../shared/format/money';
-import { TenantsRepository } from '../tenants/tenants.repository';
+import { MerchantsRepository } from '../merchants/merchants.repository';
 import { StaffRepository, type StaffRow } from './staff.repository';
 
 // Ported from server.js DEFAULT_PERMISSIONS — synthesized per role (not stored).
@@ -57,7 +57,7 @@ export interface StaffInput {
 export class StaffService {
   constructor(
     private readonly repo: StaffRepository,
-    private readonly tenants: TenantsRepository,
+    private readonly merchants: MerchantsRepository,
   ) {}
 
   private toDto(row: StaffRow): StaffDto {
@@ -76,13 +76,13 @@ export class StaffService {
     };
   }
 
-  async list(tenantId: string): Promise<StaffDto[]> {
-    const rows = await this.repo.list(tenantId);
+  async list(merchantId: string): Promise<StaffDto[]> {
+    const rows = await this.repo.list(merchantId);
     return rows.map((r) => this.toDto(r));
   }
 
   async create(
-    tenantId: string,
+    merchantId: string,
     requestedLocationId: string | null,
     body: StaffInput,
   ): Promise<StaffDto> {
@@ -95,9 +95,9 @@ export class StaffService {
       throw new BadRequestException('phone or email is required');
     }
 
-    const locationId = await this.tenants.resolveLocationId(tenantId, requestedLocationId);
+    const locationId = await this.merchants.resolveLocationId(merchantId, requestedLocationId);
     try {
-      const row = await this.repo.insert(tenantId, locationId, {
+      const row = await this.repo.insert(merchantId, locationId, {
         name,
         phone,
         email,
@@ -106,13 +106,13 @@ export class StaffService {
       return this.toDto(row);
     } catch (err) {
       if (isUniqueViolation(err)) {
-        throw new ConflictException('Staff member already exists for this business');
+        throw new ConflictException('Staff member already exists for this merchant');
       }
       throw err;
     }
   }
 
-  async update(tenantId: string, staffId: string, body: StaffInput): Promise<StaffDto> {
+  async update(merchantId: string, staffId: string, body: StaffInput): Promise<StaffDto> {
     const patch: {
       name?: string;
       phone?: string | null;
@@ -127,13 +127,13 @@ export class StaffService {
         ? (body.status as string)
         : null;
     }
-    const row = await this.repo.update(tenantId, staffId, patch);
+    const row = await this.repo.update(merchantId, staffId, patch);
     if (!row) throw new NotFoundException('Staff member not found');
     return this.toDto(row);
   }
 
-  async remove(tenantId: string, staffId: string): Promise<void> {
-    const ok = await this.repo.softDelete(tenantId, staffId);
+  async remove(merchantId: string, staffId: string): Promise<void> {
+    const ok = await this.repo.softDelete(merchantId, staffId);
     if (!ok) throw new NotFoundException('Staff member not found');
   }
 }

@@ -1,39 +1,45 @@
 import { Body, Controller, Get, Patch, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
-import { TenantAccessGuard } from '../auth/tenant-access.guard';
-import { Tenant } from '../auth/current-user.decorator';
-import type { TenantAccess } from '../auth/auth.types';
-import { TenantsRepository } from '../tenants/tenants.repository';
+import { MerchantAccessGuard } from '../auth/merchant-access.guard';
+import { Merchant } from '../auth/current-user.decorator';
+import type { MerchantAccess } from '../auth/auth.types';
+import { MerchantsRepository } from '../merchants/merchants.repository';
 import { BusinessHoursService } from './business-hours.service';
 import { UpdateHoursDto } from './dto/update-hours.dto';
 
 /**
- * Business hours over `tenant.open_hours` (one row per day_of_week). Slug-routed
- * + membership-checked. Hours are stored per tenant/location; the effective
- * location is resolved from `?locationId` or the tenant default.
+ * Business hours over `merchant.open_hours` (one row per day_of_week). Slug-routed
+ * + membership-checked. Hours are stored per merchant/location; the effective
+ * location is resolved from `?locationId` or the merchant default.
  */
-@UseGuards(AuthGuard, TenantAccessGuard)
+@UseGuards(AuthGuard, MerchantAccessGuard)
 @Controller('api/:slug/admin/hours')
 export class BusinessHoursController {
   constructor(
     private readonly hours: BusinessHoursService,
-    private readonly tenants: TenantsRepository,
+    private readonly merchants: MerchantsRepository,
   ) {}
 
   @Get()
-  async get(@Tenant() tenant: TenantAccess, @Query('locationId') locationId?: string) {
-    const resolved = await this.tenants.resolveLocationId(tenant.tenantId, locationId ?? null);
-    return this.hours.getHours(tenant.tenantId, resolved, tenant.timezone);
+  async get(@Merchant() merchant: MerchantAccess, @Query('locationId') locationId?: string) {
+    const resolved = await this.merchants.resolveLocationId(
+      merchant.merchantId,
+      locationId ?? null,
+    );
+    return this.hours.getHours(merchant.merchantId, resolved, merchant.timezone);
   }
 
   @Patch()
   async update(
-    @Tenant() tenant: TenantAccess,
+    @Merchant() merchant: MerchantAccess,
     @Body() dto: UpdateHoursDto,
     @Query('locationId') locationId?: string,
   ) {
-    const resolved = await this.tenants.resolveLocationId(tenant.tenantId, locationId ?? null);
-    await this.hours.updateAll(tenant.tenantId, resolved, {
+    const resolved = await this.merchants.resolveLocationId(
+      merchant.merchantId,
+      locationId ?? null,
+    );
+    await this.hours.updateAll(merchant.merchantId, resolved, {
       hours: dto.hours,
       timezone: dto.timezone,
       ordering: dto.ordering,

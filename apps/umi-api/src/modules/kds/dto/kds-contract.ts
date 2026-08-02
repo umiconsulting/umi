@@ -9,8 +9,8 @@ import { createHash, randomBytes, randomInt } from 'node:crypto';
  * keys off these strings (e.g. it clears Keychain on `device_revoked`).
  *
  * Underneath the frozen JSON the module reads/writes the build-v2 model
- * (`tenant.order_ticket` over `customer_order`/`order_item`, `tenant.station`,
- * `tenant.device` + `runtime.session`) — there is no `kds.*` schema and no
+ * (`merchant.order_ticket` over `customer_order`/`order_item`, `merchant.station`,
+ * `merchant.device` + `runtime.session`) — there is no `kds.*` schema and no
  * canonical transition RPC, so the logic lives in `KdsService`/`KdsRepository`,
  * not in the database.
  */
@@ -84,7 +84,7 @@ export const STATUS_TRANSITIONS: Record<KitchenStatus, KitchenStatus[]> = {
  * on it. The call site is `try rows.map { try $0.asKitchenOrder() }`, so `try` inside
  * `map` propagates on the FIRST failure — one unmappable ticket blanks the WHOLE board.
  *
- * build-v3 speaks a different, business-neutral vocabulary
+ * build-v3 speaks a different, merchant-neutral vocabulary
  * (`placed·preparing·ready·completed·canceled`), and the two disagree on exactly the
  * states that matter: `placed` (the default for every new order) and `canceled` (the
  * iPad spells it with two l's). Measured on the prod snapshot: 27 of 51 orders carry a
@@ -95,7 +95,7 @@ export const STATUS_TRANSITIONS: Record<KitchenStatus, KitchenStatus[]> = {
  * mapping is pinned here, in one typed bidirectional place, and unit-tested.
  */
 
-/** Statuses `tenant.customer_order.status` may hold (the CHECK, in code). */
+/** Statuses `merchant.customer_order.status` may hold (the CHECK, in code). */
 export type OrderStatus = 'placed' | 'preparing' | 'ready' | 'completed' | 'canceled';
 
 /**
@@ -179,9 +179,7 @@ export function validateTransition(from: KitchenStatus | null, to: KitchenStatus
 
 export interface KdsDeviceSession {
   deviceId: string;
-  tenantId: string;
-  /** Legacy field — equals tenantId in the canonical model. */
-  businessId: string;
+  merchantId: string;
   locationId: string | null;
   stationId: string | null;
   deviceName: string | null;

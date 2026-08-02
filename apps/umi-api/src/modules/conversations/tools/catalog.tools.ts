@@ -12,9 +12,9 @@ import {
 } from './product-search';
 
 /**
- * Catalog tools: search_menu (browse / exact / near-miss) + get_business_info /
+ * Catalog tools: search_menu (browse / exact / near-miss) + get_merchant_info /
  * get_business_hours. Ported from `tools.ts`; product reads rebound to
- * ProductsRepository (tenant.product), hours/info to OrderingWindowService.
+ * ProductsRepository (merchant.product), hours/info to OrderingWindowService.
  */
 @Injectable()
 export class CatalogTools {
@@ -23,8 +23,8 @@ export class CatalogTools {
     private readonly hours: OrderingWindowService,
   ) {}
 
-  async getBusinessInfo(ctx: ToolContext): Promise<ToolResult> {
-    const info = await this.hours.getBusinessInfo(ctx.tenantId, ctx.locationId ?? null);
+  async getMerchantInfo(ctx: ToolContext): Promise<ToolResult> {
+    const info = await this.hours.getMerchantInfo(ctx.merchantId, ctx.locationId ?? null);
     return {
       ...info,
       message: `Dirección: ${info.address ?? 'consulta directamente con el local'}. Métodos de pago: ${
@@ -35,7 +35,7 @@ export class CatalogTools {
 
   async getBusinessHours(ctx: ToolContext): Promise<ToolResult> {
     return this.hours.getOrderingWindow(
-      ctx.tenantId,
+      ctx.merchantId,
       ctx.locationId ?? null,
       new Date(),
       ctx.customerPhone,
@@ -49,7 +49,7 @@ export class CatalogTools {
     const browseIntent = resolveBrowseIntent(input.query);
 
     if (browseIntent.isBrowse) {
-      const rows = await this.products.browse(ctx.tenantId, browseIntent.categoryFilter ?? null);
+      const rows = await this.products.browse(ctx.merchantId, browseIntent.categoryFilter ?? null);
 
       const byCategory = new Map<string, ProductRecord[]>();
       for (const product of rows) {
@@ -87,12 +87,12 @@ export class CatalogTools {
       };
     }
 
-    const products = await this.products.searchByQuery(ctx.tenantId, input.query, 5);
+    const products = await this.products.searchByQuery(ctx.merchantId, input.query, 5);
 
     if (!products.length) {
       const [candidates, suggestions] = await Promise.all([
-        this.products.findNearestCandidates(ctx.tenantId, input.query, 6),
-        this.products.categorySuggestions(ctx.tenantId),
+        this.products.findNearestCandidates(ctx.merchantId, input.query, 6),
+        this.products.categorySuggestions(ctx.merchantId),
       ]);
       const formattedCandidates = candidates.map((product) => ({
         product_id: product.id,

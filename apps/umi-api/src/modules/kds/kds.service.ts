@@ -86,8 +86,7 @@ export class KdsService {
 
     const session: KdsDeviceSession = {
       deviceId: row.id,
-      tenantId: row.business_id,
-      businessId: row.business_id,
+      merchantId: row.merchant_id,
       locationId: typeof row.metadata?.location_id === 'string' ? row.metadata.location_id : null,
       stationId: row.station_id,
       deviceName: row.device_name,
@@ -168,14 +167,14 @@ export class KdsService {
     if (pairing.used_at) return { status: 409, body: { status: 'used' } };
 
     const station = await this.repo.loadStation(
-      pairing.business_id,
+      pairing.merchant_id,
       pairing.location_id,
       pairing.station_id ?? '',
     );
     if (!station) return { status: 404, body: { error: 'station_not_found' } };
 
     const session = await this.repo.createDeviceSession({
-      tenantId: pairing.business_id,
+      merchantId: pairing.merchant_id,
       locationId: pairing.location_id,
       stationId: pairing.station_id,
       deviceName: pairing.requested_name || pairing.device_name,
@@ -197,10 +196,10 @@ export class KdsService {
         device_session: {
           device_id: session.id,
           token: session.token,
-          business_id: session.business_id,
+          merchant_id: session.merchant_id,
           // frozen iPad KDS contract still reads `tenant_id`; keep the wire key
           // (sourced from the renamed column) until the device is updated.
-          tenant_id: session.business_id,
+          tenant_id: session.merchant_id,
           location_id: pairing.location_id,
           station_id: session.station_id,
           station_name: station.name,
@@ -219,7 +218,7 @@ export class KdsService {
     if (action === 'snapshot') {
       // No station argument: the order carries no station, so the old filter matched
       // every row — see KdsRepository.boardSnapshot.
-      const rows = await this.repo.boardSnapshot(session.tenantId);
+      const rows = await this.repo.boardSnapshot(session.merchantId);
       return { status: 200, body: { ok: true, data: rows.map(toSnapshotRow) } };
     }
 
@@ -230,7 +229,7 @@ export class KdsService {
         : 200;
       // No station argument: build-v3 orders carry no station, so the old filter
       // matched everything anyway — see KdsRepository.ticketEvents.
-      const rows = await this.repo.ticketEvents(session.tenantId, after, limit);
+      const rows = await this.repo.ticketEvents(session.merchantId, after, limit);
       return { status: 200, body: { ok: true, data: rows.map(toEventRow) } };
     }
 
@@ -253,7 +252,11 @@ export class KdsService {
       if (!ticketId || !target) {
         return { status: 400, body: { error: 'missing_required_fields' } };
       }
-      const order = await this.repo.loadOrderForScope(session.tenantId, ticketId, asUuid(ticketId));
+      const order = await this.repo.loadOrderForScope(
+        session.merchantId,
+        ticketId,
+        asUuid(ticketId),
+      );
       if (!ticketBelongsToDevice(order, session)) {
         return { status: 404, body: { error: 'ticket_not_found' } };
       }
@@ -289,7 +292,11 @@ export class KdsService {
         return { status: 400, body: { error: 'missing_required_fields' } };
       }
       const itemIds = [...new Set(mappedIds as string[])];
-      const order = await this.repo.loadOrderForScope(session.tenantId, ticketId, asUuid(ticketId));
+      const order = await this.repo.loadOrderForScope(
+        session.merchantId,
+        ticketId,
+        asUuid(ticketId),
+      );
       if (!ticketBelongsToDevice(order, session)) {
         return { status: 404, body: { error: 'ticket_not_found' } };
       }
@@ -332,45 +339,45 @@ export class KdsService {
   // ═══════════════════════════ Dashboard surface ════════════════════════════
 
   async listDevicesForDashboard(
-    tenantId: string,
+    merchantId: string,
     locationId: string | null,
   ): Promise<{ devices: unknown[] }> {
-    const rows = await this.repo.listDevices(tenantId, locationId);
+    const rows = await this.repo.listDevices(merchantId, locationId);
     return { devices: rows.map(toDeviceRow) };
   }
 
   async listOrdersForDashboard(
-    tenantId: string,
+    merchantId: string,
     filter: string | undefined,
     locationId: string | null,
   ): Promise<{ orders: unknown[] }> {
     const statuses = orderFilterStatuses(filter);
-    const rows = await this.repo.listOrders(tenantId, statuses, locationId, 24);
+    const rows = await this.repo.listOrders(merchantId, statuses, locationId, 24);
     return { orders: rows.map(toOrderRow) };
   }
 
-  async tickerForDashboard(tenantId: string): Promise<{ events: unknown[] }> {
-    const rows = await this.repo.recentEvents(tenantId, 50);
+  async tickerForDashboard(merchantId: string): Promise<{ events: unknown[] }> {
+    const rows = await this.repo.recentEvents(merchantId, 50);
     return { events: rows.map(toTickerRow) };
   }
 
   async listStationsForDashboard(
-    tenantId: string,
+    merchantId: string,
     locationId: string | null,
   ): Promise<{ stations: unknown[] }> {
-    const stations = await this.repo.listStations(tenantId, locationId);
+    const stations = await this.repo.listStations(merchantId, locationId);
     return { stations };
   }
 
   /**
-   * Create a station for the tenant (dashboard "Estaciones" panel + the
+   * Create a station for the merchant (dashboard "Estaciones" panel + the
    * add-device empty state). `station_key` is derived from the name (accent-
    * folded slug) unless the caller passes one. Created at the active location
-   * scope so it shows in that location's dropdown; unscoped (tenant-wide) when
+   * scope so it shows in that location's dropdown; unscoped (merchant-wide) when
    * no location is selected.
    */
   async createStation(
-    tenantId: string,
+    merchantId: string,
     locationId: string | null,
     body: Record<string, unknown>,
   ): Promise<{ station: unknown }> {
@@ -380,21 +387,21 @@ export class KdsService {
     if (!stationKey) {
       throw new BadRequestException({ error: 'invalid_station_name' });
     }
-    // Pre-check catches tenant-wide (location_id IS NULL) duplicates the DB's
+    // Pre-check catches merchant-wide (location_id IS NULL) duplicates the DB's
     // NULL-distinct unique index would let through; the 23505 catch below is the
     // race backstop and covers location-scoped dupes.
-    const existing = await this.repo.findActiveStationByKey(tenantId, locationId, stationKey);
+    const existing = await this.repo.findActiveStationByKey(merchantId, locationId, stationKey);
     if (existing) throw new ConflictException({ error: 'station_exists' });
     try {
       const station = await this.repo.createStation({
-        tenantId,
+        merchantId,
         locationId,
         name,
         stationKey,
       });
       return { station };
     } catch (err) {
-      // unique (business_id, location_id, station_key)
+      // unique (merchant_id, location_id, station_key)
       if ((err as { code?: string })?.code === '23505') {
         throw new ConflictException({ error: 'station_exists' });
       }
@@ -404,7 +411,7 @@ export class KdsService {
 
   /** Rename a station (keeps the stable `station_key`). */
   async updateStation(
-    tenantId: string,
+    merchantId: string,
     stationId: string,
     body: Record<string, unknown>,
   ): Promise<{ station: unknown }> {
@@ -413,7 +420,7 @@ export class KdsService {
     const name = asText(body.name);
     if (!name) throw new BadRequestException({ error: 'missing_station_name' });
     const station = await this.repo.updateStation({
-      tenantId,
+      merchantId,
       stationId: id,
       name,
     });
@@ -422,25 +429,29 @@ export class KdsService {
   }
 
   /** Archive a station (soft delete — hidden from the active list). */
-  async archiveStation(tenantId: string, stationId: string): Promise<{ ok: true }> {
+  async archiveStation(merchantId: string, stationId: string): Promise<{ ok: true }> {
     const id = asUuid(stationId);
     if (!id) throw new BadRequestException({ error: 'invalid_station_id' });
-    const ok = await this.repo.archiveStation(tenantId, id);
+    const ok = await this.repo.archiveStation(merchantId, id);
     if (!ok) throw new NotFoundException({ error: 'station_not_found' });
     return { ok: true };
   }
 
   async listPairingsForDashboard(
-    tenantId: string,
+    merchantId: string,
     locationId: string | null,
   ): Promise<{ pairings: unknown[] }> {
-    const pairings = await this.repo.listPairingRequests(tenantId, locationId, PAIRING_LIST_LIMIT);
+    const pairings = await this.repo.listPairingRequests(
+      merchantId,
+      locationId,
+      PAIRING_LIST_LIMIT,
+    );
     return { pairings };
   }
 
   /** Create a pairing PIN (dashboard `provision` + `pairing-pin` both land here). */
   async createPairing(
-    tenantId: string,
+    merchantId: string,
     locationId: string | null,
     body: Record<string, unknown>,
   ): Promise<{ pairing: Record<string, unknown> }> {
@@ -449,7 +460,7 @@ export class KdsService {
     if (!stationId || !deviceName) {
       throw new BadRequestException({ error: 'missing_required_fields' });
     }
-    const station = await this.repo.loadStation(tenantId, locationId, stationId);
+    const station = await this.repo.loadStation(merchantId, locationId, stationId);
     if (!station) throw new NotFoundException({ error: 'station_not_found' });
     // When the dashboard didn't scope by location, anchor the pairing to the
     // station's own location so kds_status re-resolves the same station
@@ -462,7 +473,7 @@ export class KdsService {
     const expiresAt = new Date(Date.now() + PIN_TTL_MINUTES * 60_000).toISOString();
 
     const row = await this.repo.insertPairingRequest({
-      tenantId,
+      merchantId,
       locationId: pairingLocationId,
       stationId,
       deviceName,
@@ -482,30 +493,30 @@ export class KdsService {
   }
 
   async approvePairing(
-    tenantId: string,
+    merchantId: string,
     pairingId: string,
     adminUserId: string | null,
   ): Promise<{ ok: true; pairing: { id: string; status: string } }> {
     const id = asUuid(pairingId);
     if (!id) throw new BadRequestException({ error: 'invalid_pairing_id' });
-    const updated = await this.repo.dispositionPairing(id, tenantId, 'approve', adminUserId);
+    const updated = await this.repo.dispositionPairing(id, merchantId, 'approve', adminUserId);
     if (!updated) throw new BadRequestException({ error: 'pairing_not_pending' });
     return { ok: true, pairing: updated };
   }
 
   async denyPairing(
-    tenantId: string,
+    merchantId: string,
     pairingId: string,
   ): Promise<{ ok: true; pairing: { id: string; status: string } }> {
     const id = asUuid(pairingId);
     if (!id) throw new BadRequestException({ error: 'invalid_pairing_id' });
-    const updated = await this.repo.dispositionPairing(id, tenantId, 'deny', null);
+    const updated = await this.repo.dispositionPairing(id, merchantId, 'deny', null);
     if (!updated) throw new BadRequestException({ error: 'pairing_not_pending' });
     return { ok: true, pairing: updated };
   }
 
   async updateDevice(
-    tenantId: string,
+    merchantId: string,
     deviceId: string,
     body: Record<string, unknown>,
   ): Promise<{ ok: true }> {
@@ -517,22 +528,22 @@ export class KdsService {
       deviceName: optText(body.device_name),
     };
     if ('station_id' in body) patch.stationId = asUuid(body.station_id);
-    const ok = await this.repo.updateSession(tenantId, id, patch);
+    const ok = await this.repo.updateSession(merchantId, id, patch);
     if (!ok) throw new NotFoundException({ error: 'device_not_found' });
     return { ok: true };
   }
 
-  async revokeDevice(tenantId: string, deviceId: string): Promise<{ ok: true }> {
+  async revokeDevice(merchantId: string, deviceId: string): Promise<{ ok: true }> {
     const id = asUuid(deviceId);
     if (!id) throw new BadRequestException({ error: 'invalid_device_id' });
-    const ok = await this.repo.revokeSession(tenantId, id);
+    const ok = await this.repo.revokeSession(merchantId, id);
     if (!ok) throw new NotFoundException({ error: 'device_not_found' });
     return { ok: true };
   }
 
   /** Dashboard-driven status transition (owner-authed; same canonical write). */
   async transitionFromDashboard(
-    tenantId: string,
+    merchantId: string,
     actorUserId: string | null,
     ticketId: string,
     body: Record<string, unknown>,
@@ -541,7 +552,7 @@ export class KdsService {
     if (!target) {
       throw new BadRequestException({ error: 'missing_required_fields' });
     }
-    const order = await this.repo.loadOrderForScope(tenantId, ticketId, asUuid(ticketId));
+    const order = await this.repo.loadOrderForScope(merchantId, ticketId, asUuid(ticketId));
     if (!order) {
       throw new NotFoundException({ error: 'ticket_not_found' });
     }
@@ -582,7 +593,7 @@ function optText(value: unknown): string | null {
 }
 
 /**
- * Slugify a station name into a stable `station_key` (unique per tenant+location):
+ * Slugify a station name into a stable `station_key` (unique per merchant+location):
  * lowercase, strip accents (estación → estacion), non-alphanumerics → `_`,
  * trim leading/trailing separators, cap at 40 chars. Returns '' for names with
  * no usable characters (caller rejects those).
@@ -602,12 +613,12 @@ export function ticketBelongsToDevice(
   session: KdsDeviceSession,
 ): order is OrderScopeRow {
   if (!order) return false;
-  const tenantMatches = order.business_id === session.tenantId;
+  const merchantMatches = order.merchant_id === session.merchantId;
   const locationMatches =
     !session.locationId || order.location_id === session.locationId || order.location_id == null;
   const stationMatches =
     !session.stationId || order.station_id === session.stationId || order.station_id == null;
-  return tenantMatches && locationMatches && stationMatches;
+  return merchantMatches && locationMatches && stationMatches;
 }
 
 export function deviceStatus(lastUsedAt: string | null): string {
@@ -640,7 +651,7 @@ function toSnapshotRow(t: TicketRow) {
   return {
     ticket_id: t.ticket_id,
     source_transaction_id: t.source_transaction_id,
-    business_id: t.business_id,
+    merchant_id: t.merchant_id,
     source_channel: t.source_channel,
     status: t.status,
     station_id: t.station_id,
@@ -661,7 +672,7 @@ function toEventRow(e: EventRow) {
   return {
     sequence: Number(e.sequence),
     ticket_id: e.ticket_id,
-    business_id: e.business_id,
+    merchant_id: e.merchant_id,
     source_transaction_id: e.source_transaction_id,
     kind: e.kind,
     status: e.status,

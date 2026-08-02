@@ -11,8 +11,8 @@ import { PgService } from '../../shared/database/pg.service';
  * `umi.prospect` is Umi's single sales pipeline: the same café-prospect whether the
  * automated funnel is nurturing it (this engine) or a human is working it. It is a
  * sealed/service-role table (umi.* has no api grant on prospect), so this repository
- * always uses the BYPASSRLS **worker pool** (`pg.query`) — leads have no tenant and no
- * authenticated user, exactly like the lifecycle reads. `business_id` is NULL by design.
+ * always uses the BYPASSRLS **worker pool** (`pg.query`) — leads have no merchant and no
+ * authenticated user, exactly like the lifecycle reads. `merchant_id` is NULL by design.
  *
  * Event-sourced: every mutation appends a `umi.prospect_event` row (email_sent,
  * email_failed, sequence_paused/resumed, responded, diagnostic_completed, …).

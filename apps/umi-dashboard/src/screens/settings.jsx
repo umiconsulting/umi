@@ -2,19 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { I } from '@/icons.jsx';
 import { XSep } from '@/shell.jsx';
 import {
-  useTenantData,
-  saveTenantSettings,
+  useMerchantData,
+  saveMerchantSettings,
   saveRewardConfig,
   useVoiceConfig,
-  saveTenantVoice,
-  getBranchProfiles,
-  saveBranchProfile,
+  saveMerchantVoice,
+  getLocationProfiles,
+  saveLocationProfile,
 } from '@/data.jsx';
-import { useTenant } from '@/lib/tenant-context.jsx';
+import { useMerchant } from '@/lib/merchant-context.jsx';
 
 // Screen 5 — Settings (Branding + Loyalty + Promotions)
-// Data: useTenantData() → umi-cash GET /api/[slug]/admin/settings + reward-config
-// Save: saveTenantSettings(patch) → PATCH /api/[slug]/admin/settings
+// Data: useMerchantData() → umi-cash GET /api/[slug]/admin/settings + reward-config
+// Save: saveMerchantSettings(patch) → PATCH /api/[slug]/admin/settings
 //       saveRewardConfig(patch)   → PATCH /api/[slug]/admin/reward-config
 
 const DOW = [
@@ -55,11 +55,11 @@ const clampStampTarget = (value) =>
   Math.max(MIN_STAMP_TARGET, Math.min(MAX_STAMP_TARGET, parseInt(value, 10) || MIN_STAMP_TARGET));
 
 const SettingsScreen = () => {
-  const { data: tenant, loading } = useTenantData();
+  const { data: merchant, loading } = useMerchantData();
   const { data: voiceData } = useVoiceConfig();
-  const tenantState = useTenant();
-  const cashActive = tenantState?.isProductActive?.('cash') === true;
-  const conversaflowActive = tenantState?.isProductActive?.('conversaflow') === true;
+  const merchantState = useMerchant();
+  const cashActive = merchantState?.isProductActive?.('cash') === true;
+  const conversaflowActive = merchantState?.isProductActive?.('conversaflow') === true;
 
   // ── Local editing state ─────────────────────────────────────────────────────
   const [biz, setBiz] = useState(null);
@@ -75,33 +75,33 @@ const SettingsScreen = () => {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // Populate state from fetched tenant once it arrives
+  // Populate state from fetched merchant once it arrives
   useEffect(() => {
-    if (!tenant) return;
+    if (!merchant) return;
     setBiz({
-      name: tenant.name,
-      city: tenant.city,
-      slug: tenant.slug,
-      cardPrefix: tenant.cardPrefix,
-      subscription: tenant.subscriptionStatus,
+      name: merchant.name,
+      city: merchant.city,
+      slug: merchant.slug,
+      cardPrefix: merchant.cardPrefix,
+      subscription: merchant.subscriptionStatus,
     });
     setBrand({
-      primary: tenant.primaryColor || '#B5605A',
-      secondary: tenant.secondaryColor || '#E8C9A3',
-      logoUrl: tenant.logoUrl || '',
+      primary: merchant.primaryColor || '#B5605A',
+      secondary: merchant.secondaryColor || '#E8C9A3',
+      logoUrl: merchant.logoUrl || '',
     });
-    setSelfReg(tenant.selfRegistration !== false);
+    setSelfReg(merchant.selfRegistration !== false);
     setBirthday({
-      on: tenant.birthdayRewardEnabled !== false,
-      rewardName: tenant.birthdayRewardName || 'Regalo de cumpleaños',
+      on: merchant.birthdayRewardEnabled !== false,
+      rewardName: merchant.birthdayRewardName || 'Regalo de cumpleaños',
     });
-    const visitsRequired = clampStampTarget(tenant.rewardConfig?.visitsRequired ?? 10);
+    const visitsRequired = clampStampTarget(merchant.rewardConfig?.visitsRequired ?? 10);
     setLoyalty(
-      tenant.rewardConfig
+      merchant.rewardConfig
         ? {
-            rewardName: (tenant.rewardConfig.rewardName || '').slice(0, MAX_REWARD_NAME_LENGTH),
+            rewardName: (merchant.rewardConfig.rewardName || '').slice(0, MAX_REWARD_NAME_LENGTH),
             visitsRequired,
-            rewardCost: Math.round(tenant.rewardConfig.rewardCostCentavos / 100),
+            rewardCost: Math.round(merchant.rewardConfig.rewardCostCentavos / 100),
           }
         : {
             rewardName: 'Recompensa de temporada',
@@ -112,22 +112,22 @@ const SettingsScreen = () => {
     setStamps((s) => Math.min(s, visitsRequired));
     // Parse promoDays "2,3,4" → ['mar','mie','jue']
     const promoNumToId = Object.fromEntries(Object.entries(DOW_NUM).map(([id, n]) => [n, id]));
-    const days = tenant.promoDays
-      ? tenant.promoDays
+    const days = merchant.promoDays
+      ? merchant.promoDays
           .split(',')
           .map((n) => promoNumToId[n.trim()])
           .filter(Boolean)
       : ['mar', 'mie', 'jue'];
     setPromo({
-      message: tenant.promoMessage || '',
-      from: tenant.promoStartsAt ? tenant.promoStartsAt.slice(0, 10) : '2026-05-15',
-      to: tenant.promoEndsAt ? tenant.promoEndsAt.slice(0, 10) : '2026-06-30',
+      message: merchant.promoMessage || '',
+      from: merchant.promoStartsAt ? merchant.promoStartsAt.slice(0, 10) : '2026-05-15',
+      to: merchant.promoEndsAt ? merchant.promoEndsAt.slice(0, 10) : '2026-06-30',
       days: days,
     });
-  }, [tenant]);
+  }, [merchant]);
 
-  // Seed the voice editor independently of the cash-gated tenant skeleton, so a
-  // conversaflow-only tenant (e.g. Kalala, cashActive=false) still gets its chips.
+  // Seed the voice editor independently of the cash-gated merchant skeleton, so a
+  // conversaflow-only merchant (e.g. Kalala, cashActive=false) still gets its chips.
   useEffect(() => {
     if (!voiceData?.voice) return;
     setVoice({
@@ -159,7 +159,7 @@ const SettingsScreen = () => {
       .filter(Boolean)
       .join(',');
     const saveResults = await Promise.allSettled([
-      saveTenantSettings({
+      saveMerchantSettings({
         name: biz.name,
         city: biz.city,
         primaryColor: brand.primary,
@@ -184,7 +184,7 @@ const SettingsScreen = () => {
       // custom-tone field clears any stale freeform override (preset wins again).
       conversaflowActive &&
         voice &&
-        saveTenantVoice({
+        saveMerchantVoice({
           tone_preset: voice.tonePreset,
           assistant_name: voice.assistantName,
           tone: voice.customTone,
@@ -196,7 +196,7 @@ const SettingsScreen = () => {
     ]);
     const [settingsResult] = saveResults;
     if (settingsResult.status === 'fulfilled') {
-      tenantState?.updateSelectedTenant?.({ name: biz.name });
+      merchantState?.updateSelectedMerchant?.({ name: biz.name });
     }
     setSaving(false);
     // Don't flash "Cambios guardados" if any section's save rejected — the user
@@ -268,10 +268,10 @@ const SettingsScreen = () => {
         </button>
       </div>
 
-      {/* Sucursales — branch aliases/descriptor (multi-branch, ConversaFlow only) */}
-      {conversaflowActive && <BranchProfilesCard />}
+      {/* Sucursales — location aliases/descriptor (multi-location, ConversaFlow only) */}
+      {conversaflowActive && <LocationProfilesCard />}
 
-      {/* Business info */}
+      {/* Merchant info */}
       <div className="card fade-up d1" style={{ padding: '24px 26px' }}>
         <div className="ed-head" style={{ marginBottom: 18 }}>
           <div className="titles">
@@ -494,7 +494,7 @@ const SettingsScreen = () => {
                   value={brand.primary}
                   onChange={(e) => {
                     setBrand((b) => ({ ...b, primary: e.target.value }));
-                    document.documentElement.style.setProperty('--tenant-brand', e.target.value);
+                    document.documentElement.style.setProperty('--merchant-brand', e.target.value);
                   }}
                 />
                 <span
@@ -514,7 +514,7 @@ const SettingsScreen = () => {
                       style={{ background: c, width: 28, height: 28, borderRadius: 8 }}
                       onClick={() => {
                         setBrand((b) => ({ ...b, primary: c }));
-                        document.documentElement.style.setProperty('--tenant-brand', c);
+                        document.documentElement.style.setProperty('--merchant-brand', c);
                       }}
                       aria-label={c}
                     />
@@ -651,7 +651,7 @@ const SettingsScreen = () => {
               stamps={stamps}
               loyalty={loyalty}
               birthday={birthday}
-              topupEnabled={tenant.topupEnabled !== false}
+              topupEnabled={merchant.topupEnabled !== false}
             />
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
               <span style={{ fontSize: 12, color: 'var(--ink-warm-soft)' }}>Max stamps</span>
@@ -727,7 +727,7 @@ const SettingsScreen = () => {
               </span>
             </div>
             <h2>Promoción del momento</h2>
-            <div className="en">Active promo · Tenant.promoMessage</div>
+            <div className="en">Active promo · Business.promoMessage</div>
           </div>
           <button className="btn btn-secondary btn-sm focusable">
             <I.Plus size={14} /> Nueva
@@ -751,7 +751,7 @@ const SettingsScreen = () => {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div className="field">
-              <label>Active range · Tenant.promoStartsAt → promoEndsAt</label>
+              <label>Active range · Business.promoStartsAt → promoEndsAt</label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input
                   type="date"
@@ -771,7 +771,7 @@ const SettingsScreen = () => {
               </div>
             </div>
             <div className="field">
-              <label>Days of week · Tenant.promoDays</label>
+              <label>Days of week · Business.promoDays</label>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {DOW.map((d) => (
                   <button
@@ -809,7 +809,7 @@ const SettingsScreen = () => {
             <I.Users size={20} />
           </div>
           <div style={{ flex: 1 }}>
-            <div className="eyebrow">Customer onboarding · Tenant.selfRegistration</div>
+            <div className="eyebrow">Customer onboarding · Business.selfRegistration</div>
             <div style={{ fontWeight: 600, fontSize: 16, marginTop: 4 }}>Self-registration</div>
             <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 2 }}>
               Customers can join the loyalty program by scanning a QR code at the table, without
@@ -933,11 +933,11 @@ function hideBrokenImage(e) {
   e.currentTarget.style.display = 'none';
 }
 
-function BranchProfilesCard() {
+function LocationProfilesCard() {
   const [profiles, setProfiles] = useState(null);
   useEffect(() => {
     let active = true;
-    getBranchProfiles()
+    getLocationProfiles()
       .then((rows) => {
         if (active) setProfiles(rows);
       })
@@ -948,7 +948,7 @@ function BranchProfilesCard() {
       active = false;
     };
   }, []);
-  // Aliases only matter when there is more than one branch to disambiguate.
+  // Aliases only matter when there is more than one location to disambiguate.
   if (!profiles || profiles.length <= 1) return null;
   return (
     <div className="card fade-up d2" style={{ padding: '24px 26px' }}>
@@ -967,14 +967,14 @@ function BranchProfilesCard() {
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {profiles.map((p) => (
-          <BranchProfileRow key={p.id} profile={p} />
+          <LocationProfileRow key={p.id} profile={p} />
         ))}
       </div>
     </div>
   );
 }
 
-function BranchProfileRow({ profile }) {
+function LocationProfileRow({ profile }) {
   const [aliases, setAliases] = useState(profile.aliases || []);
   const [descriptor, setDescriptor] = useState(profile.descriptor || '');
   const [draft, setDraft] = useState('');
@@ -1001,11 +1001,11 @@ function BranchProfileRow({ profile }) {
     setSaved(false);
     setError(null);
     try {
-      await saveBranchProfile(profile.id, { aliases, descriptor: descriptor.trim() });
+      await saveLocationProfile(profile.id, { aliases, descriptor: descriptor.trim() });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
-      console.error('branch profile save failed', e);
+      console.error('location profile save failed', e);
       setError('No se pudo guardar. Reintenta.');
     } finally {
       setSaving(false);

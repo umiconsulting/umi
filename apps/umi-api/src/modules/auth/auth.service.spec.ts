@@ -6,7 +6,7 @@ function make() {
   const repo = {
     findCredentialByEmail: vi.fn(),
     findUserById: vi.fn(),
-    findTenantsForUser: vi.fn().mockResolvedValue([]),
+    findMerchantsForUser: vi.fn().mockResolvedValue([]),
     insertResetToken: vi.fn().mockResolvedValue(undefined),
     findResetToken: vi.fn(),
     updatePassword: vi.fn().mockResolvedValue(undefined),

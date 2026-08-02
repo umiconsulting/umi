@@ -3,7 +3,7 @@
 -- core.role_permissions was EMPTY in the source (see backfill_identity.sql), so
 -- the role<->permission wiring is (re)seeded here from the build-v3 policy, not
 -- migrated. Catalog roles (admin/owner/staff/viewer) + permissions
--- (insights.read/loyalty.operate/orders.operate/tenant.manage) come from
+-- (insights.read/loyalty.operate/orders.operate/merchant.manage) come from
 -- backfill_identity; this file only adds the super_admin platform role and the
 -- role->permission edges. Keyed by KEY (id-agnostic) and guarded (idempotent).
 --
@@ -20,19 +20,19 @@
 insert into umi.role (key, name, description, is_platform)
 select 'super_admin',
        'Super Admin',
-       'Cross-tenant Umi operator; all permissions (wildcard resolved code-side).',
+       'Cross-merchant Umi operator; all permissions (wildcard resolved code-side).',
        true
 where not exists (select 1 from umi.role where key = 'super_admin');
 
--- Cross-tenant operator (owner decision 2026-07-21). backfill_identity notes the source
--- modelled this as admin-on-every-tenant, which left hola@ without access to Northwest
+-- Cross-merchant operator (owner decision 2026-07-21). backfill_identity notes the source
+-- modelled this as admin-on-every-merchant, which left hola@ without access to Northwest
 -- Café and made SUPER_ADMIN_SA_CTE dead code (nobody held the role, in v2 or v3). Make
--- the concept REAL instead: a PLATFORM-WIDE grant — business_id NULL, exactly what
+-- the concept REAL instead: a PLATFORM-WIDE grant — merchant_id NULL, exactly what
 -- umi.user_role documents as 'NULL = platform-wide grant (superadmin)'.
--- NOTE: umi.user_role's RLS policy is business_id = umi.current_business(), which a NULL
+-- NOTE: umi.user_role's RLS policy is merchant_id = umi.current_merchant(), which a NULL
 -- can never satisfy, so this row is deliberately invisible to the `api` pool; the auth
 -- queries that read it run on the worker pool.
-insert into umi.user_role (user_id, role_id, business_id, branch_id)
+insert into umi.user_role (user_id, role_id, merchant_id, location_id)
 select u.id, r.id, null, null
 from umi.user u
 cross join umi.role r
@@ -41,7 +41,7 @@ where u.email = 'hola@umiconsulting.co'
   and not exists (
     select 1 from umi.user_role x
      where x.user_id = u.id and x.role_id = r.id
-       and x.business_id is null and x.branch_id is null
+       and x.merchant_id is null and x.location_id is null
   );
 
 -- role -> permission grants.
@@ -49,9 +49,9 @@ insert into umi.role_permission (role_id, permission_id)
 select r.id, p.id
 from (values
   ('owner',  'insights.read'), ('owner',  'loyalty.operate'),
-  ('owner',  'orders.operate'), ('owner',  'tenant.manage'),
+  ('owner',  'orders.operate'), ('owner',  'merchant.manage'),
   ('admin',  'insights.read'), ('admin',  'loyalty.operate'),
-  ('admin',  'orders.operate'), ('admin',  'tenant.manage'),
+  ('admin',  'orders.operate'), ('admin',  'merchant.manage'),
   ('staff',  'loyalty.operate'), ('staff',  'orders.operate'),
   ('viewer', 'insights.read')
 ) as m(role_key, perm_key)
@@ -76,7 +76,7 @@ where not exists (
 --   offline.replay / offline.cash.checkout       owner, admin, staff
 --       A till drains its own queue; the operator does not fetch a manager to reconnect.
 --       Offline CASH is additionally gated by the pos.offline_cash entitlement and by
---       tenant.pos_offline_cash_policy, so this grant alone does not enable it.
+--       merchant.pos_offline_cash_policy, so this grant alone does not enable it.
 --   device.enroll / offline.recovery.review      owner, admin
 --       Enrolling a terminal and approving a recovery action are management decisions.
 --   audit.read                                   owner, admin

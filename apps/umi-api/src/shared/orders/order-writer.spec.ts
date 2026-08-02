@@ -17,10 +17,10 @@ function recordingClient(overrides: Record<string, unknown[]> = {}) {
       for (const [fragment, rows] of Object.entries(overrides)) {
         if (sql.includes(fragment)) return { rows, rowCount: rows.length };
       }
-      if (sql.includes('INSERT INTO tenant.customer_order')) {
+      if (sql.includes('INSERT INTO merchant.customer_order')) {
         return { rows: [{ id: 'order-1' }], rowCount: 1 };
       }
-      if (sql.includes('INSERT INTO tenant.order_item\n')) {
+      if (sql.includes('INSERT INTO merchant.order_item\n')) {
         return { rows: [{ id: `line-${queries.length}` }], rowCount: 1 };
       }
       return { rows: [], rowCount: 0 };
@@ -30,7 +30,7 @@ function recordingClient(overrides: Record<string, unknown[]> = {}) {
 }
 
 const baseOrder: NewOrder = {
-  businessId: '00000000-0000-4000-8000-000000000001',
+  merchantId: '00000000-0000-4000-8000-000000000001',
   source: 'pos',
   fulfillmentType: 'dine_in',
   lines: [{ name: 'Latte', quantity: 2, unitPriceCents: 5000 }],
@@ -41,9 +41,9 @@ describe('writeOrder', () => {
     const { client, sqlFor } = recordingClient();
     await writeOrder(client, baseOrder);
 
-    const events = sqlFor('INSERT INTO tenant.order_event');
+    const events = sqlFor('INSERT INTO merchant.order_event');
     expect(events).toHaveLength(1);
-    // tenant.order_ticket.last_event_sequence reads max(order_event.sequence) and the
+    // merchant.order_ticket.last_event_sequence reads max(order_event.sequence) and the
     // KDS polls `WHERE sequence > $n`. Without this row the cursor never advances.
     expect(events[0].params).toEqual(['order-1']);
     expect(events[0].sql).toContain("'status_changed'");
@@ -81,7 +81,7 @@ describe('writeOrder', () => {
         { name: 'C', quantity: 1, unitPriceCents: 3 },
       ],
     });
-    const lines = sqlFor('INSERT INTO tenant.order_item\n');
+    const lines = sqlFor('INSERT INTO merchant.order_item\n');
     expect(lines.map((l) => l.params[l.params.length - 1])).toEqual([0, 1, 2]);
   });
 
@@ -91,8 +91,8 @@ describe('writeOrder', () => {
       ...baseOrder,
       lines: [{ name: 'Latte', quantity: 1, unitPriceCents: 5000, stationId: 'station-bar' }],
     });
-    expect(sqlFor('INSERT INTO tenant.order_item\n')[0].params).toContain('station-bar');
-    expect(sqlFor('INSERT INTO tenant.customer_order')[0].params).not.toContain('station-bar');
+    expect(sqlFor('INSERT INTO merchant.order_item\n')[0].params).toContain('station-bar');
+    expect(sqlFor('INSERT INTO merchant.customer_order')[0].params).not.toContain('station-bar');
   });
 
   it('writes the per-modifier breakdown a receipt needs', async () => {
@@ -108,7 +108,7 @@ describe('writeOrder', () => {
         },
       ],
     });
-    const mods = sqlFor('INSERT INTO tenant.order_item_modifier');
+    const mods = sqlFor('INSERT INTO merchant.order_item_modifier');
     expect(mods).toHaveLength(1);
     expect(mods[0].params).toContain('Oat milk');
     expect(mods[0].params).toContain(500);
@@ -136,7 +136,7 @@ describe('writeOrder', () => {
         { kind: 'comp', code: 'C', label: 'Comped B', amountCents: 2000, orderItemIndex: 1 },
       ],
     });
-    expect(sqlFor('INSERT INTO tenant.order_discount')[0].params).toContain(written.lineIds[1]);
+    expect(sqlFor('INSERT INTO merchant.order_discount')[0].params).toContain(written.lineIds[1]);
   });
 
   it('refuses an order with no lines', async () => {
@@ -149,9 +149,9 @@ describe('writeOrder', () => {
   it('on a duplicate external_ref returns the existing order and rewrites nothing', async () => {
     // The conflicting INSERT returns no row; the writer then looks the order up.
     const { client, sqlFor } = recordingClient({
-      'INSERT INTO tenant.customer_order': [],
-      'SELECT id::text FROM tenant.customer_order': [{ id: 'existing-1' }],
-      'SELECT id::text FROM tenant.order_item': [{ id: 'line-a' }, { id: 'line-b' }],
+      'INSERT INTO merchant.customer_order': [],
+      'SELECT id::text FROM merchant.customer_order': [{ id: 'existing-1' }],
+      'SELECT id::text FROM merchant.order_item': [{ id: 'line-a' }, { id: 'line-b' }],
     });
     const written = await writeOrder(client, { ...baseOrder, externalRef: 'zettle-99' });
 
@@ -162,7 +162,7 @@ describe('writeOrder', () => {
     });
     // Critically: no new lines and NO second opening event. Re-emitting the event would
     // make the KDS show the ticket twice.
-    expect(sqlFor('INSERT INTO tenant.order_item\n')).toHaveLength(0);
-    expect(sqlFor('INSERT INTO tenant.order_event')).toHaveLength(0);
+    expect(sqlFor('INSERT INTO merchant.order_item\n')).toHaveLength(0);
+    expect(sqlFor('INSERT INTO merchant.order_event')).toHaveLength(0);
   });
 });

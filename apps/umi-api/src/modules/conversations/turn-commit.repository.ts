@@ -13,7 +13,7 @@ import { PgService } from '../../shared/database/pg.service';
  */
 
 export interface CommitTurnReplyParams {
-  tenantId: string;
+  merchantId: string;
   conversationId: string;
   replyBody: string;
   /** Outbox topic (route key); the relay maps it to the outbound queue. */
@@ -41,12 +41,12 @@ export class TurnCommitRepository {
       //    (or will be) delivered exactly once.
       const ob = await client.query<{ id: string }>(
         `INSERT INTO runtime.outbox_event
-           (business_id, topic, aggregate_id, idempotency_key, payload)
+           (merchant_id, topic, aggregate_id, idempotency_key, payload)
          VALUES ($1, $2, $3, $4, $5::jsonb)
-         ON CONFLICT (business_id, idempotency_key) DO NOTHING
+         ON CONFLICT (merchant_id, idempotency_key) DO NOTHING
          RETURNING id`,
         [
-          params.tenantId,
+          params.merchantId,
           params.eventType,
           params.conversationId,
           params.idempotencyKey,
@@ -58,15 +58,15 @@ export class TurnCommitRepository {
       }
 
       // 2. Touch the durable thread so listing/ordering by last_message_at stays fresh.
-      await client.query(`UPDATE tenant.conversation SET last_message_at = now() WHERE id = $1`, [
+      await client.query(`UPDATE merchant.conversation SET last_message_at = now() WHERE id = $1`, [
         params.conversationId,
       ]);
 
       // 3. Persist the assistant message. sender='bot' — the DB vocabulary
       // (customer|bot|staff|system), not the LLM 'assistant'. The message scopes to
-      // the tenant via its conversation (no business_id column); order is by created_at.
+      // the merchant via its conversation (no merchant_id column); order is by created_at.
       const msg = await client.query<{ id: string }>(
-        `INSERT INTO tenant.message (conversation_id, sender, body)
+        `INSERT INTO merchant.message (conversation_id, sender, body)
          VALUES ($1, 'bot', $2)
          RETURNING id`,
         [params.conversationId, params.replyBody],

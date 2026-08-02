@@ -8,22 +8,22 @@ import {
 import { getRequestContext } from '../../shared/database/request-context';
 import { AuthRepository } from './auth.repository';
 import { effectivePermissions, normalizeRoleKey } from './roles';
-import type { AuthedRequest, TenantAccess } from './auth.types';
+import type { AuthedRequest, MerchantAccess } from './auth.types';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Resolves the active tenant from the route (`:tenantId` uuid or `:slug`),
+ * Resolves the active merchant from the route (`:merchantId` uuid or `:slug`),
  * verifies the authed user has an active membership, and attaches
- * `req.tenantAccess` + the RLS `tenantId` to the request context.
+ * `req.merchantAccess` + the RLS `merchantId` to the request context.
  *
  * Note (intentional hardening, D9): the legacy `/:slug/admin/*` routes had no
- * membership check in `server.js`. Under unified auth every tenant-scoped route
+ * membership check in `server.js`. Under unified auth every merchant-scoped route
  * verifies membership here — closing that gap. Missing membership → 404
- * `tenant_not_found` (same shape as the dashboard's `requireTenantAccess`).
+ * `merchant_not_found` (same shape as the dashboard's `requireMerchantAccess`).
  */
 @Injectable()
-export class TenantAccessGuard implements CanActivate {
+export class MerchantAccessGuard implements CanActivate {
   constructor(private readonly repo: AuthRepository) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -31,15 +31,15 @@ export class TenantAccessGuard implements CanActivate {
     const user = req.authUser;
     if (!user) throw new UnauthorizedException('authentication_required');
 
-    const tenantId = await this.resolveTenantId(req.params ?? {});
-    if (!tenantId) throw new NotFoundException({ error: 'tenant_not_found' });
+    const merchantId = await this.resolveMerchantId(req.params ?? {});
+    if (!merchantId) throw new NotFoundException({ error: 'merchant_not_found' });
 
-    const access = await this.repo.findMembershipAccess(user.id, tenantId);
-    if (!access) throw new NotFoundException({ error: 'tenant_not_found' });
+    const access = await this.repo.findMembershipAccess(user.id, merchantId);
+    if (!access) throw new NotFoundException({ error: 'merchant_not_found' });
 
     const role = normalizeRoleKey(access.roles);
-    const tenantAccess: TenantAccess = {
-      tenantId: access.tenantId,
+    const merchantAccess: MerchantAccess = {
+      merchantId: access.merchantId,
       slug: access.slug,
       name: access.name,
       timezone: access.timezone,
@@ -48,20 +48,20 @@ export class TenantAccessGuard implements CanActivate {
       roles: access.roles,
       permissions: effectivePermissions(role, access.permissions),
     };
-    req.tenantAccess = tenantAccess;
+    req.merchantAccess = merchantAccess;
 
     const ctx = getRequestContext();
-    if (ctx) ctx.tenantId = access.tenantId;
+    if (ctx) ctx.merchantId = access.merchantId;
 
     return true;
   }
 
-  private async resolveTenantId(params: Record<string, string>): Promise<string | null> {
-    const raw = params.tenantId;
+  private async resolveMerchantId(params: Record<string, string>): Promise<string | null> {
+    const raw = params.merchantId;
     if (raw && UUID_RE.test(raw)) return raw;
-    if (params.slug) return this.repo.tenantIdForSlug(params.slug);
-    // A non-uuid :tenantId could still be a slug in some routes.
-    if (raw) return this.repo.tenantIdForSlug(raw);
+    if (params.slug) return this.repo.merchantIdForSlug(params.slug);
+    // A non-uuid :merchantId could still be a slug in some routes.
+    if (raw) return this.repo.merchantIdForSlug(raw);
     return null;
   }
 }

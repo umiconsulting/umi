@@ -4,13 +4,13 @@ import {
   TONE_PRESETS,
   TONE_PRESET_KEYS,
   type TonePreset,
-} from '../conversations/business-config.service';
+} from '../conversations/merchant-config.service';
 import { VoiceSettingsRepository } from './voice-settings.repository';
 import { UpdateVoiceDto } from './dto/update-voice.dto';
 
 /**
  * Voice & tone settings — the dashboard-facing read/write over the SAME typed
- * columns the WhatsApp bot resolves (`tenant.business.assistant_name` /
+ * columns the WhatsApp bot resolves (`merchant.merchant.assistant_name` /
  * `assistant_tone`). Two knobs only: the tone-preset chip and an optional assistant
  * name. TONE_PRESETS is the one shared catalog (no duplication); the engine reads
  * them via resolveVoiceConfig.
@@ -20,8 +20,8 @@ export class VoiceService {
   constructor(private readonly repo: VoiceSettingsRepository) {}
 
   /** Dashboard GET — current stored voice + resolved chip default + preset catalog. */
-  async getVoiceSettings(tenantId: string) {
-    const { businessName, voice } = await this.repo.read(tenantId);
+  async getVoiceSettings(merchantId: string) {
+    const { businessName, voice } = await this.repo.read(merchantId);
     const v = voice ?? {};
     const presetKey =
       typeof v.tone_preset === 'string' && TONE_PRESETS[v.tone_preset as TonePreset]
@@ -49,14 +49,14 @@ export class VoiceService {
   }
 
   /** Dashboard PATCH — persist only the provided knobs. Trimmed-empty → null so a
-   *  cleared name reverts to the business-name default. */
-  async updateVoice(tenantId: string, dto: UpdateVoiceDto): Promise<void> {
+   *  cleared name reverts to the merchant-name default. */
+  async updateVoice(merchantId: string, dto: UpdateVoiceDto): Promise<void> {
     const patch: { assistant_name?: string | null; tone_preset?: string | null } = {};
     if (dto.assistant_name !== undefined) {
       patch.assistant_name = dto.assistant_name.trim() || null;
     }
     if (dto.tone_preset !== undefined) patch.tone_preset = dto.tone_preset;
     if (Object.keys(patch).length === 0) return;
-    await this.repo.write(tenantId, patch);
+    await this.repo.write(merchantId, patch);
   }
 }

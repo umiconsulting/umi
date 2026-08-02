@@ -5,7 +5,7 @@ export { routes } from './routes';
 export type { Routes } from './routes';
 // The single author of every path in the platform. Zero-dependency, so the zod-free
 // surfaces can import it directly.
-export { ROUTE_TABLE, route, routePath, buildPath, tenantBase } from './route-table';
+export { ROUTE_TABLE, route, routePath, buildPath, merchantBase } from './route-table';
 export type { RouteDef, RouteContract, RouteId, HttpMethod, AuthMode } from './route-table';
 export * from './schemas';
 // Cross-cutting vocabulary (money, ids, pagination, errors, tenancy) shared by every

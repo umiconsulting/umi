@@ -12,7 +12,7 @@ import type { AuthedRequest } from './auth.types';
 
 /**
  * Enforces `@Roles(...)` and `@RequirePermission(...)` against the membership
- * resolved by TenantAccessGuard. Runs after it. super_admin (permissions `['*']`)
+ * resolved by MerchantAccessGuard. Runs after it. super_admin (permissions `['*']`)
  * passes any permission check.
  */
 @Injectable()
@@ -31,7 +31,7 @@ export class RolesGuard implements CanActivate {
     if (!requiredRoles?.length && !requiredPermission) return true;
 
     const req = context.switchToHttp().getRequest<AuthedRequest>();
-    const access = req.tenantAccess;
+    const access = req.merchantAccess;
     if (!access) throw new UnauthorizedException('authentication_required');
 
     if (requiredRoles?.length) {

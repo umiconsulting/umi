@@ -22,7 +22,7 @@
       "count": 1
     }
   },
-  "src/lib/tenant-context.jsx": {
+  "src/lib/merchant-context.jsx": {
     "no-unused-vars": {
       "count": 1
     },

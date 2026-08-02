@@ -18,9 +18,9 @@ const AUDIENCE = 'umi-dashboard';
  * JWT signing/verification (D9). HS256 over `JWT_SECRET`. Two token kinds:
  *   - access  (short TTL, `umi_access` cookie) carries {sub, email}
  *   - refresh (long TTL,  `umi_refresh` cookie) carries {sub} only
- * Tenant is intentionally NOT in the token — a user belongs to many tenants and
- * the active tenant is resolved per-request from the route + membership check
- * (TenantAccessGuard), mirroring the dashboard's per-request `requireTenantAccess`.
+ * Merchant is intentionally NOT in the token — a user belongs to many merchants and
+ * the active merchant is resolved per-request from the route + membership check
+ * (MerchantAccessGuard), mirroring the dashboard's per-request `requireMerchantAccess`.
  */
 @Injectable()
 export class JwtService {

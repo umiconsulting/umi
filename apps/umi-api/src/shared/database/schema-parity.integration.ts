@@ -8,14 +8,14 @@ import { PgService } from './pg.service';
 /**
  * Schema-parity gate — the check that makes the build-v2 → build-v3 rename sweep
  * VERIFIABLE. Every table the backend names lives inside a SQL string, so `tsc`
- * cannot catch a stale `tenant.card`. This test extracts every schema-qualified
+ * cannot catch a stale `merchant.card`. This test extracts every schema-qualified
  * table reference from the backend source and asserts it exists as a real
  * relation/function in the live build-v3 DB. A single leftover build-v2 name
- * (e.g. `tenant.card`, `runtime.outbox_events`) fails here with its file:line.
+ * (e.g. `merchant.card`, `runtime.outbox_events`) fails here with its file:line.
  *
  * Extraction is anchored to SQL clause keywords (FROM/JOIN/INTO/UPDATE) so a JS
- * property access on a variable named `tenant`/`runtime`/`umi` (e.g.
- * `tenant.timezone`) is NOT mistaken for a table reference.
+ * property access on a variable named `merchant`/`runtime`/`umi` (e.g.
+ * `merchant.timezone`) is NOT mistaken for a table reference.
  */
 
 const WORKER_DSN =
@@ -30,11 +30,11 @@ const APP_DSN =
   'postgresql://api_login:harness_api@127.0.0.1:5233/umi_backfill_v3';
 
 // `from|join|into|update [only] <schema>.<name>` — the places a table name appears.
-// The optional `"` group is load-bearing: build-v2 used `tenant."order"` (a reserved
+// The optional `"` group is load-bearing: build-v2 used `merchant."order"` (a reserved
 // word), and a bare [a-z_] charclass silently CANNOT match it — that blind spot hid a
 // 9th identifier across 24 call sites. Never narrow this back.
 const TABLE_REF =
-  /\b(?:from|join|into|update)\s+(?:only\s+)?(umi|tenant|runtime)\.("?)([a-z_][a-z0-9_]*)\2/gi;
+  /\b(?:from|join|into|update)\s+(?:only\s+)?(umi|merchant|runtime)\.("?)([a-z_][a-z0-9_]*)\2/gi;
 
 function sourceFiles(root: string): string[] {
   const out: string[] = [];
@@ -99,11 +99,11 @@ describe('build-v3 schema parity · backend SQL references real relations', () =
     const rels = await pg.query<{ ident: string }>(`
       select table_schema || '.' || table_name as ident
         from information_schema.tables
-       where table_schema in ('umi','tenant','runtime')
+       where table_schema in ('umi','merchant','runtime')
       union
       select n.nspname || '.' || p.proname
         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-       where n.nspname in ('umi','tenant','runtime')
+       where n.nspname in ('umi','merchant','runtime')
     `);
     valid = new Set(rels.rows.map((r) => r.ident.toLowerCase()));
   });

@@ -1,16 +1,16 @@
 import { Module } from '@nestjs/common';
 import { BusinessHoursModule } from '../business-hours/business-hours.module';
-import { TenantsModule } from '../tenants/tenants.module';
+import { MerchantsModule } from '../merchants/merchants.module';
 import { WhatsappController } from './whatsapp.controller';
 import { ChannelRepository } from './channel.repository';
-import { TenantResolutionService } from './tenant-resolution.service';
+import { MerchantResolutionService } from './merchant-resolution.service';
 import { ConversationsRepository } from './conversations.repository';
 import { MessagesRepository } from './messages.repository';
 import { MemoryRepository } from './memory.repository';
 import { IdentityRepository } from './identity.repository';
 import { ConversationTurnsRepository } from './conversation-turns.repository';
 import { TurnCommitRepository } from './turn-commit.repository';
-import { BusinessConfigService } from './business-config.service';
+import { MerchantConfigService } from './merchant-config.service';
 import { OrderingWindowService } from './ordering-window.service';
 import { SecurityService } from './security.service';
 import { IntentService } from './intent.service';
@@ -27,12 +27,12 @@ import { CatalogTools } from './tools/catalog.tools';
 import { CartTools } from './tools/cart.tools';
 import { CheckoutTools } from './tools/checkout.tools';
 import { CustomerTools } from './tools/customer.tools';
-import { BranchTools } from './tools/branch.tools';
+import { LocationTools } from './tools/location.tools';
 import { OrderLocationResolver } from './order-location.resolver';
 
 /**
  * The conversational engine (ConversaFlow port, spec §3 Phase 3):
- *   3.0 — tenant resolution                                          [done]
+ *   3.0 — merchant resolution                                          [done]
  *   3a  — repositories + leaf services                               [done]
  *   3b  — turn engine: integrity + mini-harness loop + commit        [done]
  *   3c  — tools / product search / cart / ordering  (ToolsService stub for now)
@@ -43,14 +43,14 @@ import { OrderLocationResolver } from './order-location.resolver';
  * provides the real tool implementations.
  */
 @Module({
-  imports: [BusinessHoursModule, TenantsModule],
+  imports: [BusinessHoursModule, MerchantsModule],
   // The Twilio webhook ingress (web process only; the worker imports this module
   // for the services and never instantiates controllers).
   controllers: [WhatsappController],
   providers: [
-    // tenant resolution (3.0)
+    // merchant resolution (3.0)
     ChannelRepository,
-    TenantResolutionService,
+    MerchantResolutionService,
     // repositories (3a + 3b)
     ConversationsRepository,
     MessagesRepository,
@@ -59,7 +59,7 @@ import { OrderLocationResolver } from './order-location.resolver';
     ConversationTurnsRepository,
     TurnCommitRepository,
     // leaf services (3a)
-    BusinessConfigService,
+    MerchantConfigService,
     OrderingWindowService,
     SecurityService,
     IntentService,
@@ -77,19 +77,19 @@ import { OrderLocationResolver } from './order-location.resolver';
     CartTools,
     CheckoutTools,
     CustomerTools,
-    BranchTools,
+    LocationTools,
     { provide: ToolsService, useClass: RealToolsService },
   ],
   exports: [
     ChannelRepository,
-    TenantResolutionService,
+    MerchantResolutionService,
     ConversationsRepository,
     MessagesRepository,
     MemoryRepository,
     IdentityRepository,
     ConversationTurnsRepository,
     TurnCommitRepository,
-    BusinessConfigService,
+    MerchantConfigService,
     OrderingWindowService,
     SecurityService,
     IntentService,

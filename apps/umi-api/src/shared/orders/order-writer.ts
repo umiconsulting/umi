@@ -6,7 +6,7 @@ import type { PoolClient } from 'pg';
  *
  * WHY IT EXISTS. `ORDER_MODEL.md` §1 says an order is written as three rows together:
  * `customer_order`, its `order_item` lines, and the opening `order_event`. That last row
- * is the status spine: `tenant.order_ticket.last_event_sequence` is
+ * is the status spine: `merchant.order_ticket.last_event_sequence` is
  * `max(order_event.sequence)`, and the KDS polls the event stream with `WHERE sequence >
  * $n`. An order written WITHOUT its opening event is therefore invisible to the kitchen
  * and to customer status notifications — and invisible silently, because every row that
@@ -14,7 +14,7 @@ import type { PoolClient } from 'pg';
  *
  * While there was one writer that was a convention held in one function. A second writer
  * turned it into a requirement, and the requirement was immediately broken: the POS
- * checkout on the source branch wrote `customer_order`, `order_item`, `payment`,
+ * checkout on the source location wrote `customer_order`, `order_item`, `payment`,
  * `receipt_snapshot` and `pos_committed_sale`, and no `order_event` — so a POS sale
  * never reached the KDS. The model predicted this exact failure:
  *
@@ -76,16 +76,16 @@ export interface NewOrderDiscount {
 }
 
 export interface NewOrder {
-  businessId: string;
+  merchantId: string;
   source: OrderSource;
   fulfillmentType: string;
-  branchId?: string | null;
+  locationId?: string | null;
   customerId?: string | null;
   conversationId?: string | null;
   /**
    * The ORIGIN system's id for this record — a Zettle payment, an aggregator order
-   * number. NOT a retry key: retry identity lives in `tenant.business_command`. Unique
-   * per business, so passing one makes the insert conflict-safe against a duplicate
+   * number. NOT a retry key: retry identity lives in `merchant.business_command`. Unique
+   * per merchant, so passing one makes the insert conflict-safe against a duplicate
    * delivery of the same source record.
    */
   externalRef?: string | null;
@@ -118,19 +118,19 @@ export async function writeOrder(client: PoolClient, order: NewOrder): Promise<W
   }
 
   const inserted = await client.query<{ id: string }>(
-    `INSERT INTO tenant.customer_order
-       (business_id, customer_id, conversation_id, branch_id, source, fulfillment_type,
+    `INSERT INTO merchant.customer_order
+       (merchant_id, customer_id, conversation_id, location_id, source, fulfillment_type,
         status, notes, pickup_person, external_ref, placed_at)
      VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5, $6,
              'placed', $7, $8, $9, now())
-     ON CONFLICT (business_id, external_ref) WHERE external_ref IS NOT NULL
+     ON CONFLICT (merchant_id, external_ref) WHERE external_ref IS NOT NULL
        DO NOTHING
      RETURNING id::text`,
     [
-      order.businessId,
+      order.merchantId,
       order.customerId ?? null,
       order.conversationId ?? null,
-      order.branchId ?? null,
+      order.locationId ?? null,
       order.source,
       order.fulfillmentType,
       order.notes ?? null,
@@ -143,14 +143,14 @@ export async function writeOrder(client: PoolClient, order: NewOrder): Promise<W
     // A duplicate delivery of the same source record. Return the order that already
     // exists; do NOT re-write its lines, which may have been amended since.
     const existing = await client.query<{ id: string }>(
-      `SELECT id::text FROM tenant.customer_order
-        WHERE business_id = $1::uuid AND external_ref = $2`,
-      [order.businessId, order.externalRef],
+      `SELECT id::text FROM merchant.customer_order
+        WHERE merchant_id = $1::uuid AND external_ref = $2`,
+      [order.merchantId, order.externalRef],
     );
     const orderId = existing.rows[0]?.id ?? '';
     const lines = orderId
       ? await client.query<{ id: string }>(
-          `SELECT id::text FROM tenant.order_item
+          `SELECT id::text FROM merchant.order_item
             WHERE order_id = $1::uuid ORDER BY display_order, created_at`,
           [orderId],
         )
@@ -164,7 +164,7 @@ export async function writeOrder(client: PoolClient, order: NewOrder): Promise<W
   for (let i = 0; i < order.lines.length; i++) {
     const line = order.lines[i];
     const row = await client.query<{ id: string }>(
-      `INSERT INTO tenant.order_item
+      `INSERT INTO merchant.order_item
          (order_id, product_id, name, variant_name, quantity, unit_price,
           station_id, notes, display_order)
        VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7::uuid, $8, $9)
@@ -186,11 +186,11 @@ export async function writeOrder(client: PoolClient, order: NewOrder): Promise<W
 
     for (const modifier of line.modifiers ?? []) {
       await client.query(
-        `INSERT INTO tenant.order_item_modifier
-           (business_id, order_item_id, modifier_id, name, quantity, price_delta)
+        `INSERT INTO merchant.order_item_modifier
+           (merchant_id, order_item_id, modifier_id, name, quantity, price_delta)
          VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6)`,
         [
-          order.businessId,
+          order.merchantId,
           row.rows[0].id,
           modifier.modifierId ?? null,
           modifier.name,
@@ -210,11 +210,11 @@ export async function writeOrder(client: PoolClient, order: NewOrder): Promise<W
       throw new Error('writeOrder: a comp must name the line it applies to');
     }
     await client.query(
-      `INSERT INTO tenant.order_discount
-         (business_id, order_id, order_item_id, kind, code, label, amount, reason, authorized_by)
+      `INSERT INTO merchant.order_discount
+         (merchant_id, order_id, order_item_id, kind, code, label, amount, reason, authorized_by)
        VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9::uuid)`,
       [
-        order.businessId,
+        order.merchantId,
         orderId,
         lineId,
         discount.kind,
@@ -231,7 +231,7 @@ export async function writeOrder(client: PoolClient, order: NewOrder): Promise<W
   // written here, unconditionally, in the same transaction — not left to a caller to
   // remember.
   await client.query(
-    `INSERT INTO tenant.order_event (order_id, kind, status)
+    `INSERT INTO merchant.order_event (order_id, kind, status)
      VALUES ($1::uuid, 'status_changed', 'placed')`,
     [orderId],
   );

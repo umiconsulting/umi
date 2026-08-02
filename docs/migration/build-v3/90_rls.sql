@@ -1,40 +1,40 @@
 -- ============================================================================
 -- build-v3 · 90_rls  — Grants + Row-Level Security   (HARDENED 2026-07-12)
--- Boundary: `api` is RLS-confined to one business per request; `worker` has
+-- Boundary: `api` is RLS-confined to one merchant per request; `worker` has
 -- BYPASSRLS; `readonly` reads only (never secrets). Per request the API sets:
---     set local app.current_business = '<uuid>'   -- transaction-scoped
+--     set local app.current_merchant = '<uuid>'   -- transaction-scoped
 -- Isolation is defense-in-depth: least-privilege grants + RLS + FORCE, so a
--- single app-layer bug cannot cross tenants or reach credentials.
+-- single app-layer bug cannot cross merchants or reach credentials.
 -- Consolidated from the security audit (2026-07-12): one grant block, one helper.
 -- ============================================================================
 
--- ---- Fail-closed tenant key: empty/missing GUC -> NULL -> zero rows (never errors) ----
-create or replace function umi.current_business() returns uuid
+-- ---- Fail-closed merchant key: empty/missing GUC -> NULL -> zero rows (never errors) ----
+create or replace function umi.current_merchant() returns uuid
   language sql stable
   set search_path = pg_catalog as $$
-  select nullif(current_setting('app.current_business', true), '')::uuid
+  select nullif(current_setting('app.current_merchant', true), '')::uuid
 $$;
-comment on function umi.current_business() is
-  'The request''s tenant scope. NULL when unset/empty so RLS fails CLOSED (0 rows), never errors.';
+comment on function umi.current_merchant() is
+  'The request''s merchant scope. NULL when unset/empty so RLS fails CLOSED (0 rows), never errors.';
 
--- ---- Branch scope: OPTIONAL. NULL means "all branches of the current business" ----
--- The dashboard reads across branches, so a NULL branch must not empty the result set.
--- Branch policies therefore read `umi.current_branch() is null or branch_id = ...`.
--- This is a narrowing key, not an authorization key: `current_business()` is what
+-- ---- Location scope: OPTIONAL. NULL means "all locations of the current merchant" ----
+-- The dashboard reads across locations, so a NULL location must not empty the result set.
+-- Location policies therefore read `umi.current_location() is null or location_id = ...`.
+-- This is a narrowing key, not an authorization key: `current_merchant()` is what
 -- keeps one café out of another's data.
-create or replace function umi.current_branch() returns uuid
+create or replace function umi.current_location() returns uuid
   language sql stable
   set search_path = pg_catalog as $$
-  select nullif(current_setting('app.current_branch', true), '')::uuid
+  select nullif(current_setting('app.current_location', true), '')::uuid
 $$;
-comment on function umi.current_branch() is
-  'The request''s branch narrowing. NULL = every branch of the current business (dashboard reads).';
+comment on function umi.current_location() is
+  'The request''s location narrowing. NULL = every location of the current merchant (dashboard reads).';
 
 -- ---- Device scope: REQUIRED wherever it appears. NULL -> zero rows ----
 -- The offline-replay tables are the device's own journal on the server. A request with
--- no proven device has no business reading or writing any of them, so those policies
+-- no proven device has no merchant reading or writing any of them, so those policies
 -- demand `umi.current_device() is not null` and fail closed rather than falling back to
--- business scope. That asymmetry with current_branch() is deliberate.
+-- merchant scope. That asymmetry with current_location() is deliberate.
 create or replace function umi.current_device() returns uuid
   language sql stable
   set search_path = pg_catalog as $$
@@ -45,54 +45,54 @@ comment on function umi.current_device() is
 
 -- ---- No ambient authority: lock schema public (CVE-2018-1058) and our schemas ----
 revoke create on schema public from public;
-revoke all on all tables in schema umi, tenant, runtime from public;
-grant usage on schema umi, tenant, runtime to api, worker, readonly;
+revoke all on all tables in schema umi, merchant, runtime from public;
+grant usage on schema umi, merchant, runtime to api, worker, readonly;
 
 -- ===========================================================================
 -- GRANTS — least privilege per role
 -- ===========================================================================
 
 -- worker: full DML everywhere (isolation is BYPASSRLS + code correctness).
-grant select, insert, update, delete on all tables in schema umi, tenant, runtime to worker;
+grant select, insert, update, delete on all tables in schema umi, merchant, runtime to worker;
 
 -- readonly: broad read for diagnostics — but NEVER credentials or auth secrets.
-grant select on all tables in schema umi, tenant, runtime to readonly;
+grant select on all tables in schema umi, merchant, runtime to readonly;
 revoke select on umi.audit_log from readonly;                       -- sealed Umi-internal
 revoke select on runtime.session, runtime.otp, runtime.password_reset_token,
                  runtime.pairing from readonly;   -- auth substrate
 
--- api (the café REQUEST-PATH role): full DML on tenant (RLS-bound); umi limited to
+-- api (the café REQUEST-PATH role): full DML on merchant (RLS-bound); umi limited to
 -- global catalogs + per-café tables (RLS-scoped); minimal, scoped runtime.
-grant select, insert, update, delete on all tables in schema tenant to api;
+grant select, insert, update, delete on all tables in schema merchant to api;
 
---   umi global catalogs — same for every tenant, safe to read cross-tenant
+--   umi global catalogs — same for every merchant, safe to read cross-merchant
 grant select on umi.role, umi.permission, umi.role_permission, umi.channel_type,
                 umi.feature, umi.plan, umi.plan_feature to api;
---   umi per-café tables — readable but RLS-scoped to the current business (below)
+--   umi per-café tables — readable but RLS-scoped to the current merchant (below)
 grant select on umi.subscription, umi.subscription_item, umi.invoice,
                 umi.entitlement_override, umi.user_role to api;
 --   NOT granted to api: umi.prospect / prospect_event (Umi sales pipeline),
 --     umi.audit_log (sealed). Left ungranted = unreadable by the request path.
 --   umi.effective_entitlement VIEW (security_invoker) — SELECT only:
 grant select on umi.effective_entitlement to api;
---   Views are read-only for api (the tenant grant-all handed it DML on the views too).
+--   Views are read-only for api (the merchant grant-all handed it DML on the views too).
 --   SWEPT, not listed: security_gate.sql asserts "api holds no DML on ANY view", and a
 --   hand-maintained list cannot satisfy a universal assertion — it goes stale the first
---   time someone adds a view. It did: tenant.kds_ticket landed and the gate went red.
+--   time someone adds a view. It did: merchant.kds_ticket landed and the gate went red.
 --   The sweep is the dual of the check, so the two cannot drift apart again. Views are
---   all created upstream of this file (10_umi / 20_tenant), so they are all visible here.
+--   all created upstream of this file (10_umi / 20_merchant), so they are all visible here.
 do $$
 declare v record;
 begin
   for v in select schemaname, viewname
              from pg_views
-            where schemaname in ('umi', 'tenant', 'runtime')
+            where schemaname in ('umi', 'merchant', 'runtime')
   loop
     execute format('revoke insert, update, delete on %I.%I from api', v.schemaname, v.viewname);
   end loop;
 end $$;
 
---   tenant.contact.normalized_value is DERIVED by tenant.tg_contact_normalize (60_triggers),
+--   merchant.contact.normalized_value is DERIVED by merchant.tg_contact_normalize (60_triggers),
 --   never supplied. Revoking the column makes it UNFORGEABLE: an app can no longer write a
 --   hand-rolled normalization into it, which is exactly how the L15 corruption stayed
 --   self-consistent (same broken function on read and write). raw is the truth.
@@ -100,7 +100,7 @@ end $$;
 --   UPDATE — and it does, from the blanket grant above (`api=arwd`). PostgreSQL treats a
 --   table-level privilege as covering every column, and a column-level REVOKE cannot
 --   subtract from it. This file carried exactly that statement for
---   tenant.contact.normalized_value with a long comment about making the column
+--   merchant.contact.normalized_value with a long comment about making the column
 --   UNFORGEABLE; the statement had never had any effect. Only its trigger, which fires
 --   on INSERT **or UPDATE**, was actually protecting the column.
 --
@@ -122,9 +122,9 @@ begin
     select string_agg(quote_ident(column_name), ', ' order by ordinal_position)
       into cols
       from information_schema.columns
-     where table_schema = 'tenant' and table_name = r.tbl and column_name <> r.col;
-    execute format('revoke update on tenant.%I from api', r.tbl);
-    execute format('grant update (%s) on tenant.%I to api', cols, r.tbl);
+     where table_schema = 'merchant' and table_name = r.tbl and column_name <> r.col;
+    execute format('revoke update on merchant.%I from api', r.tbl);
+    execute format('grant update (%s) on merchant.%I to api', cols, r.tbl);
   end loop;
 end $$;
 
@@ -135,8 +135,8 @@ grant select, insert          on runtime.idempotency_key  to api;    -- request 
 -- product_embedding: SELECT only. Semantic product search is a REQUEST-path read
 -- (the bot's menu fallback), and it is being moved off the BYPASSRLS worker pool onto
 -- the RLS-enforced api pool — which it cannot do without reading this table. The row
--- is a vector keyed by product_id and carries no tenant fact of its own; isolation
--- comes from the join to tenant.product, which IS under RLS. No write: only the
+-- is a vector keyed by product_id and carries no merchant fact of its own; isolation
+-- comes from the join to merchant.product, which IS under RLS. No write: only the
 -- worker's enrichment pass produces embeddings.
 grant select                  on runtime.product_embedding to api;   -- RAG read path
 --   NOT granted to api: session/otp/password_reset_token/pairing (auth
@@ -151,26 +151,26 @@ grant  select (id, email, full_name, status, last_login_at, created_at, updated_
   on umi.user to api, readonly;
 
 -- ---- Append-only audit: nobody (not even worker) updates/deletes an audit row ----
-revoke update, delete on umi.audit_log, tenant.audit_log from api, worker, readonly;
+revoke update, delete on umi.audit_log, merchant.audit_log from api, worker, readonly;
 
 -- ---- Future tables: do NOT auto-arm the request path. api gets explicit grants only.
 --   (worker = trusted machinery, readonly = non-secret schemas.)
-alter default privileges in schema tenant, runtime grant select, insert, update, delete on tables to worker;
+alter default privileges in schema merchant, runtime grant select, insert, update, delete on tables to worker;
 alter default privileges in schema umi             grant select on tables to worker;
-alter default privileges in schema tenant, runtime grant select on tables to readonly;
+alter default privileges in schema merchant, runtime grant select on tables to readonly;
 
 -- ===========================================================================
--- RLS — tenant.*  (every base table scoped to the current business, FORCED)
+-- RLS — merchant.*  (every base table scoped to the current merchant, FORCED)
 -- ===========================================================================
 
--- Root: business keys on id.
-alter table tenant.business enable row level security;
-alter table tenant.business force  row level security;
-create policy tenant_isolation on tenant.business
-  using      (id = umi.current_business())
-  with check (id = umi.current_business());
+-- Root: merchant keys on id.
+alter table merchant.merchant enable row level security;
+alter table merchant.merchant force  row level security;
+create policy merchant_isolation on merchant.merchant
+  using      (id = umi.current_merchant())
+  with check (id = umi.current_merchant());
 
--- Tables carrying business_id directly: one uniform policy + FORCE.
+-- Tables carrying merchant_id directly: one uniform policy + FORCE.
 do $$
 declare r record;
 begin
@@ -179,32 +179,32 @@ begin
     from information_schema.columns c
     join information_schema.tables t
       on t.table_schema=c.table_schema and t.table_name=c.table_name
-    where c.table_schema='tenant' and c.column_name='business_id'
+    where c.table_schema='merchant' and c.column_name='merchant_id'
       and t.table_type='BASE TABLE'
   loop
-    execute format('alter table tenant.%I enable row level security', r.table_name);
-    execute format('alter table tenant.%I force  row level security', r.table_name);
-    execute format($f$create policy tenant_isolation on tenant.%I
-      using      (business_id = umi.current_business())
-      with check (business_id = umi.current_business())$f$, r.table_name);
+    execute format('alter table merchant.%I enable row level security', r.table_name);
+    execute format('alter table merchant.%I force  row level security', r.table_name);
+    execute format($f$create policy merchant_isolation on merchant.%I
+      using      (merchant_id = umi.current_merchant())
+      with check (merchant_id = umi.current_merchant())$f$, r.table_name);
   end loop;
 end $$;
 
--- Child tables (no business_id): scope via parent. USING covers read/update/delete;
--- WITH CHECK blocks grafting a child under another tenant's parent.
+-- Child tables (no merchant_id): scope via parent. USING covers read/update/delete;
+-- WITH CHECK blocks grafting a child under another merchant's parent.
 do $$
 declare r record;
 begin
-  -- `station` was HERE, scoped via branch. It moved out when it gained business_id, and
+  -- `station` was HERE, scoped via location. It moved out when it gained merchant_id, and
   -- it had to move in the same change: the loop above is a dynamic sweep over every
-  -- tenant table with a business_id, so leaving this row would create a SECOND
-  -- tenant_isolation policy on station and abort the whole RLS rebuild with 42710.
-  -- Scoping via branch was also wrong on its own terms — a station with branch_id NULL
-  -- ("every branch") joins to nothing and would have been invisible to its owner.
+  -- merchant table with a merchant_id, so leaving this row would create a SECOND
+  -- merchant_isolation policy on station and abort the whole RLS rebuild with 42710.
+  -- Scoping via location was also wrong on its own terms — a station with location_id NULL
+  -- ("every location") joins to nothing and would have been invisible to its owner.
   for r in select * from (values
     ('loyalty_wallet_pass',         'loyalty_card',      'card_id',         'id'),
     ('product_option_group',        'product',           'product_id',      'id'),
-    ('product_branch_availability', 'product',           'product_id',      'id'),
+    ('product_location_availability', 'product',           'product_id',      'id'),
     ('message',                     'conversation',      'conversation_id', 'id'),
     ('knowledge_chunk',             'knowledge_document','document_id',     'id'),
     ('order_item',                  'customer_order',    'order_id',        'id'),
@@ -212,151 +212,151 @@ begin
     ('payment',                     'customer_order',    'order_id',        'id')
   ) as v(child, parent, fk, pk)
   loop
-    execute format('alter table tenant.%I enable row level security', r.child);
-    execute format('alter table tenant.%I force  row level security', r.child);
-    execute format($f$create policy tenant_isolation on tenant.%I
-      using (exists (select 1 from tenant.%I p where p.%I = tenant.%I.%I
-                       and p.business_id = umi.current_business()))
-      with check (exists (select 1 from tenant.%I p where p.%I = tenant.%I.%I
-                       and p.business_id = umi.current_business()))$f$,
+    execute format('alter table merchant.%I enable row level security', r.child);
+    execute format('alter table merchant.%I force  row level security', r.child);
+    execute format($f$create policy merchant_isolation on merchant.%I
+      using (exists (select 1 from merchant.%I p where p.%I = merchant.%I.%I
+                       and p.merchant_id = umi.current_merchant()))
+      with check (exists (select 1 from merchant.%I p where p.%I = merchant.%I.%I
+                       and p.merchant_id = umi.current_merchant()))$f$,
       r.child, r.parent, r.pk, r.child, r.fk, r.parent, r.pk, r.child, r.fk);
   end loop;
 end $$;
 
 -- product_modifier: two hops (option_group -> product).
-alter table tenant.product_modifier enable row level security;
-alter table tenant.product_modifier force  row level security;
-create policy tenant_isolation on tenant.product_modifier
-  using (exists (select 1 from tenant.product_option_group g
-                   join tenant.product p on p.id = g.product_id
+alter table merchant.product_modifier enable row level security;
+alter table merchant.product_modifier force  row level security;
+create policy merchant_isolation on merchant.product_modifier
+  using (exists (select 1 from merchant.product_option_group g
+                   join merchant.product p on p.id = g.product_id
                   where g.id = product_modifier.option_group_id
-                    and p.business_id = umi.current_business()))
-  with check (exists (select 1 from tenant.product_option_group g
-                   join tenant.product p on p.id = g.product_id
+                    and p.merchant_id = umi.current_merchant()))
+  with check (exists (select 1 from merchant.product_option_group g
+                   join merchant.product p on p.id = g.product_id
                   where g.id = product_modifier.option_group_id
-                    and p.business_id = umi.current_business()));
+                    and p.merchant_id = umi.current_merchant()));
 
 -- refund: two hops (payment -> customer_order).
-alter table tenant.refund enable row level security;
-alter table tenant.refund force  row level security;
-create policy tenant_isolation on tenant.refund
-  using (exists (select 1 from tenant.payment pay
-                   join tenant.customer_order o on o.id = pay.order_id
+alter table merchant.refund enable row level security;
+alter table merchant.refund force  row level security;
+create policy merchant_isolation on merchant.refund
+  using (exists (select 1 from merchant.payment pay
+                   join merchant.customer_order o on o.id = pay.order_id
                   where pay.id = refund.payment_id
-                    and o.business_id = umi.current_business()))
-  with check (exists (select 1 from tenant.payment pay
-                   join tenant.customer_order o on o.id = pay.order_id
+                    and o.merchant_id = umi.current_merchant()))
+  with check (exists (select 1 from merchant.payment pay
+                   join merchant.customer_order o on o.id = pay.order_id
                   where pay.id = refund.payment_id
-                    and o.business_id = umi.current_business()));
+                    and o.merchant_id = umi.current_merchant()));
 
 -- ===========================================================================
 -- RLS — umi.*  per-café tables (catalogs stay global; credentials column-locked)
 -- ===========================================================================
 alter table umi.subscription enable row level security;
 alter table umi.subscription force  row level security;
-create policy tenant_isolation on umi.subscription
-  using      (business_id = umi.current_business())
-  with check (business_id = umi.current_business());
+create policy merchant_isolation on umi.subscription
+  using      (merchant_id = umi.current_merchant())
+  with check (merchant_id = umi.current_merchant());
 
 alter table umi.invoice enable row level security;
 alter table umi.invoice force  row level security;
-create policy tenant_isolation on umi.invoice
-  using      (business_id = umi.current_business())
-  with check (business_id = umi.current_business());
+create policy merchant_isolation on umi.invoice
+  using      (merchant_id = umi.current_merchant())
+  with check (merchant_id = umi.current_merchant());
 
 alter table umi.user_role enable row level security;
 alter table umi.user_role force  row level security;
-create policy tenant_isolation on umi.user_role
-  using      (business_id = umi.current_business())
-  with check (business_id = umi.current_business());
+create policy merchant_isolation on umi.user_role
+  using      (merchant_id = umi.current_merchant())
+  with check (merchant_id = umi.current_merchant());
 
--- subscription_item / entitlement_override: scope via subscription.business_id.
+-- subscription_item / entitlement_override: scope via subscription.merchant_id.
 alter table umi.subscription_item enable row level security;
 alter table umi.subscription_item force  row level security;
-create policy tenant_isolation on umi.subscription_item
+create policy merchant_isolation on umi.subscription_item
   using (exists (select 1 from umi.subscription s where s.id = subscription_item.subscription_id
-                   and s.business_id = umi.current_business()))
+                   and s.merchant_id = umi.current_merchant()))
   with check (exists (select 1 from umi.subscription s where s.id = subscription_item.subscription_id
-                   and s.business_id = umi.current_business()));
+                   and s.merchant_id = umi.current_merchant()));
 
 alter table umi.entitlement_override enable row level security;
 alter table umi.entitlement_override force  row level security;
-create policy tenant_isolation on umi.entitlement_override
+create policy merchant_isolation on umi.entitlement_override
   using (exists (select 1 from umi.subscription s where s.id = entitlement_override.subscription_id
-                   and s.business_id = umi.current_business()))
+                   and s.merchant_id = umi.current_merchant()))
   with check (exists (select 1 from umi.subscription s where s.id = entitlement_override.subscription_id
-                   and s.business_id = umi.current_business()));
+                   and s.merchant_id = umi.current_merchant()));
 
 -- ===========================================================================
 -- RLS — runtime.*  (only the two request-path tables; rest is worker-only)
 -- ===========================================================================
 alter table runtime.reminder_sent enable row level security;
 alter table runtime.reminder_sent force  row level security;
-create policy tenant_isolation on runtime.reminder_sent
-  using      (business_id = umi.current_business())
-  with check (business_id = umi.current_business());
+create policy merchant_isolation on runtime.reminder_sent
+  using      (merchant_id = umi.current_merchant())
+  with check (merchant_id = umi.current_merchant());
 
 alter table runtime.conversation_cart enable row level security;
 alter table runtime.conversation_cart force  row level security;
-create policy tenant_isolation on runtime.conversation_cart
-  using (exists (select 1 from tenant.conversation cv where cv.id = conversation_cart.conversation_id
-                   and cv.business_id = umi.current_business()))
-  with check (exists (select 1 from tenant.conversation cv where cv.id = conversation_cart.conversation_id
-                   and cv.business_id = umi.current_business()));
+create policy merchant_isolation on runtime.conversation_cart
+  using (exists (select 1 from merchant.conversation cv where cv.id = conversation_cart.conversation_id
+                   and cv.merchant_id = umi.current_merchant()))
+  with check (exists (select 1 from merchant.conversation cv where cv.id = conversation_cart.conversation_id
+                   and cv.merchant_id = umi.current_merchant()));
 
--- Tenant-scoped the moment it gained a business_id (2026-07-29, queue-cluster restore).
+-- Merchant-scoped the moment it gained a merchant_id (2026-07-29, queue-cluster restore).
 -- `api` holds select+insert on it for request dedup, and the universal gate check caught
 -- this within one run of adding the column — which is the whole argument for stating a
 -- check as a universal rather than a list of table names.
 alter table runtime.idempotency_key enable row level security;
 alter table runtime.idempotency_key force  row level security;
-create policy tenant_isolation on runtime.idempotency_key
-  using      (business_id = umi.current_business())
-  with check (business_id = umi.current_business());
+create policy merchant_isolation on runtime.idempotency_key
+  using      (merchant_id = umi.current_merchant())
+  with check (merchant_id = umi.current_merchant());
 
 alter table runtime.conversation_turn enable row level security;
 alter table runtime.conversation_turn force  row level security;
-create policy tenant_isolation on runtime.conversation_turn
-  using (exists (select 1 from tenant.conversation cv where cv.id = conversation_turn.conversation_id
-                   and cv.business_id = umi.current_business()))
-  with check (exists (select 1 from tenant.conversation cv where cv.id = conversation_turn.conversation_id
-                   and cv.business_id = umi.current_business()));
+create policy merchant_isolation on runtime.conversation_turn
+  using (exists (select 1 from merchant.conversation cv where cv.id = conversation_turn.conversation_id
+                   and cv.merchant_id = umi.current_merchant()))
+  with check (exists (select 1 from merchant.conversation cv where cv.id = conversation_turn.conversation_id
+                   and cv.merchant_id = umi.current_merchant()));
 
 -- ===========================================================================
--- RLS — POS: branch narrowing and device scoping
+-- RLS — POS: location narrowing and device scoping
 -- ===========================================================================
 -- These are RESTRICTIVE policies. PERMISSIVE policies OR together; RESTRICTIVE ones
--- AND with everything else. So the tenant_isolation policy created by the sweep above
--- still decides WHICH BUSINESS, and these can only narrow it further — a branch or
+-- AND with everything else. So the merchant_isolation policy created by the sweep above
+-- still decides WHICH MERCHANT, and these can only narrow it further — a location or
 -- device policy can never widen access to another café's rows.
 --
 -- Why two different postures:
---   BRANCH is a narrowing. The dashboard reads across every branch and sets no branch
---   GUC, so NULL must mean "all branches", not "no rows". Making branch fail closed
+--   LOCATION is a narrowing. The dashboard reads across every location and sets no location
+--   GUC, so NULL must mean "all locations", not "no rows". Making location fail closed
 --   would blank the owner's own reports.
 --   DEVICE is authorization. The replay tables are one terminal's journal held on the
---   server. A request that cannot prove which device it is has no business reading any
+--   server. A request that cannot prove which device it is has no merchant reading any
 --   of them, so NULL means zero rows.
 
--- ---- Branch narrowing: SWEPT, with a recorded opt-OUT ----
+-- ---- Location narrowing: SWEPT, with a recorded opt-OUT ----
 -- This was an opt-IN list of table names, which is the booby-trap this file already
--- warns about for the child-table list: a new tenant table with a branch_id that
+-- warns about for the child-table list: a new merchant table with a location_id that
 -- nobody remembers to add gets NO narrowing, silently, and the failure is open. The
 -- sweep inverts it — forgetting now yields narrowing, which is the safe direction.
 --
--- ONE predicate serves both column shapes. Where branch_id is NOT NULL the
--- `branch_id is null` disjunct is simply never true, so it costs nothing; where it is
--- nullable, a business-wide row (no branch) stays visible to a branch-scoped caller,
+-- ONE predicate serves both column shapes. Where location_id is NOT NULL the
+-- `location_id is null` disjunct is simply never true, so it costs nothing; where it is
+-- nullable, a merchant-wide row (no location) stays visible to a location-scoped caller,
 -- which is what "this fact belongs to the whole café" means.
 --
 -- The opt-out list is short and each entry is a claim about the DATA, not a
 -- convenience:
---   staff          — manager approval reaches ACROSS branches. Narrowing staff would
---                    make a manager at another branch unreachable to authorize a void,
+--   staff          — manager approval reaches ACROSS locations. Narrowing staff would
+--                    make a manager at another location unreachable to authorize a void,
 --                    which is precisely when you need one.
---   loyalty_visit  — a stamp count is a property of the CARD, business-wide. A café
---                    with two branches would undercount a customer's stamps the moment
---                    a till set its branch, and quietly deny an earned reward.
+--   loyalty_visit  — a stamp count is a property of the CARD, merchant-wide. A café
+--                    with two locations would undercount a customer's stamps the moment
+--                    a till set its location, and quietly deny an earned reward.
 do $$
 declare
   t record;
@@ -366,28 +366,28 @@ begin
     select c.relname
       from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
-     where n.nspname = 'tenant' and c.relkind = 'r'          -- base tables only; a view has no policies
+     where n.nspname = 'merchant' and c.relkind = 'r'          -- base tables only; a view has no policies
        and exists (select 1 from information_schema.columns col
-                    where col.table_schema = 'tenant' and col.table_name = c.relname
-                      and col.column_name = 'branch_id')
+                    where col.table_schema = 'merchant' and col.table_name = c.relname
+                      and col.column_name = 'location_id')
        and not (c.relname = any(skip))
      order by c.relname
   loop
-    execute format($f$create policy branch_narrowing on tenant.%I as restrictive
-      using      (umi.current_branch() is null or branch_id is null
-                  or branch_id = umi.current_branch())
-      with check (umi.current_branch() is null or branch_id is null
-                  or branch_id = umi.current_branch())$f$, t.relname);
+    execute format($f$create policy location_narrowing on merchant.%I as restrictive
+      using      (umi.current_location() is null or location_id is null
+                  or location_id = umi.current_location())
+      with check (umi.current_location() is null or location_id is null
+                  or location_id = umi.current_location())$f$, t.relname);
   end loop;
 end $$;
 
 -- ---- Device scoping: FAIL CLOSED. No proven device, no rows. ----
--- This is the policy set that was inert on the source branch: the API never set
+-- This is the policy set that was inert on the source location: the API never set
 -- app.current_device, and the repositories ran on the BYPASSRLS worker pool, so
 -- nothing ever evaluated these predicates. pg.service.ts now sets the GUC and the POS
 -- repositories run as `api`, which is what makes this real rather than decorative.
 --
--- Deliberately opt-IN, unlike branch narrowing above. Device scoping is the strongest
+-- Deliberately opt-IN, unlike location narrowing above. Device scoping is the strongest
 -- restriction in this file — it hides a row from everyone who cannot prove which
 -- terminal they are — so applying it by sweep would silently blind the dashboard to
 -- any future device-related table it legitimately reads. Opt-in, plus the assertion
@@ -399,19 +399,19 @@ begin
     'device_replay_cursor', 'offline_replay_command', 'offline_reconciliation',
     'offline_replay_conflict', 'offline_provisional_mapping'
   ] loop
-    execute format($f$create policy device_scoping on tenant.%I as restrictive
+    execute format($f$create policy device_scoping on merchant.%I as restrictive
       using      (umi.current_device() is not null and device_id = umi.current_device())
       with check (umi.current_device() is not null and device_id = umi.current_device())$f$, t);
   end loop;
 end $$;
 
--- Every tenant table carrying a device_id must have made a DECISION about device
+-- Every merchant table carrying a device_id must have made a DECISION about device
 -- scoping — either it is scoped above, or it is named here as deliberately not. A new
 -- table that does neither aborts the build rather than shipping unscoped.
 do $$
 declare
   undecided text[];
-  -- Empty today: every tenant table with a device_id is device-scoped. Add a name here
+  -- Empty today: every merchant table with a device_id is device-scoped. Add a name here
   -- WITH A REASON when one legitimately is not — e.g. a dashboard-readable device
   -- inventory or a telemetry roll-up. The cast is required: Postgres cannot infer the
   -- element type of an empty array literal.
@@ -420,16 +420,16 @@ begin
   select array_agg(c.relname order by c.relname) into undecided
     from pg_class c
     join pg_namespace n on n.oid = c.relnamespace
-   where n.nspname = 'tenant' and c.relkind = 'r'
+   where n.nspname = 'merchant' and c.relkind = 'r'
      and exists (select 1 from information_schema.columns col
-                  where col.table_schema = 'tenant' and col.table_name = c.relname
+                  where col.table_schema = 'merchant' and col.table_name = c.relname
                     and col.column_name = 'device_id')
      and not exists (select 1 from pg_policy p
                       where p.polrelid = c.oid and p.polname = 'device_scoping')
      and not (c.relname = any(not_device_scoped));
   if undecided is not null then
     raise exception
-      'tenant tables carry device_id with no device-scoping decision: %. Scope them or name them in not_device_scoped.',
+      'merchant tables carry device_id with no device-scoping decision: %. Scope them or name them in not_device_scoped.',
       undecided;
   end if;
 end $$;
@@ -439,49 +439,49 @@ end $$;
 -- ===========================================================================
 -- These join the two request-path runtime tables above. They are on the request path
 -- because the POS runs as `api`, not as the worker: an operator session that only the
--- BYPASSRLS pool can write is an operator session with no tenant isolation at all.
+-- BYPASSRLS pool can write is an operator session with no merchant isolation at all.
 alter table runtime.operator_session enable row level security;
 alter table runtime.operator_session force  row level security;
-create policy tenant_isolation on runtime.operator_session
-  using      (business_id = umi.current_business())
-  with check (business_id = umi.current_business());
-create policy branch_narrowing on runtime.operator_session as restrictive
-  using      (umi.current_branch() is null or branch_id = umi.current_branch())
-  with check (umi.current_branch() is null or branch_id = umi.current_branch());
+create policy merchant_isolation on runtime.operator_session
+  using      (merchant_id = umi.current_merchant())
+  with check (merchant_id = umi.current_merchant());
+create policy location_narrowing on runtime.operator_session as restrictive
+  using      (umi.current_location() is null or location_id = umi.current_location())
+  with check (umi.current_location() is null or location_id = umi.current_location());
 
 alter table runtime.device_enrollment_challenge enable row level security;
 alter table runtime.device_enrollment_challenge force  row level security;
-create policy tenant_isolation on runtime.device_enrollment_challenge
-  using      (business_id = umi.current_business())
-  with check (business_id = umi.current_business());
+create policy merchant_isolation on runtime.device_enrollment_challenge
+  using      (merchant_id = umi.current_merchant())
+  with check (merchant_id = umi.current_merchant());
 
 alter table runtime.elevation_grant enable row level security;
 alter table runtime.elevation_grant force  row level security;
-create policy tenant_isolation on runtime.elevation_grant
-  using      (business_id = umi.current_business())
-  with check (business_id = umi.current_business());
+create policy merchant_isolation on runtime.elevation_grant
+  using      (merchant_id = umi.current_merchant())
+  with check (merchant_id = umi.current_merchant());
 
 -- The two write-only audit tables. api holds INSERT and nothing else, but INSERT alone
 -- is enough to forge a security event against another café — WITH CHECK is what stops
--- that. `business_id is null` is permitted because these are soft refs: a platform-level
--- security event (a login attempt against an account with no business yet) has no
--- business to name, and audit exhaust must outlive whatever it describes.
+-- that. `merchant_id is null` is permitted because these are soft refs: a platform-level
+-- security event (a login attempt against an account with no merchant yet) has no
+-- merchant to name, and audit exhaust must outlive whatever it describes.
 alter table runtime.security_audit_event enable row level security;
 alter table runtime.security_audit_event force  row level security;
-create policy tenant_isolation on runtime.security_audit_event
-  using      (business_id is null or business_id = umi.current_business())
-  with check (business_id is null or business_id = umi.current_business());
+create policy merchant_isolation on runtime.security_audit_event
+  using      (merchant_id is null or merchant_id = umi.current_merchant())
+  with check (merchant_id is null or merchant_id = umi.current_merchant());
 
 alter table runtime.audit_event_internal enable row level security;
 alter table runtime.audit_event_internal force  row level security;
-create policy tenant_isolation on runtime.audit_event_internal
-  using      (business_id = umi.current_business())
-  with check (business_id = umi.current_business());
+create policy merchant_isolation on runtime.audit_event_internal
+  using      (merchant_id = umi.current_merchant())
+  with check (merchant_id = umi.current_merchant());
 
 -- ===========================================================================
 -- GRANTS — the POS request path
 -- ===========================================================================
--- tenant.* is already granted to api by the blanket grant above and confined by RLS.
+-- merchant.* is already granted to api by the blanket grant above and confined by RLS.
 -- runtime.* is sealed by default, so every POS need is listed explicitly here.
 
 --   Operator presence: the POS starts, locks and ends shifts on the request path.
@@ -507,24 +507,24 @@ revoke select on runtime.operator_session, runtime.device_enrollment_challenge,
 -- The triggers in 60_triggers refuse the write; these revokes mean the attempt never
 -- reaches a trigger. Belt and braces, because this is the money.
 revoke update, delete on
-  tenant.audit_event, tenant.financial_event, tenant.receipt_snapshot,
-  tenant.pos_committed_sale, tenant.offline_replay_command,
-  tenant.offline_provisional_mapping
+  merchant.audit_event, merchant.financial_event, merchant.receipt_snapshot,
+  merchant.pos_committed_sale, merchant.offline_replay_command,
+  merchant.offline_provisional_mapping
   from api, worker, readonly;
 revoke update, delete on runtime.security_audit_event, runtime.audit_event_internal
   from worker;
 
 -- ---- Policies are read-only to everyone but the platform ----
 -- A café cannot raise its own offline cash limit; that is the entire point of a limit.
-revoke insert, update, delete on tenant.pos_offline_policy, tenant.pos_offline_cash_policy
+revoke insert, update, delete on merchant.pos_offline_policy, merchant.pos_offline_cash_policy
   from api, readonly;
 revoke all on umi.audit_retention_policy from api, readonly;
 revoke insert, update, delete on umi.user_permission_override from api, readonly;
 grant  select on umi.user_permission_override to api;
 
 -- ---- The offline reconciliation acknowledgement is the ONE column a device may set ----
-revoke update on tenant.offline_reconciliation from api;
-grant  update (acknowledged_at) on tenant.offline_reconciliation to api;
-revoke update on tenant.offline_replay_conflict from api;
+revoke update on merchant.offline_reconciliation from api;
+grant  update (acknowledged_at) on merchant.offline_reconciliation to api;
+revoke update on merchant.offline_replay_conflict from api;
 grant  update (last_observed_at, resolution_state, resolution_acknowledged_at)
-  on tenant.offline_replay_conflict to api;
+  on merchant.offline_replay_conflict to api;

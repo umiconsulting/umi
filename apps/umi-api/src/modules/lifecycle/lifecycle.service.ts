@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EnqueueService } from '../../jobs/enqueue.service';
 import { QUEUES } from '../../jobs/queues';
 import { JobPriority } from '../../jobs/job-options';
-import { LifecycleRepository, type LifecycleTenant } from './lifecycle.repository';
+import { LifecycleRepository, type LifecycleMerchant } from './lifecycle.repository';
 import {
   resolveCronJourneyTemplate,
   renderTemplate,
@@ -32,8 +32,8 @@ export interface JourneySummary {
 
 /**
  * Scheduled lifecycle journeys (3d-lifecycle) — the WhatsApp half of the legacy
- * `cash-cron.ts`. Each journey iterates active tenants, finds eligible cards on
- * the canonical loyalty schema, renders the tenant's copy, claims the send in
+ * `cash-cron.ts`. Each journey iterates active merchants, finds eligible cards on
+ * the canonical loyalty schema, renders the merchant's copy, claims the send in
  * `runtime.reminder_sent` (durable dedup), then enqueues `whatsapp.lifecycle`
  * to the outbound queue for delivery. WhatsApp-only — the wallet-push journeys
  * (birthday issuance, expire, goal-proximity) stay in umi-cash.
@@ -50,10 +50,10 @@ export class LifecycleService {
   async runRewardExpiring(): Promise<JourneySummary> {
     let candidates = 0;
     let sent = 0;
-    for (const tenant of await this.repo.activeTenants()) {
-      const cfg = await this.repo.tenantConfig(tenant.id);
-      const tz = tenant.timezone || DEFAULT_TZ;
-      const rewards = await this.repo.rewardExpiringCandidates(tenant.id);
+    for (const merchant of await this.repo.activeMerchants()) {
+      const cfg = await this.repo.merchantConfig(merchant.id);
+      const tz = merchant.timezone || DEFAULT_TZ;
+      const rewards = await this.repo.rewardExpiringCandidates(merchant.id);
       candidates += rewards.length;
       for (const r of rewards) {
         const rewardName = cfg.birthdayRewardName || 'regalo de cumpleaños';
@@ -61,12 +61,12 @@ export class LifecycleService {
           resolveCronJourneyTemplate(cfg.lifecycleCopy, 'reward_expiring'),
           {
             name: r.name || DEFAULT_CUSTOMER_NAME,
-            tenant: tenant.name,
+            merchant: merchant.name,
             rewardName,
             date: formatDateLabel(r.expiresAt, tz),
           },
         );
-        if (await this.dispatch(tenant, r.cardId, `reward_expiring_${r.year}`, r.phone, message))
+        if (await this.dispatch(merchant, r.cardId, `reward_expiring_${r.year}`, r.phone, message))
           sent++;
       }
     }
@@ -77,22 +77,22 @@ export class LifecycleService {
   async runStreakRecognition(): Promise<JourneySummary> {
     let candidates = 0;
     let sent = 0;
-    const tenants = await this.repo.activeTenants();
-    for (const tenant of tenants) {
-      const cfg = await this.repo.tenantConfig(tenant.id);
+    const merchants = await this.repo.activeMerchants();
+    for (const merchant of merchants) {
+      const cfg = await this.repo.merchantConfig(merchant.id);
       for (const tier of STREAK_TIERS) {
-        const cards = await this.repo.streakCandidates(tenant.id, tier.weeks);
+        const cards = await this.repo.streakCandidates(merchant.id, tier.weeks);
         candidates += cards.length;
         for (const c of cards) {
           const message = renderTemplate(
             resolveCronJourneyTemplate(cfg.lifecycleCopy, tier.journey),
             {
               name: c.name || DEFAULT_CUSTOMER_NAME,
-              tenant: tenant.name,
+              merchant: merchant.name,
               rewardName: cfg.rewardName,
             },
           );
-          if (await this.dispatch(tenant, c.cardId, tier.journey, c.phone, message)) sent++;
+          if (await this.dispatch(merchant, c.cardId, tier.journey, c.phone, message)) sent++;
         }
       }
     }
@@ -103,16 +103,16 @@ export class LifecycleService {
   async runWelcomeNoVisit(): Promise<JourneySummary> {
     let candidates = 0;
     let sent = 0;
-    for (const tenant of await this.repo.activeTenants()) {
-      const cfg = await this.repo.tenantConfig(tenant.id);
-      const cards = await this.repo.welcomeNoVisitCandidates(tenant.id);
+    for (const merchant of await this.repo.activeMerchants()) {
+      const cfg = await this.repo.merchantConfig(merchant.id);
+      const cards = await this.repo.welcomeNoVisitCandidates(merchant.id);
       candidates += cards.length;
       for (const c of cards) {
         const message = renderTemplate(
           resolveCronJourneyTemplate(cfg.lifecycleCopy, 'welcome_no_visit'),
-          { name: c.name || DEFAULT_CUSTOMER_NAME, tenant: tenant.name },
+          { name: c.name || DEFAULT_CUSTOMER_NAME, merchant: merchant.name },
         );
-        if (await this.dispatch(tenant, c.cardId, 'welcome_no_visit', c.phone, message)) sent++;
+        if (await this.dispatch(merchant, c.cardId, 'welcome_no_visit', c.phone, message)) sent++;
       }
     }
     this.logger.log(`welcome_no_visit complete candidates=${candidates} sent=${sent}`);
@@ -122,24 +122,24 @@ export class LifecycleService {
   async runWinbackInactive(): Promise<JourneySummary> {
     let candidates = 0;
     let sent = 0;
-    const tenants = await this.repo.activeTenants();
-    for (const tenant of tenants) {
-      const cfg = await this.repo.tenantConfig(tenant.id);
+    const merchants = await this.repo.activeMerchants();
+    for (const merchant of merchants) {
+      const cfg = await this.repo.merchantConfig(merchant.id);
       for (const tier of WINBACK_TIERS) {
-        const cards = await this.repo.winbackCandidates(tenant.id, tier.days);
+        const cards = await this.repo.winbackCandidates(merchant.id, tier.days);
         candidates += cards.length;
         for (const c of cards) {
           const message = renderTemplate(
             resolveCronJourneyTemplate(cfg.lifecycleCopy, tier.journey),
             {
               name: c.name || DEFAULT_CUSTOMER_NAME,
-              tenant: tenant.name,
+              merchant: merchant.name,
               rewardName: cfg.rewardName,
               visitsThisCycle: c.visitsThisCycle,
               visitsRequired: cfg.visitsRequired,
             },
           );
-          if (await this.dispatch(tenant, c.cardId, tier.journey, c.phone, message)) sent++;
+          if (await this.dispatch(merchant, c.cardId, tier.journey, c.phone, message)) sent++;
         }
       }
     }
@@ -149,26 +149,26 @@ export class LifecycleService {
 
   /** Claim the send (durable dedup) then enqueue delivery. Returns true if sent. */
   private async dispatch(
-    tenant: LifecycleTenant,
+    merchant: LifecycleMerchant,
     cardId: string,
     journey: string,
     phone: string,
     body: string,
   ): Promise<boolean> {
-    const claimed = await this.repo.claimSend(tenant.id, cardId, journey, body);
+    const claimed = await this.repo.claimSend(merchant.id, cardId, journey, body);
     if (!claimed) return false; // already sent — silent skip (matches source)
     try {
       await this.enqueue.enqueue(
         QUEUES.outbound,
         'whatsapp.lifecycle',
-        { to: phone, body, business_id: tenant.id, card_id: cardId, journey },
-        { priority: JobPriority.Background, jobId: `lc:${tenant.id}:${cardId}:${journey}` },
+        { to: phone, body, merchant_id: merchant.id, card_id: cardId, journey },
+        { priority: JobPriority.Background, jobId: `lc:${merchant.id}:${cardId}:${journey}` },
       );
     } catch (err) {
       // The claim is the dedup gate; if enqueue fails the message would be lost
       // forever (the claim blocks every future run). Roll the claim back so the
       // next cron tick retries this card.
-      await this.repo.deleteSend(tenant.id, cardId, journey).catch(() => undefined);
+      await this.repo.deleteSend(merchant.id, cardId, journey).catch(() => undefined);
       throw err;
     }
     return true;

@@ -22,8 +22,8 @@ export class UpdateLocationDto {
   @IsIn(['active', 'inactive', 'archived'])
   status?: string;
 
-  // Branch resolution (Phase 2): owner-curated nicknames the bot matches a
-  // customer's branch mention against (e.g. ["chapu"] for "Chapultepec"). The
+  // Location resolution (Phase 2): owner-curated nicknames the bot matches a
+  // customer's location mention against (e.g. ["chapu"] for "Chapultepec"). The
   // bot reads these as the sole gate (no re-validation downstream), so bound
   // here for length, non-emptiness, and case-insensitive uniqueness — a direct
   // API caller can't slip past the dashboard's client-side trim/dedupe.

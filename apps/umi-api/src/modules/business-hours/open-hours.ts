@@ -1,9 +1,9 @@
 /**
  * `open_hours` — the jsonb document, and the only place its meaning is written down.
  *
- * build-v3 makes hours an ATTRIBUTE, not a table: `tenant.business.open_hours`, with
- * `tenant.branch.open_hours` overriding it (NULL = inherit, exactly like
- * `branch.timezone` one line above it in the DDL). This module owns the shape so the
+ * build-v3 makes hours an ATTRIBUTE, not a table: `merchant.merchant.open_hours`, with
+ * `merchant.location.open_hours` overriding it (NULL = inherit, exactly like
+ * `location.timezone` one line above it in the DDL). This module owns the shape so the
  * dashboard, the WhatsApp bot and the cash register cannot each decide separately what
  * "closed" means — which is what happened with the row table it replaces, where a
  * missing row meant "closed" in one reader and "unset" in another.
@@ -20,7 +20,7 @@
  * ```
  *
  * THE THREE STATES OF A DAY, which the row table could not tell apart:
- *   - key ABSENT  → unknown. Fail closed. (A tenant that has never set hours.)
+ *   - key ABSENT  → unknown. Fail closed. (A merchant that has never set hours.)
  *   - key `[]`    → the café states it is closed that day.
  *   - key `[…]`   → open during those intervals.
  * Absent and `[]` both read as closed; they differ only in what a writer may assume,
@@ -28,7 +28,7 @@
  *
  * TWO THINGS THE ROW TABLE COULD NOT EXPRESS, both now representable:
  *   - more than one interval per day. The 2026-06-26 migration added a UNIQUE index on
- *     `(tenant, location, day_of_week)`, so a split shift was not merely unimplemented,
+ *     `(merchant, location, day_of_week)`, so a split shift was not merely unimplemented,
  *     it was forbidden.
  *   - date exceptions. "Closed on Christmas" had nowhere to live at all.
  */
@@ -36,7 +36,7 @@
 export const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
 export type DayKey = (typeof DAY_KEYS)[number];
 
-/** One open window. `HH:MM`, local to the branch/business timezone. */
+/** One open window. `HH:MM`, local to the location/merchant timezone. */
 export interface HoursInterval {
   open: string;
   close: string;
@@ -151,9 +151,9 @@ export function windowsOn(
 
 /**
  * Does this window run past midnight? `20:00 → 02:00` is a real café, and the schema
- * already concedes the point: `tenant.business.business_day_start` exists precisely so
+ * already concedes the point: `merchant.merchant.business_day_start` exists precisely so
  * a sale at 01:00 can belong to the previous trading day. Hours have to agree with it,
- * or a late-night business reads as closed during half its service.
+ * or a late-night merchant reads as closed during half its service.
  */
 export function crossesMidnight(w: HoursInterval): boolean {
   const open = timeToMinutes(w.open);

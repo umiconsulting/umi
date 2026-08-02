@@ -6,7 +6,7 @@ import { PgService } from '../shared/database/pg.service';
  * against the live platform DB on 2026-06-24
  * (`docs/migration/2026-06-24-phase1c-queue-schema-preflight.md`). All access is
  * via the worker pool — `queue` is a service-role-only schema (§9.1) and every
- * table carries a NOT NULL `business_id` FK to `tenant.business`.
+ * table carries a NOT NULL `merchant_id` FK to `merchant.merchant`.
  *
  * BullMQ owns *execution* state (queue.jobs/job_attempts are superseded, §10.5).
  * This repository owns the durable boundaries BullMQ does not: the inbound
@@ -14,7 +14,7 @@ import { PgService } from '../shared/database/pg.service';
  * dead-letter sink.
  */
 export interface DeadLetterInput {
-  tenantId: string;
+  merchantId: string;
   sourceSchema?: string | null;
   sourceTable?: string | null;
   /** Only set when the originating id is a real uuid (BullMQ ids often aren't). */
@@ -27,7 +27,7 @@ export interface DeadLetterInput {
 
 export interface OutboxEventRow {
   id: string;
-  tenantId: string;
+  merchantId: string;
   eventType: string;
   aggregateId: string | null;
   idempotencyKey: string;
@@ -45,10 +45,10 @@ export class QueueRepository {
   async recordDeadLetter(dl: DeadLetterInput): Promise<void> {
     await this.pg.query(
       `INSERT INTO runtime.dead_letter
-         (business_id, source_schema, source_table, source_id, event_type, payload, error, attempts)
+         (merchant_id, source_schema, source_table, source_id, event_type, payload, error, attempts)
        VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8)`,
       [
-        dl.tenantId,
+        dl.merchantId,
         dl.sourceSchema ?? null,
         dl.sourceTable ?? null,
         dl.sourceId ?? null,
@@ -68,7 +68,7 @@ export class QueueRepository {
    * provider_event_id) constraint. Duplicates must be dropped before enqueue.
    */
   async registerInboundEvent(input: {
-    tenantId: string;
+    merchantId: string;
     provider: string;
     providerEventId: string;
     eventType: string;
@@ -77,12 +77,12 @@ export class QueueRepository {
   }): Promise<{ id: string; duplicate: boolean }> {
     const inserted = await this.pg.query<{ id: string }>(
       `INSERT INTO runtime.inbound_event
-         (business_id, provider, provider_event_id, event_type, payload_hash, payload)
+         (merchant_id, provider, provider_event_id, event_type, payload_hash, payload)
        VALUES ($1,$2,$3,$4,$5,$6::jsonb)
        ON CONFLICT (provider, provider_event_id) DO NOTHING
        RETURNING id`,
       [
-        input.tenantId,
+        input.merchantId,
         input.provider,
         input.providerEventId,
         input.eventType,
@@ -104,19 +104,19 @@ export class QueueRepository {
 
   /**
    * Claim an idempotency key. Returns true if this caller claimed it (first
-   * time), false if it already existed. UNIQUE(business_id, scope, key).
+   * time), false if it already existed. UNIQUE(merchant_id, scope, key).
    */
   async claimIdempotencyKey(
-    tenantId: string,
+    merchantId: string,
     scope: string,
     key: string,
     expiresAt?: Date | null,
   ): Promise<boolean> {
     const res = await this.pg.query(
-      `INSERT INTO runtime.idempotency_key (business_id, scope, key, expires_at)
+      `INSERT INTO runtime.idempotency_key (merchant_id, scope, key, expires_at)
        VALUES ($1,$2,$3,$4)
-       ON CONFLICT (business_id, scope, key) DO NOTHING`,
-      [tenantId, scope, key, expiresAt ?? null],
+       ON CONFLICT (merchant_id, scope, key) DO NOTHING`,
+      [merchantId, scope, key, expiresAt ?? null],
     );
     return (res.rowCount ?? 0) > 0;
   }
@@ -134,7 +134,7 @@ export class QueueRepository {
   async claimPendingOutbox(limit: number, leaseSeconds: number): Promise<OutboxEventRow[]> {
     const res = await this.pg.query<{
       id: string;
-      business_id: string;
+      merchant_id: string;
       topic: string;
       aggregate_id: string | null;
       idempotency_key: string;
@@ -157,13 +157,13 @@ export class QueueRepository {
            LIMIT $1
         ) c
        WHERE o.id = c.id
-       RETURNING o.id, o.business_id, o.topic, o.aggregate_id,
+       RETURNING o.id, o.merchant_id, o.topic, o.aggregate_id,
                  o.idempotency_key, o.payload, o.attempts, o.max_attempts`,
       [limit, leaseSeconds],
     );
     return res.rows.map((r) => ({
       id: r.id,
-      tenantId: r.business_id,
+      merchantId: r.merchant_id,
       eventType: r.topic,
       aggregateId: r.aggregate_id,
       idempotencyKey: r.idempotency_key,

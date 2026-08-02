@@ -14,7 +14,7 @@ import type { AppConfig } from '../config/config.schema';
 export interface AiTurnLog {
   conversation_id?: string;
   customer_id?: string;
-  business_id?: string;
+  merchant_id?: string;
   model: string;
   prompt_version?: string;
   prompt_tokens?: number;
@@ -42,7 +42,7 @@ export interface PipelineTrace {
   trace_id: string;
   conversation_id?: string;
   turn_id?: string;
-  business_id?: string;
+  merchant_id?: string;
   stage: 'inbound' | 'integrity' | 'process' | 'dispatch';
   event: string;
   detail?: Record<string, unknown>;
@@ -74,14 +74,14 @@ export class TraceService {
     await this.insert(
       'ai_turn_logs',
       `INSERT INTO ${this.schema}.ai_turn_logs
-         (conversation_id, customer_id, business_id, model, prompt_version,
+         (conversation_id, customer_id, merchant_id, model, prompt_version,
           prompt_tokens, completion_tokens, cost_usd, latency_ms, response_type,
           products_referenced, customer_context, metadata, request_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13::jsonb,$14)`,
       [
         data.conversation_id ?? null,
         data.customer_id ?? null,
-        data.business_id ?? null,
+        data.merchant_id ?? null,
         data.model,
         data.prompt_version ?? null,
         data.prompt_tokens ?? null,
@@ -142,13 +142,13 @@ export class TraceService {
     await this.insert(
       'pipeline_traces',
       `INSERT INTO ${this.schema}.pipeline_traces
-         (trace_id, conversation_id, turn_id, business_id, stage, event, detail, error)
+         (trace_id, conversation_id, turn_id, merchant_id, stage, event, detail, error)
        VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)`,
       [
         data.trace_id,
         data.conversation_id ?? null,
         data.turn_id ?? null,
-        data.business_id ?? null,
+        data.merchant_id ?? null,
         data.stage,
         data.event,
         this.json(data.detail),

@@ -1,8 +1,8 @@
 -- ============================================================================
 -- build-v3 backfill · DOMAIN: Commerce & ops   (ADVERSARIALLY REVIEWED / APPROVED)
--- Source DB: umi_backfill_v3 (PGPORT=5233).  Target schemas: tenant / umi.
+-- Source DB: umi_backfill_v3 (PGPORT=5233).  Target schemas: merchant / umi.
 -- Money is bigint centavos (source stored *_cents integers → widen 1:1).
--- tenant.business rows already exist (from core.tenants); ops.businesses +
+-- merchant.merchant rows already exist (from core.tenants); ops.businesses +
 -- business_hours facts are folded via UPDATE, not INSERT.
 --
 -- REVIEW CORRECTIONS vs draft:
@@ -30,19 +30,19 @@
 begin;
 
 -- ----------------------------------------------------------------------------
--- 1. ops.product_categories  ->  tenant.product_category   (MAP)
+-- 1. ops.product_categories  ->  merchant.product_category   (MAP)
 --    key (slug) dropped (name is the human label); sort_order -> display_order.
 -- ----------------------------------------------------------------------------
-insert into tenant.product_category (id, business_id, name, display_order, created_at)
+insert into merchant.product_category (id, merchant_id, name, display_order, created_at)
 select pc.id,
-       pc.tenant_id,                       -- = tenant.business.id
+       pc.tenant_id,                       -- = merchant.merchant.id
        pc.name,
        pc.sort_order,
        pc.created_at
 from ops.product_categories pc;
 
 -- ----------------------------------------------------------------------------
--- 2. ops.products  ->  tenant.product   (MAP)
+-- 2. ops.products  ->  merchant.product   (MAP)
 --    price_cents -> price (bigint centavos). external_ref <- metadata.zettle_uuid.
 --    MOVED (not dropped): name_embedding/embedding_model -> runtime.product_embedding
 --    in step 2c below. This comment previously said "DROPPED ... (-> runtime.
@@ -52,8 +52,8 @@ from ops.product_categories pc;
 --    DROPPED: synced_at (sync cursor -> runtime.integration_sync), metadata (source_*
 --    provenance = telemetry), variants (exploded below). description '' -> null.
 -- ----------------------------------------------------------------------------
-insert into tenant.product
-  (id, business_id, category_id, name, description, price, active, external_ref,
+insert into merchant.product
+  (id, merchant_id, category_id, name, description, price, active, external_ref,
    created_at, updated_at)
 select p.id,
        p.tenant_id,
@@ -72,13 +72,13 @@ from ops.products p;
 --     delta from the product base (centavos) so base+delta = variant price.
 --     Verified: 1256 variant rows across 66 products, 0 null prices, 0 empty names.
 with og as (
-  insert into tenant.product_option_group (id, product_id, name, min_select, max_select)
+  insert into merchant.product_option_group (id, product_id, name, min_select, max_select)
   select gen_random_uuid(), p.id, 'Opciones', 0, null
   from ops.products p
   where jsonb_typeof(p.variants) = 'array' and jsonb_array_length(p.variants) > 0
   returning id, product_id
 )
-insert into tenant.product_modifier (option_group_id, name, price_delta)
+insert into merchant.product_modifier (option_group_id, name, price_delta)
 select og.id,
        btrim(v->>'name'),
        round((v->>'price')::numeric * 100)::bigint - p.price_cents::bigint
@@ -101,11 +101,11 @@ from ops.products p
 where p.name_embedding is not null;
 
 -- ----------------------------------------------------------------------------
--- 3. ops.businesses + ops.business_hours  ->  tenant.business COLUMNS  (MAP/fold)
+-- 3. ops.businesses + ops.business_hours  ->  merchant.merchant COLUMNS  (MAP/fold)
 --    ops.businesses is REDUNDANT with core.tenants (1:1, unique tenant_id) — its
 --    only NEW facts are folded as columns (owner rule: no rescue table).
 --    open_hours COLUMN built from the typed ops.business_hours rows (Kalala only).
---    DROPPED (no build-v3 home, deliberately not modeled): id, business_type,
+--    DROPPED (no build-v3 home, deliberately not modeled): id, merchant_type,
 --      branding.{strip_image_url,pass_style,promo_message},  -- secondary_color now folded to a typed column
 --      config.{payment_methods,slack_channel_id,slack_channel_name},
 --      config.order_cutoff_time — the LEGACY ABSOLUTE cutoff, deliberately not
@@ -115,12 +115,12 @@ where p.name_embedding is not null;
 --    NOW CARRIED (they were on this dropped list until the hours track gave them
 --      typed columns — CONVERSATION_MODEL.md §2c dissolves `config`, it does not
 --      discard it): config.{accepts_whatsapp_orders, order_cutoff_minutes,
---      special_notice, bypass_phones} -> tenant.business.whatsapp_*.
+--      special_notice, bypass_phones} -> merchant.merchant.whatsapp_*.
 --    FLAGGED to OTHER domains:
---      config.whatsapp -> tenant.integration(provider='twilio')  [FOLDED BELOW, 3b]
---      config.address  -> tenant.branch.address
+--      config.whatsapp -> merchant.integration(provider='twilio')  [FOLDED BELOW, 3b]
+--      config.address  -> merchant.location.address
 -- ----------------------------------------------------------------------------
-update tenant.business b set
+update merchant.merchant b set
   city        = coalesce(nullif(btrim(o.city), ''), b.city),
   logo_url        = coalesce(o.branding->>'logo_url', b.logo_url),
   brand_color     = coalesce(o.branding->>'primary_color', b.brand_color),
@@ -158,17 +158,17 @@ update tenant.business b set
 from ops.businesses o
 where b.id = o.tenant_id;
 
--- 3b. ops.businesses.config->>'whatsapp'  ->  tenant.integration(provider='twilio')
+-- 3b. ops.businesses.config->>'whatsapp'  ->  merchant.integration(provider='twilio')
 --     The INBOUND-ROUTING number: "a WhatsApp message arrived at N — which café owns
 --     it?" Without this the bot resolves nothing after cutover and fails CLOSED, so it
 --     looks like silence rather than an error. Only Kalala has a number today.
 --     ⚠️ The old ops.channel_accounts / ops.channels pair is EMPTY in prod — the live
---     number lives in the business config blob, which is why this fold is the only
+--     number lives in the merchant config blob, which is why this fold is the only
 --     source. provider='twilio' (NOT 'whatsapp' — that value violates the CHECK).
 --     Stored as BARE E.164: Twilio delivers 'whatsapp:+52…' and the backend strips the
 --     prefix before matching, so normalizing here keeps one canonical form and lets
 --     unique(provider, external_account_id) actually bite.
-insert into tenant.integration (business_id, provider, external_account_id, status)
+insert into merchant.integration (merchant_id, provider, external_account_id, status)
 select o.tenant_id,
        'twilio',
        regexp_replace(btrim(o.config->>'whatsapp'), '^whatsapp:', ''),
@@ -176,19 +176,19 @@ select o.tenant_id,
 from ops.businesses o
 where nullif(btrim(coalesce(o.config->>'whatsapp', '')), '') is not null;
 
--- 3c. ops.business_hours -> tenant.business.open_hours + tenant.branch.open_hours
+-- 3c. ops.business_hours -> merchant.merchant.open_hours + merchant.location.open_hours
 --
 --     ⚠️ This USED to `group by tenant_id` alone. `ops.business_hours` is keyed by
---     (tenant, LOCATION, day), so a café with hours at two locations produced two
+--     (merchant, LOCATION, day), so a café with hours at two locations produced two
 --     'mon' keys in one jsonb_object_agg — and jsonb_object_agg keeps the last one it
---     happens to see, without an error. One branch's hours silently overwrote the
+--     happens to see, without an error. One location's hours silently overwrote the
 --     other's, and nothing downstream could tell. Production has already made that
 --     distinction: part 2b-bis of docs/migration/2026-06-26-hours-unification.sql
 --     exists precisely BECAUSE rows lived at more than one location.
 --
---     So: one document per (tenant, location). The café's own hours come from the
---     branch the dashboard and the bot both resolve — the OLDEST ACTIVE one, mirroring
---     resolveLocationIdWorker — falling back to location-less rows. A branch keeps an
+--     So: one document per (merchant, location). The café's own hours come from the
+--     location the dashboard and the bot both resolve — the OLDEST ACTIVE one, mirroring
+--     resolveLocationIdWorker — falling back to location-less rows. A location keeps an
 --     override ONLY where its document actually differs; anywhere it agrees it stays
 --     NULL and inherits, so an override means something when you see one.
 --
@@ -218,10 +218,10 @@ default_loc as (
    where status = 'active'
    order by tenant_id, created_at asc, id asc
 ),
-business_doc as (
-  -- Preference order: the resolved branch, then location-less rows, then whatever
-  -- exists. The last case is a café whose only hours sit at a non-default branch —
-  -- it still gets real hours rather than an empty document, and the branch that
+merchant_doc as (
+  -- Preference order: the resolved location, then location-less rows, then whatever
+  -- exists. The last case is a café whose only hours sit at a non-default location —
+  -- it still gets real hours rather than an empty document, and the location that
   -- supplied them then compares equal and takes no override.
   select d.tenant_id,
          (array_agg(d.hours order by
@@ -232,35 +232,35 @@ business_doc as (
     left join default_loc dl on dl.tenant_id = d.tenant_id
    group by d.tenant_id
 ),
-set_business as (
-  update tenant.business b
+set_merchant as (
+  update merchant.merchant b
      set open_hours = bd.hours, updated_at = now()
-    from business_doc bd
+    from merchant_doc bd
    where b.id = bd.tenant_id
      and bd.hours is not null
-  returning b.id as business_id, bd.hours as hours
+  returning b.id as merchant_id, bd.hours as hours
 )
-update tenant.branch br
+update merchant.location br
    set open_hours = d.hours, updated_at = now()
   from doc d
-  join set_business sb on sb.business_id = d.tenant_id
- where br.business_id = d.tenant_id
+  join set_merchant sb on sb.merchant_id = d.tenant_id
+ where br.merchant_id = d.tenant_id
    and br.id = d.location_id
    and d.hours is distinct from sb.hours;
 
 -- ----------------------------------------------------------------------------
--- 4. ops.orders  ->  tenant.customer_order   (MAP)
---    person_id -> customer_id (48 non-null all resolve to tenant.customer, 3 null).
+-- 4. ops.orders  ->  merchant.customer_order   (MAP)
+--    person_id -> customer_id (48 non-null all resolve to merchant.customer, 3 null).
 --    source_transaction_id -> external_ref. status remapped to target vocab.
---    location_id all null -> branch_id null. no conversation link -> null.
+--    location_id all null -> location_id null. no conversation link -> null.
 --    fulfillment_type NULL: source order_type ∈ {'order',''} is NOT a
 --      pickup/dine_in/delivery value.
 --    notes -> notes and pickup_person -> pickup_person: now CARRIED, not dropped.
---      Both are named columns (see 20_tenant.sql) because both ends exist today —
+--      Both are named columns (see 20_merchant.sql) because both ends exist today —
 --      the WhatsApp checkout writes them and the frozen iPad KDS ticket renders
 --      them. The 7 populated notes are per-line drink specs plus one customer
 --      preference; they carry as-is rather than being re-routed, because these
---      orders are known TEST data (the tenant never used ordering) and inventing a
+--      orders are known TEST data (the merchant never used ordering) and inventing a
 --      line-attribution for a test string would be fabrication, not fidelity.
 --    DROPPED: metadata (source_*/kds_* = telemetry), details.items (denormalized
 --      cache of order_items), channel (dup of source), details.customer_note
@@ -268,13 +268,13 @@ update tenant.branch br
 --      (derived from latest order_event), station_id/name (KDS routing scratch),
 --      cancellation_reason* (contaminated free text; canceled fact is in status).
 --    total_cents: NOT carried as a stored column. build-v3 DERIVES the order total
---      (Σ live lines, tenant.order_total). PROVEN lossless on this snapshot:
+--      (Σ live lines, merchant.order_total). PROVEN lossless on this snapshot:
 --      total_cents = Σ(unit_price*qty WHERE NOT is_cancelled) for all 51 orders
 --      (590300 = 590300); the stored total already excluded the 3 voided lines.
 --      cancel_reason left NULL (source free-text is contaminated — see above).
 -- ----------------------------------------------------------------------------
-insert into tenant.customer_order
-  (id, business_id, branch_id, customer_id, conversation_id, source,
+insert into merchant.customer_order
+  (id, merchant_id, location_id, customer_id, conversation_id, source,
    fulfillment_type, status, notes, pickup_person, external_ref,
    placed_at, created_at, updated_at)
 select o.id,
@@ -298,24 +298,24 @@ select o.id,
 from ops.orders o;
 
 -- ----------------------------------------------------------------------------
--- 5. ops.order_items  ->  tenant.order_item   (MAP)
+-- 5. ops.order_items  ->  merchant.order_item   (MAP)
 --    68 non-null product_id all resolve. name = order-time snapshot.
 --    variant_name (63) + display_order CARRIED as their own columns. They used to be
 --      folded into notes / dropped as cosmetic; both were wrong and both broke a live
---      reader (see 20_tenant.sql). notes now carries ONLY the customer's note, which is
+--      reader (see 20_merchant.sql). notes now carries ONLY the customer's note, which is
 --      what it means — and no source row has both, so nothing about this run changes
 --      except that the two facts stay separable.
 --    is_cancelled (3 lines / 2 orders) -> voided_at (the void tombstone). The
 --      source carries only the boolean, so updated_at stands in for the unknown
 --      exact void time — what matters is non-null, so the line leaves the
---      derived total (this is what makes tenant.order_total reconcile to 590300).
+--      derived total (this is what makes merchant.order_total reconcile to 590300).
 --    void_reason left NULL — the source has no reason (and these are known tests),
 --      so we do not fabricate one; same rule as customer_order.cancel_reason.
 --    DROPPED: kitchen_status (derived), metadata.
 --    station_id DEFERRED (source has no per-line station; column not built — see
---      20_tenant.sql / ORDER_MODEL.md §5).
+--      20_merchant.sql / ORDER_MODEL.md §5).
 -- ----------------------------------------------------------------------------
-insert into tenant.order_item
+insert into merchant.order_item
   (id, order_id, product_id, name, variant_name, quantity, unit_price,
    display_order, voided_at, notes, created_at)
 select oi.id,
@@ -332,7 +332,7 @@ select oi.id,
 from ops.order_items oi;
 
 -- ----------------------------------------------------------------------------
--- 6. ops.order_events  ->  tenant.order_event   (MAP, filtered to REAL transitions)
+-- 6. ops.order_events  ->  merchant.order_event   (MAP, filtered to REAL transitions)
 --    Keep ONLY event_kind='status_changed' (the canonical, complete transition
 --    stream: 78 rows, all 26 orders that have real transitions).
 --    DROPPED: order_upserted (sync-ingestion duplicate — same timestamps/status
@@ -349,7 +349,7 @@ from ops.order_items oi;
 --      counter behind the highest carried value, so the first live event after
 --      cutover would collide. The ORDER BY below makes the generated sequence agree
 --      with source time order; kitchen_sequence itself is a cursor, not a fact.
-insert into tenant.order_event (id, order_id, status, staff_id, occurred_at)
+insert into merchant.order_event (id, order_id, status, staff_id, occurred_at)
 select e.id,
        e.order_id,
        case e.new_status

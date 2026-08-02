@@ -10,9 +10,9 @@
 // The POS surface is versioned (`/api/v1/...`); the browser surfaces are not. The
 // reasoning is in `route-table.ts`.
 
-import { buildPath, routePath, tenantBase } from './route-table';
+import { buildPath, routePath, merchantBase } from './route-table';
 
-export { tenantBase };
+export { merchantBase };
 
 export const routes = {
   auth: {
@@ -32,24 +32,25 @@ export const routes = {
     },
   },
   me: {
-    tenants: routePath('me.tenants'),
+    merchants: routePath('me.merchants'),
   },
-  tenants: {
-    /** `/api/tenants/:tenantId` — compose ad-hoc sub-paths onto this. */
-    base: tenantBase,
-    capabilities: (tenantId: string): string => buildPath('tenants.capabilities', { tenantId }),
-    settings: (tenantId: string): string => buildPath('tenants.settings', { tenantId }),
-    locations: (tenantId: string): string => buildPath('tenants.locations', { tenantId }),
-    audit: (tenantId: string): string => buildPath('tenants.audit', { tenantId }),
+  merchants: {
+    /** `/api/merchants/:merchantId` — compose ad-hoc sub-paths onto this. */
+    base: merchantBase,
+    capabilities: (merchantId: string): string =>
+      buildPath('merchants.capabilities', { merchantId }),
+    settings: (merchantId: string): string => buildPath('merchants.settings', { merchantId }),
+    locations: (merchantId: string): string => buildPath('merchants.locations', { merchantId }),
+    audit: (merchantId: string): string => buildPath('merchants.audit', { merchantId }),
   },
   cash: {
-    // Tenant-scoped surface (dashboard, cookie auth).
-    stats: (tenantId: string): string => buildPath('cash.stats', { tenantId }),
-    analytics: (tenantId: string): string => buildPath('cash.analytics', { tenantId }),
-    customers: (tenantId: string): string => buildPath('cash.customers', { tenantId }),
-    members: (tenantId: string): string => buildPath('cash.members', { tenantId }),
-    giftCards: (tenantId: string): string => buildPath('cash.giftCards', { tenantId }),
-    rewardConfig: (tenantId: string): string => buildPath('cash.rewardConfig', { tenantId }),
+    // Merchant-scoped surface (dashboard, cookie auth).
+    stats: (merchantId: string): string => buildPath('cash.stats', { merchantId }),
+    analytics: (merchantId: string): string => buildPath('cash.analytics', { merchantId }),
+    customers: (merchantId: string): string => buildPath('cash.customers', { merchantId }),
+    members: (merchantId: string): string => buildPath('cash.members', { merchantId }),
+    giftCards: (merchantId: string): string => buildPath('cash.giftCards', { merchantId }),
+    rewardConfig: (merchantId: string): string => buildPath('cash.rewardConfig', { merchantId }),
     // Slug-scoped surface (umi-cash frontend). The write plus primary read paths both
     // surfaces call; not an exhaustive mirror of every GET.
     slug: {
@@ -71,8 +72,8 @@ export const routes = {
     update: (slug: string, staffId: string): string => buildPath('staff.update', { slug, staffId }),
   },
   devices: {
-    beginEnrollment: (tenantId: string): string =>
-      buildPath('devices.beginEnrollment', { tenantId }),
+    beginEnrollment: (merchantId: string): string =>
+      buildPath('devices.beginEnrollment', { merchantId }),
     completeEnrollment: routePath('devices.completeEnrollment'),
     status: routePath('devices.status'),
   },
@@ -86,36 +87,40 @@ export const routes = {
     verifyPin: routePath('pos.verifyPin'),
     managerApproval: routePath('pos.managerApproval'),
     catalog: {
-      categories: (tenantId: string): string => buildPath('pos.catalogCategories', { tenantId }),
-      products: (tenantId: string): string => buildPath('pos.catalogProducts', { tenantId }),
-      product: (tenantId: string, productId: string): string =>
-        buildPath('pos.catalogProduct', { tenantId, productId }),
+      categories: (merchantId: string): string =>
+        buildPath('pos.catalogCategories', { merchantId }),
+      products: (merchantId: string): string => buildPath('pos.catalogProducts', { merchantId }),
+      product: (merchantId: string, productId: string): string =>
+        buildPath('pos.catalogProduct', { merchantId, productId }),
     },
     cart: {
-      base: (tenantId: string): string => buildPath('pos.cartCreate', { tenantId }),
-      lines: (tenantId: string): string => buildPath('pos.cartLines', { tenantId }),
-      line: (tenantId: string, lineId: string): string =>
-        buildPath('pos.cartLineUpdate', { tenantId, lineId }),
-      prepare: (tenantId: string): string => buildPath('pos.cartPrepare', { tenantId }),
+      base: (merchantId: string): string => buildPath('pos.cartCreate', { merchantId }),
+      lines: (merchantId: string): string => buildPath('pos.cartLines', { merchantId }),
+      line: (merchantId: string, lineId: string): string =>
+        buildPath('pos.cartLineUpdate', { merchantId, lineId }),
+      prepare: (merchantId: string): string => buildPath('pos.cartPrepare', { merchantId }),
     },
     checkout: {
-      base: (tenantId: string): string => buildPath('pos.checkout', { tenantId }),
-      payment: (tenantId: string, paymentId: string): string =>
-        buildPath('pos.checkoutPayment', { tenantId, paymentId }),
+      base: (merchantId: string): string => buildPath('pos.checkout', { merchantId }),
+      payment: (merchantId: string, paymentId: string): string =>
+        buildPath('pos.checkoutPayment', { merchantId, paymentId }),
     },
     offline: {
-      policy: (tenantId: string): string => buildPath('pos.offlinePolicy', { tenantId }),
-      replayBegin: (tenantId: string): string => buildPath('pos.offlineReplayBegin', { tenantId }),
-      replayBatch: (tenantId: string): string => buildPath('pos.offlineReplayBatch', { tenantId }),
-      replayCursor: (tenantId: string): string =>
-        buildPath('pos.offlineReplayCursor', { tenantId }),
-      replayCommand: (tenantId: string, commandId: string): string =>
-        buildPath('pos.offlineReplayCommand', { tenantId, commandId }),
-      conflicts: (tenantId: string): string => buildPath('pos.offlineConflicts', { tenantId }),
-      reconcile: (tenantId: string): string => buildPath('pos.offlineReconcile', { tenantId }),
-      reconcileAcknowledge: (tenantId: string): string =>
-        buildPath('pos.offlineReconcileAcknowledge', { tenantId }),
-      diagnostics: (tenantId: string): string => buildPath('pos.offlineDiagnostics', { tenantId }),
+      policy: (merchantId: string): string => buildPath('pos.offlinePolicy', { merchantId }),
+      replayBegin: (merchantId: string): string =>
+        buildPath('pos.offlineReplayBegin', { merchantId }),
+      replayBatch: (merchantId: string): string =>
+        buildPath('pos.offlineReplayBatch', { merchantId }),
+      replayCursor: (merchantId: string): string =>
+        buildPath('pos.offlineReplayCursor', { merchantId }),
+      replayCommand: (merchantId: string, commandId: string): string =>
+        buildPath('pos.offlineReplayCommand', { merchantId, commandId }),
+      conflicts: (merchantId: string): string => buildPath('pos.offlineConflicts', { merchantId }),
+      reconcile: (merchantId: string): string => buildPath('pos.offlineReconcile', { merchantId }),
+      reconcileAcknowledge: (merchantId: string): string =>
+        buildPath('pos.offlineReconcileAcknowledge', { merchantId }),
+      diagnostics: (merchantId: string): string =>
+        buildPath('pos.offlineDiagnostics', { merchantId }),
     },
   },
 } as const;
