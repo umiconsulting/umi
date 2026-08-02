@@ -70,9 +70,22 @@ grant select on umi.role, umi.permission, umi.role_permission, umi.channel_type,
                 umi.feature, umi.plan, umi.plan_feature to api;
 --   umi per-café tables — readable but RLS-scoped to the current merchant (below)
 grant select on umi.subscription, umi.subscription_item, umi.invoice,
-                umi.entitlement_override, umi.user_role to api;
+                umi.entitlement_override to api;
 --   NOT granted to api: umi.prospect / prospect_event (Umi sales pipeline),
---     umi.audit_log (sealed). Left ungranted = unreadable by the request path.
+--     umi.audit_log (sealed), umi.user_role, umi.access_grant. Left ungranted =
+--     unreadable by the request path.
+--   umi.access_grant is the break-glass table: the only thing that can produce the `*`
+--     permission. It is sealed from api for a stronger reason than the others — if the
+--     request path could write it, the request path could elevate itself, and every
+--     other control in this file would be decoration. runtime.elevation_grant IS
+--     granted to api (a till must record its own manager approval), which is exactly
+--     why platform elevation could not reuse that table. Reads happen on the worker
+--     pool, like every other platform grant.
+--   umi.user_role joined that list when it became a PLATFORM-only grant: it holds
+--     Umi's own cross-merchant operators and no merchant_id, so there is no predicate
+--     that could scope it to one café. The auth queries that read it run on the worker
+--     pool. A café's own role grant is merchant.staff.role_id, which api reads under
+--     the merchant policy like every other merchant table.
 --   umi.effective_entitlement VIEW (security_invoker) — SELECT only:
 grant select on umi.effective_entitlement to api;
 --   Views are read-only for api (the merchant grant-all handed it DML on the views too).
@@ -149,6 +162,13 @@ grant select                  on runtime.product_embedding to api;   -- RAG read
 revoke select on umi.user from api, readonly;
 grant  select (id, email, full_name, status, last_login_at, created_at, updated_at)
   on umi.user to api, readonly;
+--   The request path DOES mint identities: adding a staff member creates the person
+--   who will hold the till PIN. The grant is COLUMN-SCOPED so it can only ever mint a
+--   login-less row — password_hash/salt/algorithm are not in the list, so a forged
+--   account carries no credential and can authenticate nothing. Column-level INSERT is
+--   real in Postgres (unlike the `revoke update (col)` no-op the gate caught earlier),
+--   because api holds no table-level INSERT here to override it.
+grant  insert (email, full_name, status) on umi.user to api;
 
 -- ---- Append-only audit: nobody (not even worker) updates/deletes an audit row ----
 revoke update, delete on umi.audit_log, merchant.audit_log from api, worker, readonly;
@@ -264,11 +284,17 @@ create policy merchant_isolation on umi.invoice
   using      (merchant_id = umi.current_merchant())
   with check (merchant_id = umi.current_merchant());
 
-alter table umi.user_role enable row level security;
-alter table umi.user_role force  row level security;
-create policy merchant_isolation on umi.user_role
-  using      (merchant_id = umi.current_merchant())
-  with check (merchant_id = umi.current_merchant());
+-- umi.user_role has NO policy on purpose. It is a platform grant table with no
+-- merchant_id, so no predicate could scope it to one café; it is sealed by GRANT
+-- instead, like umi.audit_log (see the grant block above). security_gate.sql asserts
+-- that api and readonly cannot SELECT it.
+
+-- umi.access_grant has NO policy for the same reason, and needs none for a second one:
+-- api holds no grant on it at all, so there is nothing for a policy to constrain. Its
+-- merchant_id is nullable by design (a platform action has no café), which is itself a
+-- reason a policy would be wrong here — `merchant_id = umi.current_merchant()` returns
+-- NULL for a platform row, and a USING clause that returns NULL hides the row silently
+-- while WITH CHECK raises. Sealed by GRANT, asserted by security_gate.sql.
 
 -- subscription_item / entitlement_override: scope via subscription.merchant_id.
 alter table umi.subscription_item enable row level security;
@@ -519,8 +545,13 @@ revoke update, delete on runtime.security_audit_event, runtime.audit_event_inter
 revoke insert, update, delete on merchant.pos_offline_policy, merchant.pos_offline_cash_policy
   from api, readonly;
 revoke all on umi.audit_retention_policy from api, readonly;
-revoke insert, update, delete on umi.user_permission_override from api, readonly;
-grant  select on umi.user_permission_override to api;
+-- A permission override is READ by the request path and WRITTEN by nothing on it. If
+-- api could insert effect='allow', a compromised request path would grant itself any
+-- permission it liked, and the deny rows would be deletable by the party they restrain.
+-- Writes go through the worker pool. RLS still scopes the reads: the table carries
+-- merchant_id, so the merchant_isolation loop covered it already.
+revoke insert, update, delete on merchant.staff_permission_override from api, readonly;
+grant  select on merchant.staff_permission_override to api;
 
 -- ---- The offline reconciliation acknowledgement is the ONE column a device may set ----
 revoke update on merchant.offline_reconciliation from api;

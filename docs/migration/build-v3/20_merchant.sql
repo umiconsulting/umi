@@ -218,39 +218,131 @@ comment on table merchant.integration is
   'Generic external connection (POS sync / message sender / wallet issuer / AI). '
   'Umi''s own POS is just provider=''umi_pos''. Sync cursor lives in runtime.integration_sync.';
 
+-- THE employment, and the only principal a café ever acts through.
+--
+-- One person, two doors. The PIN opens the till. The email+password on umi.user opens
+-- the dashboard. Most staff need only the first — that is Shopify POS ("POS-only
+-- staff"), Square (passcode now, invite later) and Toast (POS passcode vs Toast Web).
+--
+-- But BOTH doors open onto the same identity, so `user_id` is NOT NULL. A PIN-only
+-- barista still gets a umi.user row, with no email and no password: they cannot log in,
+-- and they do not need to. The reason is not tidiness, it is that build-v3 has already
+-- decided who an actor is — runtime.operator_session requires user_id AND staff_id,
+-- and audit_log.actor_user_id / elevation_grant.approved_by all point at umi.user. An
+-- operator with no user row could not open a session, and no void or refund they
+-- performed could be attributed to them.
+--
+-- What the merchant creates is therefore the EMPLOYMENT, and a umi.user comes with it.
+-- What the merchant grants separately is dashboard access: set email + send an invite.
+--
+-- `role_id` lives HERE and not on umi.user_role, for a different reason that survives
+-- the above: umi.user_role was (user, role, merchant, location) and this table is
+-- (user, merchant, location). They were one table minus a column. One employment, one
+-- café role; umi.user_role keeps the platform grants only.
+--
+-- name/phone/email are the MERCHANT's record of the employee, not the login. They are
+-- deliberately not read from umi.user: umi.user has no phone at all, and one person who
+-- works at two cafés would otherwise let café A rename them inside café B.
 create table merchant.staff (
   id           uuid primary key default gen_random_uuid(),
   merchant_id  uuid not null references merchant.merchant(id) on delete cascade,
   location_id    uuid references merchant.location(id),
-  user_id      uuid not null references umi.user(id),   -- credentials live on umi.user
+  -- Always set. The row it points at may hold no email and no password (PIN-only).
+  user_id      uuid not null references umi.user(id),
+  role_id      uuid not null references umi.role(id),
+  name         text not null,
+  phone        text,
+  email        text,          -- employment contact; the LOGIN address is umi.user.email
   position     text,
   hired_at     date,
-  status       text not null default 'active' check (status in ('active','inactive')),
+  -- The merchant's switch. 'invited' is not here: that is a state of the login, and
+  -- umi.user.status already holds it.
+  status       text not null default 'active' check (status in ('active','disabled')),
   -- ---- Operator PIN ----------------------------------------------------------
   -- The till PIN. It is NOT a second password: the enrolled DEVICE authorizes the
   -- channel (may this terminal transact at all, at this location), and the PIN authorizes
   -- the privileged ACTION — void, refund, over-threshold discount, drawer open — and
-  -- names the actor for the audit chain. Salt and hash are stored; the PIN itself never
-  -- is, and never reaches the device's disk.
+  -- names the actor for the audit chain. The PIN itself is never stored, and never
+  -- reaches the device's disk.
+  --
+  -- TWO columns, because they answer two different questions.
+  --   operator_pin_lookup  WHO typed this? A blind index: HMAC-SHA256(pin, pepper),
+  --                        with the pepper held OUTSIDE the database (app env / KMS).
+  --                        Deterministic, so the row can be found from the PIN alone —
+  --                        which is what lets the operator just type it, with no name
+  --                        grid. A stolen database yields no PIN table, because the
+  --                        pepper is not in it.
+  --   operator_pin_hash    is that PIN right? Per-row salt, slow hash. Verification
+  --                        only; never searched.
+  operator_pin_lookup  text,
   operator_pin_salt    text,
   operator_pin_hash    text,
-  pin_failed_attempts  integer not null default 0,
-  pin_locked_until     timestamptz,   -- set on lockout; a til cannot be brute-forced
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
+  -- One employment per person per café.
   unique (merchant_id, user_id),
+  -- Redundant against the PK on its own. It is the TARGET of the composite FK on
+  -- merchant.staff_permission_override, which is what stops an override belonging to
+  -- one café from naming an employment at another. Same shape as
+  -- merchant.location (merchant_id, id), used by runtime.operator_session.
+  unique (merchant_id, id),
+  -- Square's rule, enforced rather than hoped for: two staff at one café may not share
+  -- a PIN. Without this the PIN names nobody and the audit chain has no actor.
+  unique (merchant_id, operator_pin_lookup),
+  constraint staff_operator_pin_lookup_ck
+    check (operator_pin_lookup is null or operator_pin_lookup ~ '^[a-f0-9]{64}$'),
   constraint staff_operator_pin_hash_ck
     check (operator_pin_hash is null or operator_pin_hash ~ '^[a-f0-9]{128}$'),
   constraint staff_operator_pin_salt_ck
     check (operator_pin_salt is null or operator_pin_salt ~ '^[a-f0-9]{32}$'),
-  -- A hash without its salt is unverifiable; a salt without its hash is noise. The
-  -- same gap the security audit found on umi.user.password_hash — refused here.
-  constraint staff_operator_pin_pair_ck
-    check ((operator_pin_salt is null) = (operator_pin_hash is null)),
-  constraint staff_pin_failed_attempts_ck check (pin_failed_attempts between 0 and 10)
+  -- A hash without its salt is unverifiable; a salt without its hash is noise; a lookup
+  -- without a hash finds a row it cannot verify. All three or none.
+  constraint staff_operator_pin_triple_ck
+    check ((operator_pin_salt is null) = (operator_pin_hash is null)
+       and (operator_pin_salt is null) = (operator_pin_lookup is null))
+  -- NO "must be able to sign in" constraint. A staff member added from the dashboard has
+  -- no PIN and no password yet: the merchant records the person first, then issues a PIN
+  -- or sends an invitation. Such a row already names the actor on a loyalty visit, which
+  -- is what most of them are for.
 );
 comment on table merchant.staff is
-  'Café employment fact. Login/credentials on umi.user; role/authority on umi.user_role.';
+  'THE café employment. One row per person per café, always backed by a umi.user. PIN '
+  'opens the till, email+password opens the dashboard, role_id is the one café grant.';
+comment on column merchant.staff.operator_pin_lookup is
+  'Blind index HMAC-SHA256(pin, pepper) — finds the operator from the PIN alone. The '
+  'pepper lives outside the database; verification still uses operator_pin_hash.';
+
+-- A result a role grant cannot express: a temporary allow, or a deny that must beat
+-- every role the employee holds. A POS needs both — suspend ONE cashier's refund right
+-- today, without touching the role everyone else shares.
+--
+-- It hangs on the employment, not on umi.user, for the reason the cashier makes plain:
+-- the person you most need to deny is the person least likely to have an account.
+--
+-- RESOLUTION ORDER: deny > allow > role grant. A deny row is absolute; that is the
+-- whole point of the table, so nothing here may be resolved by "most specific wins".
+create table merchant.staff_permission_override (
+  id             uuid primary key default gen_random_uuid(),
+  merchant_id    uuid not null references merchant.merchant(id) on delete cascade,
+  staff_id       uuid not null references merchant.staff(id)    on delete cascade,
+  permission_id  uuid not null references umi.permission(id)    on delete cascade,
+  effect         text not null check (effect in ('allow','deny')),
+  expires_at     timestamptz,  -- NULL = until revoked
+  granted_by     uuid references umi.user(id),
+  created_at     timestamptz not null default now(),
+  -- One row per (employment, permission). No scope columns: the staff row already
+  -- carries the merchant and the location, so a second copy could only disagree.
+  unique (staff_id, permission_id),
+  -- merchant_id and staff_id are ONE fact, not two. Checked separately, both FKs are
+  -- satisfied by a row that claims café A and points at an employment in café B — RLS
+  -- scopes reads by merchant_id, so café A would see and manage a deny governing café
+  -- B's employee. The composite key makes that row unrepresentable.
+  constraint staff_permission_override_same_merchant_fk
+    foreign key (merchant_id, staff_id) references merchant.staff (merchant_id, id)
+      on delete cascade
+);
+comment on table merchant.staff_permission_override is
+  'Explicit permission result for one employment. A deny always beats role grants and allows.';
 
 -- ----------------------------------------------------------------------------
 -- CUSTOMER  ·  the person  →  contact  ·  how to reach them
@@ -1187,6 +1279,12 @@ create table merchant.device (
   credential_version   integer not null default 1 check (credential_version > 0),
   platform      text check (platform in ('android','ios','linux','macos','windows','web')),
   last_seen_at  timestamptz,
+  -- Operator PIN throttle. It sits on the DEVICE, not on merchant.staff, and the PIN
+  -- model forces that: a wrong PIN matches NO staff row, so there is no employee to
+  -- count the failure against. The terminal is the only party present at a failed
+  -- attempt, so the terminal keeps the count and takes the lockout.
+  pin_failed_attempts  integer not null default 0,
+  pin_locked_until     timestamptz,
   revoked_at    timestamptz,
   revocation_reason  text,
   replacement_device_id uuid references merchant.device(id),
@@ -1198,6 +1296,7 @@ create table merchant.device (
     check (credential_hash is null or credential_hash ~ '^[a-f0-9]{64}$'),
   constraint device_installation_hash_ck
     check (installation_hash is null or installation_hash ~ '^[a-f0-9]{64}$'),
+  constraint device_pin_failed_attempts_ck check (pin_failed_attempts between 0 and 10),
   -- revoked_at and status are one fact, not two. Without this a row can claim to be
   -- active while carrying a revocation timestamp, and the reader has to guess.
   constraint device_revocation_ck
@@ -1221,14 +1320,37 @@ create table merchant.audit_log (
   id             uuid primary key default gen_random_uuid(),
   merchant_id    uuid not null references merchant.merchant(id) on delete cascade,
   actor_user_id  uuid references umi.user(id) on delete set null,
+  -- The Umi operator who acted THROUGH the café's account, when one did. NULL for the
+  -- ordinary case where a café user acted as themselves.
+  --
+  -- One column, added before it is needed, because the alternative is a trail that can
+  -- only answer one of two questions. Zendesk documents its own version of the wrong
+  -- answer: when staff assume a user, "any actions you take ... are done by the user
+  -- you're logged in as", so the acting person vanishes. Salesforce keeps both — the
+  -- impersonated user on CreatedBy, the acting one on SetupAuditTrail.DelegateUser.
+  -- PCI DSS 8.2.2 requires the same property of any shared credential: "Every action
+  -- taken is attributable to an individual user."
+  --
+  -- Umi has no "log in as" feature today, so this column stays NULL. That is the point:
+  -- adding it now costs one line, and the rule it encodes — actor_user_id is who the
+  -- action RAN AS, delegate_user_id is who CAUSED it — is fixed before any code needs it.
+  delegate_user_id uuid references umi.user(id) on delete set null,
   action         text not null
                    check (action in ('create','update','delete','grant','revoke','void','adjust')),
   entity         text not null,   -- 'merchant','product','loyalty_program','loyalty_reward','staff'
   entity_id      uuid,            -- soft ref, no FK
+  outcome        text not null default 'success'
+                   check (outcome in ('success','denied','failure')),
+  request_id     text,            -- PCI DSS 10.2.2 "origination of event"
   before         jsonb,
   after          jsonb,
   at             timestamptz not null default now()
 );
+-- "Everything Umi did inside this café" — the query a café owner is entitled to run,
+-- and the one an investigation starts from. Partial: delegated actions are the rare case.
+create index merchant_audit_log_delegate_idx
+  on merchant.audit_log (merchant_id, delegate_user_id, at desc)
+  where delegate_user_id is not null;
 create index merchant_audit_log_merchant_time_idx on merchant.audit_log (merchant_id, at desc);
 create index merchant_audit_log_entity_idx        on merchant.audit_log (merchant_id, entity, at desc);
 comment on table merchant.audit_log is
@@ -1329,6 +1451,16 @@ create table merchant.audit_event (
   merchant_id     uuid not null references merchant.merchant(id) on delete restrict,
   location_id       uuid references merchant.location(id),
   actor_user_id   uuid references umi.user(id) on delete set null,
+  -- The Umi operator who acted through this café's account. Same rule as
+  -- merchant.audit_log.delegate_user_id: actor_user_id is who the action RAN AS,
+  -- delegate_user_id is who CAUSED it. NULL for an ordinary café action.
+  --
+  -- Added while this table is still empty, and that timing is the whole reason it is
+  -- here now. The column is INSIDE the hash chain (see merchant.tg_audit_event_hash),
+  -- so introducing it later would mean either leaving it outside the hash — where it
+  -- could be edited without breaking the chain, defeating the point — or rehashing
+  -- every row already written. Neither is a change anyone wants to make under an audit.
+  delegate_user_id uuid references umi.user(id) on delete set null,
   command_id      uuid,
   event_type      text not null,
   entity_type     text not null,

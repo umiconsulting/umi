@@ -66,14 +66,29 @@ create index session_family_idx on runtime.session (refresh_family_id);
 create table runtime.otp (
   id           uuid primary key default gen_random_uuid(),
   user_id      uuid not null references umi.user(id) on delete cascade,
-  purpose      text not null check (purpose in ('login','device_pairing')),
+  -- 'mfa' joined the set with the second-factor work. It reuses this table rather than
+  -- adding a near-identical one: a second factor IS a one-time code with an expiry and
+  -- a single use, which is exactly what this table already models.
+  purpose      text not null check (purpose in ('login','device_pairing','mfa')),
   code_hash    text not null,
+  -- A 6-digit code has 10^6 possibilities, so an unthrottled verify endpoint is a
+  -- guessing oracle, not a factor. The app refuses the code once this passes its
+  -- ceiling and forces a new one to be issued. Counted on the ROW, not on the session,
+  -- because the attacker chooses the session.
+  attempts     integer not null default 0 check (attempts >= 0),
   expires_at   timestamptz not null,
   consumed_at  timestamptz,
   created_at   timestamptz not null default now()
 );
+-- "The live code for this user and purpose" — what verify looks up, and what issue
+-- invalidates before it writes a new row.
+create index otp_live_idx on runtime.otp (user_id, purpose, expires_at)
+  where consumed_at is null;
 comment on table runtime.otp is
   'One-time codes for USER auth (staff/operators). Customers do not authenticate (unverified phone only).';
+comment on column runtime.otp.attempts is
+  'Failed verifications against this code. The app caps it; without a cap a 6-digit '
+  'code is guessable in bulk.';
 
 create table runtime.password_reset_token (
   id           uuid primary key default gen_random_uuid(),

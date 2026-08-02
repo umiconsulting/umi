@@ -19,15 +19,28 @@ create schema if not exists umi;
 
 -- ----------------------------------------------------------------------------
 -- IDENTITY
--- One login identity per human who can authenticate (café staff + Umi operators).
+-- One identity per human who can authenticate (café staff + Umi operators), whichever
+-- way they do it: a password at the dashboard, or a PIN at the till. Both are the same
+-- person and both must resolve to a row HERE, because every actor column in build-v3
+-- points at this table — audit_log.actor_user_id, operator_session.user_id,
+-- elevation_grant.approved_by. An operator who is not here cannot be named by any of
+-- them. Email and password are therefore NULLABLE: they describe ONE way in, not what
+-- makes somebody a user.
 -- Customers NEVER authenticate (umi-cash collects an unverified phone only) — so
 -- nothing here references merchant.customer.
 -- ----------------------------------------------------------------------------
 
 create table umi.user (
   id             uuid primary key default gen_random_uuid(),
-  email          text not null,
-  password_hash  text,                                -- null while status='invited'
+  -- NULLABLE, and that is the POS operator. A barista signs in to the till with a PIN,
+  -- has no mailbox we know of, and must never be given a synthetic address to satisfy a
+  -- NOT NULL. They are still a user: they authenticate, they hold a role, and every
+  -- audit_log.actor_user_id and runtime.operator_session.user_id in this schema
+  -- requires them to exist here. Email is how a human LOGS IN, not what makes them one.
+  -- NULLs stay distinct under user_email_lower_uq, so many PIN-only users coexist.
+  email          text,
+  password_hash  text,                                -- null while status='invited',
+                                                        --   and null forever for PIN-only
   password_salt  text,                                 -- scrypt needs salt+hash; storing a hash
                                                         --   without its salt makes it unverifiable
                                                         --   (schema gap the security audit caught).
@@ -41,20 +54,57 @@ create table umi.user (
                    check (status in ('invited','active','suspended')),
   last_login_at  timestamptz,
   created_at     timestamptz not null default now(),
-  updated_at     timestamptz not null default now()
+  updated_at     timestamptz not null default now(),
+  -- ---- Second factor ---------------------------------------------------------
+  -- A platform grant holder reaches every café, so a password alone is one stolen
+  -- credential away from all of them. PCI DSS 8.4.1 requires MFA for administrative
+  -- access once the CDE exists; ASVS 4.3.1 asks for it on admin interfaces regardless.
+  --
+  -- `mfa_method` is a column and not a boolean because the first method Umi ships is
+  -- NOT the one that ends up satisfying PCI. Read this before choosing 'email_otp':
+  --   email_otp  A code mailed to umi.user.email. NIST SP 800-63B §5.1.3.1 says
+  --              "Methods that do not prove possession of a specific device, such as
+  --              voice-over-IP (VOIP) or email, SHALL NOT be used for out-of-band
+  --              authentication." Email proves possession of nothing — whoever holds
+  --              the password often reaches the inbox too. It is a second STEP, not a
+  --              second FACTOR, and it will not pass a PCI assessment as MFA.
+  --   totp       Shared secret, RFC 6238. A real "something you have". Not
+  --              phishing-resistant (the code is manually re-keyed), but it satisfies
+  --              the two-factor test. This is the one that closes 8.4.1.
+  -- Free text under a CHECK, not an enum, so adding 'webauthn' is a seed change.
+  mfa_method       text check (mfa_method in ('email_otp','totp')),
+  mfa_enrolled_at  timestamptz,
+  -- The whole rule, in one line: a password is worthless without the address it is
+  -- typed beside. A user may have neither (PIN-only) or both (dashboard). Never a
+  -- password alone — that row could never be authenticated by anything.
+  constraint user_login_ck check (password_hash is null or email is not null),
+  -- A method and its enrolment date arrive together, or neither does. Same pairing
+  -- shape as user_role's revocation CHECK: the IS NULL equality form binds on every
+  -- row, where `x is not null and y is not null` would evaluate to NULL and pass.
+  constraint user_mfa_ck check ((mfa_method is null) = (mfa_enrolled_at is null)),
+  -- email_otp needs a mailbox to send to. Enforceable here; totp does not need one.
+  constraint user_mfa_email_ck
+    check (mfa_method is distinct from 'email_otp' or email is not null)
 );
 create unique index user_email_lower_uq on umi.user (lower(email));
 comment on table  umi.user is
-  'Every human who can log in (café staff + Umi operators). Customers are not users.';
-comment on column umi.user.status is 'invited (no password yet) | active | suspended.';
+  'Every human who AUTHENTICATES: café staff (PIN and/or password) + Umi operators. '
+  'Customers are not users. Email+password is one way in, not the definition.';
+comment on column umi.user.status is
+  'invited (no password yet) | active | suspended. A PIN-only operator is active with '
+  'no email and no password; the till PIN is on merchant.staff.';
 
 create table umi.role (
   id           uuid primary key default gen_random_uuid(),
-  key          text not null unique,     -- 'superadmin','owner','manager','cashier','kitchen'
+  key          text not null unique,     -- 'super_admin','developer' (platform) · 'owner','admin','staff','viewer' (café)
   name         text not null,
   description  text,
-  is_platform  boolean not null default false,  -- true = Umi-internal (e.g. superadmin), never granted to a café
-  created_at   timestamptz not null default now()
+  is_platform  boolean not null default false,  -- true = Umi-internal, never granted inside a café
+  created_at   timestamptz not null default now(),
+  -- Redundant on its own (id is already the PK). It exists to be the TARGET of the
+  -- composite foreign key on umi.user_role, which is what stops a café role from being
+  -- granted platform-wide. See the note there.
+  constraint role_id_platform_uq unique (id, is_platform)
 );
 comment on table umi.role is
   'Role catalog. A LOOKUP TABLE (not a CHECK) because a role carries attributes: its permissions.';
@@ -72,50 +122,141 @@ create table umi.role_permission (
   primary key (role_id, permission_id)
 );
 
-create table umi.user_role (
-  id           uuid primary key default gen_random_uuid(),
-  user_id      uuid not null references umi.user(id) on delete cascade,
-  role_id      uuid not null references umi.role(id),
-  merchant_id  uuid,        -- xfk-> merchant.merchant ; NULL = platform-wide grant (superadmin)
-  location_id    uuid,        -- xfk-> merchant.location   ; NULL = all locations of the merchant
-  granted_by   uuid references umi.user(id),
-  created_at   timestamptz not null default now(),
-  unique (user_id, role_id, merchant_id, location_id)
-);
-comment on table umi.user_role is
-  'GRANT: one human holds many roles across scopes. Null merchant = platform-wide. '
-  'This replaces the old polymorphic merchant.login; there is no principal_type discriminator.';
-
--- A result that a role grant cannot express: a temporary allow, or a deny that must
--- beat every role the human holds. A POS needs both — suspend one cashier's refund
--- right today without touching the role everyone else shares.
+-- The PLATFORM grant, and only that.
 --
--- RESOLUTION ORDER: deny > allow > role grant. A deny row is absolute; that is the
--- whole point of the table, so nothing here may be resolved by "most specific wins".
-create table umi.user_permission_override (
+-- A role INSIDE a café hangs on the employment (merchant.staff.role_id), not here.
+-- The reason is the barista: they sign in to the till with a PIN, they never open the
+-- dashboard, and so they hold no umi.user row to grant anything to. A grant table that
+-- the majority of a café's operators cannot appear in is not the grant table — it is a
+-- second one. Square, Toast and Shopify POS all put the permission set on the employee
+-- record and treat the passcode and the email login as two doors into it.
+--
+-- What is left here is the Umi operator: cross-merchant, always an account holder,
+-- never an employee of any café. merchant_id/location_id are gone because a platform
+-- grant has no scope to carry, and merchant.staff already carries the café's.
+--
+-- role_id must name a role with is_platform = true. A plain CHECK cannot say that,
+-- because it needs a lookup — but a COMPOSITE FOREIGN KEY can. `is_platform` below is
+-- pinned to true by its own CHECK, and the pair (role_id, true) can only resolve
+-- against a umi.role row whose is_platform is also true. A café role therefore fails
+-- to insert instead of being accepted and silently ignored.
+--
+-- A grant here ENDS. It carries an expiry, a revocation with its reason, why it was
+-- asked for, and who approved it beside who granted it. Nothing in the platform layer
+-- should be permanent by default; every other grant in this schema already is not
+-- (merchant.staff_permission_override.expires_at, runtime.elevation_grant).
+--
+-- ⚠ PostgreSQL will NOT enforce expires_at. `VALID UNTIL` applies to a password, not to
+-- a role, and no DDL construct expires a row. PLATFORM_GRANT_CTE in
+-- apps/umi-api/src/modules/auth/rbac.sql.ts carries the predicate. Without it these
+-- columns are decoration.
+create table umi.user_role (
   id             uuid primary key default gen_random_uuid(),
   user_id        uuid not null references umi.user(id) on delete cascade,
-  permission_id  uuid not null references umi.permission(id) on delete cascade,
-  merchant_id    uuid,        -- xfk-> merchant.merchant ; NULL = every merchant
-  location_id      uuid,        -- xfk-> merchant.location   ; NULL = every location of the merchant
-  effect         text not null check (effect in ('allow','deny')),
-  expires_at     timestamptz, -- NULL = until revoked
+  role_id        uuid not null references umi.role(id),
+  is_platform    boolean not null default true check (is_platform),
   granted_by     uuid references umi.user(id),
+  -- A second person, deliberately distinct from granted_by. Nullable: the bootstrap
+  -- grant has nobody to approve it, which is exactly why the seed must be run by hand.
+  approved_by    uuid references umi.user(id),
+  -- A ticket or case reference. Structured on purpose — free text defeats any later
+  -- automated review of why platform access exists.
+  justification  text,
+  expires_at     timestamptz,   -- NULL = no automatic end; see the gate assertion
+  revoked_at     timestamptz,
+  revoked_reason text,
   created_at     timestamptz not null default now(),
-  -- A location without a merchant is not a scope, it is a bug.
-  constraint permission_override_location_scope_ck
-    check (location_id is null or merchant_id is not null)
+  unique (user_id, role_id),
+  constraint user_role_platform_only_fk
+    foreign key (role_id, is_platform) references umi.role (id, is_platform),
+  -- A revocation with no reason is an unexplained loss of access; a reason with no
+  -- revocation is noise. Same shape as the pairing rules elsewhere in build-v3.
+  constraint user_role_revocation_ck
+    check ((revoked_at is null) = (revoked_reason is null))
 );
--- One row per (human, permission, scope). The coalesce sentinels make NULL scopes
--- collide the way a plain UNIQUE would not: without them a user could hold two
--- contradictory platform-wide rows for the same permission.
-create unique index user_permission_override_scope_uq
-  on umi.user_permission_override
-  (user_id, permission_id,
-   coalesce(merchant_id, '00000000-0000-0000-0000-000000000000'::uuid),
-   coalesce(location_id,   '00000000-0000-0000-0000-000000000000'::uuid));
-comment on table umi.user_permission_override is
-  'Explicit permission result for one human. A deny always beats role grants and allows.';
+create index user_role_active_idx on umi.user_role (user_id) where revoked_at is null;
+comment on table umi.user_role is
+  'PLATFORM grant: an Umi operator holds a cross-merchant role. Expires and revocable. '
+  'A café role lives on merchant.staff.role_id, where a PIN-only operator holds one too.';
+comment on column umi.user_role.is_platform is
+  'Always true. Exists only to carry the composite FK that refuses a café role here.';
+comment on column umi.user_role.expires_at is
+  'NOT enforced by PostgreSQL. PLATFORM_GRANT_CTE (rbac.sql.ts) applies the predicate.';
+
+-- ----------------------------------------------------------------------------
+-- BREAK-GLASS: one privileged action, or one short window, above the catalog.
+--
+-- ⚠️ STAGED, NOT WIRED. Nothing reads this table and nothing writes it. `hasPermission`
+-- still honours `'*'`, but `effectivePermissions` no longer emits one and no code path
+-- inserts a grant, so break-glass does not exist as a capability yet — the schema is
+-- here, the request-and-approve path is not. Read the two security_gate.sql assertions
+-- about this table in that light: against zero rows they pass without checking
+-- anything, which is not the same as a control being enforced. This repository already
+-- carries runtime.elevation_grant in exactly that state. Wire it or drop it; do not
+-- leave it here reading as protection.
+--
+-- `umi.user_role` says what an operator may do every day. This says what they may do
+-- for the next few minutes, having asked for it on purpose. It is the ONLY thing that
+-- may produce the `'*'` that `hasPermission` still honours (auth/roles.ts).
+--
+-- WHY NOT runtime.elevation_grant, which already models exactly this shape:
+--   1. its merchant_id is NOT NULL — a platform action has no café;
+--   2. its session_id points at runtime.session, whose merchant_id is also NOT NULL;
+--   3. its method CHECK admits only manager_approval / operator_pin — a till's two
+--      answers, neither of which describes a platform approval;
+--   4. its RLS policy keys on merchant_id, and a NULL merchant makes a USING clause
+--      return NULL, which silently hides the row, while WITH CHECK raises instead;
+--   5. 90_rls grants it to `api`. THIS is the decisive one. An elevation record the
+--      request path can write is not a control — the request path could elevate
+--      itself. `umi.user_role` is sealed from `api` for the same reason and
+--      security_gate.sql asserts it. This table joins that seal.
+--
+-- SCOPE LIMIT, recorded so it is not quietly widened later: this is support and
+-- recovery access. It is NOT the approval path for money. A void, a refund or an
+-- over-threshold discount stays on runtime.elevation_grant with a manager or a PIN,
+-- because optimistic "allow and audit" access is not appropriate where the risk is
+-- fraud rather than delay.
+create table umi.access_grant (
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null references umi.user(id) on delete cascade,
+  -- '*' = full bypass. Any other value elevates exactly one permission key.
+  permission_key text not null,
+  merchant_id    uuid,   -- soft ref, NULL = platform-wide. No FK: this outlives the café.
+  method         text not null check (method in ('platform_approval','break_glass')),
+  -- TWO fields, because one cannot do both jobs. `reference` is machine-checkable, so a
+  -- later review can join grants to tickets and find the ones that cite nothing real.
+  -- `justification` is free text, because a menu of canned reasons is worse than no
+  -- reason: in the one published study that measured it, 98% of users picked a
+  -- predefined reason and the resulting log was judged infeasible to audit.
+  -- DO NOT replace `justification` with a dropdown.
+  reference      text not null,
+  justification  text not null,
+  approved_by    uuid references umi.user(id),
+  -- NOT NULL, unlike umi.user_role.expires_at. A standing grant is a role; this is not
+  -- one. The window is minutes, and the app sets it — PostgreSQL expires no row.
+  expires_at     timestamptz not null,
+  consumed_at    timestamptz,   -- single-action grants close here; windowed ones do not
+  -- Withdrawn BEFORE it expired: wrong person, wrong incident, account compromised. A
+  -- table that can only expire or be consumed has one way to stop an active elevation
+  -- early — DELETE — which erases the fact that it ever happened. That is the exact gap
+  -- SECURITY_GATE.md recorded against umi.user_role, and which user_role above now
+  -- closes; the highest-privilege table in the schema must not be the one still open.
+  revoked_at     timestamptz,
+  revoked_reason text,
+  created_at     timestamptz not null default now(),
+  constraint access_grant_revocation_ck
+    check ((revoked_at is null) = (revoked_reason is null))
+);
+create index access_grant_live_idx
+  on umi.access_grant (user_id, expires_at)
+  where consumed_at is null;
+comment on table umi.access_grant is
+  'Break-glass and just-in-time platform elevation. Sealed from `api` like umi.user_role. '
+  'The only source of the `*` permission. Support and recovery only, never money.';
+comment on column umi.access_grant.reference is
+  'Machine-checkable ticket or case id. Pairs with justification; neither replaces the other.';
+comment on column umi.access_grant.expires_at is
+  'NOT enforced by PostgreSQL. The auth path applies the predicate, as with user_role.';
 
 -- How long an audit class must survive, by law and by policy. Read by the retention
 -- worker; never by a request. The floor is a year — a shorter policy is a mistake, so
@@ -301,6 +442,14 @@ create table umi.prospect_event (
 -- Append-only (enforced by grant-revoke in 90_rls, not a trigger).
 -- ----------------------------------------------------------------------------
 
+-- PCI DSS 10.2.2 names six fields an audit record must carry: user identification,
+-- type of event, date and time, SUCCESS AND FAILURE INDICATION, ORIGINATION OF EVENT,
+-- and the identity of the affected resource. This table carried four of them. The two
+-- capitalised above were missing, and they are the two that matter most on a
+-- platform-privileged table: a denied attempt to grant super_admin looks exactly like
+-- no attempt at all without `outcome`, and without `request_id` a row cannot be tied
+-- to the request that produced it. `runtime.security_audit_event` already carries both
+-- under those names; the columns are spelled the same here on purpose.
 create table umi.audit_log (
   id             uuid primary key default gen_random_uuid(),
   actor_user_id  uuid references umi.user(id) on delete set null,
@@ -309,6 +458,9 @@ create table umi.audit_log (
   entity         text not null,   -- soft descriptor: 'plan','entitlement_override','merchant','user_role'
   entity_id      uuid,            -- soft ref, no FK
   merchant_id    uuid,            -- soft: which merchant it affected (nullable)
+  outcome        text not null default 'success'
+                   check (outcome in ('success','denied','failure')),
+  request_id     text,            -- origination: the request that caused the change
   before         jsonb,
   after          jsonb,
   at             timestamptz not null default now()
@@ -317,6 +469,11 @@ create index umi_audit_log_entity_idx on umi.audit_log (entity, at desc);
 create index umi_audit_log_actor_idx  on umi.audit_log (actor_user_id, at desc);
 comment on table umi.audit_log is
   'Umi-internal audit of platform-privileged actions. Sealed/service-role. Append-only.';
+comment on column umi.audit_log.outcome is
+  'PCI DSS 10.2.2 "success and failure indication". A denied privileged action is a '
+  'record, not a silence. Defaulted so existing writers stay correct.';
+comment on column umi.audit_log.request_id is
+  'PCI DSS 10.2.2 "origination of event". Same name as runtime.security_audit_event.';
 
 -- ----------------------------------------------------------------------------
 -- DERIVED: a café's EFFECTIVE entitlement = plan_feature overlaid by override.

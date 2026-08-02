@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
-import { SUPER_ADMIN_SA_CTE } from '../auth/rbac.sql';
+import { HAS_PLATFORM_GRANT, PLATFORM_GRANT_CTE } from '../auth/rbac.sql';
 
 export interface MerchantSummary {
   id: string;
@@ -41,8 +41,9 @@ export interface LocationProfileRow extends LocationRow {
  * build-v3 model: core.tenants -> merchant.merchant, core.locations -> merchant.location,
  * core.product_instances -> the entitlement cluster read via
  * `umi.effective_entitlement` (merchant granularity — no location_id),
- * RBAC -> `umi.user_role` grants joined to the `umi.role` catalog (a user may hold
- * several roles per merchant, so roles come back as an array).
+ * RBAC -> the `merchant.staff` employment joined to the `umi.role` catalog. One
+ * employment per (user, merchant), so one role — roles still come back as an array,
+ * because a super_admin is tagged from a different source.
  */
 @Injectable()
 export class MerchantsRepository {
@@ -55,20 +56,20 @@ export class MerchantsRepository {
    */
   async merchantsForUser(userId: string): Promise<MerchantSummary[]> {
     const { rows } = await this.pg.query<MerchantSummary>(
-      `WITH ${SUPER_ADMIN_SA_CTE}
+      `WITH ${PLATFORM_GRANT_CTE}
        SELECT
          t.id::text AS "id",
          t.id::text AS "slug",
          t.name     AS "name",
          t.timezone AS "timezone",
          COALESCE(array_agg(r.key) FILTER (WHERE r.key IS NOT NULL),
-                  ARRAY['super_admin']) AS "roles"
+                  ARRAY[(SELECT platform_role FROM sa)]) AS "roles"
        FROM merchant.merchant AS t
-       LEFT JOIN umi.user_role AS ur
-         ON ur.merchant_id = t.id AND ur.user_id = $1::uuid
-       LEFT JOIN umi.role AS r ON r.id = ur.role_id
+       LEFT JOIN merchant.staff AS s
+         ON s.merchant_id = t.id AND s.user_id = $1::uuid AND s.status = 'active'
+       LEFT JOIN umi.role AS r ON r.id = s.role_id
        WHERE t.status = 'active'
-         AND (ur.id IS NOT NULL OR (SELECT is_sa FROM sa))
+         AND (s.id IS NOT NULL OR ${HAS_PLATFORM_GRANT})
        GROUP BY t.id, t.name, t.timezone
        ORDER BY t.name`,
       [userId],

@@ -14,12 +14,19 @@ describe('roles', () => {
     expect(normalizeRoleKey(null)).toBeNull();
   });
 
-  it('grants the wildcard to super_admin only', () => {
-    expect(effectivePermissions('super_admin', ['a'])).toEqual(['*']);
+  it('grants NO role a wildcard — the catalog is the only source', () => {
+    // This test asserted the opposite until 2026-08-01: super_admin resolved to ['*'].
+    // A wildcard grants permission keys written after it, and Umi paid for that — eight
+    // POS keys reached super_admin in July 2026 the moment they were seeded, unreviewed.
+    // seed_rbac.sql now names super_admin's permissions one by one.
+    expect(effectivePermissions('super_admin', ['a'])).toEqual(['a']);
     expect(effectivePermissions('owner', ['a', 'b'])).toEqual(['a', 'b']);
+    expect(effectivePermissions('super_admin', [])).toEqual([]);
   });
 
-  it('honours the wildcard in permission checks', () => {
+  it('still honours a wildcard if one is ever granted (the break-glass seam)', () => {
+    // Nothing produces '*' today. The branch is kept so a future time-boxed elevation
+    // grant has one place to plug into, rather than needing this changed under pressure.
     expect(hasPermission(['*'], 'anything')).toBe(true);
     expect(hasPermission(['staff.read'], 'staff.read')).toBe(true);
     expect(hasPermission(['staff.read'], 'staff.write')).toBe(false);

@@ -6,6 +6,7 @@ import { JwtService } from '../../shared/auth/jwt.service';
 import { EmailAdapter } from '../../shared/adapters/email.adapter';
 import type { AppConfig } from '../../shared/config/config.schema';
 import { AuthRepository, type MerchantMembershipSummary } from './auth.repository';
+import { MfaService } from './mfa.service';
 
 export interface SessionUser {
   id: string;
@@ -21,6 +22,24 @@ export interface TokenPair {
 export interface LoginResult extends TokenPair {
   user: SessionUser;
   merchants: MerchantMembershipSummary[];
+}
+
+/**
+ * A correct password, and a second factor still outstanding. Carries NO tokens and no
+ * merchant list — nothing a caller could act on before the code is checked.
+ */
+export interface MfaChallengeResult {
+  mfaRequired: true;
+  method: string;
+  challengeToken: string;
+  expiresInSeconds: number;
+}
+
+export type LoginOutcome = LoginResult | MfaChallengeResult;
+
+/** Narrow a login outcome without reaching for `in` at every call site. */
+export function isMfaChallenge(outcome: LoginOutcome): outcome is MfaChallengeResult {
+  return 'mfaRequired' in outcome;
 }
 
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 min, mirrors the dashboard
@@ -40,9 +59,10 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly email: EmailAdapter,
     private readonly config: ConfigService<AppConfig, true>,
+    private readonly mfa: MfaService,
   ) {}
 
-  async login(usernameRaw: string, password: string): Promise<LoginResult> {
+  async login(usernameRaw: string, password: string): Promise<LoginOutcome> {
     const username = usernameRaw.trim().toLowerCase();
     if (!username || !password) {
       throw new BadRequestException('username and password are required');
@@ -61,6 +81,52 @@ export class AuthService {
       id: credential.userId,
       email: credential.email,
       displayName: credential.displayName,
+    };
+
+    // The password is right, and that is ALL it buys when a second factor is
+    // enrolled. Nothing below this branch issues a token, loads a merchant list, or
+    // tells the caller anything about the account — the challenge token is inert
+    // everywhere except POST /auth/mfa/verify.
+    if (credential.mfaMethod) {
+      const challengeToken = await this.jwt.signMfaChallenge(user.id, this.mfa.ttlSeconds);
+      // Only email_otp has anything to send. A totp enrolment already holds its
+      // secret, so the challenge alone is the whole prompt.
+      if (credential.mfaMethod === 'email_otp') {
+        await this.mfa.issueChallenge(user);
+      }
+      return {
+        mfaRequired: true,
+        method: credential.mfaMethod,
+        challengeToken,
+        expiresInSeconds: this.mfa.ttlSeconds,
+      };
+    }
+
+    const [merchants, tokens] = await Promise.all([
+      this.repo.findMerchantsForUser(user.id),
+      this.issueTokens(user),
+    ]);
+    return { user, merchants, ...tokens };
+  }
+
+  /**
+   * Second half of a two-step login. The challenge token proves the password was
+   * already accepted; the code proves the factor. Both are required, and the token
+   * alone can do nothing else in the system.
+   */
+  async verifyMfa(challengeToken: string, code: string): Promise<LoginResult> {
+    if (!challengeToken || !code) {
+      throw new BadRequestException('challengeToken and code are required');
+    }
+    const userId = await this.jwt.verifyMfaChallenge(challengeToken);
+    await this.mfa.verifyCode(userId, code);
+
+    const summary = await this.repo.findUserById(userId);
+    if (!summary) throw new UnauthorizedException('invalid_token');
+    const user: SessionUser = {
+      id: summary.userId,
+      email: summary.email,
+      displayName: summary.displayName,
     };
     const [merchants, tokens] = await Promise.all([
       this.repo.findMerchantsForUser(user.id),

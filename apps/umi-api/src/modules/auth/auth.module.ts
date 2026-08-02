@@ -7,6 +7,7 @@ import { MerchantAccessGuard } from './merchant-access.guard';
 import { PublicMerchantGuard } from './public-merchant.guard';
 import { EntitlementGuard } from './entitlement.guard';
 import { RolesGuard } from './roles.guard';
+import { MfaService } from './mfa.service';
 
 /**
  * Auth domain (D9). Owns login/refresh/logout/reset + the four guards that the
@@ -19,6 +20,7 @@ import { RolesGuard } from './roles.guard';
   providers: [
     AuthService,
     AuthRepository,
+    MfaService,
     AuthGuard,
     MerchantAccessGuard,
     PublicMerchantGuard,
