@@ -122,8 +122,14 @@ begin
   new.previous_hash := prior;
   new.occurred_at := clock_timestamp();
   new.event_hash := encode(extensions.digest(
+    -- delegate_user_id is hashed like every other field. A column that names WHO acted
+    -- through the café must not be editable without breaking the chain — that is the
+    -- one guarantee this table sells. coalesce, because concat_ws SKIPS a NULL argument
+    -- rather than rendering it, so two rows differing only by a NULL would otherwise
+    -- collide on the same input string.
     concat_ws('|', new.id, new.merchant_id, coalesce(new.location_id::text, ''),
-      coalesce(new.actor_user_id::text, ''), coalesce(new.command_id::text, ''),
+      coalesce(new.actor_user_id::text, ''), coalesce(new.delegate_user_id::text, ''),
+      coalesce(new.command_id::text, ''),
       new.event_type, new.entity_type, coalesce(new.entity_id::text, ''),
       new.outcome, coalesce(new.reason_code, ''), new.public_data::text,
       new.correlation_id, coalesce(prior, ''), new.occurred_at::text),

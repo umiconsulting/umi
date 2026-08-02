@@ -7,41 +7,121 @@
 -- backfill_identity; this file only adds the super_admin platform role and the
 -- role->permission edges. Keyed by KEY (id-agnostic) and guarded (idempotent).
 --
--- Mapping (owner-confirmed 2026-07-20):
---   owner, admin -> ALL four permissions
+-- Mapping (owner-confirmed 2026-07-20, amended 2026-08-01):
+--   owner, admin -> ALL four café permissions
 --   staff        -> loyalty.operate + orders.operate  (front-of-house ops)
 --   viewer       -> insights.read                      (read-only)
---   super_admin  -> ['*'] wildcard, resolved CODE-SIDE (auth/roles.ts
---                   effectivePermissions) — no explicit rows needed here.
+--   super_admin  -> every permission key, LISTED ONE BY ONE below
+--   developer    -> read-only across every café
+--
+-- The super_admin change is the point of the 2026-08-01 amendment. Its authority used
+-- to be the ['*'] wildcard, resolved in auth/roles.ts. A wildcard grants permission
+-- keys written after it: the eight POS keys seeded in July 2026 all reached super_admin
+-- the moment they existed, with no review. The list below costs one row per new key,
+-- and that cost is the control.
+--
+-- ---------------------------------------------------------------------------
+-- HOW TO RUN. The bootstrap address is a parameter, never a committed constant:
+--   psql -v bootstrap_email=someone@example.com -f seed_rbac.sql
+-- ---------------------------------------------------------------------------
+-- BOOTSTRAP, AND ITS RETIREMENT. This file is the out-of-band path that Vault,
+-- Kubernetes, Keycloak, GitLab and PostgreSQL all use: an operator runs it by hand, and
+-- no API can do what it does. Do NOT build a request path that creates a platform
+-- administrator. Every one of those systems also documents a RETIREMENT step, and this
+-- is ours:
+--   1. The bootstrap grant below is permanent (expires_at NULL). It is the only one
+--      that may be. It exists to create the second administrator, not to be used daily.
+--   2. Once a second platform grant exists, revoke or time-box this one:
+--        update umi.user_role set expires_at = now() + interval '90 days'
+--         where user_id = (select id from umi.user where lower(email) = lower(:'bootstrap_email'));
+--   3. security_gate.sql asserts that at most ONE unbounded platform grant exists.
 -- ============================================================================
 
--- super_admin: a platform-wide role (is_platform) the source never had. Dormant
--- until explicitly granted (umi.user_role); its authority is the ['*'] wildcard.
+-- Set INSIDE the file, the way security_gate.sql does, and not left to the caller.
+-- Without it psql PRINTS an exception and then carries on to the next statement, exiting
+-- 0 — so the guard below would report a missing address and seed the roles anyway. The
+-- pipeline (00_run_backfill.sh) passes the flag; a hand-run `psql -f` would not.
+\set ON_ERROR_STOP on
+
+-- `\quit` always exits 0, so it cannot fail this script on its own. The \if prints a
+-- readable message; the DO block below is what stops the run with a non-zero status.
+\if :{?bootstrap_email}
+\else
+\echo ''
+\echo 'ERROR: seed_rbac.sql needs the bootstrap address.'
+\echo '       psql -v bootstrap_email=<address> -f seed_rbac.sql'
+\echo ''
+\set bootstrap_email ''
+\endif
+
+-- The address moves into a SETTING first, because psql does NOT substitute :'variables'
+-- inside a dollar-quoted body — the DO block below would see the literal text and fail
+-- with a confusing syntax error instead of the message it is here to print.
+select set_config('umi.bootstrap_email', :'bootstrap_email', false);
+do $$
+begin
+  if nullif(current_setting('umi.bootstrap_email', true), '') is null then
+    raise exception 'seed_rbac.sql: missing -v bootstrap_email=<address>';
+  end if;
+end $$;
+
+-- super_admin: a platform-wide role (is_platform) the source never had. Dormant until
+-- explicitly granted in umi.user_role.
 insert into umi.role (key, name, description, is_platform)
 select 'super_admin',
        'Super Admin',
-       'Cross-merchant Umi operator; all permissions (wildcard resolved code-side).',
+       'Cross-merchant Umi operator. Holds every permission, each granted explicitly.',
        true
 where not exists (select 1 from umi.role where key = 'super_admin');
 
+-- developer: the answer to "how does a developer debug a café's data". Cross-merchant
+-- REACH, like super_admin — the merchant picker lists every café, which is what makes
+-- debugging quick. Read-only AUTHORITY, unlike super_admin. Reach and authority are two
+-- axes, and only one of them needs to be wide to debug something.
+-- (`tech_assist` was removed from ROLE_PRECEDENCE in the same change. It had no row
+-- here, so it outranked `staff` and granted nothing.)
+insert into umi.role (key, name, description, is_platform)
+select 'developer',
+       'Developer',
+       'Cross-merchant read-only access for debugging. Changes nothing.',
+       true
+where not exists (select 1 from umi.role where key = 'developer');
+
 -- Cross-merchant operator (owner decision 2026-07-21). backfill_identity notes the source
 -- modelled this as admin-on-every-merchant, which left hola@ without access to Northwest
--- Café and made SUPER_ADMIN_SA_CTE dead code (nobody held the role, in v2 or v3). Make
--- the concept REAL instead: a PLATFORM-WIDE grant — merchant_id NULL, exactly what
--- umi.user_role documents as 'NULL = platform-wide grant (superadmin)'.
--- NOTE: umi.user_role's RLS policy is merchant_id = umi.current_merchant(), which a NULL
--- can never satisfy, so this row is deliberately invisible to the `api` pool; the auth
--- queries that read it run on the worker pool.
-insert into umi.user_role (user_id, role_id, merchant_id, location_id)
-select u.id, r.id, null, null
+-- Café and made the super-admin CTE dead code (nobody held the role, in v2 or v3). Make
+-- the concept REAL instead: a PLATFORM grant, which is now the only thing umi.user_role
+-- holds. The 4 admin memberships are not carried; this row replaces them.
+-- NOTE: umi.user_role is ungranted to the `api` pool (90_rls.sql seals it, security_gate
+-- asserts it), so this row is invisible to the request path; the auth queries that read
+-- it run on the worker pool.
+insert into umi.user_role (user_id, role_id, justification)
+select u.id, r.id, 'bootstrap: the first platform administrator (seed_rbac.sql)'
 from umi.user u
 cross join umi.role r
-where u.email = 'hola@umiconsulting.co'
+where lower(u.email) = lower(:'bootstrap_email')
   and r.key = 'super_admin'
   and not exists (
     select 1 from umi.user_role x
      where x.user_id = u.id and x.role_id = r.id
-       and x.merchant_id is null and x.location_id is null
+  );
+
+-- The grant IS an auditable event, and this file is the only thing that performs one.
+-- umi.audit_log.action has admitted 'grant' and 'revoke' since build-v3 and nothing has
+-- ever written either. actor_user_id is NULL on purpose: an operator ran psql, and no
+-- authenticated request took this action.
+insert into umi.audit_log (actor_user_id, action, entity, entity_id, merchant_id, after)
+select null, 'grant', 'user_role', ur.id, null,
+       jsonb_build_object('role', 'super_admin', 'user_id', ur.user_id,
+                          'source', 'seed_rbac.sql', 'justification', ur.justification)
+from umi.user_role ur
+join umi.user u on u.id = ur.user_id
+join umi.role r on r.id = ur.role_id
+where lower(u.email) = lower(:'bootstrap_email')
+  and r.key = 'super_admin'
+  and not exists (
+    select 1 from umi.audit_log a
+     where a.entity = 'user_role' and a.entity_id = ur.id and a.action = 'grant'
   );
 
 -- role -> permission grants.
@@ -94,6 +174,45 @@ from (values
   ('admin','device.enroll'), ('admin','offline.recovery.review'), ('admin','audit.read'),
   ('staff','catalog.read'),  ('staff','cart.write'),  ('staff','checkout.commit'),
   ('staff','offline.replay'),('staff','offline.cash.checkout')
+) as m(role_key, perm_key)
+join umi.role r       on r.key = m.role_key
+join umi.permission p on p.key = m.perm_key
+where not exists (
+  select 1 from umi.role_permission x
+  where x.role_id = r.id and x.permission_id = p.id
+);
+
+-- ---------------------------------------------------------------------------
+-- PLATFORM role -> permission grants (2026-08-01).
+--
+-- super_admin: EVERY permission key, and this is deliberately a `select … from
+-- umi.permission` rather than a hand-written list. A hand list would go stale on the
+-- next key and reintroduce the failure quietly; a set-based insert stays complete.
+--
+-- ⚠ THIS IS NOT A WILDCARD. The rows are real, and re-running this file is what grants
+-- a NEW key to super_admin. That re-run is the review step the ['*'] wildcard never
+-- had: a key added to umi.permission does NOT reach any operator until somebody runs
+-- this seed again, on purpose.
+-- ---------------------------------------------------------------------------
+insert into umi.role_permission (role_id, permission_id)
+select r.id, p.id
+from umi.role r
+cross join umi.permission p
+where r.key = 'super_admin'
+  and not exists (
+    select 1 from umi.role_permission x
+    where x.role_id = r.id and x.permission_id = p.id
+  );
+
+-- developer: read-only across every café. The whole set, listed by hand ON PURPOSE —
+-- the opposite choice from super_admin above. A new permission key must NOT reach a
+-- debugging account by default; somebody has to decide it is a read.
+insert into umi.role_permission (role_id, permission_id)
+select r.id, p.id
+from (values
+  ('developer', 'insights.read'),   -- the dashboards
+  ('developer', 'audit.read'),      -- the redacted audit trail
+  ('developer', 'catalog.read')     -- the menu a POS device would see
 ) as m(role_key, perm_key)
 join umi.role r       on r.key = m.role_key
 join umi.permission p on p.key = m.perm_key

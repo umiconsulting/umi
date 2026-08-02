@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpException,
   Post,
   Req,
   Res,
@@ -13,7 +14,7 @@ import { randomBytes } from 'node:crypto';
 import { decodeJwt } from 'jose';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { AppConfig } from '../../shared/config/config.schema';
-import { AuthService, type LoginResult } from './auth.service';
+import { AuthService, isMfaChallenge, type LoginResult } from './auth.service';
 import { AuthGuard } from './auth.guard';
 import { buildCookieOptions, parseDurationSeconds } from './cookies';
 import { CurrentUser } from './current-user.decorator';
@@ -26,9 +27,37 @@ import {
   type AuthUser,
 } from './auth.types';
 import type { SessionEnvelope, SessionResponse } from '@umi/contract';
+import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { VerifyMfaDto } from './dto/verify-mfa.dto';
+
+/**
+ * Per-IP ceilings on the unauthenticated auth routes. The window matches the one
+ * cash-customer.controller.ts already uses, so there is one rate-limit idiom here.
+ *
+ * These bound an ANONYMOUS caller. The per-account ceilings that actually protect one
+ * user (MFA_OTP_MAX_PER_HOUR, and runtime.otp.attempts) live in MfaService and the
+ * database, because an attacker rotating source addresses must not collect a fresh
+ * budget with every new IP. Both layers are needed: this one stops the volume, those
+ * stop the patient attacker.
+ */
+const AUTH_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_PER_WINDOW = 20;
+const MFA_VERIFY_MAX_PER_WINDOW = 20;
+
+/**
+ * Login's other outcome. Not in `@umi/contract` yet on purpose — the dashboard has to
+ * learn this shape before an enrolment can safely exist, and promoting it to the
+ * shared contract is the change that pairs with the client work.
+ */
+export interface MfaChallengeResponse {
+  mfaRequired: true;
+  method: string;
+  challengeToken: string;
+  expiresInSeconds: number;
+}
 
 /**
  * Auth ingress (D9). Issues/clears the httpOnly JWT cookies and returns the
@@ -41,15 +70,64 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly config: ConfigService<AppConfig, true>,
+    private readonly rateLimit: RateLimitService,
   ) {}
 
+  /** One rate-limit bucket; on exhaustion set Retry-After and 429. */
+  private throttle(reply: FastifyReply, key: string, max: number): void {
+    const r = this.rateLimit.hit(key, max, AUTH_WINDOW_MS);
+    if (!r.allowed) {
+      void reply.header('Retry-After', String(Math.ceil((r.resetAt - Date.now()) / 1000)));
+      throw new HttpException({ error: 'Demasiados intentos. Intenta de nuevo más tarde.' }, 429);
+    }
+  }
+
+  /**
+   * Two outcomes, and the client must handle both.
+   *   - No second factor enrolled → cookies are set and a session comes back, exactly
+   *     as before.
+   *   - A second factor enrolled → NO cookies, no session. The body carries
+   *     `mfaRequired: true` and a challenge token to post back to `mfa/verify`.
+   *
+   * This is a shape change for the dashboard, and it is inert until somebody enrols:
+   * `umi.user.mfa_method` is NULL for every row today, so the second branch is
+   * unreachable until an enrolment writes it. Enrol only after the client can read
+   * `mfaRequired`, or that account is locked out of the dashboard.
+   */
   @Public()
   @Post('local/login')
   async login(
     @Body() dto: LoginDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<SessionResponse | MfaChallengeResponse> {
+    this.throttle(reply, `auth:login:${clientIp(req)}`, LOGIN_MAX_PER_WINDOW);
+    const result = await this.auth.login(dto.username, dto.password);
+    if (isMfaChallenge(result)) {
+      // Deliberately no cookies. A half-authenticated caller carries the challenge in
+      // the request body, so it can never ride along on an unrelated request the way
+      // a cookie would.
+      return {
+        mfaRequired: true,
+        method: result.method,
+        challengeToken: result.challengeToken,
+        expiresInSeconds: result.expiresInSeconds,
+      };
+    }
+    this.setAuthCookies(reply, result, dto.remember ?? false);
+    return { session: toSession(result, this.accessExpiresIn()) };
+  }
+
+  /** Second half of the two-step login. Issues the cookies the first half withheld. */
+  @Public()
+  @Post('local/mfa/verify')
+  async verifyMfa(
+    @Body() dto: VerifyMfaDto,
+    @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<SessionResponse> {
-    const result = await this.auth.login(dto.username, dto.password);
+    this.throttle(reply, `auth:mfa:${clientIp(req)}`, MFA_VERIFY_MAX_PER_WINDOW);
+    const result = await this.auth.verifyMfa(dto.challengeToken, dto.code);
     this.setAuthCookies(reply, result, dto.remember ?? false);
     return { session: toSession(result, this.accessExpiresIn()) };
   }
@@ -170,4 +248,11 @@ function toSession(result: LoginResult, accessExpiresIn: number): SessionEnvelop
     provider: 'local',
     accessExpiresIn,
   };
+}
+
+function clientIp(req: FastifyRequest): string {
+  // Fastify resolves req.ip from X-Forwarded-For using its configured trustProxy
+  // hop count (set in main.ts). Trusting the raw leftmost XFF here instead would
+  // let a caller spoof the header and rotate past the per-IP rate-limit buckets.
+  return req.ip || 'unknown';
 }

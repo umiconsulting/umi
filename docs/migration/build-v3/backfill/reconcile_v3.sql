@@ -90,7 +90,8 @@ select count(*) as pos_plan_feature
 
 \echo ''
 \echo '========== E. ORPHAN FK SWEEP (expect all 0) =========='
-select 'user_role.merchant' k, count(*) n from umi.user_role ur where ur.merchant_id is not null and not exists (select 1 from merchant.merchant b where b.id=ur.merchant_id)
+select 'staff.merchant' k, count(*) n from merchant.staff s where not exists (select 1 from merchant.merchant b where b.id=s.merchant_id)
+union all select 'staff.role', count(*) from merchant.staff s where not exists (select 1 from umi.role r where r.id=s.role_id)
 union all select 'subscription.merchant', count(*) from umi.subscription s where not exists (select 1 from merchant.merchant b where b.id=s.merchant_id)
 union all select 'location.merchant', count(*) from merchant.location x where not exists (select 1 from merchant.merchant b where b.id=x.merchant_id)
 union all select 'contact.channel', count(*) from merchant.contact c where not exists (select 1 from umi.channel_type ct where ct.id=c.channel_id)

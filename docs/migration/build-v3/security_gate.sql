@@ -17,11 +17,96 @@ select * from (values
        join pg_namespace n on n.oid=c.relnamespace
        where n.nspname='merchant' and c.relkind='r'
          and not (c.relrowsecurity and c.relforcerowsecurity))),
-  ('umi per-café tables RLS+FORCE (5)',
-    (select case when count(*)=5 then 'PASS' else 'FAIL' end from pg_class c
+  -- Four, not five: umi.user_role became a PLATFORM-only grant with no merchant_id to
+  -- scope a policy by. It is sealed the way umi.audit_log is — ungranted to api — and a
+  -- table the request path cannot reach needs no policy.
+  ('umi per-café tables RLS+FORCE (4)',
+    (select case when count(*)=4 then 'PASS' else 'FAIL' end from pg_class c
        join pg_namespace n on n.oid=c.relnamespace
        where n.nspname='umi' and c.relrowsecurity and c.relforcerowsecurity
-         and c.relname in ('subscription','subscription_item','invoice','entitlement_override','user_role'))),
+         and c.relname in ('subscription','subscription_item','invoice','entitlement_override'))),
+  -- `api` only. `readonly` is not the request path: it holds the same blanket SELECT on
+  -- umi that lets it read subscription and invoice, and sealing this one table from it
+  -- would buy nothing and diverge from every other per-café table.
+  ('umi.user_role sealed from the request path',
+    (select case when not has_table_privilege('api', 'umi.user_role', 'SELECT')
+                 then 'PASS' else 'FAIL' end)),
+  -- At most ONE platform grant may live forever: the bootstrap. Every other one is
+  -- expected to carry an expiry. seed_rbac.sql documents the retirement step that
+  -- time-boxes even that one, once a second administrator exists.
+  ('at most 1 unbounded platform grant (the bootstrap)',
+    (select case when count(*) <= 1 then 'PASS' else 'FAIL' end from umi.user_role
+       where expires_at is null and revoked_at is null)),
+  -- The composite FK should make this unreachable. Asserted anyway: the FK is the kind
+  -- of thing a later migration drops without noticing what it was for.
+  ('0 café roles granted platform-wide',
+    (select case when count(*)=0 then 'PASS' else 'FAIL' end
+       from umi.user_role ur join umi.role r on r.id = ur.role_id
+      where not r.is_platform)),
+  -- The wildcard is gone from roles.ts, so authority is whatever the catalog says.
+  -- A super_admin holding nothing would lock Umi out of its own platform.
+  ('super_admin holds every permission key',
+    (select case when count(*)=0 then 'PASS' else 'FAIL' end
+       from umi.permission p
+      where not exists (
+        select 1 from umi.role_permission rp join umi.role r on r.id = rp.role_id
+         where rp.permission_id = p.id and r.key = 'super_admin'))),
+  -- The break-glass table. `api` must hold NO privilege on it — not SELECT, and above
+  -- all not INSERT. A request path that can write its own elevation record can elevate
+  -- itself, which would make every other check in this file cosmetic. Checked as a
+  -- sweep over all four DML verbs, not just SELECT, because INSERT is the dangerous one
+  -- and a SELECT-only assertion would pass while the hole was open.
+  ('umi.access_grant sealed from the request path (no DML, no read)',
+    (select case when bool_and(not has_table_privilege('api', 'umi.access_grant', v))
+                 then 'PASS' else 'FAIL' end
+       from (values ('SELECT'),('INSERT'),('UPDATE'),('DELETE')) as t(v))),
+  -- A break-glass grant with no end is a standing wildcard wearing a different name.
+  -- expires_at is NOT NULL in the DDL, so this can only fail if someone relaxes it.
+  ('0 break-glass grants without an expiry',
+    (select case when count(*)=0 then 'PASS' else 'FAIL' end
+       from umi.access_grant where expires_at is null)),
+  -- Both halves of the reason must be present. The DDL says NOT NULL; this catches the
+  -- other failure — a writer that satisfies NOT NULL with an empty string.
+  ('every break-glass grant cites a reference and a justification',
+    (select case when count(*)=0 then 'PASS' else 'FAIL' end
+       from umi.access_grant
+      where btrim(coalesce(reference, '')) = ''
+         or btrim(coalesce(justification, '')) = '')),
+  -- MFA is what stands between one stolen password and every café. A platform grant
+  -- holder without a second factor is the single highest-value account in the system
+  -- protected by the weakest possible control.
+  --
+  -- WARN, NOT FAIL — deliberately, and temporarily. No MFA feature exists yet, so this
+  -- can only fail, on every run, until one is built. This repository has already been
+  -- burned by gates nobody believed ("the gate didn't flag it" is not evidence it is
+  -- fine); a check that is red forever teaches people to skip the whole file, which
+  -- costs more than this one check buys.
+  -- ⚠️ CHANGE 'WARN' BACK TO 'FAIL' when the MFA module ships, and BEFORE the build-v3
+  -- production cutover. A platform operator reaching every café on a password alone is
+  -- not an acceptable end state — only an acknowledged interim one.
+  ('every live platform grant holder has a second factor',
+    (select case when count(*)=0 then 'PASS' else 'WARN' end
+       from umi.user_role ur
+       join umi.user u on u.id = ur.user_id
+      where ur.revoked_at is null
+        and (ur.expires_at is null or ur.expires_at > now())
+        and u.mfa_method is null)),
+  -- PCI DSS 10.2.2 lists six fields. These are the two that were missing from the
+  -- platform audit tables; the other four were always present.
+  ('audit tables carry outcome + request_id (PCI DSS 10.2.2)',
+    (select case when count(*)=4 then 'PASS' else 'FAIL' end
+       from information_schema.columns
+      where (table_schema, table_name) in (('umi','audit_log'), ('merchant','audit_log'))
+        and column_name in ('outcome','request_id'))),
+  -- The column that keeps the acting operator distinct from the account they acted
+  -- through. Asserted before any impersonation feature exists, because the cost of
+  -- adding it to a hash-chained table later is a rehash of every row.
+  ('merchant audit tables carry delegate_user_id',
+    (select case when count(*)=2 then 'PASS' else 'FAIL' end
+       from information_schema.columns
+      where table_schema = 'merchant'
+        and table_name in ('audit_log','audit_event')
+        and column_name = 'delegate_user_id')),
   -- Derived columns must be genuinely un-writable by the request path. This check
   -- exists because 90_rls asserted it with a statement that does nothing:
   -- `revoke update (col)` is a no-op while api holds table-level UPDATE, so the
@@ -121,9 +206,13 @@ select * from (values
        where p.proname in ('tg_touch_updated_at','tg_append_only','tg_order_item_void_only')
          and array_to_string(coalesce(p.proconfig,'{}'),',') like '%search_path%')),
   -- Data hygiene (credential + PII cleaning) --------------------------------
-  ('0 active users with NULL password hash',
+  -- Narrowed by email, not widened. A PIN-only operator is an ACTIVE user with no email
+  -- and no password on purpose — they sign in at the till, never at the dashboard. The
+  -- defect this check exists to catch is the other row: one that carries a login address
+  -- and therefore invites a password attempt, with no hash behind it.
+  ('0 active users with an email but NULL password hash',
     (select case when count(*)=0 then 'PASS' else 'FAIL' end from umi."user"
-       where status='active' and password_hash is null)),
+       where status='active' and email is not null and password_hash is null)),
   ('0 legacy-sha256 hashes retained',
     (select case when count(*)=0 then 'PASS' else 'FAIL' end from umi."user"
        where password_algorithm='legacy-sha256-v1')),
@@ -184,11 +273,19 @@ reset role;
 
 \echo ''
 \echo '================= ENFORCE ================='
+-- A WARN does NOT block. It is an acknowledged, dated gap — not a passing check — so it
+-- is printed on its own, every run, and named in the summary. A warning nobody sees is
+-- just a failure that was renamed.
 do $$
-declare n int;
+declare n int; w int; r record;
 begin
   select count(*) into n from gate where status='FAIL';
+  select count(*) into w from gate where status='WARN';
+  for r in select label from gate where status='WARN' order by label loop
+    raise warning 'ACKNOWLEDGED GAP: %', r.label;
+  end loop;
   if n > 0 then raise exception 'SECURITY GATE FAILED: % structural check(s) failed', n;
-  else raise notice 'SECURITY GATE PASSED: % structural + 3 behavioral checks green', (select count(*) from gate);
+  else raise notice 'SECURITY GATE PASSED: % structural + 3 behavioral checks green, % acknowledged gap(s)',
+    (select count(*) from gate where status='PASS'), w;
   end if;
 end $$;

@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
-import { SUPER_ADMIN_SA_CTE } from './rbac.sql';
+import { HAS_PLATFORM_GRANT, PLATFORM_GRANT_CTE } from './rbac.sql';
 
 export interface UserCredential {
   userId: string;
@@ -8,6 +8,17 @@ export interface UserCredential {
   displayName: string | null;
   passwordSalt: string;
   passwordHash: string;
+  /** null = no second factor enrolled. 'email_otp' | 'totp'. */
+  mfaMethod: string | null;
+}
+
+/** A live, unconsumed one-time code. */
+export interface OtpRecord {
+  id: string;
+  userId: string;
+  codeHash: string;
+  attempts: number;
+  expiresAt: Date;
 }
 
 export interface UserSummary {
@@ -52,14 +63,20 @@ export interface ResetTokenRecord {
  * schema that `umi_app` has no USAGE on.
  *
  * build-v3 model: staff credentials + identity live on `umi.user` (email + hash +
- * `full_name`); grants are `umi.user_role` (user×role×merchant, FK role_id) read
+ * `full_name`); a café grant is `merchant.staff` (the employment, FK role_id) read
  * against the sealed `umi.role_permission` (role_id×permission_id) catalog.
- * `super_admin` is Umi's cross-merchant operator: a user holding ANY `umi.user_role`
+ * `super_admin` is Umi's cross-merchant operator: a user holding a `umi.user_role`
  * with role `super_admin` can select/access EVERY active merchant.
  *
- * DONE: `findMerchantsForUser` / `findMembershipAccess` now read `umi.user_role` joined
- * to the `umi.role` catalog (multi-role, aggregated), and a `merchant_id IS NULL`
- * grant is platform-wide.
+ * TWO grant tables, one per SCOPE, never overlapping:
+ *   merchant.staff   the employment, and the café role on it. Every human who works a
+ *                    café has one; a PIN-only operator's `umi.user` simply carries no
+ *                    email and no password. A membership IS an employment — there is
+ *                    no third table for it, which is why this replaced the old
+ *                    `umi.user_role` café grant: that was (user, role, merchant,
+ *                    location) and this is (user, merchant, location).
+ *   umi.user_role    the PLATFORM grant, and nothing else: Umi's own operators, who
+ *                    are employees of no café.
  *
  * STILL PENDING (P5, "route by id"): `merchantIdForSlug` / `merchantBySlug` read the
  * dropped `slug` column, and the queries above return the merchant id AS "slug" as an
@@ -68,6 +85,8 @@ export interface ResetTokenRecord {
  */
 @Injectable()
 export class AuthRepository {
+  private readonly logger = new Logger(AuthRepository.name);
+
   constructor(private readonly pg: PgService) {}
 
   /** Login/forgot — only rows that actually have a local password. */
@@ -78,7 +97,8 @@ export class AuthRepository {
          u.email             AS "email",
          u.full_name         AS "displayName",
          u.password_salt     AS "passwordSalt",
-         u.password_hash     AS "passwordHash"
+         u.password_hash     AS "passwordHash",
+         u.mfa_method        AS "mfaMethod"
        FROM umi.user AS u
        WHERE lower(u.email) = $1
          AND u.password_hash IS NOT NULL
@@ -86,6 +106,117 @@ export class AuthRepository {
       [email],
     );
     return rows[0] ?? null;
+  }
+
+  // ── Second factor ──────────────────────────────────────────────────────────
+  // All three run on the worker pool for the same reason the credential read does:
+  // there is no merchant context yet. A half-authenticated caller has not chosen a
+  // café and may not belong to one.
+
+  /**
+   * Burn every live code for this user, then store the new one. ONE statement, so a
+   * second login cannot race between the delete and the insert and leave two live
+   * codes — which would double an attacker's guessing budget for free.
+   */
+  async replaceMfaOtp(userId: string, codeHash: string, expiresAt: Date): Promise<void> {
+    await this.pg.query(
+      `WITH burned AS (
+         UPDATE runtime.otp
+            SET consumed_at = now()
+          WHERE user_id = $1::uuid AND purpose = 'mfa' AND consumed_at IS NULL
+       )
+       INSERT INTO runtime.otp (user_id, purpose, code_hash, expires_at)
+       VALUES ($1::uuid, 'mfa', $2, $3)`,
+      [userId, codeHash, expiresAt],
+    );
+  }
+
+  /** The one live code for this user, if any. */
+  async findLiveMfaOtp(userId: string): Promise<OtpRecord | null> {
+    const { rows } = await this.pg.query<OtpRecord>(
+      `SELECT id::text AS "id", user_id::text AS "userId", code_hash AS "codeHash",
+              attempts AS "attempts", expires_at AS "expiresAt"
+         FROM runtime.otp
+        WHERE user_id = $1::uuid AND purpose = 'mfa'
+          AND consumed_at IS NULL AND expires_at > now()
+        ORDER BY created_at DESC
+        LIMIT 1`,
+      [userId],
+    );
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Count one wrong guess, and burn the code when it reaches the ceiling. Returning
+   * the new count lets the caller tell "wrong, try again" from "that code is dead".
+   */
+  async recordMfaOtpFailure(otpId: string, maxAttempts: number): Promise<number> {
+    const { rows } = await this.pg.query<{ attempts: number }>(
+      `UPDATE runtime.otp
+          SET attempts    = attempts + 1,
+              consumed_at = CASE WHEN attempts + 1 >= $2 THEN now() ELSE consumed_at END
+        WHERE id = $1::uuid
+        RETURNING attempts`,
+      [otpId, maxAttempts],
+    );
+    return rows[0]?.attempts ?? maxAttempts;
+  }
+
+  /**
+   * Consume the code. The `consumed_at IS NULL` predicate is the single-use guarantee:
+   * two concurrent verifications of the same correct code both UPDATE, but only one
+   * matches the predicate and returns a row.
+   */
+  async consumeMfaOtp(otpId: string): Promise<boolean> {
+    const { rows } = await this.pg.query<{ id: string }>(
+      `UPDATE runtime.otp SET consumed_at = now()
+        WHERE id = $1::uuid AND consumed_at IS NULL
+        RETURNING id::text AS id`,
+      [otpId],
+    );
+    return rows.length > 0;
+  }
+
+  /**
+   * Append one row to the internal security log. THE FIRST WRITER this table has had:
+   * `runtime.security_audit_event` shipped with build-v3 and nothing ever inserted into
+   * it, which is indistinguishable from "nothing bad happened" right up to the moment
+   * somebody asks.
+   *
+   * NEVER THROWS. An audit write must not be able to fail a login, and it must not be
+   * able to turn a rejected code into a 500 that tells the caller their guess was
+   * interesting. A failure here is logged and swallowed.
+   *
+   * Worker pool: the table is sealed from `api`, and there is no merchant context at
+   * login anyway — the caller has not chosen a café and may not belong to one.
+   */
+  async recordSecurityEvent(event: {
+    actorUserId: string | null;
+    eventType: string;
+    outcome: 'success' | 'denied' | 'failure';
+    reasonCode?: string;
+    requestId?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<void> {
+    try {
+      await this.pg.query(
+        `INSERT INTO runtime.security_audit_event
+           (actor_user_id, event_type, entity_type, outcome, reason_code, request_id, metadata)
+         VALUES ($1::uuid, $2, 'umi.user', $3, $4, $5, $6::jsonb)`,
+        [
+          event.actorUserId,
+          event.eventType,
+          event.outcome,
+          event.reasonCode ?? null,
+          event.requestId ?? null,
+          JSON.stringify(event.metadata ?? {}),
+        ],
+      );
+    } catch (err) {
+      this.logger.error(
+        `security_audit_write_failed type=${event.eventType} ${(err as Error).message}`,
+      );
+    }
   }
 
   /** Refresh — re-load the user so a rotated access token carries fresh email. */
@@ -102,25 +233,30 @@ export class AuthRepository {
 
   /**
    * Active merchant memberships + role for the login response body / merchant picker.
-   * Single role per (login, merchant) now. A global super_admin (any active
-   * super_admin edge) sees EVERY active merchant, tagged with its explicit role
-   * where one exists, else 'super_admin'.
+   * One employment per (login, merchant), so one café role. A platform operator sees
+   * EVERY active merchant, tagged with their café role where an employment exists,
+   * else with the platform role itself.
+   *
+   * This is the REACH half of a platform grant, and it is deliberately unchanged by the
+   * move away from the `['*']` wildcard. Hopping between cafés is what makes debugging
+   * quick; what an operator may DO once inside is a separate question, answered by
+   * findMembershipAccess below.
    */
   async findMerchantsForUser(userId: string): Promise<MerchantMembershipSummary[]> {
     const { rows } = await this.pg.query<MerchantMembershipSummary>(
-      `WITH ${SUPER_ADMIN_SA_CTE}
+      `WITH ${PLATFORM_GRANT_CTE}
        SELECT
          t.id::text AS "id",
          t.id::text AS "slug",
          t.name     AS "name",
          COALESCE(array_agg(r.key) FILTER (WHERE r.key IS NOT NULL),
-                  ARRAY['super_admin']) AS "roles"
+                  ARRAY[(SELECT platform_role FROM sa)]) AS "roles"
        FROM merchant.merchant AS t
-       LEFT JOIN umi.user_role AS ur
-         ON ur.merchant_id = t.id AND ur.user_id = $1::uuid
-       LEFT JOIN umi.role AS r ON r.id = ur.role_id
+       LEFT JOIN merchant.staff AS s
+         ON s.merchant_id = t.id AND s.user_id = $1::uuid AND s.status = 'active'
+       LEFT JOIN umi.role AS r ON r.id = s.role_id
        WHERE t.status = 'active'
-         AND (ur.id IS NOT NULL OR (SELECT is_sa FROM sa))
+         AND (s.id IS NOT NULL OR ${HAS_PLATFORM_GRANT})
        GROUP BY t.id, t.name
        ORDER BY t.name`,
       [userId],
@@ -131,24 +267,30 @@ export class AuthRepository {
   /**
    * Membership + role + permissions for one (user, merchant). Drives
    * MerchantAccessGuard. Null ⇒ no active access (404 merchant_not_found).
-   * Permissions come from the sealed `umi.role_permission` catalog. A global
-   * super_admin with no explicit edge here is SYNTHESIZED as
-   * {membershipId:null, role:'super_admin', permissions:['*']} so the guard
-   * grants it (never 404s Umi's own operator).
+   *
+   * Permissions come from the sealed `umi.role_permission` catalog, and NOW THAT IS THE
+   * ONLY SOURCE. `effectivePermissions` used to convert super_admin into `['*']`, which
+   * meant a platform operator held every permission key in the catalog — including keys
+   * added long after the grant. Eight POS keys arrived that way in July 2026 with no
+   * review. So the permission subquery reads BOTH the café role and the platform role,
+   * and `seed_rbac.sql` names super_admin's permissions one by one.
+   *
+   * A platform operator with no employment here still gets access (never 404 Umi's own
+   * operator) and is tagged with their platform role.
    */
   async findMembershipAccess(userId: string, merchantId: string): Promise<MembershipAccess | null> {
     const { rows } = await this.pg.query<MembershipAccess>(
-      `WITH ${SUPER_ADMIN_SA_CTE},
+      `WITH ${PLATFORM_GRANT_CTE},
        grants AS (
-         -- merchant_id IS NULL is a PLATFORM-WIDE grant (umi.user_role: 'NULL =
-         -- platform-wide grant (superadmin)'), so it applies to every merchant —
-         -- otherwise a super_admin would be capped by whatever lesser role they happen
-         -- to hold on a given café, or locked out of one they hold no grant on.
-         SELECT ur.id, r.key AS role_key
-         FROM umi.user_role AS ur
-         JOIN umi.role AS r ON r.id = ur.role_id
-         WHERE ur.user_id = $1::uuid
-           AND (ur.merchant_id = $2::uuid OR ur.merchant_id IS NULL)
+         -- The café grant, and only that. The platform role is added separately below,
+         -- because it is not an employment and has no merchant.staff row to come from.
+         -- A disabled employment grants nothing, so status is part of the predicate.
+         SELECT s.id, r.key AS role_key
+         FROM merchant.staff AS s
+         JOIN umi.role AS r ON r.id = s.role_id
+         WHERE s.user_id = $1::uuid
+           AND s.merchant_id = $2::uuid
+           AND s.status = 'active'
        )
        SELECT
          (SELECT id::text FROM grants ORDER BY id LIMIT 1) AS "membershipId",
@@ -157,19 +299,22 @@ export class AuthRepository {
          t.name      AS "name",
          t.timezone  AS "timezone",
          COALESCE((SELECT array_agg(role_key) FROM grants),
-                  ARRAY['super_admin']) AS "roles",
+                  ARRAY[(SELECT platform_role FROM sa)]) AS "roles",
          COALESCE(
            (SELECT array_agg(DISTINCT p.key)
               FROM umi.role_permission AS rp
               JOIN umi.role AS r        ON r.id = rp.role_id
               JOIN umi.permission AS p  ON p.id = rp.permission_id
-             WHERE r.key IN (SELECT role_key FROM grants)),
+             -- The union is deliberate. Someone who is 'staff' at this café AND holds a
+             -- platform grant gets both sets, not the lesser of the two.
+             WHERE r.key IN (SELECT role_key FROM grants)
+                OR r.key = (SELECT platform_role FROM sa)),
            '{}'
          ) AS "permissions"
        FROM merchant.merchant AS t
        WHERE t.id = $2::uuid
          AND t.status = 'active'
-         AND (EXISTS (SELECT 1 FROM grants) OR (SELECT is_sa FROM sa))
+         AND (EXISTS (SELECT 1 FROM grants) OR ${HAS_PLATFORM_GRANT})
        LIMIT 1`,
       [userId, merchantId],
     );

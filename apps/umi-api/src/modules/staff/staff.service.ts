@@ -89,7 +89,12 @@ export class StaffService {
     const name = String(body.name ?? '').trim();
     const phone = String(body.phone ?? '').trim() || null;
     const email = String(body.email ?? '').trim() || null;
-    const status = body.status === 'active' ? 'active' : 'invited';
+    // 'invited' is a state of the LOGIN (umi.user.status), not of the employment, and
+    // merchant.staff's CHECK now says so. A staff member the merchant just recorded is
+    // an active employee; whether they ever accept a dashboard invitation is a separate
+    // question, asked of a separate table. Postgres tests a CHECK at RUN time (23514),
+    // so sql-preflight could not have caught the old value.
+    const status = body.status === 'disabled' ? 'disabled' : 'active';
     if (!name) throw new BadRequestException('name is required');
     if (!phone && !email) {
       throw new BadRequestException('phone or email is required');
@@ -123,7 +128,8 @@ export class StaffService {
     if (has(body, 'phone')) patch.phone = String(body.phone ?? '').trim() || null;
     if (has(body, 'email')) patch.email = String(body.email ?? '').trim() || null;
     if (has(body, 'status')) {
-      patch.status = ['active', 'invited', 'disabled'].includes(body.status as string)
+      // Two states, matching the CHECK. 'invited' is gone for the reason in create().
+      patch.status = ['active', 'disabled'].includes(body.status as string)
         ? (body.status as string)
         : null;
     }

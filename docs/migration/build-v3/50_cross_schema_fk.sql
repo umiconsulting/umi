@@ -6,13 +6,9 @@
 --       exhaust must outlive the row it describes.
 -- ============================================================================
 
-alter table umi.user_role
-  add constraint user_role_merchant_fk foreign key (merchant_id)
-  references merchant.merchant(id) on delete cascade;
-
-alter table umi.user_role
-  add constraint user_role_location_fk foreign key (location_id)
-  references merchant.location(id) on delete cascade;
+-- umi.user_role no longer appears here. It became a PLATFORM-ONLY grant, so it carries
+-- no merchant and no location to point at; a café role lives on merchant.staff.role_id,
+-- whose FKs are inline in 20_merchant (merchant is built after umi).
 
 alter table umi.subscription
   add constraint subscription_merchant_fk foreign key (merchant_id)
@@ -22,14 +18,9 @@ alter table umi.invoice
   add constraint invoice_merchant_fk foreign key (merchant_id)
   references merchant.merchant(id) on delete cascade;
 
--- ---- umi -> merchant (permission overrides) ----------------------------------
-alter table umi.user_permission_override
-  add constraint permission_override_merchant_fk foreign key (merchant_id)
-  references merchant.merchant(id) on delete cascade;
-
-alter table umi.user_permission_override
-  add constraint permission_override_location_fk foreign key (location_id)
-  references merchant.location(id) on delete cascade;
+-- ---- Permission overrides are not here either --------------------------------
+-- They became merchant.staff_permission_override: a café fact about a café employment,
+-- keyed by staff_id, with every FK inline in 20_merchant.
 
 -- ---- merchant -> runtime (POS operator sessions) -----------------------------
 -- These point the other way from the block above: `runtime` is built AFTER `merchant`,
