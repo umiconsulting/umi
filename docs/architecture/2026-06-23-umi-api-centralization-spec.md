@@ -199,7 +199,7 @@ apps/umi-api/
         memory.service.ts       # working memory, summaries, semantic search
         prompts.ts              # system prompt builder + PROMPT_VERSION
         intent.service.ts
-        business-hours.service.ts
+        ordering-window.service.ts  (WhatsApp ordering window; hours live in modules/business-hours/)
         security.service.ts     # rate limit, prompt-injection, output sanitization
         tools/                  # agent tools, grouped by concern (was tools.ts, 80KB)
           catalog.tools.ts      # product search
@@ -313,7 +313,7 @@ This is _what moves, from where, to which module._ It is the source-of-truth che
 | `/api/auth/local/{login,forgot-password,reset-password}`                                                                     | `modules/auth/`                          | Unify onto D9 (JWT cookies); keep scrypt verify; keep Brevo reset email                                                                     |
 | `/api/me/tenants`, `/api/tenants/:id/{capabilities,settings,locations}`                                                      | `modules/tenants/`                       |                                                                                                                                             |
 | `/api/:slug/admin/staff*`                                                                                                    | `modules/staff/`                         |                                                                                                                                             |
-| `/api/:slug/admin/hours`                                                                                                     | `modules/hours/`                         |                                                                                                                                             |
+| `/api/:slug/admin/hours`                                                                                                     | `modules/business-hours/`                |                                                                                                                                             |
 | `/api/tenants/:id/customers*`, `/customers/:id/{timeline,conversations,orders,cash,identity}`, `/insights/customer-platform` | `modules/customers/`                     | The Customer 360 composite reads. Decompose the 120-line lateral-join query into per-domain loaders.                                        |
 | `/api/:slug/admin/{stats,analytics,reward-config,customers,gift-cards}`                                                      | `modules/cash/` (read side)              | Reads go live (boundary §2.1.2). Write side built from `umi-cash` `src/lib/wallet.ts` etc. but flag-gated (D11)                             |
 | `/api/:slug/admin/conversations`                                                                                             | `modules/customers/` or `conversations/` | List view (reads `comms.*`)                                                                                                                 |

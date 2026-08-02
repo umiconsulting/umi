@@ -1,5 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
+import { isOpenAt, parseOpenHours } from '../business-hours/open-hours';
+
+/** dow 0=Sun..6=Sat — the same indexing as open-hours DAY_KEYS and Postgres `dow`. */
+const WEEKDAY_INDEX: Record<string, number> = {
+  Sunday: 0,
+  Monday: 1,
+  Tuesday: 2,
+  Wednesday: 3,
+  Thursday: 4,
+  Friday: 5,
+  Saturday: 6,
+};
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>;
@@ -155,30 +167,49 @@ export class CashScanRepository {
   }
 
   /**
-   * Best-effort after-hours check against tenant.open_hours in tenant tz.
-   * Returns true when closed/no row for the local weekday or outside opens..closes.
+   * Best-effort after-hours flag for a staff scan, against `tenant.business.open_hours`
+   * in the café's timezone. True when the café has no hours for the local day, or the
+   * scan falls outside them.
+   *
+   * The evaluation is `open-hours.ts`, the same code the bot and the dashboard use —
+   * not a second implementation in SQL. The old version compared `now_time` against
+   * `opens_at`/`closes_at` in the query, which quietly could not represent a café open
+   * past midnight: `01:00 >= closes_at` is true for every window, so a late scan was
+   * always "after hours".
+   *
+   * SCOPE: the café's hours, not the branch's. This endpoint has no branch in scope —
+   * a staff scan carries a card and a tenant — so a branch that keeps its own hours is
+   * not consulted here. Worth revisiting when the register carries its device's branch.
    */
   async isAfterHours(tenantId: string, tz: string): Promise<boolean> {
     try {
-      const { rows } = await this.pg.withTenant((c) =>
-        c.query<Row>(
-          `WITH n AS (
-             SELECT (now() AT TIME ZONE $2) AS lt
-           )
-           SELECT oh.is_closed,
-                  (SELECT lt::time FROM n) AS now_time,
-                  oh.opens_at, oh.closes_at
-           FROM tenant.open_hours oh, n
-           WHERE oh.business_id=$1::uuid
-             AND oh.day_of_week = extract(dow FROM (SELECT lt FROM n))::int
-           LIMIT 1`,
-          [tenantId, tz],
-        ),
+      const rows = await this.pg.withTenant((c) =>
+        c
+          .query<{ open_hours: unknown }>(
+            `SELECT open_hours FROM tenant.business WHERE id = $1::uuid`,
+            [tenantId],
+          )
+          .then((r) => r.rows),
       );
-      const r = rows[0];
-      if (!r) return true; // no row for today → treat as closed (matches cash)
-      if (r.is_closed) return true;
-      return r.now_time < r.opens_at || r.now_time >= r.closes_at;
+      if (!rows[0]) return true; // no café → treat as closed, as before
+      const hours = parseOpenHours(rows[0].open_hours);
+      const parts = Object.fromEntries(
+        new Intl.DateTimeFormat('en-US', {
+          timeZone: tz,
+          weekday: 'long',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: 'numeric',
+          minute: 'numeric',
+          hour12: false,
+        })
+          .formatToParts(new Date())
+          .map((p) => [p.type, p.value]),
+      );
+      const dow = WEEKDAY_INDEX[parts.weekday] ?? 0;
+      const minutes = (parseInt(parts.hour, 10) % 24) * 60 + parseInt(parts.minute, 10);
+      return !isOpenAt(hours, dow, minutes, `${parts.year}-${parts.month}-${parts.day}`);
     } catch {
       return false; // non-blocking informational flag
     }

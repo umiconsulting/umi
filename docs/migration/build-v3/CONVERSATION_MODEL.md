@@ -227,12 +227,24 @@ created_at, updated_at)`, unique `(business_id, customer_id, source, key)`. Upda
 
 - **Message embeddings → `runtime.message_embedding`** (that table already exists; the code
   still writes `tenant.message.body_embedding`). Rewrite the writer + the two similarity reads.
-- **`business-config.service`** reads the typed `business.bot_*` / `open_hours` columns, not
-  `config`; fix `WHERE business_id` → `WHERE id`.
+- **`business-config.service`** reads the typed `business` columns, not `config`; fix
+  `WHERE business_id` → `WHERE id`. The `bot_*` naming this line anticipated landed as
+  `whatsapp_*` (2026-07-29, hours track): the ordering switch must not read as governing the
+  POS, which is a second ordering channel that a WhatsApp pause has no business stopping.
+  The same `WHERE business_id` bug was in `ordering-settings.repository` and is fixed there.
 - **`memory.repository`** reads/writes `customer_fact` with typed `key` / `value` columns,
   dropping the `metadata` jsonb round-trip; Customer 360's `customers.repository` reads the same.
-- **Hours** read `business.open_hours` jsonb, not the `open_hours` table (shared with the hours
-  track; the same fix clears the deferred `cash-scan.isAfterHours` open_hours read).
+- **Hours** ✅ **DONE 2026-07-29.** They read `business.open_hours` jsonb — with a
+  `branch.open_hours` override — not the `open_hours` table, and the same change cleared the
+  deferred `cash-scan.isAfterHours` read. `modules/business-hours/open-hours.ts` owns what the
+  document MEANS, so the bot, the dashboard and the register cannot drift apart on a missing day,
+  a split shift, a holiday, or a window past midnight.
+- **Naming.** `modules/hours` became `modules/business-hours` (Square's `Location.business_hours`),
+  and the bot's old `conversations/business-hours.service` became `ordering-window.service` —
+  it never owned the hours, it decides when the WhatsApp CHANNEL takes an order. Google keeps
+  per-service hours in `moreHours` beside `regularHours` and Toast serves online ordering from a
+  separate `/orderingSchedule`, for the same reason. The column stays `open_hours`:
+  `business.business_hours` would stutter.
 
 ---
 

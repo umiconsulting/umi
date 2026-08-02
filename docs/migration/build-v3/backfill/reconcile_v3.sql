@@ -127,6 +127,48 @@ select count(*) as cross_business_branch_refs
   from tenant.customer_order o
   join tenant.branch br on br.id = o.branch_id
  where o.branch_id is not null and br.business_id <> o.business_id;
+\echo '-- HOURS · every café that had hours in ops.business_hours still has some. The'
+\echo '   fold used to group by tenant alone, so a café with hours at two locations'
+\echo '   produced duplicate day keys and jsonb_object_agg silently kept ONE of them.'
+\echo '   That loss was invisible in a count, so count the CAFES instead (expect 0):'
+select count(*) as businesses_that_lost_their_hours
+  from (select distinct tenant_id from ops.business_hours) src
+  join tenant.business b on b.id = src.tenant_id
+ where b.open_hours = '{}'::jsonb;
+
+\echo '-- HOURS · a branch override MEANS something: it is never equal to the hours it'
+\echo '   overrides, because an equal one should be NULL and inherit (expect 0):'
+select count(*) as pointless_branch_overrides
+  from tenant.branch br
+  join tenant.business b on b.id = br.business_id
+ where br.open_hours is not null and br.open_hours = b.open_hours;
+
+\echo '-- HOURS · every distinct (location, schedule) pair in the source is still'
+\echo '   distinguishable after the fold — this is the count the old version lost'
+\echo '   (source distinct schedules = target distinct schedules):'
+with src as (
+  select bh.tenant_id, bh.location_id,
+         jsonb_object_agg(bh.day_of_week,
+           case when bh.is_closed or bh.opens_at is null or bh.closes_at is null
+                     or bh.opens_at = bh.closes_at then 'closed'
+                else to_char(bh.opens_at,'HH24:MI')||'-'||to_char(bh.closes_at,'HH24:MI') end) as sched
+    from ops.business_hours bh
+   where bh.day_of_week between 0 and 6
+   group by bh.tenant_id, bh.location_id
+)
+select (select count(distinct (tenant_id, sched)) from src)                as source_schedules,
+       (select count(*) from (
+          select business_id, open_hours from tenant.branch where open_hours is not null
+          union
+          select id, open_hours from tenant.business where open_hours <> '{}'::jsonb) t) as target_schedules;
+
+\echo '-- HOURS · the ordering window came out of the config blob (Kalala: pause flag,'
+\echo '   45-minute cutoff, notice, 3 bypass numbers). Every phone is canonical +digits,'
+\echo '   or the bot compares it against an inbound number and never matches (expect 0):'
+select count(*) as non_canonical_bypass_phones
+  from tenant.business b, unnest(b.whatsapp_bypass_phone) as p
+ where p !~ '^\+?[0-9]+$';
+
 \echo '-- POS permissions have a holder (expect 21 grants across owner/admin/staff):'
 select count(*) as pos_role_grants
   from umi.role_permission rp

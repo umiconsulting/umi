@@ -33,7 +33,49 @@ create table tenant.business (
   --   {"mon":[{"open":"08:00","close":"20:00"}], ...,
   --    "exceptions":[{"date":"2026-12-25","closed":true},
   --                  {"date":"2026-05-10","open":"10:00","close":"14:00"}]}
-  open_hours        jsonb not null default '{}'::jsonb,
+  --
+  -- WHY A DOCUMENT. The unit of READ equals the unit of WRITE: one weekly form writes
+  -- it, and every reader (bot "¿están abiertos?", the ordering window, the register's
+  -- after-hours flag, the dashboard grid) wants the whole schedule for one place and
+  -- evaluates it in app code. Nothing filters or joins on hours in SQL — nobody asks
+  -- "which cafés are open now" — so the row table was splitting an atom that is never
+  -- accessed in pieces, and charging the bot's hot path a second query for it.
+  -- It also could not express things a café actually has: a split shift (its UNIQUE
+  -- index on (tenant, location, day) FORBADE a second window), a date exception, or a
+  -- window that runs past midnight. The one thing it did better — DB-typed `time` —
+  -- comes back as the CHECK below plus validation on the write path.
+  --
+  -- WHAT DOES NOT GO IN HERE. These are the hours the DOORS are open. Per-channel and
+  -- per-service restrictions are a POLICY on top, not a second schedule: the WhatsApp
+  -- cutoff below is one, and the POS will bring more. Keeping them separate is what
+  -- stops this column from growing a nesting level per channel.
+  open_hours        jsonb not null default '{}'::jsonb
+                      check (jsonb_typeof(open_hours) = 'object'),
+  -- The ORDERING WINDOW for the conversational channel. Hours say when the café is
+  -- open; these say whether it is taking WhatsApp orders right now, and until how
+  -- long before closing. They were the last four keys of the n8n-era `config` blob
+  -- (`accepts_whatsapp_orders`, `order_cutoff_minutes`, `special_notice`,
+  -- `bypass_phones`), and they are typed columns here for the reason
+  -- CONVERSATION_MODEL.md §2c gives: build-v3 dissolves that blob rather than
+  -- restoring it.
+  --
+  -- Named for the channel ON PURPOSE. The POS is a second ordering channel and it
+  -- must NOT be paused by this switch — a café that stops taking WhatsApp orders at
+  -- the lunch rush is still selling at the counter. A neutral `ordering_enabled`
+  -- would read as governing both, and would eventually be wired to do so.
+  whatsapp_ordering_enabled     boolean not null default true,
+  -- Minutes before closing after which the bot stops accepting orders (the
+  -- dashboard slider). Replaces a legacy ABSOLUTE `order_cutoff_time` that could
+  -- silently override it — one cutoff, one source.
+  whatsapp_order_cutoff_minutes integer not null default 30
+                                  check (whatsapp_order_cutoff_minutes between 0 and 1440),
+  -- Free text the bot adds to its hours answer ("today we close early"). Tenant
+  -- authored, so it is content, not configuration.
+  whatsapp_ordering_notice      text,
+  -- Numbers that may order outside the window — staff testing the bot, the owner.
+  -- E.164, normalized on write: an inbound WhatsApp number arrives normalized, and
+  -- a list stored any other way silently never matches.
+  whatsapp_bypass_phone         text[] not null default array[]::text[],
   -- Menu authority: managed in our dashboard, or synced from a POS integration.
   menu_source       text not null default 'dashboard'
                       check (menu_source in ('dashboard','pos_sync')),
@@ -60,7 +102,10 @@ create table tenant.business (
 );
 comment on table  tenant.business is 'The café. Root of the tenant schema (was tenant.tenant).';
 comment on column tenant.business.open_hours is
-  'Weekly hours + date exceptions as one jsonb column — hours are an attribute, not a table.';
+  'Weekly hours + date exceptions as one jsonb column — hours are an attribute, not a table. '
+  'A branch may override it (tenant.branch.open_hours); read COALESCE(branch, business).';
+comment on column tenant.business.whatsapp_ordering_enabled is
+  'The pause switch for conversational ordering. Does NOT gate the POS or the counter.';
 
 -- ----------------------------------------------------------------------------
 -- PLACES & PEOPLE-WHO-WORK
@@ -74,6 +119,24 @@ create table tenant.branch (
   lat          numeric(9,6),          -- captured pin (all prod locations have coords); not derived
   lng          numeric(10,6),
   timezone     text,                  -- null = inherit business.timezone
+  -- Same inherit rule as `timezone` one line up, for the same reason: a branch is
+  -- usually the café's hours and sometimes not (a mall branch closes with the mall).
+  -- NULL = inherit business.open_hours; '{}' is NOT the same thing — that is an
+  -- explicit "no windows", i.e. closed. Same jsonb shape as business.open_hours.
+  --
+  -- WE DIVERGE FROM THE INDUSTRY HERE, deliberately. Square has no hours on `Merchant`
+  -- at all — only `Location.business_hours`. Google puts `regularHours` on the Location,
+  -- Toast on the restaurant, DoorDash on the store. None of them inherit; the physical
+  -- place always carries its own hours. We inherit because (a) `branch.timezone` one line
+  -- up already does, and two adjacent columns with opposite rules is worse than one
+  -- unusual rule; (b) almost every tenant is a single café, and per-branch-only means
+  -- every one of them writes an override that says nothing; (c) the dashboard has ONE
+  -- Hours screen, so a chain with uniform hours edits one row, not N. The cost is real
+  -- and already paid: reconcile_v3 carries a `pointless_branch_overrides` invariant that
+  -- only exists because this shape can produce them, and the API returns `hoursLevel` so
+  -- a reader always knows which level answered.
+  open_hours   jsonb                  -- null = inherit business.open_hours
+                 check (open_hours is null or jsonb_typeof(open_hours) = 'object'),
   status       text not null default 'active' check (status in ('active','closed')),
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
@@ -85,6 +148,8 @@ create table tenant.branch (
 );
 -- Search via expression index, NOT a stored search_text column.
 create index branch_name_lower on tenant.branch (lower(name));
+comment on column tenant.branch.open_hours is
+  'This branch''s hours, or NULL to inherit tenant.business.open_hours. Mirrors branch.timezone.';
 
 -- A KDS station: the board a device pairs to. CONFIG — the owner creates and renames
 -- these at business cadence, never by migration (ORDER_MODEL.md §5). The order itself

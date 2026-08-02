@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CANCELLABLE_STATUS, OrdersRepository, type OrderItemSnapshot } from '../orders.repository';
 import { ProductsRepository } from '../products.repository';
 import { ConversationsRepository } from '../conversations.repository';
-import { BusinessHoursService } from '../business-hours.service';
+import { OrderingWindowService } from '../ordering-window.service';
 import { OrderLocationResolver } from '../order-location.resolver';
 import type { DraftCart } from '../conversation.types';
 import type { ToolContext, ToolResult } from '../turn.types';
@@ -34,7 +34,7 @@ export class CheckoutTools {
     private readonly orders: OrdersRepository,
     private readonly products: ProductsRepository,
     private readonly conversations: ConversationsRepository,
-    private readonly hours: BusinessHoursService,
+    private readonly hours: OrderingWindowService,
     private readonly locations: OrderLocationResolver,
   ) {}
 

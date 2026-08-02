@@ -25,7 +25,11 @@ const EMPTY_CUSTOMER_DETAIL = {
 };
 const EMPTY_CUSTOMER_INSIGHTS = { metrics: {}, insights: [], source: null };
 const EMPTY_STAFF = { staff: [] };
-const EMPTY_HOURS = { hours: {}, timezone: null };
+const EMPTY_HOURS = {
+  hours: {},
+  timezone: null,
+  ordering: { acceptsOrders: true, orderCutoffMinutes: 30, specialNotice: null, bypassPhones: [] },
+};
 const EMPTY_VOICE = { voice: null, presets: [], businessName: '', defaults: null };
 const EMPTY_GIFT_CARDS = { giftCards: [], total: 0, page: 1, totalPages: 1 };
 const EMPTY_CONVERSATIONS = { conversations: [], total: 0, page: 1, totalPages: 1 };
@@ -434,14 +438,26 @@ async function saveRewardConfig(patch) {
   });
 }
 
-async function saveBusinessHours(hours, timezone) {
+// Persist any combination of weekly hours, timezone, and the ordering window
+// ({ acceptsOrders, orderCutoffMinutes, specialNotice, bypassPhones }). Each block is
+// optional and only sent when provided, so a partial save — the pause toggle on its
+// own — does not clobber the others server-side.
+//
+// The ordering block used to have no sender at all: the API accepted it and nothing
+// called it, so the pause switch, the cutoff slider, the notice and the bypass list
+// were all display-only.
+async function saveBusinessHours(hours, timezone, ordering) {
   const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
   const locationId = window.localStorage.getItem('umi-dashboard-selected-location');
   if (!tenantId) throw new Error('No active tenant selected');
   const path = `/api/tenants/${encodeURIComponent(tenantId)}/conversaflow/hours${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`;
+  const body = {};
+  if (hours !== undefined && hours !== null) body.hours = hours;
+  if (timezone !== undefined && timezone !== null) body.timezone = timezone;
+  if (ordering !== undefined && ordering !== null) body.ordering = ordering;
   return _apiFetch(path, {
     method: 'PATCH',
-    body: JSON.stringify({ hours, timezone }),
+    body: JSON.stringify(body),
   });
 }
 
