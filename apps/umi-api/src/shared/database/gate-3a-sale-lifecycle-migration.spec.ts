@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const sql = readFileSync(
-  resolve(process.cwd(), '../../supabase/migrations/20260729000300_gate_3a_sale_lifecycle.sql'),
+  resolve(process.cwd(), '../../docs/migration/build-v3/31_pos_sale.sql'),
   'utf8',
 );
 const repository = readFileSync(
@@ -20,7 +20,7 @@ describe('Gate 3A sale lifecycle migration', () => {
   it('keeps one editable sale for each operator session', () => {
     expect(sql).toContain('create unique index pos_cart_active_operator_uidx');
     expect(sql).toContain("'building_cart','ready_for_checkout','recovered'");
-    expect(sql).toContain('on tenant.pos_cart(business_id,branch_id,operator_user_id)');
+    expect(sql).toContain('on merchant.pos_cart(merchant_id,location_id,operator_user_id)');
   });
 
   it('keeps committed and cancelled lifecycle records explicit', () => {
@@ -36,9 +36,9 @@ describe('Gate 3A sale lifecycle migration', () => {
     expect(repository).toContain("'sale.resume.any'=ANY(os.permissions)");
   });
 
-  it('scopes current and history reads to the tenant and branch', () => {
-    expect(repository).toContain('business_id=$1::uuid');
-    expect(repository).toContain('branch_id=$2::uuid');
-    expect(repository).toContain('c.branch_id=$2::uuid');
+  it('scopes current and history reads to the merchant and location', () => {
+    expect(repository).toContain('merchant_id=$1::uuid');
+    expect(repository).toContain('location_id=$2::uuid');
+    expect(repository).toContain('c.location_id=$2::uuid');
   });
 });

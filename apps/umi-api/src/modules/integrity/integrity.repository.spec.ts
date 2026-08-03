@@ -46,11 +46,11 @@ describe('IntegrityRepository concurrency', () => {
   });
 
   it('uses the RLS-scoped transaction boundary', async () => {
-    const pg = { withTenant: vi.fn().mockResolvedValue('committed') };
+    const pg = { withMerchant: vi.fn().mockResolvedValue('committed') };
     const repository = new IntegrityRepository(pg as unknown as PgService);
     const work = vi.fn();
 
     await expect(repository.transaction(work)).resolves.toBe('committed');
-    expect(pg.withTenant).toHaveBeenCalledWith(work);
+    expect(pg.withMerchant).toHaveBeenCalledWith(work);
   });
 });

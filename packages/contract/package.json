@@ -27,6 +27,11 @@
       "types": "./dist/platform.d.ts",
       "import": "./dist/platform.js",
       "require": "./dist/platform.cjs"
+    },
+    "./route-table": {
+      "types": "./dist/route-table.d.ts",
+      "import": "./dist/route-table.js",
+      "require": "./dist/route-table.cjs"
     }
   },
   "scripts": {

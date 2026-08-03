@@ -2,13 +2,17 @@ import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
 
 /**
- * Data access for landing-page leads (Phase 5, spec §9.3). Reads/writes the
- * canonical `umi.prospect` + `umi.prospect_event` tables — confirmed live on the
- * platform DB (2026-06-30) with every column §9.3 lists, so NO schema migration
- * is needed. `grow` is a service-role-only schema, so this repository always
- * uses the BYPASSRLS **worker pool** (`pg.query`) — leads have no tenant and no
- * authenticated user, exactly like the lifecycle reads. Isolation is not an
- * issue: prospects are Umi-internal, `business_id` is NULL by design.
+ * Data access for the landing-page leads funnel (Phase 5, spec §9.3), on build-v3:
+ *
+ *   grow.leads       → umi.prospect        (person = contact_name; company = business_name;
+ *                                           status is the ONE pipeline lifecycle)
+ *   grow.lead_events → umi.prospect_event  (event_type + event_data, open vocab)
+ *
+ * `umi.prospect` is Umi's single sales pipeline: the same café-prospect whether the
+ * automated funnel is nurturing it (this engine) or a human is working it. It is a
+ * sealed/service-role table (umi.* has no api grant on prospect), so this repository
+ * always uses the BYPASSRLS **worker pool** (`pg.query`) — leads have no merchant and no
+ * authenticated user, exactly like the lifecycle reads. `merchant_id` is NULL by design.
  *
  * Event-sourced: every mutation appends a `umi.prospect_event` row (email_sent,
  * email_failed, sequence_paused/resumed, responded, diagnostic_completed, …).
@@ -74,9 +78,10 @@ function toIso(v: Ts | null): string {
   return v instanceof Date ? v.toISOString() : String(v);
 }
 
-const SELECT_COLS = `id::text, email, name, company, phone, lifecycle_status,
-  diagnostic_data, diagnostic_date, sequence_paused, pause_reason,
-  emails_sent, last_email_sent_at, created_at, updated_at`;
+const SELECT_COLS = `id::text, email, contact_name AS name, business_name AS company,
+  phone, status AS lifecycle_status, diagnostic_data, diagnostic_date,
+  sequence_paused, pause_reason, emails_sent, last_email_sent_at,
+  created_at, updated_at`;
 
 function toRecord(r: LeadRow): LeadRecord {
   return {
@@ -103,7 +108,7 @@ export interface UpsertLeadInput {
   company?: string | null;
   phone?: string | null;
   diagnosticData: LeadDiagnosticData;
-  diagnosticDate: string; // ISO — required (umi.prospect.diagnostic_date is NOT NULL, no default)
+  diagnosticDate: string; // ISO — a landing capture always has one (the column is nullable for manually-entered prospects)
   sourceApp?: string;
 }
 
@@ -115,7 +120,7 @@ export class LeadsRepository {
   async findActiveByEmail(email: string): Promise<LeadRecord | null> {
     const { rows } = await this.pg.query<LeadRow>(
       `SELECT ${SELECT_COLS} FROM umi.prospect
-        WHERE email = $1 AND lifecycle_status = ANY($2::text[])
+        WHERE email = $1 AND status = ANY($2::text[])
         ORDER BY created_at DESC LIMIT 1`,
       [email, ACTIVE_STATUSES],
     );
@@ -144,7 +149,7 @@ export class LeadsRepository {
     try {
       const { rows } = await this.pg.query<LeadRow>(
         `INSERT INTO umi.prospect
-           (email, name, company, phone, diagnostic_data, diagnostic_date, source_app, submitted_form)
+           (email, contact_name, business_name, phone, diagnostic_data, diagnostic_date, source_app, submitted_form)
          VALUES ($1, $2, $3, $4, $5::jsonb, $6, COALESCE($7, 'umi-landing-page'), 'diagnostic')
          RETURNING ${SELECT_COLS}`,
         [
@@ -177,8 +182,8 @@ export class LeadsRepository {
   private async applyUpdate(id: string, input: UpsertLeadInput): Promise<LeadRecord> {
     const { rows } = await this.pg.query<LeadRow>(
       `UPDATE umi.prospect
-          SET name = $2,
-              company = COALESCE($3, company),
+          SET contact_name = $2,
+              business_name = COALESCE($3, business_name),
               phone = COALESCE($4, phone),
               diagnostic_data = $5::jsonb,
               updated_at = now()
@@ -278,7 +283,7 @@ export class LeadsRepository {
   async listActive(): Promise<LeadRecord[]> {
     const { rows } = await this.pg.query<LeadRow>(
       `SELECT ${SELECT_COLS} FROM umi.prospect
-        WHERE sequence_paused = false AND lifecycle_status = ANY($1::text[])
+        WHERE sequence_paused = false AND status = ANY($1::text[])
         ORDER BY diagnostic_date ASC`,
       [ACTIVE_STATUSES],
     );

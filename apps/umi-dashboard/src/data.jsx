@@ -1,7 +1,7 @@
 import { useState as useStateD, useEffect as useEffectD } from 'react';
 import { LIVE as _LIVE, COOKIE_AUTH, apiUrl, withCreds, errMessage } from '@/lib/config.js';
 import { getAuthHeaders, refreshSession, handleSessionExpired } from '@/lib/auth.jsx';
-import { useTenant } from '@/lib/tenant-context.jsx';
+import { useMerchant } from '@/lib/merchant-context.jsx';
 import { isProductActive } from '@/lib/module-registry.js';
 import { routes } from '@umi/contract/routes';
 
@@ -11,7 +11,7 @@ const EMPTY_TICKER = [];
 const EMPTY_DEVICES = [];
 const EMPTY_STATIONS_KDS = [];
 const EMPTY_PAIRINGS = [];
-const EMPTY_TENANT = null;
+const EMPTY_MERCHANT = null;
 const EMPTY_ORDERS = [];
 const EMPTY_MEMBERS = { customers: [], total: 0, page: 1, totalPages: 1 };
 const EMPTY_CUSTOMERS = { customers: [], total: 0, page: 1, totalPages: 1, source: null };
@@ -25,15 +25,19 @@ const EMPTY_CUSTOMER_DETAIL = {
 };
 const EMPTY_CUSTOMER_INSIGHTS = { metrics: {}, insights: [], source: null };
 const EMPTY_STAFF = { staff: [] };
-const EMPTY_HOURS = { hours: {}, timezone: null };
+const EMPTY_HOURS = {
+  hours: {},
+  timezone: null,
+  ordering: { acceptsOrders: true, orderCutoffMinutes: 30, specialNotice: null, bypassPhones: [] },
+};
 const EMPTY_VOICE = { voice: null, presets: [], businessName: '', defaults: null };
 const EMPTY_GIFT_CARDS = { giftCards: [], total: 0, page: 1, totalPages: 1 };
 const EMPTY_CONVERSATIONS = { conversations: [], total: 0, page: 1, totalPages: 1 };
 const DEVICE_LIVE_MS = 10_000;
 const DEVICE_OFFLINE_MS = 20_000;
 
-function _tenantId(ctx) {
-  return ctx?.selectedTenantId || ctx?.capabilities?.tenant?.id;
+function _merchantId(ctx) {
+  return ctx?.selectedMerchantId || ctx?.capabilities?.merchant?.id;
 }
 
 function _locationId(ctx) {
@@ -102,10 +106,10 @@ async function _apiFetch(path, opts, _retried) {
   return payload;
 }
 
-function _tenantPath(ctx, suffix) {
-  const tenantId = _tenantId(ctx);
-  if (!tenantId) throw new Error('No active tenant selected');
-  return `${routes.tenants.base(tenantId)}${suffix}`;
+function _merchantPath(ctx, suffix) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId) throw new Error('No active merchant selected');
+  return `${routes.merchants.base(merchantId)}${suffix}`;
 }
 
 function _useAsync(asyncFn, deps, seed) {
@@ -138,7 +142,7 @@ function _useAsync(asyncFn, deps, seed) {
 function _deps(ctx, extra) {
   const products = ctx?.capabilities?.products || {};
   return [
-    _tenantId(ctx) || '',
+    _merchantId(ctx) || '',
     _locationId(ctx) || '',
     products.cash?.status || '',
     products.kds?.status || '',
@@ -167,16 +171,16 @@ function _fmtLastSeen(lastUsedAt) {
 async function _loadOverviewAndStations(ctx) {
   const cashResults = _active(ctx, 'cash')
     ? await Promise.allSettled([
-        _apiFetch(_tenantPath(ctx, '/cash/stats')),
-        _apiFetch(_tenantPath(ctx, '/cash/analytics')),
-        _apiFetch(_tenantPath(ctx, '/cash/gift-cards?limit=100')),
+        _apiFetch(_merchantPath(ctx, '/cash/stats')),
+        _apiFetch(_merchantPath(ctx, '/cash/analytics')),
+        _apiFetch(_merchantPath(ctx, '/cash/gift-cards?limit=100')),
       ])
     : [];
   const kdsResults = _active(ctx, 'kds')
     ? await Promise.allSettled([
-        _apiFetch(_withLocation(ctx, _tenantPath(ctx, '/kds/orders?filter=all'))),
-        _apiFetch(_withLocation(ctx, _tenantPath(ctx, '/kds/devices'))),
-        _apiFetch(_withLocation(ctx, _tenantPath(ctx, '/kds/ticker'))),
+        _apiFetch(_withLocation(ctx, _merchantPath(ctx, '/kds/orders?filter=all'))),
+        _apiFetch(_withLocation(ctx, _merchantPath(ctx, '/kds/devices'))),
+        _apiFetch(_withLocation(ctx, _merchantPath(ctx, '/kds/ticker'))),
       ])
     : [];
 
@@ -270,7 +274,7 @@ async function _loadDevices(ctx) {
   // poll touches every cycle (Phase 4). The old separate `/api/kds/heartbeats`
   // call was a same-origin fetch that never reached umi-api in cookie mode — it
   // is removed (the "remove the duplicate" deliverable).
-  const devResult = await _apiFetch(_withLocation(ctx, _tenantPath(ctx, '/kds/devices')));
+  const devResult = await _apiFetch(_withLocation(ctx, _merchantPath(ctx, '/kds/devices')));
   return (devResult.devices || []).map(function (d) {
     // `d.ip` overrides the merged default, so re-apply the '-' fallback after
     // the spread (the server sends null when no ip has been recorded yet).
@@ -290,24 +294,24 @@ async function _loadDevices(ctx) {
 
 async function _loadKdsStations(ctx) {
   if (!_active(ctx, 'kds')) return EMPTY_STATIONS_KDS;
-  const result = await _apiFetch(_withLocation(ctx, _tenantPath(ctx, '/kds/stations')));
+  const result = await _apiFetch(_withLocation(ctx, _merchantPath(ctx, '/kds/stations')));
   return result.stations || [];
 }
 
 async function _loadDevicePairings(ctx) {
   if (!_active(ctx, 'kds')) return EMPTY_PAIRINGS;
-  const result = await _apiFetch(_withLocation(ctx, _tenantPath(ctx, '/kds/devices/pairing')));
+  const result = await _apiFetch(_withLocation(ctx, _merchantPath(ctx, '/kds/devices/pairing')));
   return result.pairings || [];
 }
 
-async function _loadTenant(ctx) {
-  const s = await _apiFetch(_tenantPath(ctx, '/settings'));
+async function _loadMerchant(ctx) {
+  const s = await _apiFetch(_merchantPath(ctx, '/settings'));
   const cashSettings =
     _active(ctx, 'cash') && s?.slug
       ? await _apiFetch(`/api/${encodeURIComponent(s.slug)}/admin/settings`).catch(() => null)
       : null;
   const rc = _active(ctx, 'cash')
-    ? await _apiFetch(_tenantPath(ctx, '/cash/reward-config')).catch(() => null)
+    ? await _apiFetch(_merchantPath(ctx, '/cash/reward-config')).catch(() => null)
     : null;
   if (!s) return null;
   return {
@@ -353,7 +357,7 @@ async function _loadOrders(ctx, filter) {
   const result = await _apiFetch(
     _withLocation(
       ctx,
-      _tenantPath(ctx, '/kds/orders?filter=' + encodeURIComponent(filter || 'all')),
+      _merchantPath(ctx, '/kds/orders?filter=' + encodeURIComponent(filter || 'all')),
     ),
   );
   return (result.orders || []).map(function (t) {
@@ -370,7 +374,7 @@ async function _loadMembers(ctx, opts) {
     sort: opts.sort || 'recent',
   });
   if (opts.search) q.set('search', opts.search);
-  return _apiFetch(_tenantPath(ctx, '/cash/customers?' + q));
+  return _apiFetch(_merchantPath(ctx, '/cash/customers?' + q));
 }
 
 async function _loadCustomers(ctx, opts) {
@@ -381,51 +385,51 @@ async function _loadCustomers(ctx, opts) {
   });
   if (opts.search) q.set('search', opts.search);
   if (opts.filter) q.set('filter', opts.filter);
-  return _apiFetch(_tenantPath(ctx, '/customers?' + q));
+  return _apiFetch(_merchantPath(ctx, '/customers?' + q));
 }
 
 async function _loadCustomerDetail(ctx, customerId) {
   if (!customerId) return EMPTY_CUSTOMER_DETAIL;
-  return _apiFetch(_tenantPath(ctx, '/customers/' + encodeURIComponent(customerId)));
+  return _apiFetch(_merchantPath(ctx, '/customers/' + encodeURIComponent(customerId)));
 }
 
 async function _loadCustomerInsights(ctx) {
-  return _apiFetch(_tenantPath(ctx, '/insights/customer-platform'));
+  return _apiFetch(_merchantPath(ctx, '/insights/customer-platform'));
 }
 
 async function _loadStaff(ctx) {
-  return _apiFetch(_tenantPath(ctx, '/staff'));
+  return _apiFetch(_merchantPath(ctx, '/staff'));
 }
 
 async function _loadGiftCards(ctx, opts) {
   if (!_active(ctx, 'cash')) return EMPTY_GIFT_CARDS;
   opts = opts || {};
   const q = new URLSearchParams({ page: String(opts.page || 1), limit: String(opts.limit || 20) });
-  return _apiFetch(_tenantPath(ctx, '/cash/gift-cards?' + q));
+  return _apiFetch(_merchantPath(ctx, '/cash/gift-cards?' + q));
 }
 
 async function _loadConversations(ctx, opts) {
   if (!_active(ctx, 'conversaflow')) return EMPTY_CONVERSATIONS;
   opts = opts || {};
   const q = new URLSearchParams({ page: String(opts.page || 1), limit: String(opts.limit || 20) });
-  return _apiFetch(_tenantPath(ctx, '/conversaflow/conversations?' + q));
+  return _apiFetch(_merchantPath(ctx, '/conversaflow/conversations?' + q));
 }
 
 async function _loadBusinessHours(ctx) {
   if (!_active(ctx, 'conversaflow')) return EMPTY_HOURS;
-  return _apiFetch(_withLocation(ctx, _tenantPath(ctx, '/conversaflow/hours')));
+  return _apiFetch(_withLocation(ctx, _merchantPath(ctx, '/conversaflow/hours')));
 }
 
 async function _loadVoiceConfig(ctx) {
   if (!_active(ctx, 'conversaflow')) return EMPTY_VOICE;
-  return _apiFetch(_tenantPath(ctx, '/conversaflow/voice'));
+  return _apiFetch(_merchantPath(ctx, '/conversaflow/voice'));
 }
 
-async function saveTenantSettings(patch) {
+async function saveMerchantSettings(patch) {
   const headers = await getAuthHeaders();
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
-  if (!tenantId) throw new Error('No active tenant selected');
-  return _apiFetch(`/api/tenants/${encodeURIComponent(tenantId)}/settings`, {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/settings`, {
     method: 'PATCH',
     headers,
     body: JSON.stringify(patch),
@@ -433,79 +437,97 @@ async function saveTenantSettings(patch) {
 }
 
 async function saveRewardConfig(patch) {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
-  if (!tenantId) throw new Error('No active tenant selected');
-  return _apiFetch(`/api/tenants/${encodeURIComponent(tenantId)}/cash/reward-config`, {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/cash/reward-config`, {
     method: 'PATCH',
     body: JSON.stringify(patch),
   });
 }
 
-async function saveBusinessHours(hours, timezone) {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
+// Persist any combination of weekly hours, timezone, and the ordering window
+// ({ acceptsOrders, orderCutoffMinutes, specialNotice, bypassPhones }). Each block is
+// optional and only sent when provided, so a partial save — the pause toggle on its
+// own — does not clobber the others server-side.
+//
+// The ordering block used to have no sender at all: the API accepted it and nothing
+// called it, so the pause switch, the cutoff slider, the notice and the bypass list
+// were all display-only.
+async function saveBusinessHours(hours, timezone, ordering) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
   const locationId = window.localStorage.getItem('umi-dashboard-selected-location');
-  if (!tenantId) throw new Error('No active tenant selected');
-  const path = `/api/tenants/${encodeURIComponent(tenantId)}/conversaflow/hours${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`;
+  if (!merchantId) throw new Error('No active merchant selected');
+  const path = `/api/merchants/${encodeURIComponent(merchantId)}/conversaflow/hours${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`;
+  const body = {};
+  if (hours !== undefined && hours !== null) body.hours = hours;
+  if (timezone !== undefined && timezone !== null) body.timezone = timezone;
+  if (ordering !== undefined && ordering !== null) body.ordering = ordering;
   return _apiFetch(path, {
     method: 'PATCH',
-    body: JSON.stringify({ hours, timezone }),
+    body: JSON.stringify(body),
   });
 }
 
-async function saveTenantVoice(patch) {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
-  if (!tenantId) throw new Error('No active tenant selected');
-  return _apiFetch(`/api/tenants/${encodeURIComponent(tenantId)}/conversaflow/voice`, {
+async function saveMerchantVoice(patch) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/conversaflow/voice`, {
     method: 'PATCH',
     body: JSON.stringify(patch),
   });
 }
 
 async function createStaffMember(staff) {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
-  if (!tenantId) throw new Error('No active tenant selected');
-  return _apiFetch(`/api/tenants/${encodeURIComponent(tenantId)}/staff`, {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/staff`, {
     method: 'POST',
     body: JSON.stringify(staff),
   });
 }
 
 async function updateStaffMember(id, patch) {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
-  if (!tenantId) throw new Error('No active tenant selected');
-  return _apiFetch(`/api/tenants/${encodeURIComponent(tenantId)}/staff/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body: JSON.stringify(patch),
-  });
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(
+    `/api/merchants/${encodeURIComponent(merchantId)}/staff/${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    },
+  );
 }
 
 async function deleteStaffMember(id) {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
-  if (!tenantId) throw new Error('No active tenant selected');
-  return _apiFetch(`/api/tenants/${encodeURIComponent(tenantId)}/staff/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-  });
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(
+    `/api/merchants/${encodeURIComponent(merchantId)}/staff/${encodeURIComponent(id)}`,
+    {
+      method: 'DELETE',
+    },
+  );
 }
 
-// Build a tenant-scoped API path with the active location as `?locationId`.
-// Centralizes the localStorage tenant/location lookup + missing-tenant guard
+// Build a merchant-scoped API path with the active location as `?locationId`.
+// Centralizes the localStorage merchant/location lookup + missing-merchant guard
 // that every KDS mutation shares.
-function tenantScopedPath(basePath) {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
+function merchantScopedPath(basePath) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
   const locationId = window.localStorage.getItem('umi-dashboard-selected-location');
-  if (!tenantId) throw new Error('No active tenant selected');
-  return `/api/tenants/${encodeURIComponent(tenantId)}${basePath}${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`;
+  if (!merchantId) throw new Error('No active merchant selected');
+  return `/api/merchants/${encodeURIComponent(merchantId)}${basePath}${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`;
 }
 
 async function provisionDevice(device) {
-  return _apiFetch(tenantScopedPath('/kds/devices/provision'), {
+  return _apiFetch(merchantScopedPath('/kds/devices/provision'), {
     method: 'POST',
     body: JSON.stringify(device),
   });
 }
 
 async function generateDevicePairingPin(device) {
-  return _apiFetch(tenantScopedPath('/kds/devices/pairing-pin'), {
+  return _apiFetch(merchantScopedPath('/kds/devices/pairing-pin'), {
     method: 'POST',
     body: JSON.stringify(device),
   });
@@ -545,57 +567,60 @@ async function denyPosEnrollmentRequest(requestId) {
 }
 
 async function createKdsStation(station) {
-  return _apiFetch(tenantScopedPath('/kds/stations'), {
+  return _apiFetch(merchantScopedPath('/kds/stations'), {
     method: 'POST',
     body: JSON.stringify(station),
   });
 }
 
 async function updateKdsStation(stationId, patch) {
-  return _apiFetch(tenantScopedPath(`/kds/stations/${encodeURIComponent(stationId)}`), {
+  return _apiFetch(merchantScopedPath(`/kds/stations/${encodeURIComponent(stationId)}`), {
     method: 'PATCH',
     body: JSON.stringify(patch),
   });
 }
 
 async function deleteKdsStation(stationId) {
-  return _apiFetch(tenantScopedPath(`/kds/stations/${encodeURIComponent(stationId)}`), {
+  return _apiFetch(merchantScopedPath(`/kds/stations/${encodeURIComponent(stationId)}`), {
     method: 'DELETE',
   });
 }
 
 async function approveDevicePairing(pairingId) {
   return _apiFetch(
-    tenantScopedPath(`/kds/devices/pairing/${encodeURIComponent(pairingId)}/approve`),
+    merchantScopedPath(`/kds/devices/pairing/${encodeURIComponent(pairingId)}/approve`),
     { method: 'POST' },
   );
 }
 
 async function denyDevicePairing(pairingId) {
-  return _apiFetch(tenantScopedPath(`/kds/devices/pairing/${encodeURIComponent(pairingId)}/deny`), {
-    method: 'POST',
-  });
+  return _apiFetch(
+    merchantScopedPath(`/kds/devices/pairing/${encodeURIComponent(pairingId)}/deny`),
+    {
+      method: 'POST',
+    },
+  );
 }
 
 async function updateDevice(deviceId, patch) {
-  return _apiFetch(tenantScopedPath(`/kds/devices/${encodeURIComponent(deviceId)}`), {
+  return _apiFetch(merchantScopedPath(`/kds/devices/${encodeURIComponent(deviceId)}`), {
     method: 'PATCH',
     body: JSON.stringify(patch),
   });
 }
 
 async function revokeDevice(deviceId, reason) {
-  return _apiFetch(tenantScopedPath(`/kds/devices/${encodeURIComponent(deviceId)}/revoke`), {
+  return _apiFetch(merchantScopedPath(`/kds/devices/${encodeURIComponent(deviceId)}/revoke`), {
     method: 'POST',
     body: JSON.stringify({ reason: reason || 'removed_from_dashboard' }),
   });
 }
 
 async function transitionOrder(ticketId, targetStatus, extra) {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
   const locationId = window.localStorage.getItem('umi-dashboard-selected-location');
-  if (!tenantId) throw new Error('No active tenant selected');
-  const path = `/api/tenants/${encodeURIComponent(tenantId)}/kds/orders/${encodeURIComponent(ticketId)}/transition${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`;
+  if (!merchantId) throw new Error('No active merchant selected');
+  const path = `/api/merchants/${encodeURIComponent(merchantId)}/kds/orders/${encodeURIComponent(ticketId)}/transition${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`;
   return _apiFetch(path, {
     method: 'POST',
     body: JSON.stringify(Object.assign({ target_status: targetStatus }, extra || {})),
@@ -603,7 +628,7 @@ async function transitionOrder(ticketId, targetStatus, extra) {
 }
 
 function useOverviewData(refresh) {
-  const ctx = useTenant();
+  const ctx = useMerchant();
   return _useAsync(
     function () {
       return _loadOverviewAndStations(ctx);
@@ -614,7 +639,7 @@ function useOverviewData(refresh) {
 }
 
 function useDevicesData(refresh) {
-  const ctx = useTenant();
+  const ctx = useMerchant();
   return _useAsync(
     function () {
       return _loadDevices(ctx);
@@ -625,7 +650,7 @@ function useDevicesData(refresh) {
 }
 
 function useKdsStations(refresh) {
-  const ctx = useTenant();
+  const ctx = useMerchant();
   return _useAsync(
     function () {
       return _loadKdsStations(ctx);
@@ -636,7 +661,7 @@ function useKdsStations(refresh) {
 }
 
 function useDevicePairings(refresh) {
-  const ctx = useTenant();
+  const ctx = useMerchant();
   return _useAsync(
     function () {
       return _loadDevicePairings(ctx);
@@ -646,19 +671,19 @@ function useDevicePairings(refresh) {
   );
 }
 
-function useTenantData() {
-  const ctx = useTenant();
+function useMerchantData() {
+  const ctx = useMerchant();
   return _useAsync(
     function () {
-      return _loadTenant(ctx);
+      return _loadMerchant(ctx);
     },
     _deps(ctx),
-    EMPTY_TENANT,
+    EMPTY_MERCHANT,
   );
 }
 
 function useOrdersData(filter, refresh) {
-  const ctx = useTenant();
+  const ctx = useMerchant();
   return _useAsync(
     function () {
       return _loadOrders(ctx, filter);
@@ -669,7 +694,7 @@ function useOrdersData(filter, refresh) {
 }
 
 function useStaffData(refresh) {
-  const ctx = useTenant();
+  const ctx = useMerchant();
   return _useAsync(
     function () {
       return _loadStaff(ctx);
@@ -680,7 +705,7 @@ function useStaffData(refresh) {
 }
 
 function useBusinessHours() {
-  const ctx = useTenant();
+  const ctx = useMerchant();
   return _useAsync(
     function () {
       return _loadBusinessHours(ctx);
@@ -691,7 +716,7 @@ function useBusinessHours() {
 }
 
 function useVoiceConfig() {
-  const ctx = useTenant();
+  const ctx = useMerchant();
   return _useAsync(
     function () {
       return _loadVoiceConfig(ctx);
@@ -702,7 +727,7 @@ function useVoiceConfig() {
 }
 
 function useMembersData(opts) {
-  const ctx = useTenant();
+  const ctx = useMerchant();
   var page = opts && opts.page ? opts.page : 1;
   var search = opts && opts.search ? opts.search : '';
   var sort = opts && opts.sort ? opts.sort : 'recent';
@@ -716,7 +741,7 @@ function useMembersData(opts) {
 }
 
 function useCustomersData(opts) {
-  const ctx = useTenant();
+  const ctx = useMerchant();
   var page = opts && opts.page ? opts.page : 1;
   var search = opts && opts.search ? opts.search : '';
   var filter = opts && opts.filter ? opts.filter : '';
@@ -730,7 +755,7 @@ function useCustomersData(opts) {
 }
 
 function useCustomerDetail(customerId, refresh) {
-  const ctx = useTenant();
+  const ctx = useMerchant();
   return _useAsync(
     function () {
       return _loadCustomerDetail(ctx, customerId);
@@ -741,7 +766,7 @@ function useCustomerDetail(customerId, refresh) {
 }
 
 function useCustomerInsights(refresh) {
-  const ctx = useTenant();
+  const ctx = useMerchant();
   return _useAsync(
     function () {
       return _loadCustomerInsights(ctx);
@@ -752,7 +777,7 @@ function useCustomerInsights(refresh) {
 }
 
 function useGiftCardsData(opts) {
-  const ctx = useTenant();
+  const ctx = useMerchant();
   var page = opts && opts.page ? opts.page : 1;
   return _useAsync(
     function () {
@@ -764,7 +789,7 @@ function useGiftCardsData(opts) {
 }
 
 function useConversationsData(opts) {
-  const ctx = useTenant();
+  const ctx = useMerchant();
   var page = opts && opts.page ? opts.page : 1;
   return _useAsync(
     function () {
@@ -837,18 +862,20 @@ function useKdsConnection() {
   };
 }
 
-async function getBranchProfiles() {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
-  if (!tenantId) throw new Error('No active tenant selected');
-  const res = await _apiFetch(`/api/tenants/${encodeURIComponent(tenantId)}/locations/profiles`);
+async function getLocationProfiles() {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  const res = await _apiFetch(
+    `/api/merchants/${encodeURIComponent(merchantId)}/locations/profiles`,
+  );
   return res?.locations || [];
 }
 
-async function saveBranchProfile(locationId, patch) {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
-  if (!tenantId) throw new Error('No active tenant selected');
+async function saveLocationProfile(locationId, patch) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
   const res = await _apiFetch(
-    `/api/tenants/${encodeURIComponent(tenantId)}/locations/${encodeURIComponent(locationId)}`,
+    `/api/merchants/${encodeURIComponent(merchantId)}/locations/${encodeURIComponent(locationId)}`,
     {
       method: 'PATCH',
       body: JSON.stringify(patch),
@@ -860,7 +887,7 @@ async function saveBranchProfile(locationId, patch) {
 export {
   useOverviewData,
   useDevicesData,
-  useTenantData,
+  useMerchantData,
   useOrdersData,
   useKdsStations,
   useDevicePairings,
@@ -873,12 +900,12 @@ export {
   useVoiceConfig,
   useGiftCardsData,
   useConversationsData,
-  saveTenantSettings,
+  saveMerchantSettings,
   saveRewardConfig,
   saveBusinessHours,
-  saveTenantVoice,
-  getBranchProfiles,
-  saveBranchProfile,
+  saveMerchantVoice,
+  getLocationProfiles,
+  saveLocationProfile,
   createStaffMember,
   updateStaffMember,
   deleteStaffMember,

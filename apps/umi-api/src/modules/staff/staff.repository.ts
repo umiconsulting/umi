@@ -3,11 +3,10 @@ import { PgService } from '../../shared/database/pg.service';
 
 export interface StaffRow {
   id: string;
-  userId: string;
   name: string;
   phone: string | null;
   email: string | null;
-  role: string;
+  role: 'ADMIN' | 'STAFF';
   status: string;
   permissions: Record<string, boolean> | null;
   invitedAt: Date | null;
@@ -16,262 +15,189 @@ export interface StaffRow {
   updatedAt: Date | string | null;
 }
 
+// `role` comes from the real grant now — merchant.staff.role_id joined to the
+// umi.role catalog — not from `lower(name) = 'admin'`. It is still narrowed to the
+// two values the wire contract declares, so the dashboard renders unchanged: the
+// catalog has four café roles and the DTO has two.
+//
+// `permissions` and `invitedAt` stay synthesized. The permission set is derivable
+// (umi.role_permission), but the dashboard has always received null here and widening
+// it is a contract change, not a repair. `invitedAt` has no source at all: an
+// invitation belongs to umi.user, and that table records no timestamp for it.
+//
+// Every column is aliased `s.`, because the projection is used with a join.
 const PROJECTION = `
   s.id::text,
-  s.user_id::text AS "userId",
-  u.full_name AS name,
-  NULL::text AS phone,
-  u.email,
-  COALESCE((array_agg(DISTINCT r.key) FILTER (WHERE r.key IS NOT NULL))[1], 'staff') AS role,
+  s.name,
+  s.phone,
+  s.email,
+  CASE WHEN r.key IN ('owner','admin') THEN 'ADMIN' ELSE 'STAFF' END AS role,
   s.status,
-  COALESCE(jsonb_object_agg(p.key, true) FILTER (WHERE p.key IS NOT NULL), '{}'::jsonb)
-    AS permissions,
-  CASE WHEN u.status = 'invited' THEN u.created_at ELSE NULL END AS "invitedAt",
+  NULL::jsonb AS permissions,
+  NULL::timestamptz AS "invitedAt",
   s.created_at AS "createdAt",
   s.updated_at AS "updatedAt"`;
+
+// A staff member added from the dashboard gets the LEAST café role. Anything more is
+// an explicit act by someone who already holds `merchant.manage`.
+const DEFAULT_ROLE = `(SELECT id FROM umi.role WHERE key = 'staff')`;
 
 @Injectable()
 export class StaffRepository {
   constructor(private readonly pg: PgService) {}
 
-  async list(tenantId: string): Promise<StaffRow[]> {
-    const { rows } = await this.pg.withTenant((c) =>
+  async list(merchantId: string): Promise<StaffRow[]> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<StaffRow>(
         `SELECT ${PROJECTION}, NULL::timestamptz AS "disabledAt"
-         FROM tenant.staff AS s
-         JOIN umi.user AS u ON u.id = s.user_id
-         LEFT JOIN umi.user_role AS ur
-           ON ur.user_id = s.user_id AND ur.business_id = s.business_id
-         LEFT JOIN umi.role AS r ON r.id = ur.role_id
-         LEFT JOIN umi.role_permission AS rp ON rp.role_id = r.id
-         LEFT JOIN umi.permission AS p ON p.id = rp.permission_id
-         WHERE s.business_id = $1::uuid
-         GROUP BY s.id, u.id
+         FROM merchant.staff AS s
+         LEFT JOIN umi.role AS r ON r.id = s.role_id
+         WHERE s.merchant_id = $1::uuid
          ORDER BY
-           CASE WHEN bool_or(r.key IN ('owner', 'admin')) THEN 0 ELSE 1 END,
+           CASE WHEN r.key IN ('owner','admin') THEN 0 ELSE 1 END,
+           CASE s.status WHEN 'active' THEN 0 ELSE 1 END,
            s.created_at ASC`,
-        [tenantId],
+        [merchantId],
       ),
     );
     return rows;
   }
 
   async insert(
-    tenantId: string,
+    merchantId: string,
     locationId: string | null,
     data: {
       name: string;
-      email: string;
-      role: string;
-      position: string | null;
-      actorUserId: string;
+      phone: string | null;
+      email: string | null;
+      status: string;
       pinSalt: string | null;
       pinHash: string | null;
-      pinLookupHash: string | null;
+      pinLookup: string | null;
     },
   ): Promise<StaffRow> {
-    const client = await this.pg.worker.connect();
-    try {
-      await client.query('BEGIN');
-      const user = await client.query<{ id: string }>(
-        `WITH inserted AS (
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<StaffRow>(
+        // An employment is always backed by a umi.user (merchant.staff.user_id is NOT
+        // NULL), so this statement mints one. Everything is one statement, so a failure
+        // cannot leave a user with no employment.
+        //
+        // IT NEVER LINKS TO AN EXISTING ACCOUNT, and that is the whole point of `taken`.
+        // An earlier version looked up umi.user by email and reused the match, so a café
+        // could type any known address — hola@umiconsulting.co included — and silently
+        // employ that person. Membership is not something one party grants themselves
+        // over another; it needs an invitation the recipient accepts, and no such flow
+        // exists yet.
+        //
+        // So when the address is already claimed, the new umi.user is created WITHOUT an
+        // email. The typed address still lands on merchant.staff.email, which is the
+        // employment contact and was never the login. The behaviour is identical whether
+        // or not the address exists, so this also cannot be used to probe for accounts.
+        //
+        // The cost, stated: one human working at two cafés holds two umi.user rows until
+        // an invitation flow reconciles them. That is the honest position — we cannot
+        // prove two employments are the same person from a typed string.
+        //
+        // The new user gets no password. Its status follows the only door it has:
+        //   no email (or taken) -> 'active'   the person exists to hold a till PIN
+        //   a free email        -> 'invited'  a dashboard invitation is still owed
+        // 'active' + email + no hash is precisely what security_gate.sql refuses.
+        //
+        // RETURNING cannot join, so the write is wrapped in a CTE and the role catalog
+        // is joined to its output. One round trip.
+        `WITH taken AS (
+           SELECT 1 FROM umi.user
+            WHERE $5::text IS NOT NULL AND lower(email) = lower($5::text)
+            LIMIT 1
+         ), created AS (
            INSERT INTO umi.user (email, full_name, status)
-           VALUES (lower($1), $2, 'invited')
-           ON CONFLICT ((lower(email))) DO NOTHING
+           SELECT
+             CASE WHEN EXISTS (SELECT 1 FROM taken) THEN NULL ELSE $5::text END,
+             $3::text,
+             CASE WHEN $5::text IS NULL OR EXISTS (SELECT 1 FROM taken)
+                  THEN 'active' ELSE 'invited' END
            RETURNING id
+         ), person AS (
+           SELECT id FROM created
+         ), ins AS (
+           INSERT INTO merchant.staff
+             (merchant_id, location_id, user_id, role_id, name, phone, email, status,
+              operator_pin_salt, operator_pin_hash, operator_pin_lookup)
+           SELECT $1::uuid, $2::uuid, person.id, ${DEFAULT_ROLE}, $3, $4, $5, $6,
+                  $7, $8, $9
+             FROM person
+           RETURNING *
          )
-         SELECT id::text FROM inserted
-         UNION ALL
-         SELECT id::text FROM umi.user
-         WHERE lower(email) = lower($1) AND status <> 'suspended'
-         LIMIT 1`,
-        [data.email, data.name],
-      );
-      if (!user.rows[0]) throw new Error('staff_identity_not_available');
-      const userId = user.rows[0].id;
-      const role = await client.query<{ id: string }>(
-        `SELECT id::text FROM umi.role WHERE key = $1 AND NOT is_platform LIMIT 1`,
-        [data.role],
-      );
-      if (!role.rows[0]) throw new Error('invalid_staff_role');
-      const staff = await client.query<{ id: string }>(
-        `INSERT INTO tenant.staff
-           (business_id, branch_id, user_id, position, status,
-            operator_pin_salt, operator_pin_hash, operator_pin_lookup_hash)
-         VALUES ($1::uuid, $2::uuid, $3::uuid, $4, 'active', $5, $6, $7)
-         RETURNING id::text`,
+         SELECT ${PROJECTION}, NULL::timestamptz AS "disabledAt"
+         FROM ins AS s
+         LEFT JOIN umi.role AS r ON r.id = s.role_id`,
         [
-          tenantId,
+          merchantId,
           locationId,
-          userId,
-          data.position,
+          data.name,
+          data.phone,
+          data.email,
+          data.status,
           data.pinSalt,
           data.pinHash,
-          data.pinLookupHash,
+          data.pinLookup,
         ],
-      );
-      await client.query(
-        `INSERT INTO umi.user_role (user_id, role_id, business_id, branch_id, granted_by)
-         VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid)
-         ON CONFLICT DO NOTHING`,
-        [userId, role.rows[0].id, tenantId, locationId, data.actorUserId],
-      );
-      await client.query('COMMIT');
-      const row = await this.findById(tenantId, staff.rows[0].id);
-      if (!row) throw new Error('created_staff_not_found');
-      return row;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+      ),
+    );
+    return rows[0];
   }
 
   async update(
-    tenantId: string,
+    merchantId: string,
     staffId: string,
     patch: {
+      name?: string;
+      phone?: string | null;
+      email?: string | null;
       status?: string | null;
     },
   ): Promise<StaffRow | null> {
-    const { rows } = await this.pg.withTenant((c) =>
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<StaffRow>(
-        `UPDATE tenant.staff
-         SET status = COALESCE($3, status), updated_at = now()
-         WHERE id = $2::uuid AND business_id = $1::uuid
-         RETURNING id::text`,
-        [tenantId, staffId, patch.status ?? null],
-      ),
-    );
-    if (!rows[0]) return null;
-    return this.findById(tenantId, staffId);
-  }
-
-  async updateOperatorPin(
-    tenantId: string,
-    staffId: string,
-    pin: { salt: string; hash: string; lookupHash: string } | null,
-  ): Promise<boolean> {
-    const { rowCount } = await this.pg.withTenant((c) =>
-      c.query(
-        `UPDATE tenant.staff
-         SET operator_pin_salt = $3,
-             operator_pin_hash = $4,
-             operator_pin_lookup_hash = $5,
-             pin_failed_attempts = 0,
-             pin_locked_until = null,
-             updated_at = now()
-         WHERE business_id = $1::uuid AND id = $2::uuid`,
-        [tenantId, staffId, pin?.salt ?? null, pin?.hash ?? null, pin?.lookupHash ?? null],
-      ),
-    );
-    return (rowCount ?? 0) === 1;
-  }
-
-  async softDelete(tenantId: string, staffId: string): Promise<boolean> {
-    const { rows } = await this.pg.withTenant((c) =>
-      c.query<{ id: string }>(
-        `UPDATE tenant.staff
-         SET status = 'inactive', updated_at = now()
-         WHERE id = $2::uuid AND business_id = $1::uuid
-         RETURNING id::text`,
-        [tenantId, staffId],
-      ),
-    );
-    return rows.length > 0;
-  }
-
-  async updateAuthorization(
-    tenantId: string,
-    staffId: string,
-    patch: {
-      branchId?: string | null;
-      position?: string | null;
-      role?: string;
-      actorUserId: string;
-    },
-  ): Promise<boolean> {
-    const client = await this.pg.worker.connect();
-    try {
-      await client.query('BEGIN');
-      const staff = await client.query<{ userId: string; branchId: string | null }>(
-        `UPDATE tenant.staff
-         SET branch_id = CASE WHEN $3::boolean THEN $4::uuid ELSE branch_id END,
-             position = CASE WHEN $5::boolean THEN $6 ELSE position END,
-             updated_at = now()
-         WHERE id = $2::uuid AND business_id = $1::uuid
-         RETURNING user_id::text AS "userId", branch_id::text AS "branchId"`,
+        `WITH upd AS (
+           UPDATE merchant.staff
+           SET name = COALESCE($3, name),
+               phone = CASE WHEN $4::boolean THEN $5 ELSE phone END,
+               email = CASE WHEN $6::boolean THEN $7 ELSE email END,
+               status = COALESCE($8, status),
+               updated_at = now()
+           WHERE id = $2::uuid AND merchant_id = $1::uuid
+           RETURNING *
+         )
+         SELECT ${PROJECTION},
+           CASE WHEN s.status = 'disabled' THEN s.updated_at ELSE NULL END AS "disabledAt"
+         FROM upd AS s
+         LEFT JOIN umi.role AS r ON r.id = s.role_id`,
         [
-          tenantId,
+          merchantId,
           staffId,
-          patch.branchId !== undefined,
-          patch.branchId ?? null,
-          patch.position !== undefined,
-          patch.position ?? null,
+          patch.name ?? null,
+          patch.phone !== undefined,
+          patch.phone ?? null,
+          patch.email !== undefined,
+          patch.email ?? null,
+          patch.status ?? null,
         ],
-      );
-      if (!staff.rows[0]) {
-        await client.query('ROLLBACK');
-        return false;
-      }
-      if (patch.role !== undefined) {
-        const role = await client.query<{ id: string }>(
-          `SELECT id::text FROM umi.role WHERE key = $1 AND NOT is_platform LIMIT 1`,
-          [patch.role],
-        );
-        if (!role.rows[0]) throw new Error('invalid_staff_role');
-        await client.query(
-          `DELETE FROM umi.user_role
-           WHERE user_id = $1::uuid AND business_id = $2::uuid`,
-          [staff.rows[0].userId, tenantId],
-        );
-        await client.query(
-          `INSERT INTO umi.user_role (user_id, role_id, business_id, branch_id, granted_by)
-           VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid)`,
-          [
-            staff.rows[0].userId,
-            role.rows[0].id,
-            tenantId,
-            staff.rows[0].branchId,
-            patch.actorUserId,
-          ],
-        );
-      } else if (patch.branchId !== undefined) {
-        await client.query(
-          `UPDATE umi.user_role
-           SET branch_id = $3::uuid, granted_by = $4::uuid
-           WHERE user_id = $1::uuid AND business_id = $2::uuid`,
-          [staff.rows[0].userId, tenantId, staff.rows[0].branchId, patch.actorUserId],
-        );
-      }
-      await client.query('COMMIT');
-      return true;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
-  async findById(tenantId: string, staffId: string): Promise<StaffRow | null> {
-    const { rows } = await this.pg.withTenant((c) =>
-      c.query<StaffRow>(
-        `SELECT ${PROJECTION},
-           CASE WHEN s.status = 'inactive' THEN s.updated_at ELSE NULL END AS "disabledAt"
-         FROM tenant.staff AS s
-         JOIN umi.user AS u ON u.id = s.user_id
-         LEFT JOIN umi.user_role AS ur
-           ON ur.user_id = s.user_id AND ur.business_id = s.business_id
-         LEFT JOIN umi.role AS r ON r.id = ur.role_id
-         LEFT JOIN umi.role_permission AS rp ON rp.role_id = r.id
-         LEFT JOIN umi.permission AS p ON p.id = rp.permission_id
-         WHERE s.business_id = $1::uuid AND s.id = $2::uuid
-         GROUP BY s.id, u.id`,
-        [tenantId, staffId],
       ),
     );
     return rows[0] ?? null;
+  }
+
+  async softDelete(merchantId: string, staffId: string): Promise<boolean> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<{ id: string }>(
+        `UPDATE merchant.staff
+         SET status = 'disabled', updated_at = now()
+         WHERE id = $2::uuid AND merchant_id = $1::uuid
+         RETURNING id::text`,
+        [merchantId, staffId],
+      ),
+    );
+    return rows.length > 0;
   }
 }

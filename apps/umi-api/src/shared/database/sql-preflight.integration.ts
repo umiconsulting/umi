@@ -9,9 +9,10 @@ import { PgService } from './pg.service';
  * SQL PREFLIGHT — the column-level gate.
  *
  * The schema-parity gate only checks TABLE NAMES. It is blind to columns, to
- * quoted identifiers, and to function calls — which is why 488 `tenant_id`
- * references (build-v3 has ZERO `tenant_id` columns), a missing
- * `tenant.normalize_phone()`, and an `ON CONFLICT` on a non-existent unique
+ * quoted identifiers, and to function calls — which is why 488 references to a
+ * column the schema does not have (the backend said `tenant_id`; the schema has
+ * only ever had one merchant key, now `merchant_id`), a missing
+ * `merchant.normalize_phone()`, and an `ON CONFLICT` on a non-existent unique
  * index all sailed through it while every gate reported green.
  *
  * This harness PREPAREs every SQL statement the backend issues against the live
@@ -37,7 +38,7 @@ import { PgService } from './pg.service';
  * bucket. A blind spot that large stops being a caveat and becomes a hiding place.
  *
  * So interpolated statements are now RECONSTRUCTED before being given up on:
- *   1. Same-file SQL fragment constants (`const FROM = \`FROM tenant.product p …\``)
+ *   1. Same-file SQL fragment constants (`const FROM = \`FROM merchant.product p …\``)
  *      are substituted, recursively — this is the dominant pattern by far.
  *   2. Any `${…}` still left is a runtime value (an optional clause, a sort
  *      direction). It is blanked, which yields the statement's MINIMAL form.
@@ -81,6 +82,69 @@ interface Stmt {
   reconstructed?: boolean;
 }
 
+/**
+ * Blank out comments before the scanner looks for SQL, preserving every character
+ * position so reported line numbers stay true.
+ *
+ * WHY. The scanner walks backtick-delimited spans over the raw file, and a doc comment
+ * that QUOTES SQL contains backticks too. `kds.repository.ts` explains a rewrite with
+ * "Replaces the old `SELECT kitchen_status FROM ops.orders FOR UPDATE`", and the gate
+ * dutifully reported that as an unresolved statement against `ops.orders` — a table that
+ * is *supposed* to be gone. The give-away was the extracted SQL carrying the comment's
+ * own `*` continuation marker.
+ *
+ * This matters more than one bad row. P1's definition of done is "0 unresolved", and a
+ * false positive makes that target unreachable except by deleting a correct explanatory
+ * comment. A gate that cannot reach zero is a gate people learn to read past.
+ *
+ * The scanner tracks string state as well as comment state, so a `//` inside a URL or a
+ * `/*` inside a SQL string is not mistaken for a comment.
+ */
+export function blankComments(text: string): string {
+  const out = text.split('');
+  type Mode = 'code' | 'line' | 'block' | 'squote' | 'dquote' | 'tick';
+  let mode: Mode = 'code';
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    const next = text[i + 1];
+    if (mode === 'code') {
+      if (c === '/' && next === '/') {
+        mode = 'line';
+        out[i] = ' ';
+        out[i + 1] = ' ';
+        i++;
+      } else if (c === '/' && next === '*') {
+        mode = 'block';
+        out[i] = ' ';
+        out[i + 1] = ' ';
+        i++;
+      } else if (c === "'") mode = 'squote';
+      else if (c === '"') mode = 'dquote';
+      else if (c === '`') mode = 'tick';
+    } else if (mode === 'line') {
+      if (c === '\n') mode = 'code';
+      else out[i] = ' ';
+    } else if (mode === 'block') {
+      if (c === '*' && next === '/') {
+        out[i] = ' ';
+        out[i + 1] = ' ';
+        i++;
+        mode = 'code';
+      } else if (c !== '\n') out[i] = ' ';
+    } else {
+      // Inside a string: only its own terminator ends it. Backslash escapes the next char.
+      if (c === '\\') i++;
+      else if (
+        (mode === 'squote' && c === "'") ||
+        (mode === 'dquote' && c === '"') ||
+        (mode === 'tick' && c === '`')
+      )
+        mode = 'code';
+    }
+  }
+  return out.join('');
+}
+
 function sourceFiles(root: string): string[] {
   const out: string[] = [];
   for (const e of readdirSync(root, { recursive: true, withFileTypes: true })) {
@@ -100,7 +164,7 @@ function sourceFiles(root: string): string[] {
 }
 
 /**
- * Module-level SQL fragment constants in one file: `const FROM = \`FROM tenant.x\``.
+ * Module-level SQL fragment constants in one file: `const FROM = \`FROM merchant.x\``.
  * These are how this codebase shares a projection or a join across several queries,
  * and they are the single biggest reason a statement is not literal.
  */
@@ -147,7 +211,9 @@ function extractStatements(root: string): {
   const LOOKS_LIKE_SQL = /^\s*(?:with|select|insert|update|delete)\s/i;
 
   for (const file of sourceFiles(root)) {
-    const text = readFileSync(file, 'utf8');
+    // Comments blanked first: a doc comment that quotes SQL is documentation, not a
+    // statement the database has to be able to resolve.
+    const text = blankComments(readFileSync(file, 'utf8'));
     const frags = collectFragments(text);
     // Walk backtick-delimited spans. Good enough for this codebase: every SQL
     // string is a plain template literal passed to query().

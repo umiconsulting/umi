@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const sql = readFileSync(
-  resolve(process.cwd(), '../../supabase/migrations/20260729000500_gate_3c_cash_shift.sql'),
+  resolve(process.cwd(), '../../docs/migration/build-v3/33_pos_cash.sql'),
   'utf8',
 );
 const checkout = readFileSync(
@@ -19,7 +19,7 @@ describe('Gate 3C cash persistence', () => {
   it('creates one unresolved shift for each register', () => {
     expect(sql).toContain('cash_shift_one_unresolved_register');
     expect(sql).toContain("where status not in ('closed','blocked')");
-    expect(sql).toContain('unique(business_id,opening_command_id)');
+    expect(sql).toContain('unique(merchant_id,opening_command_id)');
   });
 
   it('keeps ledger, count, reconciliation, and close facts immutable', () => {
@@ -43,15 +43,15 @@ describe('Gate 3C cash persistence', () => {
     expect(checkout).toContain("WHERE id=$1::uuid AND status='open'");
   });
 
-  it('enables tenant and branch RLS for all cash tables', () => {
+  it('enables merchant and location RLS for all cash tables', () => {
     expect(sql).toContain('enable row level security');
     expect(sql).toContain('force row level security');
-    expect(sql).toContain('business_id=umi.current_business() and branch_id=umi.current_branch()');
+    expect(sql).toContain('merchant_id=umi.current_merchant() and location_id=umi.current_location()');
   });
 
   it('grants the RLS-confined API role the required cash writes', () => {
-    expect(sql).toContain('tenant.cash_shift to api,worker');
-    expect(sql).toContain('tenant.cash_shift_close,tenant.no_sale_drawer_event to api,worker');
+    expect(sql).toContain('merchant.cash_shift to api,worker');
+    expect(sql).toContain('merchant.cash_shift_close,merchant.no_sale_drawer_event to api,worker');
   });
 
   it('binds terminal operations to operator, device, and session scope', () => {
@@ -62,7 +62,7 @@ describe('Gate 3C cash persistence', () => {
 
   it('closes with the selected count before it makes the shift terminal', () => {
     expect(repository).toContain('WHERE id=$2::uuid AND shift_id=$1::uuid');
-    expect(repository.indexOf('INSERT INTO tenant.cash_shift_close')).toBeLessThan(
+    expect(repository.indexOf('INSERT INTO merchant.cash_shift_close')).toBeLessThan(
       repository.indexOf("SET status='closed',closed_at=$2::timestamptz"),
     );
     expect(repository).not.toContain('max(counted_minor_units)');

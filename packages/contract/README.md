@@ -11,8 +11,8 @@ surface can't drift between the two sides.
 | `@umi/contract/routes` | route path constants + builders           | **none** (safe for the dashboard bundle) |
 | `@umi/contract`        | routes **+** zod schemas + inferred types | `zod`                                    |
 
-`src/schemas.ts` and `src/platform.ts` are the only editable schema sources.
-Each Zod schema supplies runtime validation and a TypeScript type.
+The files in `src/` are the only editable contract sources. Domain files contain
+their Zod schemas. Each Zod schema supplies runtime validation and a TypeScript type.
 
 The generator creates these deterministic artifacts:
 

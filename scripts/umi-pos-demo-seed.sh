@@ -3,8 +3,8 @@ set -euo pipefail
 
 container="${UMI_POS_DEV_DB_CONTAINER:-umi-gate2f-postgres}"
 database="${UMI_POS_DEV_DB_NAME:-umi_gate2f}"
-tenant_id="${UMI_POS_DEV_TENANT_ID:-10000000-0000-4000-8000-000000000101}"
-branch_id="${UMI_POS_DEV_BRANCH_ID:-20000000-0000-4000-8000-000000000101}"
+merchant_id="${UMI_POS_DEV_MERCHANT_ID:-${UMI_POS_DEV_TENANT_ID:-10000000-0000-4000-8000-000000000101}}"
+location_id="${UMI_POS_DEV_LOCATION_ID:-${UMI_POS_DEV_BRANCH_ID:-20000000-0000-4000-8000-000000000101}}"
 
 if [[ "${UMI_POS_DEV_SEED_CONFIRM:-}" != "disposable" ]]; then
   echo "Set UMI_POS_DEV_SEED_CONFIRM=disposable for the disposable local database." >&2
@@ -56,7 +56,7 @@ fi
 pin_material() {
   local pin="$1"
   SEED_JWT_SECRET="$jwt_secret" \
-    SEED_TENANT_ID="$tenant_id" \
+    SEED_MERCHANT_ID="$merchant_id" \
     SEED_PIN="$pin" \
     node <<'NODE'
 const crypto = require('crypto');
@@ -64,7 +64,7 @@ const salt = crypto.randomBytes(16).toString('hex');
 const hash = crypto.scryptSync(process.env.SEED_PIN, salt, 64).toString('hex');
 const lookup = crypto
   .createHmac('sha256', process.env.SEED_JWT_SECRET)
-  .update(`umi-pos-pin:${process.env.SEED_TENANT_ID}:${process.env.SEED_PIN}`)
+  .update(`umi-pos-pin:${process.env.SEED_MERCHANT_ID}:${process.env.SEED_PIN}`)
   .digest('hex');
 process.stdout.write(`${salt}|${hash}|${lookup}`);
 NODE
@@ -77,8 +77,8 @@ IFS='|' read -r cashier_salt cashier_hash cashier_lookup <<<"$(pin_material 2468
 IFS='|' read -r viewer_salt viewer_hash viewer_lookup <<<"$(pin_material 5555)"
 
 docker exec -i "$container" psql -v ON_ERROR_STOP=1 -U postgres -d "$database" \
-  -v tenant_id="$tenant_id" \
-  -v branch_id="$branch_id" \
+  -v merchant_id="$merchant_id" \
+  -v location_id="$location_id" \
   -v owner_salt="$owner_salt" -v owner_hash="$owner_hash" -v owner_lookup="$owner_lookup" \
   -v admin_salt="$admin_salt" -v admin_hash="$admin_hash" -v admin_lookup="$admin_lookup" \
   -v manager_salt="$manager_salt" -v manager_hash="$manager_hash" -v manager_lookup="$manager_lookup" \
@@ -169,8 +169,24 @@ join umi.role r on r.key=g.role_key
 join umi.permission p on p.key=g.permission_key
 on conflict do nothing;
 
-insert into tenant.pos_checkout_policy(
-  business_id,branch_id,version,manual_terminal_enabled,mixed_tender_enabled,
+insert into merchant.merchant(id,name,currency,status)
+values (:'merchant_id','UmiPOS Local','MXN','active')
+on conflict(id) do update
+set name=excluded.name,
+    currency=excluded.currency,
+    status=excluded.status,
+    updated_at=now();
+
+insert into merchant.location(id,merchant_id,name,status)
+values (:'location_id',:'merchant_id','Sucursal Local','active')
+on conflict(id) do update
+set merchant_id=excluded.merchant_id,
+    name=excluded.name,
+    status=excluded.status,
+    updated_at=now();
+
+insert into merchant.pos_checkout_policy(
+  merchant_id,location_id,version,manual_terminal_enabled,mixed_tender_enabled,
   maximum_tender_lines,manual_terminal_approval_threshold,tips_enabled,
   tip_preset_basis_points,custom_tip_percentage_enabled,custom_tip_fixed_enabled,
   maximum_tip_minor_units,discounts_enabled,maximum_discount_basis_points,
@@ -178,10 +194,10 @@ insert into tenant.pos_checkout_policy(
   custom_discount_requires_approval,currency
 )
 values (
-  :'tenant_id',:'branch_id','demo-1',true,true,8,25000,true,
+  :'merchant_id',:'location_id','demo-1',true,true,8,25000,true,
   array[1000,1500,2000],true,true,5000,true,3000,10000,1500,true,'MXN'
 )
-on conflict(business_id,branch_id) do update set
+on conflict(merchant_id,location_id) do update set
   version=excluded.version,
   manual_terminal_enabled=excluded.manual_terminal_enabled,
   mixed_tender_enabled=excluded.mixed_tender_enabled,
@@ -213,100 +229,75 @@ set email=excluded.email,
     status='active',
     updated_at=now();
 
-delete from umi.user_role
-where business_id=:'tenant_id'::uuid
-  and user_id in (
-    '30000000-0000-4000-8000-000000000200',
-    '30000000-0000-4000-8000-000000000102',
-    '30000000-0000-4000-8000-000000000203',
-    '30000000-0000-4000-8000-000000000201',
-    '30000000-0000-4000-8000-000000000204'
-  );
-
-with assignments(user_id, role_key) as (
-  values
-    ('30000000-0000-4000-8000-000000000200'::uuid,'owner'),
-    ('30000000-0000-4000-8000-000000000102'::uuid,'admin'),
-    ('30000000-0000-4000-8000-000000000203'::uuid,'manager'),
-    ('30000000-0000-4000-8000-000000000201'::uuid,'cashier'),
-    ('30000000-0000-4000-8000-000000000204'::uuid,'viewer')
-)
-insert into umi.user_role(user_id,role_id,business_id,branch_id,granted_by)
-select a.user_id,r.id,:'tenant_id'::uuid,:'branch_id'::uuid,
-       '30000000-0000-4000-8000-000000000102'::uuid
-from assignments a
-join umi.role r on r.key=a.role_key;
-
-insert into tenant.staff(
-  id,business_id,branch_id,user_id,position,status,
-  operator_pin_salt,operator_pin_hash,operator_pin_lookup_hash,
-  pin_failed_attempts,pin_locked_until
+insert into merchant.staff(
+  id,merchant_id,location_id,user_id,role_id,name,position,status,
+  operator_pin_salt,operator_pin_hash,operator_pin_lookup
 )
 values
-  ('40000000-0000-4000-8000-000000000200',:'tenant_id',:'branch_id',
-   '30000000-0000-4000-8000-000000000200','owner','active',
-   :'owner_salt',:'owner_hash',:'owner_lookup',0,null),
-  ('40000000-0000-4000-8000-000000000202',:'tenant_id',:'branch_id',
-   '30000000-0000-4000-8000-000000000102','admin','active',
-   :'admin_salt',:'admin_hash',:'admin_lookup',0,null),
-  ('40000000-0000-4000-8000-000000000203',:'tenant_id',:'branch_id',
-   '30000000-0000-4000-8000-000000000203','manager','active',
-   :'manager_salt',:'manager_hash',:'manager_lookup',0,null),
-  ('40000000-0000-4000-8000-000000000201',:'tenant_id',:'branch_id',
-   '30000000-0000-4000-8000-000000000201','cashier','active',
-   :'cashier_salt',:'cashier_hash',:'cashier_lookup',0,null),
-  ('40000000-0000-4000-8000-000000000204',:'tenant_id',:'branch_id',
-   '30000000-0000-4000-8000-000000000204','viewer','active',
-   :'viewer_salt',:'viewer_hash',:'viewer_lookup',0,null)
-on conflict (business_id,user_id) do update
-set branch_id=excluded.branch_id,
+  ('40000000-0000-4000-8000-000000000200',:'merchant_id',:'location_id',
+   '30000000-0000-4000-8000-000000000200',(select id from umi.role where key='owner'),
+   'Propietaria UmiPOS','owner','active',:'owner_salt',:'owner_hash',:'owner_lookup'),
+  ('40000000-0000-4000-8000-000000000202',:'merchant_id',:'location_id',
+   '30000000-0000-4000-8000-000000000102',(select id from umi.role where key='admin'),
+   'Administradora UmiPOS','admin','active',:'admin_salt',:'admin_hash',:'admin_lookup'),
+  ('40000000-0000-4000-8000-000000000203',:'merchant_id',:'location_id',
+   '30000000-0000-4000-8000-000000000203',(select id from umi.role where key='manager'),
+   'Gerente UmiPOS','manager','active',:'manager_salt',:'manager_hash',:'manager_lookup'),
+  ('40000000-0000-4000-8000-000000000201',:'merchant_id',:'location_id',
+   '30000000-0000-4000-8000-000000000201',(select id from umi.role where key='cashier'),
+   'Cajera UmiPOS','cashier','active',:'cashier_salt',:'cashier_hash',:'cashier_lookup'),
+  ('40000000-0000-4000-8000-000000000204',:'merchant_id',:'location_id',
+   '30000000-0000-4000-8000-000000000204',(select id from umi.role where key='viewer'),
+   'Consulta UmiPOS','viewer','active',:'viewer_salt',:'viewer_hash',:'viewer_lookup')
+on conflict (merchant_id,user_id) do update
+set location_id=excluded.location_id,
+    role_id=excluded.role_id,
+    name=excluded.name,
     position=excluded.position,
     status='active',
     operator_pin_salt=excluded.operator_pin_salt,
     operator_pin_hash=excluded.operator_pin_hash,
-    operator_pin_lookup_hash=excluded.operator_pin_lookup_hash,
-    pin_failed_attempts=0,
-    pin_locked_until=null,
+    operator_pin_lookup=excluded.operator_pin_lookup,
     updated_at=now();
 
-insert into tenant.product_category(id,business_id,name,display_order)
+insert into merchant.product_category(id,merchant_id,name,display_order)
 values
-  ('51000000-0000-4000-8000-000000000101',:'tenant_id','Café',10),
-  ('51000000-0000-4000-8000-000000000102',:'tenant_id','Té y bebidas',20),
-  ('51000000-0000-4000-8000-000000000103',:'tenant_id','Alimentos',30),
-  ('51000000-0000-4000-8000-000000000104',:'tenant_id','Postres',40)
+  ('51000000-0000-4000-8000-000000000101',:'merchant_id','Café',10),
+  ('51000000-0000-4000-8000-000000000102',:'merchant_id','Té y bebidas',20),
+  ('51000000-0000-4000-8000-000000000103',:'merchant_id','Alimentos',30),
+  ('51000000-0000-4000-8000-000000000104',:'merchant_id','Postres',40)
 on conflict (id) do update
 set name=excluded.name,
     display_order=excluded.display_order;
 
-insert into tenant.product(
-  id,business_id,category_id,name,description,price,active,external_ref,
+insert into merchant.product(
+  id,merchant_id,category_id,name,description,price,active,external_ref,
   sku,barcode,tax_rate_basis_points
 )
 values
-  ('52000000-0000-4000-8000-000000000101',:'tenant_id','51000000-0000-4000-8000-000000000101',
+  ('52000000-0000-4000-8000-000000000101',:'merchant_id','51000000-0000-4000-8000-000000000101',
    'Americano','Espresso con agua caliente.',4500,true,'demo-americano','CAF-AME','750100000001',1600),
-  ('52000000-0000-4000-8000-000000000102',:'tenant_id','51000000-0000-4000-8000-000000000101',
+  ('52000000-0000-4000-8000-000000000102',:'merchant_id','51000000-0000-4000-8000-000000000101',
    'Latte','Espresso con leche vaporizada.',6500,true,'demo-latte','CAF-LAT','750100000002',1600),
-  ('52000000-0000-4000-8000-000000000103',:'tenant_id','51000000-0000-4000-8000-000000000101',
+  ('52000000-0000-4000-8000-000000000103',:'merchant_id','51000000-0000-4000-8000-000000000101',
    'Cappuccino','Espresso, leche y espuma.',6200,true,'demo-cappuccino','CAF-CAP','750100000003',1600),
-  ('52000000-0000-4000-8000-000000000104',:'tenant_id','51000000-0000-4000-8000-000000000101',
+  ('52000000-0000-4000-8000-000000000104',:'merchant_id','51000000-0000-4000-8000-000000000101',
    'Cold brew','Café extraído en frío.',7000,true,'demo-cold-brew','CAF-CBR','750100000004',1600),
-  ('52000000-0000-4000-8000-000000000105',:'tenant_id','51000000-0000-4000-8000-000000000102',
+  ('52000000-0000-4000-8000-000000000105',:'merchant_id','51000000-0000-4000-8000-000000000102',
    'Matcha latte','Matcha con leche vaporizada.',7800,true,'demo-matcha','BEB-MAT','750100000005',1600),
-  ('52000000-0000-4000-8000-000000000106',:'tenant_id','51000000-0000-4000-8000-000000000102',
+  ('52000000-0000-4000-8000-000000000106',:'merchant_id','51000000-0000-4000-8000-000000000102',
    'Chai latte','Té chai con leche.',7200,true,'demo-chai','BEB-CHA','750100000006',1600),
-  ('52000000-0000-4000-8000-000000000107',:'tenant_id','51000000-0000-4000-8000-000000000103',
+  ('52000000-0000-4000-8000-000000000107',:'merchant_id','51000000-0000-4000-8000-000000000103',
    'Croissant','Croissant de mantequilla.',4800,true,'demo-croissant','ALI-CRO','750100000007',1600),
-  ('52000000-0000-4000-8000-000000000108',:'tenant_id','51000000-0000-4000-8000-000000000103',
+  ('52000000-0000-4000-8000-000000000108',:'merchant_id','51000000-0000-4000-8000-000000000103',
    'Sándwich de pavo','Pavo, queso, lechuga y tomate.',11500,true,'demo-sandwich','ALI-SAN','750100000008',1600),
-  ('52000000-0000-4000-8000-000000000109',:'tenant_id','51000000-0000-4000-8000-000000000104',
+  ('52000000-0000-4000-8000-000000000109',:'merchant_id','51000000-0000-4000-8000-000000000104',
    'Cheesecake','Rebanada de cheesecake clásico.',8500,true,'demo-cheesecake','POS-CHE','750100000009',1600),
-  ('52000000-0000-4000-8000-000000000110',:'tenant_id','51000000-0000-4000-8000-000000000104',
+  ('52000000-0000-4000-8000-000000000110',:'merchant_id','51000000-0000-4000-8000-000000000104',
    'Galleta de chocolate','Galleta con trozos de chocolate.',3800,true,'demo-cookie','POS-GAL','750100000010',1600),
-  ('52000000-0000-4000-8000-000000000111',:'tenant_id','51000000-0000-4000-8000-000000000104',
+  ('52000000-0000-4000-8000-000000000111',:'merchant_id','51000000-0000-4000-8000-000000000104',
    'Rollo de canela','Disponible en el siguiente turno.',5900,true,'demo-cinnamon','POS-CAN','750100000011',1600),
-  ('52000000-0000-4000-8000-000000000112',:'tenant_id','51000000-0000-4000-8000-000000000102',
+  ('52000000-0000-4000-8000-000000000112',:'merchant_id','51000000-0000-4000-8000-000000000102',
    'Bebida de temporada','Producto fuera del surtido actual.',7600,true,'demo-seasonal','BEB-TEM','750100000012',1600)
 on conflict (id) do update
 set category_id=excluded.category_id,
@@ -320,43 +311,42 @@ set category_id=excluded.category_id,
     tax_rate_basis_points=excluded.tax_rate_basis_points,
     updated_at=now();
 
-insert into tenant.product_branch_availability(
-  product_id,branch_id,available,status,available_from
+insert into merchant.product_location_availability(
+  product_id,location_id,status,available_from
 )
-select id,:'branch_id'::uuid,true,'enabled',null
-from tenant.product
+select id,:'location_id'::uuid,'enabled',null
+from merchant.product
 where id between '52000000-0000-4000-8000-000000000101'::uuid
              and '52000000-0000-4000-8000-000000000110'::uuid
-on conflict (product_id,branch_id) do update
-set available=true,status='enabled',available_from=null,updated_at=now();
+on conflict (product_id,location_id) do update
+set status='enabled',available_from=null,updated_at=now();
 
-insert into tenant.product_branch_availability(
-  product_id,branch_id,available,status,available_from
+insert into merchant.product_location_availability(
+  product_id,location_id,status,available_from
 )
 values
-  ('52000000-0000-4000-8000-000000000111',:'branch_id',false,
+  ('52000000-0000-4000-8000-000000000111',:'location_id',
    'future_availability',now()+interval '1 day'),
-  ('52000000-0000-4000-8000-000000000112',:'branch_id',false,
+  ('52000000-0000-4000-8000-000000000112',:'location_id',
    'out_of_assortment',null)
-on conflict (product_id,branch_id) do update
-set available=excluded.available,
-    status=excluded.status,
+on conflict (product_id,location_id) do update
+set status=excluded.status,
     available_from=excluded.available_from,
     updated_at=now();
 
-insert into tenant.product_variant(
-  id,business_id,product_id,name,attributes,price_delta,active,display_order
+insert into merchant.product_variant(
+  id,merchant_id,product_id,name,attributes,price_delta,active,display_order
 )
 values
-  ('53000000-0000-4000-8000-000000000101',:'tenant_id','52000000-0000-4000-8000-000000000102',
+  ('53000000-0000-4000-8000-000000000101',:'merchant_id','52000000-0000-4000-8000-000000000102',
    'Chico',jsonb_build_object('size','chico'),0,true,10),
-  ('53000000-0000-4000-8000-000000000102',:'tenant_id','52000000-0000-4000-8000-000000000102',
+  ('53000000-0000-4000-8000-000000000102',:'merchant_id','52000000-0000-4000-8000-000000000102',
    'Mediano',jsonb_build_object('size','mediano'),1000,true,20),
-  ('53000000-0000-4000-8000-000000000103',:'tenant_id','52000000-0000-4000-8000-000000000102',
+  ('53000000-0000-4000-8000-000000000103',:'merchant_id','52000000-0000-4000-8000-000000000102',
    'Grande',jsonb_build_object('size','grande'),1800,true,30),
-  ('53000000-0000-4000-8000-000000000104',:'tenant_id','52000000-0000-4000-8000-000000000108',
+  ('53000000-0000-4000-8000-000000000104',:'merchant_id','52000000-0000-4000-8000-000000000108',
    'Pan blanco',jsonb_build_object('bread','blanco'),0,true,10),
-  ('53000000-0000-4000-8000-000000000105',:'tenant_id','52000000-0000-4000-8000-000000000108',
+  ('53000000-0000-4000-8000-000000000105',:'merchant_id','52000000-0000-4000-8000-000000000108',
    'Pan integral',jsonb_build_object('bread','integral'),500,true,20)
 on conflict (id) do update
 set name=excluded.name,
@@ -366,7 +356,7 @@ set name=excluded.name,
     display_order=excluded.display_order,
     updated_at=now();
 
-insert into tenant.product_option_group(id,product_id,name,min_select,max_select)
+insert into merchant.product_option_group(id,product_id,name,min_select,max_select)
 values
   ('54000000-0000-4000-8000-000000000101','52000000-0000-4000-8000-000000000102',
    'Tipo de leche',1,1),
@@ -379,7 +369,7 @@ set name=excluded.name,
     min_select=excluded.min_select,
     max_select=excluded.max_select;
 
-insert into tenant.product_modifier(id,option_group_id,name,price_delta)
+insert into merchant.product_modifier(id,option_group_id,name,price_delta)
 values
   ('55000000-0000-4000-8000-000000000101','54000000-0000-4000-8000-000000000101',
    'Leche entera',0),
@@ -399,23 +389,23 @@ on conflict (id) do update
 set name=excluded.name,
     price_delta=excluded.price_delta;
 
-insert into tenant.product_media(
-  id,business_id,product_id,url,alt_text,width,height,display_order
+insert into merchant.product_media(
+  id,merchant_id,product_id,url,alt_text,width,height,display_order
 )
 values
-  ('56000000-0000-4000-8000-000000000101',:'tenant_id','52000000-0000-4000-8000-000000000101',
+  ('56000000-0000-4000-8000-000000000101',:'merchant_id','52000000-0000-4000-8000-000000000101',
    'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=80',
    'Taza de café americano',900,700,10),
-  ('56000000-0000-4000-8000-000000000102',:'tenant_id','52000000-0000-4000-8000-000000000102',
+  ('56000000-0000-4000-8000-000000000102',:'merchant_id','52000000-0000-4000-8000-000000000102',
    'https://images.unsplash.com/photo-1570968915860-54d5c301fa9f?auto=format&fit=crop&w=900&q=80',
    'Taza de café latte',900,700,10),
-  ('56000000-0000-4000-8000-000000000107',:'tenant_id','52000000-0000-4000-8000-000000000107',
+  ('56000000-0000-4000-8000-000000000107',:'merchant_id','52000000-0000-4000-8000-000000000107',
    'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=900&q=80',
    'Croissant de mantequilla',900,700,10),
-  ('56000000-0000-4000-8000-000000000108',:'tenant_id','52000000-0000-4000-8000-000000000108',
+  ('56000000-0000-4000-8000-000000000108',:'merchant_id','52000000-0000-4000-8000-000000000108',
    'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=900&q=80',
    'Sándwich de pavo',900,700,10),
-  ('56000000-0000-4000-8000-000000000109',:'tenant_id','52000000-0000-4000-8000-000000000109',
+  ('56000000-0000-4000-8000-000000000109',:'merchant_id','52000000-0000-4000-8000-000000000109',
    'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=900&q=80',
    'Rebanada de cheesecake',900,700,10)
 on conflict (id) do update
@@ -426,15 +416,15 @@ set url=excluded.url,
     display_order=excluded.display_order;
 
 select 1 / case when count(*)=5 then 1 else 0 end
-from tenant.staff
-where business_id=:'tenant_id'::uuid
-  and operator_pin_lookup_hash in (
+from merchant.staff
+where merchant_id=:'merchant_id'::uuid
+  and operator_pin_lookup in (
     :'owner_lookup',:'admin_lookup',:'manager_lookup',:'cashier_lookup',:'viewer_lookup'
   );
 
 select 1 / case when count(*)=12 then 1 else 0 end
-from tenant.product
-where business_id=:'tenant_id'::uuid
+from merchant.product
+where merchant_id=:'merchant_id'::uuid
   and external_ref like 'demo-%';
 
 select 1 / case when count(*)=27 then 1 else 0 end
@@ -451,16 +441,15 @@ commit;
 
 select 'UmiPOS demo seed completed.' as result;
 select u.email,r.key as role,s.position
-from tenant.staff s
+from merchant.staff s
 join umi.user u on u.id=s.user_id
-join umi.user_role ur on ur.user_id=u.id and ur.business_id=s.business_id
-join umi.role r on r.id=ur.role_id
-where s.business_id=:'tenant_id'::uuid
+join umi.role r on r.id=s.role_id
+where s.merchant_id=:'merchant_id'::uuid
   and u.email like '%@umipos.local'
 order by r.key;
 select count(*) as demo_product_count
-from tenant.product
-where business_id=:'tenant_id'::uuid
+from merchant.product
+where merchant_id=:'merchant_id'::uuid
   and external_ref like 'demo-%';
 SQL
 

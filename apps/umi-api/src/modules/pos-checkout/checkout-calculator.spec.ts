@@ -54,7 +54,7 @@ const policy: CheckoutPolicy = {
 };
 const command: CheckoutCommand = {
   cartId: id(1),
-  branchId: id(2),
+  locationId: id(2),
   operatorSessionId: id(3),
   expectedCartVersion: 1,
   paymentMethod: 'cash',

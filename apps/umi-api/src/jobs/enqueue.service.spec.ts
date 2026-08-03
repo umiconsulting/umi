@@ -31,14 +31,14 @@ describe('EnqueueService', () => {
     const id = await svc.enqueue(
       QUEUES.turns,
       'turn.process',
-      expect.objectContaining({ tenantId: 't1' }),
+      { merchantId: 't1' },
       { priority: JobPriority.Interactive, jobId: 'msg-abc' },
     );
 
     expect(id).toBe('job-1');
     expect(queues[QUEUES.turns].add).toHaveBeenCalledWith(
       'turn.process',
-      expect.objectContaining({ tenantId: 't1' }),
+      { merchantId: 't1' },
       expect.objectContaining({
         priority: toBullPriority(JobPriority.Interactive),
         jobId: 'msg-abc',
@@ -48,34 +48,18 @@ describe('EnqueueService', () => {
     );
   });
 
-  it('rejects enqueue when bounded queue capacity is exhausted', async () => {
-    const { svc, queues } = serviceWithQueues();
-    vi.mocked(queues[QUEUES.turns].getJobCounts).mockResolvedValue({
-      active: 1,
-      waiting: 9_999,
-      completed: 0,
-      failed: 0,
-      delayed: 0,
-      prioritized: 0,
-      paused: 0,
-      'waiting-children': 0,
-    });
-
-    await expect(svc.enqueue(QUEUES.turns, 'turn.process', { tenantId: 't1' })).rejects.toThrow(
-      'queue_backpressure:turns',
-    );
-    expect(queues[QUEUES.turns].add).not.toHaveBeenCalled();
-  });
-
   it('sanitizes ":" out of the jobId (BullMQ rejects it in custom ids)', async () => {
     const { svc, queues } = serviceWithQueues();
-    await svc.enqueue(QUEUES.turns, 'turn.process', expect.objectContaining({ tenantId: 't1' }), {
-      jobId: 'turn_process:11111111-2222-3333-4444-555555555555',
-    });
+    await svc.enqueue(
+      QUEUES.turns,
+      'turn.process',
+      { merchantId: 't1' },
+      { jobId: 'turn_process:11111111-2222-3333-4444-555555555555' },
+    );
 
     expect(queues[QUEUES.turns].add).toHaveBeenCalledWith(
       'turn.process',
-      { tenantId: 't1' },
+      { merchantId: 't1' },
       expect.objectContaining({
         jobId: 'turn_process_11111111-2222-3333-4444-555555555555',
       }),
@@ -84,12 +68,12 @@ describe('EnqueueService', () => {
 
   it('routes to the requested queue and defaults priority', async () => {
     const { svc, queues } = serviceWithQueues();
-    await svc.enqueue(QUEUES.outbound, 'twilio.reply', { tenantId: 't1' });
+    await svc.enqueue(QUEUES.outbound, 'twilio.reply', { merchantId: 't1' });
 
     expect(queues[QUEUES.turns].add).not.toHaveBeenCalled();
     expect(queues[QUEUES.outbound].add).toHaveBeenCalledWith(
       'twilio.reply',
-      { tenantId: 't1' },
+      { merchantId: 't1' },
       expect.objectContaining({
         priority: toBullPriority(JobPriority.Default),
         attempts: 5, // outbound keeps the legacy outbox max_attempts

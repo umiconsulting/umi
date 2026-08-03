@@ -49,18 +49,18 @@ export class CashWriteService {
   ) {}
 
   async topup(
-    tenantId: string,
+    merchantId: string,
     userId: string,
     input: { cardId: string; amountCentavos: number; note?: string; idempotencyKey?: string },
   ) {
     if (input.amountCentavos < 100 || input.amountCentavos > MAX_TOPUP_CENTAVOS) {
       throw new BadRequestException('Monto inválido');
     }
-    const card = await this.repo.findCard(tenantId, input.cardId);
+    const card = await this.repo.findCard(merchantId, input.cardId);
     if (!card) throw new NotFoundException({ error: 'Tarjeta no encontrada' });
 
     const [staffMemberId, userPersonId] = await Promise.all([
-      this.repo.getStaffMemberId(tenantId, userId),
+      this.repo.getStaffMemberId(merchantId, userId),
       this.repo.getUserPersonId(userId),
     ]);
     if (userPersonId && userPersonId === card.person_id) {
@@ -69,7 +69,7 @@ export class CashWriteService {
 
     const dayStart = new Date();
     dayStart.setHours(0, 0, 0, 0);
-    const g = await this.repo.topupGuards(tenantId, card.id, staffMemberId, dayStart);
+    const g = await this.repo.topupGuards(merchantId, card.id, staffMemberId, dayStart);
     if (staffMemberId && g.staffSum + input.amountCentavos > STAFF_DAILY_TOPUP_LIMIT) {
       tooMany(
         `Límite diario de recargas alcanzado (máx. ${formatMxn2(STAFF_DAILY_TOPUP_LIMIT)} por día). Contacta al administrador.`,
@@ -87,7 +87,7 @@ export class CashWriteService {
     }
 
     const balanceCents = await this.repo.creditWallet({
-      tenantId,
+      merchantId,
       cardId: card.id,
       deltaCents: input.amountCentavos,
       type: 'topup',
@@ -108,18 +108,18 @@ export class CashWriteService {
   }
 
   async purchase(
-    tenantId: string,
+    merchantId: string,
     userId: string,
     input: { cardId: string; amountCentavos: number; note?: string; idempotencyKey?: string },
   ) {
-    const card = await this.repo.findCard(tenantId, input.cardId);
+    const card = await this.repo.findCard(merchantId, input.cardId);
     if (!card) throw new NotFoundException({ error: 'Tarjeta no encontrada' });
-    const staffMemberId = await this.repo.getStaffMemberId(tenantId, userId);
+    const staffMemberId = await this.repo.getStaffMemberId(merchantId, userId);
 
     let balanceCents: number;
     try {
       balanceCents = await this.repo.purchase({
-        tenantId,
+        merchantId,
         cardId: card.id,
         deltaCents: -input.amountCentavos,
         amountCents: input.amountCentavos,
@@ -151,7 +151,7 @@ export class CashWriteService {
   }
 
   async issueGiftCard(
-    tenantId: string,
+    merchantId: string,
     userId: string,
     input: {
       amountCentavos: number;
@@ -162,12 +162,12 @@ export class CashWriteService {
       recipientName?: string;
     },
   ) {
-    const staffMemberId = await this.repo.getStaffMemberId(tenantId, userId);
+    const staffMemberId = await this.repo.getStaffMemberId(merchantId, userId);
     let gc: { id: string; code: string; amount_cents: number } | null = null;
     for (let attempt = 0; attempt < 5 && !gc; attempt++) {
       try {
         gc = await this.repo.insertGiftCard({
-          tenantId,
+          merchantId,
           code: generateGiftCode(),
           amountCents: input.amountCentavos,
           staffMemberId,
@@ -189,9 +189,9 @@ export class CashWriteService {
     };
   }
 
-  async redeemGiftCard(tenantId: string, code: string, by: { phone?: string; email?: string }) {
+  async redeemGiftCard(merchantId: string, code: string, by: { phone?: string; email?: string }) {
     const normalizedCode = code.toUpperCase();
-    const gift = await this.repo.findGiftCardByCode(tenantId, normalizedCode);
+    const gift = await this.repo.findGiftCardByCode(merchantId, normalizedCode);
     if (!gift) throw new NotFoundException({ error: 'Código no válido' });
     if (gift.redeemed_at !== null) {
       throw new BadRequestException({ error: 'Esta tarjeta de regalo ya fue canjeada' });
@@ -200,7 +200,7 @@ export class CashWriteService {
       throw new BadRequestException({ error: 'Esta tarjeta de regalo ha expirado' });
     }
 
-    const found = await this.repo.findPersonCard(tenantId, by);
+    const found = await this.repo.findPersonCard(merchantId, by);
     if (!found) {
       throw new NotFoundException({
         error: 'No encontramos una tarjeta de lealtad con ese teléfono/email. Regístrate primero.',
@@ -211,7 +211,7 @@ export class CashWriteService {
     let balanceCents: number;
     try {
       balanceCents = await this.repo.redeemGiftCard({
-        tenantId,
+        merchantId,
         giftCardId: gift.id,
         cardId: found.cardId,
         amountCents: gift.amount_cents,

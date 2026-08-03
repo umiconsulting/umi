@@ -37,8 +37,8 @@ describe('OperationalInterceptor', () => {
         requestId: 'request-1',
         correlationId: 'correlation-1',
         userId: 'user-1',
-        tenantId: 'tenant-1',
-        branchId: 'branch-1',
+        merchantId: 'tenant-1',
+        locationId: 'branch-1',
       },
       () => lastValueFrom(interceptor.intercept(context, next)),
     );

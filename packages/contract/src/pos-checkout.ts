@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  BusinessDate,
+  MerchantDate,
   CorrelationId,
   CurrencyCode,
   IsoTimestamp,
@@ -259,13 +259,13 @@ export const PaymentCommitResult = z
   .strict();
 export const CheckoutRecoveryQuery = z
   .object({
-    branchId: Uuid,
+    locationId: Uuid,
     operatorSessionId: Uuid,
   })
   .strict();
 export const CheckoutCancellationRequest = z
   .object({
-    branchId: Uuid,
+    locationId: Uuid,
     operatorSessionId: Uuid,
     reason: z.string().trim().min(1).max(160),
     checkoutFingerprint: z
@@ -355,7 +355,7 @@ export const CheckoutCommand = z
   .object({
     commandId: Uuid.optional(),
     cartId: Uuid,
-    branchId: Uuid,
+    locationId: Uuid,
     operatorSessionId: Uuid,
     cashShiftId: Uuid.nullable().optional(),
     expectedCartVersion: z.number().int().positive(),
@@ -469,7 +469,7 @@ export const CheckoutRecoverySnapshot = z
   .strict();
 export const PaymentStatusQuery = z
   .object({
-    branchId: Uuid,
+    locationId: Uuid,
     operatorSessionId: Uuid,
   })
   .strict();
@@ -544,5 +544,5 @@ export const posCheckoutModels = {
   PaymentStatusQuery,
   CartItem,
   CurrencyCode,
-  BusinessDate,
+  MerchantDate,
 };

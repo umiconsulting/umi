@@ -34,13 +34,13 @@ export class CashRegisterService {
   ) {}
 
   async register(
-    tenantId: string,
-    tenantName: string,
+    merchantId: string,
+    merchantName: string,
     input: RegisterInput,
-    userAgent: string | null,
+    _userAgent: string | null,
   ) {
-    const cfg = await this.repo.tenantConfig(tenantId);
-    if (!cfg) throw new NotFoundException({ error: 'Tenant no encontrado' });
+    const cfg = await this.repo.merchantConfig(merchantId);
+    if (!cfg) throw new NotFoundException({ error: 'Merchant no encontrado' });
     if (!cfg.selfRegistration) {
       throw new ForbiddenException({ error: 'El registro no está disponible' });
     }
@@ -53,12 +53,12 @@ export class CashRegisterService {
       throw new BadRequestException({ error: 'Número de teléfono no válido' });
     }
 
-    const existing = await this.repo.findExisting(tenantId, normalized);
+    const existing = await this.repo.findExisting(merchantId, normalized);
     if (existing && existing.hasCard) {
       const { accessToken } = await this.session.createSession(
         existing.personId,
         'CUSTOMER',
-        tenantId,
+        merchantId,
       );
       // Already registered, but hand back a session so the page shows wallet
       // buttons (same UX as umi-cash). Carried in the exception body.
@@ -69,16 +69,14 @@ export class CashRegisterService {
       });
     }
 
-    const personId = await this.repo.resolveContact(tenantId, input.phone, input.name);
-    await this.repo.updatePerson(personId, input.name, input.birthDate, {
-      ua: userAgent ?? null,
-    });
+    const personId = await this.repo.resolveContact(merchantId, input.phone, input.name);
+    await this.repo.updatePerson(personId, input.name, input.birthDate);
 
     let created: { cardId: string; cardNumber: string } | null = null;
     for (let attempt = 0; attempt < 5 && !created; attempt++) {
       try {
         created = await this.repo.createCard({
-          tenantId,
+          merchantId,
           personId,
           cardNumber: generateCardNumber(cfg.cardPrefix),
           qrToken: this.qr.generateRandomToken(),
@@ -90,14 +88,14 @@ export class CashRegisterService {
     }
     if (!created) throw new HttpException({ error: 'Error al registrar' }, 500);
 
-    const { accessToken } = await this.session.createSession(personId, 'CUSTOMER', tenantId);
+    const { accessToken } = await this.session.createSession(personId, 'CUSTOMER', merchantId);
     return {
       userId: personId,
       cardId: created.cardId,
       cardNumber: created.cardNumber,
       accessToken,
       user: { id: personId, name: input.name, role: 'CUSTOMER' },
-      message: `¡Bienvenido a ${tenantName}!`,
+      message: `¡Bienvenido a ${merchantName}!`,
     };
   }
 }

@@ -69,7 +69,7 @@ export class MemoryService {
   async buildWorkingMemory(params: {
     conversationId: string;
     personId: string;
-    tenantId: string;
+    merchantId: string;
     currentMessage: string;
     totalMsgCount: number;
     summary: string | null;
@@ -85,7 +85,7 @@ export class MemoryService {
 
     const [recent, rawFacts] = await Promise.all([
       this.messages.getRecentMessages(params.conversationId, 8),
-      this.memory.getCustomerFacts(params.tenantId, params.personId),
+      this.memory.getCustomerFacts(params.merchantId, params.personId),
     ]);
 
     const recentMessages = recent
@@ -104,7 +104,7 @@ export class MemoryService {
         try {
           let sourceScope: 'customer' | 'conversation' = 'customer';
           let similarMsgs: SemanticRow[] = await this.memory.searchCustomerMessages({
-            tenantId: params.tenantId,
+            merchantId: params.merchantId,
             personId: params.personId,
             currentConversationId: params.conversationId,
             embedding: queryEmbedding,

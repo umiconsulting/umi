@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================================
 # build-v3 COEXIST backfill — prod (core/loyalty/ops/grow/comms/observability)
-# translated into the new umi/tenant/runtime schemas, on a clone of the prod
+# translated into the new umi/merchant/runtime schemas, on a clone of the prod
 # snapshot. Proves the rename is lossless (see reconcile_v3.sql).
 #
 #   usage: ./00_run_backfill.sh [target_db] [template_db]
@@ -10,19 +10,18 @@
 #
 # ORDER MATTERS. Two ordering rules the hard way:
 #   1. The loyalty VERTICAL (backfill_loyalty_v3) runs FIRST — it is the only
-#      file that seeds tenant.business / customer / contact / loyalty_card /
+#      file that seeds merchant.merchant / customer / contact / loyalty_card /
 #      stored_value_ledger / loyalty_visit. The 6 domain files build on top and
-#      will FK-fail against an empty tenant.business without it.
+#      will FK-fail against an empty merchant.merchant without it.
 #   2. Cross-schema FKs (50_cross_schema_fk) + RLS (90_rls) are applied AFTER the
-#      data lands — they add umi->tenant FKs (user_role/subscription/invoice ->
-#      business) that reference rows the backfill creates. 99_verify is pristine-
+#      data lands — they add umi->merchant FKs (user_role/subscription/invoice ->
+#      merchant) that reference rows the backfill creates. 99_verify is pristine-
 #      build-only (it asserts the prod schemas do NOT exist) — skip it here.
 # ============================================================================
 set -euo pipefail
 DB="${1:-umi_backfill_v3}"
 TEMPLATE="${2:-umi_prod_snapshot}"
-ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
-DDL="$ROOT/supabase/migrations"
+DDL="$(cd "$(dirname "$0")/.." && pwd)"     # docs/migration/build-v3
 BF="$(cd "$(dirname "$0")" && pwd)"         # .../backfill
 
 echo "== (re)create $DB from template $TEMPLATE =="
@@ -31,12 +30,7 @@ psql -d postgres -c "drop database if exists $DB"
 psql -d postgres -c "create database $DB template $TEMPLATE"
 
 echo "== schema: tables + touch triggers (NO cross-FK yet) =="
-for f in \
-  20260725000100_build_v3_foundation \
-  20260725000200_build_v3_umi \
-  20260725000300_build_v3_tenant \
-  20260725000400_build_v3_runtime \
-  20260725000600_build_v3_triggers; do
+for f in 00_foundation 10_umi 20_merchant 30_runtime 60_triggers; do
   psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$DDL/$f.sql"
 done
 
@@ -50,9 +44,7 @@ echo "== seed: RBAC role -> permission grants (source had none) =="
 psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$BF/seed_rbac.sql"
 
 echo "== cross-schema FKs + RLS (data now present) =="
-for f in \
-  20260725000500_build_v3_cross_schema_fk \
-  20260725000700_build_v3_rls; do
+for f in 50_cross_schema_fk 90_rls; do
   psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$DDL/$f.sql"
 done
 

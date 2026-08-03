@@ -15,28 +15,28 @@ test('auth route literals are byte-exact to the controllers', () => {
   assert.equal(routes.auth.forgotPassword, '/api/auth/local/forgot-password');
   assert.equal(routes.auth.resetPassword, '/api/auth/local/reset-password');
   assert.equal(routes.auth.me, '/api/auth/me');
-  assert.equal(routes.auth.posPinLogin, '/api/auth/pos/pin-login');
+  assert.equal(routes.auth.pos.pinLogin, '/api/v1/auth/pos/pin-login');
 });
 
-test('me + tenant-scoped route builders', () => {
-  assert.equal(routes.me.tenants, '/api/me/tenants');
-  assert.equal(routes.tenants.base('abc'), '/api/tenants/abc');
-  assert.equal(routes.tenants.capabilities('abc'), '/api/tenants/abc/capabilities');
-  assert.equal(routes.tenants.settings('abc'), '/api/tenants/abc/settings');
-  assert.equal(routes.cash.stats('abc'), '/api/tenants/abc/cash/stats');
+test('me + merchant-scoped route builders', () => {
+  assert.equal(routes.me.merchants, '/api/me/merchants');
+  assert.equal(routes.merchants.base('abc'), '/api/merchants/abc');
+  assert.equal(routes.merchants.capabilities('abc'), '/api/merchants/abc/capabilities');
+  assert.equal(routes.merchants.settings('abc'), '/api/merchants/abc/settings');
+  assert.equal(routes.cash.stats('abc'), '/api/merchants/abc/cash/stats');
 });
 
-test('tenant id is URL-encoded (matches data.jsx _tenantPath)', () => {
-  assert.equal(routes.tenants.base('a b'), '/api/tenants/a%20b');
-  assert.equal(routes.cash.stats('a/b'), `/api/tenants/${encodeURIComponent('a/b')}/cash/stats`);
+test('merchant id is URL-encoded (matches data.jsx _merchantPath)', () => {
+  assert.equal(routes.merchants.base('a b'), '/api/merchants/a%20b');
+  assert.equal(routes.cash.stats('a/b'), `/api/merchants/${encodeURIComponent('a/b')}/cash/stats`);
 });
 
-test('cash tenant-scoped routes (dashboard surface)', () => {
-  assert.equal(routes.cash.analytics('abc'), '/api/tenants/abc/cash/analytics');
-  assert.equal(routes.cash.customers('abc'), '/api/tenants/abc/cash/customers');
-  assert.equal(routes.cash.members('abc'), '/api/tenants/abc/cash/members');
-  assert.equal(routes.cash.giftCards('abc'), '/api/tenants/abc/cash/gift-cards');
-  assert.equal(routes.cash.rewardConfig('abc'), '/api/tenants/abc/cash/reward-config');
+test('cash merchant-scoped routes (dashboard surface)', () => {
+  assert.equal(routes.cash.analytics('abc'), '/api/merchants/abc/cash/analytics');
+  assert.equal(routes.cash.customers('abc'), '/api/merchants/abc/cash/customers');
+  assert.equal(routes.cash.members('abc'), '/api/merchants/abc/cash/members');
+  assert.equal(routes.cash.giftCards('abc'), '/api/merchants/abc/cash/gift-cards');
+  assert.equal(routes.cash.rewardConfig('abc'), '/api/merchants/abc/cash/reward-config');
 });
 
 test('cash slug-scoped routes (umi-cash surface) — byte-exact to controllers', () => {

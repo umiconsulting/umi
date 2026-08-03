@@ -48,19 +48,19 @@ final class _FakeCashRepository implements CashRepository {
 
   @override
   Future<CashCenterSnapshot> center(
-    String tenantId,
+    String merchantId,
     CashCenterQuery query,
   ) async => snapshot;
 
   @override
   Future<CashCommandRecoveryResult> commandRecovery(
-    String tenantId,
+    String merchantId,
     CashCommandRecoveryQuery query,
   ) async => recoveryResult;
 
   @override
   Future<OpenCashShiftResult> open(
-    String tenantId,
+    String merchantId,
     OpenCashShiftRequest request,
   ) async {
     openCalls += 1;
@@ -101,7 +101,7 @@ final class _FakeCashRepository implements CashRepository {
 
   @override
   Future<CashCountSummary> count(
-    String tenantId,
+    String merchantId,
     String shiftId,
     SubmitBlindCountRequest request,
   ) async {
@@ -163,8 +163,8 @@ void main() {
     final repository = _FakeCashRepository();
     final controller = CashController(repository: repository);
     controller.setContext(
-      tenantId: '00000000-0000-4000-8000-000000000010',
-      branchId: '00000000-0000-4000-8000-000000000011',
+      merchantId: '00000000-0000-4000-8000-000000000010',
+      locationId: '00000000-0000-4000-8000-000000000011',
       operatorSessionId: '00000000-0000-4000-8000-000000000012',
     );
     await controller.load();
@@ -181,8 +181,8 @@ void main() {
   ) async {
     final controller = CashController(repository: _FakeCashRepository());
     controller.setContext(
-      tenantId: '00000000-0000-4000-8000-000000000010',
-      branchId: '00000000-0000-4000-8000-000000000011',
+      merchantId: '00000000-0000-4000-8000-000000000010',
+      locationId: '00000000-0000-4000-8000-000000000011',
       operatorSessionId: '00000000-0000-4000-8000-000000000012',
     );
     await controller.load();
@@ -209,8 +209,8 @@ void main() {
     final repository = _FakeCashRepository();
     final first = CashController(repository: repository);
     first.setContext(
-      tenantId: '00000000-0000-4000-8000-000000000010',
-      branchId: '00000000-0000-4000-8000-000000000011',
+      merchantId: '00000000-0000-4000-8000-000000000010',
+      locationId: '00000000-0000-4000-8000-000000000011',
       operatorSessionId: '00000000-0000-4000-8000-000000000012',
     );
     await first.load();
@@ -222,8 +222,8 @@ void main() {
 
     final recovered = CashController(repository: repository);
     recovered.setContext(
-      tenantId: '00000000-0000-4000-8000-000000000010',
-      branchId: '00000000-0000-4000-8000-000000000011',
+      merchantId: '00000000-0000-4000-8000-000000000010',
+      locationId: '00000000-0000-4000-8000-000000000011',
       operatorSessionId: '00000000-0000-4000-8000-000000000012',
     );
     await recovered.load();
@@ -240,8 +240,8 @@ void main() {
     final repository = _FakeCashRepository();
     final controller = CashController(repository: repository);
     controller.setContext(
-      tenantId: '00000000-0000-4000-8000-000000000010',
-      branchId: '00000000-0000-4000-8000-000000000011',
+      merchantId: '00000000-0000-4000-8000-000000000010',
+      locationId: '00000000-0000-4000-8000-000000000011',
       operatorSessionId: '00000000-0000-4000-8000-000000000012',
     );
     await controller.load();
@@ -277,8 +277,8 @@ void main() {
       final store = MemoryCashRecoveryStore();
       await store.save(
         const PendingCashCommand(
-          tenantId: '00000000-0000-4000-8000-000000000010',
-          branchId: '00000000-0000-4000-8000-000000000011',
+          merchantId: '00000000-0000-4000-8000-000000000010',
+          locationId: '00000000-0000-4000-8000-000000000011',
           operation: 'cash_movement',
           commandId: '00000000-0000-4000-8000-000000000070',
           idempotencyKey: '00000000-0000-4000-8000-000000000071',
@@ -289,8 +289,8 @@ void main() {
         recoveryStore: store,
       );
       controller.setContext(
-        tenantId: '00000000-0000-4000-8000-000000000010',
-        branchId: '00000000-0000-4000-8000-000000000011',
+        merchantId: '00000000-0000-4000-8000-000000000010',
+        locationId: '00000000-0000-4000-8000-000000000011',
         operatorSessionId: '00000000-0000-4000-8000-000000000012',
       );
       await controller.load();
@@ -321,8 +321,8 @@ void main() {
       });
       final controller = CashController(repository: repository);
       controller.setContext(
-        tenantId: '00000000-0000-4000-8000-000000000010',
-        branchId: '00000000-0000-4000-8000-000000000011',
+        merchantId: '00000000-0000-4000-8000-000000000010',
+        locationId: '00000000-0000-4000-8000-000000000011',
         operatorSessionId: '00000000-0000-4000-8000-000000000012',
       );
       await controller.load();

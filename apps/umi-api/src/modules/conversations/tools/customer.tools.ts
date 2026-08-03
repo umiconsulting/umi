@@ -4,8 +4,8 @@ import type { ToolContext, ToolResult } from '../turn.types';
 
 /**
  * Customer tools: get_recent_customer_orders. Ported from `tools.ts`; rebound from
- * the legacy `transactions` read to `tenant.customer_order` (OrdersRepository). Money
- * surfaced to the LLM in pesos; the lines now come from `tenant.order_item` rather
+ * the legacy `transactions` read to `merchant.customer_order` (OrdersRepository). Money
+ * surfaced to the LLM in pesos; the lines now come from `merchant.order_item` rather
  * than the dropped `details` snapshot, so they are the order's only copy.
  */
 @Injectable()
@@ -13,7 +13,7 @@ export class CustomerTools {
   constructor(private readonly orders: OrdersRepository) {}
 
   async getRecentCustomerOrders(ctx: ToolContext, limit?: number): Promise<ToolResult> {
-    const orders = await this.orders.recentOrders(ctx.tenantId, ctx.personId, limit ?? 3);
+    const orders = await this.orders.recentOrders(ctx.merchantId, ctx.personId, limit ?? 3);
     if (!orders.length) {
       return {
         found: 0,

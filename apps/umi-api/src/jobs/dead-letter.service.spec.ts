@@ -22,15 +22,15 @@ function serviceWithRepo() {
 }
 
 describe('DeadLetterService', () => {
-  it('persists a tenant-scoped job to runtime.dead_letters', async () => {
+  it('persists a merchant-scoped job to runtime.dead_letters', async () => {
     const { svc, repo } = serviceWithRepo();
     await svc.recordTerminalFailure(
-      makeJob({ data: { business_id: 't1', foo: 1 }, attemptsMade: 3 }),
+      makeJob({ data: { merchant_id: 't1', foo: 1 }, attemptsMade: 3 }),
       new Error('boom'),
     );
     expect(repo.recordDeadLetter).toHaveBeenCalledWith(
       expect.objectContaining({
-        tenantId: 't1',
+        merchantId: 't1',
         sourceTable: 'turns',
         eventType: 'turn.process',
         error: 'Error',
@@ -39,13 +39,15 @@ describe('DeadLetterService', () => {
     );
   });
 
-  it('accepts camelCase tenantId too', async () => {
+  it('accepts camelCase merchantId too', async () => {
     const { svc, repo } = serviceWithRepo();
-    await svc.recordTerminalFailure(makeJob({ data: { tenantId: 't2' } }), new Error('x'));
-    expect(repo.recordDeadLetter).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 't2' }));
+    await svc.recordTerminalFailure(makeJob({ data: { merchantId: 't2' } }), new Error('x'));
+    expect(repo.recordDeadLetter).toHaveBeenCalledWith(
+      expect.objectContaining({ merchantId: 't2' }),
+    );
   });
 
-  it('is log-only for infra jobs with no tenant (FK would reject)', async () => {
+  it('is log-only for infra jobs with no merchant (FK would reject)', async () => {
     const { svc, repo } = serviceWithRepo();
     await svc.recordTerminalFailure(makeJob({ data: {} }), new Error('x'));
     expect(repo.recordDeadLetter).not.toHaveBeenCalled();
@@ -55,14 +57,14 @@ describe('DeadLetterService', () => {
     const { svc, repo } = serviceWithRepo();
     const uuid = '11111111-2222-3333-4444-555555555555';
     await svc.recordTerminalFailure(
-      makeJob({ id: uuid, data: { business_id: 't1' } }),
+      makeJob({ id: uuid, data: { merchant_id: 't1' } }),
       new Error('x'),
     );
     expect(repo.recordDeadLetter).toHaveBeenCalledWith(expect.objectContaining({ sourceId: uuid }));
 
     repo.recordDeadLetter.mockClear();
     await svc.recordTerminalFailure(
-      makeJob({ id: '42', data: { business_id: 't1' } }),
+      makeJob({ id: '42', data: { merchant_id: 't1' } }),
       new Error('x'),
     );
     expect(repo.recordDeadLetter).toHaveBeenCalledWith(expect.objectContaining({ sourceId: null }));
@@ -74,7 +76,7 @@ describe('DeadLetterService', () => {
     };
     const svc = new DeadLetterService(repo as unknown as QueueRepository);
     await expect(
-      svc.recordTerminalFailure(makeJob({ data: { business_id: 't1' } }), new Error('x')),
+      svc.recordTerminalFailure(makeJob({ data: { merchant_id: 't1' } }), new Error('x')),
     ).resolves.toBeUndefined();
   });
 });

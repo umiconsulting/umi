@@ -56,7 +56,7 @@ export const SaleSnapshot = z
 
 export const SaleContextRequest = z
   .object({
-    branchId: Uuid,
+    locationId: Uuid,
     operatorSessionId: Uuid,
     idempotencyKey: IdempotencyKey,
   })
@@ -88,7 +88,7 @@ export const AttachSaleCustomerRequest = SaleMutationRequest.extend({
 
 export const SaleHistoryQuery = z
   .object({
-    branchId: Uuid,
+    locationId: Uuid,
     operatorSessionId: Uuid,
     state: z.enum(['suspended', 'committed', 'cancelled']).optional(),
     search: z.string().trim().max(120).default(''),
@@ -107,7 +107,7 @@ export const SaleHistoryPage = z
 
 export const PosCustomerSearchQuery = z
   .object({
-    branchId: Uuid,
+    locationId: Uuid,
     operatorSessionId: Uuid,
     search: z.string().trim().max(120).default(''),
     recent: z

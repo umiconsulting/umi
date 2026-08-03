@@ -3,19 +3,19 @@ import 'package:umi_contract/umi_contract.dart';
 import '../../core/network/api_client.dart';
 
 abstract interface class CheckoutRepository {
-  Future<CheckoutResult> checkout(String tenantId, CheckoutCommand command);
+  Future<CheckoutResult> checkout(String merchantId, CheckoutCommand command);
   Future<PaymentOutcome> paymentStatus(
-    String tenantId,
+    String merchantId,
     String paymentId,
     PaymentStatusQuery query,
   );
   Future<CheckoutRecoverySnapshot> recovery(
-    String tenantId,
+    String merchantId,
     String cartId,
     CheckoutRecoveryQuery query,
   );
   Future<CheckoutCancellationResult> cancel(
-    String tenantId,
+    String merchantId,
     String cartId,
     CheckoutCancellationRequest request,
   );
@@ -27,28 +27,28 @@ final class ApiCheckoutRepository implements CheckoutRepository {
 
   @override
   Future<CheckoutResult> checkout(
-    String tenantId,
+    String merchantId,
     CheckoutCommand command,
   ) async => CheckoutResult.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: UmiRoutes.posCheckout(tenantId),
+      path: UmiRoutes.posCheckout(merchantId),
       body: command.toJson(),
     ),
   );
 
   @override
   Future<PaymentOutcome> paymentStatus(
-    String tenantId,
+    String merchantId,
     String paymentId,
     PaymentStatusQuery query,
   ) async => PaymentOutcome.fromJson(
     await _api.request(
       method: ApiMethod.get,
       path: Uri(
-        path: UmiRoutes.posCheckoutPayment(tenantId, paymentId),
+        path: UmiRoutes.posCheckoutPayment(merchantId, paymentId),
         queryParameters: {
-          'branchId': query.branchId,
+          'locationId': query.locationId,
           'operatorSessionId': query.operatorSessionId,
         },
       ).toString(),
@@ -57,16 +57,16 @@ final class ApiCheckoutRepository implements CheckoutRepository {
 
   @override
   Future<CheckoutRecoverySnapshot> recovery(
-    String tenantId,
+    String merchantId,
     String cartId,
     CheckoutRecoveryQuery query,
   ) async => CheckoutRecoverySnapshot.fromJson(
     await _api.request(
       method: ApiMethod.get,
       path: Uri(
-        path: UmiRoutes.posCheckoutRecovery(tenantId, cartId),
+        path: UmiRoutes.posCheckoutRecovery(merchantId, cartId),
         queryParameters: {
-          'branchId': query.branchId,
+          'locationId': query.locationId,
           'operatorSessionId': query.operatorSessionId,
         },
       ).toString(),
@@ -75,13 +75,13 @@ final class ApiCheckoutRepository implements CheckoutRepository {
 
   @override
   Future<CheckoutCancellationResult> cancel(
-    String tenantId,
+    String merchantId,
     String cartId,
     CheckoutCancellationRequest request,
   ) async => CheckoutCancellationResult.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: UmiRoutes.posCheckoutCancel(tenantId, cartId),
+      path: UmiRoutes.posCheckoutCancel(merchantId, cartId),
       body: request.toJson(),
       idempotent: true,
     ),

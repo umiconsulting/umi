@@ -9,8 +9,8 @@ import 'offline_journal.dart';
 
 final class OfflineAuthorityContext {
   const OfflineAuthorityContext({
-    required this.tenantId,
-    required this.branchId,
+    required this.merchantId,
+    required this.locationId,
     required this.deviceId,
     required this.credentialVersion,
     required this.operatorSessionId,
@@ -19,8 +19,8 @@ final class OfflineAuthorityContext {
     required this.currency,
     required this.deviceTrusted,
   });
-  final String tenantId;
-  final String branchId;
+  final String merchantId;
+  final String locationId;
   final String deviceId;
   final int credentialVersion;
   final String operatorSessionId;
@@ -89,10 +89,10 @@ final class OfflinePolicyCache {
     if (!cash.enabled) {
       throw const OfflineJournalException('policy_disabled');
     }
-    if (cash.tenantId != authority.tenantId) {
+    if (cash.merchantId != authority.merchantId) {
       throw const OfflineJournalException('tenant_mismatch');
     }
-    if (cash.branchId != authority.branchId) {
+    if (cash.locationId != authority.locationId) {
       throw const OfflineJournalException('branch_mismatch');
     }
     if (cash.deviceId != authority.deviceId) {

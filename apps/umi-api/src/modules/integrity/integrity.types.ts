@@ -4,8 +4,8 @@ export type FailureClass =
   'validation' | 'authorization' | 'conflict' | 'transient' | 'permanent' | 'unknown_outcome';
 
 export interface CommandInput {
-  tenantId: string;
-  branchId: string | null;
+  merchantId: string;
+  locationId: string | null;
   commandId: string;
   idempotencyKey: string;
   commandType: string;

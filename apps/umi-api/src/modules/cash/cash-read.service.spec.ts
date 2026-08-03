@@ -5,7 +5,7 @@ import { CashReadService } from './cash-read.service';
 function make() {
   const repo = {
     branding: vi.fn(),
-    updateTenantName: vi.fn().mockResolvedValue(undefined),
+    updateMerchantName: vi.fn().mockResolvedValue(undefined),
     updateProgram: vi.fn().mockResolvedValue(undefined),
     stats: vi.fn(),
     analytics: vi.fn(),
@@ -69,7 +69,7 @@ describe('CashReadService.updateRewardConfig', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('rejects when the tenant has no loyalty program', async () => {
+  it('rejects when the merchant has no loyalty program', async () => {
     h.repo.branding.mockResolvedValue({ programId: null });
     await expect(
       h.svc.updateRewardConfig('t1', { visitsRequired: 10, rewardName: 'X' }),
@@ -94,13 +94,13 @@ describe('CashReadService.updateRewardConfig', () => {
 });
 
 describe('CashReadService.updateSettings', () => {
-  it('updates the tenant name and merges branding patch', async () => {
+  it('updates the merchant name and builds the column-keyed program patch', async () => {
     const h = make();
     await h.svc.updateSettings('t1', { name: 'New Cafe', primaryColor: '#000', cardPrefix: 'NC' });
-    expect(h.repo.updateTenantName).toHaveBeenCalledWith('t1', 'New Cafe');
+    expect(h.repo.updateMerchantName).toHaveBeenCalledWith('t1', 'New Cafe');
     const arg = h.repo.updateProgram.mock.calls[0][1];
-    expect(arg.cardPrefix).toBe('NC');
-    expect(arg.brandingPatch.primary_color).toBe('#000');
+    expect(arg.card_prefix).toBe('NC');
+    expect(arg.primary_color).toBe('#000');
   });
 
   it('skips the program update when only the name changes', async () => {

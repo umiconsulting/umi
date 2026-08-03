@@ -37,28 +37,28 @@ export class DevicesService {
   ) {}
 
   async begin(
-    tenantId: string,
+    merchantId: string,
     actorUserId: string,
     dto: BeginDeviceEnrollmentRequest,
   ): Promise<DeviceEnrollmentRequestCreated> {
-    return this.beginForReplacement(tenantId, actorUserId, dto, null);
+    return this.beginForReplacement(merchantId, actorUserId, dto, null);
   }
 
   async beginForReplacement(
-    tenantId: string,
+    merchantId: string,
     actorUserId: string,
     dto: BeginDeviceEnrollmentRequest,
     replacesDeviceId: string | null,
   ): Promise<DeviceEnrollmentRequestCreated> {
-    this.enforceRateLimit(`device-enrollment:tenant:${tenantId}`, 40, 60 * 60_000);
+    this.enforceRateLimit(`device-enrollment:tenant:${merchantId}`, 40, 60 * 60_000);
     this.enforceRateLimit(`device-enrollment:admin:${actorUserId}`, 20, 60 * 60_000);
     const id = randomUUID();
     const code = this.enrollmentCode(id);
     const expiresAt = new Date(Date.now() + 5 * 60_000);
     const request = await this.repo.beginPairing({
       id,
-      tenantId,
-      branchId: dto.branchId,
+      merchantId,
+      locationId: dto.locationId,
       displayName: dto.displayName,
       type: dto.type,
       platform: dto.platform,
@@ -106,48 +106,48 @@ export class DevicesService {
     };
   }
 
-  async list(tenantId: string, branchIds: string[] | null): Promise<DeviceEnrollmentRequestList> {
-    return { requests: await this.repo.listPairingRequests(tenantId, branchIds) };
+  async list(merchantId: string, locationIds: string[] | null): Promise<DeviceEnrollmentRequestList> {
+    return { requests: await this.repo.listPairingRequests(merchantId, locationIds) };
   }
 
   async approve(
-    tenantId: string,
+    merchantId: string,
     actorUserId: string,
     requestId: string,
     idempotencyKey: string,
-    branchIds: string[] | null,
+    locationIds: string[] | null,
   ): Promise<DeviceEnrollmentDecision> {
     this.enforceRateLimit(`device-pairing:decision:${actorUserId}`, 60, 60 * 60_000);
     const credential = this.deviceCredential(requestId);
     const result = await this.repo.decidePairing({
-      tenantId,
+      merchantId,
       actorUserId,
       requestId,
       idempotencyKey,
       approve: true,
       credentialHash: hash(credential),
-      allowedBranchIds: branchIds,
+      allowedBranchIds: locationIds,
     });
     if (!result) throw new ConflictException({ code: 'ENROLLMENT_REJECTED' });
     return result;
   }
 
   async deny(
-    tenantId: string,
+    merchantId: string,
     actorUserId: string,
     requestId: string,
     idempotencyKey: string,
-    branchIds: string[] | null,
+    locationIds: string[] | null,
   ): Promise<DeviceEnrollmentDecision> {
     this.enforceRateLimit(`device-pairing:decision:${actorUserId}`, 60, 60 * 60_000);
     const result = await this.repo.decidePairing({
-      tenantId,
+      merchantId,
       actorUserId,
       requestId,
       idempotencyKey,
       approve: false,
       credentialHash: null,
-      allowedBranchIds: branchIds,
+      allowedBranchIds: locationIds,
     });
     if (!result) throw new ConflictException({ code: 'ENROLLMENT_REJECTED' });
     return result;
@@ -214,7 +214,7 @@ export class DevicesService {
   }
 
   async rotate(
-    tenantId: string,
+    merchantId: string,
     deviceId: string,
     currentVersion: number,
     idempotencyKey: string,
@@ -222,8 +222,8 @@ export class DevicesService {
     const credential = this.rotationCredential(deviceId, currentVersion, idempotencyKey);
     const result = await this.integrity.execute<DeviceSummary>(
       {
-        tenantId,
-        branchId: null,
+        merchantId,
+        locationId: null,
         commandId: idempotencyKey,
         idempotencyKey,
         commandType: 'device.credential.rotate',
@@ -233,7 +233,7 @@ export class DevicesService {
       async (context) => {
         const device = await this.repo.rotate(
           context.client,
-          tenantId,
+          merchantId,
           deviceId,
           currentVersion,
           hash(credential),
@@ -258,22 +258,22 @@ export class DevicesService {
   }
 
   async revoke(
-    tenantId: string,
+    merchantId: string,
     deviceId: string,
     reason: string,
     idempotencyKey: string,
   ): Promise<void> {
     const result = await this.integrity.execute<DeviceSummary>(
       {
-        tenantId,
-        branchId: null,
+        merchantId,
+        locationId: null,
         commandId: idempotencyKey,
         idempotencyKey,
         commandType: 'device.revoke',
         payload: { deviceId, reason },
       },
       async (context) => {
-        const device = await this.repo.revoke(context.client, tenantId, deviceId, reason);
+        const device = await this.repo.revoke(context.client, merchantId, deviceId, reason);
         if (!device) {
           return {
             ok: false,

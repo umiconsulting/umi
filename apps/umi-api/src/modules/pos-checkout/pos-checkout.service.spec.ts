@@ -7,7 +7,7 @@ const id = (value: number) => `00000000-0000-4000-8000-${value.toString().padSta
 const user = { id: id(1), email: 'operator@example.test', sessionId: id(2), deviceId: id(3) };
 const base = {
   cartId: id(4),
-  branchId: id(5),
+  locationId: id(5),
   operatorSessionId: id(6),
   expectedCartVersion: 3,
   paymentMethod: 'cash' as const,
@@ -35,13 +35,13 @@ const base = {
 };
 const cart = {
   id: id(4),
-  tenantId: id(1),
-  branchId: id(5),
+  merchantId: id(1),
+  locationId: id(5),
   operatorSessionId: id(6),
   version: 3,
   businessDate: '2026-07-28',
-  tenantName: 'Umi Café',
-  branchName: 'Centro',
+  merchantName: 'Umi Café',
+  locationName: 'Centro',
   operatorName: 'Ada',
   lines: [
     {
@@ -203,7 +203,7 @@ describe('PosCheckoutService', () => {
     expect(repo.lockCart).toHaveBeenCalledWith(
       expect.anything(),
       id(1),
-      base.branchId,
+      base.locationId,
       base.operatorSessionId,
       base.cartId,
       base.expectedCartVersion,
@@ -282,7 +282,7 @@ describe('PosCheckoutService', () => {
   it('cancels draft checkout state but blocks terminal facts that need recovery', async () => {
     const { service, repo } = harness();
     const request = {
-      branchId: base.branchId,
+      locationId: base.locationId,
       operatorSessionId: base.operatorSessionId,
       reason: 'operator_cancelled',
       checkoutFingerprint: null,
@@ -386,13 +386,13 @@ describe('PosCheckoutService', () => {
       updatedAt: '2026-07-29T19:00:00.000Z',
     });
     const result = await service.recovery(user, id(1), base.cartId, {
-      branchId: base.branchId,
+      locationId: base.locationId,
       operatorSessionId: base.operatorSessionId,
     });
     expect(result.result).toEqual(committed);
     expect(repo.recovery).toHaveBeenCalledWith(
       id(1),
-      base.branchId,
+      base.locationId,
       base.operatorSessionId,
       base.cartId,
       user.id,

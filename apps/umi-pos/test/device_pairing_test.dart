@@ -16,8 +16,8 @@ const _installationId = '00000000-0000-4000-8000-000000000001';
 const _sessionId = '00000000-0000-4000-8000-000000000002';
 const _deviceId = '00000000-0000-4000-8000-000000000003';
 const _publicId = '00000000-0000-4000-8000-000000000004';
-const _tenantId = '00000000-0000-4000-8000-000000000005';
-const _branchId = '00000000-0000-4000-8000-000000000006';
+const _merchantId = '00000000-0000-4000-8000-000000000005';
+const _locationId = '00000000-0000-4000-8000-000000000006';
 const _secret = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ';
 
 void main() {
@@ -241,8 +241,8 @@ void main() {
       credential: _secret,
       credentialVersion: 1,
       state: 'active',
-      tenantId: _tenantId,
-      branchId: _branchId,
+      merchantId: _merchantId,
+      locationId: _locationId,
     );
     final gateway = _PairingGateway();
     final controller = _controller(gateway, vault);
@@ -286,8 +286,8 @@ void main() {
         credential: _secret,
         credentialVersion: 1,
         state: 'active',
-        tenantId: _tenantId,
-        branchId: _branchId,
+        merchantId: _merchantId,
+        locationId: _locationId,
       );
       await vault.saveTokens('old-access', 'old-refresh');
       final gateway = _PairingGateway();
@@ -311,8 +311,8 @@ void main() {
       credential: _secret,
       credentialVersion: 1,
       state: 'active',
-      tenantId: _tenantId,
-      branchId: _branchId,
+      merchantId: _merchantId,
+      locationId: _locationId,
     );
     final gateway = _PairingGateway();
     final controller = _controller(gateway, vault);
@@ -323,8 +323,8 @@ void main() {
     await controller.lock();
 
     final identity = await vault.deviceIdentity();
-    expect(identity.tenantId, _tenantId);
-    expect(identity.branchId, _branchId);
+    expect(identity.merchantId, _merchantId);
+    expect(identity.locationId, _locationId);
     expect(controller.state.phase, EntryPhase.pinRequired);
     expect(controller.state.errorCode, isNull);
 
@@ -346,8 +346,8 @@ void main() {
         credential: _secret,
         credentialVersion: 1,
         state: 'active',
-        tenantId: _tenantId,
-        branchId: _branchId,
+        merchantId: _merchantId,
+        locationId: _locationId,
       );
       final gateway = _PairingGateway()..failLock = true;
       final controller = _controller(gateway, vault);
@@ -416,8 +416,8 @@ final class _PairingGateway implements EntryGateway {
       device: {
         'id': _deviceId,
         'publicId': _publicId,
-        'tenantId': _tenantId,
-        'branchId': _branchId,
+        'merchantId': _merchantId,
+        'locationId': _locationId,
         'displayName': 'Front register',
         'type': 'pos_terminal',
         'platform': 'web',
@@ -444,8 +444,8 @@ final class _PairingGateway implements EntryGateway {
   Future<DeviceSummary> deviceStatus() async => const DeviceSummary(
     id: _deviceId,
     publicId: _publicId,
-    tenantId: _tenantId,
-    branchId: _branchId,
+    merchantId: _merchantId,
+    locationId: _locationId,
     displayName: 'Front register',
     type: 'pos_terminal',
     platform: 'web',
@@ -462,8 +462,8 @@ final class _PairingGateway implements EntryGateway {
   @override
   Future<PosSessionResponse> pinLogin({
     required String pin,
-    required String tenantId,
-    required String branchId,
+    required String merchantId,
+    required String locationId,
   }) async {
     authenticatedPin = pin;
     return const PosSessionResponse(
@@ -484,16 +484,16 @@ final class _PairingGateway implements EntryGateway {
   @override
   Future<EntryContextResponse> entryContext() async =>
       const EntryContextResponse(
-        tenants: [
+        merchants: [
           {
-            'id': _tenantId,
+            'id': _merchantId,
             'name': 'Local business',
             'roles': ['cashier'],
             'permissions': ['catalog.read', 'cart.write', 'checkout.commit'],
-            'branches': [
+            'locations': [
               {
-                'id': _branchId,
-                'tenantId': _tenantId,
+                'id': _locationId,
+                'merchantId': _merchantId,
                 'name': 'Local branch',
                 'status': 'active',
                 'deviceAllowed': true,
@@ -507,14 +507,14 @@ final class _PairingGateway implements EntryGateway {
         ],
       );
   @override
-  Future<OperatorSessionView> startOperator(String tenantId, String branchId) =>
+  Future<OperatorSessionView> startOperator(String merchantId, String locationId) =>
       Future.value(
         OperatorSessionView(
           id: _sessionId,
           userId: '00000000-0000-4000-8000-000000000007',
           staffId: '00000000-0000-4000-8000-000000000008',
-          tenantId: tenantId,
-          branchId: branchId,
+          merchantId: merchantId,
+          locationId: locationId,
           deviceId: _deviceId,
           state: 'active',
           permissions: const ['catalog.read', 'cart.write', 'checkout.commit'],
@@ -543,16 +543,16 @@ final class _PairingGateway implements EntryGateway {
   Future<ElevationGrantView> verifyPin({
     required String pin,
     required String permission,
-    required String tenantId,
-    required String branchId,
+    required String merchantId,
+    required String locationId,
   }) => throw UnimplementedError();
   @override
   Future<ElevationGrantView> requestManagerApproval({
     required String operatorSessionId,
     required String managerPin,
     required String permission,
-    required String tenantId,
-    required String branchId,
+    required String merchantId,
+    required String locationId,
     String? commandFingerprint,
   }) => throw UnimplementedError();
 }

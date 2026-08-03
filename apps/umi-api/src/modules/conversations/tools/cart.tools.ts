@@ -24,7 +24,7 @@ import { needsInputToolError, retryableToolError, terminalToolError } from './to
 /**
  * Cart tools: add_to_cart + edit_cart. Ported from `tools.ts`; product reads
  * rebound to ProductsRepository, draft cart to ConversationsRepository
- * (`runtime.conversation_state.draft_cart` + CAS on `draft_cart_version`). The legacy
+ * (`runtime.conversation_cart.cart`, last-write-wins — no CAS). The legacy
  * partial-order seed (kds.tickets) is deferred to Phase 4 → no seed here.
  * Money is PESOS (tool unit).
  */
@@ -43,21 +43,22 @@ export class CartTools {
   ): Promise<{ cart: DraftCart | null; version: number }> {
     const conv = await this.conversations.loadById(conversationId);
     const cart = (conv?.draftCart as DraftCart | null) ?? null;
-    const version = conv?.draftCartVersion ?? 0;
+    const version = 0; // last-write-wins: no CAS version any more (the FSM is gone)
     if (!validateCartItems(cart).valid) {
       return { cart: { items: [], updated_at: new Date().toISOString() }, version };
     }
     return { cart, version };
   }
 
-  /** CAS write (returns true if this writer won the version race). */
+  /** Last-write-wins cart write. There is no CAS, so the write always lands
+   *  (the retry loop at call sites now runs a single iteration). */
   private async writeDraftCart(
     conversationId: string,
     cart: DraftCart | null,
-    expectedVersion: number,
+    _expectedVersion: number,
   ): Promise<boolean> {
-    const next = await this.conversations.updateDraftCartCas(conversationId, expectedVersion, cart);
-    return next !== null;
+    await this.conversations.setDraftCart(conversationId, cart);
+    return true;
   }
 
   async addToCart(
@@ -82,7 +83,7 @@ export class CartTools {
       temp: input.temp,
       milk: input.milk,
     });
-    const searchResults = await this.products.searchByQuery(ctx.tenantId, input.query, 10);
+    const searchResults = await this.products.searchByQuery(ctx.merchantId, input.query, 10);
     let products = chooseBestProductMatch(searchResults, input.query);
     let effectiveQuery = input.query;
 
@@ -94,7 +95,11 @@ export class CartTools {
         variantFilters.milk,
       );
       if (strippedQuery) {
-        const strippedResults = await this.products.searchByQuery(ctx.tenantId, strippedQuery, 10);
+        const strippedResults = await this.products.searchByQuery(
+          ctx.merchantId,
+          strippedQuery,
+          10,
+        );
         const strippedProducts = chooseBestProductMatch(strippedResults, strippedQuery);
         if (strippedProducts.length) {
           products = strippedProducts;
@@ -104,7 +109,7 @@ export class CartTools {
     }
 
     if (!products.length) {
-      const suggestions = await this.products.categorySuggestions(ctx.tenantId);
+      const suggestions = await this.products.categorySuggestions(ctx.merchantId);
       return {
         ...retryableToolError(
           `No encontré "${effectiveQuery}" en el menú.`,
@@ -233,7 +238,7 @@ export class CartTools {
           );
         }
         const target = matches[0];
-        const product = await this.products.getById(ctx.tenantId, target.product_id);
+        const product = await this.products.getById(ctx.merchantId, target.product_id);
         if (!product || product.available === false) {
           return retryableToolError(`El producto ${target.product_name} ya no está disponible.`, {
             tool: 'search_menu',

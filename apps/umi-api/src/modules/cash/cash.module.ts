@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
-import { TenantsModule } from '../tenants/tenants.module';
+import { MerchantsModule } from '../merchants/merchants.module';
 import { CashController } from './cash.controller';
-import { CashTenantController } from './cash-tenant.controller';
+import { CashMerchantController } from './cash-merchant.controller';
 import { CashReadService } from './cash-read.service';
 import { CashRepository } from './cash.repository';
 import { CashWriteController } from './cash-write.controller';
@@ -25,10 +25,10 @@ import { CustomerSessionService } from './customer-session.service';
  * RateLimitService come from global modules.
  */
 @Module({
-  imports: [AuthModule, TenantsModule],
+  imports: [AuthModule, MerchantsModule],
   controllers: [
     CashController,
-    CashTenantController,
+    CashMerchantController,
     CashWriteController,
     CashScanController,
     CashCustomerController,

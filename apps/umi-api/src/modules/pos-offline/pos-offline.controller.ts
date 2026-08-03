@@ -10,54 +10,57 @@ import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthUser } from '../auth/auth.types';
-import { TenantAccessGuard } from '../auth/tenant-access.guard';
+import { MerchantAccessGuard } from '../auth/merchant-access.guard';
+import { EntitlementGuard } from '../auth/entitlement.guard';
+import { RequireProduct } from '../auth/require-product.decorator';
 import { PosOfflineService } from './pos-offline.service';
 
-@UseGuards(AuthGuard, TenantAccessGuard)
-@Controller('api/pos/tenants/:tenantId/offline')
+@RequireProduct('pos')
+@UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard)
+@Controller('api/v1/pos/merchants/:merchantId/offline')
 export class PosOfflineController {
   constructor(private readonly offline: PosOfflineService) {}
 
   @Get('policy')
   policy(
     @CurrentUser() user: AuthUser,
-    @Param('tenantId') tenantId: string,
+    @Param('merchantId') merchantId: string,
     @Query(new ZodValidationPipe(ReplayContextQuery)) query: ReplayContextQuery,
   ) {
-    return this.offline.issuePolicy(user, tenantId, query);
+    return this.offline.issuePolicy(user, merchantId, query);
   }
 
   @Post('replay/begin')
   begin(
     @CurrentUser() user: AuthUser,
-    @Param('tenantId') tenantId: string,
+    @Param('merchantId') merchantId: string,
     @Body(new ZodValidationPipe(BeginReplayRequest)) dto: BeginReplayRequest,
   ) {
-    return this.offline.begin(user, tenantId, dto);
+    return this.offline.begin(user, merchantId, dto);
   }
 
   @Post('replay/batch')
   batch(
     @CurrentUser() user: AuthUser,
-    @Param('tenantId') tenantId: string,
+    @Param('merchantId') merchantId: string,
     @Body(new ZodValidationPipe(ReplayBatch)) dto: ReplayBatch,
   ) {
-    return this.offline.batch(user, tenantId, dto);
+    return this.offline.batch(user, merchantId, dto);
   }
 
   @Post('reconcile')
   reconcile(
     @CurrentUser() user: AuthUser,
-    @Param('tenantId') tenantId: string,
-    @Query('branchId') branchId: string,
+    @Param('merchantId') merchantId: string,
+    @Query('locationId') locationId: string,
     @Query('operatorSessionId') operatorSessionId: string,
     @Query('credentialVersion') credentialVersion: string,
     @Body(new ZodValidationPipe(ReconcileRequest)) dto: ReconcileRequest,
   ) {
     return this.offline.reconcile(
       user,
-      tenantId,
-      branchId,
+      merchantId,
+      locationId,
       operatorSessionId,
       Number(credentialVersion),
       dto,
@@ -67,48 +70,48 @@ export class PosOfflineController {
   @Get('replay/cursor')
   cursor(
     @CurrentUser() user: AuthUser,
-    @Param('tenantId') tenantId: string,
+    @Param('merchantId') merchantId: string,
     @Query(new ZodValidationPipe(ReplayContextQuery)) query: ReplayContextQuery,
   ) {
-    return this.offline.readCursor(user, tenantId, query);
+    return this.offline.readCursor(user, merchantId, query);
   }
 
   @Get('replay/commands/:commandId')
   commandResult(
     @CurrentUser() user: AuthUser,
-    @Param('tenantId') tenantId: string,
+    @Param('merchantId') merchantId: string,
     @Param('commandId') commandId: string,
     @Query(new ZodValidationPipe(ReplayContextQuery)) query: ReplayContextQuery,
   ) {
-    return this.offline.commandResult(user, tenantId, query, commandId);
+    return this.offline.commandResult(user, merchantId, query, commandId);
   }
 
   @Get('conflicts')
   conflicts(
     @CurrentUser() user: AuthUser,
-    @Param('tenantId') tenantId: string,
+    @Param('merchantId') merchantId: string,
     @Query(new ZodValidationPipe(ReplayContextQuery)) query: ReplayContextQuery,
   ) {
-    return this.offline.conflicts(user, tenantId, query);
+    return this.offline.conflicts(user, merchantId, query);
   }
 
   @Get('diagnostics')
   diagnostics(
     @CurrentUser() user: AuthUser,
-    @Param('tenantId') tenantId: string,
+    @Param('merchantId') merchantId: string,
     @Query(new ZodValidationPipe(ReplayContextQuery)) query: ReplayContextQuery,
   ) {
-    return this.offline.diagnostics(user, tenantId, query);
+    return this.offline.diagnostics(user, merchantId, query);
   }
 
   @Post('reconcile/acknowledge')
   acknowledge(
     @CurrentUser() user: AuthUser,
-    @Param('tenantId') tenantId: string,
+    @Param('merchantId') merchantId: string,
     @Query(new ZodValidationPipe(ReplayContextQuery)) query: ReplayContextQuery,
     @Body(new ZodValidationPipe(AcknowledgeReconciliationRequest))
     dto: AcknowledgeReconciliationRequest,
   ) {
-    return this.offline.acknowledge(user, tenantId, query, dto.reconciliationId);
+    return this.offline.acknowledge(user, merchantId, query, dto.reconciliationId);
   }
 }

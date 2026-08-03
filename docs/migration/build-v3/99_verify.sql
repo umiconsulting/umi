@@ -6,7 +6,7 @@ declare n int;
 begin
   -- schemas
   if not exists (select 1 from information_schema.schemata where schema_name='umi')     then raise exception 'missing schema umi';     end if;
-  if not exists (select 1 from information_schema.schemata where schema_name='tenant')  then raise exception 'missing schema tenant';  end if;
+  if not exists (select 1 from information_schema.schemata where schema_name='merchant')  then raise exception 'missing schema merchant';  end if;
   if not exists (select 1 from information_schema.schemata where schema_name='runtime') then raise exception 'missing schema runtime'; end if;
 
   -- roles
@@ -20,20 +20,34 @@ begin
 
   -- views exist (derive, don't cache)
   if not exists (select 1 from information_schema.views where table_schema='umi'    and table_name='effective_entitlement')  then raise exception 'missing view umi.effective_entitlement'; end if;
-  if not exists (select 1 from information_schema.views where table_schema='tenant' and table_name='conversation_analytics') then raise exception 'missing view tenant.conversation_analytics'; end if;
+  if not exists (select 1 from information_schema.views where table_schema='merchant' and table_name='conversation_analytics') then raise exception 'missing view merchant.conversation_analytics'; end if;
 
-  -- RLS enabled on a representative tenant money table
+  -- RLS enabled on a representative merchant money table
   if not exists (
     select 1 from pg_class cl join pg_namespace ns on ns.oid=cl.relnamespace
-    where ns.nspname='tenant' and cl.relname='loyalty_stored_value_ledger' and cl.relrowsecurity
-  ) then raise exception 'RLS not enabled on tenant.loyalty_stored_value_ledger'; end if;
+    where ns.nspname='merchant' and cl.relname='loyalty_stored_value_ledger' and cl.relrowsecurity
+  ) then raise exception 'RLS not enabled on merchant.loyalty_stored_value_ledger'; end if;
+
+  -- UmiPOS integration authorities must exist in the build-v3 chain.
+  if not exists (
+    select 1 from pg_class cl join pg_namespace ns on ns.oid=cl.relnamespace
+    where ns.nspname='merchant' and cl.relname='cash_ledger_entry'
+      and cl.relrowsecurity and cl.relforcerowsecurity
+  ) then raise exception 'Gate 3 cash ledger RLS is incomplete'; end if;
+  if not exists (
+    select 1 from pg_trigger where tgname='cash_ledger_immutable'
+  ) then raise exception 'missing append-only trigger: cash_ledger'; end if;
+  if not exists (
+    select 1 from information_schema.tables
+    where table_schema='runtime' and table_name='device_pairing_session'
+  ) then raise exception 'missing UmiPOS device pairing session'; end if;
 
   -- observability must NOT exist (killed 2026-07-11)
   if exists (select 1 from information_schema.schemata where schema_name='observability') then raise exception 'observability schema should not exist'; end if;
 
   -- counts (sanity)
   select count(*) into n from information_schema.tables where table_schema='umi'     and table_type='BASE TABLE'; raise notice 'umi base tables:     %', n;
-  select count(*) into n from information_schema.tables where table_schema='tenant'  and table_type='BASE TABLE'; raise notice 'tenant base tables:  %', n;
+  select count(*) into n from information_schema.tables where table_schema='merchant'  and table_type='BASE TABLE'; raise notice 'merchant base tables:  %', n;
   select count(*) into n from information_schema.tables where table_schema='runtime' and table_type='BASE TABLE'; raise notice 'runtime base tables: %', n;
 
   raise notice 'build-v3 verify: OK';

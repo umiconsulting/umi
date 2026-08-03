@@ -5,11 +5,11 @@ import 'package:umi_contract/umi_contract.dart';
 import '../../core/network/api_client.dart';
 
 final class CatalogPartition {
-  const CatalogPartition(this.tenantId, this.branchId, this.locale);
-  final String tenantId;
-  final String branchId;
+  const CatalogPartition(this.merchantId, this.locationId, this.locale);
+  final String merchantId;
+  final String locationId;
   final String locale;
-  String get key => '$tenantId:$branchId:$locale';
+  String get key => '$merchantId:$locationId:$locale';
 }
 
 final class CatalogCache {
@@ -47,8 +47,8 @@ final class CatalogCache {
     }
   }
 
-  void clearPartition(String tenantId, String branchId) {
-    final prefix = '$tenantId:$branchId:';
+  void clearPartition(String merchantId, String locationId) {
+    final prefix = '$merchantId:$locationId:';
     for (final key
         in _products.keys.where((key) => key.startsWith(prefix)).toList()) {
       _products.remove(key);
@@ -83,8 +83,8 @@ final class ApiCatalogRepository implements CatalogRepository {
   ) async => CatalogCategoriesResponse.fromJson(
     await _api.request(
       method: ApiMethod.get,
-      path: _path(UmiRoutes.posCatalogCategories(partition.tenantId), {
-        'branchId': partition.branchId,
+      path: _path(UmiRoutes.posCatalogCategories(partition.merchantId), {
+        'locationId': partition.locationId,
         'locale': partition.locale,
       }),
     ),
@@ -101,8 +101,8 @@ final class ApiCatalogRepository implements CatalogRepository {
   }) async => CatalogPage.fromJson(
     await _api.request(
       method: ApiMethod.get,
-      path: _path(UmiRoutes.posCatalogProducts(partition.tenantId), {
-        'branchId': partition.branchId,
+      path: _path(UmiRoutes.posCatalogProducts(partition.merchantId), {
+        'locationId': partition.locationId,
         'locale': partition.locale,
         'limit': '40',
         // ignore: use_null_aware_elements
@@ -123,8 +123,8 @@ final class ApiCatalogRepository implements CatalogRepository {
   ) async => CatalogProductDetail.fromJson(
     await _api.request(
       method: ApiMethod.get,
-      path: _path(UmiRoutes.posCatalogProduct(partition.tenantId, productId), {
-        'branchId': partition.branchId,
+      path: _path(UmiRoutes.posCatalogProduct(partition.merchantId, productId), {
+        'locationId': partition.locationId,
         'locale': partition.locale,
       }),
     ),

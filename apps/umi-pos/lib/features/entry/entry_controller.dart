@@ -31,7 +31,7 @@ final class EntryState {
   const EntryState(
     this.phase, {
     this.device,
-    this.tenants = const [],
+    this.merchants = const [],
     this.selectedTenant,
     this.selectedBranch,
     this.operator,
@@ -39,9 +39,9 @@ final class EntryState {
   });
   final EntryPhase phase;
   final DeviceSummary? device;
-  final List<EntryTenant> tenants;
-  final EntryTenant? selectedTenant;
-  final BranchAccess? selectedBranch;
+  final List<EntryMerchant> merchants;
+  final EntryMerchant? selectedTenant;
+  final LocationAccess? selectedBranch;
   final OperatorSessionView? operator;
   final String? errorCode;
 }
@@ -210,8 +210,8 @@ final class EntryController extends ChangeNotifier {
             credential: response.credential!,
             credentialVersion: device.credentialVersion,
             state: device.state,
-            tenantId: device.tenantId,
-            branchId: device.branchId,
+            merchantId: device.merchantId,
+            locationId: device.locationId,
           );
           try {
             await _gateway.acknowledgePairing(pairing, response.credential!);
@@ -271,9 +271,9 @@ final class EntryController extends ChangeNotifier {
 
   Future<void> loginWithPin(String pin) async {
     final device = _state.device;
-    final tenantId = device?.tenantId;
-    final branchId = device?.branchId;
-    if (tenantId == null || branchId == null) {
+    final merchantId = device?.merchantId;
+    final locationId = device?.locationId;
+    if (merchantId == null || locationId == null) {
       _set(
         EntryState(
           EntryPhase.pinRequired,
@@ -287,8 +287,8 @@ final class EntryController extends ChangeNotifier {
     try {
       final response = await _gateway.pinLogin(
         pin: pin,
-        tenantId: tenantId,
-        branchId: branchId,
+        merchantId: merchantId,
+        locationId: locationId,
       );
       await _saveSession(response);
       _event('authentication.pin_succeeded');
@@ -320,29 +320,29 @@ final class EntryController extends ChangeNotifier {
     }
   }
 
-  Future<void> selectTenant(EntryTenant tenant) async {
+  Future<void> selectTenant(EntryMerchant tenant) async {
     await _vault.selectTenant(tenant.id);
     _event('tenant.selected');
-    final branches = tenant.branches
-        .map(BranchAccess.fromJson)
+    final locations = tenant.locations
+        .map(LocationAccess.fromJson)
         .where((b) => b.deviceAllowed && b.operatorAllowed)
         .toList();
-    if (branches.length == 1) {
-      await selectBranch(tenant, branches.single);
+    if (locations.length == 1) {
+      await selectBranch(tenant, locations.single);
     } else {
       _set(
         EntryState(
           EntryPhase.branchRequired,
           device: _state.device,
-          tenants: _state.tenants,
+          merchants: _state.merchants,
           selectedTenant: tenant,
         ),
       );
     }
   }
 
-  Future<void> selectBranch(EntryTenant tenant, BranchAccess branch) async {
-    if (branch.tenantId != tenant.id ||
+  Future<void> selectBranch(EntryMerchant tenant, LocationAccess branch) async {
+    if (branch.merchantId != tenant.id ||
         branch.status != 'active' ||
         !branch.deviceAllowed ||
         !branch.operatorAllowed) {
@@ -357,7 +357,7 @@ final class EntryController extends ChangeNotifier {
       EntryState(
         EntryPhase.operatorRequired,
         device: _state.device,
-        tenants: _state.tenants,
+        merchants: _state.merchants,
         selectedTenant: tenant,
         selectedBranch: branch,
       ),
@@ -376,7 +376,7 @@ final class EntryController extends ChangeNotifier {
         EntryState(
           EntryPhase.ready,
           device: _state.device,
-          tenants: _state.tenants,
+          merchants: _state.merchants,
           selectedTenant: tenant,
           selectedBranch: branch,
           operator: operator,
@@ -423,7 +423,7 @@ final class EntryController extends ChangeNotifier {
       EntryState(
         EntryPhase.branchRequired,
         device: _state.device,
-        tenants: _state.tenants,
+        merchants: _state.merchants,
         selectedTenant: tenant,
       ),
     );
@@ -439,8 +439,8 @@ final class EntryController extends ChangeNotifier {
         operatorSessionId: operator.id,
         managerPin: managerPin,
         permission: 'offline.recovery.review',
-        tenantId: tenant.id,
-        branchId: branch.id,
+        merchantId: tenant.id,
+        locationId: branch.id,
       );
       _event('offline.recovery.manager_review_granted');
       return true;
@@ -464,8 +464,8 @@ final class EntryController extends ChangeNotifier {
         operatorSessionId: operator.id,
         managerPin: managerPin,
         permission: permission,
-        tenantId: tenant.id,
-        branchId: branch.id,
+        merchantId: tenant.id,
+        locationId: branch.id,
         commandFingerprint: commandFingerprint,
       );
       _event('checkout.approval_granted');
@@ -500,24 +500,24 @@ final class EntryController extends ChangeNotifier {
   Future<void> _resolveContext() async {
     final device = _state.device;
     final response = await _gateway.entryContext();
-    final tenants = response.tenants.map(EntryTenant.fromJson).toList();
-    if (tenants.isEmpty) {
+    final merchants = response.merchants.map(EntryMerchant.fromJson).toList();
+    if (merchants.isEmpty) {
       _set(
         EntryState(
           EntryPhase.tenantRequired,
           device: device,
-          tenants: tenants,
+          merchants: merchants,
           errorCode: 'NO_ACCESS',
         ),
       );
-    } else if (tenants.length == 1) {
+    } else if (merchants.length == 1) {
       _set(
-        EntryState(EntryPhase.tenantRequired, device: device, tenants: tenants),
+        EntryState(EntryPhase.tenantRequired, device: device, merchants: merchants),
       );
-      await selectTenant(tenants.single);
+      await selectTenant(merchants.single);
     } else {
       _set(
-        EntryState(EntryPhase.tenantRequired, device: device, tenants: tenants),
+        EntryState(EntryPhase.tenantRequired, device: device, merchants: merchants),
       );
     }
   }

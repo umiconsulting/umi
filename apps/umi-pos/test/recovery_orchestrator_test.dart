@@ -15,8 +15,8 @@ void main() {
         commandId: _id(1),
         deviceId: _id(2),
         credentialVersion: 1,
-        tenantId: _id(3),
-        branchId: _id(4),
+        merchantId: _id(3),
+        locationId: _id(4),
         operatorSessionId: _id(5),
         idempotencyKey: _id(6),
         provisionalId: _id(7),
@@ -74,8 +74,8 @@ void main() {
         commandId: _id(1),
         deviceId: _id(2),
         credentialVersion: 1,
-        tenantId: _id(3),
-        branchId: _id(4),
+        merchantId: _id(3),
+        locationId: _id(4),
         operatorSessionId: _id(5),
         idempotencyKey: _id(6),
         payload: const {},
@@ -105,8 +105,8 @@ ConnectivityController _online() {
 }
 
 ReplayScope _scope() => ReplayScope(
-  tenantId: _id(3),
-  branchId: _id(4),
+  merchantId: _id(3),
+  locationId: _id(4),
   operatorSessionId: _id(5),
   credentialVersion: 1,
 );
@@ -151,8 +151,8 @@ final class _Gateway implements ReplayGateway {
           .add(const Duration(minutes: 10))
           .toIso8601String(),
       maxPolicyAgeSeconds: 600,
-      tenantId: _id(3),
-      branchId: _id(4),
+      merchantId: _id(3),
+      locationId: _id(4),
       deviceId: _id(2),
       deviceCredentialVersion: 1,
       currency: 'MXN',

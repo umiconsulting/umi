@@ -3,7 +3,7 @@ set -euo pipefail
 
 container="${UMI_POS_DEV_DB_CONTAINER:-umi-gate2f-postgres}"
 database="${UMI_POS_DEV_DB_NAME:-umi_gate2f}"
-tenant_id="${UMI_POS_DEV_TENANT_ID:-10000000-0000-4000-8000-000000000101}"
+merchant_id="${UMI_POS_DEV_MERCHANT_ID:-${UMI_POS_DEV_TENANT_ID:-10000000-0000-4000-8000-000000000101}}"
 
 if [[ "${UMI_POS_DEV_SEED_CONFIRM:-}" != "disposable" ]]; then
   echo "Set UMI_POS_DEV_SEED_CONFIRM=disposable for a disposable local database." >&2
@@ -21,7 +21,7 @@ docker inspect "$container" >/dev/null 2>&1 || {
 }
 
 docker exec -i "$container" psql -v ON_ERROR_STOP=1 -U postgres -d "$database" \
-  -v tenant_id="$tenant_id" <<'SQL'
+  -v merchant_id="$merchant_id" <<'SQL'
 begin;
 
 insert into umi.feature(id, key, module, name, description, kind)
@@ -61,11 +61,11 @@ join umi.feature f on f.key = 'pos'
 where p.key = 'umipos-local'
 on conflict (plan_id, feature_id) do nothing;
 
-insert into umi.subscription(business_id, plan_id, status)
-select :'tenant_id'::uuid, p.id, 'active'
+insert into umi.subscription(merchant_id, plan_id, status)
+select :'merchant_id'::uuid, p.id, 'active'
 from umi.plan p
 where p.key = 'umipos-local'
-on conflict (business_id) do update
+on conflict (merchant_id) do update
 set plan_id = excluded.plan_id,
     status = excluded.status,
     canceled_at = null,

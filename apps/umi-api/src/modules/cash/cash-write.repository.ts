@@ -8,7 +8,7 @@ type Row = Record<string, any>;
 export type WalletTxnType = 'topup' | 'purchase' | 'adjustment' | 'gift_card_redeem';
 
 export interface WalletDelta {
-  tenantId: string;
+  merchantId: string;
   cardId: string;
   /** signed centavos: positive = credit, negative = debit */
   deltaCents: number;
@@ -38,88 +38,88 @@ export interface CardRow {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Customer-facing cash writes on the canonical `tenant.*` schema. Money moves
+ * Customer-facing cash writes on the canonical `merchant.*` schema. Money moves
  * ONLY through `applyWalletDelta`, which appends to the insert-only
- * `tenant.loyalty_stored_value_ledger` (idempotency_key + UNIQUE(business_id, idempotency_key)
+ * `merchant.loyalty_stored_value_ledger` (idempotency_key + UNIQUE(merchant_id, idempotency_key)
  * make retries safe) — there is NO balance cache to keep in sync. Balance is
  * always `SUM(card_ledger.delta)`; visit/reward counts derive from
- * `tenant.loyalty_visit` / `tenant.loyalty_redemption` (identity-only card).
+ * `merchant.loyalty_visit` / `merchant.loyalty_redemption` (identity-only card).
  */
 @Injectable()
 export class CashWriteRepository {
   constructor(private readonly pg: PgService) {}
 
   /** The operational staff row for the authed login (audit attribution). */
-  async getStaffMemberId(tenantId: string, userId: string): Promise<string | null> {
-    const { rows } = await this.pg.withTenant((c) =>
+  async getStaffMemberId(merchantId: string, userId: string): Promise<string | null> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<{ id: string }>(
-        `SELECT id::text AS id FROM tenant.staff
-         WHERE business_id = $1::uuid AND login_id = $2::uuid AND status = 'active'
+        `SELECT id::text AS id FROM merchant.staff
+         WHERE merchant_id = $1::uuid AND user_id = $2::uuid AND status = 'active'
          LIMIT 1`,
-        [tenantId, userId],
+        [merchantId, userId],
       ),
     );
     return rows[0]?.id ?? null;
   }
 
   /**
-   * The contact linked to the authed customer principal (self-card guard). In
-   * build-v3 the umi-cash session `sub` IS the `tenant.customer.id`
-   * (customer-session.service: principal_type='person'), and `tenant.customer`
-   * carries `contact_id` directly — so we resolve the person here exactly as
-   * `findCard` exposes the card owner's contact as `person_id`. A staff userId
-   * (a `umi.user.id`) matches no customer row → null → not-self (staff path),
-   * matching the old behavior where staff logins had no contact_id.
+   * The customer id behind the authed principal (self-card guard). In build-v3 the
+   * umi-cash session `sub` IS the `merchant.customer.id` (customer-session.service:
+   * principal_type='person'), so "the person" is just that id — there is no
+   * `contact_id` indirection (build-v2 had one; build-v3's customer does not, which
+   * is why the earlier `customer.contact_id` guard could never resolve). `findCard`
+   * exposes the card owner as the same `customer_id`, and the guard compares the two.
+   * A staff `userId` (a `umi.user.id`) matches no customer row → null → not-self.
    */
   async getUserPersonId(userId: string): Promise<string | null> {
-    const { rows } = await this.pg.query<{ contact_id: string | null }>(
-      `SELECT contact_id::text AS contact_id FROM tenant.customer WHERE id = $1::uuid LIMIT 1`,
+    const { rows } = await this.pg.query<{ id: string }>(
+      `SELECT id::text AS id FROM merchant.customer WHERE id = $1::uuid LIMIT 1`,
       [userId],
     );
-    return rows[0]?.contact_id ?? null;
+    return rows[0]?.id ?? null;
   }
 
   /**
-   * Find a card by uuid id or card_number, scoped to tenant, with its owner and
+   * Find a card by uuid id or card_number, scoped to merchant, with its owner and
    * DERIVED loyalty state (balance = SUM(card_ledger); visits = COUNT(visit);
    * cycle/pending computed against the active reward_rule threshold).
    */
-  async findCard(tenantId: string, identifier: string): Promise<CardRow | null> {
+  async findCard(merchantId: string, identifier: string): Promise<CardRow | null> {
     const isUuid = UUID_RE.test(identifier);
-    const { rows } = await this.pg.withTenant((c) =>
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<CardRow>(
         `WITH vr AS (
            SELECT COALESCE((
-             SELECT visits_required FROM tenant.loyalty_reward
-             WHERE business_id = $1::uuid AND is_active
-             ORDER BY activated_at DESC NULLS LAST LIMIT 1), 10) AS n
+             SELECT stamps_required FROM merchant.loyalty_reward
+             WHERE merchant_id = $1::uuid AND active AND type = 'stamps_free_item'
+             ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
          )
          SELECT c.id::text, c.customer_id::text, c.card_number, c.qr_token,
                 agg.balance_cents::int                                   AS balance_cents,
                 agg.total_visits::int                                    AS total_visits,
                 (agg.total_visits % vr.n)::int                           AS visits_this_cycle,
                 (agg.total_visits / vr.n - agg.redemptions)::int         AS pending_rewards,
-                cu.contact_id::text                                      AS person_id,
+                cu.id::text                                              AS person_id,
                 cu.name                                                  AS display_name,
                 NULL::text                                               AS normalized_email
-                -- email reachability lives in tenant.contact (channel_type 'email')
-         FROM tenant.loyalty_card AS c
-         LEFT JOIN tenant.customer AS cu
-           ON cu.business_id = c.business_id AND cu.id = c.customer_id
+                -- email reachability lives in merchant.contact (channel_type 'email')
+         FROM merchant.loyalty_card AS c
+         LEFT JOIN merchant.customer AS cu
+           ON cu.merchant_id = c.merchant_id AND cu.id = c.customer_id
          CROSS JOIN vr
          CROSS JOIN LATERAL (
            SELECT
-             (SELECT COUNT(*) FROM tenant.loyalty_visit v
-               WHERE v.business_id = c.business_id AND v.card_id = c.id)              AS total_visits,
-             (SELECT COUNT(*) FROM tenant.loyalty_redemption r
-               WHERE r.business_id = c.business_id AND r.card_id = c.id)             AS redemptions,
-             COALESCE((SELECT SUM(l.delta) FROM tenant.loyalty_stored_value_ledger l
-               WHERE l.business_id = c.business_id AND l.card_id = c.id), 0)         AS balance_cents
+             (SELECT COUNT(*) FROM merchant.loyalty_visit v
+               WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id)              AS total_visits,
+             (SELECT COUNT(*) FROM merchant.loyalty_redemption r
+               WHERE r.merchant_id = c.merchant_id AND r.card_id = c.id)             AS redemptions,
+             COALESCE((SELECT SUM(l.delta) FROM merchant.loyalty_stored_value_ledger l
+               WHERE l.merchant_id = c.merchant_id AND l.card_id = c.id), 0)         AS balance_cents
          ) AS agg
-         WHERE c.business_id = $1::uuid
+         WHERE c.merchant_id = $1::uuid
            AND (c.card_number = $2 ${isUuid ? 'OR c.id = $2::uuid' : ''})
          LIMIT 1`,
-        [tenantId, identifier],
+        [merchantId, identifier],
       ),
     );
     return rows[0] ?? null;
@@ -127,28 +127,28 @@ export class CashWriteRepository {
 
   /** Today's top-up aggregates for the anti-fraud limits (from the ledger). */
   async topupGuards(
-    tenantId: string,
+    merchantId: string,
     cardId: string,
     staffMemberId: string | null,
     dayStart: Date,
   ): Promise<{ staffSum: number; cardSum: number; cardCount: number }> {
-    return this.pg.withTenant(async (c) => {
+    return this.pg.withMerchant(async (c) => {
       const staff = staffMemberId
         ? (
             await c.query<Row>(
               `SELECT COALESCE(sum(delta),0)::bigint AS s
-               FROM tenant.loyalty_stored_value_ledger
-               WHERE business_id=$1::uuid AND staff_id=$2::uuid AND reason='topup' AND created_at>=$3`,
-              [tenantId, staffMemberId, dayStart],
+               FROM merchant.loyalty_stored_value_ledger
+               WHERE merchant_id=$1::uuid AND staff_id=$2::uuid AND reason='topup' AND created_at>=$3`,
+              [merchantId, staffMemberId, dayStart],
             )
           ).rows[0].s
         : 0;
       const card = (
         await c.query<Row>(
           `SELECT COALESCE(sum(delta),0)::bigint AS s, count(*)::int AS n
-           FROM tenant.loyalty_stored_value_ledger
-           WHERE business_id=$1::uuid AND card_id=$2::uuid AND reason='topup' AND created_at>=$3`,
-          [tenantId, cardId, dayStart],
+           FROM merchant.loyalty_stored_value_ledger
+           WHERE merchant_id=$1::uuid AND card_id=$2::uuid AND reason='topup' AND created_at>=$3`,
+          [merchantId, cardId, dayStart],
         )
       ).rows[0];
       return {
@@ -165,17 +165,19 @@ export class CashWriteRepository {
    */
   private async applyWalletDelta(c: PoolClient, d: WalletDelta): Promise<number> {
     const ledger = await c.query(
-      `INSERT INTO tenant.loyalty_stored_value_ledger
-         (business_id, card_id, staff_id, delta, reason, source_type, source_id, idempotency_key)
-       VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8)
-       ON CONFLICT (business_id, idempotency_key) DO NOTHING`,
+      `INSERT INTO merchant.loyalty_stored_value_ledger
+         (merchant_id, card_id, staff_id, delta, reason, external_ref, idempotency_key)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7)
+       ON CONFLICT (merchant_id, idempotency_key) DO NOTHING`,
       [
-        d.tenantId,
+        d.merchantId,
         d.cardId,
         d.staffMemberId ?? null,
         d.deltaCents,
         d.reason ?? d.type,
-        d.sourceType ?? d.type,
+        // external_ref = the payment ref (e.g. Zettle uuid). The old source_type
+        // discriminator is dropped: 'zettle' vs 'manual' is implied by whether
+        // external_ref is present, and `reason` already carries topup/purchase/etc.
         d.sourceId ?? null,
         d.idempotencyKey,
       ],
@@ -184,8 +186,8 @@ export class CashWriteRepository {
     // SUM — no wallet_transactions / balances / cards.balance_cents to reconcile.
     const { rows } = await c.query<Row>(
       `SELECT COALESCE(sum(delta),0)::int AS balance
-       FROM tenant.loyalty_stored_value_ledger WHERE business_id=$1::uuid AND card_id=$2::uuid`,
-      [d.tenantId, d.cardId],
+       FROM merchant.loyalty_stored_value_ledger WHERE merchant_id=$1::uuid AND card_id=$2::uuid`,
+      [d.merchantId, d.cardId],
     );
     void ledger;
     return Number(rows[0].balance);
@@ -193,17 +195,17 @@ export class CashWriteRepository {
 
   /** Credit a wallet in its own transaction (top-up). */
   creditWallet(d: WalletDelta): Promise<number> {
-    return this.pg.withTenant((c) => this.applyWalletDelta(c, d));
+    return this.pg.withMerchant((c) => this.applyWalletDelta(c, d));
   }
 
   /** Debit for a purchase: lock the card, check balance, debit, rotate QR. */
   async purchase(d: WalletDelta & { amountCents: number; newQrToken: string }): Promise<number> {
-    return this.pg.withTenant(async (c) => {
+    return this.pg.withMerchant(async (c) => {
       // Lock the card row so concurrent purchases on the same card serialize.
       const locked = await c.query<Row>(
-        `SELECT id FROM tenant.loyalty_card
-         WHERE business_id=$1::uuid AND id=$2::uuid FOR UPDATE`,
-        [d.tenantId, d.cardId],
+        `SELECT id FROM merchant.loyalty_card
+         WHERE merchant_id=$1::uuid AND id=$2::uuid FOR UPDATE`,
+        [d.merchantId, d.cardId],
       );
       if (!locked.rows[0]) throw new CardNotFoundError();
 
@@ -213,15 +215,15 @@ export class CashWriteRepository {
       // InsufficientBalanceError on a retry) or re-rotating qr_token (which would
       // invalidate the QR the original call already issued).
       const replay = await c.query<Row>(
-        `SELECT 1 AS balance FROM tenant.loyalty_stored_value_ledger
-         WHERE business_id=$1::uuid AND idempotency_key=$2 LIMIT 1`,
-        [d.tenantId, d.idempotencyKey],
+        `SELECT 1 AS balance FROM merchant.loyalty_stored_value_ledger
+         WHERE merchant_id=$1::uuid AND idempotency_key=$2 LIMIT 1`,
+        [d.merchantId, d.idempotencyKey],
       );
       if (replay.rows[0]) {
         const { rows } = await c.query<Row>(
           `SELECT COALESCE(sum(delta),0)::int AS balance
-           FROM tenant.loyalty_stored_value_ledger WHERE business_id=$1::uuid AND card_id=$2::uuid`,
-          [d.tenantId, d.cardId],
+           FROM merchant.loyalty_stored_value_ledger WHERE merchant_id=$1::uuid AND card_id=$2::uuid`,
+          [d.merchantId, d.cardId],
         );
         return Number(rows[0].balance);
       }
@@ -230,8 +232,8 @@ export class CashWriteRepository {
         (
           await c.query<Row>(
             `SELECT COALESCE(sum(delta),0)::int AS balance
-             FROM tenant.loyalty_stored_value_ledger WHERE business_id=$1::uuid AND card_id=$2::uuid`,
-            [d.tenantId, d.cardId],
+             FROM merchant.loyalty_stored_value_ledger WHERE merchant_id=$1::uuid AND card_id=$2::uuid`,
+            [d.merchantId, d.cardId],
           )
         ).rows[0].balance,
       );
@@ -239,9 +241,9 @@ export class CashWriteRepository {
 
       const balance = await this.applyWalletDelta(c, d);
       await c.query(
-        `UPDATE tenant.loyalty_card SET qr_token=$3, qr_issued_at=now()
-         WHERE business_id=$1::uuid AND id=$2::uuid`,
-        [d.tenantId, d.cardId, d.newQrToken],
+        `UPDATE merchant.loyalty_card SET qr_token=$3, qr_issued_at=now()
+         WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+        [d.merchantId, d.cardId, d.newQrToken],
       );
       return balance;
     });
@@ -249,7 +251,7 @@ export class CashWriteRepository {
 
   /** Insert a gift card + seed its ledger (+amount). Throws on code collision (23505). */
   async insertGiftCard(input: {
-    tenantId: string;
+    merchantId: string;
     code: string;
     amountCents: number;
     staffMemberId: string | null;
@@ -259,16 +261,16 @@ export class CashWriteRepository {
     recipientPhone: string | null;
     recipientName: string | null;
   }): Promise<{ id: string; code: string; amount_cents: number }> {
-    return this.pg.withTenant(async (c) => {
+    return this.pg.withMerchant(async (c) => {
       const { rows } = await c.query<{ id: string; code: string; amount_cents: number }>(
         // balance_cents cache DROPPED — remaining value = SUM(gift_card_ledger.delta).
-        `INSERT INTO tenant.loyalty_gift_card
-           (business_id, code, amount_cents, created_by_staff_id,
+        `INSERT INTO merchant.loyalty_gift_card
+           (merchant_id, code, amount_cents, created_by_staff_id,
             sender_name, message, recipient_email, recipient_phone, recipient_name)
          VALUES ($1::uuid, $2, $3, $4::uuid, $5, $6, $7, $8, $9)
          RETURNING id::text, code, amount_cents`,
         [
-          input.tenantId,
+          input.merchantId,
           input.code,
           input.amountCents,
           input.staffMemberId,
@@ -283,10 +285,10 @@ export class CashWriteRepository {
       await c.query(
         // gift_card_ledger reason CHECK is (migration_initial_load/load/redeem/
         // adjustment/expire) — 'load' is the issuance reason.
-        `INSERT INTO tenant.loyalty_gift_card_ledger
-           (business_id, gift_card_id, delta, reason, source_type, source_id, idempotency_key)
+        `INSERT INTO merchant.loyalty_gift_card_ledger
+           (merchant_id, gift_card_id, delta, reason, source_type, source_id, idempotency_key)
          VALUES ($1::uuid, $2::uuid, $3, 'load', 'gift_card', $2::text, $4)`,
-        [input.tenantId, gc.id, input.amountCents, `giftissue_${gc.id}`],
+        [input.merchantId, gc.id, input.amountCents, `giftissue_${gc.id}`],
       );
       return gc;
     });
@@ -294,15 +296,15 @@ export class CashWriteRepository {
 
   /** Minimal-leak gift-card info for the PUBLIC GET (no amount/sender exposure). */
   async giftCardInfo(
-    tenantId: string,
+    merchantId: string,
     code: string,
   ): Promise<{ code: string; isRedeemed: boolean; hasMessage: boolean } | null> {
     const { rows } = await this.pg.workerTx((c) =>
       c.query<Row>(
         `SELECT code, (redeemed_at IS NOT NULL) AS is_redeemed, (message IS NOT NULL) AS has_message
-         FROM tenant.loyalty_gift_card
-         WHERE business_id=$1::uuid AND code=$2 LIMIT 1`,
-        [tenantId, code],
+         FROM merchant.loyalty_gift_card
+         WHERE merchant_id=$1::uuid AND code=$2 LIMIT 1`,
+        [merchantId, code],
       ),
     );
     const r = rows[0];
@@ -310,13 +312,13 @@ export class CashWriteRepository {
     return { code: r.code, isRedeemed: r.is_redeemed, hasMessage: r.has_message };
   }
 
-  async findGiftCardByCode(tenantId: string, code: string): Promise<Row | null> {
+  async findGiftCardByCode(merchantId: string, code: string): Promise<Row | null> {
     const { rows } = await this.pg.workerTx((c) =>
       c.query<Row>(
         `SELECT id::text, amount_cents, sender_name, redeemed_at, expires_at
-         FROM tenant.loyalty_gift_card
-         WHERE business_id=$1::uuid AND code=$2 LIMIT 1`,
-        [tenantId, code],
+         FROM merchant.loyalty_gift_card
+         WHERE merchant_id=$1::uuid AND code=$2 LIMIT 1`,
+        [merchantId, code],
       ),
     );
     return rows[0] ?? null;
@@ -324,53 +326,53 @@ export class CashWriteRepository {
 
   /**
    * Resolve a customer + their card by phone (normalized) or email over the
-   * flat identity model: `tenant.contact` → `tenant.customer` →
-   * `tenant.loyalty_card` by `customer_id`. Phone matches across the e164 family (a
+   * flat identity model: `merchant.contact` → `merchant.customer` →
+   * `merchant.loyalty_card` by `customer_id`. Phone matches across the e164 family (a
    * WhatsApp-only contact resolves the same customer); email matches the `email`
-   * channel. `personId` is the `tenant.customer.id`.
+   * channel. `personId` is the `merchant.customer.id`.
    */
   async findPersonCard(
-    tenantId: string,
+    merchantId: string,
     by: { phone?: string; email?: string },
   ): Promise<{ personId: string; displayName: string | null; cardId: string } | null> {
     return this.pg.workerTx(async (c) => {
       let customer: Row | undefined;
       if (by.phone) {
-        const norm = (await c.query<Row>(`SELECT tenant.normalize_phone($1) AS n`, [by.phone]))
+        const norm = (await c.query<Row>(`SELECT merchant.normalize_phone($1) AS n`, [by.phone]))
           .rows[0]?.n;
         if (!norm) return null;
         customer = (
           await c.query<Row>(
             `SELECT cu.id::text AS id, cu.name AS display_name
-               FROM tenant.contact ct
+               FROM merchant.contact ct
                JOIN umi.channel_type ch ON ch.id = ct.channel_id
-               JOIN tenant.customer cu ON cu.id = ct.customer_id
-              WHERE ct.business_id = $1::uuid AND ct.normalized_value = $2
+               JOIN merchant.customer cu ON cu.id = ct.customer_id
+              WHERE ct.merchant_id = $1::uuid AND ct.normalized_value = $2
                 AND ch.key IN ('phone', 'whatsapp', 'sms')
               ORDER BY ct.is_primary DESC, ct.updated_at DESC LIMIT 1`,
-            [tenantId, norm],
+            [merchantId, norm],
           )
         ).rows[0];
       } else if (by.email) {
         customer = (
           await c.query<Row>(
             `SELECT cu.id::text AS id, cu.name AS display_name
-               FROM tenant.contact ct
+               FROM merchant.contact ct
                JOIN umi.channel_type ch ON ch.id = ct.channel_id
-               JOIN tenant.customer cu ON cu.id = ct.customer_id
-              WHERE ct.business_id = $1::uuid AND ct.normalized_value = $2 AND ch.key = 'email'
+               JOIN merchant.customer cu ON cu.id = ct.customer_id
+              WHERE ct.merchant_id = $1::uuid AND ct.normalized_value = $2 AND ch.key = 'email'
               ORDER BY ct.is_primary DESC, ct.updated_at DESC LIMIT 1`,
-            [tenantId, by.email.trim().toLowerCase()],
+            [merchantId, by.email.trim().toLowerCase()],
           )
         ).rows[0];
       }
       if (!customer) return null;
       const card = (
         await c.query<Row>(
-          `SELECT id::text FROM tenant.loyalty_card
-            WHERE business_id=$1::uuid AND customer_id=$2::uuid AND status='active'
+          `SELECT id::text FROM merchant.loyalty_card
+            WHERE merchant_id=$1::uuid AND customer_id=$2::uuid AND status='active'
             ORDER BY created_at LIMIT 1`,
-          [tenantId, customer.id],
+          [merchantId, customer.id],
         )
       ).rows[0];
       if (!card) return null;
@@ -384,7 +386,7 @@ export class CashWriteRepository {
    * debits the gift ledger and credits the wallet in one transaction.
    */
   async redeemGiftCard(args: {
-    tenantId: string;
+    merchantId: string;
     giftCardId: string;
     cardId: string;
     amountCents: number;
@@ -392,22 +394,22 @@ export class CashWriteRepository {
   }): Promise<number> {
     return this.pg.workerTx(async (c) => {
       const claim = await c.query<Row>(
-        `UPDATE tenant.loyalty_gift_card
+        `UPDATE merchant.loyalty_gift_card
          SET redeemed_at=now(), redeemed_card_id=$3::uuid
-         WHERE business_id=$1::uuid AND id=$2::uuid AND redeemed_at IS NULL
+         WHERE merchant_id=$1::uuid AND id=$2::uuid AND redeemed_at IS NULL
          RETURNING id`,
-        [args.tenantId, args.giftCardId, args.cardId],
+        [args.merchantId, args.giftCardId, args.cardId],
       );
       if (!claim.rows[0]) throw new GiftCardAlreadyRedeemedError();
 
       await c.query(
         // gift_card_ledger.reason='redeem'; the wallet credit below uses card_ledger
         // reason 'gift_card_redeem' (its own CHECK allows it).
-        `INSERT INTO tenant.loyalty_gift_card_ledger
-           (business_id, gift_card_id, delta, reason, source_type, source_id, idempotency_key)
+        `INSERT INTO merchant.loyalty_gift_card_ledger
+           (merchant_id, gift_card_id, delta, reason, source_type, source_id, idempotency_key)
          VALUES ($1::uuid, $2::uuid, $3, 'redeem', 'loyalty_card', $4::text, $5)`,
         [
-          args.tenantId,
+          args.merchantId,
           args.giftCardId,
           -args.amountCents,
           args.cardId,
@@ -416,7 +418,7 @@ export class CashWriteRepository {
       );
 
       return this.applyWalletDelta(c, {
-        tenantId: args.tenantId,
+        merchantId: args.merchantId,
         cardId: args.cardId,
         deltaCents: args.amountCents,
         type: 'gift_card_redeem',

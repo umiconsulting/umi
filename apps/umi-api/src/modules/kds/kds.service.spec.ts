@@ -47,8 +47,7 @@ function make(notifyEnabled = true) {
 
 const SESSION: KdsDeviceSession = {
   deviceId: 'dev-1',
-  tenantId: 't1',
-  businessId: 't1',
+  merchantId: 't1',
   locationId: null,
   stationId: null,
   deviceName: 'iPad',
@@ -74,18 +73,18 @@ describe('KdsService.verifyDevice', () => {
     const { svc, repo } = make();
     repo.findSessionByToken.mockResolvedValue({
       id: 's1',
-      business_id: 't1',
+      merchant_id: 't1',
       is_active: false,
       metadata: {},
     });
     await expect(svc.verifyDevice('tok')).rejects.toMatchObject({ status: 403 });
   });
 
-  it('active session → normalized + touched (businessId=tenant, location from metadata)', async () => {
+  it('active session → normalized + touched (merchantId=merchant, location from metadata)', async () => {
     const { svc, repo } = make();
     repo.findSessionByToken.mockResolvedValue({
       id: 's1',
-      business_id: 't1',
+      merchant_id: 't1',
       station_id: 'st1',
       device_name: 'Expo',
       is_active: true,
@@ -94,8 +93,7 @@ describe('KdsService.verifyDevice', () => {
     const session = await svc.verifyDevice('tok');
     expect(session).toMatchObject({
       deviceId: 's1',
-      tenantId: 't1',
-      businessId: 't1',
+      merchantId: 't1',
       locationId: 'loc-9',
       stationId: 'st1',
     });
@@ -169,7 +167,7 @@ describe('KdsService.pairing — kds_start', () => {
 describe('KdsService.pairing — kds_status', () => {
   const approved = {
     id: 'p1',
-    business_id: 't1',
+    merchant_id: 't1',
     location_id: null,
     station_id: 'st1',
     device_name: 'iPad',
@@ -182,10 +180,10 @@ describe('KdsService.pairing — kds_status', () => {
   it('issues a device session + token on an approved+claimed pairing', async () => {
     const { svc, repo } = make();
     repo.getPairing.mockResolvedValue(approved);
-    repo.loadStation.mockResolvedValue({ id: 'st1', name: 'Expo', business_id: 't1' });
+    repo.loadStation.mockResolvedValue({ id: 'st1', name: 'Expo', merchant_id: 't1' });
     repo.createDeviceSession.mockResolvedValue({
       id: 'sess-1',
-      business_id: 't1',
+      merchant_id: 't1',
       station_id: 'st1',
       device_name: 'Cocina 1',
       token: 'plaintext-token',
@@ -203,7 +201,7 @@ describe('KdsService.pairing — kds_status', () => {
       device_session: {
         device_id: 'sess-1',
         token: 'plaintext-token',
-        business_id: 't1',
+        merchant_id: 't1',
         tenant_id: 't1',
         station_name: 'Expo',
       },
@@ -213,10 +211,10 @@ describe('KdsService.pairing — kds_status', () => {
   it('drops the session and returns used on a lost claim race', async () => {
     const { svc, repo } = make();
     repo.getPairing.mockResolvedValue(approved);
-    repo.loadStation.mockResolvedValue({ id: 'st1', name: 'Expo', business_id: 't1' });
+    repo.loadStation.mockResolvedValue({ id: 'st1', name: 'Expo', merchant_id: 't1' });
     repo.createDeviceSession.mockResolvedValue({
       id: 'sess-1',
-      business_id: 't1',
+      merchant_id: 't1',
       station_id: 'st1',
       device_name: 'x',
       token: 't',
@@ -255,7 +253,7 @@ describe('KdsService.board', () => {
       {
         ticket_id: 'o1',
         source_transaction_id: null,
-        business_id: 't1',
+        merchant_id: 't1',
         source_channel: 'whatsapp',
         status: 'new',
         station_id: null,
@@ -300,7 +298,7 @@ describe('KdsService.board', () => {
 describe('KdsService.command — transition_ticket', () => {
   const order = {
     id: 'o1',
-    business_id: 't1',
+    merchant_id: 't1',
     location_id: null,
     station_id: null,
     kitchen_status: 'new',
@@ -316,7 +314,7 @@ describe('KdsService.command — transition_ticket', () => {
 
   it('404s when the ticket is not in the device scope', async () => {
     const { svc, repo } = make();
-    repo.loadOrderForScope.mockResolvedValue({ ...order, business_id: 'OTHER' });
+    repo.loadOrderForScope.mockResolvedValue({ ...order, merchant_id: 'OTHER' });
     const r = await svc.command(SESSION, {
       action: 'transition_ticket',
       ticket_id: 'o1',
@@ -378,7 +376,7 @@ describe('KdsService.command — partial_cancel_items', () => {
     const { svc, repo } = make();
     repo.loadOrderForScope.mockResolvedValue({
       id: 'o1',
-      business_id: 't1',
+      merchant_id: 't1',
       location_id: null,
       station_id: null,
       kitchen_status: 'preparing',
@@ -406,12 +404,12 @@ describe('KdsService unknown actions', () => {
 });
 
 describe('pure helpers', () => {
-  it('ticketBelongsToDevice honors tenant/location/station scope', () => {
+  it('ticketBelongsToDevice honors merchant/location/station scope', () => {
     expect(
       ticketBelongsToDevice(
         {
           id: 'o',
-          business_id: 't1',
+          merchant_id: 't1',
           location_id: null,
           station_id: null,
           kitchen_status: 'new',
@@ -425,7 +423,7 @@ describe('pure helpers', () => {
       ticketBelongsToDevice(
         {
           id: 'o',
-          business_id: 'other',
+          merchant_id: 'other',
           location_id: null,
           station_id: null,
           kitchen_status: 'new',
@@ -452,7 +450,7 @@ describe('pure helpers', () => {
       ticketBelongsToDevice(
         {
           id: 'o',
-          business_id: 't1',
+          merchant_id: 't1',
           location_id: null,
           station_id: null,
           kitchen_status: 'new',
@@ -462,12 +460,12 @@ describe('pure helpers', () => {
         boundSession,
       ),
     ).toBe(true);
-    // A different, explicit location on the order is still rejected (tenant-scoped, not global).
+    // A different, explicit location on the order is still rejected (merchant-scoped, not global).
     expect(
       ticketBelongsToDevice(
         {
           id: 'o',
-          business_id: 't1',
+          merchant_id: 't1',
           location_id: 'loc-2',
           station_id: null,
           kitchen_status: 'new',
@@ -493,7 +491,7 @@ describe('pure helpers', () => {
     const { svc, repo } = make();
     const out = await svc.createStation('t1', null, { name: 'Estación Fría' });
     expect(repo.createStation).toHaveBeenCalledWith({
-      tenantId: 't1',
+      merchantId: 't1',
       locationId: null,
       name: 'Estación Fría',
       stationKey: 'estacion_fria',

@@ -6,14 +6,13 @@ import { TraceService } from '../../shared/logging/trace.service';
 import { ConversationsRepository } from './conversations.repository';
 import { ConversationTurnsRepository } from './conversation-turns.repository';
 import { decideTurnIntegrity } from './turn-integrity.logic';
-import { getActivePendingClarification } from './pending-clarification';
 
 /** Job payloads for the turns queue. */
 export interface TurnIntegrityPayload {
   conversation_id: string;
   person_id: string;
-  business_id: string;
-  /** Resolved business location (channel_account), threaded from ingress for
+  merchant_id: string;
+  /** Resolved merchant location (channel_account), threaded from ingress for
    *  location-aware tools (hours, order persistence). Null when unresolved. */
   location_id?: string | null;
   request_id?: string;
@@ -60,7 +59,7 @@ export class TurnIntegrityService {
       await this.trace.logPipelineTrace({
         trace_id: traceId,
         conversation_id: payload.conversation_id,
-        business_id: payload.business_id,
+        merchant_id: payload.merchant_id,
         stage: 'integrity',
         event: 'failed',
         error: 'conversation_missing',
@@ -73,7 +72,7 @@ export class TurnIntegrityService {
       await this.trace.logPipelineTrace({
         trace_id: traceId,
         conversation_id: payload.conversation_id,
-        business_id: payload.business_id,
+        merchant_id: payload.merchant_id,
         stage: 'integrity',
         event: 'failed',
         error: 'no_trailing_user_messages',
@@ -83,8 +82,10 @@ export class TurnIntegrityService {
 
     const decision = decideTurnIntegrity({
       messages,
-      currentState: conversation.currentState ?? 'initial',
-      pendingClarification: getActivePendingClarification(conversation.pendingClarification),
+      // Dialog-state label DERIVED from cart-presence (no stored FSM); the open
+      // question is inferred by the LLM from the buffer, not tracked here.
+      currentState: conversation.draftCart?.items?.length ? 'awaiting_confirmation' : 'initial',
+      pendingClarification: null,
     });
     if (!decision) return;
 
@@ -107,7 +108,7 @@ export class TurnIntegrityService {
       await this.trace.logPipelineTrace({
         trace_id: traceId,
         conversation_id: payload.conversation_id,
-        business_id: payload.business_id,
+        merchant_id: payload.merchant_id,
         stage: 'integrity',
         event: 'skipped',
         detail: { reason: 'turn_already_in_progress', existing_turn_id: existingTurn.id },
@@ -124,15 +125,11 @@ export class TurnIntegrityService {
     // (set only when released) distinguishes them.
     const turn = await this.turns.upsertTurn({
       existingTurnId: existingTurn?.id ?? null,
-      tenantId: payload.business_id,
+      merchantId: payload.merchant_id,
       conversationId: payload.conversation_id,
-      personId: payload.person_id,
       status: 'pending',
       sourceMessageIds: decision.sourceMessageIds,
       mergedUserText: decision.mergedText,
-      integrityDecision: decision.decision,
-      integrityReason: decision.reason,
-      baseStateVersion: conversation.stateVersion ?? 0,
       firstMessageAt: decision.firstMessageAt,
       lastMessageAt: decision.lastMessageAt,
       holdUntil: released ? null : decision.holdUntil,
@@ -164,7 +161,7 @@ export class TurnIntegrityService {
       trace_id: traceId,
       conversation_id: payload.conversation_id,
       turn_id: turn.id,
-      business_id: payload.business_id,
+      merchant_id: payload.merchant_id,
       stage: 'integrity',
       event: 'completed',
       detail: { decision: decision.decision, reason: decision.reason },

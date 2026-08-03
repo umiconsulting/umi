@@ -11,45 +11,45 @@ final class _CartRepository implements CartRepository {
   int reads = 0;
 
   @override
-  Future<Cart> create(String tenantId, CreateCartRequest request) async {
+  Future<Cart> create(String merchantId, CreateCartRequest request) async {
     creates++;
     return cart;
   }
 
   @override
-  Future<Cart> read(String tenantId, CartQuery query) async {
+  Future<Cart> read(String merchantId, CartQuery query) async {
     reads++;
     return cart;
   }
 
   @override
-  Future<Cart> add(String tenantId, CartLineInput input) async {
+  Future<Cart> add(String merchantId, CartLineInput input) async {
     lastAdded = input;
     return cart;
   }
 
   @override
   Future<Cart> update(
-    String tenantId,
+    String merchantId,
     String lineId,
     CartLineInput input,
   ) async => cart;
   @override
   Future<Cart> remove(
-    String tenantId,
+    String merchantId,
     String lineId,
     RemoveCartLineRequest input,
   ) async => cart;
   @override
-  Future<Cart> prepare(String tenantId, PrepareSaleRequest input) async => cart;
+  Future<Cart> prepare(String merchantId, PrepareSaleRequest input) async => cart;
   @override
-  Future<Cart> clear(String tenantId, ClearCartRequest input) async => cart;
+  Future<Cart> clear(String merchantId, ClearCartRequest input) async => cart;
 }
 
 Cart _cart() => const Cart(
   id: '00000000-0000-4000-8000-000000000001',
-  tenantId: '00000000-0000-4000-8000-000000000002',
-  branchId: '00000000-0000-4000-8000-000000000003',
+  merchantId: '00000000-0000-4000-8000-000000000002',
+  locationId: '00000000-0000-4000-8000-000000000003',
   operatorSessionId: '00000000-0000-4000-8000-000000000004',
   status: 'draft',
   version: 1,
@@ -86,8 +86,8 @@ void main() {
     );
 
     await controller.open(
-      repository.cart.tenantId,
-      repository.cart.branchId,
+      repository.cart.merchantId,
+      repository.cart.locationId,
       repository.cart.operatorSessionId,
     );
 
@@ -113,8 +113,8 @@ void main() {
         ),
       );
       await controller.open(
-        repository.cart.tenantId,
-        repository.cart.branchId,
+        repository.cart.merchantId,
+        repository.cart.locationId,
         repository.cart.operatorSessionId,
       );
       await controller.add(
@@ -143,8 +143,8 @@ void main() {
       ),
     );
     await controller.open(
-      repository.cart.tenantId,
-      repository.cart.branchId,
+      repository.cart.merchantId,
+      repository.cart.locationId,
       repository.cart.operatorSessionId,
     );
     controller.clearLocal();

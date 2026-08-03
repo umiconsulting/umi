@@ -3,24 +3,22 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const sql = readFileSync(
-  resolve(process.cwd(), '../../supabase/migrations/20260729000200_pos_pin_authentication.sql'),
+  resolve(process.cwd(), '../../docs/migration/build-v3/20_merchant.sql'),
   'utf8',
 );
 
 describe('UmiPOS operator PIN migration', () => {
   it('stores a keyed lookup hash and keeps the salted verifier', () => {
-    expect(sql).toContain('operator_pin_lookup_hash text');
-    expect(sql).toContain('existing salted scrypt hash remains the PIN verifier');
+    expect(sql).toContain('operator_pin_lookup  text');
+    expect(sql).toContain('operator_pin_hash    is that PIN right?');
     expect(sql).not.toMatch(/\boperator_pin\s+text\b/);
   });
 
-  it('enforces one active PIN lookup per tenant', () => {
-    expect(sql).toContain('create unique index staff_operator_pin_lookup_uq');
-    expect(sql).toContain('on tenant.staff (business_id, operator_pin_lookup_hash)');
-    expect(sql).toContain('operator_pin_lookup_hash is not null');
+  it('enforces one PIN lookup per merchant', () => {
+    expect(sql).toContain('unique (merchant_id, operator_pin_lookup)');
   });
 
   it('restricts lookup hashes to a SHA-256 hexadecimal value', () => {
-    expect(sql).toContain("operator_pin_lookup_hash ~ '^[a-f0-9]{64}$'");
+    expect(sql).toContain("operator_pin_lookup is null or operator_pin_lookup ~ '^[a-f0-9]{64}$'");
   });
 });

@@ -82,7 +82,7 @@ final class _CheckoutRepository implements CheckoutRepository {
 
   @override
   Future<CheckoutResult> checkout(
-    String tenantId,
+    String merchantId,
     CheckoutCommand command,
   ) async {
     commands.add(command);
@@ -168,8 +168,8 @@ final class _CheckoutRepository implements CheckoutRepository {
       },
       receipt: {
         'receiptRef': 'POS-test',
-        'tenantId': '00000000-0000-4000-8000-000000000001',
-        'branchId': '00000000-0000-4000-8000-000000000002',
+        'merchantId': '00000000-0000-4000-8000-000000000001',
+        'locationId': '00000000-0000-4000-8000-000000000002',
         'issuedAt': '2026-07-28T19:00:00.000Z',
         'businessDate': '2026-07-28',
         'lines': [
@@ -194,7 +194,7 @@ final class _CheckoutRepository implements CheckoutRepository {
 
   @override
   Future<PaymentOutcome> paymentStatus(
-    String tenantId,
+    String merchantId,
     String paymentId,
     PaymentStatusQuery query,
   ) async => PaymentOutcome.fromJson({
@@ -220,7 +220,7 @@ final class _CheckoutRepository implements CheckoutRepository {
 
   @override
   Future<CheckoutRecoverySnapshot> recovery(
-    String tenantId,
+    String merchantId,
     String cartId,
     CheckoutRecoveryQuery query,
   ) async {
@@ -235,7 +235,7 @@ final class _CheckoutRepository implements CheckoutRepository {
 
   @override
   Future<CheckoutCancellationResult> cancel(
-    String tenantId,
+    String merchantId,
     String cartId,
     CheckoutCancellationRequest request,
   ) async {
@@ -252,8 +252,8 @@ final class _CheckoutRepository implements CheckoutRepository {
 final class _CartRepository implements CartRepository {
   final cart = Cart(
     id: '00000000-0000-4000-8000-000000000004',
-    tenantId: '00000000-0000-4000-8000-000000000001',
-    branchId: '00000000-0000-4000-8000-000000000002',
+    merchantId: '00000000-0000-4000-8000-000000000001',
+    locationId: '00000000-0000-4000-8000-000000000002',
     operatorSessionId: '00000000-0000-4000-8000-000000000003',
     status: 'prepared',
     version: 3,
@@ -264,27 +264,27 @@ final class _CartRepository implements CartRepository {
     updatedAt: '2026-07-28T19:00:00.000Z',
   );
   @override
-  Future<Cart> create(String tenantId, CreateCartRequest request) async => cart;
+  Future<Cart> create(String merchantId, CreateCartRequest request) async => cart;
   @override
-  Future<Cart> read(String tenantId, CartQuery query) async => cart;
+  Future<Cart> read(String merchantId, CartQuery query) async => cart;
   @override
-  Future<Cart> add(String tenantId, CartLineInput input) async => cart;
+  Future<Cart> add(String merchantId, CartLineInput input) async => cart;
   @override
   Future<Cart> update(
-    String tenantId,
+    String merchantId,
     String lineId,
     CartLineInput input,
   ) async => cart;
   @override
   Future<Cart> remove(
-    String tenantId,
+    String merchantId,
     String lineId,
     RemoveCartLineRequest input,
   ) async => cart;
   @override
-  Future<Cart> prepare(String tenantId, PrepareSaleRequest input) async => cart;
+  Future<Cart> prepare(String merchantId, PrepareSaleRequest input) async => cart;
   @override
-  Future<Cart> clear(String tenantId, ClearCartRequest input) async => cart;
+  Future<Cart> clear(String merchantId, ClearCartRequest input) async => cart;
 }
 
 CheckoutController _controller(_CheckoutRepository repository) =>
@@ -306,8 +306,8 @@ void main() {
     final repository = _CheckoutRepository();
     final controller = _controller(repository);
     await controller.preview(
-      tenantId: '00000000-0000-4000-8000-000000000001',
-      branchId: '00000000-0000-4000-8000-000000000002',
+      merchantId: '00000000-0000-4000-8000-000000000001',
+      locationId: '00000000-0000-4000-8000-000000000002',
       operatorSessionId: '00000000-0000-4000-8000-000000000003',
       cartId: '00000000-0000-4000-8000-000000000004',
       cartVersion: 3,
@@ -331,8 +331,8 @@ void main() {
     final repository = _CheckoutRepository(unknown: true);
     final controller = _controller(repository);
     await controller.preview(
-      tenantId: '00000000-0000-4000-8000-000000000001',
-      branchId: '00000000-0000-4000-8000-000000000002',
+      merchantId: '00000000-0000-4000-8000-000000000001',
+      locationId: '00000000-0000-4000-8000-000000000002',
       operatorSessionId: '00000000-0000-4000-8000-000000000003',
       cartId: '00000000-0000-4000-8000-000000000004',
       cartVersion: 3,
@@ -351,8 +351,8 @@ void main() {
       final repository = _CheckoutRepository(loseCommitResponseOnce: true);
       final controller = _controller(repository);
       await controller.preview(
-        tenantId: '00000000-0000-4000-8000-000000000001',
-        branchId: '00000000-0000-4000-8000-000000000002',
+        merchantId: '00000000-0000-4000-8000-000000000001',
+        locationId: '00000000-0000-4000-8000-000000000002',
         operatorSessionId: '00000000-0000-4000-8000-000000000003',
         cartId: '00000000-0000-4000-8000-000000000004',
         cartVersion: 3,
@@ -428,8 +428,8 @@ void main() {
     );
     final controller = _controller(repository);
     await controller.recover(
-      tenantId: '00000000-0000-4000-8000-000000000001',
-      branchId: '00000000-0000-4000-8000-000000000002',
+      merchantId: '00000000-0000-4000-8000-000000000001',
+      locationId: '00000000-0000-4000-8000-000000000002',
       operatorSessionId: '00000000-0000-4000-8000-000000000003',
       cartId: '00000000-0000-4000-8000-000000000004',
       cartVersion: 3,
@@ -476,8 +476,8 @@ void main() {
           },
           receipt: {
             'receiptRef': 'POS-recovered',
-            'tenantId': '00000000-0000-4000-8000-000000000001',
-            'branchId': '00000000-0000-4000-8000-000000000002',
+            'merchantId': '00000000-0000-4000-8000-000000000001',
+            'locationId': '00000000-0000-4000-8000-000000000002',
             'issuedAt': '2026-07-29T20:00:00.000Z',
             'businessDate': '2026-07-29',
             'lines': [],
@@ -504,8 +504,8 @@ void main() {
     );
     final controller = _controller(repository);
     await controller.recover(
-      tenantId: '00000000-0000-4000-8000-000000000001',
-      branchId: '00000000-0000-4000-8000-000000000002',
+      merchantId: '00000000-0000-4000-8000-000000000001',
+      locationId: '00000000-0000-4000-8000-000000000002',
       operatorSessionId: '00000000-0000-4000-8000-000000000003',
       cartId: '00000000-0000-4000-8000-000000000004',
       cartVersion: 3,
@@ -520,8 +520,8 @@ void main() {
       final repository = _CheckoutRepository();
       final controller = _controller(repository);
       await controller.preview(
-        tenantId: '00000000-0000-4000-8000-000000000001',
-        branchId: '00000000-0000-4000-8000-000000000002',
+        merchantId: '00000000-0000-4000-8000-000000000001',
+        locationId: '00000000-0000-4000-8000-000000000002',
         operatorSessionId: '00000000-0000-4000-8000-000000000003',
         cartId: '00000000-0000-4000-8000-000000000004',
         cartVersion: 3,
@@ -534,8 +534,8 @@ void main() {
       final unknownRepository = _CheckoutRepository(unknown: true);
       final unknownController = _controller(unknownRepository);
       await unknownController.preview(
-        tenantId: '00000000-0000-4000-8000-000000000001',
-        branchId: '00000000-0000-4000-8000-000000000002',
+        merchantId: '00000000-0000-4000-8000-000000000001',
+        locationId: '00000000-0000-4000-8000-000000000002',
         operatorSessionId: '00000000-0000-4000-8000-000000000003',
         cartId: '00000000-0000-4000-8000-000000000004',
         cartVersion: 3,
@@ -553,8 +553,8 @@ void main() {
       final repository = _CheckoutRepository();
       final controller = _controller(repository);
       await controller.preview(
-        tenantId: '00000000-0000-4000-8000-000000000001',
-        branchId: '00000000-0000-4000-8000-000000000002',
+        merchantId: '00000000-0000-4000-8000-000000000001',
+        locationId: '00000000-0000-4000-8000-000000000002',
         operatorSessionId: '00000000-0000-4000-8000-000000000003',
         cartId: '00000000-0000-4000-8000-000000000004',
         cartVersion: 3,
@@ -628,8 +628,8 @@ void main() {
         ),
       );
       await cart.open(
-        repository.cart.tenantId,
-        repository.cart.branchId,
+        repository.cart.merchantId,
+        repository.cart.locationId,
         repository.cart.operatorSessionId,
       );
       final root = testRoot();

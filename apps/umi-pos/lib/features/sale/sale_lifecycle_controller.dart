@@ -58,8 +58,8 @@ final class SaleLifecycleController extends ChangeNotifier {
   bool get canResumeSuspendedSale => _isTerminalOrMissing && !_mutationActive;
   bool get canLoadMoreHistory => _historyNextCursor != null;
   bool get historyLoading => _historyLoading;
-  String? _tenantId;
-  String? _branchId;
+  String? _merchantId;
+  String? _locationId;
   String? _operatorSessionId;
   bool _mutationActive = false;
   bool _historyLoading = false;
@@ -69,21 +69,21 @@ final class SaleLifecycleController extends ChangeNotifier {
   String _historySort = 'newest';
 
   Future<void> open(
-    String tenantId,
-    String branchId,
+    String merchantId,
+    String locationId,
     String operatorSessionId,
   ) async {
     final sameScope =
-        _tenantId == tenantId &&
-        _branchId == branchId &&
+        _merchantId == merchantId &&
+        _locationId == locationId &&
         _operatorSessionId == operatorSessionId;
     if (sameScope && _state.sale != null) return;
-    _tenantId = tenantId;
-    _branchId = branchId;
+    _merchantId = merchantId;
+    _locationId = locationId;
     _operatorSessionId = operatorSessionId;
     _set(const SaleLifecycleState(phase: SalePhase.loading));
     try {
-      final recovered = await _repository.current(tenantId, _query());
+      final recovered = await _repository.current(merchantId, _query());
       _apply(recovered);
       _event('sale_restored');
     } on AppException catch (error) {
@@ -112,10 +112,10 @@ final class SaleLifecycleController extends ChangeNotifier {
     }
     await _mutation(
       () => _repository.suspend(
-        _tenantId!,
+        _merchantId!,
         sale.id,
         SuspendSaleRequest(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           idempotencyKey: _uuid(),
           expectedVersion: cart.version,
@@ -135,10 +135,10 @@ final class SaleLifecycleController extends ChangeNotifier {
     final suspendedCart = Cart.fromJson(suspended.cart);
     await _mutation(
       () => _repository.resume(
-        _tenantId!,
+        _merchantId!,
         suspended.id,
         ResumeSaleRequest(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           idempotencyKey: _uuid(),
           expectedVersion: suspendedCart.version,
@@ -160,10 +160,10 @@ final class SaleLifecycleController extends ChangeNotifier {
     _mutationActive = true;
     try {
       await _repository.rename(
-        _tenantId!,
+        _merchantId!,
         suspended.id,
         RenameSuspendedSaleRequest(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           idempotencyKey: _uuid(),
           expectedVersion: suspendedCart.version,
@@ -194,10 +194,10 @@ final class SaleLifecycleController extends ChangeNotifier {
     }
     await _mutation(
       () => _repository.cancel(
-        _tenantId!,
+        _merchantId!,
         sale.id,
         CancelSaleRequest(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           idempotencyKey: _uuid(),
           expectedVersion: cart.version,
@@ -219,10 +219,10 @@ final class SaleLifecycleController extends ChangeNotifier {
     }
     await _mutation(
       () => _repository.attachCustomer(
-        _tenantId!,
+        _merchantId!,
         sale.id,
         AttachSaleCustomerRequest(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           idempotencyKey: _uuid(),
           expectedVersion: cart.version,
@@ -244,10 +244,10 @@ final class SaleLifecycleController extends ChangeNotifier {
     }
     await _mutation(
       () => _repository.detachCustomer(
-        _tenantId!,
+        _merchantId!,
         sale.id,
         SaleMutationRequest(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           idempotencyKey: _uuid(),
           expectedVersion: cart.version,
@@ -275,14 +275,14 @@ final class SaleLifecycleController extends ChangeNotifier {
   }
 
   Future<void> _loadHistoryPage({required bool append}) async {
-    if (_tenantId == null || _historyLoading) return;
+    if (_merchantId == null || _historyLoading) return;
     _historyLoading = true;
     notifyListeners();
     try {
       final page = await _repository.history(
-        _tenantId!,
+        _merchantId!,
         SaleHistoryQuery(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           state: _historyState,
           search: _historySearch,
@@ -311,12 +311,12 @@ final class SaleLifecycleController extends ChangeNotifier {
   }
 
   Future<void> searchCustomers(String search, {bool recent = false}) async {
-    if (_tenantId == null) return;
+    if (_merchantId == null) return;
     try {
       final result = await _repository.customers(
-        _tenantId!,
+        _merchantId!,
         PosCustomerSearchQuery(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           search: search,
           recent: recent,
@@ -395,7 +395,7 @@ final class SaleLifecycleController extends ChangeNotifier {
 
   Future<void> openReceipt(SaleSnapshot sale) async {
     try {
-      final receipt = await _repository.receipt(_tenantId!, sale.id, _query());
+      final receipt = await _repository.receipt(_merchantId!, sale.id, _query());
       _set(
         SaleLifecycleState(
           phase: _state.phase,
@@ -411,22 +411,22 @@ final class SaleLifecycleController extends ChangeNotifier {
   }
 
   void clear() {
-    _tenantId = null;
-    _branchId = null;
+    _merchantId = null;
+    _locationId = null;
     _operatorSessionId = null;
     _cart.clearLocal();
     _set(const SaleLifecycleState());
   }
 
   Future<void> _start({required bool readyForNextCustomer}) async {
-    if (_mutationActive || _tenantId == null) return;
+    if (_mutationActive || _merchantId == null) return;
     _mutationActive = true;
     _set(const SaleLifecycleState(phase: SalePhase.loading));
     try {
       final sale = await _repository.start(
-        _tenantId!,
+        _merchantId!,
         SaleContextRequest(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           idempotencyKey: _uuid(),
         ),
@@ -496,7 +496,7 @@ final class SaleLifecycleController extends ChangeNotifier {
   }
 
   SaleHistoryQuery _query() => SaleHistoryQuery(
-    branchId: _branchId!,
+    locationId: _locationId!,
     operatorSessionId: _operatorSessionId!,
     search: '',
     sort: 'newest',

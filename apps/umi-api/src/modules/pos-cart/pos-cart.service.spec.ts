@@ -9,7 +9,7 @@ const user = {
   deviceId: '00000000-0000-4000-8000-000000000003',
 };
 const dto = {
-  branchId: '00000000-0000-4000-8000-000000000004',
+  locationId: '00000000-0000-4000-8000-000000000004',
   operatorSessionId: '00000000-0000-4000-8000-000000000005',
   idempotencyKey: '00000000-0000-4000-8000-000000000006',
 };
@@ -59,7 +59,7 @@ describe('PosCartService', () => {
       user.sessionId,
       user.deviceId,
       user.id,
-      dto.branchId,
+      dto.locationId,
       dto.operatorSessionId,
     );
     expect(integrity.execute).toHaveBeenCalledOnce();

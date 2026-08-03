@@ -38,8 +38,8 @@ final class CashController extends ChangeNotifier {
   final CashRecoveryStore _recoveryStore;
   CashState _state = const CashState();
   CashState get state => _state;
-  String? _tenantId;
-  String? _branchId;
+  String? _merchantId;
+  String? _locationId;
   String? _operatorSessionId;
 
   String? get activeShiftId {
@@ -55,24 +55,24 @@ final class CashController extends ChangeNotifier {
   }
 
   void setContext({
-    required String tenantId,
-    required String branchId,
+    required String merchantId,
+    required String locationId,
     required String operatorSessionId,
   }) {
-    if (_tenantId == tenantId &&
-        _branchId == branchId &&
+    if (_merchantId == merchantId &&
+        _locationId == locationId &&
         _operatorSessionId == operatorSessionId) {
       return;
     }
-    _tenantId = tenantId;
-    _branchId = branchId;
+    _merchantId = merchantId;
+    _locationId = locationId;
     _operatorSessionId = operatorSessionId;
     _state = const CashState();
   }
 
   void clear() {
-    _tenantId = null;
-    _branchId = null;
+    _merchantId = null;
+    _locationId = null;
     _operatorSessionId = null;
     _set(const CashState());
   }
@@ -83,9 +83,9 @@ final class CashController extends ChangeNotifier {
     try {
       final recoveryCode = await _recoverPendingCommand();
       final snapshot = await _repository.center(
-        _tenantId!,
+        _merchantId!,
         CashCenterQuery(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
         ),
       );
@@ -117,9 +117,9 @@ final class CashController extends ChangeNotifier {
     await _perform(() async {
       final ids = await _commandIds('open_shift');
       await _repository.open(
-        _tenantId!,
+        _merchantId!,
         OpenCashShiftRequest(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           commandId: ids.commandId,
           idempotencyKey: ids.idempotencyKey,
@@ -151,10 +151,10 @@ final class CashController extends ChangeNotifier {
     await _perform(() async {
       final ids = await _commandIds('cash_movement');
       await _repository.movement(
-        _tenantId!,
+        _merchantId!,
         shift['id']! as String,
         CashMovementRequest(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           commandId: ids.commandId,
           idempotencyKey: ids.idempotencyKey,
@@ -181,10 +181,10 @@ final class CashController extends ChangeNotifier {
     await _perform(() async {
       final ids = await _commandIds(suspend ? 'suspend_shift' : 'resume_shift');
       await _repository.transition(
-        _tenantId!,
+        _merchantId!,
         shift['id']! as String,
         ShiftTransitionRequest(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           commandId: ids.commandId,
           idempotencyKey: ids.idempotencyKey,
@@ -204,10 +204,10 @@ final class CashController extends ChangeNotifier {
     await _perform(() async {
       final ids = await _commandIds('handoff_shift');
       await _repository.handoff(
-        _tenantId!,
+        _merchantId!,
         shift['id']! as String,
         ShiftHandoffRequest(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           commandId: ids.commandId,
           idempotencyKey: ids.idempotencyKey,
@@ -231,10 +231,10 @@ final class CashController extends ChangeNotifier {
     await _perform(() async {
       final ids = await _commandIds('submit_count');
       final count = await _repository.count(
-        _tenantId!,
+        _merchantId!,
         shift['id']! as String,
         SubmitBlindCountRequest(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           commandId: ids.commandId,
           idempotencyKey: ids.idempotencyKey,
@@ -261,10 +261,10 @@ final class CashController extends ChangeNotifier {
     await _perform(() async {
       final ids = await _commandIds('request_recount');
       await _repository.recount(
-        _tenantId!,
+        _merchantId!,
         shift['id']! as String,
         RecountRequest(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           commandId: ids.commandId,
           idempotencyKey: ids.idempotencyKey,
@@ -294,8 +294,8 @@ final class CashController extends ChangeNotifier {
         operatorSessionId: _operatorSessionId!,
         managerPin: managerPin,
         permission: 'cash.variance.approve',
-        tenantId: _tenantId!,
-        branchId: _branchId!,
+        merchantId: _merchantId!,
+        locationId: _locationId!,
         commandFingerprint: fingerprint,
       ),
     );
@@ -313,10 +313,10 @@ final class CashController extends ChangeNotifier {
     await _perform(() async {
       final ids = await _commandIds('resolve_variance');
       final resolution = await _repository.resolve(
-        _tenantId!,
+        _merchantId!,
         shift['id']! as String,
         ResolveCashVarianceRequest(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           commandId: ids.commandId,
           idempotencyKey: ids.idempotencyKey,
@@ -341,10 +341,10 @@ final class CashController extends ChangeNotifier {
     await _perform(() async {
       final ids = await _commandIds('reconcile_shift');
       final result = await _repository.reconcile(
-        _tenantId!,
+        _merchantId!,
         shift['id']! as String,
         ReconcileCashShiftRequest(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           commandId: ids.commandId,
           idempotencyKey: ids.idempotencyKey,
@@ -377,8 +377,8 @@ final class CashController extends ChangeNotifier {
         operatorSessionId: _operatorSessionId!,
         managerPin: managerPin,
         permission: 'cash.shift.close',
-        tenantId: _tenantId!,
-        branchId: _branchId!,
+        merchantId: _merchantId!,
+        locationId: _locationId!,
         commandFingerprint: fingerprint,
       ),
     );
@@ -395,10 +395,10 @@ final class CashController extends ChangeNotifier {
     await _perform(() async {
       final ids = await _commandIds('close_shift');
       final result = await _repository.close(
-        _tenantId!,
+        _merchantId!,
         shift['id']! as String,
         ShiftCloseRequest(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           commandId: ids.commandId,
           idempotencyKey: ids.idempotencyKey,
@@ -412,9 +412,9 @@ final class CashController extends ChangeNotifier {
       );
       await _completeCommand(ids);
       final snapshot = await _repository.center(
-        _tenantId!,
+        _merchantId!,
         CashCenterQuery(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
         ),
       );
@@ -427,10 +427,10 @@ final class CashController extends ChangeNotifier {
     await _perform(() async {
       final ids = await _commandIds('no_sale_drawer');
       await _repository.noSale(
-        _tenantId!,
+        _merchantId!,
         shift['id']! as String,
         NoSaleDrawerRequest(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           commandId: ids.commandId,
           idempotencyKey: ids.idempotencyKey,
@@ -445,7 +445,7 @@ final class CashController extends ChangeNotifier {
   }
 
   bool get _hasContext =>
-      _tenantId != null && _branchId != null && _operatorSessionId != null;
+      _merchantId != null && _locationId != null && _operatorSessionId != null;
 
   CashCenterSnapshot _requireSnapshot() {
     final snapshot = _state.snapshot;
@@ -465,9 +465,9 @@ final class CashController extends ChangeNotifier {
     ShiftReconciliation? reconciliation,
   }) async {
     final snapshot = await _repository.center(
-      _tenantId!,
+      _merchantId!,
       CashCenterQuery(
-        branchId: _branchId!,
+        locationId: _locationId!,
         operatorSessionId: _operatorSessionId!,
       ),
     );
@@ -537,21 +537,21 @@ final class CashController extends ChangeNotifier {
   }
 
   Future<PendingCashCommand> _commandIds(String operation) async {
-    final tenantId = _tenantId!;
-    final branchId = _branchId!;
-    final pending = await _recoveryStore.load(tenantId, branchId);
+    final merchantId = _merchantId!;
+    final locationId = _locationId!;
+    final pending = await _recoveryStore.load(merchantId, locationId);
     if (pending != null) {
       final result = await _repository.commandRecovery(
-        tenantId,
+        merchantId,
         CashCommandRecoveryQuery(
-          branchId: branchId,
+          locationId: locationId,
           operatorSessionId: _operatorSessionId!,
           commandId: pending.commandId,
           idempotencyKey: pending.idempotencyKey,
         ),
       );
       if (result.status == 'succeeded') {
-        await _recoveryStore.clear(tenantId, branchId);
+        await _recoveryStore.clear(merchantId, locationId);
         throw const AppException(
           category: AppErrorCategory.conflict,
           code: 'CASH_COMMAND_RECOVERED',
@@ -567,7 +567,7 @@ final class CashController extends ChangeNotifier {
         );
       }
       if (result.status == 'failed' && !result.retryable) {
-        await _recoveryStore.clear(tenantId, branchId);
+        await _recoveryStore.clear(merchantId, locationId);
         throw AppException(
           category: AppErrorCategory.conflict,
           code: result.failureCode ?? 'CASH_OPERATION_CONFLICT',
@@ -585,8 +585,8 @@ final class CashController extends ChangeNotifier {
       return pending;
     }
     final command = PendingCashCommand(
-      tenantId: tenantId,
-      branchId: branchId,
+      merchantId: merchantId,
+      locationId: locationId,
       operation: operation,
       commandId: _uuid(),
       idempotencyKey: _uuid(),
@@ -596,15 +596,15 @@ final class CashController extends ChangeNotifier {
   }
 
   Future<void> _completeCommand(PendingCashCommand command) =>
-      _recoveryStore.clear(command.tenantId, command.branchId);
+      _recoveryStore.clear(command.merchantId, command.locationId);
 
   Future<String?> _recoverPendingCommand() async {
-    final pending = await _recoveryStore.load(_tenantId!, _branchId!);
+    final pending = await _recoveryStore.load(_merchantId!, _locationId!);
     if (pending == null) return null;
     final result = await _repository.commandRecovery(
-      _tenantId!,
+      _merchantId!,
       CashCommandRecoveryQuery(
-        branchId: _branchId!,
+        locationId: _locationId!,
         operatorSessionId: _operatorSessionId!,
         commandId: pending.commandId,
         idempotencyKey: pending.idempotencyKey,

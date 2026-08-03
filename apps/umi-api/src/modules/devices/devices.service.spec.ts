@@ -4,8 +4,8 @@ import { DevicesService } from './devices.service';
 const device = {
   id: '00000000-0000-4000-8000-000000000010',
   publicId: '00000000-0000-4000-8000-000000000011',
-  tenantId: '00000000-0000-4000-8000-000000000012',
-  branchId: '00000000-0000-4000-8000-000000000013',
+  merchantId: '00000000-0000-4000-8000-000000000012',
+  locationId: '00000000-0000-4000-8000-000000000013',
   displayName: 'Caja principal',
   type: 'pos_terminal' as const,
   platform: 'android' as const,
@@ -77,8 +77,8 @@ const make = () => {
 describe('DevicesService', () => {
   it('creates a bounded deterministic one-time challenge', async () => {
     const { service, repo } = make();
-    const first = await service.begin(device.tenantId, device.id, {
-      branchId: device.branchId,
+    const first = await service.begin(device.merchantId, device.id, {
+      locationId: device.locationId,
       displayName: device.displayName,
       type: 'pos_terminal',
       platform: 'android',
@@ -145,7 +145,7 @@ describe('DevicesService', () => {
       decidedAt: new Date().toISOString(),
     });
     await service.approve(
-      device.tenantId,
+      device.merchantId,
       device.id,
       device.id,
       '00000000-0000-4000-8000-000000000099',
@@ -169,7 +169,7 @@ describe('DevicesService', () => {
   it('routes credential rotation through canonical idempotency without storing plaintext', async () => {
     const { service, repo, integrity } = make();
     const idempotencyKey = '00000000-0000-4000-8000-000000000099';
-    const result = await service.rotate(device.tenantId, device.id, 1, idempotencyKey);
+    const result = await service.rotate(device.merchantId, device.id, 1, idempotencyKey);
 
     expect(integrity.execute).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -181,7 +181,7 @@ describe('DevicesService', () => {
     );
     expect(repo.rotate).toHaveBeenCalledWith(
       expect.anything(),
-      device.tenantId,
+      device.merchantId,
       device.id,
       1,
       expect.stringMatching(/^[a-f0-9]{64}$/),

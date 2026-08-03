@@ -1,0 +1,185 @@
+import { Injectable } from '@nestjs/common';
+import { PgService } from '../../shared/database/pg.service';
+
+/**
+ * Per-merchant voice + operating config. Ported from `_shared/merchant-config.ts`
+ * and rebound to the TYPED `merchant.merchant` columns (`assistant_name` /
+ * `assistant_tone` / `locale`) — the legacy `config.voice` jsonb blob was dissolved
+ * in build-v3. `fetchConfigRow` re-inflates the old MerchantConfig shape the resolver
+ * and consumers expect. Read on the worker pool: the WhatsApp path is unauthenticated
+ * (no member user → no RLS merchant context), and the query keys on the merchant `id`.
+ *
+ * `resolveVoiceConfig` NEVER throws: it fills sane defaults (assistant name from
+ * the merchant name, locale `es-MX`, tone from the merchant's preset or a friendly
+ * default) so a merchant that has not configured a voice can no longer dead-letter
+ * a turn. Tone is merchant-configurable via `tone_preset` (the dashboard chips) with
+ * a freeform `tone` advanced override; see TONE_PRESETS.
+ */
+
+/** The resolved/strict voice shape consumed by prompts.ts (always fully populated). */
+export interface VoiceConfig {
+  assistant_name: string;
+  locale: string;
+  tone: string;
+  style_notes?: string[];
+}
+
+export type TonePreset = 'casual' | 'friendly' | 'formal';
+
+/** Single source of truth for tone presets — consumed by BOTH the engine
+ *  (resolveVoiceConfig → prompts.ts) and the dashboard voice GET (chip labels). */
+export const TONE_PRESETS: Record<TonePreset, { label: string; tone: string }> = {
+  casual: {
+    label: 'Casual',
+    tone: 'Relajado y cercano: tutea al cliente, usa lenguaje cotidiano y ligero, frases cortas y algún emoji ocasional cuando venga al caso. Evita sonar acartonado.',
+  },
+  friendly: {
+    label: 'Amigable',
+    tone: 'Cálido y servicial: tutea al cliente con amabilidad, muestra entusiasmo genuino por ayudar y mantén un trato humano y positivo sin exagerar.',
+  },
+  formal: {
+    label: 'Formal',
+    tone: 'Cortés y profesional: trata al cliente de usted, usa lenguaje pulido y respetuoso, sin modismos ni emojis, manteniendo cercanía y claridad.',
+  },
+};
+
+export const TONE_PRESET_KEYS = Object.keys(TONE_PRESETS) as TonePreset[];
+export const DEFAULT_TONE_PRESET: TonePreset = 'friendly';
+export const DEFAULT_LOCALE = 'es-MX';
+export const DEFAULT_ASSISTANT_NAME = 'Asistente';
+
+/** Defensive LENGTH caps for merchant-controlled voice text read on the worker
+ *  path, where legacy / hand-seeded rows bypass the DTO's MaxLength bounds.
+ *  These bound length only (not content): voice is first-party config a merchant
+ *  sets for their OWN assistant, so it is not a cross-merchant injection boundary
+ *  (unlike sanitizeCustomerFacts, which also content-filters). */
+const MAX_ASSISTANT_NAME_CHARS = 60;
+const MAX_LOCALE_CHARS = 20;
+const MAX_TONE_CHARS = 280;
+const MAX_STYLE_NOTES = 8;
+const MAX_STYLE_NOTE_CHARS = 200;
+
+export interface MerchantConfig {
+  address?: string;
+  whatsapp?: string;
+  payment_methods?: string[];
+  timezone?: string;
+  accepts_whatsapp_orders?: boolean;
+  special_notice?: string | null;
+  order_cutoff_time?: string | null;
+  hours?: Record<string, { open?: string; close?: string; closed?: boolean }>;
+  bypass_phones?: string[];
+  voice?: (Partial<VoiceConfig> & { tone_preset?: TonePreset }) | null;
+}
+
+export interface MerchantConfigRow {
+  id: string;
+  name: string | null;
+  config: MerchantConfig | null;
+}
+
+/**
+ * Resolve the tone TEXT fed to the LLM. Precedence:
+ *   1. explicit freeform `tone` (advanced override; ALSO the legacy {tone} shape)
+ *   2. `tone_preset` → its Spanish guidance
+ *   3. friendly default
+ * Backward-compatible: a hand-seeded {assistant_name, locale, tone} row keeps its
+ * freeform tone verbatim (case 1).
+ */
+function resolveToneText(
+  voice: (Partial<VoiceConfig> & { tone_preset?: unknown }) | null | undefined,
+): string {
+  const freeform = typeof voice?.tone === 'string' ? voice.tone.trim() : '';
+  if (freeform) return freeform.slice(0, MAX_TONE_CHARS);
+  const key =
+    typeof voice?.tone_preset === 'string' ? (voice.tone_preset.trim() as TonePreset) : undefined;
+  if (key && TONE_PRESETS[key]) return TONE_PRESETS[key].tone;
+  return TONE_PRESETS[DEFAULT_TONE_PRESET].tone;
+}
+
+/**
+ * Never-throw voice resolver (replaces the old `requireVoiceConfig`). Always
+ * returns a VoiceConfig with NON-EMPTY assistant_name/locale/tone so prompts.ts
+ * never interpolates `undefined`. A merchant with no voice config can no longer
+ * dead-letter a turn.
+ */
+export function resolveVoiceConfig(
+  config: MerchantConfig | null | undefined,
+  businessName: string | null | undefined,
+  _merchantId: string, // kept for call-site symmetry/future logging; never used to throw
+): VoiceConfig {
+  const voice = (config?.voice ?? null) as
+    (Partial<VoiceConfig> & { tone_preset?: unknown }) | null;
+
+  // Cap to the same bounds as UpdateVoiceDto (assistant_name 60, locale 20) so a
+  // long merchant name or hand-seeded legacy row resolves to a value that still
+  // round-trips cleanly back through the dashboard PATCH validator.
+  const assistant_name = (
+    (typeof voice?.assistant_name === 'string' && voice.assistant_name.trim()) ||
+    (typeof businessName === 'string' && businessName.trim()) ||
+    DEFAULT_ASSISTANT_NAME
+  ).slice(0, MAX_ASSISTANT_NAME_CHARS);
+
+  const locale = (
+    (typeof voice?.locale === 'string' && voice.locale.trim()) ||
+    DEFAULT_LOCALE
+  ).slice(0, MAX_LOCALE_CHARS);
+
+  const tone = resolveToneText(voice);
+
+  const style_notes = Array.isArray(voice?.style_notes)
+    ? voice.style_notes
+        .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+        .slice(0, MAX_STYLE_NOTES)
+        .map((s) => s.slice(0, MAX_STYLE_NOTE_CHARS))
+    : [];
+
+  return {
+    assistant_name,
+    locale,
+    tone,
+    style_notes: style_notes.length > 0 ? style_notes : undefined,
+  };
+}
+
+@Injectable()
+export class MerchantConfigService {
+  constructor(private readonly pg: PgService) {}
+
+  /**
+   * Load the merchant's merchant config row (the single merchant per merchant in the
+   * current model). Returns null when the merchant has no `merchant.merchant` row.
+   */
+  async fetchConfigRow(merchantId: string): Promise<MerchantConfigRow | null> {
+    const { rows } = await this.pg.query<{
+      id: string;
+      name: string | null;
+      assistant_name: string | null;
+      assistant_tone: string | null;
+      locale: string | null;
+    }>(
+      `SELECT id::text, name, assistant_name, assistant_tone, locale
+         FROM merchant.merchant
+        WHERE id = $1
+        LIMIT 1`,
+      [merchantId],
+    );
+    const r = rows[0];
+    if (!r) return null;
+    // Re-inflate the legacy MerchantConfig shape from the typed columns. Only the voice
+    // sub-object has typed homes today; the ordering/contact scalars (address, whatsapp,
+    // payment_methods, …) have no column yet → left undefined, and the consumers default
+    // safely (voice never-throws, business-hours fail-closed).
+    return {
+      id: r.id,
+      name: r.name,
+      config: {
+        voice: {
+          assistant_name: r.assistant_name ?? undefined,
+          tone_preset: (r.assistant_tone ?? undefined) as TonePreset | undefined,
+          locale: r.locale ?? undefined,
+        },
+      },
+    };
+  }
+}

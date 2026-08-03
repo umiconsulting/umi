@@ -23,7 +23,7 @@ final class OfflineCheckoutRequest {
     required this.taxSnapshotAt,
     required this.amountReceivedMinorUnits,
     required this.businessDate,
-    required this.branchName,
+    required this.locationName,
     required this.operatorName,
   });
   final String commandId;
@@ -41,7 +41,7 @@ final class OfflineCheckoutRequest {
   final DateTime taxSnapshotAt;
   final int amountReceivedMinorUnits;
   final String businessDate;
-  final String branchName;
+  final String locationName;
   final String operatorName;
 }
 
@@ -111,8 +111,8 @@ final class OfflineCheckoutService {
       commandId: request.commandId,
       deviceId: request.authority.deviceId,
       credentialVersion: request.authority.credentialVersion,
-      tenantId: request.authority.tenantId,
-      branchId: request.authority.branchId,
+      merchantId: request.authority.merchantId,
+      locationId: request.authority.locationId,
       operatorSessionId: request.authority.operatorSessionId,
       idempotencyKey: request.idempotencyKey,
       payload: payload.toJson(),
@@ -130,7 +130,7 @@ final class OfflineCheckoutService {
     return ProvisionalReceipt(
       provisionalSaleId: persisted.provisionalId!,
       status: 'pending_sync',
-      branchName: request.branchName,
+      locationName: request.locationName,
       operatorName: request.operatorName,
       snapshot: persistedSnapshot.toJson(),
       createdAt: persisted.createdAt,
@@ -141,8 +141,8 @@ final class OfflineCheckoutService {
 
   String _checkoutIdentity(OfflineCheckoutRequest request) {
     final canonical = <String, Object?>{
-      'tenantId': request.authority.tenantId,
-      'branchId': request.authority.branchId,
+      'merchantId': request.authority.merchantId,
+      'locationId': request.authority.locationId,
       'operatorSessionId': request.authority.operatorSessionId,
       'deviceId': request.authority.deviceId,
       'credentialVersion': request.authority.credentialVersion,

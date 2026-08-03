@@ -40,8 +40,8 @@ export interface CashAuthorization {
 
 interface PhysicalRegisterRow {
   id: string;
-  tenantId: string;
-  branchId: string;
+  merchantId: string;
+  locationId: string;
   displayName: string;
   publicReference: string;
   currency: string;
@@ -71,13 +71,13 @@ export class PosCashRepository {
 
   commandRecovery(
     userId: string,
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     commandId: string,
     idempotencyKey: string,
   ): Promise<CashCommandRecoveryResult> {
-    return this.pg.runWithTenant(
-      tenantId,
+    return this.pg.runWithMerchant(
+      merchantId,
       userId,
       async (client) => {
         const result = await client.query<{
@@ -91,12 +91,12 @@ export class PosCashRepository {
           `SELECT command_id::text AS "commandId",command_type AS "commandType",
                   status,retryable,failure_code AS "failureCode",
                   correlation_id::text AS "correlationId"
-           FROM tenant.business_command
-           WHERE business_id=$1::uuid AND branch_id=$2::uuid
+           FROM merchant.business_command
+           WHERE merchant_id=$1::uuid AND location_id=$2::uuid
              AND command_id=$3::uuid AND idempotency_key=$4
              AND command_type LIKE 'pos.cash.%'
            LIMIT 1`,
-          [tenantId, branchId, commandId, idempotencyKey],
+          [merchantId, locationId, commandId, idempotencyKey],
         );
         const row = result.rows[0];
         if (!row) {
@@ -111,7 +111,7 @@ export class PosCashRepository {
         }
         return row;
       },
-      branchId,
+      locationId,
     );
   }
 
@@ -119,30 +119,37 @@ export class PosCashRepository {
     userId: string,
     durableSessionId: string,
     deviceId: string,
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     operatorSessionId: string,
   ): Promise<CashAuthorization | null> {
-    const { rows } = await this.pg.worker.query<CashAuthorization>(
-      `SELECT os.id::text AS "operatorSessionId",os.user_id::text AS "operatorId",
+    return this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      async (client) => {
+        const { rows } = await client.query<CashAuthorization>(
+          `SELECT os.id::text AS "operatorSessionId",os.user_id::text AS "operatorId",
               os.device_id::text AS "deviceId",d.credential_version AS "credentialVersion",
               os.permissions
        FROM runtime.operator_session os
-       JOIN tenant.device d ON d.id=os.device_id
+       JOIN merchant.device d ON d.id=os.device_id
        WHERE os.id=$6::uuid AND os.durable_session_id=$2::uuid
          AND os.user_id=$1::uuid AND os.device_id=$3::uuid
-         AND os.business_id=$4::uuid AND os.branch_id=$5::uuid
+         AND os.merchant_id=$4::uuid AND os.location_id=$5::uuid
          AND os.state='active' AND os.expires_at>now()
-         AND d.lifecycle_state='active' AND d.credential_version>0`,
-      [userId, durableSessionId, deviceId, tenantId, branchId, operatorSessionId],
+         AND d.status='active' AND d.credential_version>0`,
+          [userId, durableSessionId, deviceId, merchantId, locationId, operatorSessionId],
+        );
+        return rows[0] ?? null;
+      },
+      locationId,
     );
-    return rows[0] ?? null;
   }
 
   async policy(
     client: PoolClient,
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     currency: string,
   ): Promise<CashShiftPolicy> {
     const { rows } = await client.query<{
@@ -184,10 +191,10 @@ export class PosCashRepository {
               close_approval_threshold::text AS "closeApprovalThreshold",
               no_sale_drawer_allowed AS "noSaleDrawerAllowed",
               offline_cash_shift_allowed AS "offlineCashShiftAllowed",denominations
-       FROM tenant.cash_shift_policy
-       WHERE business_id=$1::uuid AND branch_id=$2::uuid AND currency=$3
+       FROM merchant.cash_shift_policy
+       WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND currency=$3
          AND expires_at>now()`,
-      [tenantId, branchId, currency],
+      [merchantId, locationId, currency],
     );
     const row = rows[0];
     const money = (minorUnits: number) => ({ minorUnits, currency });
@@ -229,14 +236,14 @@ export class PosCashRepository {
 
   async openShift(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     authorization: CashAuthorization,
     dto: OpenCashShiftRequest,
     correlationId: string,
   ): Promise<OpenCashShiftResult> {
     const register = await client.query<{
       id: string;
-      branchId: string;
+      locationId: string;
       displayName: string;
       publicReference: string;
       currency: string;
@@ -248,18 +255,18 @@ export class PosCashRepository {
       version: number;
       createdAt: string;
     }>(
-      `SELECT id::text,branch_id::text AS "branchId",display_name AS "displayName",
+      `SELECT id::text,location_id::text AS "locationId",display_name AS "displayName",
               public_reference AS "publicReference",currency,active,
               assignment_policy AS "assignmentPolicy",
               assigned_device_id::text AS "assignedDeviceId",
               allowed_device_classes AS "allowedDeviceClasses",status,version,
               created_at::text AS "createdAt"
-       FROM tenant.physical_register
-       WHERE id=$1::uuid AND business_id=$2::uuid AND branch_id=$3::uuid
+       FROM merchant.physical_register
+       WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
          AND active AND archived_at IS NULL AND status IN ('available','assigned')
          AND version=$4
        FOR UPDATE`,
-      [dto.registerId, tenantId, dto.branchId, dto.expectedRegisterVersion],
+      [dto.registerId, merchantId, dto.locationId, dto.expectedRegisterVersion],
     );
     const current = register.rows[0];
     if (
@@ -270,7 +277,7 @@ export class PosCashRepository {
       throw new Error('REGISTER_NOT_AVAILABLE');
     }
     if (current.currency !== dto.openingFloat.currency) throw new Error('CURRENCY_MISMATCH');
-    const policy = await this.policy(client, tenantId, dto.branchId, current.currency);
+    const policy = await this.policy(client, merchantId, dto.locationId, current.currency);
     if (
       policy.version === 'default-deny' ||
       dto.openingFloat.minorUnits > policy.maximumOpeningFloat.minorUnits
@@ -286,8 +293,8 @@ export class PosCashRepository {
       openedAt: string;
       version: number;
     }>(
-      `INSERT INTO tenant.cash_shift
-         (business_id,branch_id,register_id,device_id,device_credential_version,
+      `INSERT INTO merchant.cash_shift
+         (merchant_id,location_id,register_id,device_id,device_credential_version,
           opening_operator_id,responsible_operator_id,operator_session_id,currency,
           business_date,status,opening_command_id,opening_float_minor_units,
           opening_denominations,opening_note)
@@ -295,8 +302,8 @@ export class PosCashRepository {
                $8,$9::date,'open',$10::uuid,$11,$12,$13)
        RETURNING id::text,opened_at::text AS "openedAt",version`,
       [
-        tenantId,
-        dto.branchId,
+        merchantId,
+        dto.locationId,
         dto.registerId,
         authorization.deviceId,
         authorization.credentialVersion,
@@ -312,14 +319,14 @@ export class PosCashRepository {
     );
     const opened = shift.rows[0];
     await client.query(
-      `INSERT INTO tenant.cash_ledger_entry
-         (business_id,branch_id,register_id,shift_id,sequence,entry_type,
+      `INSERT INTO merchant.cash_ledger_entry
+         (merchant_id,location_id,register_id,shift_id,sequence,entry_type,
           amount_minor_units,currency,command_id,business_date,public_data)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,1,'opening_float',$5,$6,
                $7::uuid,$8::date,jsonb_build_object('denominationCount',$9::integer))`,
       [
-        tenantId,
-        dto.branchId,
+        merchantId,
+        dto.locationId,
         dto.registerId,
         opened.id,
         dto.openingFloat.minorUnits,
@@ -329,19 +336,19 @@ export class PosCashRepository {
         dto.denominations.length,
       ],
     );
-    await client.query(`UPDATE tenant.cash_shift SET ledger_sequence=1 WHERE id=$1::uuid`, [
+    await client.query(`UPDATE merchant.cash_shift SET ledger_sequence=1 WHERE id=$1::uuid`, [
       opened.id,
     ]);
     const updated = await client.query<{ version: number }>(
-      `UPDATE tenant.physical_register
+      `UPDATE merchant.physical_register
        SET status='in_use',current_shift_id=$2::uuid,version=version+1
        WHERE id=$1::uuid RETURNING version`,
       [dto.registerId, opened.id],
     );
     const registerResult = {
       id: current.id,
-      tenantId,
-      branchId: current.branchId,
+      merchantId,
+      locationId: current.locationId,
       displayName: current.displayName,
       publicReference: current.publicReference,
       currency: current.currency,
@@ -362,8 +369,8 @@ export class PosCashRepository {
       register: registerResult,
       shift: {
         id: opened.id,
-        tenantId,
-        branchId: dto.branchId,
+        merchantId,
+        locationId: dto.locationId,
         registerId: dto.registerId,
         deviceId: authorization.deviceId,
         deviceCredentialVersion: authorization.credentialVersion,
@@ -393,7 +400,7 @@ export class PosCashRepository {
 
   async expectedCash(client: PoolClient, shiftId: string): Promise<ExpectedCash> {
     const shift = await client.query<{ currency: string; version: number }>(
-      `SELECT currency,version FROM tenant.cash_shift WHERE id=$1::uuid`,
+      `SELECT currency,version FROM merchant.cash_shift WHERE id=$1::uuid`,
       [shiftId],
     );
     if (!shift.rows[0]) throw new Error('SHIFT_NOT_FOUND');
@@ -407,7 +414,7 @@ export class PosCashRepository {
       `SELECT sequence::text,entry_type AS type,amount_minor_units::text AS "amountMinorUnits",
               cash_received_minor_units::text AS received,
               change_given_minor_units::text AS change
-       FROM tenant.cash_ledger_entry WHERE shift_id=$1::uuid ORDER BY sequence`,
+       FROM merchant.cash_ledger_entry WHERE shift_id=$1::uuid ORDER BY sequence`,
       [shiftId],
     );
     return calculateExpectedCash(
@@ -425,7 +432,7 @@ export class PosCashRepository {
 
   async movement(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     authorization: CashAuthorization,
     dto: CashMovementRequest,
   ): Promise<CashMovement> {
@@ -438,15 +445,15 @@ export class PosCashRepository {
     }>(
       `SELECT register_id::text AS "registerId",currency,business_date::text AS "businessDate",
               version,ledger_sequence::text AS sequence
-       FROM tenant.cash_shift
-       WHERE id=$1::uuid AND business_id=$2::uuid AND branch_id=$3::uuid
+       FROM merchant.cash_shift
+       WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
          AND responsible_operator_id=$4::uuid AND device_id=$5::uuid
          AND status='open' AND version=$6
        FOR UPDATE`,
       [
         dto.shiftId,
-        tenantId,
-        dto.branchId,
+        merchantId,
+        dto.locationId,
         authorization.operatorId,
         authorization.deviceId,
         dto.expectedShiftVersion,
@@ -454,7 +461,7 @@ export class PosCashRepository {
     );
     const current = shift.rows[0];
     if (!current || current.currency !== dto.amount.currency) throw new Error('SHIFT_NOT_OPEN');
-    const policy = await this.policy(client, tenantId, dto.branchId, current.currency);
+    const policy = await this.policy(client, merchantId, dto.locationId, current.currency);
     if (!policy.allowedMovementTypes.includes(dto.type)) throw new Error('CASH_POLICY_DENIED');
     if (
       dto.amount.minorUnits >= policy.movementApprovalThreshold.minorUnits &&
@@ -465,8 +472,8 @@ export class PosCashRepository {
     if (dto.approvalId) {
       if (!dto.actionFingerprint) throw new Error('APPROVAL_FINGERPRINT_REQUIRED');
       await this.consumeApproval(client, dto.approvalId, {
-        tenantId,
-        branchId: dto.branchId,
+        merchantId,
+        locationId: dto.locationId,
         permission: `cash.movement.${dto.type}`,
         fingerprint: dto.actionFingerprint,
         commandId: dto.commandId,
@@ -480,14 +487,14 @@ export class PosCashRepository {
     }
     const sequence = Number(current.sequence) + 1;
     const entry = await client.query<{ id: string; occurredAt: string }>(
-      `INSERT INTO tenant.cash_ledger_entry
-         (business_id,branch_id,register_id,shift_id,sequence,entry_type,
+      `INSERT INTO merchant.cash_ledger_entry
+         (merchant_id,location_id,register_id,shift_id,sequence,entry_type,
           amount_minor_units,currency,command_id,business_date)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7,$8,$9::uuid,$10::date)
        RETURNING id::text,occurred_at::text AS "occurredAt"`,
       [
-        tenantId,
-        dto.branchId,
+        merchantId,
+        dto.locationId,
         current.registerId,
         dto.shiftId,
         sequence,
@@ -499,15 +506,15 @@ export class PosCashRepository {
       ],
     );
     const movement = await client.query<{ id: string; committedAt: string }>(
-      `INSERT INTO tenant.cash_movement
-         (business_id,branch_id,register_id,shift_id,ledger_entry_id,movement_type,
+      `INSERT INTO merchant.cash_movement
+         (merchant_id,location_id,register_id,shift_id,ledger_entry_id,movement_type,
           amount_minor_units,currency,reason_code,note,operator_id,approval_id,command_id)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7,$8,$9,$10,
                $11::uuid,$12::uuid,$13::uuid)
        RETURNING id::text,committed_at::text AS "committedAt"`,
       [
-        tenantId,
-        dto.branchId,
+        merchantId,
+        dto.locationId,
         current.registerId,
         dto.shiftId,
         entry.rows[0].id,
@@ -522,7 +529,7 @@ export class PosCashRepository {
       ],
     );
     await client.query(
-      `UPDATE tenant.cash_shift
+      `UPDATE merchant.cash_shift
        SET ledger_sequence=$2,version=version+1
        WHERE id=$1::uuid`,
       [dto.shiftId, sequence],
@@ -539,8 +546,8 @@ export class PosCashRepository {
       businessDate: current.businessDate,
       ledgerEntry: {
         id: entry.rows[0].id,
-        tenantId,
-        branchId: dto.branchId,
+        merchantId,
+        locationId: dto.locationId,
         registerId: current.registerId,
         shiftId: dto.shiftId,
         sequence,
@@ -559,7 +566,7 @@ export class PosCashRepository {
 
   async submitCount(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     authorization: CashAuthorization,
     dto: SubmitBlindCountRequest,
   ) {
@@ -570,16 +577,16 @@ export class PosCashRepository {
       version: number;
     }>(
       `SELECT register_id::text AS "registerId",currency,ledger_sequence::text AS sequence,version
-       FROM tenant.cash_shift
-       WHERE id=$1::uuid AND business_id=$2::uuid AND branch_id=$3::uuid
+       FROM merchant.cash_shift
+       WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
          AND responsible_operator_id=$4::uuid AND device_id=$5::uuid
          AND status IN ('open','suspended','counting','reconciliation_required')
          AND version=$6 AND ledger_sequence=$7
        FOR UPDATE`,
       [
         dto.shiftId,
-        tenantId,
-        dto.branchId,
+        merchantId,
+        dto.locationId,
         authorization.operatorId,
         authorization.deviceId,
         dto.expectedShiftVersion,
@@ -589,13 +596,13 @@ export class PosCashRepository {
     const current = shift.rows[0];
     if (!current || current.currency !== dto.countedCash.currency) throw new Error('STALE_COUNT');
     const prior = await client.query<{ attempts: string }>(
-      `SELECT count(*)::text AS attempts FROM tenant.cash_count_attempt WHERE shift_id=$1::uuid`,
+      `SELECT count(*)::text AS attempts FROM merchant.cash_count_attempt WHERE shift_id=$1::uuid`,
       [dto.shiftId],
     );
     const attempt = Number(prior.rows[0].attempts) + 1;
     if (attempt > 10) throw new Error('RECOUNT_LIMIT');
     const expected = await this.expectedCash(client, dto.shiftId);
-    const policy = await this.policy(client, tenantId, dto.branchId, current.currency);
+    const policy = await this.policy(client, merchantId, dto.locationId, current.currency);
     if (policy.version === 'default-deny') throw new Error('CASH_POLICY_DENIED');
     const variance = calculateVariance(
       expected.expectedDrawerCash.minorUnits,
@@ -611,14 +618,14 @@ export class PosCashRepository {
           ? 'approval_required'
           : 'variance_calculated';
     const count = await client.query<{ id: string; submittedAt: string }>(
-      `INSERT INTO tenant.cash_count_attempt
-         (business_id,branch_id,register_id,shift_id,attempt_number,state,
+      `INSERT INTO merchant.cash_count_attempt
+         (merchant_id,location_id,register_id,shift_id,attempt_number,state,
           counted_minor_units,currency,denominations,operator_id,ledger_sequence,note,command_id)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7,$8,$9,$10::uuid,$11,$12,$13::uuid)
        RETURNING id::text,submitted_at::text AS "submittedAt"`,
       [
-        tenantId,
-        dto.branchId,
+        merchantId,
+        dto.locationId,
         current.registerId,
         dto.shiftId,
         attempt,
@@ -633,13 +640,13 @@ export class PosCashRepository {
       ],
     );
     await client.query(
-      `UPDATE tenant.cash_shift
+      `UPDATE merchant.cash_shift
        SET status='reconciliation_required',version=version+1
        WHERE id=$1::uuid`,
       [dto.shiftId],
     );
     await client.query(
-      `UPDATE tenant.physical_register
+      `UPDATE merchant.physical_register
        SET status='reconciliation_required',version=version+1
        WHERE id=$1::uuid`,
       [current.registerId],
@@ -648,8 +655,8 @@ export class PosCashRepository {
       ? createHash('sha256')
           .update(
             [
-              tenantId,
-              dto.branchId,
+              merchantId,
+              dto.locationId,
               dto.shiftId,
               count.rows[0].id,
               dto.countedCash.minorUnits,
@@ -677,30 +684,30 @@ export class PosCashRepository {
 
   async requestRecount(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     authorization: CashAuthorization,
     dto: RecountRequest,
   ): Promise<CashShift> {
     const prior = await client.query<{ attempts: string }>(
       `SELECT count(*)::text AS attempts
-       FROM tenant.cash_count_attempt
+       FROM merchant.cash_count_attempt
        WHERE id=$1::uuid AND shift_id=$2::uuid
-         AND business_id=$3::uuid AND branch_id=$4::uuid`,
-      [dto.priorCountAttemptId, dto.shiftId, tenantId, dto.branchId],
+         AND merchant_id=$3::uuid AND location_id=$4::uuid`,
+      [dto.priorCountAttemptId, dto.shiftId, merchantId, dto.locationId],
     );
     if (Number(prior.rows[0].attempts) !== 1) throw new Error('COUNT_NOT_FOUND');
     const { rows } = await client.query<CashShift>(
-      `UPDATE tenant.cash_shift
+      `UPDATE merchant.cash_shift
        SET status='counting',version=version+1
-       WHERE id=$1::uuid AND business_id=$2::uuid AND branch_id=$3::uuid
+       WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
          AND responsible_operator_id=$4::uuid AND device_id=$5::uuid
          AND version=$6 AND status='reconciliation_required'
          AND (
-           SELECT count(*) FROM tenant.cash_count_attempt
+           SELECT count(*) FROM merchant.cash_count_attempt
            WHERE shift_id=$1::uuid
          )<10
-       RETURNING id::text,business_id::text AS "tenantId",
-                 branch_id::text AS "branchId",register_id::text AS "registerId",
+       RETURNING id::text,merchant_id::text AS "merchantId",
+                 location_id::text AS "locationId",register_id::text AS "registerId",
                  device_id::text AS "deviceId",
                  device_credential_version AS "deviceCredentialVersion",
                  opening_operator_id::text AS "openingOperatorId",
@@ -712,8 +719,8 @@ export class PosCashRepository {
                  closed_at::text AS "closedAt",ledger_sequence AS "ledgerSequence",version`,
       [
         dto.shiftId,
-        tenantId,
-        dto.branchId,
+        merchantId,
+        dto.locationId,
         authorization.operatorId,
         authorization.deviceId,
         dto.expectedShiftVersion,
@@ -721,7 +728,7 @@ export class PosCashRepository {
     );
     if (!rows[0]) throw new Error('RECOUNT_NOT_AVAILABLE');
     await client.query(
-      `UPDATE tenant.physical_register
+      `UPDATE merchant.physical_register
        SET status='counting',version=version+1
        WHERE id=$1::uuid`,
       [rows[0].registerId],
@@ -731,7 +738,7 @@ export class PosCashRepository {
 
   async resolveVariance(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     authorization: CashAuthorization,
     dto: ResolveCashVarianceRequest,
   ) {
@@ -743,18 +750,18 @@ export class PosCashRepository {
     }>(
       `SELECT c.ledger_sequence::text AS "ledgerSequence",c.state,
               c.counted_minor_units::text AS counted,c.currency
-       FROM tenant.cash_count_attempt c
-       JOIN tenant.cash_shift s ON s.id=c.shift_id
-       WHERE c.id=$1::uuid AND c.shift_id=$2::uuid AND c.business_id=$3::uuid
-         AND c.branch_id=$4::uuid AND s.version=$5
+       FROM merchant.cash_count_attempt c
+       JOIN merchant.cash_shift s ON s.id=c.shift_id
+       WHERE c.id=$1::uuid AND c.shift_id=$2::uuid AND c.merchant_id=$3::uuid
+         AND c.location_id=$4::uuid AND s.version=$5
          AND s.responsible_operator_id=$6::uuid AND s.device_id=$7::uuid
          AND s.operator_session_id=$8::uuid
        FOR UPDATE OF s`,
       [
         dto.countAttemptId,
         dto.shiftId,
-        tenantId,
-        dto.branchId,
+        merchantId,
+        dto.locationId,
         dto.expectedShiftVersion,
         authorization.operatorId,
         authorization.deviceId,
@@ -770,8 +777,8 @@ export class PosCashRepository {
       const expectedFingerprint = createHash('sha256')
         .update(
           [
-            tenantId,
-            dto.branchId,
+            merchantId,
+            dto.locationId,
             dto.shiftId,
             dto.countAttemptId,
             Number(row.rows[0].counted),
@@ -783,22 +790,22 @@ export class PosCashRepository {
         throw new Error('APPROVAL_FINGERPRINT_MISMATCH');
       }
       await this.consumeApproval(client, dto.approvalId, {
-        tenantId,
-        branchId: dto.branchId,
+        merchantId,
+        locationId: dto.locationId,
         permission: 'cash.variance.approve',
         fingerprint: dto.approvalFingerprint,
         commandId: dto.commandId,
       });
     }
     const resolution = await client.query<{ id: string; resolvedAt: string }>(
-      `INSERT INTO tenant.cash_variance_resolution
-         (business_id,branch_id,shift_id,count_attempt_id,reason,note,approval_id,
+      `INSERT INTO merchant.cash_variance_resolution
+         (merchant_id,location_id,shift_id,count_attempt_id,reason,note,approval_id,
           ledger_sequence,command_id)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7::uuid,$8,$9::uuid)
        RETURNING id::text,resolved_at::text AS "resolvedAt"`,
       [
-        tenantId,
-        dto.branchId,
+        merchantId,
+        dto.locationId,
         dto.shiftId,
         dto.countAttemptId,
         dto.reason,
@@ -823,7 +830,7 @@ export class PosCashRepository {
 
   async reconcile(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     authorization: CashAuthorization,
     dto: ReconcileCashShiftRequest,
   ) {
@@ -848,11 +855,11 @@ export class PosCashRepository {
               c.submitted_at::text AS "submittedAt",r.id::text AS "resolutionId",
               r.reason AS "resolutionReason",r.note AS "resolutionNote",
               r.approval_id::text AS "approvalId",r.resolved_at::text AS "resolvedAt"
-       FROM tenant.cash_count_attempt c
-       JOIN tenant.cash_shift s ON s.id=c.shift_id
-       LEFT JOIN tenant.cash_variance_resolution r ON r.count_attempt_id=c.id
-       WHERE c.id=$1::uuid AND c.shift_id=$2::uuid AND c.business_id=$3::uuid
-         AND c.branch_id=$4::uuid AND s.version=$5
+       FROM merchant.cash_count_attempt c
+       JOIN merchant.cash_shift s ON s.id=c.shift_id
+       LEFT JOIN merchant.cash_variance_resolution r ON r.count_attempt_id=c.id
+       WHERE c.id=$1::uuid AND c.shift_id=$2::uuid AND c.merchant_id=$3::uuid
+         AND c.location_id=$4::uuid AND s.version=$5
          AND s.status='reconciliation_required' AND s.ledger_sequence=c.ledger_sequence
          AND s.responsible_operator_id=$6::uuid AND s.device_id=$7::uuid
          AND s.operator_session_id=$8::uuid
@@ -860,8 +867,8 @@ export class PosCashRepository {
       [
         dto.countAttemptId,
         dto.shiftId,
-        tenantId,
-        dto.branchId,
+        merchantId,
+        dto.locationId,
         dto.expectedShiftVersion,
         authorization.operatorId,
         authorization.deviceId,
@@ -871,7 +878,7 @@ export class PosCashRepository {
     const selected = count.rows[0];
     if (!selected) throw new Error('STALE_COUNT');
     const expected = await this.expectedCash(client, dto.shiftId);
-    const policy = await this.policy(client, tenantId, dto.branchId, selected.currency);
+    const policy = await this.policy(client, merchantId, dto.locationId, selected.currency);
     if (policy.version === 'default-deny') throw new Error('CASH_POLICY_DENIED');
     const variance = calculateVariance(
       expected.expectedDrawerCash.minorUnits,
@@ -898,8 +905,8 @@ export class PosCashRepository {
       ? createHash('sha256')
           .update(
             [
-              tenantId,
-              dto.branchId,
+              merchantId,
+              dto.locationId,
               dto.shiftId,
               selected.id,
               expected.expectedDrawerCash.minorUnits,
@@ -910,15 +917,15 @@ export class PosCashRepository {
           .digest('hex')
       : null;
     const reconciliation = await client.query<{ id: string; reconciledAt: string }>(
-      `INSERT INTO tenant.cash_reconciliation
-         (business_id,branch_id,shift_id,count_attempt_id,resolution_id,
+      `INSERT INTO merchant.cash_reconciliation
+         (merchant_id,location_id,shift_id,count_attempt_id,resolution_id,
           expected_minor_units,counted_minor_units,variance_minor_units,
           tolerance_minor_units,currency,outcome,ledger_sequence,command_id)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7,$8,$9,$10,$11,$12,$13::uuid)
        RETURNING id::text,reconciled_at::text AS "reconciledAt"`,
       [
-        tenantId,
-        dto.branchId,
+        merchantId,
+        dto.locationId,
         dto.shiftId,
         dto.countAttemptId,
         dto.resolutionId,
@@ -933,7 +940,7 @@ export class PosCashRepository {
       ],
     );
     await client.query(
-      `UPDATE tenant.cash_shift SET status='closing',version=version+1 WHERE id=$1::uuid`,
+      `UPDATE merchant.cash_shift SET status='closing',version=version+1 WHERE id=$1::uuid`,
       [dto.shiftId],
     );
     const resolution = selected.resolutionId
@@ -976,14 +983,14 @@ export class PosCashRepository {
 
   async close(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     authorization: CashAuthorization,
     dto: ShiftCloseRequest,
     correlationId: string,
   ): Promise<ShiftCloseResult> {
     const shift = await client.query<{
       id: string;
-      branchId: string;
+      locationId: string;
       registerId: string;
       deviceId: string;
       deviceCredentialVersion: number;
@@ -998,7 +1005,7 @@ export class PosCashRepository {
       ledgerSequence: string;
       version: number;
     }>(
-      `SELECT id::text,branch_id::text AS "branchId",register_id::text AS "registerId",
+      `SELECT id::text,location_id::text AS "locationId",register_id::text AS "registerId",
               device_id::text AS "deviceId",device_credential_version AS "deviceCredentialVersion",
               opening_operator_id::text AS "openingOperatorId",
               responsible_operator_id::text AS "responsibleOperatorId",
@@ -1006,16 +1013,16 @@ export class PosCashRepository {
               business_date::text AS "businessDate",opening_command_id::text AS "openingCommandId",
               opening_float_minor_units::text AS "openingFloat",
               opened_at::text AS "openedAt",ledger_sequence::text AS "ledgerSequence",version
-       FROM tenant.cash_shift
-       WHERE id=$1::uuid AND business_id=$2::uuid AND branch_id=$3::uuid
+       FROM merchant.cash_shift
+       WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
          AND status='closing' AND version=$4
          AND responsible_operator_id=$5::uuid AND device_id=$6::uuid
          AND operator_session_id=$7::uuid
        FOR UPDATE`,
       [
         dto.shiftId,
-        tenantId,
-        dto.branchId,
+        merchantId,
+        dto.locationId,
         dto.expectedShiftVersion,
         authorization.operatorId,
         authorization.deviceId,
@@ -1024,7 +1031,7 @@ export class PosCashRepository {
     );
     const current = shift.rows[0];
     if (!current) throw new Error('SHIFT_NOT_CLOSABLE');
-    const policy = await this.policy(client, tenantId, dto.branchId, current.currency);
+    const policy = await this.policy(client, merchantId, dto.locationId, current.currency);
     if (policy.version === 'default-deny') throw new Error('CASH_POLICY_DENIED');
     const reconciliation = await client.query<{
       payload: StoredReconciliationHeader;
@@ -1033,7 +1040,7 @@ export class PosCashRepository {
          'id',r.id::text,'shiftId',r.shift_id::text,'countAttemptId',r.count_attempt_id::text,
          'outcome',r.outcome,'ledgerSequence',r.ledger_sequence,
          'reconciledAt',r.reconciled_at::text) AS payload
-       FROM tenant.cash_reconciliation r
+       FROM merchant.cash_reconciliation r
        WHERE r.id=$1::uuid AND r.shift_id=$2::uuid AND r.count_attempt_id=$3::uuid
          AND r.ledger_sequence=$4`,
       [dto.reconciliationId, dto.shiftId, dto.countAttemptId, current.ledgerSequence],
@@ -1049,11 +1056,11 @@ export class PosCashRepository {
       submittedAt: string;
     }>(
       `SELECT counted_minor_units::text AS counted,
-              (SELECT count(*)::text FROM tenant.cash_count_attempt
+              (SELECT count(*)::text FROM merchant.cash_count_attempt
                WHERE shift_id=$1::uuid) AS attempts,
               attempt_number AS "attemptNumber",denominations,
               operator_id::text AS "operatorId",submitted_at::text AS "submittedAt"
-       FROM tenant.cash_count_attempt
+       FROM merchant.cash_count_attempt
        WHERE id=$2::uuid AND shift_id=$1::uuid
          AND ledger_sequence=$3`,
       [dto.shiftId, dto.countAttemptId, current.ledgerSequence],
@@ -1066,8 +1073,8 @@ export class PosCashRepository {
       ? createHash('sha256')
           .update(
             [
-              tenantId,
-              dto.branchId,
+              merchantId,
+              dto.locationId,
               dto.shiftId,
               dto.countAttemptId,
               expected.expectedDrawerCash.minorUnits,
@@ -1085,8 +1092,8 @@ export class PosCashRepository {
         throw new Error('APPROVAL_FINGERPRINT_MISMATCH');
       }
       await this.consumeApproval(client, dto.approvalId, {
-        tenantId,
-        branchId: dto.branchId,
+        merchantId,
+        locationId: dto.locationId,
         permission: 'cash.shift.close',
         fingerprint: dto.approvalFingerprint,
         commandId: dto.commandId,
@@ -1102,7 +1109,7 @@ export class PosCashRepository {
       createdAt: string;
       version: number;
     }>(
-      `UPDATE tenant.physical_register
+      `UPDATE merchant.physical_register
        SET status=CASE WHEN assigned_device_id IS NULL THEN 'available' ELSE 'assigned' END,
            current_shift_id=NULL,version=version+1
        WHERE id=$1::uuid
@@ -1117,8 +1124,8 @@ export class PosCashRepository {
     const shiftSummary: CashShiftSummary = {
       shift: {
         id: current.id,
-        tenantId,
-        branchId: current.branchId,
+        merchantId,
+        locationId: current.locationId,
         registerId: current.registerId,
         deviceId: current.deviceId,
         deviceCredentialVersion: current.deviceCredentialVersion,
@@ -1137,8 +1144,8 @@ export class PosCashRepository {
       },
       register: {
         id: current.registerId,
-        tenantId,
-        branchId: current.branchId,
+        merchantId,
+        locationId: current.locationId,
         displayName: register.rows[0].displayName,
         publicReference: register.rows[0].publicReference,
         currency: current.currency,
@@ -1165,12 +1172,12 @@ export class PosCashRepository {
       handoffCount: 0,
     };
     await client.query(
-      `INSERT INTO tenant.cash_shift_close
-         (business_id,branch_id,register_id,shift_id,reconciliation_id,summary,command_id,closed_at)
+      `INSERT INTO merchant.cash_shift_close
+         (merchant_id,location_id,register_id,shift_id,reconciliation_id,summary,command_id,closed_at)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7::uuid,$8::timestamptz)`,
       [
-        tenantId,
-        dto.branchId,
+        merchantId,
+        dto.locationId,
         current.registerId,
         dto.shiftId,
         dto.reconciliationId,
@@ -1180,7 +1187,7 @@ export class PosCashRepository {
       ],
     );
     await client.query(
-      `UPDATE tenant.cash_shift
+      `UPDATE merchant.cash_shift
        SET status='closed',closed_at=$2::timestamptz,version=version+1
        WHERE id=$1::uuid`,
       [dto.shiftId, closedAt],
@@ -1220,33 +1227,33 @@ export class PosCashRepository {
 
   async center(
     userId: string,
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     operatorSessionId: string,
     deviceId: string,
     operatorId: string,
   ): Promise<CashCenterSnapshot> {
-    return this.pg.runWithTenant(
-      tenantId,
+    return this.pg.runWithMerchant(
+      merchantId,
       userId,
       async (client) => {
         const registers = await client.query<PhysicalRegisterRow>(
-          `SELECT id::text,business_id::text AS "tenantId",branch_id::text AS "branchId",
+          `SELECT id::text,merchant_id::text AS "merchantId",location_id::text AS "locationId",
                   display_name AS "displayName",public_reference AS "publicReference",
                   currency,active,assignment_policy AS "assignmentPolicy",
                   assigned_device_id::text AS "assignedDeviceId",
                   allowed_device_classes AS "allowedDeviceClasses",
                   current_shift_id::text AS "currentShiftId",status,version,
                   created_at::text AS "createdAt",archived_at::text AS "archivedAt"
-           FROM tenant.physical_register
-           WHERE business_id=$1::uuid AND branch_id=$2::uuid AND active
+           FROM merchant.physical_register
+           WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND active
              AND archived_at IS NULL
              AND (assignment_policy='operator_selects' OR assigned_device_id=$3::uuid)
            ORDER BY display_name LIMIT 100`,
-          [tenantId, branchId, deviceId],
+          [merchantId, locationId, deviceId],
         );
         const current = await client.query<CashShift>(
-          `SELECT id::text,business_id::text AS "tenantId",branch_id::text AS "branchId",
+          `SELECT id::text,merchant_id::text AS "merchantId",location_id::text AS "locationId",
                   register_id::text AS "registerId",device_id::text AS "deviceId",
                   device_credential_version AS "deviceCredentialVersion",
                   opening_operator_id::text AS "openingOperatorId",
@@ -1256,12 +1263,12 @@ export class PosCashRepository {
                   opening_command_id::text AS "openingCommandId",
                   opened_at::text AS "openedAt",suspended_at::text AS "suspendedAt",
                   closed_at::text AS "closedAt",ledger_sequence AS "ledgerSequence",version
-           FROM tenant.cash_shift
-           WHERE business_id=$1::uuid AND branch_id=$2::uuid
+           FROM merchant.cash_shift
+           WHERE merchant_id=$1::uuid AND location_id=$2::uuid
              AND device_id=$4::uuid AND status<>'closed'
              AND responsible_operator_id=$5::uuid
            ORDER BY opened_at DESC LIMIT 1`,
-          [tenantId, branchId, operatorSessionId, deviceId, operatorId],
+          [merchantId, locationId, operatorSessionId, deviceId, operatorId],
         );
         const mappedRegisters = registers.rows.map((row) => ({
           ...row,
@@ -1276,12 +1283,12 @@ export class PosCashRepository {
         const closeSummaryResult = !shift
           ? await client.query<{ summary: CashShiftSummary }>(
               `SELECT c.summary
-               FROM tenant.cash_shift_close c
-               JOIN tenant.cash_shift s ON s.id=c.shift_id
-               WHERE c.business_id=$1::uuid AND c.branch_id=$2::uuid
+               FROM merchant.cash_shift_close c
+               JOIN merchant.cash_shift s ON s.id=c.shift_id
+               WHERE c.merchant_id=$1::uuid AND c.location_id=$2::uuid
                  AND s.device_id=$3::uuid AND s.responsible_operator_id=$4::uuid
                ORDER BY c.closed_at DESC LIMIT 1`,
-              [tenantId, branchId, deviceId, operatorId],
+              [merchantId, locationId, deviceId, operatorId],
             )
           : null;
         const closeSummary = closeSummaryResult?.rows[0]?.summary ?? null;
@@ -1289,7 +1296,7 @@ export class PosCashRepository {
           `SELECT current_date::text AS "businessDate"`,
         );
         const currency = shift?.currency ?? mappedRegisters[0]?.currency ?? 'MXN';
-        const policy = await this.policy(client, tenantId, branchId, currency);
+        const policy = await this.policy(client, merchantId, locationId, currency);
         const policyUsable =
           policy.version !== 'default-deny' && Date.parse(policy.expiresAt) > Date.now();
         const expected = shift ? await this.expectedCash(client, shift.id) : null;
@@ -1313,7 +1320,7 @@ export class PosCashRepository {
                       operator_id::text AS "operatorId",
                       ledger_sequence::text AS "ledgerSequence",
                       submitted_at::text AS "submittedAt"
-               FROM tenant.cash_count_attempt
+               FROM merchant.cash_count_attempt
                WHERE shift_id=$1::uuid
                ORDER BY attempt_number DESC LIMIT 1`,
               [shift.id],
@@ -1335,8 +1342,8 @@ export class PosCashRepository {
             ? createHash('sha256')
                 .update(
                   [
-                    tenantId,
-                    branchId,
+                    merchantId,
+                    locationId,
                     shift.id,
                     latestCountRow.id,
                     Number(latestCountRow.counted),
@@ -1372,7 +1379,7 @@ export class PosCashRepository {
                       count_attempt_id::text AS "countAttemptId",outcome,
                       ledger_sequence AS "ledgerSequence",
                       reconciled_at::text AS "reconciledAt"
-               FROM tenant.cash_reconciliation
+               FROM merchant.cash_reconciliation
                WHERE shift_id=$1::uuid
                ORDER BY reconciled_at DESC LIMIT 1`,
               [shift.id],
@@ -1391,7 +1398,7 @@ export class PosCashRepository {
                 `SELECT id::text,reason,note,approval_id::text AS "approvalId",
                         ledger_sequence::text AS "ledgerSequence",
                         resolved_at::text AS "resolvedAt"
-                 FROM tenant.cash_variance_resolution
+                 FROM merchant.cash_variance_resolution
                  WHERE shift_id=$1::uuid AND count_attempt_id=$2::uuid
                  LIMIT 1`,
                 [shift.id, latestCountRow.id],
@@ -1433,8 +1440,8 @@ export class PosCashRepository {
                     ? createHash('sha256')
                         .update(
                           [
-                            tenantId,
-                            branchId,
+                            merchantId,
+                            locationId,
                             shift.id,
                             latestCount.count.id,
                             expected.expectedDrawerCash.minorUnits,
@@ -1486,13 +1493,13 @@ export class PosCashRepository {
           summary: closeSummary,
         };
       },
-      branchId,
+      locationId,
     );
   }
 
   async transition(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     authorization: CashAuthorization,
     dto: ShiftTransitionRequest,
     target: 'suspended' | 'open',
@@ -1509,7 +1516,7 @@ export class PosCashRepository {
             'closing',
           ];
     const { rows } = await client.query<CashShift>(
-      `UPDATE tenant.cash_shift
+      `UPDATE merchant.cash_shift
        SET status=CASE
              WHEN $7='open' AND status IN ('counting','reconciliation_required','closing')
                THEN status
@@ -1518,10 +1525,10 @@ export class PosCashRepository {
            version=version+1,
            operator_session_id=CASE WHEN $7='open' THEN $9::uuid ELSE operator_session_id END,
            suspended_at=CASE WHEN $7='suspended' THEN now() ELSE NULL END
-       WHERE id=$1::uuid AND business_id=$2::uuid AND branch_id=$3::uuid
+       WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
          AND responsible_operator_id=$4::uuid AND device_id=$5::uuid
          AND version=$6 AND status=ANY($8::text[])
-       RETURNING id::text,business_id::text AS "tenantId",branch_id::text AS "branchId",
+       RETURNING id::text,merchant_id::text AS "merchantId",location_id::text AS "locationId",
                  register_id::text AS "registerId",device_id::text AS "deviceId",
                  device_credential_version AS "deviceCredentialVersion",
                  opening_operator_id::text AS "openingOperatorId",
@@ -1533,8 +1540,8 @@ export class PosCashRepository {
                  closed_at::text AS "closedAt",ledger_sequence AS "ledgerSequence",version`,
       [
         dto.shiftId,
-        tenantId,
-        dto.branchId,
+        merchantId,
+        dto.locationId,
         authorization.operatorId,
         authorization.deviceId,
         dto.expectedShiftVersion,
@@ -1545,7 +1552,7 @@ export class PosCashRepository {
     );
     if (!rows[0]) throw new Error('INVALID_SHIFT_TRANSITION');
     await client.query(
-      `UPDATE tenant.physical_register SET status=$2,version=version+1
+      `UPDATE merchant.physical_register SET status=$2,version=version+1
        WHERE id=$1::uuid`,
       [
         rows[0].registerId,
@@ -1563,51 +1570,67 @@ export class PosCashRepository {
 
   async incomingPinRecord(
     lookupHash: string,
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     actingOperatorSessionId: string,
+    actingUserId: string,
   ) {
-    const { rows } = await this.pg.worker.query<{
-      staffId: string;
-      userId: string;
-      salt: string | null;
-      hash: string | null;
-      lockedUntil: Date | null;
-    }>(
-      `SELECT s.id::text AS "staffId",s.user_id::text AS "userId",
+    return this.pg.runWithMerchant(
+      merchantId,
+      actingUserId,
+      async (client) => {
+        const { rows } = await client.query<{
+          staffId: string;
+          userId: string;
+          salt: string | null;
+          hash: string | null;
+          lockedUntil: Date | null;
+        }>(
+          `SELECT s.id::text AS "staffId",s.user_id::text AS "userId",
               s.operator_pin_salt AS salt,s.operator_pin_hash AS hash,
-              s.pin_locked_until AS "lockedUntil"
-       FROM tenant.staff s
+              d.pin_locked_until AS "lockedUntil"
+       FROM merchant.staff s
        JOIN runtime.operator_session acting ON acting.id=$4::uuid
-         AND acting.business_id=s.business_id AND acting.branch_id=$3::uuid
-       JOIN umi.user_role ur ON ur.user_id=s.user_id
-         AND (ur.business_id=s.business_id OR ur.business_id IS NULL)
-         AND (ur.branch_id IS NULL OR ur.branch_id=$3::uuid)
-       JOIN umi.role_permission rp ON rp.role_id=ur.role_id
+         AND acting.merchant_id=s.merchant_id AND acting.location_id=$3::uuid
+       JOIN merchant.device d ON d.id=acting.device_id AND d.status='active'
+       JOIN umi.role_permission rp ON rp.role_id=s.role_id
        JOIN umi.permission p ON p.id=rp.permission_id AND p.key='cash.register.use'
-       WHERE s.operator_pin_lookup_hash=$1 AND s.business_id=$2::uuid
-         AND (s.branch_id IS NULL OR s.branch_id=$3::uuid) AND s.status='active'
+       WHERE s.operator_pin_lookup=$1 AND s.merchant_id=$2::uuid
+         AND (s.location_id IS NULL OR s.location_id=$3::uuid) AND s.status='active'
          AND acting.user_id<>s.user_id AND acting.state='active'
        LIMIT 1`,
-      [lookupHash, tenantId, branchId, actingOperatorSessionId],
+          [lookupHash, merchantId, locationId, actingOperatorSessionId],
+        );
+        return rows[0] ?? null;
+      },
+      locationId,
     );
-    return rows[0] ?? null;
   }
 
-  async recordPinFailure(staffId: string): Promise<void> {
-    await this.pg.worker.query(
-      `UPDATE tenant.staff
+  async recordPinFailure(
+    deviceId: string,
+    merchantId: string,
+    locationId: string,
+    userId: string,
+  ): Promise<void> {
+    await this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      async (client) => client.query(
+        `UPDATE merchant.device
        SET pin_failed_attempts=least(pin_failed_attempts+1,10),
            pin_locked_until=CASE WHEN pin_failed_attempts+1>=5
              THEN now()+interval '15 minutes' ELSE pin_locked_until END
        WHERE id=$1::uuid`,
-      [staffId],
+        [deviceId],
+      ),
+      locationId,
     );
   }
 
   async handoff(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     authorization: CashAuthorization,
     incoming: { staffId: string; userId: string },
     dto: ShiftHandoffRequest,
@@ -1620,15 +1643,15 @@ export class PosCashRepository {
     }>(
       `SELECT register_id::text AS "registerId",currency,
               ledger_sequence::text AS sequence,status
-       FROM tenant.cash_shift
-       WHERE id=$1::uuid AND business_id=$2::uuid AND branch_id=$3::uuid
+       FROM merchant.cash_shift
+       WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
          AND responsible_operator_id=$4::uuid AND device_id=$5::uuid
          AND version=$6 AND status IN ('open','suspended','reconciliation_required')
        FOR UPDATE`,
       [
         dto.shiftId,
-        tenantId,
-        dto.branchId,
+        merchantId,
+        dto.locationId,
         authorization.operatorId,
         authorization.deviceId,
         dto.expectedShiftVersion,
@@ -1636,7 +1659,7 @@ export class PosCashRepository {
     );
     const current = shift.rows[0];
     if (!current) throw new Error('SHIFT_NOT_HANDOFF_READY');
-    const policy = await this.policy(client, tenantId, dto.branchId, current.currency);
+    const policy = await this.policy(client, merchantId, dto.locationId, current.currency);
     if (!policy.handoffAllowed) {
       throw new Error('CASH_HANDOFF_BLOCKED');
     }
@@ -1647,8 +1670,8 @@ export class PosCashRepository {
       }>(
         `SELECT c.counted_minor_units::text AS counted,
                 r.id::text AS "resolutionId"
-         FROM tenant.cash_count_attempt c
-         LEFT JOIN tenant.cash_variance_resolution r ON r.count_attempt_id=c.id
+         FROM merchant.cash_count_attempt c
+         LEFT JOIN merchant.cash_variance_resolution r ON r.count_attempt_id=c.id
          WHERE c.shift_id=$1::uuid AND c.ledger_sequence=$2
          ORDER BY c.attempt_number DESC LIMIT 1`,
         [dto.shiftId, current.sequence],
@@ -1669,14 +1692,14 @@ export class PosCashRepository {
       [authorization.operatorSessionId],
     );
     const row = await client.query<{ id: string; completedAt: string }>(
-      `INSERT INTO tenant.cash_shift_handoff
-         (business_id,branch_id,shift_id,outgoing_operator_id,incoming_operator_id,
+      `INSERT INTO merchant.cash_shift_handoff
+         (merchant_id,location_id,shift_id,outgoing_operator_id,incoming_operator_id,
           expected_cash_snapshot,ledger_sequence,command_id)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7,$8::uuid)
        RETURNING id::text,completed_at::text AS "completedAt"`,
       [
-        tenantId,
-        dto.branchId,
+        merchantId,
+        dto.locationId,
         dto.shiftId,
         authorization.operatorId,
         incoming.userId,
@@ -1686,21 +1709,21 @@ export class PosCashRepository {
       ],
     );
     await client.query(
-      `UPDATE tenant.cash_shift
+      `UPDATE merchant.cash_shift
        SET responsible_operator_id=$2::uuid,status='handoff_pending',
            suspended_at=now(),version=version+1
        WHERE id=$1::uuid`,
       [dto.shiftId, incoming.userId],
     );
     await client.query(
-      `UPDATE tenant.physical_register
+      `UPDATE merchant.physical_register
        SET status='suspended',version=version+1
        WHERE id=$1::uuid`,
       [current.registerId],
     );
     await client.query(
-      `UPDATE tenant.staff SET pin_failed_attempts=0,pin_locked_until=NULL WHERE id=$1::uuid`,
-      [incoming.staffId],
+      `UPDATE merchant.device SET pin_failed_attempts=0,pin_locked_until=NULL WHERE id=$1::uuid`,
+      [authorization.deviceId],
     );
     return {
       id: row.rows[0].id,
@@ -1714,39 +1737,39 @@ export class PosCashRepository {
 
   async noSale(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     authorization: CashAuthorization,
     dto: NoSaleDrawerRequest,
     correlationId: string,
   ): Promise<NoSaleDrawerEvent> {
     const shift = await client.query<{ registerId: string; currency: string }>(
       `SELECT register_id::text AS "registerId",currency
-       FROM tenant.cash_shift
-       WHERE id=$1::uuid AND business_id=$2::uuid AND branch_id=$3::uuid
+       FROM merchant.cash_shift
+       WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
          AND responsible_operator_id=$4::uuid AND device_id=$5::uuid AND status='open'
        FOR UPDATE`,
-      [dto.shiftId, tenantId, dto.branchId, authorization.operatorId, authorization.deviceId],
+      [dto.shiftId, merchantId, dto.locationId, authorization.operatorId, authorization.deviceId],
     );
     if (!shift.rows[0]) throw new Error('SHIFT_NOT_OPEN');
-    const policy = await this.policy(client, tenantId, dto.branchId, shift.rows[0].currency);
+    const policy = await this.policy(client, merchantId, dto.locationId, shift.rows[0].currency);
     if (!policy.noSaleDrawerAllowed) throw new Error('NO_SALE_DRAWER_DISABLED');
     const recent = await client.query<{ total: string }>(
       `SELECT count(*)::text AS total
-       FROM tenant.no_sale_drawer_event
+       FROM merchant.no_sale_drawer_event
        WHERE shift_id=$1::uuid AND operator_id=$2::uuid
          AND requested_at>now()-interval '1 minute'`,
       [dto.shiftId, authorization.operatorId],
     );
     if (Number(recent.rows[0].total) >= 3) throw new Error('RATE_LIMITED');
     const { rows } = await client.query<{ id: string; requestedAt: string }>(
-      `INSERT INTO tenant.no_sale_drawer_event
-         (business_id,branch_id,register_id,shift_id,operator_id,reason_code,
+      `INSERT INTO merchant.no_sale_drawer_event
+         (merchant_id,location_id,register_id,shift_id,operator_id,reason_code,
           approval_id,command_id)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7::uuid,$8::uuid)
        RETURNING id::text,requested_at::text AS "requestedAt"`,
       [
-        tenantId,
-        dto.branchId,
+        merchantId,
+        dto.locationId,
         shift.rows[0].registerId,
         dto.shiftId,
         authorization.operatorId,
@@ -1769,8 +1792,8 @@ export class PosCashRepository {
     client: PoolClient,
     approvalId: string,
     input: {
-      tenantId: string;
-      branchId: string;
+      merchantId: string;
+      locationId: string;
       permission: string;
       fingerprint: string;
       commandId: string;
@@ -1779,13 +1802,13 @@ export class PosCashRepository {
     const { rowCount } = await client.query(
       `UPDATE runtime.elevation_grant
        SET consumed_at=now(),consumed_by_command_id=$6::uuid
-       WHERE id=$1::uuid AND business_id=$2::uuid AND branch_id=$3::uuid
+       WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
          AND permission_key=$4 AND command_fingerprint=$5
          AND method='manager_approval' AND expires_at>now() AND consumed_at IS NULL`,
       [
         approvalId,
-        input.tenantId,
-        input.branchId,
+        input.merchantId,
+        input.locationId,
         input.permission,
         input.fingerprint,
         input.commandId,

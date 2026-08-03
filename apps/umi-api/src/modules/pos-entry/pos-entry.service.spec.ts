@@ -45,8 +45,8 @@ describe('PosEntryService', () => {
     await expect(
       service.verifyPin(user, {
         pin: '1234',
-        tenantId: 'tenant',
-        branchId: 'branch',
+        merchantId: 'tenant',
+        locationId: 'branch',
         permission: 'future.action',
       }),
     ).rejects.toMatchObject({ response: { code: 'PIN_LOCKED' } });
@@ -75,8 +75,8 @@ describe('PosEntryService', () => {
       operatorSessionId: '00000000-0000-4000-8000-000000000013',
       managerPin: '3333',
       permission: 'checkout.discount.approve',
-      tenantId: '00000000-0000-4000-8000-000000000014',
-      branchId: '00000000-0000-4000-8000-000000000015',
+      merchantId: '00000000-0000-4000-8000-000000000014',
+      locationId: '00000000-0000-4000-8000-000000000015',
       commandFingerprint: fingerprint,
     });
     expect(grant.commandFingerprint).toBe(fingerprint);

@@ -9,7 +9,7 @@ import {
 } from './tools/product-search';
 
 /**
- * `tenant.product` catalog access for the bot. Rebound from the legacy Supabase
+ * `merchant.product` catalog access for the bot. Rebound from the legacy Supabase
  * RPCs (`search_products_text`/`search_products_by_embedding`, which don't exist
  * canonically) to direct SQL: ILIKE waterfall (ranked in TS) → pgvector cosine
  * fallback (preflight §3/§4). Worker pool (unauthenticated WhatsApp path).
@@ -62,15 +62,15 @@ const VARIANTS = `(
                                         'price', (p.price + m.price_delta) / 100.0)
                      ORDER BY m.name),
            '[]'::jsonb)
-    FROM tenant.product_option_group g
-    JOIN tenant.product_modifier m ON m.option_group_id = g.id
+    FROM merchant.product_option_group g
+    JOIN merchant.product_modifier m ON m.option_group_id = g.id
    WHERE g.product_id = p.id
  ) AS variants`;
 
 const SELECT = `p.id::text, p.name, p.price, p.description,
   pc.name AS category_name, ${VARIANTS}`;
-const FROM = `FROM tenant.product p
-  LEFT JOIN tenant.product_category pc ON pc.id = p.category_id`;
+const FROM = `FROM merchant.product p
+  LEFT JOIN merchant.product_category pc ON pc.id = p.category_id`;
 
 function mapRow(r: ProductRow): ProductRecord {
   return {
@@ -94,7 +94,7 @@ export class ProductsRepository {
    * Two-tier search: ILIKE candidates ranked in TS; on no hits, pgvector cosine
    * (threshold 0.60). Ranking is the behavior-critical TS layer (preserved).
    */
-  async searchByQuery(tenantId: string, query: string, limit = 10): Promise<ProductRecord[]> {
+  async searchByQuery(merchantId: string, query: string, limit = 10): Promise<ProductRecord[]> {
     const tokens = query
       .toLowerCase()
       .split(/\s+/)
@@ -104,9 +104,9 @@ export class ProductsRepository {
     const likePatterns = [`%${query.trim()}%`, ...tokens.map((t) => `%${t}%`)];
 
     const text = await this.pg.tquery<ProductRow>(
-      tenantId,
+      merchantId,
       `SELECT ${SELECT} ${FROM}
-        WHERE p.business_id = $1::uuid AND p.active = true
+        WHERE p.merchant_id = $1::uuid AND p.active = true
           AND (
             p.name ILIKE ANY($2)
             OR COALESCE(p.description,'') ILIKE ANY($2)
@@ -119,15 +119,15 @@ export class ProductsRepository {
             -- jsonb_array_elements from erroring on a non-array is no longer needed.
             OR EXISTS (
               SELECT 1
-                FROM tenant.product_option_group g
-                JOIN tenant.product_modifier m ON m.option_group_id = g.id
+                FROM merchant.product_option_group g
+                JOIN merchant.product_modifier m ON m.option_group_id = g.id
                WHERE g.product_id = p.id AND m.name ILIKE ANY($2)
             )
           )
         LIMIT 250`,
-      [tenantId, likePatterns],
+      [merchantId, likePatterns],
     );
-    // Exclude internal-only categories in BOTH branches, matching browse() /
+    // Exclude internal-only categories in BOTH locations, matching browse() /
     // findNearestCandidates() / categorySuggestions() — otherwise a text or
     // semantic hit could surface internal catalog items to the customer.
     const textMatches = text.rows
@@ -141,14 +141,14 @@ export class ProductsRepository {
     const embedding = await this.voyage.generateEmbedding(query, 'query');
     if (!embedding) return [];
     const sem = await this.pg.tquery<ProductRow>(
-      tenantId,
+      merchantId,
       `SELECT ${SELECT} ${FROM}
         JOIN runtime.product_embedding pe ON pe.product_id = p.id
-        WHERE p.business_id = $1::uuid AND p.active = true
+        WHERE p.merchant_id = $1::uuid AND p.active = true
           AND 1 - (pe.embedding <=> $2::vector) >= 0.60
         ORDER BY pe.embedding <=> $2::vector
         LIMIT $3`,
-      [tenantId, JSON.stringify(embedding), limit],
+      [merchantId, JSON.stringify(embedding), limit],
     );
     return rankProducts(
       sem.rows.map(mapRow).filter((p) => !INTERNAL_ONLY_CATEGORIES.has(p.category ?? '')),
@@ -158,51 +158,51 @@ export class ProductsRepository {
 
   /** Permissive cosine "nearest" candidates (threshold 0.30) for near-miss help. */
   async findNearestCandidates(
-    tenantId: string,
+    merchantId: string,
     query: string,
     limit = 6,
   ): Promise<ProductRecord[]> {
     const embedding = await this.voyage.generateEmbedding(query, 'query');
     if (!embedding) return [];
     const { rows } = await this.pg.tquery<ProductRow>(
-      tenantId,
+      merchantId,
       `SELECT ${SELECT} ${FROM}
         JOIN runtime.product_embedding pe ON pe.product_id = p.id
-        WHERE p.business_id = $1::uuid AND p.active = true
+        WHERE p.merchant_id = $1::uuid AND p.active = true
           AND 1 - (pe.embedding <=> $2::vector) >= 0.30
         ORDER BY pe.embedding <=> $2::vector
         LIMIT $3`,
-      [tenantId, JSON.stringify(embedding), limit],
+      [merchantId, JSON.stringify(embedding), limit],
     );
     return rows.map(mapRow).filter((p) => !INTERNAL_ONLY_CATEGORIES.has(p.category ?? ''));
   }
 
   /** Available products for a browse intent, optionally filtered by category names. */
   async browse(
-    tenantId: string,
+    merchantId: string,
     categoryFilter: string[] | null,
     limit = 80,
   ): Promise<ProductRecord[]> {
     const { rows } = await this.pg.tquery<ProductRow>(
-      tenantId,
+      merchantId,
       `SELECT ${SELECT} ${FROM}
-        WHERE p.business_id = $1::uuid AND p.active = true
+        WHERE p.merchant_id = $1::uuid AND p.active = true
           AND ($2::text[] IS NULL OR pc.name = ANY($2))
         LIMIT $3`,
-      [tenantId, categoryFilter, limit],
+      [merchantId, categoryFilter, limit],
     );
     return rows.map(mapRow).filter((p) => !INTERNAL_ONLY_CATEGORIES.has(p.category ?? ''));
   }
 
   /** Distinct customer-facing category names (browse suggestions). */
-  async categorySuggestions(tenantId: string): Promise<string[]> {
+  async categorySuggestions(merchantId: string): Promise<string[]> {
     const { rows } = await this.pg.tquery<{ name: string | null }>(
-      tenantId,
+      merchantId,
       `SELECT DISTINCT pc.name
-         FROM tenant.product p
-         JOIN tenant.product_category pc ON pc.id = p.category_id
-        WHERE p.business_id = $1::uuid AND p.active = true`,
-      [tenantId],
+         FROM merchant.product p
+         JOIN merchant.product_category pc ON pc.id = p.category_id
+        WHERE p.merchant_id = $1::uuid AND p.active = true`,
+      [merchantId],
     );
     return rows
       .map((r) => r.name)
@@ -211,35 +211,35 @@ export class ProductsRepository {
 
   /** Fetch products by id (order validation / re-price). Includes unavailable. */
   async getByIds(
-    tenantId: string,
+    merchantId: string,
     ids: string[],
   ): Promise<Map<string, ProductRecord & { available: boolean }>> {
     if (!ids.length) return new Map();
     const { rows } = await this.pg.tquery<ProductRow & { active: boolean }>(
-      tenantId,
+      merchantId,
       `SELECT ${SELECT}, p.active ${FROM}
-        WHERE p.business_id = $1::uuid AND p.id = ANY($2::uuid[])`,
-      [tenantId, ids],
+        WHERE p.merchant_id = $1::uuid AND p.id = ANY($2::uuid[])`,
+      [merchantId, ids],
     );
     return new Map(rows.map((r) => [r.id, { ...mapRow(r), available: r.active }]));
   }
 
   /** Products lacking a name embedding (product.embed enrichment). */
   async listNeedingEmbedding(
-    tenantId: string,
+    merchantId: string,
     limit: number,
   ): Promise<
     Array<{ id: string; name: string; category: string | null; variants: ProductVariant[] }>
   > {
     const { rows } = await this.pg.tquery<ProductRow>(
-      tenantId,
+      merchantId,
       `SELECT ${SELECT} ${FROM}
-        WHERE p.business_id = $1::uuid AND p.active = true
+        WHERE p.merchant_id = $1::uuid AND p.active = true
           AND NOT EXISTS (
             SELECT 1 FROM runtime.product_embedding pe WHERE pe.product_id = p.id
           )
         LIMIT $2`,
-      [tenantId, limit],
+      [merchantId, limit],
     );
     return rows.map((r) => ({
       id: r.id,
@@ -257,8 +257,8 @@ export class ProductsRepository {
    *
    * Stays on the worker pool: `api` holds SELECT on runtime.product_embedding (for
    * the request-path semantic read) but no write, because producing embeddings is
-   * the enrichment job's business, not a request's. The `id` is not tenant-checked
-   * here — it comes from listNeedingEmbedding, which is tenant-scoped.
+   * the enrichment job's merchant, not a request's. The `id` is not merchant-checked
+   * here — it comes from listNeedingEmbedding, which is merchant-scoped.
    */
   async updateNameEmbedding(id: string, embedding: number[], model: string): Promise<void> {
     await this.pg.query(
@@ -282,15 +282,15 @@ export class ProductsRepository {
    * DO NOTHING an existing category yields zero rows and the caller would read
    * that as "no category" and detach every product from it.
    */
-  async getOrCreateCategory(tenantId: string, name: string | null): Promise<string | null> {
+  async getOrCreateCategory(merchantId: string, name: string | null): Promise<string | null> {
     if (!name || !name.trim()) return null;
     const { rows } = await this.pg.tquery<{ id: string }>(
-      tenantId,
-      `INSERT INTO tenant.product_category (business_id, name, display_order)
+      merchantId,
+      `INSERT INTO merchant.product_category (merchant_id, name, display_order)
        VALUES ($1::uuid, $2, 0)
-       ON CONFLICT (business_id, name) DO UPDATE SET name = EXCLUDED.name
+       ON CONFLICT (merchant_id, name) DO UPDATE SET name = EXCLUDED.name
        RETURNING id::text`,
-      [tenantId, name.trim()],
+      [merchantId, name.trim()],
     );
     return rows[0]?.id ?? null;
   }
@@ -313,7 +313,7 @@ export class ProductsRepository {
    * the statement that this product came from the integration.
    */
   async upsertFromZettle(
-    tenantId: string,
+    merchantId: string,
     p: {
       zettleUuid: string;
       name: string;
@@ -333,18 +333,18 @@ export class ProductsRepository {
       // case is one unnecessary re-embed, while ON CONFLICT still keeps the write
       // atomic.
       const before = await client.query<{ name: string; price: string }>(
-        `SELECT name, price::text FROM tenant.product
-          WHERE business_id = $1::uuid AND external_ref = $2`,
-        [tenantId, p.zettleUuid],
+        `SELECT name, price::text FROM merchant.product
+          WHERE merchant_id = $1::uuid AND external_ref = $2`,
+        [merchantId, p.zettleUuid],
       );
       const prev = before.rows[0];
       const textMoved = !prev || prev.name !== p.name || Number(prev.price) !== p.priceCents;
 
       const { rows } = await client.query<{ id: string }>(
-        `INSERT INTO tenant.product
-           (business_id, category_id, name, description, price, active, external_ref)
+        `INSERT INTO merchant.product
+           (merchant_id, category_id, name, description, price, active, external_ref)
          VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7)
-         ON CONFLICT (business_id, external_ref) WHERE external_ref IS NOT NULL
+         ON CONFLICT (merchant_id, external_ref) WHERE external_ref IS NOT NULL
            DO UPDATE SET
              category_id = EXCLUDED.category_id,
              name        = EXCLUDED.name,
@@ -353,7 +353,15 @@ export class ProductsRepository {
              active      = EXCLUDED.active,
              updated_at  = now()
          RETURNING id::text`,
-        [tenantId, p.categoryId, p.name, p.description, p.priceCents, p.isAvailable, p.zettleUuid],
+        [
+          merchantId,
+          p.categoryId,
+          p.name,
+          p.description,
+          p.priceCents,
+          p.isAvailable,
+          p.zettleUuid,
+        ],
       );
       const productId = rows[0].id;
 
@@ -362,12 +370,12 @@ export class ProductsRepository {
       // (1256 modifiers across the whole catalog), and a diff would have to reason
       // about deltas that shift whenever the base price moves. The cascade from
       // option_group removes the modifiers.
-      await client.query(`DELETE FROM tenant.product_option_group WHERE product_id = $1::uuid`, [
+      await client.query(`DELETE FROM merchant.product_option_group WHERE product_id = $1::uuid`, [
         productId,
       ]);
       if (p.variants.length) {
         const g = await client.query<{ id: string }>(
-          `INSERT INTO tenant.product_option_group (product_id, name, min_select, max_select)
+          `INSERT INTO merchant.product_option_group (product_id, name, min_select, max_select)
            VALUES ($1::uuid, 'Opciones', 0, NULL)
            RETURNING id::text`,
           [productId],
@@ -376,7 +384,7 @@ export class ProductsRepository {
           // Zettle gives an ABSOLUTE price in pesos; the model stores a delta from
           // the product base in centavos, so base + delta reproduces it exactly.
           await client.query(
-            `INSERT INTO tenant.product_modifier (option_group_id, name, price_delta)
+            `INSERT INTO merchant.product_modifier (option_group_id, name, price_delta)
              VALUES ($1::uuid, $2, $3)`,
             [g.rows[0].id, v.name, Math.round(Number(v.price) * 100) - p.priceCents],
           );
@@ -400,33 +408,33 @@ export class ProductsRepository {
    * hand-created product is never deactivated by a sync that has never heard of it.
    *
    * Deliberately on `tquery`, not the worker pool: this is the most dangerous shape
-   * in the file — an UPDATE across many rows whose ONLY tenant guard is one
-   * predicate. On the BYPASSRLS pool, deleting that `business_id = $1` would
-   * deactivate EVERY tenant's catalog in a single statement, and nothing would fail.
-   * Under RLS the same mistake touches zero rows outside this business.
+   * in the file — an UPDATE across many rows whose ONLY merchant guard is one
+   * predicate. On the BYPASSRLS pool, deleting that `merchant_id = $1` would
+   * deactivate EVERY merchant's catalog in a single statement, and nothing would fail.
+   * Under RLS the same mistake touches zero rows outside this merchant.
    */
-  async markUnavailableExcept(tenantId: string, zettleUuids: string[]): Promise<void> {
+  async markUnavailableExcept(merchantId: string, zettleUuids: string[]): Promise<void> {
     await this.pg.tquery(
-      tenantId,
-      `UPDATE tenant.product SET active = false, updated_at = now()
-        WHERE business_id = $1::uuid
+      merchantId,
+      `UPDATE merchant.product SET active = false, updated_at = now()
+        WHERE merchant_id = $1::uuid
           AND external_ref IS NOT NULL
           AND NOT (external_ref = ANY($2::text[]))`,
-      [tenantId, zettleUuids],
+      [merchantId, zettleUuids],
     );
   }
 
   /** Single product (edit_cart update_options). */
   async getById(
-    tenantId: string,
+    merchantId: string,
     id: string,
   ): Promise<(ProductRecord & { available: boolean }) | null> {
     const { rows } = await this.pg.tquery<ProductRow & { active: boolean }>(
-      tenantId,
+      merchantId,
       `SELECT ${SELECT}, p.active ${FROM}
-        WHERE p.business_id = $1::uuid AND p.id = $2::uuid
+        WHERE p.merchant_id = $1::uuid AND p.id = $2::uuid
         LIMIT 1`,
-      [tenantId, id],
+      [merchantId, id],
     );
     return rows[0] ? { ...mapRow(rows[0]), available: rows[0].active } : null;
   }

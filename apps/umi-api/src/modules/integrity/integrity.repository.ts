@@ -34,7 +34,7 @@ export class IntegrityRepository {
   constructor(private readonly pg: PgService) {}
 
   transaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
-    return this.pg.withTenant(work);
+    return this.pg.withMerchant(work);
   }
 
   async claimCommand(
@@ -43,18 +43,18 @@ export class IntegrityRepository {
     fingerprint: string,
   ): Promise<{ owner: boolean; row: CommandRow }> {
     const inserted = await client.query<CommandRow>(
-      `INSERT INTO tenant.business_command
-         (business_id, branch_id, command_id, idempotency_key, command_type, fingerprint,
+      `INSERT INTO merchant.business_command
+         (merchant_id, location_id, command_id, idempotency_key, command_type, fingerprint,
           status, expected_version, correlation_id, expires_at)
        VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, 'processing', $7, $8,
                now() + interval '30 days')
-       ON CONFLICT (business_id, idempotency_key) DO NOTHING
+       ON CONFLICT (merchant_id, idempotency_key) DO NOTHING
        RETURNING command_id::text AS "commandId", fingerprint, status,
                  response_data AS "responseData", failure_code AS "failureCode",
                  retryable, correlation_id AS "correlationId"`,
       [
-        input.tenantId,
-        input.branchId,
+        input.merchantId,
+        input.locationId,
         input.commandId,
         input.idempotencyKey,
         input.commandType,
@@ -69,10 +69,10 @@ export class IntegrityRepository {
       `SELECT command_id::text AS "commandId", fingerprint, status,
               response_data AS "responseData", failure_code AS "failureCode",
               retryable, correlation_id AS "correlationId"
-       FROM tenant.business_command
-       WHERE business_id = $1::uuid AND idempotency_key = $2
+       FROM merchant.business_command
+       WHERE merchant_id = $1::uuid AND idempotency_key = $2
        FOR UPDATE`,
-      [input.tenantId, input.idempotencyKey],
+      [input.merchantId, input.idempotencyKey],
     );
     const row = existing.rows[0];
     if (!row) throw new Error('command_claim_missing');
@@ -84,14 +84,14 @@ export class IntegrityRepository {
     }
     if (row.status === 'failed' && row.retryable) {
       const reset = await client.query<CommandRow>(
-        `UPDATE tenant.business_command
+        `UPDATE merchant.business_command
          SET status = 'processing', response_data = NULL, failure_code = NULL,
              retryable = false, completed_at = NULL, correlation_id = $3
-         WHERE business_id = $1::uuid AND idempotency_key = $2
+         WHERE merchant_id = $1::uuid AND idempotency_key = $2
          RETURNING command_id::text AS "commandId", fingerprint, status,
                    response_data AS "responseData", failure_code AS "failureCode",
                    retryable, correlation_id AS "correlationId"`,
-        [input.tenantId, input.idempotencyKey, input.correlationId],
+        [input.merchantId, input.idempotencyKey, input.correlationId],
       );
       return { owner: true, row: reset.rows[0] };
     }
@@ -100,16 +100,16 @@ export class IntegrityRepository {
 
   async getCommand(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     idempotencyKey: string,
   ): Promise<CommandRow> {
     const result = await client.query<CommandRow>(
       `SELECT command_id::text AS "commandId", fingerprint, status,
               response_data AS "responseData", failure_code AS "failureCode",
               retryable, correlation_id AS "correlationId"
-       FROM tenant.business_command
-       WHERE business_id = $1::uuid AND idempotency_key = $2`,
-      [tenantId, idempotencyKey],
+       FROM merchant.business_command
+       WHERE merchant_id = $1::uuid AND idempotency_key = $2`,
+      [merchantId, idempotencyKey],
     );
     if (!result.rows[0]) throw new Error('command_result_missing');
     return result.rows[0];
@@ -117,32 +117,32 @@ export class IntegrityRepository {
 
   async succeed<T>(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     idempotencyKey: string,
     value: T,
   ): Promise<void> {
     await client.query(
-      `UPDATE tenant.business_command
+      `UPDATE merchant.business_command
        SET status = 'succeeded', response_data = $3, completed_at = now()
-       WHERE business_id = $1::uuid AND idempotency_key = $2 AND status = 'processing'`,
-      [tenantId, idempotencyKey, redactObject(value)],
+       WHERE merchant_id = $1::uuid AND idempotency_key = $2 AND status = 'processing'`,
+      [merchantId, idempotencyKey, redactObject(value)],
     );
   }
 
   async fail(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     idempotencyKey: string,
     code: string,
     failureClass: FailureClass,
     retryable: boolean,
   ): Promise<void> {
     await client.query(
-      `UPDATE tenant.business_command
+      `UPDATE merchant.business_command
        SET status = 'failed', failure_code = $3, retryable = $4,
            response_data = jsonb_build_object('failureClass', $5::text), completed_at = now()
-       WHERE business_id = $1::uuid AND idempotency_key = $2 AND status = 'processing'`,
-      [tenantId, idempotencyKey, code, retryable, failureClass],
+       WHERE merchant_id = $1::uuid AND idempotency_key = $2 AND status = 'processing'`,
+      [merchantId, idempotencyKey, code, retryable, failureClass],
     );
   }
 
@@ -168,25 +168,25 @@ export class IntegrityRepository {
 
   async claimVersion(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     aggregateType: string,
     aggregateId: string,
     expectedVersion: number,
   ): Promise<number> {
     await client.query(
-      `INSERT INTO tenant.aggregate_version
-         (business_id, aggregate_type, aggregate_id, version)
+      `INSERT INTO merchant.aggregate_version
+         (merchant_id, aggregate_type, aggregate_id, version)
        VALUES ($1::uuid, $2, $3::uuid, 0)
        ON CONFLICT DO NOTHING`,
-      [tenantId, aggregateType, aggregateId],
+      [merchantId, aggregateType, aggregateId],
     );
     const updated = await client.query<{ version: string }>(
-      `UPDATE tenant.aggregate_version
+      `UPDATE merchant.aggregate_version
        SET version = version + 1, updated_at = now()
-       WHERE business_id = $1::uuid AND aggregate_type = $2
+       WHERE merchant_id = $1::uuid AND aggregate_type = $2
          AND aggregate_id = $3::uuid AND version = $4
        RETURNING version::text`,
-      [tenantId, aggregateType, aggregateId, expectedVersion],
+      [merchantId, aggregateType, aggregateId, expectedVersion],
     );
     if (!updated.rows[0]) {
       throw new ConflictException({
@@ -204,14 +204,14 @@ export class IntegrityRepository {
     event: AuditAppend,
   ): Promise<string> {
     const audit = await client.query<{ id: string }>(
-      `INSERT INTO tenant.audit_event
-         (business_id, branch_id, actor_user_id, command_id, event_type, entity_type,
+      `INSERT INTO merchant.audit_event
+         (merchant_id, location_id, actor_user_id, command_id, event_type, entity_type,
           entity_id, outcome, reason_code, public_data, correlation_id, event_hash)
        VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5, $6, $7::uuid, $8, $9, $10, $11, '')
        RETURNING id::text`,
       [
-        input.tenantId,
-        input.branchId,
+        input.merchantId,
+        input.locationId,
         actorUserId,
         input.commandId,
         event.eventType,
@@ -225,9 +225,9 @@ export class IntegrityRepository {
     );
     const id = audit.rows[0].id;
     await client.query(
-      `INSERT INTO runtime.audit_event_internal (audit_event_id, business_id, metadata)
+      `INSERT INTO runtime.audit_event_internal (audit_event_id, merchant_id, metadata)
        VALUES ($1::uuid, $2::uuid, $3)`,
-      [id, input.tenantId, redactObject(event.internalMetadata ?? {})],
+      [id, input.merchantId, redactObject(event.internalMetadata ?? {})],
     );
     return id;
   }
@@ -239,16 +239,16 @@ export class IntegrityRepository {
     aggregateVersion: number,
   ): Promise<string> {
     const { rows } = await client.query<{ id: string }>(
-      `INSERT INTO tenant.financial_event
-         (business_id, branch_id, command_id, aggregate_type, aggregate_id,
+      `INSERT INTO merchant.financial_event
+         (merchant_id, location_id, command_id, aggregate_type, aggregate_id,
           aggregate_version, event_type, amount_minor_units, currency,
           compensates_event_id, public_data, correlation_id)
        VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5::uuid, $6, $7, $8, $9,
                $10::uuid, $11, $12)
        RETURNING id::text`,
       [
-        input.tenantId,
-        input.branchId,
+        input.merchantId,
+        input.locationId,
         input.commandId,
         event.aggregateType,
         event.aggregateId,
@@ -264,16 +264,16 @@ export class IntegrityRepository {
     return rows[0].id;
   }
 
-  async searchAudit(tenantId: string, search: AuditSearch): Promise<unknown[]> {
-    return this.pg.withTenant(async (client) => {
+  async searchAudit(merchantId: string, search: AuditSearch): Promise<unknown[]> {
+    return this.pg.withMerchant(async (client) => {
       const { rows } = await client.query(
-        `SELECT id::text, business_id::text AS "tenantId", branch_id::text AS "branchId",
+        `SELECT id::text, merchant_id::text AS "merchantId", location_id::text AS "locationId",
                 event_type AS "eventType", entity_type AS "entityType",
                 entity_id::text AS "entityId", outcome, reason_code AS "reasonCode",
                 public_data AS data, correlation_id AS "correlationId",
                 occurred_at::text AS "occurredAt"
-         FROM tenant.audit_event
-         WHERE business_id = $1::uuid
+         FROM merchant.audit_event
+         WHERE merchant_id = $1::uuid
            AND ($2::timestamptz IS NULL OR occurred_at < $2::timestamptz)
            AND ($3::text IS NULL OR event_type = $3)
            AND ($4::text IS NULL OR entity_type = $4)
@@ -282,7 +282,7 @@ export class IntegrityRepository {
          ORDER BY occurred_at DESC, id DESC
          LIMIT $7`,
         [
-          tenantId,
+          merchantId,
           search.before ?? null,
           search.eventType ?? null,
           search.entityType ?? null,

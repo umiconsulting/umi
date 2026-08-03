@@ -11,79 +11,51 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
-import { TenantAccessGuard } from '../auth/tenant-access.guard';
-import { Tenant } from '../auth/current-user.decorator';
-import type { TenantAccess } from '../auth/auth.types';
-import type { AuthUser } from '../auth/auth.types';
-import { CurrentUser } from '../auth/current-user.decorator';
-import { RequirePermission } from '../auth/roles.decorator';
-import { RolesGuard } from '../auth/roles.guard';
+import { MerchantAccessGuard } from '../auth/merchant-access.guard';
+import { Merchant } from '../auth/current-user.decorator';
+import type { MerchantAccess } from '../auth/auth.types';
 import { StaffService } from './staff.service';
-import {
-  CreateStaffRequest,
-  UpdateStaffRequest,
-  type CreateStaffRequest as CreateStaffInput,
-  type UpdateStaffRequest as UpdateStaffInput,
-} from '@umi/contract';
-import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
+import { CreateStaffDto, UpdateStaffDto } from './dto/staff.dto';
 
 /**
- * Staff CRUD over `tenant.staff`. Slug-routed; TenantAccessGuard resolves
- * the slug → tenant and verifies membership (no membership check existed in
+ * Staff CRUD over `merchant.staff`. Slug-routed; MerchantAccessGuard resolves
+ * the slug → merchant and verifies membership (no membership check existed in
  * server.js — hardened here). No product entitlement gate, matching server.js.
  */
-@UseGuards(AuthGuard, TenantAccessGuard, RolesGuard)
+@UseGuards(AuthGuard, MerchantAccessGuard)
 @Controller('api/:slug/admin/staff')
 export class StaffController {
   constructor(private readonly staff: StaffService) {}
 
   @Get()
-  @RequirePermission('staff.read')
-  async list(@Tenant() tenant: TenantAccess) {
-    return { staff: await this.staff.list(tenant.tenantId) };
+  async list(@Merchant() merchant: MerchantAccess) {
+    return { staff: await this.staff.list(merchant.merchantId) };
   }
 
   @Post()
   @HttpCode(201)
-  @RequirePermission('staff.manage')
   async create(
-    @Tenant() tenant: TenantAccess,
-    @CurrentUser() user: AuthUser,
-    @Body(new ZodValidationPipe(CreateStaffRequest)) dto: CreateStaffInput,
+    @Merchant() merchant: MerchantAccess,
+    @Body() dto: CreateStaffDto,
     @Query('locationId') locationId?: string,
   ) {
     return {
-      staff: await this.staff.create(
-        tenant.tenantId,
-        locationId ?? null,
-        dto,
-        user.id,
-        user.sessionId,
-      ),
+      staff: await this.staff.create(merchant.merchantId, locationId ?? null, dto),
     };
   }
 
   @Patch(':staffId')
-  @RequirePermission('staff.manage')
   async update(
-    @Tenant() tenant: TenantAccess,
-    @CurrentUser() user: AuthUser,
+    @Merchant() merchant: MerchantAccess,
     @Param('staffId') staffId: string,
-    @Body(new ZodValidationPipe(UpdateStaffRequest)) dto: UpdateStaffInput,
+    @Body() dto: UpdateStaffDto,
   ) {
-    return {
-      staff: await this.staff.update(tenant.tenantId, staffId, dto, user.id, user.sessionId),
-    };
+    return { staff: await this.staff.update(merchant.merchantId, staffId, dto) };
   }
 
   @Delete(':staffId')
-  @RequirePermission('staff.manage')
-  async remove(
-    @Tenant() tenant: TenantAccess,
-    @CurrentUser() user: AuthUser,
-    @Param('staffId') staffId: string,
-  ) {
-    await this.staff.remove(tenant.tenantId, staffId, user.id, user.sessionId);
+  async remove(@Merchant() merchant: MerchantAccess, @Param('staffId') staffId: string) {
+    await this.staff.remove(merchant.merchantId, staffId);
     return { ok: true };
   }
 }

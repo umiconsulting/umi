@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 /**
  * Phone normalization, pinned to REAL DATA (BACKFILL_METHODOLOGY L15 / O-3).
  *
- * This is the test that would have caught the fatal branch. Prod's
+ * This is the test that would have caught the fatal location. Prod's
  * `core.normalize_phone` — and the copy build-v3 originally shipped — carried
  *   length(d)=11 AND left(d,1)='1' -> '+52'||right(d,10)
  * which strips the `+` BEFORE deciding the country, rewriting a real NANP number into a
@@ -105,7 +105,7 @@ describe('umi.e164 — phone normalization pinned to real data', () => {
              count(*) filter (
                where c.normalized_value is distinct from cm.normalized_value)::int AS changed,
              count(*) filter (where c.normalized_value is null)::int AS now_null
-        from tenant.contact c
+        from merchant.contact c
         join core.contact_methods cm on cm.id = c.id`);
     const { total, changed, now_null } = rows[0];
 
@@ -120,7 +120,7 @@ describe('umi.e164 — phone normalization pinned to real data', () => {
     if (!hasSnapshot) return;
     const { rows } = await pool.query(`
       select cm.display_value AS raw, c.normalized_value AS now
-        from tenant.contact c
+        from merchant.contact c
         join core.contact_methods cm on cm.id = c.id
        where c.normalized_value is distinct from cm.normalized_value
        order by 1`);
@@ -141,15 +141,15 @@ describe('umi.e164 — phone normalization pinned to real data', () => {
     try {
       await c.query('BEGIN');
       const { rows: target } = await c.query(
-        `select id, normalized_value from tenant.contact
+        `select id, normalized_value from merchant.contact
           where normalized_value is not null limit 1`,
       );
-      await c.query(`update tenant.contact set normalized_value = $2 where id = $1`, [
+      await c.query(`update merchant.contact set normalized_value = $2 where id = $1`, [
         target[0].id,
         '+520000000000',
       ]);
       const { rows: after } = await c.query(
-        `select normalized_value from tenant.contact where id = $1`,
+        `select normalized_value from merchant.contact where id = $1`,
         [target[0].id],
       );
       // The app cannot write its own normalization into the column any more — which is

@@ -30,80 +30,87 @@ export class PosCartRepository {
     userId: string,
     sessionId: string,
     deviceId: string,
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     operatorSessionId: string,
   ): Promise<boolean> {
-    const { rowCount } = await this.pg.worker.query(
-      `SELECT 1 FROM runtime.operator_session os
-       JOIN tenant.device d ON d.id=os.device_id
+    return this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      async (client) => {
+        const { rowCount } = await client.query(
+          `SELECT 1 FROM runtime.operator_session os
+       JOIN merchant.device d ON d.id=os.device_id
        WHERE os.id=$6::uuid AND os.durable_session_id=$2::uuid AND os.user_id=$1::uuid
-         AND os.device_id=$3::uuid AND os.business_id=$4::uuid AND os.branch_id=$5::uuid
-         AND os.state='active' AND os.expires_at>now() AND d.lifecycle_state='active'
+         AND os.device_id=$3::uuid AND os.merchant_id=$4::uuid AND os.location_id=$5::uuid
+         AND os.state='active' AND os.expires_at>now() AND d.status='active'
          AND ('cart.write'=ANY(os.permissions) OR '*'=ANY(os.permissions))
          AND EXISTS (SELECT 1 FROM jsonb_array_elements(os.entitlements) e
            WHERE e->>'featureKey'='pos' AND COALESCE((e->>'enabled')::boolean,false))`,
-      [userId, sessionId, deviceId, tenantId, branchId, operatorSessionId],
+          [userId, sessionId, deviceId, merchantId, locationId, operatorSessionId],
+        );
+        return (rowCount ?? 0) > 0;
+      },
+      locationId,
     );
-    return (rowCount ?? 0) > 0;
   }
 
   async create(
     client: PoolClient,
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     operatorSessionId: string,
   ): Promise<string> {
     const { rows } = await client.query<{ id: string }>(
-      `INSERT INTO tenant.pos_cart
-         (business_id,branch_id,operator_session_id,original_operator_session_id,
+      `INSERT INTO merchant.pos_cart
+         (merchant_id,location_id,operator_session_id,original_operator_session_id,
           original_operator_user_id,operator_user_id,business_date)
        SELECT $1::uuid,$2::uuid,$3::uuid,$3::uuid,os.user_id,os.user_id,
          (now() at time zone COALESCE(b.timezone,business.timezone))::date
-       FROM tenant.branch b JOIN tenant.business business ON business.id=b.business_id
+       FROM merchant.location b JOIN merchant.merchant business ON business.id=b.merchant_id
        JOIN runtime.operator_session os ON os.id=$3::uuid
-       WHERE b.id=$2::uuid AND b.business_id=$1::uuid AND b.status='active'
-         AND os.business_id=$1::uuid AND os.branch_id=$2::uuid
-       ON CONFLICT (business_id,branch_id,operator_user_id) WHERE lifecycle_state IN
+       WHERE b.id=$2::uuid AND b.merchant_id=$1::uuid AND b.status='active'
+         AND os.merchant_id=$1::uuid AND os.location_id=$2::uuid
+       ON CONFLICT (merchant_id,location_id,operator_user_id) WHERE lifecycle_state IN
          ('building_cart','ready_for_checkout','recovered')
        DO UPDATE SET operator_session_id=excluded.operator_session_id,
                      lifecycle_state='recovered',
                      updated_at=now()
        RETURNING id::text`,
-      [tenantId, branchId, operatorSessionId],
+      [merchantId, locationId, operatorSessionId],
     );
     if (!rows[0]) throw new Error('branch_not_allowed');
     return rows[0].id;
   }
 
   async activeCartId(
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     operatorSessionId: string,
   ): Promise<string | null> {
-    const rows = await this.pg.runWithTenant(
-      tenantId,
+    const rows = await this.pg.runWithMerchant(
+      merchantId,
       null,
       async (client) =>
         (
           await client.query<{ id: string }>(
-            `SELECT id::text FROM tenant.pos_cart
-             WHERE business_id=$1::uuid AND branch_id=$2::uuid
+            `SELECT id::text FROM merchant.pos_cart
+             WHERE merchant_id=$1::uuid AND location_id=$2::uuid
                AND operator_session_id=$3::uuid
                AND lifecycle_state IN
                  ('building_cart','ready_for_checkout','recovered')`,
-            [tenantId, branchId, operatorSessionId],
+            [merchantId, locationId, operatorSessionId],
           )
         ).rows,
-      branchId,
+      locationId,
     );
     return rows[0]?.id ?? null;
   }
 
   async price(
     client: PoolClient,
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     input: CartLineInput,
   ): Promise<PricedSelection | null> {
     const product = await client.query<{
@@ -121,14 +128,14 @@ export class PosCartRepository {
               p.tax_rate_basis_points AS "taxRateBasisPoints",business.currency,
               v.id::text AS "variantId",v.name AS "variantName",
               v.attributes AS "variantAttributes",v.price_delta::text AS "variantDelta"
-       FROM tenant.product p JOIN tenant.business business ON business.id=p.business_id
-       LEFT JOIN tenant.product_variant v ON v.id=$4::uuid AND v.product_id=p.id AND v.active
-       LEFT JOIN tenant.product_branch_availability a
-         ON a.product_id=p.id AND a.branch_id=$2::uuid
-       WHERE p.business_id=$1::uuid AND p.id=$3::uuid AND p.active
+       FROM merchant.product p JOIN merchant.merchant business ON business.id=p.merchant_id
+       LEFT JOIN merchant.product_variant v ON v.id=$4::uuid AND v.product_id=p.id AND v.active
+       LEFT JOIN merchant.product_location_availability a
+         ON a.product_id=p.id AND a.location_id=$2::uuid
+       WHERE p.merchant_id=$1::uuid AND p.id=$3::uuid AND p.active
          AND COALESCE(a.status,'enabled')='enabled'
          AND ($4::uuid IS NULL OR v.id IS NOT NULL)`,
-      [tenantId, branchId, input.productId, input.variantId],
+      [merchantId, locationId, input.productId, input.variantId],
     );
     if (!product.rows[0]) return null;
     const modifierIds = input.modifierSelections.map((item) => item.modifierId);
@@ -144,11 +151,11 @@ export class PosCartRepository {
           `SELECT m.id::text AS "modifierId",g.id::text AS "groupId",m.name,
                   m.price_delta::text AS "priceDelta",g.min_select AS "minSelect",
                   g.max_select AS "maxSelect"
-           FROM tenant.product_modifier m
-           JOIN tenant.product_option_group g ON g.id=m.option_group_id
-           JOIN tenant.product p ON p.id=g.product_id
-           WHERE p.business_id=$1::uuid AND p.id=$2::uuid AND m.id=ANY($3::uuid[])`,
-          [tenantId, input.productId, modifierIds],
+           FROM merchant.product_modifier m
+           JOIN merchant.product_option_group g ON g.id=m.option_group_id
+           JOIN merchant.product p ON p.id=g.product_id
+           WHERE p.merchant_id=$1::uuid AND p.id=$2::uuid AND m.id=ANY($3::uuid[])`,
+          [merchantId, input.productId, modifierIds],
         )
       : { rows: [] };
     if (modifiers.rows.length !== modifierIds.length) return null;
@@ -163,9 +170,9 @@ export class PosCartRepository {
       maxSelect: number | null;
     }>(
       `SELECT g.id::text,g.min_select AS "minSelect",g.max_select AS "maxSelect"
-       FROM tenant.product_option_group g JOIN tenant.product p ON p.id=g.product_id
-       WHERE p.business_id=$1::uuid AND p.id=$2::uuid`,
-      [tenantId, input.productId],
+       FROM merchant.product_option_group g JOIN merchant.product p ON p.id=g.product_id
+       WHERE p.merchant_id=$1::uuid AND p.id=$2::uuid`,
+      [merchantId, input.productId],
     );
     if (
       required.rows.some((group) => {
@@ -190,14 +197,14 @@ export class PosCartRepository {
 
   async addOrMerge(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     cartId: string,
     expectedVersion: number,
     identityKey: string,
     input: CartLineInput,
     priced: PricedSelection,
   ): Promise<boolean> {
-    if (!(await this.bump(client, tenantId, cartId, expectedVersion, input.operatorSessionId))) {
+    if (!(await this.bump(client, merchantId, cartId, expectedVersion, input.operatorSessionId))) {
       return false;
     }
     const modifierTotal = priced.modifiers.reduce(
@@ -205,16 +212,16 @@ export class PosCartRepository {
       0,
     );
     const { rows } = await client.query<{ id: string }>(
-      `INSERT INTO tenant.pos_cart_line
-         (business_id,cart_id,product_id,variant_id,identity_key,product_name,variant_name,
+      `INSERT INTO merchant.pos_cart_line
+         (merchant_id,cart_id,product_id,variant_id,identity_key,product_name,variant_name,
           variant_attributes,quantity,note,base_price,variant_delta,modifier_total,
           tax_rate_basis_points)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        ON CONFLICT (cart_id,identity_key) DO UPDATE
-         SET quantity=tenant.pos_cart_line.quantity+excluded.quantity,updated_at=now()
+         SET quantity=merchant.pos_cart_line.quantity+excluded.quantity,updated_at=now()
        RETURNING id::text`,
       [
-        tenantId,
+        merchantId,
         cartId,
         priced.productId,
         priced.variantId,
@@ -231,16 +238,16 @@ export class PosCartRepository {
       ],
     );
     const lineId = rows[0].id;
-    await client.query(`DELETE FROM tenant.pos_cart_line_modifier WHERE line_id=$1::uuid`, [
+    await client.query(`DELETE FROM merchant.pos_cart_line_modifier WHERE line_id=$1::uuid`, [
       lineId,
     ]);
     for (const modifier of priced.modifiers) {
       await client.query(
-        `INSERT INTO tenant.pos_cart_line_modifier
-          (business_id,line_id,group_id,modifier_id,name,quantity,price_delta)
+        `INSERT INTO merchant.pos_cart_line_modifier
+          (merchant_id,line_id,group_id,modifier_id,name,quantity,price_delta)
          VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7)`,
         [
-          tenantId,
+          merchantId,
           lineId,
           modifier.groupId,
           modifier.modifierId,
@@ -255,25 +262,25 @@ export class PosCartRepository {
 
   async remove(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     cartId: string,
     lineId: string,
     expectedVersion: number,
     operatorSessionId: string,
   ): Promise<boolean> {
-    if (!(await this.bump(client, tenantId, cartId, expectedVersion, operatorSessionId))) {
+    if (!(await this.bump(client, merchantId, cartId, expectedVersion, operatorSessionId))) {
       return false;
     }
     const result = await client.query(
-      `DELETE FROM tenant.pos_cart_line WHERE business_id=$1::uuid AND cart_id=$2::uuid AND id=$3::uuid`,
-      [tenantId, cartId, lineId],
+      `DELETE FROM merchant.pos_cart_line WHERE merchant_id=$1::uuid AND cart_id=$2::uuid AND id=$3::uuid`,
+      [merchantId, cartId, lineId],
     );
     return (result.rowCount ?? 0) > 0;
   }
 
   async replace(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     cartId: string,
     lineId: string,
     expectedVersion: number,
@@ -284,7 +291,7 @@ export class PosCartRepository {
     if (
       !(await this.remove(
         client,
-        tenantId,
+        merchantId,
         cartId,
         lineId,
         expectedVersion,
@@ -295,7 +302,7 @@ export class PosCartRepository {
     }
     return this.addOrMerge(
       client,
-      tenantId,
+      merchantId,
       cartId,
       expectedVersion + 1,
       identityKey,
@@ -306,79 +313,79 @@ export class PosCartRepository {
 
   async prepare(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     cartId: string,
     expectedVersion: number,
     operatorSessionId: string,
   ): Promise<boolean> {
     const { rowCount } = await client.query(
-      `UPDATE tenant.pos_cart SET status='prepared',lifecycle_state='ready_for_checkout',
+      `UPDATE merchant.pos_cart SET status='prepared',lifecycle_state='ready_for_checkout',
          version=version+1,updated_at=now()
-       WHERE business_id=$1::uuid AND id=$2::uuid AND version=$3
+       WHERE merchant_id=$1::uuid AND id=$2::uuid AND version=$3
          AND operator_session_id=$4::uuid
          AND lifecycle_state IN ('building_cart','recovered')
          AND status='draft'
-         AND EXISTS(SELECT 1 FROM tenant.pos_cart_line WHERE cart_id=$2::uuid)`,
-      [tenantId, cartId, expectedVersion, operatorSessionId],
+         AND EXISTS(SELECT 1 FROM merchant.pos_cart_line WHERE cart_id=$2::uuid)`,
+      [merchantId, cartId, expectedVersion, operatorSessionId],
     );
     return (rowCount ?? 0) > 0;
   }
 
   async clear(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     cartId: string,
     expectedVersion: number,
     operatorSessionId: string,
   ): Promise<boolean> {
-    if (!(await this.bump(client, tenantId, cartId, expectedVersion, operatorSessionId))) {
+    if (!(await this.bump(client, merchantId, cartId, expectedVersion, operatorSessionId))) {
       return false;
     }
     await client.query(
-      `DELETE FROM tenant.pos_cart_line
-       WHERE business_id=$1::uuid AND cart_id=$2::uuid`,
-      [tenantId, cartId],
+      `DELETE FROM merchant.pos_cart_line
+       WHERE merchant_id=$1::uuid AND cart_id=$2::uuid`,
+      [merchantId, cartId],
     );
     return true;
   }
 
   private async bump(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     cartId: string,
     expectedVersion: number,
     operatorSessionId: string,
   ) {
     const { rowCount } = await client.query(
-      `UPDATE tenant.pos_cart SET status='draft',lifecycle_state='building_cart',
+      `UPDATE merchant.pos_cart SET status='draft',lifecycle_state='building_cart',
          version=version+1,updated_at=now()
-       WHERE business_id=$1::uuid AND id=$2::uuid AND version=$3
+       WHERE merchant_id=$1::uuid AND id=$2::uuid AND version=$3
          AND operator_session_id=$4::uuid
          AND lifecycle_state IN ('building_cart','ready_for_checkout','recovered')
          AND status IN ('draft','prepared')`,
-      [tenantId, cartId, expectedVersion, operatorSessionId],
+      [merchantId, cartId, expectedVersion, operatorSessionId],
     );
     return (rowCount ?? 0) > 0;
   }
 
-  async snapshot(tenantId: string, branchId: string, cartId: string): Promise<Cart | null> {
-    return this.pg.runWithTenant(
-      tenantId,
+  async snapshot(merchantId: string, locationId: string, cartId: string): Promise<Cart | null> {
+    return this.pg.runWithMerchant(
+      merchantId,
       null,
-      (client) => this.snapshotWithClient(client, tenantId, cartId),
-      branchId,
+      (client) => this.snapshotWithClient(client, merchantId, cartId),
+      locationId,
     );
   }
 
   async snapshotWithClient(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     cartId: string,
   ): Promise<Cart | null> {
     const cart = await client.query<{
       id: string;
-      tenantId: string;
-      branchId: string;
+      merchantId: string;
+      locationId: string;
       operatorSessionId: string;
       status: 'draft' | 'prepared' | 'committed' | 'abandoned';
       version: number;
@@ -386,12 +393,12 @@ export class PosCartRepository {
       updatedAt: string;
       currency: string;
     }>(
-      `SELECT c.id::text,c.business_id::text AS "tenantId",c.branch_id::text AS "branchId",
+      `SELECT c.id::text,c.merchant_id::text AS "merchantId",c.location_id::text AS "locationId",
               c.operator_session_id::text AS "operatorSessionId",c.status,c.version,
               c.business_date::text AS "businessDate",c.updated_at::text AS "updatedAt",b.currency
-       FROM tenant.pos_cart c JOIN tenant.business b ON b.id=c.business_id
-       WHERE c.business_id=$1::uuid AND c.id=$2::uuid`,
-      [tenantId, cartId],
+       FROM merchant.pos_cart c JOIN merchant.merchant b ON b.id=c.merchant_id
+       WHERE c.merchant_id=$1::uuid AND c.id=$2::uuid`,
+      [merchantId, cartId],
     );
     if (!cart.rows[0]) return null;
     const lines = await client.query<{
@@ -418,10 +425,10 @@ export class PosCartRepository {
                 'groupId',m.group_id::text,'name',m.name,'quantity',m.quantity,
                 'priceDelta',jsonb_build_object('minorUnits',m.price_delta,'currency',$3::text))
                 ORDER BY m.name) FILTER(WHERE m.id IS NOT NULL),'[]') modifiers
-       FROM tenant.pos_cart_line l LEFT JOIN tenant.pos_cart_line_modifier m ON m.line_id=l.id
-       WHERE l.business_id=$1::uuid AND l.cart_id=$2::uuid
+       FROM merchant.pos_cart_line l LEFT JOIN merchant.pos_cart_line_modifier m ON m.line_id=l.id
+       WHERE l.merchant_id=$1::uuid AND l.cart_id=$2::uuid
        GROUP BY l.id ORDER BY l.created_at,l.id`,
-      [tenantId, cartId, cart.rows[0].currency],
+      [merchantId, cartId, cart.rows[0].currency],
     );
     const currency = cart.rows[0].currency;
     let subtotal = 0;

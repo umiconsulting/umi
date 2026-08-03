@@ -16,8 +16,8 @@ const command = (sequence: number): OfflineCommand => {
     deviceId: uid(3),
     deviceCredentialVersion: 1,
     deviceSequence: sequence,
-    tenantId: uid(4),
-    branchId: uid(5),
+    merchantId: uid(4),
+    locationId: uid(5),
     operatorSessionId: uid(6),
     commandType: 'operational.ack' as const,
     idempotencyKey: uid(200 + sequence),
@@ -48,7 +48,7 @@ describe('PosOfflineService', () => {
       policy: vi.fn(async () => null),
     } as unknown as PosOfflineRepository;
     const value = await new PosOfflineService(repo, checkout).issuePolicy(user, uid(4), {
-      branchId: uid(5),
+      locationId: uid(5),
       operatorSessionId: uid(6),
       credentialVersion: 1,
     });
@@ -90,7 +90,7 @@ describe('PosOfflineService', () => {
       })),
     } as unknown as PosOfflineRepository;
     const value = await new PosOfflineService(repo, checkout).issuePolicy(user, uid(4), {
-      branchId: uid(5),
+      locationId: uid(5),
       operatorSessionId: uid(6),
       credentialVersion: 1,
     });

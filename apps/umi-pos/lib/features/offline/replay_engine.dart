@@ -8,17 +8,17 @@ import 'offline_journal.dart';
 
 final class ReplayScope {
   const ReplayScope({
-    required this.tenantId,
-    required this.branchId,
+    required this.merchantId,
+    required this.locationId,
     required this.operatorSessionId,
     required this.credentialVersion,
   });
-  final String tenantId;
-  final String branchId;
+  final String merchantId;
+  final String locationId;
   final String operatorSessionId;
   final int credentialVersion;
   Map<String, String> get query => {
-    'branchId': branchId,
+    'locationId': locationId,
     'operatorSessionId': operatorSessionId,
     'credentialVersion': '$credentialVersion',
   };
@@ -51,10 +51,10 @@ final class ApiReplayGateway implements ReplayGateway {
       BeginReplayResponse.fromJson(
         await _api.request(
           method: ApiMethod.post,
-          path: UmiRoutes.posOfflineReplayBegin(scope.tenantId),
+          path: UmiRoutes.posOfflineReplayBegin(scope.merchantId),
           body: BeginReplayRequest(
-            tenantId: scope.tenantId,
-            branchId: scope.branchId,
+            merchantId: scope.merchantId,
+            locationId: scope.locationId,
             operatorSessionId: scope.operatorSessionId,
             credentialVersion: scope.credentialVersion,
           ).toJson(),
@@ -67,7 +67,7 @@ final class ApiReplayGateway implements ReplayGateway {
       OfflinePolicy.fromJson(
         await _api.request(
           method: ApiMethod.get,
-          path: _path(UmiRoutes.posOfflinePolicy(scope.tenantId), scope),
+          path: _path(UmiRoutes.posOfflinePolicy(scope.merchantId), scope),
         ),
       );
 
@@ -75,7 +75,7 @@ final class ApiReplayGateway implements ReplayGateway {
   Future<ReplayCursor> cursor(ReplayScope scope) async => ReplayCursor.fromJson(
     await _api.request(
       method: ApiMethod.get,
-      path: _path(UmiRoutes.posOfflineReplayCursor(scope.tenantId), scope),
+      path: _path(UmiRoutes.posOfflineReplayCursor(scope.merchantId), scope),
     ),
   );
 
@@ -86,7 +86,7 @@ final class ApiReplayGateway implements ReplayGateway {
   ) async => ReplayBatchResult.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: UmiRoutes.posOfflineReplayBatch(scope.tenantId),
+      path: UmiRoutes.posOfflineReplayBatch(scope.merchantId),
       body: batch.toJson(),
       // A lost response must be queried before the same batch is sent again.
       idempotent: false,
@@ -100,7 +100,7 @@ final class ApiReplayGateway implements ReplayGateway {
         await _api.request(
           method: ApiMethod.get,
           path: _path(
-            UmiRoutes.posOfflineReplayCommand(scope.tenantId, commandId),
+            UmiRoutes.posOfflineReplayCommand(scope.merchantId, commandId),
             scope,
           ),
         ),
@@ -116,7 +116,7 @@ final class ApiReplayGateway implements ReplayGateway {
       ConflictSummary.fromJson(
         await _api.request(
           method: ApiMethod.get,
-          path: _path(UmiRoutes.posOfflineConflicts(scope.tenantId), scope),
+          path: _path(UmiRoutes.posOfflineConflicts(scope.merchantId), scope),
         ),
       );
 
@@ -127,7 +127,7 @@ final class ApiReplayGateway implements ReplayGateway {
   ) async => ReconciliationSummary.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: _path(UmiRoutes.posOfflineReconcile(scope.tenantId), scope),
+      path: _path(UmiRoutes.posOfflineReconcile(scope.merchantId), scope),
       body: request.toJson(),
       idempotent: true,
     ),
@@ -138,7 +138,7 @@ final class ApiReplayGateway implements ReplayGateway {
     await _api.request(
       method: ApiMethod.post,
       path: _path(
-        UmiRoutes.posOfflineReconcileAcknowledge(scope.tenantId),
+        UmiRoutes.posOfflineReconcileAcknowledge(scope.merchantId),
         scope,
       ),
       body: AcknowledgeReconciliationRequest(
@@ -153,7 +153,7 @@ final class ApiReplayGateway implements ReplayGateway {
       SafeReplayDiagnostic.fromJson(
         await _api.request(
           method: ApiMethod.get,
-          path: _path(UmiRoutes.posOfflineDiagnostics(scope.tenantId), scope),
+          path: _path(UmiRoutes.posOfflineDiagnostics(scope.merchantId), scope),
         ),
       );
 }

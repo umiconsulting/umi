@@ -95,8 +95,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       widget.connectivity.apiReachable(authorityValid: true);
       if (entry.operator != null) {
         widget.cash.setContext(
-          tenantId: entry.selectedTenant!.id,
-          branchId: entry.selectedBranch!.id,
+          merchantId: entry.selectedTenant!.id,
+          locationId: entry.selectedBranch!.id,
           operatorSessionId: entry.operator!.id,
         );
         await widget.cash.load();
@@ -425,8 +425,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       return null;
     }
     return ReplayScope(
-      tenantId: tenant.id,
-      branchId: branch.id,
+      merchantId: tenant.id,
+      locationId: branch.id,
       operatorSessionId: operator.id,
       credentialVersion: device.credentialVersion,
     );

@@ -240,8 +240,8 @@ final class EncryptedOfflineJournal {
     required String commandId,
     required String deviceId,
     required int credentialVersion,
-    required String tenantId,
-    required String branchId,
+    required String merchantId,
+    required String locationId,
     required String operatorSessionId,
     required String idempotencyKey,
     required Map<String, Object?> payload,
@@ -292,8 +292,8 @@ final class EncryptedOfflineJournal {
       final same =
           existing.deviceId == deviceId &&
           existing.deviceCredentialVersion == credentialVersion &&
-          existing.tenantId == tenantId &&
-          existing.branchId == branchId &&
+          existing.merchantId == merchantId &&
+          existing.locationId == locationId &&
           existing.operatorSessionId == operatorSessionId &&
           existing.commandType == commandType &&
           existing.idempotencyKey == idempotencyKey &&
@@ -316,8 +316,8 @@ final class EncryptedOfflineJournal {
       deviceId: deviceId,
       deviceCredentialVersion: credentialVersion,
       deviceSequence: current.nextSequence,
-      tenantId: tenantId,
-      branchId: branchId,
+      merchantId: merchantId,
+      locationId: locationId,
       operatorSessionId: operatorSessionId,
       commandType: commandType,
       idempotencyKey: idempotencyKey,
@@ -341,8 +341,8 @@ final class EncryptedOfflineJournal {
       deviceId: deviceId,
       deviceCredentialVersion: credentialVersion,
       deviceSequence: current.nextSequence,
-      tenantId: tenantId,
-      branchId: branchId,
+      merchantId: merchantId,
+      locationId: locationId,
       operatorSessionId: operatorSessionId,
       commandType: commandType,
       idempotencyKey: idempotencyKey,

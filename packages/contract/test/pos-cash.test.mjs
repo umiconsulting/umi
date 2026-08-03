@@ -44,7 +44,7 @@ test('Gate 3C contracts enforce cash facts and blind-count boundaries', () => {
 
   assert.ok(
     OpenCashShiftRequest.safeParse({
-      branchId: id(1),
+      locationId: id(1),
       registerId: id(2),
       operatorSessionId: id(3),
       openingFloat: money(700),
@@ -62,7 +62,7 @@ test('Gate 3C contracts enforce cash facts and blind-count boundaries', () => {
 
   assert.equal(
     OpenCashShiftRequest.safeParse({
-      branchId: id(1),
+      locationId: id(1),
       registerId: id(2),
       operatorSessionId: id(3),
       openingFloat: money(600),
@@ -81,7 +81,7 @@ test('Gate 3C contracts enforce cash facts and blind-count boundaries', () => {
 
   assert.equal(
     SubmitBlindCountRequest.safeParse({
-      branchId: id(1),
+      locationId: id(1),
       shiftId: id(6),
       operatorSessionId: id(3),
       countedCash: money(-1),
@@ -97,7 +97,7 @@ test('Gate 3C contracts enforce cash facts and blind-count boundaries', () => {
 
   assert.equal(
     CashMovementRequest.safeParse({
-      branchId: id(1),
+      locationId: id(1),
       shiftId: id(6),
       operatorSessionId: id(3),
       type: 'paid_out',
@@ -114,7 +114,7 @@ test('Gate 3C contracts enforce cash facts and blind-count boundaries', () => {
 
   assert.ok(
     ShiftCloseRequest.safeParse({
-      branchId: id(1),
+      locationId: id(1),
       shiftId: id(6),
       operatorSessionId: id(3),
       countAttemptId: id(9),
@@ -128,15 +128,15 @@ test('Gate 3C contracts enforce cash facts and blind-count boundaries', () => {
   );
   assert.ok(
     CashCommandRecoveryQuery.safeParse({
-      branchId: id(1),
+      locationId: id(1),
       operatorSessionId: id(3),
       commandId: id(11),
       idempotencyKey: id(12),
     }).success,
   );
-  assert.equal(routes.pos.cashShifts(id(1)), `/api/pos/tenants/${id(1)}/cash/shifts`);
+  assert.equal(routes.pos.cash.shifts(id(1)), `/api/v1/pos/merchants/${id(1)}/cash/shifts`);
   assert.equal(
-    routes.pos.cashCommand(id(1), id(11)),
-    `/api/pos/tenants/${id(1)}/cash/commands/${id(11)}`,
+    routes.pos.cash.command(id(1), id(11)),
+    `/api/v1/pos/merchants/${id(1)}/cash/commands/${id(11)}`,
   );
 });

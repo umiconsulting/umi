@@ -71,8 +71,8 @@ export class OperationalInterceptor implements NestInterceptor {
     const dimensions: Array<[keyof typeof LIMITS, string]> = [];
     if (request.authUser?.id) dimensions.push(['user', request.authUser.id]);
     if (device) dimensions.push(['device', device]);
-    if (context?.tenantId) dimensions.push(['tenant', context.tenantId]);
-    if (context?.branchId) dimensions.push(['branch', context.branchId]);
+    if (context?.merchantId) dimensions.push(['tenant', context.merchantId]);
+    if (context?.locationId) dimensions.push(['branch', context.locationId]);
     return dimensions;
   }
 }

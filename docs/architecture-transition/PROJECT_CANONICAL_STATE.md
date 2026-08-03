@@ -1,6 +1,6 @@
 # UMI × UmiPOS — Canonical Project State
 
-Updated: 2026-07-29
+Updated: 2026-08-02
 
 ## Product authority
 
@@ -9,7 +9,7 @@ Future clients use `packages/contract` and controlled UMI APIs.
 
 ## Completed platform gates
 
-- Gate 1A established one Supabase migration authority, API authority, RLS, and tenant and branch isolation.
+- Gate 1A established one Supabase migration authority, API authority, RLS, and merchant and location isolation.
 - Gate 1B established `packages/contract` as the only editable public contract authority.
 - Gate 1C established durable identity, staff, session, permission, entitlement, and elevation foundations.
 - Gate 1D established canonical idempotent business commands, optimistic aggregate versions,
@@ -22,12 +22,12 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Gate 2A created the Flutter application foundation at `apps/umi-pos`, consuming the generated
   Dart contract SDK and stopping at a guarded ready-for-authentication boundary.
 - Gate 2B established canonical POS device trust, credential-bound durable authentication,
-  server-intersected tenant/branch context, operator sessions, scoped elevation, and the honest
+  server-intersected merchant/location context, operator sessions, scoped elevation, and the honest
   ready shell.
 - Gate 2C established a server-authoritative, branch-aware, read-only catalog with bounded cursor
   pagination, search, operator-safe product details, media, variants, modifiers, and Flutter cache
   partitions.
-- Gate 2D established a server-authoritative, tenant/branch/operator-partitioned cart with
+- Gate 2D established a server-authoritative, merchant/location/operator-partitioned cart with
   validated variants, modifiers, notes, optimistic versioning, and tax/total previews. It does
   not commit an order, mutate inventory, take payment, or issue a receipt.
 - Gate 2E established the first authoritative online sale: immediate repricing, explicit totals
@@ -49,21 +49,22 @@ Future clients use `packages/contract` and controlled UMI APIs.
 
 ## Current implementation state
 
-- `supabase/migrations/` is the only editable migration source.
+- `docs/migration/build-v3/` is the pre-cutover DDL authority.
+- `supabase/migrations/` opens only for approved post-cutover changes.
 - `apps/umi-api` is the only authoritative business write boundary.
 - `packages/contract` generates neutral JSON, TypeScript, and Dart artifacts.
 - `umi.user` owns login identity.
-- `tenant.staff` owns the employment fact.
+- `merchant.staff` owns the employment fact.
 - `umi.user_role` and `umi.user_permission_override` own access grants.
 - `runtime.session` owns durable application sessions.
 - The API request role remains RLS-confined.
 - Internal session, elevation, and security audit tables are not readable by clients.
-- `tenant.business_command` owns command idempotency, fingerprint conflict detection, safe
+- `merchant.business_command` owns command idempotency, fingerprint conflict detection, safe
   retry classification, and stored results.
-- `tenant.aggregate_version` owns generic optimistic concurrency claims.
-- `tenant.audit_event` is the append-only, hash-linked business audit authority.
+- `merchant.aggregate_version` owns generic optimistic concurrency claims.
+- `merchant.audit_event` is the append-only, hash-linked business audit authority.
 - `runtime.audit_event_internal` separates internal metadata from client-visible audit data.
-- `tenant.financial_event` provides the neutral append-only financial-event foundation.
+- `merchant.financial_event` provides the neutral append-only financial-event foundation.
 - Financial corrections are new compensating events; existing financial events are never
   updated or deleted.
 - Request and correlation identifiers are validated at the HTTP boundary and propagated
@@ -80,37 +81,37 @@ Future clients use `packages/contract` and controlled UMI APIs.
   route guards, typed fail-closed configuration, bounded HTTP behavior, platform secure storage,
   redacted telemetry, localized Spanish/English bootstrap UI, and explicit unsupported hardware
   adapters.
-- `tenant.device` is the device authority. Approval-based requests live in
+- `merchant.device` is the device authority. Approval-based requests live in
   `runtime.device_enrollment_request`, and polling state lives in
   `runtime.device_pairing_session`.
 - UmiPOS device pairing uses one eight-character code, one polling credential, administrator
   approval, secure credential storage, and transition audit.
-- UmiPOS uses a personal tenant-unique PIN after device trust. The API resolves the staff identity
+- UmiPOS uses a personal merchant-unique PIN after device trust. The API resolves the staff identity
   and current role without an email or client role selector.
 - `runtime.operator_session` separates operator presence from PIN authentication.
 - UmiPOS consumes contract version `2.1.0`, content hash
-  `7a2f560b1542e868d78869bc712e0f46385bda5f4b7dbc378681d548524d5c88`.
+  `33dea07d6f25831f39944c9c4066795cf525c80d42f3bcb2a56da92ba00d23bb`.
 - Native UmiPOS journal schema version 1 uses AES-256-GCM with platform-secure key storage and
   separate ciphertext persistence. Replay is ordered per device credential version; Web sensitive
   journaling is unsupported.
-- `tenant.pos_cart` is mutable sale preparation only. The API owns pricing, availability,
+- `merchant.pos_cart` is mutable sale preparation only. The API owns pricing, availability,
   inclusive-tax rounding, modifier validation, line merging, and totals previews.
-- `tenant.pos_cart.lifecycle_state` is the Gate 3A sale state authority. One tenant, branch,
+- `merchant.pos_cart.lifecycle_state` is the Gate 3A sale state authority. One merchant, location,
   and operator identity can own only one editable sale. Terminal sales are immutable.
-- `tenant.pos_committed_sale` and `tenant.receipt_snapshot` are immutable checkout facts.
-  `tenant.inventory_reservation` is a time-bounded preparation record and never decrements stock.
-- Checkout commits atomically through `tenant.business_command`. Cash and manual-terminal
+- `merchant.pos_committed_sale` and `merchant.receipt_snapshot` are immutable checkout facts.
+  `merchant.inventory_reservation` is a time-bounded preparation record and never decrements stock.
+- Checkout commits atomically through `merchant.business_command`. Cash and manual-terminal
   tender facts use integer minor units. Mixed payment requires full server-confirmed coverage.
 - A manual-terminal result is an operator assertion. An unknown result remains query-only.
   It does not create an order, a receipt, or a financial event.
 - Tips and discounts use a branch policy. Each sensitive permission requires a separate,
   short, one-use manager approval bound to the full tender fingerprint.
 - Recovery returns the immutable committed result and receipt after response loss or restart.
-- `tenant.physical_register` owns the physical cash location. One unresolved shift can use one
+- `merchant.physical_register` owns the physical cash location. One unresolved shift can use one
   register.
-- `tenant.cash_shift` owns the register, device, operator, currency, and business date context.
+- `merchant.cash_shift` owns the register, device, operator, currency, and business date context.
 - The server derives the shift business date. The client cannot select this financial context.
-- `tenant.cash_ledger_entry` owns each immutable physical cash effect. Expected cash is a
+- `merchant.cash_ledger_entry` owns each immutable physical cash effect. Expected cash is a
   reproducible projection.
 - Cash checkout posts the net cash effect in the same database transaction as the sale.
 - Blind counts remain separate from expected cash. Reconciliation uses one fixed ledger sequence.
@@ -144,7 +145,8 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Certification date: `2026-07-27`
 - `BUILD_V3_CERTIFIED`: `true`
 - UmiPOS application creation: `YES WITH OBSERVATIONS`
-- Remote publication: Gate 3C publication follows the local commit through the PR gate.
+- This PR #72 integration commit synchronizes the UmiPOS branch with current `build-v3`.
+- GitHub is the authority for the current push, check, review, and mergeability state.
 - Gate 2F: complete with the external native-toolchain observation. The full disposable PostgreSQL
   migration chain and negative authorization matrix passed. Linux debug compilation cannot start
   because the runner lacks CMake, Ninja, Clang, and GTK development headers; no code defect is

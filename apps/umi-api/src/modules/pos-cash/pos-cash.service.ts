@@ -35,14 +35,14 @@ export class PosCashService {
     private readonly config?: ConfigService<AppConfig, true>,
   ) {}
 
-  center(user: AuthUser, tenantId: string, branchId: string, operatorSessionId: string) {
+  center(user: AuthUser, merchantId: string, locationId: string, operatorSessionId: string) {
     if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
-    return this.authorize(user, tenantId, branchId, operatorSessionId, 'cash.shift.read').then(
+    return this.authorize(user, merchantId, locationId, operatorSessionId, 'cash.shift.read').then(
       (authorization) =>
         this.repo.center(
           user.id,
-          tenantId,
-          branchId,
+          merchantId,
+          locationId,
           operatorSessionId,
           user.deviceId!,
           authorization.operatorId,
@@ -52,7 +52,7 @@ export class PosCashService {
 
   async commandRecovery(
     user: AuthUser,
-    tenantId: string,
+    merchantId: string,
     commandId: string,
     query: CashCommandRecoveryQuery,
   ) {
@@ -61,33 +61,33 @@ export class PosCashService {
     }
     await this.authorize(
       user,
-      tenantId,
-      query.branchId,
+      merchantId,
+      query.locationId,
       query.operatorSessionId,
       'cash.shift.read',
     );
     return this.repo.commandRecovery(
       user.id,
-      tenantId,
-      query.branchId,
+      merchantId,
+      query.locationId,
       query.commandId,
       query.idempotencyKey,
     );
   }
 
-  async open(user: AuthUser, tenantId: string, dto: OpenCashShiftRequest) {
+  async open(user: AuthUser, merchantId: string, dto: OpenCashShiftRequest) {
     const authorization = await this.authorize(
       user,
-      tenantId,
-      dto.branchId,
+      merchantId,
+      dto.locationId,
       dto.operatorSessionId,
       'cash.shift.open',
     );
     return this.unwrap(
       this.integrity.execute(
         {
-          tenantId,
-          branchId: dto.branchId,
+          merchantId,
+          locationId: dto.locationId,
           commandId: dto.commandId,
           idempotencyKey: dto.idempotencyKey,
           commandType: 'pos.cash.shift.open',
@@ -96,7 +96,7 @@ export class PosCashService {
         async (context) => {
           const result = await this.repo.openShift(
             context.client,
-            tenantId,
+            merchantId,
             authorization,
             dto,
             context.correlationId,
@@ -114,28 +114,28 @@ export class PosCashService {
     );
   }
 
-  async movement(user: AuthUser, tenantId: string, shiftId: string, dto: CashMovementRequest) {
+  async movement(user: AuthUser, merchantId: string, shiftId: string, dto: CashMovementRequest) {
     this.assertPathShift(shiftId, dto.shiftId);
     const permission = `cash.movement.${dto.type}`;
     const authorization = await this.authorize(
       user,
-      tenantId,
-      dto.branchId,
+      merchantId,
+      dto.locationId,
       dto.operatorSessionId,
       permission,
     );
     return this.unwrap(
       this.integrity.execute(
         {
-          tenantId,
-          branchId: dto.branchId,
+          merchantId,
+          locationId: dto.locationId,
           commandId: dto.commandId,
           idempotencyKey: dto.idempotencyKey,
           commandType: `pos.cash.${dto.type}`,
           payload: dto,
         },
         async (context) => {
-          const result = await this.repo.movement(context.client, tenantId, authorization, dto);
+          const result = await this.repo.movement(context.client, merchantId, authorization, dto);
           await context.appendAudit({
             eventType: 'cash.movement_committed',
             entityType: 'cash_shift',
@@ -149,27 +149,27 @@ export class PosCashService {
     );
   }
 
-  async count(user: AuthUser, tenantId: string, shiftId: string, dto: SubmitBlindCountRequest) {
+  async count(user: AuthUser, merchantId: string, shiftId: string, dto: SubmitBlindCountRequest) {
     this.assertPathShift(shiftId, dto.shiftId);
     const authorization = await this.authorize(
       user,
-      tenantId,
-      dto.branchId,
+      merchantId,
+      dto.locationId,
       dto.operatorSessionId,
       'cash.count.submit',
     );
     return this.unwrap(
       this.integrity.execute(
         {
-          tenantId,
-          branchId: dto.branchId,
+          merchantId,
+          locationId: dto.locationId,
           commandId: dto.commandId,
           idempotencyKey: dto.idempotencyKey,
           commandType: 'pos.cash.count.submit',
           payload: dto,
         },
         async (context) => {
-          const result = await this.repo.submitCount(context.client, tenantId, authorization, dto);
+          const result = await this.repo.submitCount(context.client, merchantId, authorization, dto);
           await context.appendAudit({
             eventType: 'cash.count_submitted',
             entityType: 'cash_shift',
@@ -186,24 +186,24 @@ export class PosCashService {
     );
   }
 
-  async recount(user: AuthUser, tenantId: string, shiftId: string, dto: RecountRequest) {
+  async recount(user: AuthUser, merchantId: string, shiftId: string, dto: RecountRequest) {
     this.assertPathShift(shiftId, dto.shiftId);
     const authorization = await this.authorize(
       user,
-      tenantId,
-      dto.branchId,
+      merchantId,
+      dto.locationId,
       dto.operatorSessionId,
       'cash.count.recount',
     );
     return this.command(
-      tenantId,
-      dto.branchId,
+      merchantId,
+      dto.locationId,
       dto.commandId,
       dto.idempotencyKey,
       'pos.cash.count.recount',
       dto,
       async (context) => {
-        const result = await this.repo.requestRecount(context.client, tenantId, authorization, dto);
+        const result = await this.repo.requestRecount(context.client, merchantId, authorization, dto);
         await context.appendAudit({
           eventType: 'cash.recount_requested',
           entityType: 'cash_shift',
@@ -219,21 +219,21 @@ export class PosCashService {
 
   async resolve(
     user: AuthUser,
-    tenantId: string,
+    merchantId: string,
     shiftId: string,
     dto: ResolveCashVarianceRequest,
   ) {
     this.assertPathShift(shiftId, dto.shiftId);
     const authorization = await this.authorize(
       user,
-      tenantId,
-      dto.branchId,
+      merchantId,
+      dto.locationId,
       dto.operatorSessionId,
       'cash.reconcile',
     );
     return this.command(
-      tenantId,
-      dto.branchId,
+      merchantId,
+      dto.locationId,
       dto.commandId,
       dto.idempotencyKey,
       'pos.cash.variance.resolve',
@@ -241,7 +241,7 @@ export class PosCashService {
       async (context) => {
         const result = await this.repo.resolveVariance(
           context.client,
-          tenantId,
+          merchantId,
           authorization,
           dto,
         );
@@ -259,27 +259,27 @@ export class PosCashService {
 
   async reconcile(
     user: AuthUser,
-    tenantId: string,
+    merchantId: string,
     shiftId: string,
     dto: ReconcileCashShiftRequest,
   ) {
     this.assertPathShift(shiftId, dto.shiftId);
     const authorization = await this.authorize(
       user,
-      tenantId,
-      dto.branchId,
+      merchantId,
+      dto.locationId,
       dto.operatorSessionId,
       'cash.reconcile',
     );
     return this.command(
-      tenantId,
-      dto.branchId,
+      merchantId,
+      dto.locationId,
       dto.commandId,
       dto.idempotencyKey,
       'pos.cash.reconcile',
       dto,
       async (context) => {
-        const result = await this.repo.reconcile(context.client, tenantId, authorization, dto);
+        const result = await this.repo.reconcile(context.client, merchantId, authorization, dto);
         await context.appendAudit({
           eventType: 'cash.reconciliation_completed',
           entityType: 'cash_shift',
@@ -292,20 +292,20 @@ export class PosCashService {
     );
   }
 
-  async close(user: AuthUser, tenantId: string, shiftId: string, dto: ShiftCloseRequest) {
+  async close(user: AuthUser, merchantId: string, shiftId: string, dto: ShiftCloseRequest) {
     this.assertPathShift(shiftId, dto.shiftId);
     const authorization = await this.authorize(
       user,
-      tenantId,
-      dto.branchId,
+      merchantId,
+      dto.locationId,
       dto.operatorSessionId,
       'cash.shift.close',
     );
     return this.unwrap(
       this.integrity.execute(
         {
-          tenantId,
-          branchId: dto.branchId,
+          merchantId,
+          locationId: dto.locationId,
           commandId: dto.commandId,
           idempotencyKey: dto.idempotencyKey,
           commandType: 'pos.cash.shift.close',
@@ -314,7 +314,7 @@ export class PosCashService {
         async (context) => {
           const result = await this.repo.close(
             context.client,
-            tenantId,
+            merchantId,
             authorization,
             dto,
             context.correlationId,
@@ -334,7 +334,7 @@ export class PosCashService {
 
   async transition(
     user: AuthUser,
-    tenantId: string,
+    merchantId: string,
     shiftId: string,
     dto: ShiftTransitionRequest,
     target: 'suspended' | 'open',
@@ -343,14 +343,14 @@ export class PosCashService {
     const permission = target === 'suspended' ? 'cash.shift.suspend' : 'cash.shift.resume';
     const authorization = await this.authorize(
       user,
-      tenantId,
-      dto.branchId,
+      merchantId,
+      dto.locationId,
       dto.operatorSessionId,
       permission,
     );
     return this.command(
-      tenantId,
-      dto.branchId,
+      merchantId,
+      dto.locationId,
       dto.commandId,
       dto.idempotencyKey,
       `pos.cash.shift.${target}`,
@@ -358,7 +358,7 @@ export class PosCashService {
       async (context) => {
         const result = await this.repo.transition(
           context.client,
-          tenantId,
+          merchantId,
           authorization,
           dto,
           target,
@@ -375,12 +375,13 @@ export class PosCashService {
     );
   }
 
-  async handoff(user: AuthUser, tenantId: string, shiftId: string, dto: ShiftHandoffRequest) {
+  async handoff(user: AuthUser, merchantId: string, shiftId: string, dto: ShiftHandoffRequest) {
+    if (!user.deviceId) throw new ForbiddenException({ code: 'DEVICE_NOT_ALLOWED' });
     this.assertPathShift(shiftId, dto.shiftId);
     const authorization = await this.authorize(
       user,
-      tenantId,
-      dto.branchId,
+      merchantId,
+      dto.locationId,
       dto.operatorSessionId,
       'cash.shift.handoff',
     );
@@ -389,10 +390,11 @@ export class PosCashService {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
     }
     const incoming = await this.repo.incomingPinRecord(
-      posPinLookupHash(secret, tenantId, dto.incomingOperatorPin),
-      tenantId,
-      dto.branchId,
+      posPinLookupHash(secret, merchantId, dto.incomingOperatorPin),
+      merchantId,
+      dto.locationId,
       dto.operatorSessionId,
+      user.id,
     );
     if (
       !incoming ||
@@ -403,17 +405,17 @@ export class PosCashService {
       throw new ForbiddenException({ code: 'PIN_LOCKED' });
     }
     if (!this.passwords.verify(dto.incomingOperatorPin, incoming.salt, incoming.hash)) {
-      await this.repo.recordPinFailure(incoming.staffId);
+      await this.repo.recordPinFailure(user.deviceId, merchantId, dto.locationId, user.id);
       throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
     }
     return this.command(
-      tenantId,
-      dto.branchId,
+      merchantId,
+      dto.locationId,
       dto.commandId,
       dto.idempotencyKey,
       'pos.cash.shift.handoff',
       {
-        branchId: dto.branchId,
+        locationId: dto.locationId,
         shiftId: dto.shiftId,
         operatorSessionId: dto.operatorSessionId,
         expectedShiftVersion: dto.expectedShiftVersion,
@@ -425,7 +427,7 @@ export class PosCashService {
       async (context) => {
         const result = await this.repo.handoff(
           context.client,
-          tenantId,
+          merchantId,
           authorization,
           incoming,
           dto,
@@ -442,20 +444,20 @@ export class PosCashService {
     );
   }
 
-  async noSale(user: AuthUser, tenantId: string, shiftId: string, dto: NoSaleDrawerRequest) {
+  async noSale(user: AuthUser, merchantId: string, shiftId: string, dto: NoSaleDrawerRequest) {
     this.assertPathShift(shiftId, dto.shiftId);
     const authorization = await this.authorize(
       user,
-      tenantId,
-      dto.branchId,
+      merchantId,
+      dto.locationId,
       dto.operatorSessionId,
       'cash.drawer.no_sale',
     );
     return this.unwrap(
       this.integrity.execute(
         {
-          tenantId,
-          branchId: dto.branchId,
+          merchantId,
+          locationId: dto.locationId,
           commandId: dto.commandId,
           idempotencyKey: dto.idempotencyKey,
           commandType: 'pos.cash.drawer.no_sale',
@@ -464,7 +466,7 @@ export class PosCashService {
         async (context) => {
           const result = await this.repo.noSale(
             context.client,
-            tenantId,
+            merchantId,
             authorization,
             dto,
             context.correlationId,
@@ -484,8 +486,8 @@ export class PosCashService {
 
   private async authorize(
     user: AuthUser,
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     operatorSessionId: string,
     permission: string,
   ): Promise<CashAuthorization> {
@@ -494,8 +496,8 @@ export class PosCashService {
       user.id,
       user.sessionId,
       user.deviceId,
-      tenantId,
-      branchId,
+      merchantId,
+      locationId,
       operatorSessionId,
     );
     if (
@@ -514,8 +516,8 @@ export class PosCashService {
   }
 
   private async command<T>(
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     commandId: string,
     idempotencyKey: string,
     commandType: string,
@@ -525,8 +527,8 @@ export class PosCashService {
     return this.unwrap(
       this.integrity.execute(
         {
-          tenantId,
-          branchId,
+          merchantId,
+          locationId,
           commandId,
           idempotencyKey,
           commandType,

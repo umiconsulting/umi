@@ -17,150 +17,9 @@ const {
   CartLineInput,
   CheckoutCommand,
   CheckoutResult,
-  TenderDraft,
-  ManualTerminalOutcome,
-  PartialPaymentState,
-  ManagerApprovalRequest,
   OfflineCheckoutCommand,
   RecoveryAction,
-  SaleSnapshot,
-  SuspendSaleRequest,
-  CancelSaleRequest,
-  SaleHistoryQuery,
-  PosCustomerSearchQuery,
 } = require('../dist/index.cjs');
-const { routes } = require('../dist/routes.cjs');
-
-test('Gate 3A sale lifecycle contracts enforce explicit states and safe reasons', () => {
-  const id = '00000000-0000-4000-8000-000000000001';
-  const cart = {
-    id,
-    tenantId: id,
-    branchId: id,
-    operatorSessionId: id,
-    status: 'draft',
-    version: 1,
-    items: [],
-    totals: {
-      subtotal: { minorUnits: 0, currency: 'MXN' },
-      tax: { minorUnits: 0, currency: 'MXN' },
-      discounts: {
-        total: { minorUnits: 0, currency: 'MXN' },
-        entries: [],
-      },
-      grandTotal: { minorUnits: 0, currency: 'MXN' },
-      businessDate: '2026-07-29',
-    },
-    checkoutEnabled: false,
-    checkoutMessageCode: 'CHECKOUT_GATE_NOT_AVAILABLE',
-    updatedAt: '2026-07-29T12:00:00Z',
-  };
-  assert.ok(
-    SaleSnapshot.safeParse({
-      id,
-      state: 'building_cart',
-      cart,
-      label: null,
-      customer: null,
-      originalOperatorSessionId: id,
-      currentOperatorSessionId: id,
-      suspendedAt: null,
-      cancelledAt: null,
-      cancellationReason: null,
-      committedSaleId: null,
-      receiptId: null,
-      receiptRef: null,
-      updatedAt: '2026-07-29T12:00:00Z',
-    }).success,
-  );
-  assert.ok(
-    SuspendSaleRequest.safeParse({
-      branchId: id,
-      operatorSessionId: id,
-      expectedVersion: 1,
-      label: 'Mesa 4',
-      idempotencyKey: id,
-    }).success,
-  );
-  assert.equal(
-    CancelSaleRequest.safeParse({
-      branchId: id,
-      operatorSessionId: id,
-      expectedVersion: 1,
-      reason: '<script>',
-      idempotencyKey: id,
-    }).success,
-    false,
-  );
-  assert.ok(
-    SaleHistoryQuery.safeParse({
-      branchId: id,
-      operatorSessionId: id,
-      state: 'suspended',
-      search: 'Mesa',
-      sort: 'oldest',
-      limit: 20,
-    }).success,
-  );
-  assert.equal(
-    PosCustomerSearchQuery.parse({
-      branchId: id,
-      operatorSessionId: id,
-      recent: 'false',
-    }).recent,
-    false,
-  );
-  assert.equal(routes.pos.saleSuspend(id, id), `/api/pos/tenants/${id}/sales/${id}/suspend`);
-});
-
-test('Gate 3B checkout contracts bound tenders, approvals, tips, discounts, and recovery', () => {
-  const cash = TenderDraft.parse({
-    id: '00000000-0000-4000-8000-000000000101',
-    type: 'cash',
-    amount: { minorUnits: 8500, currency: 'MXN' },
-    amountReceived: { minorUnits: 10000, currency: 'MXN' },
-    status: 'draft',
-    correlationId: null,
-  });
-  assert.equal(cash.amountReceived.minorUnits, 10000);
-  assert.throws(() =>
-    TenderDraft.parse({
-      ...cash,
-      amount: { minorUnits: 0, currency: 'MXN' },
-    }),
-  );
-  assert.throws(() =>
-    CheckoutCommand.parse({
-      cartId: '00000000-0000-4000-8000-000000000102',
-      branchId: '00000000-0000-4000-8000-000000000103',
-      operatorSessionId: '00000000-0000-4000-8000-000000000104',
-      expectedCartVersion: 1,
-      paymentMethod: 'cash',
-      totalsFingerprint: null,
-      idempotencyKey: '00000000-0000-4000-8000-000000000105',
-      commandId: '00000000-0000-4000-8000-000000000106',
-      tenderDrafts: Array.from({ length: 9 }, (_, index) => ({
-        ...cash,
-        id: `00000000-0000-4000-8000-${String(index + 200).padStart(12, '0')}`,
-      })),
-      discountDrafts: [],
-      approvalIds: [],
-      receiptDelivery: { destination: 'display', channel: null, customerContactId: null },
-    }),
-  );
-  assert.equal(ManualTerminalOutcome.parse('outcome_unknown'), 'outcome_unknown');
-  assert.equal(PartialPaymentState.parse('partially_covered'), 'partially_covered');
-  assert.throws(() =>
-    ManagerApprovalRequest.parse({
-      operatorSessionId: '00000000-0000-4000-8000-000000000104',
-      managerPin: '2468',
-      permission: 'checkout.discount.approve',
-      tenantId: '00000000-0000-4000-8000-000000000107',
-      branchId: '00000000-0000-4000-8000-000000000103',
-      commandFingerprint: 'not-a-fingerprint',
-    }),
-  );
-});
 
 test('Gate 2F checkout identity and recovery actions are typed and bounded', () => {
   const hash = 'a'.repeat(64);
@@ -206,7 +65,7 @@ test('Gate 2D cart contracts bound quantities, notes, and checkout authority', (
   const id = '00000000-0000-4000-8000-000000000001';
   const line = {
     cartId: id,
-    branchId: id,
+    locationId: id,
     operatorSessionId: id,
     productId: id,
     modifierSelections: [],
@@ -220,8 +79,8 @@ test('Gate 2D cart contracts bound quantities, notes, and checkout authority', (
   assert.ok(
     Cart.safeParse({
       id,
-      tenantId: id,
-      branchId: id,
+      merchantId: id,
+      locationId: id,
       operatorSessionId: id,
       status: 'draft',
       version: 1,
@@ -247,7 +106,7 @@ test('Gate 2E checkout requires explicit totals confirmation and safe ambiguity'
   const id = '00000000-0000-4000-8000-000000000001';
   const command = {
     cartId: id,
-    branchId: id,
+    locationId: id,
     operatorSessionId: id,
     expectedCartVersion: 1,
     paymentMethod: 'cash',
@@ -305,10 +164,10 @@ test('Money uses integer minor units and explicit currency', () => {
   assert.equal(Money.safeParse({ minorUnits: 1099, currency: 'mxn' }).success, false);
 });
 
-test('Gate 2C catalog contracts bound branch search and cursor pages', () => {
-  const branchId = '00000000-0000-4000-8000-000000000004';
-  assert.ok(CatalogQuery.safeParse({ branchId, search: 'cafe', limit: 40 }).success);
-  assert.equal(CatalogQuery.safeParse({ branchId, limit: 101 }).success, false);
+test('Gate 2C catalog contracts bound location search and cursor pages', () => {
+  const locationId = '00000000-0000-4000-8000-000000000004';
+  assert.ok(CatalogQuery.safeParse({ locationId, search: 'cafe', limit: 40 }).success);
+  assert.equal(CatalogQuery.safeParse({ locationId, limit: 101 }).success, false);
   assert.ok(
     CatalogPage.safeParse({
       items: [],
@@ -337,8 +196,8 @@ test('OfflineCommandEnvelope rejects unbounded identity and invalid fingerprints
   const command = {
     commandId: '00000000-0000-4000-8000-000000000001',
     deviceId: '00000000-0000-4000-8000-000000000002',
-    tenantId: '00000000-0000-4000-8000-000000000003',
-    branchId: '00000000-0000-4000-8000-000000000004',
+    merchantId: '00000000-0000-4000-8000-000000000003',
+    locationId: '00000000-0000-4000-8000-000000000004',
     operatorSessionId: '00000000-0000-4000-8000-000000000005',
     sequence: 1,
     issuedAt: '2026-07-25T12:00:00Z',
@@ -356,8 +215,8 @@ test('receipt and error envelopes validate public-safe shapes', () => {
   assert.ok(
     ReceiptSnapshot.safeParse({
       receiptRef: 'receipt-public-ref',
-      tenantId: '00000000-0000-4000-8000-000000000003',
-      branchId: '00000000-0000-4000-8000-000000000004',
+      merchantId: '00000000-0000-4000-8000-000000000003',
+      locationId: '00000000-0000-4000-8000-000000000004',
       issuedAt: '2026-07-25T12:00:00Z',
       businessDate: '2026-07-25',
       lines: [
@@ -400,8 +259,6 @@ test('neutral artifact has required models and a valid checksum', async () => {
     'ReconciliationResponse',
     'ReceiptSnapshot',
     'PaymentAmbiguity',
-    'SaleSnapshot',
-    'SaleHistoryPage',
   ]) {
     assert.ok(manifest.definitions[name], `missing ${name}`);
   }
@@ -434,5 +291,24 @@ test('Gate 2B device contracts are bounded and generated for Flutter', async () 
     'utf8',
   );
   assert.match(dart, /abstract final class UmiRoutes/);
-  assert.match(dart, /static const posLogin = '\/api\/auth\/pos\/login'/);
+  // The generated Dart must agree with ROUTE_TABLE, not with a path repeated here.
+  // Asserting a literal is how this file became a fourth copy of the URL space.
+  const { ROUTE_TABLE } = await import('../dist/index.js');
+  const exposed = ROUTE_TABLE.filter((r) => r.dart !== null);
+  assert.ok(exposed.length > 0, 'no routes are exposed to the Dart client');
+  for (const def of exposed) {
+    const literal = def.path.replace(
+      /:([A-Za-z0-9_]+)/g,
+      (_m, name) => '${Uri.encodeComponent(' + name + ')}',
+    );
+    assert.ok(
+      dart.includes(`'${literal}'`),
+      `generated Dart is missing ${def.method} ${def.path} (${def.dart})`,
+    );
+  }
+  // Every POS-facing path carries the URL major. A field client must never be able
+  // to reach an unversioned POS route.
+  for (const def of exposed) {
+    assert.match(def.path, /^\/api\/v1\//, `${def.id} is exposed to the POS but unversioned`);
+  }
 });

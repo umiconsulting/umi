@@ -18,8 +18,8 @@ export const DeviceSummary = z
   .object({
     id: Uuid,
     publicId: Uuid,
-    tenantId: Uuid,
-    branchId: Uuid.nullable(),
+    merchantId: Uuid,
+    locationId: Uuid.nullable(),
     displayName: z.string().min(1).max(120),
     type: DeviceType,
     platform: DevicePlatform,
@@ -35,7 +35,7 @@ export type DeviceSummary = z.infer<typeof DeviceSummary>;
 
 export const BeginDeviceEnrollmentRequest = z
   .object({
-    branchId: Uuid.nullable(),
+    locationId: Uuid.nullable(),
     displayName: z.string().trim().min(1).max(120),
     type: DeviceType,
     platform: DevicePlatform,
@@ -106,8 +106,8 @@ export type DevicePairingSession = z.infer<typeof DevicePairingSession>;
 export const DeviceEnrollmentRequestView = z
   .object({
     id: Uuid,
-    tenantId: Uuid,
-    branchId: Uuid.nullable(),
+    merchantId: Uuid,
+    locationId: Uuid.nullable(),
     displayName: z.string().min(1).max(120),
     type: DeviceType,
     platform: DevicePlatform,
@@ -220,8 +220,8 @@ export type PosLoginRequest = z.infer<typeof PosLoginRequest>;
 export const PosPinLoginRequest = z
   .object({
     pin: z.string().regex(/^\d{4,8}$/),
-    tenantId: Uuid,
-    branchId: Uuid,
+    merchantId: Uuid,
+    locationId: Uuid,
     installationId: Uuid,
   })
   .strict();
@@ -236,37 +236,42 @@ export const PosSessionTokens = z
     refreshToken: z.string().min(1).max(4096),
   })
   .strict();
+export const PosSessionEnvelope = SessionEnvelope.extend({
+  sessionId: Uuid,
+  deviceId: Uuid.nullable(),
+});
+export type PosSessionEnvelope = z.infer<typeof PosSessionEnvelope>;
 export const PosSessionResponse = z
   .object({
-    session: SessionEnvelope,
+    session: PosSessionEnvelope,
     tokens: PosSessionTokens,
   })
   .strict();
 export type PosSessionResponse = z.infer<typeof PosSessionResponse>;
 
-export const BranchAccess = z
+export const LocationAccess = z
   .object({
     id: Uuid,
-    tenantId: Uuid,
+    merchantId: Uuid,
     name: z.string().min(1).max(160),
     status: z.enum(['active', 'closed']),
     deviceAllowed: z.boolean(),
     operatorAllowed: z.boolean(),
   })
   .strict();
-export type BranchAccess = z.infer<typeof BranchAccess>;
+export type LocationAccess = z.infer<typeof LocationAccess>;
 
-export const EntryTenant = z
+export const EntryMerchant = z
   .object({
     id: Uuid,
     name: z.string().min(1).max(160),
     roles: z.array(z.string().min(1).max(100)).max(50),
     permissions: z.array(z.string().min(1).max(100)).max(500),
-    branches: z.array(BranchAccess).max(500),
+    locations: z.array(LocationAccess).max(500),
     entitlements: z.array(EffectiveEntitlement).max(200),
   })
   .strict();
-export const EntryContextResponse = z.object({ tenants: z.array(EntryTenant).max(100) }).strict();
+export const EntryContextResponse = z.object({ merchants: z.array(EntryMerchant).max(100) }).strict();
 
 export const OperatorSessionState = z.enum(['active', 'locked', 'ended']);
 export const OperatorSessionView = z
@@ -274,8 +279,8 @@ export const OperatorSessionView = z
     id: Uuid,
     userId: Uuid,
     staffId: Uuid,
-    tenantId: Uuid,
-    branchId: Uuid,
+    merchantId: Uuid,
+    locationId: Uuid,
     deviceId: Uuid,
     state: OperatorSessionState,
     permissions: z.array(z.string().min(1).max(100)).max(500),
@@ -286,15 +291,15 @@ export const OperatorSessionView = z
   })
   .strict();
 export type OperatorSessionView = z.infer<typeof OperatorSessionView>;
-export const StartOperatorSessionRequest = z.object({ tenantId: Uuid, branchId: Uuid }).strict();
+export const StartOperatorSessionRequest = z.object({ merchantId: Uuid, locationId: Uuid }).strict();
 export type StartOperatorSessionRequest = z.infer<typeof StartOperatorSessionRequest>;
 
 export const VerifyOperatorPinRequest = z
   .object({
     pin: z.string().regex(/^\d{4,8}$/),
     permission: z.string().min(1).max(100),
-    tenantId: Uuid,
-    branchId: Uuid,
+    merchantId: Uuid,
+    locationId: Uuid,
   })
   .strict();
 export type VerifyOperatorPinRequest = z.infer<typeof VerifyOperatorPinRequest>;
@@ -303,8 +308,8 @@ export const ManagerApprovalRequest = z
     operatorSessionId: Uuid,
     managerPin: z.string().regex(/^\d{4,8}$/),
     permission: z.string().min(1).max(100),
-    tenantId: Uuid,
-    branchId: Uuid,
+    merchantId: Uuid,
+    locationId: Uuid,
     commandFingerprint: z
       .string()
       .regex(/^[a-f0-9]{64}$/)
@@ -317,8 +322,8 @@ export const ElevationGrantView = z
   .object({
     elevationId: Uuid,
     permission: z.string().min(1).max(100),
-    tenantId: Uuid,
-    branchId: Uuid,
+    merchantId: Uuid,
+    locationId: Uuid,
     method: z.enum(['manager_approval', 'operator_pin']),
     expiresAt: IsoTimestamp,
     commandFingerprint: z
@@ -357,9 +362,10 @@ export const deviceModels = {
   PosPinLoginRequest,
   PosRefreshRequest,
   PosSessionTokens,
+  PosSessionEnvelope,
   PosSessionResponse,
-  BranchAccess,
-  EntryTenant,
+  LocationAccess,
+  EntryMerchant,
   EntryContextResponse,
   OperatorSessionState,
   OperatorSessionView,

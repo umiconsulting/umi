@@ -73,8 +73,8 @@ export const TotalsPreview = z
 export const Cart = z
   .object({
     id: Uuid,
-    tenantId: Uuid,
-    branchId: Uuid,
+    merchantId: Uuid,
+    locationId: Uuid,
     operatorSessionId: Uuid,
     status: z.enum(['draft', 'prepared', 'committed', 'abandoned']),
     version: z.number().int().positive(),
@@ -86,12 +86,12 @@ export const Cart = z
   })
   .strict();
 export const CreateCartRequest = z
-  .object({ branchId: Uuid, operatorSessionId: Uuid, idempotencyKey: Idempotency })
+  .object({ locationId: Uuid, operatorSessionId: Uuid, idempotencyKey: Idempotency })
   .strict();
 export const CartLineInput = z
   .object({
     cartId: Uuid,
-    branchId: Uuid,
+    locationId: Uuid,
     operatorSessionId: Uuid,
     productId: Uuid,
     variantId: Uuid.nullable().default(null),
@@ -108,7 +108,7 @@ export const CartLineInput = z
 export const RemoveCartLineRequest = z
   .object({
     cartId: Uuid,
-    branchId: Uuid,
+    locationId: Uuid,
     operatorSessionId: Uuid,
     expectedVersion: z.number().int().positive(),
     idempotencyKey: Idempotency,
@@ -118,13 +118,13 @@ export const ClearCartRequest = RemoveCartLineRequest;
 export const PrepareSaleRequest = z
   .object({
     cartId: Uuid,
-    branchId: Uuid,
+    locationId: Uuid,
     operatorSessionId: Uuid,
     expectedVersion: z.number().int().positive(),
     idempotencyKey: Idempotency,
   })
   .strict();
-export const CartQuery = z.object({ branchId: Uuid, operatorSessionId: Uuid }).strict();
+export const CartQuery = z.object({ locationId: Uuid, operatorSessionId: Uuid }).strict();
 
 export type Cart = z.infer<typeof Cart>;
 export type CartItem = z.infer<typeof CartItem>;

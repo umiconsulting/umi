@@ -78,8 +78,8 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     if (cart != null && operator != null) {
       unawaited(
         widget.checkout.recover(
-          tenantId: cart.tenantId,
-          branchId: cart.branchId,
+          merchantId: cart.merchantId,
+          locationId: cart.locationId,
           operatorSessionId: operator.id,
           cartId: cart.id,
           cartVersion: cart.version,
@@ -754,8 +754,8 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         tenant == null || device == null || operator == null
         ? null
         : OfflineAuthorityContext(
-            tenantId: tenant.id,
-            branchId: cart.branchId,
+            merchantId: tenant.id,
+            locationId: cart.locationId,
             deviceId: device.id,
             credentialVersion: device.credentialVersion,
             operatorSessionId: operator.id,
@@ -770,15 +770,15 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     dirty = false;
     widget.sales.checkoutStarted();
     widget.checkout.preview(
-      tenantId: cart.tenantId,
-      branchId: cart.branchId,
+      merchantId: cart.merchantId,
+      locationId: cart.locationId,
       operatorSessionId: cart.operatorSessionId,
       cartId: cart.id,
       cartVersion: cart.version,
       paymentMethod: method,
       cart: cart,
       authority: offlineAuthority,
-      branchName: entry.selectedBranch?.name ?? '',
+      locationName: entry.selectedBranch?.name ?? '',
       operatorName: operator?.staffId ?? cart.operatorSessionId,
       cashShiftId: widget.cashShiftId,
       cashReceivedMinorUnits: cashEnabled
@@ -894,7 +894,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
             receipt.provisionalSaleId,
             textAlign: TextAlign.center,
           ),
-          Text(receipt.branchName, textAlign: TextAlign.center),
+          Text(receipt.locationName, textAlign: TextAlign.center),
           Text(receipt.operatorName, textAlign: TextAlign.center),
           const Divider(),
           Expanded(

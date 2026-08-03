@@ -6,7 +6,13 @@ import { defineConfig } from 'tsup';
 //   - umi-dashboard (Vite/ESM) imports the routes entry (via a source alias in
 //     dev/build; the ESM dist is here for any packaged consumer).
 export default defineConfig({
-  entry: ['src/index.ts', 'src/routes.ts', 'src/entitlements.ts', 'src/platform.ts'],
+  entry: [
+    'src/index.ts',
+    'src/routes.ts',
+    'src/route-table.ts',
+    'src/entitlements.ts',
+    'src/platform.ts',
+  ],
   format: ['cjs', 'esm'],
   dts: true,
   target: 'node22',

@@ -61,7 +61,7 @@ void main() {
     await OfflinePolicyCache(journal, web: false).save(_policy(now), now);
     await expectLater(
       OfflinePolicyCache(journal, web: false).validated(
-        authority: _authority(branchId: _id(99)),
+        authority: _authority(locationId: _id(99)),
         now: now,
       ),
       throwsA(
@@ -104,8 +104,8 @@ void main() {
       await cache.save(_policy(now), now);
       final cart = Cart(
         id: _id(20),
-        tenantId: _id(1),
-        branchId: _id(2),
+        merchantId: _id(1),
+        locationId: _id(2),
         operatorSessionId: _id(4),
         status: 'prepared',
         version: 2,
@@ -141,7 +141,7 @@ void main() {
         authority: _authority(),
         checkoutCommand: CheckoutCommand(
           cartId: cart.id,
-          branchId: cart.branchId,
+          locationId: cart.locationId,
           operatorSessionId: cart.operatorSessionId,
           expectedCartVersion: cart.version,
           paymentMethod: 'cash',
@@ -158,7 +158,7 @@ void main() {
         taxSnapshotAt: now,
         amountReceivedMinorUnits: 5000,
         businessDate: '2026-07-28',
-        branchName: 'Branch',
+        locationName: 'Branch',
         operatorName: 'Operator',
       );
       final facts = OfflineCheckoutFacts(
@@ -199,7 +199,7 @@ void main() {
           taxSnapshotAt: request.taxSnapshotAt,
           amountReceivedMinorUnits: request.amountReceivedMinorUnits,
           businessDate: request.businessDate,
-          branchName: request.branchName,
+          locationName: request.locationName,
           operatorName: request.operatorName,
         ),
         facts: facts,
@@ -222,10 +222,10 @@ Map<String, Object?> _totals() => {
   'businessDate': '2026-07-28',
 };
 
-OfflineAuthorityContext _authority({String? branchId}) =>
+OfflineAuthorityContext _authority({String? locationId}) =>
     OfflineAuthorityContext(
-      tenantId: _id(1),
-      branchId: branchId ?? _id(2),
+      merchantId: _id(1),
+      locationId: locationId ?? _id(2),
       deviceId: _id(3),
       credentialVersion: 1,
       operatorSessionId: _id(4),
@@ -242,8 +242,8 @@ OfflinePolicy _policy(DateTime now) {
     'issuedAt': now.toIso8601String(),
     'expiresAt': now.add(const Duration(minutes: 10)).toIso8601String(),
     'maxPolicyAgeSeconds': 600,
-    'tenantId': _id(1),
-    'branchId': _id(2),
+    'merchantId': _id(1),
+    'locationId': _id(2),
     'deviceId': _id(3),
     'deviceCredentialVersion': 1,
     'currency': 'MXN',

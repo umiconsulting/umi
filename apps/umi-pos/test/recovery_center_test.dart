@@ -30,8 +30,8 @@ void main() {
             journal: journal,
             recovery: recovery,
             scope: ReplayScope(
-              tenantId: _id(1),
-              branchId: _id(2),
+              merchantId: _id(1),
+              locationId: _id(2),
               operatorSessionId: _id(3),
               credentialVersion: 1,
             ),
@@ -71,8 +71,8 @@ void main() {
               journal: journal,
               recovery: recovery,
               scope: ReplayScope(
-                tenantId: _id(1),
-                branchId: _id(2),
+                merchantId: _id(1),
+                locationId: _id(2),
                 operatorSessionId: _id(3),
                 credentialVersion: 1,
               ),
@@ -110,8 +110,8 @@ void main() {
               journal: journal,
               recovery: recovery,
               scope: ReplayScope(
-                tenantId: _id(1),
-                branchId: _id(2),
+                merchantId: _id(1),
+                locationId: _id(2),
                 operatorSessionId: _id(3),
                 credentialVersion: 1,
               ),

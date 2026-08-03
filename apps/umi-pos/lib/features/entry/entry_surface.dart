@@ -324,7 +324,7 @@ final class _TenantSelection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    if (controller.state.tenants.isEmpty) {
+    if (controller.state.merchants.isEmpty) {
       return StatusCard(
         icon: Icons.domain_disabled_outlined,
         title: l.noTenantTitle,
@@ -339,7 +339,7 @@ final class _TenantSelection extends StatelessWidget {
             l.selectTenantTitle,
             style: Theme.of(context).textTheme.headlineSmall,
           ),
-          for (final tenant in controller.state.tenants)
+          for (final tenant in controller.state.merchants)
             ListTile(
               title: Text(tenant.name),
               trailing: const Icon(Icons.chevron_right),
@@ -358,9 +358,9 @@ final class _BranchSelection extends StatelessWidget {
   Widget build(BuildContext context) {
     final tenant = controller.state.selectedTenant;
     final l = AppLocalizations.of(context);
-    final branches =
-        tenant?.branches
-            .map(BranchAccess.fromJson)
+    final locations =
+        tenant?.locations
+            .map(LocationAccess.fromJson)
             .where(
               (b) =>
                   b.deviceAllowed && b.operatorAllowed && b.status == 'active',
@@ -375,8 +375,8 @@ final class _BranchSelection extends StatelessWidget {
             l.selectBranchTitle,
             style: Theme.of(context).textTheme.headlineSmall,
           ),
-          if (branches.isEmpty) Text(l.noBranchBody),
-          for (final branch in branches)
+          if (locations.isEmpty) Text(l.noBranchBody),
+          for (final branch in locations)
             ListTile(
               title: Text(branch.name),
               trailing: const Icon(Icons.chevron_right),

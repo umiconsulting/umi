@@ -102,6 +102,28 @@ export const configSchema = z
     COOKIE_DOMAIN: z.string().optional(), // e.g. .umiconsulting.co
     APP_URL: z.string().url().optional(), // password-reset link base
 
+    // ── Second factor ────────────────────────────────────────────────────────
+    // The pepper for runtime.otp.code_hash. A six-digit code has only 10^6
+    // possibilities, so a plain digest of it is reversible by brute force the
+    // moment someone reads the table. HMAC under a key held OUTSIDE the database
+    // means a stolen dump alone does not yield the codes. Same reasoning, and the
+    // same construction, as merchant.staff.operator_pin_lookup.
+    // Optional in the schema so non-auth phases and tests boot; MfaService throws
+    // a clear configuration error if a code is ever issued without it.
+    MFA_OTP_PEPPER: z.string().min(32).optional(),
+    // How long a mailed code stays valid. Short on purpose: the code travels over
+    // email, which is the weakest part of this factor.
+    MFA_OTP_TTL_SECONDS: z.coerce.number().int().min(60).max(1800).default(300),
+    // Wrong guesses allowed against ONE code before it is burned. Six digits with
+    // unlimited guesses is not a factor, it is a delay.
+    MFA_OTP_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(5),
+    // Codes ISSUED per user per hour. This is what makes MFA_OTP_MAX_ATTEMPTS mean
+    // anything: a new code resets `attempts` to 0, so without a ceiling here an
+    // attacker who holds the password just re-logs-in for a fresh allowance and the
+    // per-code cap bounds nothing. 5/hour leaves room for a user who mistypes an
+    // address or waits out a slow mail relay.
+    MFA_OTP_MAX_PER_HOUR: z.coerce.number().int().min(1).max(50).default(5),
+
     // Cash QR + customer-auth secrets (ported from umi-cash; MUST be byte-identical
     // to umi-cash's values or already-issued wallet passes / customer tokens fail).
     // APP_QR_SECRET is used TWO ways: HS256 JWT key (UTF-8 bytes) for in-app QR, and
@@ -124,10 +146,10 @@ export const configSchema = z
     ALLOW_INSECURE_TWILIO_WEBHOOK: booleanFromEnv.default(false),
     // Location-pin tool (geo). Optional; the tool degrades to text when unset.
     GOOGLE_MAPS_API_KEY: z.string().optional(),
-    // Tenant-resolution fallback (Phase 3): when an inbound WhatsApp number has no
-    // matching tenant.whatsapp_number row, messages resolve to this tenant. Lets the
-    // single live tenant keep working before its number is seeded in channel_accounts.
-    DEFAULT_TENANT_ID: z.string().uuid().optional(),
+    // Merchant-resolution fallback (Phase 3): when an inbound WhatsApp number has no
+    // matching merchant.whatsapp_number row, messages resolve to this merchant. Lets the
+    // single live merchant keep working before its number is seeded in channel_accounts.
+    DEFAULT_MERCHANT_ID: z.string().uuid().optional(),
     ZETTLE_CLIENT_ID: z.string().optional(),
     ZETTLE_API_KEY: z.string().optional(),
     SMTP_HOST: z.string().optional(),

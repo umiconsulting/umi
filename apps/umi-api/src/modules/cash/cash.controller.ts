@@ -1,10 +1,10 @@
 import { Body, Controller, Get, Patch, Put, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
-import { TenantAccessGuard } from '../auth/tenant-access.guard';
+import { MerchantAccessGuard } from '../auth/merchant-access.guard';
 import { EntitlementGuard } from '../auth/entitlement.guard';
 import { RequireProduct } from '../auth/require-product.decorator';
-import { Tenant } from '../auth/current-user.decorator';
-import type { TenantAccess } from '../auth/auth.types';
+import { Merchant } from '../auth/current-user.decorator';
+import type { MerchantAccess } from '../auth/auth.types';
 import { CashReadService } from './cash-read.service';
 
 /**
@@ -13,56 +13,56 @@ import { CashReadService } from './cash-read.service';
  * Gated on the `cash` product. Customer-facing wallet/ledger writes are NOT here
  * — see cash-write.controller (inert, unmounted unless CASH_WRITE_ENABLED).
  */
-@UseGuards(AuthGuard, TenantAccessGuard, EntitlementGuard)
+@UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard)
 @RequireProduct('cash')
 @Controller('api/:slug/admin')
 export class CashController {
   constructor(private readonly cash: CashReadService) {}
 
   @Get('settings')
-  getSettings(@Tenant() t: TenantAccess) {
-    return this.cash.getSettings(t.tenantId);
+  getSettings(@Merchant() t: MerchantAccess) {
+    return this.cash.getSettings(t.merchantId);
   }
 
   @Patch('settings')
-  async updateSettings(@Tenant() t: TenantAccess, @Body() body: Record<string, unknown>) {
-    await this.cash.updateSettings(t.tenantId, body);
+  async updateSettings(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
+    await this.cash.updateSettings(t.merchantId, body);
     return { ok: true };
   }
 
   @Get('stats')
-  getStats(@Tenant() t: TenantAccess) {
-    return this.cash.getStats(t.tenantId);
+  getStats(@Merchant() t: MerchantAccess) {
+    return this.cash.getStats(t.merchantId);
   }
 
   @Get('analytics')
-  getAnalytics(@Tenant() t: TenantAccess) {
-    return this.cash.getAnalytics(t.tenantId);
+  getAnalytics(@Merchant() t: MerchantAccess) {
+    return this.cash.getAnalytics(t.merchantId);
   }
 
   @Get('customers')
-  getCustomers(@Tenant() t: TenantAccess, @Query() query: Record<string, string>) {
-    return this.cash.getCustomers(t.tenantId, query);
+  getCustomers(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
+    return this.cash.getCustomers(t.merchantId, query);
   }
 
   @Get('reward-config')
-  getRewardConfig(@Tenant() t: TenantAccess) {
-    return this.cash.getRewardConfig(t.tenantId);
+  getRewardConfig(@Merchant() t: MerchantAccess) {
+    return this.cash.getRewardConfig(t.merchantId);
   }
 
   // Admin-config write (not the inert customer-facing path — preflight §4).
   @Put('reward-config')
-  putRewardConfig(@Tenant() t: TenantAccess, @Body() body: Record<string, unknown>) {
-    return this.cash.updateRewardConfig(t.tenantId, body);
+  putRewardConfig(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
+    return this.cash.updateRewardConfig(t.merchantId, body);
   }
 
   @Patch('reward-config')
-  patchRewardConfig(@Tenant() t: TenantAccess, @Body() body: Record<string, unknown>) {
-    return this.cash.updateRewardConfig(t.tenantId, body);
+  patchRewardConfig(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
+    return this.cash.updateRewardConfig(t.merchantId, body);
   }
 
   @Get('gift-cards')
-  getGiftCards(@Tenant() t: TenantAccess, @Query() query: Record<string, string>) {
-    return this.cash.getGiftCards(t.tenantId, query);
+  getGiftCards(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
+    return this.cash.getGiftCards(t.merchantId, query);
   }
 }

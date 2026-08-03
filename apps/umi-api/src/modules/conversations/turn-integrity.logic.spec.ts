@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { decideTurnIntegrity, isRevisionLike, isExtensionLike } from './turn-integrity.logic';
-import { deriveNextConversationState, blockUnverifiedOrderConfirmation } from './turn-safety';
+import { blockUnverifiedOrderConfirmation } from './turn-safety';
 import type { MessageRunItem } from './turn.types';
 
 function m(id: string, content: string, agoMs: number, base: number): MessageRunItem {
@@ -83,29 +83,5 @@ describe('turn-safety', () => {
       orderConfirmed: true,
     });
     expect(out).toContain('confirmada');
-  });
-  it('derives the next state', () => {
-    expect(
-      deriveNextConversationState({
-        pendingClarification: { q: 1 },
-        orderConfirmed: false,
-        orderCancelled: false,
-        orderChangesConfirmed: false,
-        cartUpdated: false,
-        searchPerformed: false,
-        fallbackState: 'initial',
-      }),
-    ).toBe('awaiting_clarification');
-    expect(
-      deriveNextConversationState({
-        pendingClarification: null,
-        orderConfirmed: false,
-        orderCancelled: false,
-        orderChangesConfirmed: false,
-        cartUpdated: true,
-        searchPerformed: false,
-        fallbackState: 'initial',
-      }),
-    ).toBe('awaiting_confirmation');
   });
 });

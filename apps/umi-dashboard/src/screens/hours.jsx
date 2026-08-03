@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { I } from '@/icons.jsx';
 import { XSep } from '@/shell.jsx';
 import { useBusinessHours, saveBusinessHours } from '@/data.jsx';
@@ -80,39 +80,61 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
   const [savedJson, setSavedJson] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState(null); // 'saved' | 'error' | null
-  const [cutoff, setCutoff] = useState(45);
+  // Every control below is seeded from the server payload. None of it holds a
+  // literal: this screen used to ship a 45-minute cutoff, a Spanish notice and three
+  // real phone numbers as its initial state, so it displayed a bot configuration that
+  // nothing had ever read or written — and an operator has no way to tell the two apart.
+  const [cutoff, setCutoff] = useState(30);
   const [tz, setTz] = useState('America/Mexico_City');
-  const [notice, setNotice] = useState(
-    'Hoy nuestro horario será reducido por capacitación. Aceptamos pedidos hasta las 10pm.',
-  );
-  const [bypass, setBypass] = useState([
-    '+52 667 312 4480',
-    '+52 667 901 1124',
-    '+52 667 402 0091',
-  ]);
+  const [notice, setNotice] = useState('');
+  const [bypass, setBypass] = useState([]);
   const [bypassInput, setBypassInput] = useState('');
   const [confirmPause, setConfirmPause] = useState(null); // {to: bool}
 
   useEffect(() => {
-    if (hoursData && hoursData.hours) {
-      const normalized = normalizeHours(hoursData.hours);
-      setHours(normalized);
-      setSavedJson(JSON.stringify(normalized));
-      if (hoursData.timezone) setTz(hoursData.timezone);
-    }
-  }, [hoursData]);
+    if (!hoursData) return;
+    const normalized = normalizeHours(hoursData.hours);
+    const ord = hoursData.ordering || {};
+    const seededCutoff = typeof ord.orderCutoffMinutes === 'number' ? ord.orderCutoffMinutes : 30;
+    const seededNotice = ord.specialNotice ?? '';
+    const seededBypass = Array.isArray(ord.bypassPhones) ? ord.bypassPhones : [];
+    setHours(normalized);
+    setCutoff(seededCutoff);
+    setNotice(seededNotice);
+    setBypass(seededBypass);
+    if (hoursData.timezone) setTz(hoursData.timezone);
+    if (typeof ord.acceptsOrders === 'boolean') setOrdersPaused(!ord.acceptsOrders);
+    setSavedJson(
+      JSON.stringify({
+        hours: normalized,
+        cutoff: seededCutoff,
+        notice: seededNotice,
+        bypass: seededBypass,
+      }),
+    );
+  }, [hoursData, setOrdersPaused]);
 
-  const isDirty = savedJson !== null && savedJson !== JSON.stringify(hours);
+  // Dirty tracking covers everything Save writes. Pause is excluded — it persists on
+  // its own confirm, so leaving it here would leave the Save button permanently lit.
+  const isDirty =
+    savedJson !== null && savedJson !== JSON.stringify({ hours, cutoff, notice, bypass });
+
+  const orderingPayload = () => ({
+    acceptsOrders: !ordersPaused,
+    orderCutoffMinutes: cutoff,
+    specialNotice: notice,
+    bypassPhones: bypass,
+  });
 
   const handleSave = async () => {
     setSaving(true);
     setSaveMsg(null);
     try {
-      await saveBusinessHours(hours, tz);
-      setSavedJson(JSON.stringify(hours));
+      await saveBusinessHours(hours, tz, orderingPayload());
+      setSavedJson(JSON.stringify({ hours, cutoff, notice, bypass }));
       setSaveMsg('saved');
       setTimeout(() => setSaveMsg(null), 3000);
-    } catch (e) {
+    } catch {
       setSaveMsg('error');
     } finally {
       setSaving(false);
@@ -124,6 +146,24 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
 
   const handlePauseToggle = () => {
     setConfirmPause({ to: !ordersPaused });
+  };
+
+  // Pausing is a global action with its own confirmation, so it persists immediately
+  // rather than waiting for Save. An ordering-only PATCH — the hours block is omitted,
+  // so the server leaves the weekly grid untouched.
+  const handlePauseConfirm = async (to) => {
+    setOrdersPaused(to);
+    setConfirmPause(null);
+    try {
+      await saveBusinessHours(undefined, undefined, {
+        acceptsOrders: !to,
+        orderCutoffMinutes: cutoff,
+        specialNotice: notice,
+        bypassPhones: bypass,
+      });
+    } catch {
+      setSaveMsg('error');
+    }
   };
 
   return (
@@ -497,10 +537,7 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
       {confirmPause && (
         <PauseConfirm
           to={confirmPause.to}
-          onConfirm={() => {
-            setOrdersPaused(confirmPause.to);
-            setConfirmPause(null);
-          }}
+          onConfirm={() => handlePauseConfirm(confirmPause.to)}
           onCancel={() => setConfirmPause(null)}
         />
       )}

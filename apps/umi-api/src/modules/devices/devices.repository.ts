@@ -12,7 +12,7 @@ import type {
 type ChallengeRow = {
   id: string;
   businessId: string;
-  branchId: string | null;
+  locationId: string | null;
   displayName: string;
   deviceKind: 'kds' | 'pos_terminal';
   platform: 'android' | 'ios' | 'linux' | 'macos' | 'windows' | 'web';
@@ -26,7 +26,7 @@ type ChallengeRow = {
 type PairingRequestRow = {
   id: string;
   businessId: string;
-  branchId: string | null;
+  locationId: string | null;
   displayName: string;
   deviceKind: 'kds' | 'pos_terminal';
   platform: ChallengeRow['platform'];
@@ -43,15 +43,15 @@ type PairingRequestRow = {
 const DEVICE_PROJECTION = `
   d.id::text,
   d.public_id::text AS "publicId",
-  d.business_id::text AS "tenantId",
-  d.branch_id::text AS "branchId",
+  d.merchant_id::text AS "merchantId",
+  d.location_id::text AS "locationId",
   d.name AS "displayName",
   d.kind AS type,
   d.platform,
-  d.lifecycle_state AS state,
+  d.status AS state,
   d.credential_version AS "credentialVersion",
   d.last_seen_at AS "lastSeenAt",
-  (d.lifecycle_state = 'rotation_required') AS "rotationRequired",
+  (d.status = 'rotation_required') AS "rotationRequired",
   d.revoked_at AS "revokedAt",
   d.replacement_device_id::text AS "replacementDeviceId"`;
 
@@ -61,8 +61,8 @@ export class DevicesRepository {
 
   async beginEnrollment(input: {
     id: string;
-    tenantId: string;
-    branchId: string | null;
+    merchantId: string;
+    locationId: string | null;
     displayName: string;
     type: 'kds' | 'pos_terminal';
     platform: ChallengeRow['platform'];
@@ -74,20 +74,20 @@ export class DevicesRepository {
   }): Promise<{ id: string; expiresAt: Date }> {
     const { rows } = await this.pg.worker.query<{ id: string; expiresAt: Date }>(
       `INSERT INTO runtime.device_enrollment_challenge
-         (id, business_id, branch_id, display_name, device_kind, platform, code_hash,
+         (id, merchant_id, location_id, display_name, device_kind, platform, code_hash,
           idempotency_key, expires_at, created_by, replaces_device_id)
        SELECT $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8::uuid, $9, $10::uuid, $11::uuid
        WHERE $3::uuid IS NULL OR EXISTS (
-         SELECT 1 FROM tenant.branch
-         WHERE id = $3::uuid AND business_id = $2::uuid AND status = 'active'
+         SELECT 1 FROM merchant.location
+         WHERE id = $3::uuid AND merchant_id = $2::uuid AND status = 'active'
        )
-       ON CONFLICT (business_id, idempotency_key) DO UPDATE
+       ON CONFLICT (merchant_id, idempotency_key) DO UPDATE
          SET idempotency_key = excluded.idempotency_key
        RETURNING id::text, expires_at AS "expiresAt"`,
       [
         input.id,
-        input.tenantId,
-        input.branchId,
+        input.merchantId,
+        input.locationId,
         input.displayName,
         input.type,
         input.platform,
@@ -104,8 +104,8 @@ export class DevicesRepository {
 
   async beginPairing(input: {
     id: string;
-    tenantId: string;
-    branchId: string | null;
+    merchantId: string;
+    locationId: string | null;
     displayName: string;
     type: 'kds' | 'pos_terminal';
     platform: ChallengeRow['platform'];
@@ -117,20 +117,20 @@ export class DevicesRepository {
   }): Promise<{ id: string; expiresAt: Date }> {
     const { rows } = await this.pg.worker.query<{ id: string; expiresAt: Date }>(
       `INSERT INTO runtime.device_enrollment_request
-         (id, business_id, branch_id, display_name, device_kind, platform,
+         (id, merchant_id, location_id, display_name, device_kind, platform,
           setup_code_hash, idempotency_key, expires_at, created_by, replaces_device_id)
        SELECT $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8::uuid, $9, $10::uuid, $11::uuid
        WHERE $3::uuid IS NULL OR EXISTS (
-         SELECT 1 FROM tenant.branch
-         WHERE id = $3::uuid AND business_id = $2::uuid AND status = 'active'
+         SELECT 1 FROM merchant.location
+         WHERE id = $3::uuid AND merchant_id = $2::uuid AND status = 'active'
        )
-       ON CONFLICT (business_id, idempotency_key) DO UPDATE
+       ON CONFLICT (merchant_id, idempotency_key) DO UPDATE
          SET idempotency_key = excluded.idempotency_key
        RETURNING id::text, expires_at AS "expiresAt"`,
       [
         input.id,
-        input.tenantId,
-        input.branchId,
+        input.merchantId,
+        input.locationId,
         input.displayName,
         input.type,
         input.platform,
@@ -145,10 +145,10 @@ export class DevicesRepository {
     if (rows[0].id === input.id) {
       await this.pg.worker.query(
         `INSERT INTO runtime.security_audit_event
-           (actor_user_id, business_id, branch_id, event_type, entity_type, entity_id, outcome)
+           (actor_user_id, merchant_id, location_id, event_type, entity_type, entity_id, outcome)
          VALUES ($1::uuid, $2::uuid, $3::uuid, 'device.enrollment_created',
                  'device_enrollment_request', $4::uuid, 'success')`,
-        [input.actorUserId, input.tenantId, input.branchId, input.id],
+        [input.actorUserId, input.merchantId, input.locationId, input.id],
       );
     }
     return rows[0];
@@ -170,8 +170,8 @@ export class DevicesRepository {
     try {
       await client.query('BEGIN');
       const selected = await client.query<PairingRequestRow>(
-        `SELECT r.id::text, r.business_id::text AS "businessId",
-                r.branch_id::text AS "branchId", r.display_name AS "displayName",
+        `SELECT r.id::text, r.merchant_id::text AS "businessId",
+                r.location_id::text AS "locationId", r.display_name AS "displayName",
                 r.device_kind AS "deviceKind", r.platform, r.requested_platform AS "requestedPlatform",
                 r.state, r.attempts, r.installation_hash AS "installationHash",
                 r.expires_at AS "expiresAt", s.id::text AS "pairingSessionId",
@@ -255,27 +255,27 @@ export class DevicesRepository {
   }
 
   async listPairingRequests(
-    tenantId: string,
-    branchIds: string[] | null,
+    merchantId: string,
+    locationIds: string[] | null,
   ): Promise<DeviceEnrollmentRequestView[]> {
     const { rows } = await this.pg.worker.query<DeviceEnrollmentRequestView>(
-      `SELECT id::text, business_id::text AS "tenantId", branch_id::text AS "branchId",
+      `SELECT id::text, merchant_id::text AS "merchantId", location_id::text AS "locationId",
               display_name AS "displayName", device_kind AS type, platform,
               requested_platform AS "requestedPlatform", state,
               expires_at AS "expiresAt", claimed_at AS "claimedAt",
               installation_reference AS "installationReference", created_at AS "createdAt"
        FROM runtime.device_enrollment_request
-       WHERE business_id = $1::uuid
-         AND ($2::uuid[] IS NULL OR branch_id = any($2::uuid[]))
+       WHERE merchant_id = $1::uuid
+         AND ($2::uuid[] IS NULL OR location_id = any($2::uuid[]))
        ORDER BY created_at DESC
        LIMIT 200`,
-      [tenantId, branchIds],
+      [merchantId, locationIds],
     );
     return rows;
   }
 
   async decidePairing(input: {
-    tenantId: string;
+    merchantId: string;
     requestId: string;
     actorUserId: string;
     idempotencyKey: string;
@@ -287,8 +287,8 @@ export class DevicesRepository {
     try {
       await client.query('BEGIN');
       const selected = await client.query<PairingRequestRow>(
-        `SELECT r.id::text, r.business_id::text AS "businessId",
-                r.branch_id::text AS "branchId", r.display_name AS "displayName",
+        `SELECT r.id::text, r.merchant_id::text AS "businessId",
+                r.location_id::text AS "locationId", r.display_name AS "displayName",
                 r.device_kind AS "deviceKind", r.platform, r.requested_platform AS "requestedPlatform",
                 r.state, r.attempts, r.installation_hash AS "installationHash",
                 r.expires_at AS "expiresAt", s.id::text AS "pairingSessionId",
@@ -296,10 +296,10 @@ export class DevicesRepository {
                 r.replaces_device_id::text AS "replacesDeviceId"
          FROM runtime.device_enrollment_request r
          LEFT JOIN runtime.device_pairing_session s ON s.enrollment_request_id = r.id
-         WHERE r.id = $1::uuid AND r.business_id = $2::uuid
-           AND ($3::uuid[] IS NULL OR r.branch_id = any($3::uuid[]))
+         WHERE r.id = $1::uuid AND r.merchant_id = $2::uuid
+           AND ($3::uuid[] IS NULL OR r.location_id = any($3::uuid[]))
          FOR UPDATE OF r`,
-        [input.requestId, input.tenantId, input.allowedBranchIds],
+        [input.requestId, input.merchantId, input.allowedBranchIds],
       );
       const request = selected.rows[0];
       if (!request || !request.pairingSessionId || !request.installationHash) {
@@ -343,14 +343,14 @@ export class DevicesRepository {
       if (input.approve) {
         if (!input.credentialHash) throw new Error('credential_hash_required');
         const inserted = await client.query<{ id: string }>(
-          `INSERT INTO tenant.device
-             (business_id, branch_id, name, kind, status, platform, lifecycle_state,
+          `INSERT INTO merchant.device
+             (merchant_id, location_id, name, kind, status, platform,
               installation_hash, credential_hash, credential_version)
-           VALUES ($1::uuid, $2::uuid, $3, $4, 'active', $5, 'active', $6, $7, 1)
+           VALUES ($1::uuid, $2::uuid, $3, $4, 'active', $5, $6, $7, 1)
            RETURNING id::text`,
           [
             request.businessId,
-            request.branchId,
+            request.locationId,
             request.displayName,
             request.deviceKind,
             request.requestedPlatform ?? request.platform,
@@ -361,12 +361,12 @@ export class DevicesRepository {
         deviceId = inserted.rows[0].id;
         if (request.replacesDeviceId) {
           await client.query(
-            `UPDATE tenant.device
-             SET lifecycle_state = 'replaced', status = 'retired', revoked_at = now(),
+            `UPDATE merchant.device
+             SET status = 'replaced', revoked_at = now(),
                  revocation_reason = 'replaced', replacement_device_id = $2::uuid,
                  credential_hash = null, updated_at = now()
-             WHERE id = $1::uuid AND business_id = $3::uuid
-               AND lifecycle_state NOT IN ('revoked', 'replaced')`,
+             WHERE id = $1::uuid AND merchant_id = $3::uuid
+               AND status NOT IN ('revoked', 'replaced')`,
             [request.replacesDeviceId, deviceId, request.businessId],
           );
         }
@@ -415,8 +415,8 @@ export class DevicesRepository {
     try {
       await client.query('BEGIN');
       const selected = await client.query<PairingRequestRow & { pollingAttempts: number }>(
-        `SELECT r.id::text, r.business_id::text AS "businessId",
-                r.branch_id::text AS "branchId", r.display_name AS "displayName",
+        `SELECT r.id::text, r.merchant_id::text AS "businessId",
+                r.location_id::text AS "locationId", r.display_name AS "displayName",
                 r.device_kind AS "deviceKind", r.platform, r.requested_platform AS "requestedPlatform",
                 r.state, r.attempts, r.installation_hash AS "installationHash",
                 r.expires_at AS "expiresAt", s.id::text AS "pairingSessionId",
@@ -478,7 +478,7 @@ export class DevicesRepository {
       ) {
         const result = await client.query<DeviceSummary>(
           `SELECT ${DEVICE_PROJECTION}
-           FROM tenant.device d WHERE d.id = $1::uuid AND d.business_id = $2::uuid`,
+           FROM merchant.device d WHERE d.id = $1::uuid AND d.merchant_id = $2::uuid`,
           [request.deviceId, request.businessId],
         );
         device = result.rows[0] ?? null;
@@ -503,8 +503,8 @@ export class DevicesRepository {
     try {
       await client.query('BEGIN');
       const result = await client.query<PairingRequestRow>(
-        `SELECT r.id::text, r.business_id::text AS "businessId",
-                r.branch_id::text AS "branchId", r.display_name AS "displayName",
+        `SELECT r.id::text, r.merchant_id::text AS "businessId",
+                r.location_id::text AS "locationId", r.display_name AS "displayName",
                 r.device_kind AS "deviceKind", r.platform, r.requested_platform AS "requestedPlatform",
                 r.state, r.attempts, r.installation_hash AS "installationHash",
                 r.expires_at AS "expiresAt", s.id::text AS "pairingSessionId",
@@ -512,7 +512,7 @@ export class DevicesRepository {
                 r.replaces_device_id::text AS "replacesDeviceId"
          FROM runtime.device_pairing_session s
          JOIN runtime.device_enrollment_request r ON r.id = s.enrollment_request_id
-         JOIN tenant.device d ON d.id = r.device_id
+         JOIN merchant.device d ON d.id = r.device_id
          WHERE s.id = $1::uuid AND s.polling_credential_hash = $2
            AND r.installation_hash = $3 AND d.credential_hash = $4
          FOR UPDATE OF r, s`,
@@ -560,7 +560,7 @@ export class DevicesRepository {
 
   private async audit(
     client: PoolClient,
-    request: Pick<PairingRequestRow, 'id' | 'businessId' | 'branchId'>,
+    request: Pick<PairingRequestRow, 'id' | 'businessId' | 'locationId'>,
     eventType: string,
     outcome: 'success' | 'denied' | 'failure',
     actorUserId: string | null,
@@ -568,14 +568,14 @@ export class DevicesRepository {
   ): Promise<void> {
     await client.query(
       `INSERT INTO runtime.security_audit_event
-         (actor_user_id, business_id, branch_id, event_type, entity_type, entity_id,
+         (actor_user_id, merchant_id, location_id, event_type, entity_type, entity_id,
           outcome, metadata)
        VALUES ($1::uuid, $2::uuid, $3::uuid, $4, 'device_enrollment_request',
                $5::uuid, $6, $7::jsonb)`,
       [
         actorUserId,
         request.businessId,
-        request.branchId,
+        request.locationId,
         eventType,
         request.id,
         outcome,
@@ -594,7 +594,7 @@ export class DevicesRepository {
     try {
       await client.query('BEGIN');
       const result = await client.query<ChallengeRow>(
-        `SELECT id::text, business_id::text AS "businessId", branch_id::text AS "branchId",
+        `SELECT id::text, merchant_id::text AS "businessId", location_id::text AS "locationId",
                 display_name AS "displayName", device_kind AS "deviceKind", platform,
                 code_hash AS "codeHash", expires_at AS "expiresAt", attempts,
                 consumed_at AS "consumedAt", replaces_device_id::text AS "replacesDeviceId"
@@ -625,14 +625,14 @@ export class DevicesRepository {
         return challenge.attempts + 1 >= 5 ? 'attempts_exceeded' : 'rejected';
       }
       const inserted = await client.query<DeviceSummary>(
-        `INSERT INTO tenant.device AS d
-           (business_id, branch_id, name, kind, status, platform, lifecycle_state,
+        `INSERT INTO merchant.device AS d
+           (merchant_id, location_id, name, kind, status, platform,
             installation_hash, credential_hash, credential_version)
-         VALUES ($1::uuid, $2::uuid, $3, $4, 'active', $5, 'active', $6, $7, 1)
+         VALUES ($1::uuid, $2::uuid, $3, $4, 'active', $5, $6, $7, 1)
          RETURNING ${DEVICE_PROJECTION}`,
         [
           challenge.businessId,
-          challenge.branchId,
+          challenge.locationId,
           challenge.displayName,
           challenge.deviceKind,
           challenge.platform,
@@ -646,19 +646,19 @@ export class DevicesRepository {
       );
       if (challenge.replacesDeviceId) {
         await client.query(
-          `UPDATE tenant.device
-           SET lifecycle_state = 'replaced', status = 'retired', revoked_at = now(),
+          `UPDATE merchant.device
+           SET status = 'replaced', revoked_at = now(),
                revocation_reason = 'replaced', replacement_device_id = $2::uuid,
                credential_hash = null, updated_at = now()
-           WHERE id = $1::uuid AND business_id = $3::uuid
-             AND lifecycle_state NOT IN ('revoked','replaced')`,
+           WHERE id = $1::uuid AND merchant_id = $3::uuid
+             AND status NOT IN ('revoked','replaced')`,
           [challenge.replacesDeviceId, inserted.rows[0].id, challenge.businessId],
         );
       }
       await client.query(
         `INSERT INTO runtime.security_audit_event
-           (actor_user_id, business_id, branch_id, event_type, entity_type, entity_id, outcome)
-         SELECT created_by, business_id, branch_id, 'device.enrollment_completed',
+           (actor_user_id, merchant_id, location_id, event_type, entity_type, entity_id, outcome)
+         SELECT created_by, merchant_id, location_id, 'device.enrollment_completed',
                 'device', $2::uuid, 'success'
          FROM runtime.device_enrollment_challenge WHERE id = $1::uuid`,
         [input.challengeId, inserted.rows[0].id],
@@ -679,12 +679,11 @@ export class DevicesRepository {
     credentialHash: string,
   ): Promise<DeviceSummary | null> {
     const { rows } = await this.pg.worker.query<DeviceSummary>(
-      `UPDATE tenant.device AS d SET last_seen_at = now(), updated_at = now()
+      `UPDATE merchant.device AS d SET last_seen_at = now(), updated_at = now()
        WHERE d.public_id = $1::uuid
          AND d.installation_hash = $2
          AND d.credential_hash = $3
-         AND d.lifecycle_state IN ('active','rotation_required')
-         AND d.status = 'active'
+         AND d.status IN ('active','rotation_required')
        RETURNING ${DEVICE_PROJECTION}`,
       [publicId, installationHash, credentialHash],
     );
@@ -693,37 +692,37 @@ export class DevicesRepository {
 
   async rotate(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     deviceId: string,
     currentVersion: number,
     credentialHash: string,
   ): Promise<DeviceSummary | null> {
     const { rows } = await client.query<DeviceSummary>(
-      `UPDATE tenant.device AS d
+      `UPDATE merchant.device AS d
          SET credential_hash = $4, credential_version = credential_version + 1,
-             lifecycle_state = 'active', updated_at = now()
-         WHERE id = $2::uuid AND business_id = $1::uuid
-           AND credential_version = $3 AND lifecycle_state IN ('active','rotation_required')
+             status = 'active', updated_at = now()
+         WHERE id = $2::uuid AND merchant_id = $1::uuid
+           AND credential_version = $3 AND status IN ('active','rotation_required')
        RETURNING ${DEVICE_PROJECTION}`,
-      [tenantId, deviceId, currentVersion, credentialHash],
+      [merchantId, deviceId, currentVersion, credentialHash],
     );
     return rows[0] ?? null;
   }
 
   async revoke(
     client: PoolClient,
-    tenantId: string,
+    merchantId: string,
     deviceId: string,
     reason: string,
   ): Promise<DeviceSummary | null> {
     const { rows } = await client.query<DeviceSummary>(
-      `UPDATE tenant.device AS d
-         SET lifecycle_state = 'revoked', status = 'retired', revoked_at = now(),
+      `UPDATE merchant.device AS d
+         SET status = 'revoked', revoked_at = now(),
              revocation_reason = $3, credential_hash = null, updated_at = now()
-         WHERE id = $2::uuid AND business_id = $1::uuid
-           AND lifecycle_state NOT IN ('revoked','replaced')
+         WHERE id = $2::uuid AND merchant_id = $1::uuid
+           AND status NOT IN ('revoked','replaced')
        RETURNING ${DEVICE_PROJECTION}`,
-      [tenantId, deviceId, reason],
+      [merchantId, deviceId, reason],
     );
     return rows[0] ?? null;
   }

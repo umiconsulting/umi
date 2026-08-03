@@ -1,7 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
-import { SUPER_ADMIN_SA_CTE } from './rbac.sql';
-import type { TenantMembership } from '@umi/contract';
+import { HAS_PLATFORM_GRANT, PLATFORM_GRANT_CTE } from './rbac.sql';
 
 export interface UserCredential {
   userId: string;
@@ -9,6 +8,17 @@ export interface UserCredential {
   displayName: string | null;
   passwordSalt: string;
   passwordHash: string;
+  /** null = no second factor enrolled. 'email_otp' | 'totp'. */
+  mfaMethod: string | null;
+}
+
+/** A live, unconsumed one-time code. */
+export interface OtpRecord {
+  id: string;
+  userId: string;
+  codeHash: string;
+  attempts: number;
+  expiresAt: Date;
 }
 
 export interface UserSummary {
@@ -17,20 +27,24 @@ export interface UserSummary {
   displayName: string | null;
 }
 
+export interface MerchantMembershipSummary {
+  id: string;
+  slug: string;
+  name: string;
+  roles: string[];
+}
+
 export interface MembershipAccess {
-  // null for a SYNTHESIZED global-super_admin access (no explicit tenant_access
-  // edge in the requested tenant). Only ever surfaced to the client as an
+  // null for a SYNTHESIZED global-super_admin access (no explicit merchant_access
+  // edge in the requested merchant). Only ever surfaced to the client as an
   // informational membership id — never a DB write key.
   membershipId: string | null;
-  tenantId: string;
+  merchantId: string;
   slug: string;
   name: string;
   timezone: string | null;
   roles: string[];
   permissions: string[];
-  deniedPermissions: string[];
-  branchIds: string[];
-  allBranches: boolean;
 }
 
 export interface ResetTokenRecord {
@@ -38,16 +52,6 @@ export interface ResetTokenRecord {
   userId: string;
   expiresAt: Date;
   usedAt: Date | null;
-}
-
-export interface SessionRecord {
-  id: string;
-  userId: string;
-  deviceId: string | null;
-  app: 'dashboard' | 'kds' | 'pos';
-  tokenHash: string;
-  expiresAt: Date;
-  revokedAt: Date | null;
 }
 
 export interface EffectiveEntitlementRecord {
@@ -64,36 +68,232 @@ export interface PosPinStaffRecord {
   displayName: string | null;
   pinSalt: string;
   pinHash: string;
-  failedAttempts: number;
-  lockedUntil: Date | null;
 }
 
 /**
- * Auth/membership/entitlement reads. These run BEFORE any tenant RLS context
- * exists (login resolves which tenants a user has), so they use the worker pool
- * (`query`) with explicit parameterized predicates — never `withTenant`. The
+ * Auth/membership/entitlement reads. These run BEFORE any merchant RLS context
+ * exists (login resolves which merchants a user has), so they use the worker pool
+ * (`query`) with explicit parameterized predicates — never `withMerchant`. The
  * worker pool is also MANDATORY here because the entitlement + RBAC-policy sources
  * (`umi.effective_entitlement`, `umi.role_permission`) live in the SEALED `umi`
  * schema that `umi_app` has no USAGE on.
  *
  * build-v3 model: staff credentials + identity live on `umi.user` (email + hash +
- * `full_name`); grants are `umi.user_role` (user×role×business, FK role_id) read
+ * `full_name`); a café grant is `merchant.staff` (the employment, FK role_id) read
  * against the sealed `umi.role_permission` (role_id×permission_id) catalog.
- * `super_admin` is Umi's cross-tenant operator: a user holding ANY `umi.user_role`
- * with role `super_admin` can select/access EVERY active business.
+ * `super_admin` is Umi's cross-merchant operator: a user holding a `umi.user_role`
+ * with role `super_admin` can select/access EVERY active merchant.
  *
- * DONE: `findTenantsForUser` / `findMembershipAccess` now read `umi.user_role` joined
- * to the `umi.role` catalog (multi-role, aggregated), and a `business_id IS NULL`
- * grant is platform-wide.
+ * TWO grant tables, one per SCOPE, never overlapping:
+ *   merchant.staff   the employment, and the café role on it. Every human who works a
+ *                    café has one; a PIN-only operator's `umi.user` simply carries no
+ *                    email and no password. A membership IS an employment — there is
+ *                    no third table for it, which is why this replaced the old
+ *                    `umi.user_role` café grant: that was (user, role, merchant,
+ *                    location) and this is (user, merchant, location).
+ *   umi.user_role    the PLATFORM grant, and nothing else: Umi's own operators, who
+ *                    are employees of no café.
  *
- * STILL PENDING (P5, "route by id"): `tenantIdForSlug` / `tenantBySlug` read the
- * dropped `slug` column, and the queries above return the business id AS "slug" as an
- * interim. Closing both halves changes the /me/tenants + tenant-access API contract,
+ * STILL PENDING (P5, "route by id"): `merchantIdForSlug` / `merchantBySlug` read the
+ * dropped `slug` column, and the queries above return the merchant id AS "slug" as an
+ * interim. Closing both halves changes the /me/merchants + merchant-access API contract,
  * so it lands as a coordinated @umi/contract release with the dashboard.
  */
 @Injectable()
 export class AuthRepository {
+  private readonly logger = new Logger(AuthRepository.name);
+
   constructor(private readonly pg: PgService) {}
+
+  async effectiveEntitlement(
+    merchantId: string,
+    productKey: string,
+  ): Promise<EffectiveEntitlementRecord | null> {
+    const { rows } = await this.pg.query<EffectiveEntitlementRecord>(
+      `SELECT ee.feature_key AS "featureKey", ee.enabled,
+              ee.limit_value AS "limit", s.status AS "subscriptionStatus"
+         FROM umi.effective_entitlement AS ee
+         JOIN umi.subscription AS s ON s.merchant_id = ee.merchant_id
+        WHERE ee.merchant_id = $1::uuid
+          AND ee.feature_key = $2
+        LIMIT 1`,
+      [merchantId, productKey],
+    );
+    return rows[0] ?? null;
+  }
+
+  async findPosPinStaff(
+    merchantId: string,
+    locationId: string,
+    lookupHash: string,
+  ): Promise<PosPinStaffRecord | null> {
+    const { rows } = await this.pg.query<PosPinStaffRecord>(
+      `SELECT s.id::text AS "staffId", s.user_id::text AS "userId",
+              COALESCE(u.email, s.email) AS email,
+              COALESCE(u.full_name, s.name) AS "displayName",
+              s.operator_pin_salt AS "pinSalt",
+              s.operator_pin_hash AS "pinHash"
+         FROM merchant.staff AS s
+         JOIN umi.user AS u ON u.id = s.user_id AND u.status = 'active'
+         JOIN merchant.location AS l
+           ON l.id = $2::uuid AND l.merchant_id = s.merchant_id
+        WHERE s.merchant_id = $1::uuid
+          AND s.status = 'active'
+          AND (s.location_id IS NULL OR s.location_id = l.id)
+          AND s.operator_pin_lookup = $3
+          AND s.operator_pin_salt IS NOT NULL
+          AND s.operator_pin_hash IS NOT NULL
+        LIMIT 1`,
+      [merchantId, locationId, lookupHash],
+    );
+    return rows[0] ?? null;
+  }
+
+  async validatePosDevice(input: {
+    deviceId: string;
+    merchantId: string;
+    locationId: string;
+    installationHash: string;
+    credentialHash: string;
+  }): Promise<boolean> {
+    const { rows } = await this.pg.query<{ allowed: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1
+           FROM merchant.device AS d
+          WHERE d.id = $1::uuid
+            AND d.merchant_id = $2::uuid
+            AND d.location_id = $3::uuid
+            AND d.kind = 'pos_terminal'
+            AND d.status = 'active'
+            AND d.installation_hash = $4
+            AND d.credential_hash = $5
+       ) AS allowed`,
+      [
+        input.deviceId,
+        input.merchantId,
+        input.locationId,
+        input.installationHash,
+        input.credentialHash,
+      ],
+    );
+    return rows[0]?.allowed === true;
+  }
+
+  async recordPosPinFailure(deviceId: string): Promise<void> {
+    await this.pg.query(
+      `UPDATE merchant.device
+          SET pin_failed_attempts = least(pin_failed_attempts + 1, 10),
+              pin_locked_until = CASE
+                WHEN pin_failed_attempts + 1 >= 5 THEN now() + interval '15 minutes'
+                ELSE pin_locked_until
+              END,
+              updated_at = now()
+        WHERE id = $1::uuid`,
+      [deviceId],
+    );
+  }
+
+  async clearPosPinFailures(deviceId: string): Promise<void> {
+    await this.pg.query(
+      `UPDATE merchant.device
+          SET pin_failed_attempts = 0, pin_locked_until = null, updated_at = now()
+        WHERE id = $1::uuid`,
+      [deviceId],
+    );
+  }
+
+  async createPosSession(input: {
+    id: string;
+    merchantId: string;
+    locationId: string;
+    userId: string;
+    deviceId: string;
+    tokenHash: string;
+    expiresAt: Date;
+  }): Promise<void> {
+    await this.pg.query(
+      `INSERT INTO runtime.session
+         (id, merchant_id, principal_type, principal_id, token_hash, metadata, expires_at)
+       VALUES ($1::uuid, $2::uuid, 'device', $3::uuid, $4,
+               jsonb_build_object('app','pos','operatorUserId',$5::text,'locationId',$6::text), $7)`,
+      [
+        input.id,
+        input.merchantId,
+        input.deviceId,
+        input.tokenHash,
+        input.userId,
+        input.locationId,
+        input.expiresAt,
+      ],
+    );
+  }
+
+  async validatePosSession(input: {
+    sessionId: string;
+    userId: string;
+    installationHash: string;
+    credentialHash: string;
+  }): Promise<{ deviceId: string } | null> {
+    const { rows } = await this.pg.worker.query<{ deviceId: string }>(
+      `SELECT d.id::text AS "deviceId"
+       FROM runtime.session s
+       JOIN merchant.device d
+         ON s.principal_type='device' AND d.id=s.principal_id
+        AND d.merchant_id=s.merchant_id
+       WHERE s.id=$1::uuid AND s.is_active AND s.expires_at>now()
+         AND s.metadata->>'app'='pos'
+         AND s.metadata->>'operatorUserId'=$2
+         AND d.status='active'
+         AND d.installation_hash=$3
+         AND d.credential_hash=$4
+       LIMIT 1`,
+      [input.sessionId, input.userId, input.installationHash, input.credentialHash],
+    );
+    return rows[0] ?? null;
+  }
+
+  async rotatePosSessionToken(sessionId: string, tokenHash: string): Promise<boolean> {
+    const { rowCount } = await this.pg.worker.query(
+      `UPDATE runtime.session
+       SET token_hash=$2, last_used_at=now()
+       WHERE id=$1::uuid AND principal_type='device' AND is_active AND expires_at>now()`,
+      [sessionId, tokenHash],
+    );
+    return rowCount === 1;
+  }
+
+  async revokePosSession(sessionId: string, userId: string, tokenHash: string): Promise<void> {
+    await this.pg.worker.query(
+      `WITH revoked AS (
+         UPDATE runtime.session
+         SET is_active=false, revoked_at=now(), revoked_reason='operator_logout'
+         WHERE id=$1::uuid AND principal_type='device' AND token_hash=$3
+           AND metadata->>'operatorUserId'=$2 AND is_active
+         RETURNING id
+       )
+       UPDATE runtime.operator_session
+       SET state='ended',ended_at=now(),last_activity_at=now()
+       WHERE durable_session_id IN (SELECT id FROM revoked) AND state<>'ended'`,
+      [sessionId, userId, tokenHash],
+    );
+  }
+
+  async revokePosSessionsForOperator(userId: string, exceptSessionId: string | null): Promise<void> {
+    await this.pg.worker.query(
+      `WITH revoked AS (
+         UPDATE runtime.session
+         SET is_active=false, revoked_at=now(), revoked_reason='operator_global_logout'
+         WHERE principal_type='device' AND metadata->>'app'='pos'
+           AND metadata->>'operatorUserId'=$1 AND is_active
+           AND ($2::uuid IS NULL OR id<>$2::uuid)
+         RETURNING id
+       )
+       UPDATE runtime.operator_session
+       SET state='ended',ended_at=now(),last_activity_at=now()
+       WHERE durable_session_id IN (SELECT id FROM revoked) AND state<>'ended'`,
+      [userId, exceptSessionId],
+    );
+  }
 
   /** Login/forgot — only rows that actually have a local password. */
   async findCredentialByEmail(email: string): Promise<UserCredential | null> {
@@ -103,15 +303,126 @@ export class AuthRepository {
          u.email             AS "email",
          u.full_name         AS "displayName",
          u.password_salt     AS "passwordSalt",
-         u.password_hash     AS "passwordHash"
+         u.password_hash     AS "passwordHash",
+         u.mfa_method        AS "mfaMethod"
        FROM umi.user AS u
        WHERE lower(u.email) = $1
          AND u.password_hash IS NOT NULL
-         AND u.status = 'active'
        LIMIT 1`,
       [email],
     );
     return rows[0] ?? null;
+  }
+
+  // ── Second factor ──────────────────────────────────────────────────────────
+  // All three run on the worker pool for the same reason the credential read does:
+  // there is no merchant context yet. A half-authenticated caller has not chosen a
+  // café and may not belong to one.
+
+  /**
+   * Burn every live code for this user, then store the new one. ONE statement, so a
+   * second login cannot race between the delete and the insert and leave two live
+   * codes — which would double an attacker's guessing budget for free.
+   */
+  async replaceMfaOtp(userId: string, codeHash: string, expiresAt: Date): Promise<void> {
+    await this.pg.query(
+      `WITH burned AS (
+         UPDATE runtime.otp
+            SET consumed_at = now()
+          WHERE user_id = $1::uuid AND purpose = 'mfa' AND consumed_at IS NULL
+       )
+       INSERT INTO runtime.otp (user_id, purpose, code_hash, expires_at)
+       VALUES ($1::uuid, 'mfa', $2, $3)`,
+      [userId, codeHash, expiresAt],
+    );
+  }
+
+  /** The one live code for this user, if any. */
+  async findLiveMfaOtp(userId: string): Promise<OtpRecord | null> {
+    const { rows } = await this.pg.query<OtpRecord>(
+      `SELECT id::text AS "id", user_id::text AS "userId", code_hash AS "codeHash",
+              attempts AS "attempts", expires_at AS "expiresAt"
+         FROM runtime.otp
+        WHERE user_id = $1::uuid AND purpose = 'mfa'
+          AND consumed_at IS NULL AND expires_at > now()
+        ORDER BY created_at DESC
+        LIMIT 1`,
+      [userId],
+    );
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Count one wrong guess, and burn the code when it reaches the ceiling. Returning
+   * the new count lets the caller tell "wrong, try again" from "that code is dead".
+   */
+  async recordMfaOtpFailure(otpId: string, maxAttempts: number): Promise<number> {
+    const { rows } = await this.pg.query<{ attempts: number }>(
+      `UPDATE runtime.otp
+          SET attempts    = attempts + 1,
+              consumed_at = CASE WHEN attempts + 1 >= $2 THEN now() ELSE consumed_at END
+        WHERE id = $1::uuid
+        RETURNING attempts`,
+      [otpId, maxAttempts],
+    );
+    return rows[0]?.attempts ?? maxAttempts;
+  }
+
+  /**
+   * Consume the code. The `consumed_at IS NULL` predicate is the single-use guarantee:
+   * two concurrent verifications of the same correct code both UPDATE, but only one
+   * matches the predicate and returns a row.
+   */
+  async consumeMfaOtp(otpId: string): Promise<boolean> {
+    const { rows } = await this.pg.query<{ id: string }>(
+      `UPDATE runtime.otp SET consumed_at = now()
+        WHERE id = $1::uuid AND consumed_at IS NULL
+        RETURNING id::text AS id`,
+      [otpId],
+    );
+    return rows.length > 0;
+  }
+
+  /**
+   * Append one row to the internal security log. THE FIRST WRITER this table has had:
+   * `runtime.security_audit_event` shipped with build-v3 and nothing ever inserted into
+   * it, which is indistinguishable from "nothing bad happened" right up to the moment
+   * somebody asks.
+   *
+   * NEVER THROWS. An audit write must not be able to fail a login, and it must not be
+   * able to turn a rejected code into a 500 that tells the caller their guess was
+   * interesting. A failure here is logged and swallowed.
+   *
+   * Worker pool: the table is sealed from `api`, and there is no merchant context at
+   * login anyway — the caller has not chosen a café and may not belong to one.
+   */
+  async recordSecurityEvent(event: {
+    actorUserId: string | null;
+    eventType: string;
+    outcome: 'success' | 'denied' | 'failure';
+    reasonCode?: string;
+    requestId?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<void> {
+    try {
+      await this.pg.query(
+        `INSERT INTO runtime.security_audit_event
+           (actor_user_id, event_type, entity_type, outcome, reason_code, request_id, metadata)
+         VALUES ($1::uuid, $2, 'umi.user', $3, $4, $5, $6::jsonb)`,
+        [
+          event.actorUserId,
+          event.eventType,
+          event.outcome,
+          event.reasonCode ?? null,
+          event.requestId ?? null,
+          JSON.stringify(event.metadata ?? {}),
+        ],
+      );
+    } catch (err) {
+      this.logger.error(
+        `security_audit_write_failed type=${event.eventType} ${(err as Error).message}`,
+      );
+    }
   }
 
   /** Refresh — re-load the user so a rotated access token carries fresh email. */
@@ -119,7 +430,7 @@ export class AuthRepository {
     const { rows } = await this.pg.query<UserSummary>(
       `SELECT u.id::text AS "userId", u.email, u.full_name AS "displayName"
        FROM umi.user AS u
-       WHERE u.id = $1::uuid AND u.password_hash IS NOT NULL AND u.status = 'active'
+       WHERE u.id = $1::uuid AND u.password_hash IS NOT NULL
        LIMIT 1`,
       [userId],
     );
@@ -127,26 +438,31 @@ export class AuthRepository {
   }
 
   /**
-   * Active tenant memberships + role for the login response body / tenant picker.
-   * Single role per (login, tenant) now. A global super_admin (any active
-   * super_admin edge) sees EVERY active tenant, tagged with its explicit role
-   * where one exists, else 'super_admin'.
+   * Active merchant memberships + role for the login response body / merchant picker.
+   * One employment per (login, merchant), so one café role. A platform operator sees
+   * EVERY active merchant, tagged with their café role where an employment exists,
+   * else with the platform role itself.
+   *
+   * This is the REACH half of a platform grant, and it is deliberately unchanged by the
+   * move away from the `['*']` wildcard. Hopping between cafés is what makes debugging
+   * quick; what an operator may DO once inside is a separate question, answered by
+   * findMembershipAccess below.
    */
-  async findTenantsForUser(userId: string): Promise<TenantMembership[]> {
-    const { rows } = await this.pg.query<TenantMembership>(
-      `WITH ${SUPER_ADMIN_SA_CTE}
+  async findMerchantsForUser(userId: string): Promise<MerchantMembershipSummary[]> {
+    const { rows } = await this.pg.query<MerchantMembershipSummary>(
+      `WITH ${PLATFORM_GRANT_CTE}
        SELECT
          t.id::text AS "id",
          t.id::text AS "slug",
          t.name     AS "name",
          COALESCE(array_agg(r.key) FILTER (WHERE r.key IS NOT NULL),
-                  ARRAY['super_admin']) AS "roles"
-       FROM tenant.business AS t
-       LEFT JOIN umi.user_role AS ur
-         ON ur.business_id = t.id AND ur.user_id = $1::uuid
-       LEFT JOIN umi.role AS r ON r.id = ur.role_id
+                  ARRAY[(SELECT platform_role FROM sa)]) AS "roles"
+       FROM merchant.merchant AS t
+       LEFT JOIN merchant.staff AS s
+         ON s.merchant_id = t.id AND s.user_id = $1::uuid AND s.status = 'active'
+       LEFT JOIN umi.role AS r ON r.id = s.role_id
        WHERE t.status = 'active'
-         AND (ur.id IS NOT NULL OR (SELECT is_sa FROM sa))
+         AND (s.id IS NOT NULL OR ${HAS_PLATFORM_GRANT})
        GROUP BY t.id, t.name
        ORDER BY t.name`,
       [userId],
@@ -155,527 +471,102 @@ export class AuthRepository {
   }
 
   /**
-   * Membership + role + permissions for one (user, tenant). Drives
-   * TenantAccessGuard. Null ⇒ no active access (404 tenant_not_found).
-   * Permissions come from the sealed `umi.role_permission` catalog. A global
-   * super_admin with no explicit edge here is SYNTHESIZED as
-   * {membershipId:null, role:'super_admin', permissions:['*']} so the guard
-   * grants it (never 404s Umi's own operator).
+   * Membership + role + permissions for one (user, merchant). Drives
+   * MerchantAccessGuard. Null ⇒ no active access (404 merchant_not_found).
+   *
+   * Permissions come from the sealed `umi.role_permission` catalog, and NOW THAT IS THE
+   * ONLY SOURCE. `effectivePermissions` used to convert super_admin into `['*']`, which
+   * meant a platform operator held every permission key in the catalog — including keys
+   * added long after the grant. Eight POS keys arrived that way in July 2026 with no
+   * review. So the permission subquery reads BOTH the café role and the platform role,
+   * and `seed_rbac.sql` names super_admin's permissions one by one.
+   *
+   * A platform operator with no employment here still gets access (never 404 Umi's own
+   * operator) and is tagged with their platform role.
    */
-  async findMembershipAccess(userId: string, tenantId: string): Promise<MembershipAccess | null> {
+  async findMembershipAccess(userId: string, merchantId: string): Promise<MembershipAccess | null> {
     const { rows } = await this.pg.query<MembershipAccess>(
-      `WITH ${SUPER_ADMIN_SA_CTE},
+      `WITH ${PLATFORM_GRANT_CTE},
        grants AS (
-         -- business_id IS NULL is a PLATFORM-WIDE grant (umi.user_role: 'NULL =
-         -- platform-wide grant (superadmin)'), so it applies to every business —
-         -- otherwise a super_admin would be capped by whatever lesser role they happen
-         -- to hold on a given café, or locked out of one they hold no grant on.
-         SELECT ur.id, ur.branch_id, r.key AS role_key
-         FROM umi.user_role AS ur
-         JOIN umi.role AS r ON r.id = ur.role_id
-         WHERE ur.user_id = $1::uuid
-           AND (ur.business_id = $2::uuid OR ur.business_id IS NULL)
+         -- The café grant, and only that. The platform role is added separately below,
+         -- because it is not an employment and has no merchant.staff row to come from.
+         -- A disabled employment grants nothing, so status is part of the predicate.
+         SELECT s.id, r.key AS role_key
+         FROM merchant.staff AS s
+         JOIN umi.role AS r ON r.id = s.role_id
+         WHERE s.user_id = $1::uuid
+           AND s.merchant_id = $2::uuid
+           AND s.status = 'active'
        )
        SELECT
          (SELECT id::text FROM grants ORDER BY id LIMIT 1) AS "membershipId",
-         t.id::text  AS "tenantId",
+         t.id::text  AS "merchantId",
          t.id::text  AS "slug",
          t.name      AS "name",
          t.timezone  AS "timezone",
          COALESCE((SELECT array_agg(role_key) FROM grants),
-                  ARRAY['super_admin']) AS "roles",
-         COALESCE(
-           (SELECT array_agg(DISTINCT branch_id::text)
-              FROM grants WHERE branch_id IS NOT NULL),
-           '{}'
-         ) AS "branchIds",
-         COALESCE((SELECT bool_or(branch_id IS NULL) FROM grants), (SELECT is_sa FROM sa))
-           AS "allBranches",
+                  ARRAY[(SELECT platform_role FROM sa)]) AS "roles",
          COALESCE(
            (SELECT array_agg(DISTINCT p.key)
               FROM umi.role_permission AS rp
               JOIN umi.role AS r        ON r.id = rp.role_id
               JOIN umi.permission AS p  ON p.id = rp.permission_id
-             WHERE r.key IN (SELECT role_key FROM grants)),
+             -- The union is deliberate. Someone who is 'staff' at this café AND holds a
+             -- platform grant gets both sets, not the lesser of the two.
+             WHERE r.key IN (SELECT role_key FROM grants)
+                OR r.key = (SELECT platform_role FROM sa)),
            '{}'
-         ) AS "permissions",
-         COALESCE(
-           (SELECT array_agg(DISTINCT p.key)
-              FROM umi.user_permission_override AS upo
-              JOIN umi.permission AS p ON p.id = upo.permission_id
-             WHERE upo.user_id = $1::uuid
-               AND (upo.business_id = $2::uuid OR upo.business_id IS NULL)
-               AND upo.branch_id IS NULL
-               AND upo.effect = 'deny'
-               AND (upo.expires_at IS NULL OR upo.expires_at > now())),
-           '{}'
-         ) AS "deniedPermissions"
-       FROM tenant.business AS t
+         ) AS "permissions"
+       FROM merchant.merchant AS t
        WHERE t.id = $2::uuid
          AND t.status = 'active'
-         AND (EXISTS (SELECT 1 FROM grants) OR (SELECT is_sa FROM sa))
+         AND (EXISTS (SELECT 1 FROM grants) OR ${HAS_PLATFORM_GRANT})
        LIMIT 1`,
-      [userId, tenantId],
+      [userId, merchantId],
     );
     return rows[0] ?? null;
   }
 
-  async branchBelongsToTenant(branchId: string, tenantId: string): Promise<boolean> {
-    const { rows } = await this.pg.query<{ exists: boolean }>(
-      `SELECT EXISTS (
-         SELECT 1
-         FROM tenant.branch
-         WHERE id = $1::uuid AND business_id = $2::uuid
-       ) AS "exists"`,
-      [branchId, tenantId],
-    );
-    return rows[0]?.exists === true;
-  }
-
-  async deniedPermissions(
-    userId: string,
-    tenantId: string,
-    branchId: string | null,
-  ): Promise<string[]> {
-    const { rows } = await this.pg.query<{ key: string }>(
-      `SELECT DISTINCT p.key
-       FROM umi.user_permission_override AS upo
-       JOIN umi.permission AS p ON p.id = upo.permission_id
-       WHERE upo.user_id = $1::uuid
-         AND (upo.business_id = $2::uuid OR upo.business_id IS NULL)
-         AND (upo.branch_id IS NULL OR upo.branch_id = $3::uuid)
-         AND upo.effect = 'deny'
-         AND (upo.expires_at IS NULL OR upo.expires_at > now())`,
-      [userId, tenantId, branchId],
-    );
-    return rows.map((row) => row.key);
-  }
-
-  async allowedPermissions(
-    userId: string,
-    tenantId: string,
-    branchId: string | null,
-  ): Promise<string[]> {
-    const { rows } = await this.pg.query<{ key: string }>(
-      `SELECT DISTINCT p.key
-       FROM umi.user_permission_override AS upo
-       JOIN umi.permission AS p ON p.id = upo.permission_id
-       WHERE upo.user_id = $1::uuid
-         AND (upo.business_id = $2::uuid OR upo.business_id IS NULL)
-         AND (upo.branch_id IS NULL OR upo.branch_id = $3::uuid)
-         AND upo.effect = 'allow'
-         AND (upo.expires_at IS NULL OR upo.expires_at > now())`,
-      [userId, tenantId, branchId],
-    );
-    return rows.map((row) => row.key);
-  }
-
-  /** Resolve a tenant id from its slug (for the legacy `/:slug/...` routes). */
-  async tenantIdForSlug(slug: string): Promise<string | null> {
+  /** Resolve a merchant id from its slug (for the legacy `/:slug/...` routes). */
+  async merchantIdForSlug(slug: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ id: string }>(
-      `SELECT id::text AS id FROM tenant.business WHERE slug = $1 LIMIT 1`,
+      `SELECT id::text AS id FROM merchant.merchant WHERE slug = $1 LIMIT 1`,
       [slug],
     );
     return rows[0]?.id ?? null;
   }
 
-  /** Resolve tenant id + name from a slug (public routes need the name). */
-  async tenantBySlug(slug: string): Promise<{ id: string; name: string; slug: string } | null> {
+  /** Resolve merchant id + name from a slug (public routes need the name). */
+  async merchantBySlug(slug: string): Promise<{ id: string; name: string; slug: string } | null> {
     const { rows } = await this.pg.query<{ id: string; name: string; slug: string }>(
-      `SELECT id::text AS id, name, slug FROM tenant.business WHERE slug = $1 LIMIT 1`,
+      `SELECT id::text AS id, name, slug FROM merchant.merchant WHERE slug = $1 LIMIT 1`,
       [slug],
     );
     return rows[0] ?? null;
   }
 
   /**
-   * Tenant-level product entitlement status — the SINGLE SOURCE is the derived
+   * Merchant-level product entitlement status — the SINGLE SOURCE is the derived
    * `umi.effective_entitlement` view (plan_feature overlaid by override, already
    * filtered to trialing/active subscriptions). A feature is entitled iff an
    * `enabled` row exists for it; we join `umi.subscription` back for the café's
    * real status so the guard keeps its `active`/`trialing` vocabulary. Read on the
    * worker pool, which is BYPASSRLS — the view is `security_invoker`, so RLS does
-   * NOT scope it here; the explicit `business_id` predicate does. Returns null when
+   * NOT scope it here; the explicit `merchant_id` predicate does. Returns null when
    * the feature is absent/disabled (→ `product_not_active`).
    */
-  async effectiveEntitlement(
-    tenantId: string,
-    productKey: string,
-  ): Promise<EffectiveEntitlementRecord | null> {
-    const { rows } = await this.pg.query<EffectiveEntitlementRecord>(
-      `SELECT ee.feature_key AS "featureKey", ee.enabled,
-              ee.limit_value AS "limit", s.status AS "subscriptionStatus"
+  async productStatus(merchantId: string, productKey: string): Promise<string | null> {
+    const { rows } = await this.pg.query<{ status: string }>(
+      `SELECT s.status
          FROM umi.effective_entitlement AS ee
-         JOIN umi.subscription          AS s ON s.business_id = ee.business_id
-        WHERE ee.business_id = $1::uuid
+         JOIN umi.subscription          AS s ON s.merchant_id = ee.merchant_id
+        WHERE ee.merchant_id = $1::uuid
           AND ee.feature_key = $2
+          AND ee.enabled
         LIMIT 1`,
-      [tenantId, productKey],
+      [merchantId, productKey],
     );
-    return rows[0] ?? null;
-  }
-
-  async findPosPinStaff(
-    tenantId: string,
-    branchId: string,
-    lookupHash: string,
-  ): Promise<PosPinStaffRecord | null> {
-    const { rows } = await this.pg.query<PosPinStaffRecord>(
-      `SELECT s.id::text AS "staffId", s.user_id::text AS "userId",
-              u.email, u.full_name AS "displayName",
-              s.operator_pin_salt AS "pinSalt",
-              s.operator_pin_hash AS "pinHash",
-              s.pin_failed_attempts AS "failedAttempts",
-              s.pin_locked_until AS "lockedUntil"
-       FROM tenant.staff s
-       JOIN umi.user u ON u.id = s.user_id AND u.status = 'active'
-       JOIN tenant.branch b ON b.id = $2::uuid
-         AND b.business_id = s.business_id AND b.status = 'active'
-       WHERE s.business_id = $1::uuid
-         AND s.status = 'active'
-         AND (s.branch_id IS NULL OR s.branch_id = b.id)
-         AND s.operator_pin_lookup_hash = $3
-         AND EXISTS (
-           SELECT 1 FROM umi.user_role ur
-           WHERE ur.user_id = s.user_id
-             AND (ur.business_id = s.business_id OR ur.business_id IS NULL)
-             AND (ur.branch_id IS NULL OR ur.branch_id = b.id)
-         )
-       LIMIT 1`,
-      [tenantId, branchId, lookupHash],
-    );
-    return rows[0] ?? null;
-  }
-
-  async findLegacyPosPinCandidates(
-    tenantId: string,
-    branchId: string,
-  ): Promise<PosPinStaffRecord[]> {
-    const { rows } = await this.pg.query<PosPinStaffRecord>(
-      `SELECT s.id::text AS "staffId", s.user_id::text AS "userId",
-              u.email, u.full_name AS "displayName",
-              s.operator_pin_salt AS "pinSalt",
-              s.operator_pin_hash AS "pinHash",
-              s.pin_failed_attempts AS "failedAttempts",
-              s.pin_locked_until AS "lockedUntil"
-       FROM tenant.staff s
-       JOIN umi.user u ON u.id = s.user_id AND u.status = 'active'
-       JOIN tenant.branch b ON b.id = $2::uuid
-         AND b.business_id = s.business_id AND b.status = 'active'
-       WHERE s.business_id = $1::uuid
-         AND s.status = 'active'
-         AND (s.branch_id IS NULL OR s.branch_id = b.id)
-         AND s.operator_pin_hash IS NOT NULL
-         AND s.operator_pin_salt IS NOT NULL
-         AND s.operator_pin_lookup_hash IS NULL
-         AND EXISTS (
-           SELECT 1 FROM umi.user_role ur
-           WHERE ur.user_id = s.user_id
-             AND (ur.business_id = s.business_id OR ur.business_id IS NULL)
-             AND (ur.branch_id IS NULL OR ur.branch_id = b.id)
-         )
-       ORDER BY s.id
-       LIMIT 100`,
-      [tenantId, branchId],
-    );
-    return rows;
-  }
-
-  async recordPosPinFailure(staffId: string): Promise<void> {
-    await this.pg.query(
-      `UPDATE tenant.staff
-       SET pin_failed_attempts = least(pin_failed_attempts + 1, 10),
-           pin_locked_until = CASE
-             WHEN pin_failed_attempts + 1 >= 5
-             THEN now() + interval '15 minutes'
-             ELSE pin_locked_until
-           END,
-           updated_at = now()
-       WHERE id = $1::uuid`,
-      [staffId],
-    );
-  }
-
-  async confirmPosPin(staffId: string, tenantId: string, lookupHash: string): Promise<boolean> {
-    const { rowCount } = await this.pg.query(
-      `UPDATE tenant.staff
-       SET operator_pin_lookup_hash = $3,
-           pin_failed_attempts = 0,
-           pin_locked_until = null,
-           updated_at = now()
-       WHERE id = $1::uuid AND business_id = $2::uuid
-         AND status = 'active'
-       RETURNING id`,
-      [staffId, tenantId, lookupHash],
-    );
-    return (rowCount ?? 0) === 1;
-  }
-
-  async createSession(input: {
-    id: string;
-    userId: string;
-    deviceId: string | null;
-    app: 'dashboard' | 'kds' | 'pos';
-    tokenHash: string;
-    expiresAt: Date;
-    ip: string | null;
-    userAgent: string | null;
-    familyId?: string;
-  }): Promise<void> {
-    await this.pg.query(
-      `WITH created AS (
-         INSERT INTO runtime.session
-           (id, user_id, device_id, app, token_hash, expires_at, ip, user_agent, refresh_family_id)
-         VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8,
-                 COALESCE($9::uuid, gen_random_uuid()))
-         RETURNING id, user_id
-       )
-       INSERT INTO runtime.security_audit_event
-         (actor_user_id, session_id, event_type, entity_type, entity_id, outcome, metadata)
-       SELECT user_id, id, 'session.created', 'session', id, 'success',
-              jsonb_build_object('app', $4, 'deviceBound', $3::uuid IS NOT NULL)
-       FROM created`,
-      [
-        input.id,
-        input.userId,
-        input.deviceId,
-        input.app,
-        input.tokenHash,
-        input.expiresAt,
-        input.ip,
-        input.userAgent,
-        input.familyId ?? null,
-      ],
-    );
-  }
-
-  async findSession(sessionId: string): Promise<SessionRecord | null> {
-    const { rows } = await this.pg.query<SessionRecord>(
-      `SELECT id::text, user_id::text AS "userId", device_id::text AS "deviceId",
-              app, token_hash AS "tokenHash", expires_at AS "expiresAt",
-              revoked_at AS "revokedAt"
-       FROM runtime.session WHERE id = $1::uuid LIMIT 1`,
-      [sessionId],
-    );
-    return rows[0] ?? null;
-  }
-
-  async sessionIsActive(sessionId: string, userId: string): Promise<boolean> {
-    const { rows } = await this.pg.query<{ active: boolean }>(
-      `UPDATE runtime.session AS s
-       SET last_seen_at = now()
-       WHERE s.id = $1::uuid AND s.user_id = $2::uuid
-         AND s.revoked_at IS NULL AND s.expires_at > now()
-         AND (
-           s.device_id IS NULL OR EXISTS (
-             SELECT 1 FROM tenant.device AS d
-             WHERE d.id = s.device_id AND d.status = 'active'
-           )
-         )
-       RETURNING true AS active`,
-      [sessionId, userId],
-    );
-    return rows[0]?.active === true;
-  }
-
-  async deviceAllowedForUser(
-    userId: string,
-    deviceId: string,
-    app: 'dashboard' | 'kds' | 'pos',
-    installationHash: string | null = null,
-    credentialHash: string | null = null,
-    tenantId: string | null = null,
-    branchId: string | null = null,
-  ): Promise<boolean> {
-    if (app === 'dashboard') return false;
-    const expectedKind = app === 'kds' ? 'kds' : 'pos_terminal';
-    const { rows } = await this.pg.query<{ allowed: boolean }>(
-      `WITH ${SUPER_ADMIN_SA_CTE}
-       SELECT EXISTS (
-         SELECT 1
-         FROM tenant.device AS d
-         WHERE d.id = $2::uuid
-           AND d.kind = $3
-           AND d.status = 'active'
-           AND ($6::uuid IS NULL OR d.business_id = $6::uuid)
-           AND ($7::uuid IS NULL OR d.branch_id = $7::uuid)
-           AND (
-             $3 <> 'pos_terminal' OR (
-               d.lifecycle_state = 'active'
-               AND d.installation_hash = $4
-               AND d.credential_hash = $5
-             )
-           )
-           AND (
-             EXISTS (
-               SELECT 1 FROM umi.user_role AS ur
-               WHERE ur.user_id = $1::uuid
-                 AND (ur.business_id = d.business_id OR ur.business_id IS NULL)
-                 AND (ur.branch_id IS NULL OR ur.branch_id = d.branch_id)
-             )
-             OR (SELECT is_sa FROM sa)
-           )
-       ) AS allowed`,
-      [userId, deviceId, expectedKind, installationHash, credentialHash, tenantId, branchId],
-    );
-    return rows[0]?.allowed === true;
-  }
-
-  async rotateSession(
-    currentId: string,
-    tokenHash: string,
-    replacement: {
-      id: string;
-      userId: string;
-      deviceId: string | null;
-      app: 'dashboard' | 'kds' | 'pos';
-      tokenHash: string;
-      expiresAt: Date;
-      ip: string | null;
-      userAgent: string | null;
-    },
-  ): Promise<boolean> {
-    const client = await this.pg.worker.connect();
-    try {
-      await client.query('BEGIN');
-      const { rows } = await client.query<{ refreshFamilyId: string }>(
-        `SELECT refresh_family_id::text AS "refreshFamilyId"
-         FROM runtime.session
-         WHERE id = $1::uuid AND token_hash = $2 AND revoked_at IS NULL AND expires_at > now()
-         FOR UPDATE`,
-        [currentId, tokenHash],
-      );
-      const current = rows[0];
-      if (!current) {
-        await client.query('ROLLBACK');
-        return false;
-      }
-      await client.query(
-        `INSERT INTO runtime.session
-           (id, user_id, device_id, app, token_hash, expires_at, ip, user_agent, refresh_family_id)
-         VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9::uuid)`,
-        [
-          replacement.id,
-          replacement.userId,
-          replacement.deviceId,
-          replacement.app,
-          replacement.tokenHash,
-          replacement.expiresAt,
-          replacement.ip,
-          replacement.userAgent,
-          current.refreshFamilyId,
-        ],
-      );
-      await client.query(
-        `UPDATE runtime.session
-         SET revoked_at = now(), revoked_reason = 'rotated', replaced_by_id = $2::uuid
-         WHERE id = $1::uuid`,
-        [currentId, replacement.id],
-      );
-      await client.query(
-        `INSERT INTO runtime.security_audit_event
-           (actor_user_id, session_id, event_type, entity_type, entity_id, outcome, metadata)
-         VALUES ($1::uuid, $2::uuid, 'session.renewed', 'session', $2::uuid, 'success',
-                 jsonb_build_object('previousSessionId', $3))`,
-        [replacement.userId, replacement.id, currentId],
-      );
-      await client.query('COMMIT');
-      return true;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
-  async revokeSession(sessionId: string, reason: string): Promise<void> {
-    await this.pg.query(
-      `UPDATE runtime.session
-       SET revoked_at = COALESCE(revoked_at, now()), revoked_reason = COALESCE(revoked_reason, $2)
-       WHERE id = $1::uuid`,
-      [sessionId, reason],
-    );
-  }
-
-  async revokeSessionFamily(sessionId: string, reason: string): Promise<void> {
-    await this.pg.query(
-      `UPDATE runtime.session
-       SET revoked_at = COALESCE(revoked_at, now()),
-           revoked_reason = COALESCE(revoked_reason, $2)
-       WHERE refresh_family_id = (
-         SELECT refresh_family_id FROM runtime.session WHERE id = $1::uuid
-       )`,
-      [sessionId, reason],
-    );
-  }
-
-  async revokeUserSessions(userId: string, exceptSessionId: string | null): Promise<number> {
-    const { rowCount } = await this.pg.query(
-      `UPDATE runtime.session
-       SET revoked_at = now(), revoked_reason = 'global_logout'
-       WHERE user_id = $1::uuid AND revoked_at IS NULL
-         AND ($2::uuid IS NULL OR id <> $2::uuid)`,
-      [userId, exceptSessionId],
-    );
-    return rowCount ?? 0;
-  }
-
-  async writeSecurityAudit(input: {
-    actorUserId: string | null;
-    sessionId: string | null;
-    businessId?: string | null;
-    branchId?: string | null;
-    eventType: string;
-    entityType: string;
-    entityId?: string | null;
-    outcome: 'success' | 'denied' | 'failure';
-    reasonCode?: string | null;
-    requestId?: string | null;
-    metadata?: Record<string, unknown>;
-  }): Promise<void> {
-    await this.pg.query(
-      `INSERT INTO runtime.security_audit_event
-         (actor_user_id, session_id, business_id, branch_id, event_type, entity_type,
-          entity_id, outcome, reason_code, request_id, metadata)
-       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5, $6, $7::uuid, $8, $9, $10, $11)`,
-      [
-        input.actorUserId,
-        input.sessionId,
-        input.businessId ?? null,
-        input.branchId ?? null,
-        input.eventType,
-        input.entityType,
-        input.entityId ?? null,
-        input.outcome,
-        input.reasonCode ?? null,
-        input.requestId ?? null,
-        input.metadata ?? {},
-      ],
-    );
-  }
-
-  async hasElevation(input: {
-    sessionId: string;
-    businessId: string;
-    branchId: string | null;
-    permission: string;
-    method: 'manager_approval' | 'operator_pin';
-  }): Promise<boolean> {
-    const { rows } = await this.pg.query<{ active: boolean }>(
-      `SELECT EXISTS (
-         SELECT 1 FROM runtime.elevation_grant
-         WHERE session_id = $1::uuid
-           AND business_id = $2::uuid
-           AND (branch_id IS NULL OR branch_id = $3::uuid)
-           AND permission_key = $4
-           AND method = $5
-           AND expires_at > now()
-           AND consumed_at IS NULL
-       ) AS active`,
-      [input.sessionId, input.businessId, input.branchId, input.permission, input.method],
-    );
-    return rows[0]?.active === true;
+    return rows[0]?.status ?? null;
   }
 
   // ── password reset (runtime.password_reset_token, user-keyed) ──
@@ -703,7 +594,6 @@ export class AuthRepository {
     await this.pg.query(
       `UPDATE umi.user
        SET password_salt = $2, password_hash = $3, updated_at = now()
-           , status = 'active'
        WHERE id = $1::uuid`,
       [userId, salt, hash],
     );

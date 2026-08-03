@@ -1,12 +1,12 @@
 import React from 'react';
 import { isProductStatusActive } from '@umi/contract/entitlements';
 import { I } from '@/icons.jsx';
-import { useTenant } from '@/lib/tenant-context.jsx';
+import { useMerchant } from '@/lib/merchant-context.jsx';
 
 const PRODUCT_COPY = {
   dashboard: {
     title: 'Umi Dashboard',
-    body: 'Owner console, tenant switching, branch context, and account settings.',
+    body: 'Owner console, merchant switching, location context, and account settings.',
     icon: 'Home',
   },
   conversaflow: {
@@ -45,7 +45,7 @@ function ProductCard({ productKey, product }) {
           width: 46,
           height: 46,
           borderRadius: 12,
-          background: active ? 'var(--tenant-brand)' : 'var(--canvas-2)',
+          background: active ? 'var(--merchant-brand)' : 'var(--canvas-2)',
           color: active ? '#fff' : 'var(--ink-3)',
           display: 'flex',
           alignItems: 'center',
@@ -83,8 +83,8 @@ function ProductCard({ productKey, product }) {
 }
 
 export default function ProductsBillingScreen() {
-  const tenantState = useTenant();
-  const products = tenantState?.capabilities?.products || {};
+  const merchantState = useMerchant();
+  const products = merchantState?.capabilities?.products || {};
   const ordered = ['dashboard', 'conversaflow', 'kds', 'cash', 'observability'];
 
   return (
@@ -96,7 +96,7 @@ export default function ProductsBillingScreen() {
           <span>PRODUCTS & BILLING</span>
         </div>
         <h2 style={{ margin: '0 0 8px', fontSize: 26 }}>
-          Product contract for {tenantState?.selectedTenant?.name || 'tenant'}
+          Product contract for {merchantState?.selectedMerchant?.name || 'merchant'}
         </h2>
         <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 760 }}>
           Product status controls which modules exist in the dashboard. Roles decide actions inside

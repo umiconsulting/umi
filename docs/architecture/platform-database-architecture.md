@@ -10,7 +10,7 @@
 
 ## 0. Philosophy
 
-Umi is an AI-first platform serving multi-tenant businesses — restaurants today,
+Umi is an AI-first platform serving many merchants — restaurants today,
 gyms, salons, events, and retail tomorrow. Products (ConversaFlow, Cash, KDS,
 Dashboard, Landing) are interfaces over shared business domains. Products come
 and go. Domains are permanent.
@@ -26,37 +26,37 @@ instantly where everything lives.
 
 Every table falls into one of three categories.
 
-### Tenant-scoped
+### Merchant-scoped
 
-Every row belongs to exactly one tenant. `tenant_id uuid NOT NULL`.
+Every row belongs to exactly one merchant. `tenant_id uuid NOT NULL`.
 RLS enforced. Composite FKs: `(tenant_id, entity_id)` guards against
-cross-tenant corruption at the schema level, not just the policy level.
+cross-merchant corruption at the schema level, not just the policy level.
 
 All tables in `ops`, `comms`, `loyalty`, `device`, `kitchen`.
 
-### Global / cross-tenant
+### Global / cross-merchant
 
-Data about Umi the company, or infrastructure spanning tenants.
+Data about Umi the company, or infrastructure spanning merchants.
 No `tenant_id`, or `tenant_id` is nullable. Protected by role separation,
 not RLS.
 
-Tables: `grow.*` (leads have no tenant — they're prospects).
+Tables: `grow.*` (leads have no merchant — they're prospects).
 `queue.*` and `observability.*` carry denormalized `tenant_id` for filtering
 but are `service_role` only — never in `exposed_schemas`.
 
 ### Umi-internal
 
-Umi's own business data. Tenants can NEVER read these tables.
+Umi's own merchant data. Merchants can NEVER read these tables.
 Protected by `REVOKE ALL FROM authenticated`.
 
 Tables: `grow.*`.
 
 ### Tenancy invariants
 
-1. Every tenant-scoped table MUST have `tenant_id uuid NOT NULL`.
-2. Every tenant-scoped table MUST have RLS enabled.
+1. Every merchant-scoped table MUST have `tenant_id uuid NOT NULL`.
+2. Every merchant-scoped table MUST have RLS enabled.
 3. Composite FKs: `(tenant_id, id)` unique constraint + `(tenant_id, ref_id)`
-   foreign key — makes cross-tenant reference bugs structurally impossible.
+   foreign key — makes cross-merchant reference bugs structurally impossible.
 4. `queue` and `observability` are `service_role` only — never API-exposed.
 5. `grow` is `service_role` only — never granted to authenticated.
 
@@ -66,7 +66,7 @@ Tables: `grow.*`.
 
 ```
 core           Identity & tenancy
-ops            Business operations
+ops            Merchant operations
 comms          AI conversations & memory
 loyalty        Points, rewards, wallet, passes
 device         Hardware pairing, sessions, registry
@@ -80,29 +80,29 @@ grow           Umi's leads, subscriptions, feature flags
 
 The shared kernel. Every product depends on this. It depends on nothing above it.
 
-Answer: "Who is this person? What tenant do they belong to?"
+Answer: "Who is this person? What merchant do they belong to?"
 
-| Table                | Purpose                                                                                                                      |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `tenants`            | A business that pays Umi                                                                                                     |
-| `locations`          | Physical locations belonging to a tenant                                                                                     |
-| `people`             | One human known to a tenant. Customer, staff, owner-who-is-also-a-diner — all one row. Roles are edges, not duplicate rows   |
-| `contact_methods`    | How to reach a person: phone, WhatsApp, email. `UNIQUE(tenant_id, kind, normalized_value)`                                   |
-| `users`              | Someone who logs into the dashboard. Links to `auth.users`. May optionally link to `people` for staff-who-are-also-customers |
-| `tenant_memberships` | Which user belongs to which tenant with what role                                                                            |
+| Table                  | Purpose                                                                                                                      |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `merchants`            | A merchant that pays Umi                                                                                                     |
+| `locations`            | Physical locations belonging to a merchant                                                                                   |
+| `people`               | One human known to a merchant. Customer, staff, owner-who-is-also-a-diner — all one row. Roles are edges, not duplicate rows |
+| `contact_methods`      | How to reach a person: phone, WhatsApp, email. `UNIQUE(tenant_id, kind, normalized_value)`                                   |
+| `users`                | Someone who logs into the dashboard. Links to `auth.users`. May optionally link to `people` for staff-who-are-also-customers |
+| `merchant_memberships` | Which user belongs to which merchant with what role                                                                          |
 
-### ops — Business operations
+### ops — Merchant operations
 
 The operational truth. Orders, catalog, payments, channels. Orders exist here
 whether created by WhatsApp, POS, kiosk, or dashboard.
 
-Answer: "What does this business sell? What did they sell? Who paid?"
+Answer: "What does this merchant sell? What did they sell? Who paid?"
 
 | Table                     | Purpose                                                                     |
 | ------------------------- | --------------------------------------------------------------------------- |
-| `businesses`              | Tenant brand configuration                                                  |
+| `merchants`               | Merchant brand configuration                                                |
 | `locations`               | (references core.locations)                                                 |
-| `channels`                | WhatsApp, SMS, web — how customers reach the business                       |
+| `channels`                | WhatsApp, SMS, web — how customers reach the merchant                       |
 | `channel_accounts`        | Specific phone numbers / accounts per channel                               |
 | `products`                | Menu items, catalog. What the restaurant sells                              |
 | `product_categories`      | Menu sections                                                               |
@@ -131,7 +131,7 @@ Answer: "What was said? What does the AI remember? What does it know?"
 | `conversation_turns`   | AI reasoning steps within a conversation                      |
 | `tool_calls`           | What tools the AI invoked and their results                   |
 | `memory_items`         | Durable facts the AI remembers: preferences, allergies, facts |
-| `knowledge_documents`  | Tenant-provided grounding: FAQ, policies, menu notes          |
+| `knowledge_documents`  | Merchant-provided grounding: FAQ, policies, menu notes        |
 | `knowledge_chunks`     | Chunked text + pgvector embeddings for RAG                    |
 | `customer_preferences` | Explicit customer preferences                                 |
 
@@ -163,9 +163,9 @@ Answer: "How many points? What rewards? What passes? When did they visit?"
 
 ### device — Hardware
 
-Any screen or peripheral in any business. Pairing, authentication, sessions,
+Any screen or peripheral in any merchant. Pairing, authentication, sessions,
 heartbeat monitoring. Does not know what a KDS or printer or kiosk IS — it
-knows "a device of type X paired to tenant Y at location Z with permissions P."
+knows "a device of type X paired to merchant Y at location Z with permissions P."
 
 Answer: "What hardware is connected? Is it online? What can it do?"
 
@@ -223,20 +223,20 @@ Answer: "What did the AI do? What happened in production? Who changed what?"
 | `edge_logs`             | Edge function stdout/stderr                                               |
 | `data_quality_findings` | Reconciliation results, drift detection                                   |
 
-### grow — Umi's business
+### grow — Umi's merchant
 
-Umi-the-company data. Sales leads, tenant subscriptions, feature flags.
-Different tenancy model: leads have NO tenant (they're prospects).
-Tenants never read this. `service_role` only.
+Umi-the-company data. Sales leads, merchant subscriptions, feature flags.
+Different tenancy model: leads have NO merchant (they're prospects).
+Merchants never read this. `service_role` only.
 
-Answer: "Who's in our sales pipeline? What are tenants subscribed to?"
+Answer: "Who's in our sales pipeline? What are merchants subscribed to?"
 
-| Table           | Purpose                                                                       |
-| --------------- | ----------------------------------------------------------------------------- |
-| `leads`         | Prospective restaurant clients. `tenant_id` IS NULL — they aren't tenants yet |
-| `lead_events`   | Sales funnel activity                                                         |
-| `subscriptions` | Tenant billing: plan, status, trial_ends_at                                   |
-| `feature_flags` | Per-tenant rollout control                                                    |
+| Table           | Purpose                                                                         |
+| --------------- | ------------------------------------------------------------------------------- |
+| `leads`         | Prospective restaurant clients. `tenant_id` IS NULL — they aren't merchants yet |
+| `lead_events`   | Sales funnel activity                                                           |
+| `subscriptions` | Merchant billing: plan, status, trial_ends_at                                   |
+| `feature_flags` | Per-merchant rollout control                                                    |
 
 ---
 
@@ -257,10 +257,10 @@ Answer: "Who's in our sales pipeline? What are tenants subscribed to?"
    survives order deletion. `observability.*` may soft-reference
    any entity. Exhaust must survive parent deletion.
 
-4. **Composite tenant FKs for structural safety.**
-   `UNIQUE(tenant_id, id)` on every tenant-scoped table.
+4. **Composite merchant FKs for structural safety.**
+   `UNIQUE(tenant_id, id)` on every merchant-scoped table.
    `FK (tenant_id, person_id) REFERENCES core.people(tenant_id, id)` —
-   makes cross-tenant references physically impossible, even with a
+   makes cross-merchant references physically impossible, even with a
    service-code bug.
 
 ---
@@ -304,20 +304,20 @@ Truncate `queue` → system stops working (orders, messages, events all break).
 Truncate `observability` → system keeps running (you lose visibility).
 Different criticality. Different retention. Different consumers.
 
-### Why tenant-scoped `people`
+### Why merchant-scoped `people`
 
 The same human at El Gran Ribera and Kalala Cafe is two `people` rows.
 My relationship with Cafe A is genuinely separate from my relationship
-with Cafe B. A shared row would create a cross-tenant join path and a
-privacy hazard. Cross-tenant identity resolution is an analytics-layer
+with Cafe B. A shared row would create a cross-merchant join path and a
+privacy hazard. Cross-merchant identity resolution is an analytics-layer
 concern, not an operational-store concern.
 
 ### Why `grow` is separate
 
 Leads have no `tenant_id` — they're prospects. Subscriptions are Umi's
-revenue data. Feature flags are per-tenant entitlements. Mixing these
-with restaurant data would break the tenant-scoped invariant on every
-other schema. `grow` is Umi-internal, never exposed to tenants.
+revenue data. Feature flags are per-merchant entitlements. Mixing these
+with restaurant data would break the merchant-scoped invariant on every
+other schema. `grow` is Umi-internal, never exposed to merchants.
 
 ---
 
@@ -338,7 +338,7 @@ other schema. `grow` is Umi-internal, never exposed to tenants.
 
 ## 6. Edge Cases
 
-### Onboarding tenant #2
+### Onboarding merchant #2
 
 Zero DDL. A single transaction: `INSERT INTO core.tenants`, `core.locations`,
 `loyalty.programs`, `ops.channels`, `ops.channel_accounts`, optional
@@ -353,9 +353,9 @@ and optional `person_id` linking back to their customer identity.
 `loyalty.accounts` for their loyalty membership. All connected through
 one person, never duplicated.
 
-### Cross-tenant analytics
+### Cross-merchant analytics
 
-Operational store is tenant-isolated by RLS. Cross-tenant queries
+Operational store is merchant-isolated by RLS. Cross-merchant queries
 (benchmarks, peer comparisons) run on a read replica or analytics
 warehouse fed by `queue.outbox_events` + CDC. Never on the OLTP primary.
 
@@ -371,15 +371,35 @@ traces are pruned on schedule, not on demand.
 
 ## 7. Naming Conventions
 
+> ⚠️ **This section describes the SUPERSEDED `core`/`ops`/`comms`/`loyalty` schema.**
+> build-v3 (`umi`/`merchant`/`runtime`) reverses two of these rules — see the note under
+> **Tables** and **Views**. It is left in place because it documents the schema the
+> migration reads FROM, not the one it writes to.
+
 - **Schemas**: singular, short, lowercase nouns. `core`, `ops`, `comms`, `loyalty`.
 - **Tables**: plural snake_case. `people`, `orders`, `loyalty_cards`.
+  - **build-v3 uses SINGULAR** — `customer`, `order_item`, `loyalty_card` — and is
+    consistent across all 65 tables. A table names the TYPE of one row, not the
+    collection. The practical reason is that English plurals are irregular and the
+    schema pays for it: `person`/`people`, `status`/`statuses`, `merchant`/`merchants`.
+    Singular also matches the FK rule below (`order_item.order_id` → `customer_order`),
+    where plural would mix the two forms in every join, and maps 1:1 to a generated
+    class name with no inflection library. Both conventions are defensible; mixing them
+    is what costs.
 - **Columns**: snake_case. `tenant_id`, `created_at`, `display_name`.
+  - **build-v3 uses `merchant_id`**, never `tenant_id` — name the concept, not the
+    multitenancy mechanism. (The 20-agent audit found 488 `tenant_id` references against
+    a schema with zero such columns; this rule is why.)
 - **PK**: `id uuid primary key default gen_random_uuid()`.
 - **Timestamps**: `created_at timestamptz`, `updated_at timestamptz`.
 - **Money**: `*_cents integer` (minor units). Never float.
 - **Status**: `text` with `CHECK` constraint. Not native enum.
 - **Foreign keys**: `<singular>_id`. `person_id`, `order_id`, `account_id`.
 - **Views**: `v_` prefix. `v_customer_360`, `v_kds_tickets`.
+  - **build-v3 drops the prefix**: `merchant.order_total`, `merchant.order_ticket`,
+    `merchant.kds_ticket`. A consumer should not have to care whether a projection is a
+    view or a table — that is the point of a projection — and the prefix leaks the
+    storage decision into every call site, making it expensive to change later.
 - **Functions**: `verb_noun`. `award_points`, `place_order`, `resolve_contact`.
 - **No**: CamelCase, product prefixes, soft-delete booleans, generic `transactions`.
 
@@ -395,6 +415,6 @@ traces are pruned on schedule, not on demand.
 | KDS duplicate ticket tree        | `ops.order_items` as single source; KDS reads projection   |
 | Mutable loyalty balances         | Append-only `points_ledger` with `SUM(delta)`              |
 | Product-named schemas            | Domain-named schemas survive rebrands                      |
-| No tenancy enforcement           | Composite tenant FKs + uniform RLS                         |
+| No tenancy enforcement           | Composite merchant FKs + uniform RLS                       |
 | Homeless OAuth tokens            | Future: `integrations` schema or explicit home in platform |
 | No analytics path                | `queue.outbox_events` + CDC → warehouse/read replica       |

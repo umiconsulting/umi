@@ -2,23 +2,25 @@ import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
 
 /**
- * Memory + semantic-search queries over `tenant.message` and `tenant.customer_note`
- * (build-v2). Two rebinds from the old `comms.*` model:
- *   * semantic search: `comms.messages` → `tenant.message` (`role → sender`,
- *     `content → body`, `embedding → body_embedding`); the person join moves to
- *     `tenant.conversation.customer_id`.
+ * Memory + semantic-search queries over `merchant.message` and `merchant.customer_fact`
+ * (build-v3). Two rebinds from the old `comms.*` model:
+ *   * semantic search: `comms.messages` → `merchant.message` (`role → sender`,
+ *     `content → body`); the body embedding lives in `runtime.message_embedding`,
+ *     joined at query time, and the person join moves to
+ *     `merchant.conversation.customer_id`.
  *   * customer facts: the single `comms.customer_preferences.facts` jsonb blob is
- *     RE-GRAINED to atomic `tenant.customer_note` rows (one row per fact key,
- *     `source='preferences'`). The public blob contract is preserved — reads
- *     reconstruct the object, and the write REPLACES the preference set (matching
- *     the old wholesale-overwrite upsert) atomically.
+ *     RE-GRAINED to atomic `merchant.customer_fact` rows (one row per fact key,
+ *     `source='preferences'`), with typed `key` / `value` columns — no metadata
+ *     junk-drawer. The public blob contract is preserved — reads reconstruct the
+ *     object, and the write REPLACES the preference set (matching the old
+ *     wholesale-overwrite upsert) atomically.
  *
- * The `personId` argument carries `tenant.customer.id` (build-v2). Worker pool,
- * explicit tenant predicates. The legacy `search_customer_messages` /
+ * The `personId` argument carries `merchant.customer.id` (build-v3). Worker pool,
+ * explicit merchant predicates. The legacy `search_customer_messages` /
  * `search_similar_messages` RPCs are not on canonical, so cosine is direct here.
  */
 
-/** Preference facts are stored one-per-row under this `customer_note.source`. */
+/** Preference facts are stored one-per-row under this `customer_fact.source`. */
 const PREFERENCES_SOURCE = 'preferences';
 
 export interface SemanticRow {
@@ -34,29 +36,29 @@ export class MemoryRepository {
   constructor(private readonly pg: PgService) {}
 
   /**
-   * Customer facts, reconstructed from the atomic `tenant.customer_note` rows
+   * Customer facts, reconstructed from the atomic `merchant.customer_fact` rows
    * (`source='preferences'`) back into the blob shape the prompt builder expects.
-   * Each note carries its original `{key, value}` in `metadata`, so the object
-   * round-trips exactly. Returns null when the customer has no preference notes.
+   * Each row carries a typed `key` / `value jsonb`, so the object round-trips
+   * exactly. Returns null when the customer has no preference facts.
    */
   async getCustomerFacts(
-    tenantId: string,
+    merchantId: string,
     personId: string,
   ): Promise<Record<string, unknown> | null> {
     const { rows } = await this.pg.query<{
-      key: string | null;
+      key: string;
       value: unknown;
     }>(
-      `SELECT metadata->>'key' AS key, metadata->'value' AS value
-         FROM tenant.customer_note
-        WHERE customer_id = $1 AND business_id = $2 AND source = $3
+      `SELECT key, value
+         FROM merchant.customer_fact
+        WHERE customer_id = $1 AND merchant_id = $2 AND source = $3
         ORDER BY created_at`,
-      [personId, tenantId, PREFERENCES_SOURCE],
+      [personId, merchantId, PREFERENCES_SOURCE],
     );
     if (rows.length === 0) return null;
     const facts: Record<string, unknown> = {};
     for (const row of rows) {
-      if (row.key != null) facts[row.key] = row.value;
+      facts[row.key] = row.value;
     }
     return facts;
   }
@@ -67,7 +69,7 @@ export class MemoryRepository {
    * the current conversation. Mirrors the legacy `search_customer_messages` RPC.
    */
   async searchCustomerMessages(params: {
-    tenantId: string;
+    merchantId: string;
     personId: string;
     currentConversationId: string;
     embedding: number[];
@@ -77,7 +79,7 @@ export class MemoryRepository {
   }): Promise<SemanticRow[]> {
     const { rows } = await this.pg.query<SemanticRow>(
       `WITH recent AS (
-         SELECT id FROM tenant.message
+         SELECT id FROM merchant.message
           WHERE conversation_id = $3
           ORDER BY created_at DESC
           LIMIT $6
@@ -87,18 +89,18 @@ export class MemoryRepository {
               COALESCE(m.body, '') AS content,
               m.created_at,
               m.conversation_id::text AS conversation_id,
-              1 - (m.body_embedding <=> $4::vector) AS similarity
-         FROM tenant.message m
-         JOIN tenant.conversation c ON c.id = m.conversation_id
+              1 - (me.embedding <=> $4::vector) AS similarity
+         FROM merchant.message m
+         JOIN merchant.conversation c ON c.id = m.conversation_id
+         JOIN runtime.message_embedding me ON me.message_id = m.id
         WHERE c.customer_id = $2
-          AND m.business_id = $1
-          AND m.body_embedding IS NOT NULL
+          AND c.merchant_id = $1
           AND m.sender = ANY($5)
           AND m.id NOT IN (SELECT id FROM recent)
-        ORDER BY m.body_embedding <=> $4::vector
+        ORDER BY me.embedding <=> $4::vector
         LIMIT $7`,
       [
-        params.tenantId,
+        params.merchantId,
         params.personId,
         params.currentConversationId,
         JSON.stringify(params.embedding),
@@ -119,7 +121,7 @@ export class MemoryRepository {
   }): Promise<SemanticRow[]> {
     const { rows } = await this.pg.query<SemanticRow>(
       `WITH recent AS (
-         SELECT id FROM tenant.message
+         SELECT id FROM merchant.message
           WHERE conversation_id = $1
           ORDER BY created_at DESC
           LIMIT $3
@@ -129,12 +131,12 @@ export class MemoryRepository {
               COALESCE(m.body, '') AS content,
               m.created_at,
               m.conversation_id::text AS conversation_id,
-              1 - (m.body_embedding <=> $2::vector) AS similarity
-         FROM tenant.message m
+              1 - (me.embedding <=> $2::vector) AS similarity
+         FROM merchant.message m
+         JOIN runtime.message_embedding me ON me.message_id = m.id
         WHERE m.conversation_id = $1
-          AND m.body_embedding IS NOT NULL
           AND m.id NOT IN (SELECT id FROM recent)
-        ORDER BY m.body_embedding <=> $2::vector
+        ORDER BY me.embedding <=> $2::vector
         LIMIT $4`,
       [params.conversationId, JSON.stringify(params.embedding), params.excludeRecent, params.limit],
     );
@@ -142,38 +144,31 @@ export class MemoryRepository {
   }
 
   /**
-   * Merge-write the customer facts: REPLACE the customer's `preferences` notes
+   * Merge-write the customer facts: REPLACE the customer's `preferences` facts
    * with the incoming set (matching the old wholesale-overwrite upsert of
    * `comms.customer_preferences.facts`). Delete + re-insert runs in one worker
    * transaction so two concurrent extract-facts jobs can't interleave into a
-   * partial set. Each fact key becomes one `tenant.customer_note` row, with the
-   * original `{key, value}` preserved in `metadata` for an exact round-trip.
+   * partial set. Each fact key becomes one `merchant.customer_fact` row with typed
+   * `key` / `value jsonb` — the unique `(merchant_id, customer_id, source, key)`
+   * keeps a key single-valued.
    */
   async upsertCustomerFacts(
-    tenantId: string,
+    merchantId: string,
     personId: string,
     facts: Record<string, unknown>,
   ): Promise<void> {
     await this.pg.workerTx(async (client) => {
       await client.query(
-        `DELETE FROM tenant.customer_note
-          WHERE business_id = $1 AND customer_id = $2 AND source = $3`,
-        [tenantId, personId, PREFERENCES_SOURCE],
+        `DELETE FROM merchant.customer_fact
+          WHERE merchant_id = $1 AND customer_id = $2 AND source = $3`,
+        [merchantId, personId, PREFERENCES_SOURCE],
       );
       for (const [key, value] of Object.entries(facts)) {
-        const valueText = typeof value === 'string' ? value : JSON.stringify(value);
         await client.query(
-          `INSERT INTO tenant.customer_note
-             (business_id, customer_id, fact, source, metadata)
-           VALUES ($1, $2, $3, $4, jsonb_build_object('key', $5::text, 'value', $6::jsonb))`,
-          [
-            tenantId,
-            personId,
-            `${key}: ${valueText}`,
-            PREFERENCES_SOURCE,
-            key,
-            JSON.stringify(value ?? null),
-          ],
+          `INSERT INTO merchant.customer_fact
+             (merchant_id, customer_id, source, key, value)
+           VALUES ($1, $2, $3, $4, $5::jsonb)`,
+          [merchantId, personId, PREFERENCES_SOURCE, key, JSON.stringify(value ?? null)],
         );
       }
     });

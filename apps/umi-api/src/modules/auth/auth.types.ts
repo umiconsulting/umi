@@ -6,22 +6,18 @@ export interface AuthUser {
   deviceId: string | null;
 }
 
-/** Resolved tenant membership attached by TenantAccessGuard. */
-export interface TenantAccess {
-  tenantId: string;
-  branchId: string | null;
-  branchIds: string[];
-  allBranches: boolean;
+/** Resolved merchant membership attached by MerchantAccessGuard. */
+export interface MerchantAccess {
+  merchantId: string;
   slug: string;
   name: string;
   timezone: string | null;
   // null for a synthesized global-super_admin access (no explicit edge in this
-  // tenant). Client-informational only — never a DB write key.
+  // merchant). Client-informational only — never a DB write key.
   membershipId: string | null;
   role: string | null;
   roles: string[];
   permissions: string[]; // ['*'] for super_admin
-  deniedPermissions: string[];
 }
 
 /**
@@ -33,8 +29,10 @@ export interface AuthedRequest {
   cookies?: Record<string, string | undefined>;
   headers?: Record<string, string | string[] | undefined>;
   params?: Record<string, string>;
+  query?: Record<string, unknown>;
+  body?: Record<string, unknown>;
   authUser?: AuthUser;
-  tenantAccess?: TenantAccess;
+  merchantAccess?: MerchantAccess;
 }
 
 export const ACCESS_COOKIE = 'umi_access';

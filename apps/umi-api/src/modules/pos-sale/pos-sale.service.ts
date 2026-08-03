@@ -30,24 +30,24 @@ export class PosSaleService {
     private readonly integrity: IntegrityService,
   ) {}
 
-  async start(user: AuthUser, tenantId: string, dto: SaleContextRequest) {
-    await this.authorize(user, tenantId, dto.branchId, dto.operatorSessionId);
-    return this.command(tenantId, dto, 'sale.started', (client) =>
-      this.repo.start(client, tenantId, dto.branchId, dto.operatorSessionId),
+  async start(user: AuthUser, merchantId: string, dto: SaleContextRequest) {
+    await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId);
+    return this.command(merchantId, dto, 'sale.started', (client) =>
+      this.repo.start(client, merchantId, dto.locationId, dto.operatorSessionId),
     );
   }
 
-  async current(user: AuthUser, tenantId: string, query: SaleHistoryQuery) {
-    await this.authorize(user, tenantId, query.branchId, query.operatorSessionId);
-    const sale = await this.repo.current(tenantId, query.branchId, query.operatorSessionId);
+  async current(user: AuthUser, merchantId: string, query: SaleHistoryQuery) {
+    await this.authorize(user, merchantId, query.locationId, query.operatorSessionId);
+    const sale = await this.repo.current(merchantId, query.locationId, query.operatorSessionId);
     if (!sale) throw new NotFoundException({ code: 'SALE_NOT_FOUND' });
     return sale;
   }
 
-  async history(user: AuthUser, tenantId: string, query: SaleHistoryQuery) {
-    await this.authorize(user, tenantId, query.branchId, query.operatorSessionId);
+  async history(user: AuthUser, merchantId: string, query: SaleHistoryQuery) {
+    await this.authorize(user, merchantId, query.locationId, query.operatorSessionId);
     const cursor = query.cursor ? this.decodeHistoryCursor(query.cursor) : null;
-    const page = await this.repo.history(tenantId, query, cursor);
+    const page = await this.repo.history(merchantId, query, cursor);
     return {
       items: page.items,
       nextCursor: page.nextKey
@@ -56,16 +56,16 @@ export class PosSaleService {
     };
   }
 
-  async suspend(user: AuthUser, tenantId: string, saleId: string, dto: SuspendSaleRequest) {
-    await this.authorize(user, tenantId, dto.branchId, dto.operatorSessionId);
+  async suspend(user: AuthUser, merchantId: string, saleId: string, dto: SuspendSaleRequest) {
+    await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId);
     return this.command(
-      tenantId,
+      merchantId,
       dto,
       'sale.suspended',
       (client) =>
         this.repo.suspend(
           client,
-          tenantId,
+          merchantId,
           saleId,
           dto.expectedVersion,
           dto.label,
@@ -75,28 +75,28 @@ export class PosSaleService {
     );
   }
 
-  async resume(user: AuthUser, tenantId: string, saleId: string, dto: ResumeSaleRequest) {
-    await this.authorize(user, tenantId, dto.branchId, dto.operatorSessionId);
+  async resume(user: AuthUser, merchantId: string, saleId: string, dto: ResumeSaleRequest) {
+    await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId);
     return this.command(
-      tenantId,
+      merchantId,
       dto,
       'sale.resumed',
       (client) =>
-        this.repo.resume(client, tenantId, saleId, dto.expectedVersion, dto.operatorSessionId),
+        this.repo.resume(client, merchantId, saleId, dto.expectedVersion, dto.operatorSessionId),
       saleId,
     );
   }
 
-  async rename(user: AuthUser, tenantId: string, saleId: string, dto: RenameSuspendedSaleRequest) {
-    await this.authorize(user, tenantId, dto.branchId, dto.operatorSessionId);
+  async rename(user: AuthUser, merchantId: string, saleId: string, dto: RenameSuspendedSaleRequest) {
+    await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId);
     return this.command(
-      tenantId,
+      merchantId,
       dto,
       'sale.suspended_renamed',
       (client) =>
         this.repo.rename(
           client,
-          tenantId,
+          merchantId,
           saleId,
           dto.expectedVersion,
           dto.label,
@@ -106,16 +106,16 @@ export class PosSaleService {
     );
   }
 
-  async cancel(user: AuthUser, tenantId: string, saleId: string, dto: CancelSaleRequest) {
-    await this.authorize(user, tenantId, dto.branchId, dto.operatorSessionId);
+  async cancel(user: AuthUser, merchantId: string, saleId: string, dto: CancelSaleRequest) {
+    await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId);
     return this.command(
-      tenantId,
+      merchantId,
       dto,
       'sale.cancelled',
       (client) =>
         this.repo.cancel(
           client,
-          tenantId,
+          merchantId,
           saleId,
           dto.expectedVersion,
           dto.reason,
@@ -127,19 +127,19 @@ export class PosSaleService {
 
   async attachCustomer(
     user: AuthUser,
-    tenantId: string,
+    merchantId: string,
     saleId: string,
     dto: AttachSaleCustomerRequest,
   ) {
-    await this.authorize(user, tenantId, dto.branchId, dto.operatorSessionId);
+    await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId);
     return this.command(
-      tenantId,
+      merchantId,
       dto,
       'sale.customer_attached',
       (client) =>
         this.repo.attachCustomer(
           client,
-          tenantId,
+          merchantId,
           saleId,
           dto.expectedVersion,
           dto.customerId,
@@ -149,16 +149,16 @@ export class PosSaleService {
     );
   }
 
-  async detachCustomer(user: AuthUser, tenantId: string, saleId: string, dto: SaleMutationRequest) {
-    await this.authorize(user, tenantId, dto.branchId, dto.operatorSessionId);
+  async detachCustomer(user: AuthUser, merchantId: string, saleId: string, dto: SaleMutationRequest) {
+    await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId);
     return this.command(
-      tenantId,
+      merchantId,
       dto,
       'sale.customer_detached',
       (client) =>
         this.repo.attachCustomer(
           client,
-          tenantId,
+          merchantId,
           saleId,
           dto.expectedVersion,
           null,
@@ -168,20 +168,20 @@ export class PosSaleService {
     );
   }
 
-  async customers(user: AuthUser, tenantId: string, query: PosCustomerSearchQuery) {
-    await this.authorize(user, tenantId, query.branchId, query.operatorSessionId);
-    return this.repo.customers(tenantId, query);
+  async customers(user: AuthUser, merchantId: string, query: PosCustomerSearchQuery) {
+    await this.authorize(user, merchantId, query.locationId, query.operatorSessionId);
+    return this.repo.customers(merchantId, query);
   }
 
-  async receipt(user: AuthUser, tenantId: string, saleId: string, query: SaleHistoryQuery) {
-    await this.authorize(user, tenantId, query.branchId, query.operatorSessionId);
-    const receipt = await this.repo.receipt(tenantId, query.branchId, saleId);
+  async receipt(user: AuthUser, merchantId: string, saleId: string, query: SaleHistoryQuery) {
+    await this.authorize(user, merchantId, query.locationId, query.operatorSessionId);
+    const receipt = await this.repo.receipt(merchantId, query.locationId, saleId);
     if (!receipt) throw new NotFoundException({ code: 'RECEIPT_NOT_FOUND' });
     return receipt;
   }
 
   private async command(
-    tenantId: string,
+    merchantId: string,
     dto: SaleContextRequest,
     eventType: string,
     operation: (
@@ -191,8 +191,8 @@ export class PosSaleService {
   ): Promise<SaleSnapshot> {
     const result = await this.integrity.execute<SaleSnapshot>(
       {
-        tenantId,
-        branchId: dto.branchId,
+        merchantId,
+        locationId: dto.locationId,
         commandId: randomUUID(),
         idempotencyKey: dto.idempotencyKey,
         commandType: eventType,
@@ -259,8 +259,8 @@ export class PosSaleService {
 
   private async authorize(
     user: AuthUser,
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     operatorSessionId: string,
   ) {
     if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
@@ -268,8 +268,8 @@ export class PosSaleService {
       user.id,
       user.sessionId,
       user.deviceId,
-      tenantId,
-      branchId,
+      merchantId,
+      locationId,
       operatorSessionId,
     );
     if (!allowed) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });

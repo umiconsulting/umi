@@ -13,6 +13,7 @@ import type {
   TotalsConfirmation,
 } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
+import { writeOrder } from '../../shared/orders/order-writer';
 
 export interface CheckoutLine {
   id: string;
@@ -25,13 +26,13 @@ export interface CheckoutLine {
 
 export interface CheckoutCart {
   id: string;
-  tenantId: string;
-  branchId: string;
+  merchantId: string;
+  locationId: string;
   operatorSessionId: string;
   version: number;
   businessDate: string;
-  tenantName: string;
-  branchName: string;
+  merchantName: string;
+  locationName: string;
   operatorName: string;
   customerId: string | null;
   lines: CheckoutLine[];
@@ -50,30 +51,37 @@ export class PosCheckoutRepository {
     userId: string,
     sessionId: string,
     deviceId: string,
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     operatorSessionId: string,
   ): Promise<CheckoutAuthorization | null> {
-    const { rows } = await this.pg.worker.query<CheckoutAuthorization>(
-      `SELECT u.full_name AS "operatorName",os.permissions
+    return this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      async (client) => {
+        const { rows } = await client.query<CheckoutAuthorization>(
+          `SELECT u.full_name AS "operatorName",os.permissions
        FROM runtime.operator_session os
-       JOIN tenant.device d ON d.id=os.device_id
+       JOIN merchant.device d ON d.id=os.device_id
        JOIN umi.user u ON u.id=os.user_id
        WHERE os.id=$6::uuid AND os.durable_session_id=$2::uuid AND os.user_id=$1::uuid
-         AND os.device_id=$3::uuid AND os.business_id=$4::uuid AND os.branch_id=$5::uuid
-         AND os.state='active' AND os.expires_at>now() AND d.lifecycle_state='active'
+         AND os.device_id=$3::uuid AND os.merchant_id=$4::uuid AND os.location_id=$5::uuid
+         AND os.state='active' AND os.expires_at>now() AND d.status='active'
          AND ('checkout.commit'=ANY(os.permissions) OR '*'=ANY(os.permissions))
          AND EXISTS (SELECT 1 FROM jsonb_array_elements(os.entitlements) e
            WHERE e->>'featureKey'='pos' AND COALESCE((e->>'enabled')::boolean,false))`,
-      [userId, sessionId, deviceId, tenantId, branchId, operatorSessionId],
+          [userId, sessionId, deviceId, merchantId, locationId, operatorSessionId],
+        );
+        return rows[0] ?? null;
+      },
+      locationId,
     );
-    return rows[0] ?? null;
   }
 
   async policy(
     client: PoolClient,
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     currency: string,
   ): Promise<CheckoutPolicy> {
     const { rows } = await client.query<{
@@ -111,9 +119,9 @@ export class PosCheckoutRepository {
               cashier_discount_threshold::text AS "cashierDiscountThreshold",
               custom_discount_requires_approval AS "customDiscountRequiresApproval",
               currency AS "policyCurrency"
-       FROM tenant.pos_checkout_policy
-       WHERE business_id=$1::uuid AND branch_id=$2::uuid AND currency=$3`,
-      [tenantId, branchId, currency],
+       FROM merchant.pos_checkout_policy
+       WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND currency=$3`,
+      [merchantId, locationId, currency],
     );
     const row = rows[0];
     const money = (minorUnits: number) => ({ minorUnits, currency });
@@ -186,25 +194,25 @@ export class PosCheckoutRepository {
     fingerprint: string | null,
   ): Promise<{ id: string; version: number }> {
     const { rows } = await client.query<{ id: string; version: number }>(
-      `INSERT INTO tenant.pos_checkout_draft
-         (business_id,branch_id,cart_id,operator_session_id,device_id,state,
+      `INSERT INTO merchant.pos_checkout_draft
+         (merchant_id,location_id,cart_id,operator_session_id,device_id,state,
           command_fingerprint,tender_drafts,tip_draft,discount_drafts,
           receipt_delivery,payment_summary,recovery_state,cash_shift_id)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7,$8,$9,$10,$11,$12,$13,$14::uuid)
-       ON CONFLICT(business_id,cart_id) DO UPDATE SET
-         state=excluded.state,version=tenant.pos_checkout_draft.version+1,
+       ON CONFLICT(merchant_id,cart_id) DO UPDATE SET
+         state=excluded.state,version=merchant.pos_checkout_draft.version+1,
          command_fingerprint=excluded.command_fingerprint,
          tender_drafts=excluded.tender_drafts,tip_draft=excluded.tip_draft,
          discount_drafts=excluded.discount_drafts,receipt_delivery=excluded.receipt_delivery,
          payment_summary=excluded.payment_summary,recovery_state=excluded.recovery_state,
          cash_shift_id=excluded.cash_shift_id,
          updated_at=now()
-       WHERE tenant.pos_checkout_draft.state NOT IN ('completed','receipt_available','payment_unknown')
-         AND tenant.pos_checkout_draft.operator_session_id=$4::uuid
-         AND tenant.pos_checkout_draft.device_id=$5::uuid
+       WHERE merchant.pos_checkout_draft.state NOT IN ('completed','receipt_available','payment_unknown')
+         AND merchant.pos_checkout_draft.operator_session_id=$4::uuid
+         AND merchant.pos_checkout_draft.device_id=$5::uuid
          AND NOT EXISTS (
            SELECT 1
-           FROM jsonb_array_elements(tenant.pos_checkout_draft.tender_drafts) prior
+           FROM jsonb_array_elements(merchant.pos_checkout_draft.tender_drafts) prior
            WHERE prior->>'type'='manual_terminal'
              AND prior->>'status'='confirmed_success'
              AND NOT EXISTS (
@@ -218,8 +226,8 @@ export class PosCheckoutRepository {
          )
        RETURNING id::text,version`,
       [
-        cart.tenantId,
-        cart.branchId,
+        cart.merchantId,
+        cart.locationId,
         cart.id,
         cart.operatorSessionId,
         userDeviceId,
@@ -243,8 +251,8 @@ export class PosCheckoutRepository {
     approvalIds: string[],
     input: {
       sessionId: string;
-      tenantId: string;
-      branchId: string;
+      merchantId: string;
+      locationId: string;
       permissions: string[];
       fingerprint: string;
       commandId: string;
@@ -264,16 +272,16 @@ export class PosCheckoutRepository {
     const matched = await client.query<{ id: string; permission: string }>(
       `SELECT id::text,permission_key AS permission
        FROM runtime.elevation_grant
-       WHERE id=ANY($1::uuid[]) AND session_id=$2::uuid AND business_id=$3::uuid
-         AND branch_id=$4::uuid AND permission_key=ANY($5::text[])
+       WHERE id=ANY($1::uuid[]) AND session_id=$2::uuid AND merchant_id=$3::uuid
+         AND location_id=$4::uuid AND permission_key=ANY($5::text[])
          AND command_fingerprint=$6 AND expires_at>now()
          AND consumed_at IS NULL AND method='manager_approval'
        FOR UPDATE`,
       [
         approvalIds,
         input.sessionId,
-        input.tenantId,
-        input.branchId,
+        input.merchantId,
+        input.locationId,
         permissions,
         input.fingerprint,
       ],
@@ -298,28 +306,28 @@ export class PosCheckoutRepository {
 
   async lockCart(
     client: PoolClient,
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     operatorSessionId: string,
     cartId: string,
     expectedVersion: number,
     operatorName: string,
   ): Promise<CheckoutCart | null> {
     const cart = await client.query<Omit<CheckoutCart, 'lines'>>(
-      `SELECT c.id::text,c.business_id::text AS "tenantId",c.branch_id::text AS "branchId",
+      `SELECT c.id::text,c.merchant_id::text AS "merchantId",c.location_id::text AS "locationId",
               c.operator_session_id::text AS "operatorSessionId",c.version,
-              c.business_date::text AS "businessDate",b.name AS "tenantName",
-              br.name AS "branchName",$6::text AS "operatorName",
+              c.business_date::text AS "businessDate",b.name AS "merchantName",
+              br.name AS "locationName",$6::text AS "operatorName",
               c.customer_id::text AS "customerId"
-       FROM tenant.pos_cart c
-       JOIN tenant.business b ON b.id=c.business_id
-       JOIN tenant.branch br ON br.id=c.branch_id
-       WHERE c.id=$1::uuid AND c.business_id=$2::uuid AND c.branch_id=$3::uuid
+       FROM merchant.pos_cart c
+       JOIN merchant.merchant b ON b.id=c.merchant_id
+       JOIN merchant.location br ON br.id=c.location_id
+       WHERE c.id=$1::uuid AND c.merchant_id=$2::uuid AND c.location_id=$3::uuid
          AND c.operator_session_id=$4::uuid AND c.version=$5
          AND c.status IN ('draft','prepared')
          AND c.lifecycle_state IN ('building_cart','ready_for_checkout','recovered')
        FOR UPDATE OF c`,
-      [cartId, tenantId, branchId, operatorSessionId, expectedVersion, operatorName],
+      [cartId, merchantId, locationId, operatorSessionId, expectedVersion, operatorName],
     );
     if (!cart.rows[0]) return null;
     const lines = await client.query<CheckoutLine>(
@@ -328,11 +336,11 @@ export class PosCheckoutRepository {
               COALESCE(jsonb_agg(jsonb_build_object('modifierId',m.modifier_id::text,
                 'quantity',m.quantity) ORDER BY m.modifier_id)
                 FILTER(WHERE m.id IS NOT NULL),'[]') AS modifiers
-       FROM tenant.pos_cart_line l
-       LEFT JOIN tenant.pos_cart_line_modifier m ON m.line_id=l.id
-       WHERE l.business_id=$1::uuid AND l.cart_id=$2::uuid
+       FROM merchant.pos_cart_line l
+       LEFT JOIN merchant.pos_cart_line_modifier m ON m.line_id=l.id
+       WHERE l.merchant_id=$1::uuid AND l.cart_id=$2::uuid
        GROUP BY l.id ORDER BY l.created_at,l.id`,
-      [tenantId, cartId],
+      [merchantId, cartId],
     );
     return lines.rows.length ? { ...cart.rows[0], lines: lines.rows } : null;
   }
@@ -347,15 +355,15 @@ export class PosCheckoutRepository {
       status: InventoryReservation['status'];
       expiresAt: string;
     }>(
-      `INSERT INTO tenant.inventory_reservation
-         (business_id,branch_id,cart_id,status,cart_version,line_snapshot,expires_at)
+      `INSERT INTO merchant.inventory_reservation
+         (merchant_id,location_id,cart_id,status,cart_version,line_snapshot,expires_at)
        VALUES ($1::uuid,$2::uuid,$3::uuid,'reserved',$4,$5,now()+interval '10 minutes')
        ON CONFLICT(cart_id) DO UPDATE SET
-         status=CASE WHEN tenant.inventory_reservation.status IN ('released','expired')
-                     THEN 'reserved' ELSE tenant.inventory_reservation.status END,
+         status=CASE WHEN merchant.inventory_reservation.status IN ('released','expired')
+                     THEN 'reserved' ELSE merchant.inventory_reservation.status END,
          line_snapshot=excluded.line_snapshot,expires_at=excluded.expires_at,updated_at=now()
        RETURNING id::text,status,expires_at::text AS "expiresAt"`,
-      [cart.tenantId, cart.branchId, cart.id, cart.version, JSON.stringify(lineSnapshot)],
+      [cart.merchantId, cart.locationId, cart.id, cart.version, JSON.stringify(lineSnapshot)],
     );
     return {
       ...rows[0],
@@ -373,28 +381,28 @@ export class PosCheckoutRepository {
     const outcomes: PaymentOutcome[] = [];
     for (const [position, tender] of summary.tenders.entries()) {
       const tenderFact = await client.query<{ id: string }>(
-        `INSERT INTO tenant.pos_tender_fact
-           (id,business_id,branch_id,checkout_id,cart_id,position,tender_type,status,
+        `INSERT INTO merchant.pos_tender_fact
+           (id,merchant_id,location_id,checkout_id,cart_id,position,tender_type,status,
             amount_minor_units,received_minor_units,change_minor_units,currency,correlation_id)
          VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7,$8,$9,$10,$11,$12,$13)
          ON CONFLICT(id) DO UPDATE SET id=excluded.id
-         WHERE tenant.pos_tender_fact.business_id=excluded.business_id
-           AND tenant.pos_tender_fact.branch_id=excluded.branch_id
-           AND tenant.pos_tender_fact.checkout_id=excluded.checkout_id
-           AND tenant.pos_tender_fact.cart_id=excluded.cart_id
-           AND tenant.pos_tender_fact.position=excluded.position
-           AND tenant.pos_tender_fact.tender_type=excluded.tender_type
-           AND tenant.pos_tender_fact.status=excluded.status
-           AND tenant.pos_tender_fact.amount_minor_units=excluded.amount_minor_units
-           AND tenant.pos_tender_fact.received_minor_units
+         WHERE merchant.pos_tender_fact.merchant_id=excluded.merchant_id
+           AND merchant.pos_tender_fact.location_id=excluded.location_id
+           AND merchant.pos_tender_fact.checkout_id=excluded.checkout_id
+           AND merchant.pos_tender_fact.cart_id=excluded.cart_id
+           AND merchant.pos_tender_fact.position=excluded.position
+           AND merchant.pos_tender_fact.tender_type=excluded.tender_type
+           AND merchant.pos_tender_fact.status=excluded.status
+           AND merchant.pos_tender_fact.amount_minor_units=excluded.amount_minor_units
+           AND merchant.pos_tender_fact.received_minor_units
              IS NOT DISTINCT FROM excluded.received_minor_units
-           AND tenant.pos_tender_fact.change_minor_units=excluded.change_minor_units
-           AND tenant.pos_tender_fact.currency=excluded.currency
+           AND merchant.pos_tender_fact.change_minor_units=excluded.change_minor_units
+           AND merchant.pos_tender_fact.currency=excluded.currency
          RETURNING id::text`,
         [
           tender.tenderId,
-          cart.tenantId,
-          cart.branchId,
+          cart.merchantId,
+          cart.locationId,
           checkoutId,
           cart.id,
           position,
@@ -422,25 +430,25 @@ export class PosCheckoutRepository {
         expiresAt: string | null;
         createdAt: string;
       }>(
-        `INSERT INTO tenant.pos_payment_attempt
-           (business_id,branch_id,cart_id,tender_id,method,amount_minor_units,currency,
+        `INSERT INTO merchant.pos_payment_attempt
+           (merchant_id,location_id,cart_id,tender_id,method,amount_minor_units,currency,
             status,query_only,correlation_id,resolved_at)
          VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7,'succeeded',false,$8,now())
-         ON CONFLICT(business_id,cart_id,tender_id) DO UPDATE SET
+         ON CONFLICT(merchant_id,cart_id,tender_id) DO UPDATE SET
            tender_id=excluded.tender_id
-         WHERE tenant.pos_payment_attempt.branch_id=excluded.branch_id
-           AND tenant.pos_payment_attempt.method=excluded.method
-           AND tenant.pos_payment_attempt.amount_minor_units=excluded.amount_minor_units
-           AND tenant.pos_payment_attempt.currency=excluded.currency
-           AND tenant.pos_payment_attempt.status='succeeded'
-           AND tenant.pos_payment_attempt.query_only=false
+         WHERE merchant.pos_payment_attempt.location_id=excluded.location_id
+           AND merchant.pos_payment_attempt.method=excluded.method
+           AND merchant.pos_payment_attempt.amount_minor_units=excluded.amount_minor_units
+           AND merchant.pos_payment_attempt.currency=excluded.currency
+           AND merchant.pos_payment_attempt.status='succeeded'
+           AND merchant.pos_payment_attempt.query_only=false
          RETURNING id::text,method,amount_minor_units::text AS "amountMinorUnits",
                    currency,status,query_only AS "queryOnly",
                    correlation_id AS "correlationId",expires_at::text AS "expiresAt",
                    created_at::text AS "createdAt"`,
         [
-          cart.tenantId,
-          cart.branchId,
+          cart.merchantId,
+          cart.locationId,
           cart.id,
           tender.tenderId,
           method,
@@ -481,29 +489,29 @@ export class PosCheckoutRepository {
     correlationId: string,
   ): Promise<PaymentOutcome> {
     const tenderFact = await client.query<{ id: string }>(
-      `INSERT INTO tenant.pos_tender_fact
-         (id,business_id,branch_id,checkout_id,cart_id,position,tender_type,status,
+      `INSERT INTO merchant.pos_tender_fact
+         (id,merchant_id,location_id,checkout_id,cart_id,position,tender_type,status,
           amount_minor_units,received_minor_units,change_minor_units,currency,correlation_id)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,0,'manual_terminal',
                'outcome_unknown',$6,null,0,$7,$8)
        ON CONFLICT(id) DO UPDATE SET id=excluded.id
-       WHERE tenant.pos_tender_fact.business_id=excluded.business_id
-         AND tenant.pos_tender_fact.branch_id=excluded.branch_id
-         AND tenant.pos_tender_fact.checkout_id=excluded.checkout_id
-         AND tenant.pos_tender_fact.cart_id=excluded.cart_id
-         AND tenant.pos_tender_fact.position=excluded.position
-         AND tenant.pos_tender_fact.tender_type=excluded.tender_type
-         AND tenant.pos_tender_fact.status=excluded.status
-         AND tenant.pos_tender_fact.amount_minor_units=excluded.amount_minor_units
-         AND tenant.pos_tender_fact.received_minor_units
+       WHERE merchant.pos_tender_fact.merchant_id=excluded.merchant_id
+         AND merchant.pos_tender_fact.location_id=excluded.location_id
+         AND merchant.pos_tender_fact.checkout_id=excluded.checkout_id
+         AND merchant.pos_tender_fact.cart_id=excluded.cart_id
+         AND merchant.pos_tender_fact.position=excluded.position
+         AND merchant.pos_tender_fact.tender_type=excluded.tender_type
+         AND merchant.pos_tender_fact.status=excluded.status
+         AND merchant.pos_tender_fact.amount_minor_units=excluded.amount_minor_units
+         AND merchant.pos_tender_fact.received_minor_units
            IS NOT DISTINCT FROM excluded.received_minor_units
-         AND tenant.pos_tender_fact.change_minor_units=excluded.change_minor_units
-         AND tenant.pos_tender_fact.currency=excluded.currency
+         AND merchant.pos_tender_fact.change_minor_units=excluded.change_minor_units
+         AND merchant.pos_tender_fact.currency=excluded.currency
        RETURNING id::text`,
       [
         tender.tenderId,
-        cart.tenantId,
-        cart.branchId,
+        cart.merchantId,
+        cart.locationId,
         checkoutId,
         cart.id,
         tender.applied.minorUnits,
@@ -522,24 +530,24 @@ export class PosCheckoutRepository {
       expiresAt: string;
       createdAt: string;
     }>(
-      `INSERT INTO tenant.pos_payment_attempt
-         (business_id,branch_id,cart_id,tender_id,method,amount_minor_units,currency,
+      `INSERT INTO merchant.pos_payment_attempt
+         (merchant_id,location_id,cart_id,tender_id,method,amount_minor_units,currency,
           status,query_only,correlation_id,expires_at)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,'external_terminal',$5,$6,
                'unknown',true,$7,now()+interval '10 minutes')
-       ON CONFLICT(business_id,cart_id,tender_id) DO UPDATE SET tender_id=excluded.tender_id
-       WHERE tenant.pos_payment_attempt.branch_id=excluded.branch_id
-         AND tenant.pos_payment_attempt.method=excluded.method
-         AND tenant.pos_payment_attempt.amount_minor_units=excluded.amount_minor_units
-         AND tenant.pos_payment_attempt.currency=excluded.currency
-         AND tenant.pos_payment_attempt.status IN ('unknown','timeout')
-         AND tenant.pos_payment_attempt.query_only=true
+       ON CONFLICT(merchant_id,cart_id,tender_id) DO UPDATE SET tender_id=excluded.tender_id
+       WHERE merchant.pos_payment_attempt.location_id=excluded.location_id
+         AND merchant.pos_payment_attempt.method=excluded.method
+         AND merchant.pos_payment_attempt.amount_minor_units=excluded.amount_minor_units
+         AND merchant.pos_payment_attempt.currency=excluded.currency
+         AND merchant.pos_payment_attempt.status IN ('unknown','timeout')
+         AND merchant.pos_payment_attempt.query_only=true
        RETURNING id::text,amount_minor_units::text AS "amountMinorUnits",currency,
                  correlation_id AS "correlationId",expires_at::text AS "expiresAt",
                  created_at::text AS "createdAt"`,
       [
-        cart.tenantId,
-        cart.branchId,
+        cart.merchantId,
+        cart.locationId,
         cart.id,
         tender.tenderId,
         tender.applied.minorUnits,
@@ -595,15 +603,15 @@ export class PosCheckoutRepository {
     if (cashShiftId) {
       const eligible = await client.query(
         `SELECT 1
-         FROM tenant.cash_shift s
-         JOIN tenant.pos_checkout_draft d ON d.id=$6::uuid AND d.cash_shift_id=s.id
-         WHERE s.id=$1::uuid AND s.business_id=$2::uuid AND s.branch_id=$3::uuid
+         FROM merchant.cash_shift s
+         JOIN merchant.pos_checkout_draft d ON d.id=$6::uuid AND d.cash_shift_id=s.id
+         WHERE s.id=$1::uuid AND s.merchant_id=$2::uuid AND s.location_id=$3::uuid
            AND s.operator_session_id=$4::uuid AND s.status='open' AND s.currency=$5
          FOR UPDATE OF s`,
         [
           cashShiftId,
-          cart.tenantId,
-          cart.branchId,
+          cart.merchantId,
+          cart.locationId,
           cart.operatorSessionId,
           confirmation.totals.grandTotal.currency,
           checkoutId,
@@ -611,34 +619,26 @@ export class PosCheckoutRepository {
       );
       if (!eligible.rows[0]) throw new Error('CASH_SHIFT_NOT_ELIGIBLE');
     }
-    const order = await client.query<{ id: string }>(
-      `INSERT INTO tenant.customer_order
-         (business_id,branch_id,customer_id,source,fulfillment_type,status,external_ref)
-       VALUES ($1::uuid,$2::uuid,$3::uuid,'pos','dine_in','placed',$4)
-       ON CONFLICT(business_id,external_ref) WHERE external_ref IS NOT NULL
-       DO UPDATE SET external_ref=excluded.external_ref RETURNING id::text`,
-      [cart.tenantId, cart.branchId, cart.customerId, `pos-cart:${cart.id}`],
-    );
-    const orderId = order.rows[0].id;
-    for (const [index, line] of receipt.lines.entries()) {
-      await client.query(
-        `INSERT INTO tenant.order_item
-           (order_id,product_id,name,variant_name,quantity,unit_price,display_order,notes)
-         VALUES ($1::uuid,$2::uuid,$3,$4,$5,$6,$7,$8)`,
-        [
-          orderId,
-          cart.lines[index].productId,
-          line.description,
-          line.variantName ?? null,
-          line.quantity,
-          line.unitPrice.minorUnits,
-          index,
-          line.note ?? null,
-        ],
-      );
-    }
+    const writtenOrder = await writeOrder(client, {
+      merchantId: cart.merchantId,
+      locationId: cart.locationId,
+      customerId: cart.customerId,
+      source: 'pos',
+      fulfillmentType: 'dine_in',
+      externalRef: `pos-cart:${cart.id}`,
+      lines: receipt.lines.map((line, index) => ({
+        productId: cart.lines[index]?.productId ?? null,
+        name: line.description,
+        variantName: line.variantName ?? null,
+        quantity: line.quantity,
+        unitPriceCents: line.unitPrice.minorUnits,
+        notes: line.note ?? null,
+        modifiers: (line.modifiers ?? []).map((name) => ({ name, priceDeltaCents: 0 })),
+      })),
+    });
+    const orderId = writtenOrder.orderId;
     await client.query(
-      `INSERT INTO tenant.payment (id,order_id,amount,method,external_ref,status,paid_at)
+      `INSERT INTO merchant.payment (id,order_id,amount,method,external_ref,status,paid_at)
        VALUES ($1::uuid,$2::uuid,$3,$4,$1::text,'captured',now())
        ON CONFLICT(id) DO NOTHING`,
       [
@@ -650,7 +650,7 @@ export class PosCheckoutRepository {
     );
     for (const payment of payments.slice(1)) {
       await client.query(
-        `INSERT INTO tenant.payment (id,order_id,amount,method,external_ref,status,paid_at)
+        `INSERT INTO merchant.payment (id,order_id,amount,method,external_ref,status,paid_at)
          VALUES ($1::uuid,$2::uuid,$3,$4,$1::text,'captured',now())
          ON CONFLICT(id) DO NOTHING`,
         [
@@ -662,14 +662,14 @@ export class PosCheckoutRepository {
       );
     }
     const receiptRow = await client.query<{ id: string }>(
-      `INSERT INTO tenant.receipt_snapshot
-         (business_id,branch_id,order_id,payment_attempt_id,receipt_number,
+      `INSERT INTO merchant.receipt_snapshot
+         (merchant_id,location_id,order_id,payment_attempt_id,receipt_number,
           business_date,currency,grand_total,snapshot,receipt_destination,delivery_intent)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6::date,$7,$8,$9,$10,$11)
        RETURNING id::text`,
       [
-        cart.tenantId,
-        cart.branchId,
+        cart.merchantId,
+        cart.locationId,
         orderId,
         payments[0].attempt.id,
         receipt.receiptRef,
@@ -684,14 +684,14 @@ export class PosCheckoutRepository {
       ],
     );
     const sale = await client.query<{ id: string; committedAt: string }>(
-      `INSERT INTO tenant.pos_committed_sale
-         (business_id,branch_id,cart_id,order_id,payment_attempt_id,
+      `INSERT INTO merchant.pos_committed_sale
+         (merchant_id,location_id,cart_id,order_id,payment_attempt_id,
           receipt_snapshot_id,totals_fingerprint,cash_shift_id)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7,$8::uuid)
        RETURNING id::text,committed_at::text AS "committedAt"`,
       [
-        cart.tenantId,
-        cart.branchId,
+        cart.merchantId,
+        cart.locationId,
         cart.id,
         orderId,
         payments[0].attempt.id,
@@ -705,23 +705,23 @@ export class PosCheckoutRepository {
       const shift = await client.query<{ sequence: string; registerId: string }>(
         `SELECT (ledger_sequence+1)::text AS sequence,
                 register_id::text AS "registerId"
-         FROM tenant.cash_shift
+         FROM merchant.cash_shift
          WHERE id=$1::uuid AND status='open'
          FOR UPDATE`,
         [cashShiftId],
       );
       if (!shift.rows[0]) throw new Error('CASH_SHIFT_NOT_ELIGIBLE');
       await client.query(
-        `INSERT INTO tenant.cash_ledger_entry
-           (business_id,branch_id,register_id,shift_id,sequence,entry_type,
+        `INSERT INTO merchant.cash_ledger_entry
+           (merchant_id,location_id,register_id,shift_id,sequence,entry_type,
             amount_minor_units,cash_received_minor_units,change_given_minor_units,
             currency,command_id,sale_id,tender_fact_id,business_date,public_data)
          VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,'cash_sale',$6,$7,$8,$9,
                  $10::uuid,$11::uuid,$12::uuid,$13::date,
                  jsonb_build_object('checkoutId',$14::text))`,
         [
-          cart.tenantId,
-          cart.branchId,
+          cart.merchantId,
+          cart.locationId,
           shift.rows[0].registerId,
           cashShiftId,
           shift.rows[0].sequence,
@@ -737,31 +737,31 @@ export class PosCheckoutRepository {
         ],
       );
       await client.query(
-        `UPDATE tenant.cash_shift
+        `UPDATE merchant.cash_shift
          SET ledger_sequence=$2,version=version+1
          WHERE id=$1::uuid`,
         [cashShiftId, shift.rows[0].sequence],
       );
     }
     await client.query(
-      `UPDATE tenant.inventory_reservation SET status='commit_prepared',updated_at=now()
+      `UPDATE merchant.inventory_reservation SET status='commit_prepared',updated_at=now()
        WHERE id=$1::uuid AND status='reserved'`,
       [reservation.id],
     );
     await client.query(
-      `UPDATE tenant.pos_tender_fact
+      `UPDATE merchant.pos_tender_fact
        SET status='committed',committed_at=now()
        WHERE checkout_id=$1::uuid AND status IN ('draft','confirmed_success')`,
       [checkoutId],
     );
     await client.query(
-      `UPDATE tenant.pos_checkout_draft
+      `UPDATE merchant.pos_checkout_draft
        SET payment_summary=$2,updated_at=now()
        WHERE id=$1::uuid AND state NOT IN ('completed','receipt_available')`,
       [checkoutId, JSON.stringify({ ...paymentSummary, state: 'completed' })],
     );
     await client.query(
-      `UPDATE tenant.pos_cart
+      `UPDATE merchant.pos_cart
        SET status='committed',lifecycle_state='committed',updated_at=now()
        WHERE id=$1::uuid AND version=$2`,
       [cart.id, cart.version],
@@ -783,7 +783,7 @@ export class PosCheckoutRepository {
     result: CheckoutResult,
   ): Promise<void> {
     const { rowCount } = await client.query(
-      `UPDATE tenant.pos_checkout_draft
+      `UPDATE merchant.pos_checkout_draft
        SET state='completed',checkout_result=$2,updated_at=now()
        WHERE id=$1::uuid AND state NOT IN ('completed','receipt_available')
          AND checkout_result IS NULL`,
@@ -795,37 +795,37 @@ export class PosCheckoutRepository {
   }
 
   async recovery(
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     operatorSessionId: string,
     cartId: string,
     currentUserId: string,
     allowOtherOperator: boolean,
   ): Promise<CheckoutRecoverySnapshot | null> {
-    const scope = await this.pg.worker.query(
-      `SELECT 1
-       FROM tenant.pos_checkout_draft checkout
+    return this.pg.runWithMerchant(
+      merchantId,
+      currentUserId,
+      async (client) => {
+        const scope = await client.query(
+          `SELECT 1
+       FROM merchant.pos_checkout_draft checkout
        JOIN runtime.operator_session current_operator
          ON current_operator.id=$3::uuid
-        AND current_operator.business_id=checkout.business_id
-        AND current_operator.branch_id=checkout.branch_id
+        AND current_operator.merchant_id=checkout.merchant_id
+        AND current_operator.location_id=checkout.location_id
         AND current_operator.user_id=$5::uuid
         AND current_operator.state='active'
         AND current_operator.expires_at>now()
        JOIN runtime.operator_session original_operator
          ON original_operator.id=checkout.operator_session_id
-       WHERE checkout.business_id=$1::uuid AND checkout.branch_id=$2::uuid
+       WHERE checkout.merchant_id=$1::uuid AND checkout.location_id=$2::uuid
          AND checkout.cart_id=$4::uuid
          AND (checkout.operator_session_id=$3::uuid
            OR original_operator.user_id=current_operator.user_id
            OR $6::boolean)`,
-      [tenantId, branchId, operatorSessionId, cartId, currentUserId, allowOtherOperator],
-    );
-    if (!scope.rows[0]) return null;
-    return this.pg.runWithTenant(
-      tenantId,
-      currentUserId,
-      async (client) => {
+          [merchantId, locationId, operatorSessionId, cartId, currentUserId, allowOtherOperator],
+        );
+        if (!scope.rows[0]) return null;
         const { rows } = await client.query<{
           checkoutId: string;
           cartId: string;
@@ -855,10 +855,10 @@ export class PosCheckoutRepository {
                 checkout.command_fingerprint AS "checkoutFingerprint",
                 checkout.checkout_result AS result,
                 checkout.updated_at::text AS "updatedAt"
-         FROM tenant.pos_checkout_draft checkout
-         WHERE checkout.business_id=$1::uuid AND checkout.branch_id=$2::uuid
+         FROM merchant.pos_checkout_draft checkout
+         WHERE checkout.merchant_id=$1::uuid AND checkout.location_id=$2::uuid
            AND checkout.cart_id=$3::uuid`,
-          [tenantId, branchId, cartId],
+          [merchantId, locationId, cartId],
         );
         const snapshot = rows[0];
         if (!snapshot) return null;
@@ -876,12 +876,12 @@ export class PosCheckoutRepository {
           `SELECT id::text,method,amount_minor_units::text AS "amountMinorUnits",currency,
                 status,query_only AS "queryOnly",correlation_id AS "correlationId",
                 expires_at::text AS "expiresAt",created_at::text AS "createdAt"
-         FROM tenant.pos_payment_attempt
-         WHERE business_id=$1::uuid AND branch_id=$2::uuid AND cart_id=$3::uuid
+         FROM merchant.pos_payment_attempt
+         WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND cart_id=$3::uuid
            AND status IN ('unknown','timeout')
          ORDER BY created_at DESC
          LIMIT 1`,
-          [tenantId, branchId, cartId],
+          [merchantId, locationId, cartId],
         );
         const row = payment.rows[0];
         const paymentOutcome: PaymentOutcome | null = row
@@ -911,14 +911,14 @@ export class PosCheckoutRepository {
           : null;
         return { ...snapshot, paymentOutcome };
       },
-      branchId,
+      locationId,
     );
   }
 
   async cancelDraft(
     client: PoolClient,
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     operatorSessionId: string,
     cartId: string,
   ): Promise<{ id: string | null; blocked: boolean }> {
@@ -928,11 +928,11 @@ export class PosCheckoutRepository {
       tenderDrafts: CheckoutRecoverySnapshot['tenderDrafts'];
     }>(
       `SELECT id::text,state,tender_drafts AS "tenderDrafts"
-       FROM tenant.pos_checkout_draft
-       WHERE business_id=$1::uuid AND branch_id=$2::uuid
+       FROM merchant.pos_checkout_draft
+       WHERE merchant_id=$1::uuid AND location_id=$2::uuid
          AND operator_session_id=$3::uuid AND cart_id=$4::uuid
        FOR UPDATE`,
-      [tenantId, branchId, operatorSessionId, cartId],
+      [merchantId, locationId, operatorSessionId, cartId],
     );
     const draft = rows[0];
     if (!draft) return { id: null, blocked: false };
@@ -949,12 +949,12 @@ export class PosCheckoutRepository {
       return { id: draft.id, blocked: true };
     }
     await client.query(
-      `DELETE FROM tenant.pos_tender_fact
+      `DELETE FROM merchant.pos_tender_fact
        WHERE checkout_id=$1::uuid AND status NOT IN ('committed','outcome_unknown')`,
       [draft.id],
     );
     await client.query(
-      `UPDATE tenant.pos_checkout_draft
+      `UPDATE merchant.pos_checkout_draft
        SET state='ready',tender_drafts='[]',tip_draft=null,discount_drafts='[]',
            payment_summary=null,recovery_state='none',command_fingerprint=null,
            version=version+1,updated_at=now()
@@ -965,20 +965,20 @@ export class PosCheckoutRepository {
   }
 
   async paymentStatus(
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     paymentId: string,
   ): Promise<PaymentOutcome | null> {
-    return this.pg.runWithTenant(
-      tenantId,
+    return this.pg.runWithMerchant(
+      merchantId,
       null,
       async (client) => {
         await client.query(
-          `UPDATE tenant.pos_payment_attempt
+          `UPDATE merchant.pos_payment_attempt
            SET status='timeout',query_only=true,resolved_at=now()
-           WHERE id=$1::uuid AND business_id=$2::uuid AND branch_id=$3::uuid
+           WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
              AND status IN ('pending','unknown') AND expires_at<=now()`,
-          [paymentId, tenantId, branchId],
+          [paymentId, merchantId, locationId],
         );
         const { rows } = await client.query<{
           id: string;
@@ -994,9 +994,9 @@ export class PosCheckoutRepository {
           `SELECT id::text,method,amount_minor_units::text AS "amountMinorUnits",currency,
                   status,query_only AS "queryOnly",correlation_id AS "correlationId",
                   expires_at::text AS "expiresAt",created_at::text AS "createdAt"
-           FROM tenant.pos_payment_attempt
-           WHERE id=$1::uuid AND business_id=$2::uuid AND branch_id=$3::uuid`,
-          [paymentId, tenantId, branchId],
+           FROM merchant.pos_payment_attempt
+           WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid`,
+          [paymentId, merchantId, locationId],
         );
         if (!rows[0]) return null;
         const row = rows[0];
@@ -1025,7 +1025,7 @@ export class PosCheckoutRepository {
               : null,
         };
       },
-      branchId,
+      locationId,
     );
   }
 }

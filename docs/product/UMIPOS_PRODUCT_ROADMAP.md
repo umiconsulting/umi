@@ -16,7 +16,8 @@ Updated: 2026-07-29
 | 3C Cash shift and register operations   | Complete                   | 3B                     | Approve the next commercial POS Gate                       | None                                                    | Focused contract, API, Flutter, accessibility, localization, Linux, and PostgreSQL checks passed                         |
 | Later platform work                     | Planned                    | 3C                     | Inventory, refunds, KDS, customer display, Assistant       | Next Gate scope approval                                | Not run                                                                                                                  |
 
-The latest relevant revision is the Gate 3C commit containing this document.
+The latest relevant revision is this PR #72 integration commit.
+PR #72 keeps Gate 3A, Gate 3B, and Gate 3C complete on current `build-v3`.
 Native encrypted offline support covers the explicit allowlist and server-policy-authorized cash;
 Web sensitive journaling remains disabled. UMI remains the
 sole business authority; Flutter owns presentation, hardware integration, encrypted local state,

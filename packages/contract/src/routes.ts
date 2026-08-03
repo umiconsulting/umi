@@ -1,170 +1,178 @@
-// Zero-dependency HTTP route contract shared by umi-api (server) and
-// umi-dashboard (client). Keeping the path literals + builders in one place means
-// a rename can't silently drift between the two sides. Byte-exact to the NestJS
-// controllers (apps/umi-api/src/modules/**). This module imports nothing, so the
+// Zero-dependency HTTP route accessor shared by umi-api (server), umi-dashboard and
+// umi-cash (clients). This module imports nothing but `route-table.ts`, so the
 // dashboard can consume it without pulling zod into its bundle.
+//
+// THERE ARE NO PATH LITERALS HERE. Every path comes from `ROUTE_TABLE` in
+// `./route-table.ts`, which is the single author of the platform's URL space. This
+// file is the ergonomic view of that table: the shape callers already use, with the
+// parameters encoded. To change a path, change the table.
+//
+// The POS surface is versioned (`/api/v1/...`); the browser surfaces are not. The
+// reasoning is in `route-table.ts`.
 
-const enc = encodeURIComponent;
+import { buildPath, routePath, merchantBase } from './route-table';
 
-/** Base path for a tenant-scoped resource: `/api/tenants/:tenantId`. */
-const tenantBase = (tenantId: string): string => `/api/tenants/${enc(tenantId)}`;
+export { merchantBase };
 
 export const routes = {
   auth: {
-    login: '/api/auth/local/login',
-    refresh: '/api/auth/local/refresh',
-    logout: '/api/auth/local/logout',
-    forgotPassword: '/api/auth/local/forgot-password',
-    resetPassword: '/api/auth/local/reset-password',
-    me: '/api/auth/me',
-    posLogin: '/api/auth/pos/login',
-    posPinLogin: '/api/auth/pos/pin-login',
-    posRefresh: '/api/auth/pos/refresh',
-    posLogout: '/api/auth/pos/logout',
-  },
-  devices: {
-    claimPairing: '/api/devices/pairing/claim',
-    pollPairing: (pairingSessionId: string): string =>
-      `/api/devices/pairing/${enc(pairingSessionId)}/poll`,
-    acknowledgePairing: (pairingSessionId: string): string =>
-      `/api/devices/pairing/${enc(pairingSessionId)}/acknowledge`,
-    status: '/api/devices/status',
-    beginEnrollment: (tenantId: string): string => `${tenantBase(tenantId)}/devices/enrollment`,
-    enrollmentRequests: (tenantId: string): string =>
-      `${tenantBase(tenantId)}/devices/enrollment-requests`,
-    approveEnrollment: (tenantId: string, requestId: string): string =>
-      `${tenantBase(tenantId)}/devices/enrollment-requests/${enc(requestId)}/approve`,
-    denyEnrollment: (tenantId: string, requestId: string): string =>
-      `${tenantBase(tenantId)}/devices/enrollment-requests/${enc(requestId)}/deny`,
-    rotate: (tenantId: string, deviceId: string): string =>
-      `${tenantBase(tenantId)}/devices/${enc(deviceId)}/rotate`,
-    revoke: (tenantId: string, deviceId: string): string =>
-      `${tenantBase(tenantId)}/devices/${enc(deviceId)}/revoke`,
-    replace: (tenantId: string): string => `${tenantBase(tenantId)}/devices/replacement`,
-  },
-  pos: {
-    entryContext: '/api/pos/entry-context',
-    operatorSession: '/api/pos/operator-sessions',
-    operatorLock: (sessionId: string): string =>
-      `/api/pos/operator-sessions/${enc(sessionId)}/lock`,
-    operatorEnd: (sessionId: string): string => `/api/pos/operator-sessions/${enc(sessionId)}/end`,
-    verifyPin: '/api/pos/elevation/pin',
-    managerApproval: '/api/pos/elevation/manager-approval',
-    catalogCategories: (tenantId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/catalog/categories`,
-    catalogProducts: (tenantId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/catalog/products`,
-    catalogProduct: (tenantId: string, productId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/catalog/products/${enc(productId)}`,
-    cart: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/cart`,
-    cartLines: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/cart/lines`,
-    cartLine: (tenantId: string, lineId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/cart/lines/${enc(lineId)}`,
-    clearCart: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/cart/clear`,
-    prepareCart: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/cart/prepare`,
-    checkout: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/checkout`,
-    checkoutPayment: (tenantId: string, paymentId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/checkout/payments/${enc(paymentId)}`,
-    checkoutRecovery: (tenantId: string, cartId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/checkout/carts/${enc(cartId)}`,
-    checkoutCancel: (tenantId: string, cartId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/checkout/carts/${enc(cartId)}/cancel`,
-    cashCenter: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/cash`,
-    cashCommand: (tenantId: string, commandId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/cash/commands/${enc(commandId)}`,
-    cashRegisters: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/cash/registers`,
-    cashShifts: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/cash/shifts`,
-    cashShift: (tenantId: string, shiftId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}`,
-    cashMovement: (tenantId: string, shiftId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/movements`,
-    cashSuspend: (tenantId: string, shiftId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/suspend`,
-    cashResume: (tenantId: string, shiftId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/resume`,
-    cashHandoff: (tenantId: string, shiftId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/handoff`,
-    cashCount: (tenantId: string, shiftId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/counts`,
-    cashRecount: (tenantId: string, shiftId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/counts/recount`,
-    cashVariance: (tenantId: string, shiftId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/variance`,
-    cashReconcile: (tenantId: string, shiftId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/reconcile`,
-    cashClose: (tenantId: string, shiftId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/close`,
-    cashNoSale: (tenantId: string, shiftId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/cash/shifts/${enc(shiftId)}/no-sale`,
-    sales: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/sales`,
-    currentSale: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/sales/current`,
-    saleSuspend: (tenantId: string, saleId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/sales/${enc(saleId)}/suspend`,
-    saleResume: (tenantId: string, saleId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/sales/${enc(saleId)}/resume`,
-    saleRename: (tenantId: string, saleId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/sales/${enc(saleId)}/rename`,
-    saleCancel: (tenantId: string, saleId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/sales/${enc(saleId)}/cancel`,
-    saleCustomer: (tenantId: string, saleId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/sales/${enc(saleId)}/customer`,
-    saleReceipt: (tenantId: string, saleId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/sales/${enc(saleId)}/receipt`,
-    saleCustomers: (tenantId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/sales/customers`,
-    offlineReplayBegin: (tenantId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/offline/replay/begin`,
-    offlinePolicy: (tenantId: string): string => `/api/pos/tenants/${enc(tenantId)}/offline/policy`,
-    offlineReplayBatch: (tenantId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/offline/replay/batch`,
-    offlineReplayCursor: (tenantId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/offline/replay/cursor`,
-    offlineReplayCommand: (tenantId: string, commandId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/offline/replay/commands/${enc(commandId)}`,
-    offlineConflicts: (tenantId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/offline/conflicts`,
-    offlineReconcile: (tenantId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/offline/reconcile`,
-    offlineReconcileAcknowledge: (tenantId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/offline/reconcile/acknowledge`,
-    offlineDiagnostics: (tenantId: string): string =>
-      `/api/pos/tenants/${enc(tenantId)}/offline/diagnostics`,
+    login: routePath('auth.login'),
+    refresh: routePath('auth.refresh'),
+    logout: routePath('auth.logout'),
+    globalLogout: routePath('auth.globalLogout'),
+    forgotPassword: routePath('auth.forgotPassword'),
+    resetPassword: routePath('auth.resetPassword'),
+    me: routePath('auth.me'),
+    /** POS device authentication. Versioned — a field client depends on it. */
+    pos: {
+      login: routePath('auth.posLogin'),
+      pinLogin: routePath('auth.posPinLogin'),
+      refresh: routePath('auth.posRefresh'),
+      logout: routePath('auth.posLogout'),
+      globalLogout: routePath('auth.posGlobalLogout'),
+    },
   },
   me: {
-    tenants: '/api/me/tenants',
+    merchants: routePath('me.merchants'),
   },
-  tenants: {
-    /** `/api/tenants/:tenantId` — compose sub-paths onto this. Encodes the id,
-     *  matching the dashboard's `_tenantPath` (encodeURIComponent). */
-    base: tenantBase,
-    capabilities: (tenantId: string): string => `${tenantBase(tenantId)}/capabilities`,
-    settings: (tenantId: string): string => `${tenantBase(tenantId)}/settings`,
-    locations: (tenantId: string): string => `${tenantBase(tenantId)}/locations`,
-    audit: (tenantId: string): string => `${tenantBase(tenantId)}/audit`,
+  merchants: {
+    /** `/api/merchants/:merchantId` — compose ad-hoc sub-paths onto this. */
+    base: merchantBase,
+    capabilities: (merchantId: string): string =>
+      buildPath('merchants.capabilities', { merchantId }),
+    settings: (merchantId: string): string => buildPath('merchants.settings', { merchantId }),
+    locations: (merchantId: string): string => buildPath('merchants.locations', { merchantId }),
+    audit: (merchantId: string): string => buildPath('merchants.audit', { merchantId }),
   },
   cash: {
-    // Tenant-scoped surface (dashboard, cookie auth) — /api/tenants/:tenantId/cash/*.
-    stats: (tenantId: string): string => `${tenantBase(tenantId)}/cash/stats`,
-    analytics: (tenantId: string): string => `${tenantBase(tenantId)}/cash/analytics`,
-    customers: (tenantId: string): string => `${tenantBase(tenantId)}/cash/customers`,
-    members: (tenantId: string): string => `${tenantBase(tenantId)}/cash/members`,
-    giftCards: (tenantId: string): string => `${tenantBase(tenantId)}/cash/gift-cards`,
-    rewardConfig: (tenantId: string): string => `${tenantBase(tenantId)}/cash/reward-config`,
-    // Slug-scoped surface (umi-cash frontend) — /api/:slug/... . The write + primary
-    // read paths both surfaces call; each byte-exact to the cash-scan / cash-write /
-    // cash-customer / cash controllers (not an exhaustive mirror of every GET).
+    // Merchant-scoped surface (dashboard, cookie auth).
+    stats: (merchantId: string): string => buildPath('cash.stats', { merchantId }),
+    analytics: (merchantId: string): string => buildPath('cash.analytics', { merchantId }),
+    customers: (merchantId: string): string => buildPath('cash.customers', { merchantId }),
+    members: (merchantId: string): string => buildPath('cash.members', { merchantId }),
+    giftCards: (merchantId: string): string => buildPath('cash.giftCards', { merchantId }),
+    rewardConfig: (merchantId: string): string => buildPath('cash.rewardConfig', { merchantId }),
+    // Slug-scoped surface (umi-cash frontend). The write plus primary read paths both
+    // surfaces call; not an exhaustive mirror of every GET.
     slug: {
-      scan: (slug: string): string => `/api/${enc(slug)}/admin/scan`,
-      topup: (slug: string): string => `/api/${enc(slug)}/admin/topup`,
-      purchase: (slug: string): string => `/api/${enc(slug)}/admin/purchase`,
-      giftCards: (slug: string): string => `/api/${enc(slug)}/admin/gift-cards`,
-      settings: (slug: string): string => `/api/${enc(slug)}/admin/settings`,
-      rewardConfig: (slug: string): string => `/api/${enc(slug)}/admin/reward-config`,
-      stats: (slug: string): string => `/api/${enc(slug)}/admin/stats`,
-      analytics: (slug: string): string => `/api/${enc(slug)}/admin/analytics`,
+      scan: (slug: string): string => buildPath('cash.slug.scan', { slug }),
+      topup: (slug: string): string => buildPath('cash.slug.topup', { slug }),
+      purchase: (slug: string): string => buildPath('cash.slug.purchase', { slug }),
+      giftCards: (slug: string): string => buildPath('cash.slug.giftCards', { slug }),
+      settings: (slug: string): string => buildPath('cash.slug.settings', { slug }),
+      rewardConfig: (slug: string): string => buildPath('cash.slug.rewardConfig', { slug }),
+      stats: (slug: string): string => buildPath('cash.slug.stats', { slug }),
+      analytics: (slug: string): string => buildPath('cash.slug.analytics', { slug }),
       // POST /api/:slug/customers — member registration (name↔path: registers a member).
-      registerMember: (slug: string): string => `/api/${enc(slug)}/customers`,
-      gift: (slug: string, code: string): string => `/api/${enc(slug)}/gift/${enc(code)}`,
+      registerMember: (slug: string): string => buildPath('cash.slug.registerMember', { slug }),
+      gift: (slug: string, code: string): string => buildPath('cash.slug.gift', { slug, code }),
+    },
+  },
+  staff: {
+    create: (slug: string): string => buildPath('staff.create', { slug }),
+    update: (slug: string, staffId: string): string => buildPath('staff.update', { slug, staffId }),
+  },
+  devices: {
+    beginEnrollment: (merchantId: string): string =>
+      buildPath('devices.beginEnrollment', { merchantId }),
+    completeEnrollment: routePath('devices.completeEnrollment'),
+    status: routePath('devices.status'),
+  },
+  pos: {
+    entryContext: routePath('pos.entryContext'),
+    operatorSessions: routePath('pos.operatorSessions'),
+    operatorLock: (operatorSessionId: string): string =>
+      buildPath('pos.operatorLock', { operatorSessionId }),
+    operatorEnd: (operatorSessionId: string): string =>
+      buildPath('pos.operatorEnd', { operatorSessionId }),
+    verifyPin: routePath('pos.verifyPin'),
+    managerApproval: routePath('pos.managerApproval'),
+    catalog: {
+      categories: (merchantId: string): string =>
+        buildPath('pos.catalogCategories', { merchantId }),
+      products: (merchantId: string): string => buildPath('pos.catalogProducts', { merchantId }),
+      product: (merchantId: string, productId: string): string =>
+        buildPath('pos.catalogProduct', { merchantId, productId }),
+    },
+    cart: {
+      base: (merchantId: string): string => buildPath('pos.cartCreate', { merchantId }),
+      lines: (merchantId: string): string => buildPath('pos.cartLines', { merchantId }),
+      line: (merchantId: string, lineId: string): string =>
+        buildPath('pos.cartLineUpdate', { merchantId, lineId }),
+      prepare: (merchantId: string): string => buildPath('pos.cartPrepare', { merchantId }),
+    },
+    checkout: {
+      base: (merchantId: string): string => buildPath('pos.checkout', { merchantId }),
+      payment: (merchantId: string, paymentId: string): string =>
+        buildPath('pos.checkoutPayment', { merchantId, paymentId }),
+      recovery: (merchantId: string, cartId: string): string =>
+        buildPath('pos.checkoutRecovery', { merchantId, cartId }),
+      cancel: (merchantId: string, cartId: string): string =>
+        buildPath('pos.checkoutCancel', { merchantId, cartId }),
+    },
+    cash: {
+      center: (merchantId: string): string => buildPath('pos.cashCenter', { merchantId }),
+      command: (merchantId: string, commandId: string): string =>
+        buildPath('pos.cashCommand', { merchantId, commandId }),
+      shifts: (merchantId: string): string => buildPath('pos.cashShifts', { merchantId }),
+      movement: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashMovement', { merchantId, shiftId }),
+      suspend: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashSuspend', { merchantId, shiftId }),
+      resume: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashResume', { merchantId, shiftId }),
+      handoff: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashHandoff', { merchantId, shiftId }),
+      count: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashCount', { merchantId, shiftId }),
+      recount: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashRecount', { merchantId, shiftId }),
+      variance: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashVariance', { merchantId, shiftId }),
+      reconcile: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashReconcile', { merchantId, shiftId }),
+      close: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashClose', { merchantId, shiftId }),
+      noSale: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashNoSale', { merchantId, shiftId }),
+    },
+    sales: {
+      create: (merchantId: string): string => buildPath('pos.salesCreate', { merchantId }),
+      current: (merchantId: string): string => buildPath('pos.salesCurrent', { merchantId }),
+      list: (merchantId: string): string => buildPath('pos.salesList', { merchantId }),
+      suspend: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleSuspend', { merchantId, saleId }),
+      resume: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleResume', { merchantId, saleId }),
+      rename: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleRename', { merchantId, saleId }),
+      cancel: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleCancel', { merchantId, saleId }),
+      attachCustomer: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleCustomerAttach', { merchantId, saleId }),
+      detachCustomer: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleCustomerDetach', { merchantId, saleId }),
+      receipt: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleReceipt', { merchantId, saleId }),
+      customers: (merchantId: string): string =>
+        buildPath('pos.saleCustomers', { merchantId }),
+    },
+    offline: {
+      policy: (merchantId: string): string => buildPath('pos.offlinePolicy', { merchantId }),
+      replayBegin: (merchantId: string): string =>
+        buildPath('pos.offlineReplayBegin', { merchantId }),
+      replayBatch: (merchantId: string): string =>
+        buildPath('pos.offlineReplayBatch', { merchantId }),
+      replayCursor: (merchantId: string): string =>
+        buildPath('pos.offlineReplayCursor', { merchantId }),
+      replayCommand: (merchantId: string, commandId: string): string =>
+        buildPath('pos.offlineReplayCommand', { merchantId, commandId }),
+      conflicts: (merchantId: string): string => buildPath('pos.offlineConflicts', { merchantId }),
+      reconcile: (merchantId: string): string => buildPath('pos.offlineReconcile', { merchantId }),
+      reconcileAcknowledge: (merchantId: string): string =>
+        buildPath('pos.offlineReconcileAcknowledge', { merchantId }),
+      diagnostics: (merchantId: string): string =>
+        buildPath('pos.offlineDiagnostics', { merchantId }),
     },
   },
 } as const;

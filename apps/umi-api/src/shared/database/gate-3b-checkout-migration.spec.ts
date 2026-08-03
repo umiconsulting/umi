@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const sql = readFileSync(
-  resolve(process.cwd(), '../../supabase/migrations/20260729000400_gate_3b_advanced_checkout.sql'),
+  resolve(process.cwd(), '../../docs/migration/build-v3/32_pos_checkout.sql'),
   'utf8',
 );
 const repository = readFileSync(
@@ -13,9 +13,9 @@ const repository = readFileSync(
 
 describe('Gate 3B checkout persistence', () => {
   it('keeps one recoverable checkout for each sale', () => {
-    expect(sql).toContain('unique(business_id,cart_id)');
+    expect(sql).toContain('unique(merchant_id,cart_id)');
     expect(sql).toContain('pos_checkout_terminal_immutable');
-    expect(repository).toContain('ON CONFLICT(business_id,cart_id) DO UPDATE SET');
+    expect(repository).toContain('ON CONFLICT(merchant_id,cart_id) DO UPDATE SET');
   });
 
   it('keeps committed tender facts immutable and exactly valued', () => {
@@ -35,11 +35,11 @@ describe('Gate 3B checkout persistence', () => {
     );
   });
 
-  it('enables and forces tenant and branch RLS for all checkout state', () => {
+  it('enables and forces merchant and location RLS for all checkout state', () => {
     for (const table of ['pos_checkout_policy', 'pos_checkout_draft', 'pos_tender_fact']) {
-      expect(sql).toContain(`alter table tenant.${table} enable row level security`);
-      expect(sql).toContain(`alter table tenant.${table} force row level security`);
+      expect(sql).toContain(`alter table merchant.${table} enable row level security`);
+      expect(sql).toContain(`alter table merchant.${table} force row level security`);
     }
-    expect(sql).toContain('business_id=umi.current_business() and branch_id=umi.current_branch()');
+    expect(sql).toContain('merchant_id=umi.current_merchant() and location_id=umi.current_location()');
   });
 });

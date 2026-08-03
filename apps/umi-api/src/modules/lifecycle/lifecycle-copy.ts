@@ -21,20 +21,21 @@ export type CronJourneyKey =
 
 export const CRON_LIFECYCLE_COPY: Record<CronJourneyKey, string> = {
   welcome_no_visit:
-    '¡Hola {name}! Tu tarjeta de {tenant} te espera ☕ — visítanos para tu primer sello.',
+    '¡Hola {name}! Tu tarjeta de {merchant} te espera ☕ — visítanos para tu primer sello.',
   winback_14:
-    'Te extrañamos en {tenant}. Tienes {visitsThisCycle}/{visitsRequired} sellos esperándote.',
+    'Te extrañamos en {merchant}. Tienes {visitsThisCycle}/{visitsRequired} sellos esperándote.',
   winback_30: 'Han pasado 30 días, {name}. Vuelve y sigue acumulando sellos para tu {rewardName}.',
-  winback_60: '{name}, queremos volver a verte en {tenant}. Tu tarjeta sigue activa.',
-  reward_expiring: '⏰ Tu {rewardName} expira el {date} — pasa por {tenant} antes de que se acabe.',
-  streak_3w: '🔥 ¡3 semanas seguidas visitando {tenant}! Sigue así, {name}.',
-  streak_6w: '🔥 ¡6 semanas seguidas! {name}, eres parte de la familia de {tenant}.',
+  winback_60: '{name}, queremos volver a verte en {merchant}. Tu tarjeta sigue activa.',
+  reward_expiring:
+    '⏰ Tu {rewardName} expira el {date} — pasa por {merchant} antes de que se acabe.',
+  streak_3w: '🔥 ¡3 semanas seguidas visitando {merchant}! Sigue así, {name}.',
+  streak_6w: '🔥 ¡6 semanas seguidas! {name}, eres parte de la familia de {merchant}.',
   streak_12w: '🏆 ¡12 semanas seguidas! Gracias por tu fidelidad, {name}.',
 };
 
 const DEFAULT_TZ = 'America/Mexico_City';
 
-/** Tenant override (`programs.branding.lifecycle_copy[journey]`) else the default. */
+/** Merchant override (`programs.branding.lifecycle_copy[journey]`) else the default. */
 export function resolveCronJourneyTemplate(
   lifecycleCopy: unknown,
   journey: CronJourneyKey,
@@ -43,7 +44,7 @@ export function resolveCronJourneyTemplate(
     const v = (lifecycleCopy as Record<string, unknown>)[journey];
     if (typeof v === 'string' && v.trim().length > 0) return v;
   }
-  return CRON_LIFECYCLE_COPY[journey] ?? `{name}, mensaje de {tenant}`;
+  return CRON_LIFECYCLE_COPY[journey] ?? `{name}, mensaje de {merchant}`;
 }
 
 /** Format a date in a timezone as "d de MMMM" (Spanish), matching the source. */

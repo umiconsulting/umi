@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "7a2f560b1542e868d78869bc712e0f46385bda5f4b7dbc378681d548524d5c88",
+  "contentHash": "28789e1b5f1c021d37624ace4a22f83d947138b73344e62bf8e7c133eab3576a",
   "contractVersion": "2.1.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
@@ -49,11 +49,13 @@
             "VALIDATION_FAILED",
             "AUTHENTICATION_REQUIRED",
             "PERMISSION_DENIED",
-            "TENANT_NOT_FOUND",
-            "BRANCH_NOT_FOUND",
-            "BRANCH_REQUIRED",
+            "MERCHANT_NOT_FOUND",
+            "LOCATION_NOT_FOUND",
+            "LOCATION_REQUIRED",
+            "LOCATION_SCOPE_VIOLATION",
             "CONFLICT",
             "IDEMPOTENCY_CONFLICT",
+            "IDEMPOTENCY_EXPIRED",
             "COMMAND_IN_PROGRESS",
             "OPTIMISTIC_VERSION_CONFLICT",
             "RATE_LIMITED",
@@ -65,8 +67,9 @@
             "ENROLLMENT_EXPIRED",
             "ENROLLMENT_REJECTED",
             "ENROLLMENT_ATTEMPTS_EXCEEDED",
-            "TENANT_DISABLED",
-            "BRANCH_DISABLED",
+            "MERCHANT_DISABLED",
+            "LOCATION_DISABLED",
+            "ENTITLEMENT_DISABLED",
             "OPERATOR_SESSION_REQUIRED",
             "CART_VALIDATION_FAILED",
             "CART_NOT_FOUND",
@@ -135,11 +138,13 @@
                 "VALIDATION_FAILED",
                 "AUTHENTICATION_REQUIRED",
                 "PERMISSION_DENIED",
-                "TENANT_NOT_FOUND",
-                "BRANCH_NOT_FOUND",
-                "BRANCH_REQUIRED",
+                "MERCHANT_NOT_FOUND",
+                "LOCATION_NOT_FOUND",
+                "LOCATION_REQUIRED",
+                "LOCATION_SCOPE_VIOLATION",
                 "CONFLICT",
                 "IDEMPOTENCY_CONFLICT",
+                "IDEMPOTENCY_EXPIRED",
                 "COMMAND_IN_PROGRESS",
                 "OPTIMISTIC_VERSION_CONFLICT",
                 "RATE_LIMITED",
@@ -151,8 +156,9 @@
                 "ENROLLMENT_EXPIRED",
                 "ENROLLMENT_REJECTED",
                 "ENROLLMENT_ATTEMPTS_EXCEEDED",
-                "TENANT_DISABLED",
-                "BRANCH_DISABLED",
+                "MERCHANT_DISABLED",
+                "LOCATION_DISABLED",
+                "ENTITLEMENT_DISABLED",
                 "OPERATOR_SESSION_REQUIRED",
                 "CART_VALIDATION_FAILED",
                 "CART_NOT_FOUND",
@@ -219,10 +225,6 @@
     "AttachSaleCustomerRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "customerId": {
           "format": "uuid",
           "type": "string"
@@ -235,13 +237,17 @@
           "format": "uuid",
           "type": "string"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "operatorSessionId": {
           "format": "uuid",
           "type": "string"
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "idempotencyKey",
         "expectedVersion",
@@ -252,17 +258,6 @@
     "AuditEventView": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "anyOf": [
-            {
-              "format": "uuid",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "correlationId": {
           "pattern": "^[A-Za-z0-9._:-]{1,128}$",
           "type": "string"
@@ -296,6 +291,21 @@
           "format": "uuid",
           "type": "string"
         },
+        "locationId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "occurredAt": {
           "format": "date-time",
           "type": "string"
@@ -319,16 +329,12 @@
               "type": "null"
             }
           ]
-        },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
         }
       },
       "required": [
         "id",
-        "tenantId",
-        "branchId",
+        "merchantId",
+        "locationId",
         "eventType",
         "entityType",
         "entityId",
@@ -414,17 +420,6 @@
           "items": {
             "additionalProperties": false,
             "properties": {
-              "branchId": {
-                "anyOf": [
-                  {
-                    "format": "uuid",
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
               "correlationId": {
                 "pattern": "^[A-Za-z0-9._:-]{1,128}$",
                 "type": "string"
@@ -458,6 +453,21 @@
                 "format": "uuid",
                 "type": "string"
               },
+              "locationId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "merchantId": {
+                "format": "uuid",
+                "type": "string"
+              },
               "occurredAt": {
                 "format": "date-time",
                 "type": "string"
@@ -481,16 +491,12 @@
                     "type": "null"
                   }
                 ]
-              },
-              "tenantId": {
-                "format": "uuid",
-                "type": "string"
               }
             },
             "required": [
               "id",
-              "tenantId",
-              "branchId",
+              "merchantId",
+              "locationId",
               "eventType",
               "entityType",
               "entityId",
@@ -549,7 +555,7 @@
         "allowed": {
           "type": "boolean"
         },
-        "branchId": {
+        "locationId": {
           "anyOf": [
             {
               "format": "uuid",
@@ -559,6 +565,10 @@
               "type": "null"
             }
           ]
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
         },
         "permission": {
           "maxLength": 100,
@@ -571,14 +581,10 @@
             "explicit_deny",
             "missing_permission",
             "missing_entitlement",
-            "tenant_scope",
-            "branch_scope",
+            "merchant_scope",
+            "location_scope",
             "elevation_required"
           ],
-          "type": "string"
-        },
-        "tenantId": {
-          "format": "uuid",
           "type": "string"
         }
       },
@@ -586,15 +592,24 @@
         "allowed",
         "reason",
         "permission",
-        "tenantId",
-        "branchId"
+        "merchantId",
+        "locationId"
       ],
       "type": "object"
     },
     "BeginDeviceEnrollmentRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
+        "displayName": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
           "anyOf": [
             {
               "format": "uuid",
@@ -604,15 +619,6 @@
               "type": "null"
             }
           ]
-        },
-        "displayName": {
-          "maxLength": 120,
-          "minLength": 1,
-          "type": "string"
-        },
-        "idempotencyKey": {
-          "format": "uuid",
-          "type": "string"
         },
         "platform": {
           "enum": [
@@ -634,7 +640,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "displayName",
         "type",
         "platform",
@@ -645,26 +651,26 @@
     "BeginReplayRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "credentialVersion": {
           "exclusiveMinimum": 0,
           "type": "integer"
         },
-        "operatorSessionId": {
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
-        "tenantId": {
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
           "format": "uuid",
           "type": "string"
         }
       },
       "required": [
-        "tenantId",
-        "branchId",
+        "merchantId",
+        "locationId",
         "operatorSessionId",
         "credentialVersion"
       ],
@@ -730,10 +736,6 @@
                   },
                   "maxItems": 20,
                   "type": "array"
-                },
-                "branchId": {
-                  "format": "uuid",
-                  "type": "string"
                 },
                 "correlationId": {
                   "maxLength": 128,
@@ -823,6 +825,10 @@
                   ],
                   "type": "object"
                 },
+                "locationId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
                 "managerApprovalThresholdMinorUnits": {
                   "anyOf": [
                     {
@@ -840,16 +846,16 @@
                   "maximum": 86400,
                   "type": "integer"
                 },
+                "merchantId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
                 "requiredEntitlement": {
                   "const": "pos.offline_cash",
                   "type": "string"
                 },
                 "requiredPermission": {
                   "const": "offline.cash.checkout",
-                  "type": "string"
-                },
-                "tenantId": {
-                  "format": "uuid",
                   "type": "string"
                 },
                 "version": {
@@ -864,8 +870,8 @@
                 "issuedAt",
                 "expiresAt",
                 "maxPolicyAgeSeconds",
-                "tenantId",
-                "branchId",
+                "merchantId",
+                "locationId",
                 "deviceId",
                 "deviceCredentialVersion",
                 "currency",
@@ -1039,214 +1045,18 @@
       ],
       "type": "object"
     },
-    "BranchAccess": {
-      "additionalProperties": false,
-      "properties": {
-        "deviceAllowed": {
-          "type": "boolean"
-        },
-        "id": {
-          "format": "uuid",
-          "type": "string"
-        },
-        "name": {
-          "maxLength": 160,
-          "minLength": 1,
-          "type": "string"
-        },
-        "operatorAllowed": {
-          "type": "boolean"
-        },
-        "status": {
-          "enum": [
-            "active",
-            "closed"
-          ],
-          "type": "string"
-        },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "tenantId",
-        "name",
-        "status",
-        "deviceAllowed",
-        "operatorAllowed"
-      ],
-      "type": "object"
-    },
-    "BranchContext": {
-      "additionalProperties": false,
-      "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
-        }
-      },
-      "required": [
-        "tenantId",
-        "branchId"
-      ],
-      "type": "object"
-    },
-    "BranchSummaryModel": {
-      "additionalProperties": false,
-      "properties": {
-        "id": {
-          "format": "uuid",
-          "type": "string"
-        },
-        "name": {
-          "maxLength": 160,
-          "minLength": 1,
-          "type": "string"
-        },
-        "status": {
-          "enum": [
-            "active",
-            "closed"
-          ],
-          "type": "string"
-        },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
-        },
-        "timezone": {
-          "anyOf": [
-            {
-              "maxLength": 100,
-              "minLength": 1,
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "id",
-        "tenantId",
-        "name",
-        "timezone",
-        "status"
-      ],
-      "type": "object"
-    },
-    "BusinessCommandResult": {
-      "additionalProperties": false,
-      "properties": {
-        "commandId": {
-          "format": "uuid",
-          "type": "string"
-        },
-        "correlationId": {
-          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
-          "type": "string"
-        },
-        "duplicate": {
-          "type": "boolean"
-        },
-        "failureClass": {
-          "anyOf": [
-            {
-              "enum": [
-                "validation",
-                "authorization",
-                "conflict",
-                "transient",
-                "permanent",
-                "unknown_outcome"
-              ],
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "failureCode": {
-          "anyOf": [
-            {
-              "maxLength": 100,
-              "minLength": 1,
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "result": {
-          "anyOf": [
-            {
-              "additionalProperties": {},
-              "type": "object"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "retryable": {
-          "type": "boolean"
-        },
-        "status": {
-          "enum": [
-            "succeeded",
-            "failed"
-          ],
-          "type": "string"
-        }
-      },
-      "required": [
-        "commandId",
-        "status",
-        "duplicate",
-        "retryable",
-        "result",
-        "failureCode",
-        "failureClass",
-        "correlationId"
-      ],
-      "type": "object"
-    },
-    "BusinessDate": {
-      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-      "type": "string"
-    },
-    "BusinessFailureClass": {
-      "enum": [
-        "validation",
-        "authorization",
-        "conflict",
-        "transient",
-        "permanent",
-        "unknown_outcome"
-      ],
-      "type": "string"
-    },
     "CancelSaleRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "expectedVersion": {
           "exclusiveMinimum": 0,
           "type": "integer"
         },
         "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -1261,7 +1071,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "idempotencyKey",
         "expectedVersion",
@@ -1272,10 +1082,6 @@
     "Cart": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "checkoutEnabled": {
           "const": false,
           "type": "boolean"
@@ -1514,6 +1320,14 @@
           "maxItems": 250,
           "type": "array"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "operatorSessionId": {
           "format": "uuid",
           "type": "string"
@@ -1525,10 +1339,6 @@
             "committed",
             "abandoned"
           ],
-          "type": "string"
-        },
-        "tenantId": {
-          "format": "uuid",
           "type": "string"
         },
         "totals": {
@@ -1682,8 +1492,8 @@
       },
       "required": [
         "id",
-        "tenantId",
-        "branchId",
+        "merchantId",
+        "locationId",
         "operatorSessionId",
         "status",
         "version",
@@ -1920,10 +1730,6 @@
     "CartLineInput": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "cartId": {
           "format": "uuid",
           "type": "string"
@@ -1933,6 +1739,10 @@
           "type": "integer"
         },
         "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -2000,7 +1810,7 @@
       },
       "required": [
         "cartId",
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "productId",
         "quantity",
@@ -2012,7 +1822,7 @@
     "CartQuery": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -2022,7 +1832,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId"
       ],
       "type": "object"
@@ -2030,10 +1840,6 @@
     "CashApprovalRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "commandFingerprint": {
           "pattern": "^[a-f0-9]{64}$",
           "type": "string"
@@ -2045,6 +1851,10 @@
         "ledgerSequence": {
           "minimum": 0,
           "type": "integer"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
         },
         "managerPin": {
           "pattern": "^\\d{4,8}$",
@@ -2089,7 +1899,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "shiftId",
         "countAttemptId",
         "variance",
@@ -2137,7 +1947,7 @@
     "CashCenterQuery": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -2147,7 +1957,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId"
       ],
       "type": "object"
@@ -2173,10 +1983,6 @@
             {
               "additionalProperties": false,
               "properties": {
-                "branchId": {
-                  "format": "uuid",
-                  "type": "string"
-                },
                 "businessDate": {
                   "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
                   "type": "string"
@@ -2211,6 +2017,14 @@
                 "ledgerSequence": {
                   "minimum": 0,
                   "type": "integer"
+                },
+                "locationId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "merchantId": {
+                  "format": "uuid",
+                  "type": "string"
                 },
                 "openedAt": {
                   "format": "date-time",
@@ -2262,10 +2076,6 @@
                     }
                   ]
                 },
-                "tenantId": {
-                  "format": "uuid",
-                  "type": "string"
-                },
                 "version": {
                   "exclusiveMinimum": 0,
                   "type": "integer"
@@ -2273,8 +2083,8 @@
               },
               "required": [
                 "id",
-                "tenantId",
-                "branchId",
+                "merchantId",
+                "locationId",
                 "registerId",
                 "deviceId",
                 "deviceCredentialVersion",
@@ -3739,10 +3549,6 @@
                 ],
                 "type": "string"
               },
-              "branchId": {
-                "format": "uuid",
-                "type": "string"
-              },
               "createdAt": {
                 "format": "date-time",
                 "type": "string"
@@ -3771,6 +3577,14 @@
                 "format": "uuid",
                 "type": "string"
               },
+              "locationId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "merchantId": {
+                "format": "uuid",
+                "type": "string"
+              },
               "publicReference": {
                 "maxLength": 80,
                 "minLength": 1,
@@ -3789,10 +3603,6 @@
                 ],
                 "type": "string"
               },
-              "tenantId": {
-                "format": "uuid",
-                "type": "string"
-              },
               "version": {
                 "exclusiveMinimum": 0,
                 "type": "integer"
@@ -3800,8 +3610,8 @@
             },
             "required": [
               "id",
-              "tenantId",
-              "branchId",
+              "merchantId",
+              "locationId",
               "displayName",
               "publicReference",
               "currency",
@@ -4172,10 +3982,6 @@
                       ],
                       "type": "string"
                     },
-                    "branchId": {
-                      "format": "uuid",
-                      "type": "string"
-                    },
                     "createdAt": {
                       "format": "date-time",
                       "type": "string"
@@ -4204,6 +4010,14 @@
                       "format": "uuid",
                       "type": "string"
                     },
+                    "locationId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "merchantId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
                     "publicReference": {
                       "maxLength": 80,
                       "minLength": 1,
@@ -4222,10 +4036,6 @@
                       ],
                       "type": "string"
                     },
-                    "tenantId": {
-                      "format": "uuid",
-                      "type": "string"
-                    },
                     "version": {
                       "exclusiveMinimum": 0,
                       "type": "integer"
@@ -4233,8 +4043,8 @@
                   },
                   "required": [
                     "id",
-                    "tenantId",
-                    "branchId",
+                    "merchantId",
+                    "locationId",
                     "displayName",
                     "publicReference",
                     "currency",
@@ -4252,10 +4062,6 @@
                 "shift": {
                   "additionalProperties": false,
                   "properties": {
-                    "branchId": {
-                      "format": "uuid",
-                      "type": "string"
-                    },
                     "businessDate": {
                       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
                       "type": "string"
@@ -4290,6 +4096,14 @@
                     "ledgerSequence": {
                       "minimum": 0,
                       "type": "integer"
+                    },
+                    "locationId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "merchantId": {
+                      "format": "uuid",
+                      "type": "string"
                     },
                     "openedAt": {
                       "format": "date-time",
@@ -4341,10 +4155,6 @@
                         }
                       ]
                     },
-                    "tenantId": {
-                      "format": "uuid",
-                      "type": "string"
-                    },
                     "version": {
                       "exclusiveMinimum": 0,
                       "type": "integer"
@@ -4352,8 +4162,8 @@
                   },
                   "required": [
                     "id",
-                    "tenantId",
-                    "branchId",
+                    "merchantId",
+                    "locationId",
                     "registerId",
                     "deviceId",
                     "deviceCredentialVersion",
@@ -4551,15 +4361,15 @@
     "CashCommandRecoveryQuery": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "commandId": {
           "format": "uuid",
           "type": "string"
         },
         "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -4569,7 +4379,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "commandId",
         "idempotencyKey"
@@ -5070,10 +4880,6 @@
           ],
           "type": "object"
         },
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "businessDate": {
           "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
           "type": "string"
@@ -5124,6 +4930,14 @@
           "format": "uuid",
           "type": "string"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "occurredAt": {
           "format": "date-time",
           "type": "string"
@@ -5151,10 +4965,6 @@
           "format": "uuid",
           "type": "string"
         },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "type": {
           "enum": [
             "opening_float",
@@ -5173,8 +4983,8 @@
       },
       "required": [
         "id",
-        "tenantId",
-        "branchId",
+        "merchantId",
+        "locationId",
         "registerId",
         "shiftId",
         "sequence",
@@ -5260,10 +5070,6 @@
               ],
               "type": "object"
             },
-            "branchId": {
-              "format": "uuid",
-              "type": "string"
-            },
             "businessDate": {
               "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
               "type": "string"
@@ -5314,6 +5120,14 @@
               "format": "uuid",
               "type": "string"
             },
+            "locationId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "merchantId": {
+              "format": "uuid",
+              "type": "string"
+            },
             "occurredAt": {
               "format": "date-time",
               "type": "string"
@@ -5341,10 +5155,6 @@
               "format": "uuid",
               "type": "string"
             },
-            "tenantId": {
-              "format": "uuid",
-              "type": "string"
-            },
             "type": {
               "enum": [
                 "opening_float",
@@ -5363,8 +5173,8 @@
           },
           "required": [
             "id",
-            "tenantId",
-            "branchId",
+            "merchantId",
+            "locationId",
             "registerId",
             "shiftId",
             "sequence",
@@ -5478,10 +5288,6 @@
             }
           ]
         },
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "commandId": {
           "format": "uuid",
           "type": "string"
@@ -5491,6 +5297,10 @@
           "type": "integer"
         },
         "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -5532,7 +5342,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "commandId",
         "idempotencyKey",
@@ -5591,10 +5401,6 @@
     "CashShift": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "businessDate": {
           "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
           "type": "string"
@@ -5629,6 +5435,14 @@
         "ledgerSequence": {
           "minimum": 0,
           "type": "integer"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
         },
         "openedAt": {
           "format": "date-time",
@@ -5680,10 +5494,6 @@
             }
           ]
         },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "version": {
           "exclusiveMinimum": 0,
           "type": "integer"
@@ -5691,8 +5501,8 @@
       },
       "required": [
         "id",
-        "tenantId",
-        "branchId",
+        "merchantId",
+        "locationId",
         "registerId",
         "deviceId",
         "deviceCredentialVersion",
@@ -6272,10 +6082,6 @@
               ],
               "type": "string"
             },
-            "branchId": {
-              "format": "uuid",
-              "type": "string"
-            },
             "createdAt": {
               "format": "date-time",
               "type": "string"
@@ -6304,6 +6110,14 @@
               "format": "uuid",
               "type": "string"
             },
+            "locationId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "merchantId": {
+              "format": "uuid",
+              "type": "string"
+            },
             "publicReference": {
               "maxLength": 80,
               "minLength": 1,
@@ -6322,10 +6136,6 @@
               ],
               "type": "string"
             },
-            "tenantId": {
-              "format": "uuid",
-              "type": "string"
-            },
             "version": {
               "exclusiveMinimum": 0,
               "type": "integer"
@@ -6333,8 +6143,8 @@
           },
           "required": [
             "id",
-            "tenantId",
-            "branchId",
+            "merchantId",
+            "locationId",
             "displayName",
             "publicReference",
             "currency",
@@ -6352,10 +6162,6 @@
         "shift": {
           "additionalProperties": false,
           "properties": {
-            "branchId": {
-              "format": "uuid",
-              "type": "string"
-            },
             "businessDate": {
               "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
               "type": "string"
@@ -6390,6 +6196,14 @@
             "ledgerSequence": {
               "minimum": 0,
               "type": "integer"
+            },
+            "locationId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "merchantId": {
+              "format": "uuid",
+              "type": "string"
             },
             "openedAt": {
               "format": "date-time",
@@ -6441,10 +6255,6 @@
                 }
               ]
             },
-            "tenantId": {
-              "format": "uuid",
-              "type": "string"
-            },
             "version": {
               "exclusiveMinimum": 0,
               "type": "integer"
@@ -6452,8 +6262,8 @@
           },
           "required": [
             "id",
-            "tenantId",
-            "branchId",
+            "merchantId",
+            "locationId",
             "registerId",
             "deviceId",
             "deviceCredentialVersion",
@@ -8106,10 +7916,6 @@
           "minLength": 1,
           "type": "string"
         },
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "categoryId": {
           "format": "uuid",
           "type": "string"
@@ -8133,6 +7939,10 @@
           ],
           "type": "string"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "search": {
           "maxLength": 120,
           "minLength": 1,
@@ -8140,7 +7950,7 @@
         }
       },
       "required": [
-        "branchId"
+        "locationId"
       ],
       "type": "object"
     },
@@ -8213,10 +8023,6 @@
           "maxItems": 1,
           "type": "array"
         },
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "checkoutFingerprint": {
           "anyOf": [
             {
@@ -8232,6 +8038,10 @@
           "format": "uuid",
           "type": "string"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "operatorSessionId": {
           "format": "uuid",
           "type": "string"
@@ -8243,7 +8053,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "reason",
         "checkoutFingerprint",
@@ -8297,10 +8107,6 @@
           },
           "maxItems": 10,
           "type": "array"
-        },
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
         },
         "cartId": {
           "format": "uuid",
@@ -8412,6 +8218,10 @@
           "type": "integer"
         },
         "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -8655,7 +8465,7 @@
       },
       "required": [
         "cartId",
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "expectedCartVersion",
         "paymentMethod",
@@ -8968,7 +8778,7 @@
     "CheckoutRecoveryQuery": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -8978,7 +8788,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId"
       ],
       "type": "object"
@@ -11077,15 +10887,6 @@
                     {
                       "additionalProperties": false,
                       "properties": {
-                        "branchId": {
-                          "format": "uuid",
-                          "type": "string"
-                        },
-                        "branchName": {
-                          "maxLength": 240,
-                          "minLength": 1,
-                          "type": "string"
-                        },
                         "businessDate": {
                           "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
                           "type": "string"
@@ -11256,6 +11057,24 @@
                           "maxItems": 500,
                           "minItems": 1,
                           "type": "array"
+                        },
+                        "locationId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "locationName": {
+                          "maxLength": 240,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "merchantId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "merchantName": {
+                          "maxLength": 240,
+                          "minLength": 1,
+                          "type": "string"
                         },
                         "operatorName": {
                           "maxLength": 240,
@@ -11459,15 +11278,6 @@
                           ],
                           "type": "object"
                         },
-                        "tenantId": {
-                          "format": "uuid",
-                          "type": "string"
-                        },
-                        "tenantName": {
-                          "maxLength": 240,
-                          "minLength": 1,
-                          "type": "string"
-                        },
                         "tip": {
                           "additionalProperties": false,
                           "properties": {
@@ -11494,8 +11304,8 @@
                       },
                       "required": [
                         "receiptRef",
-                        "tenantId",
-                        "branchId",
+                        "merchantId",
+                        "locationId",
                         "issuedAt",
                         "businessDate",
                         "lines",
@@ -13390,15 +13200,6 @@
             {
               "additionalProperties": false,
               "properties": {
-                "branchId": {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "branchName": {
-                  "maxLength": 240,
-                  "minLength": 1,
-                  "type": "string"
-                },
                 "businessDate": {
                   "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
                   "type": "string"
@@ -13569,6 +13370,24 @@
                   "maxItems": 500,
                   "minItems": 1,
                   "type": "array"
+                },
+                "locationId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "locationName": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "merchantId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "merchantName": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "type": "string"
                 },
                 "operatorName": {
                   "maxLength": 240,
@@ -13772,15 +13591,6 @@
                   ],
                   "type": "object"
                 },
-                "tenantId": {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "tenantName": {
-                  "maxLength": 240,
-                  "minLength": 1,
-                  "type": "string"
-                },
                 "tip": {
                   "additionalProperties": false,
                   "properties": {
@@ -13807,8 +13617,8 @@
               },
               "required": [
                 "receiptRef",
-                "tenantId",
-                "branchId",
+                "merchantId",
+                "locationId",
                 "issuedAt",
                 "businessDate",
                 "lines",
@@ -14216,10 +14026,6 @@
     "ClearCartRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "cartId": {
           "format": "uuid",
           "type": "string"
@@ -14232,6 +14038,10 @@
           "format": "uuid",
           "type": "string"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "operatorSessionId": {
           "format": "uuid",
           "type": "string"
@@ -14239,7 +14049,7 @@
       },
       "required": [
         "cartId",
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "expectedVersion",
         "idempotencyKey"
@@ -14506,8 +14316,8 @@
         "sequence_behind",
         "credential_rotated",
         "device_revoked",
-        "tenant_mismatch",
-        "branch_mismatch",
+        "merchant_mismatch",
+        "location_mismatch",
         "operator_invalid",
         "permission_revoked",
         "entitlement_disabled",
@@ -14558,8 +14368,8 @@
                           "sequence_behind",
                           "credential_rotated",
                           "device_revoked",
-                          "tenant_mismatch",
-                          "branch_mismatch",
+                          "merchant_mismatch",
+                          "location_mismatch",
                           "operator_invalid",
                           "permission_revoked",
                           "entitlement_disabled",
@@ -15110,11 +14920,11 @@
     "CreateCartRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
+        "idempotencyKey": {
           "format": "uuid",
           "type": "string"
         },
-        "idempotencyKey": {
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -15124,7 +14934,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "idempotencyKey"
       ],
@@ -15133,7 +14943,11 @@
     "CreateStaffRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
+        "email": {
+          "format": "email",
+          "type": "string"
+        },
+        "locationId": {
           "anyOf": [
             {
               "format": "uuid",
@@ -15143,10 +14957,6 @@
               "type": "null"
             }
           ]
-        },
-        "email": {
-          "format": "email",
-          "type": "string"
         },
         "name": {
           "maxLength": 160,
@@ -15292,17 +15102,6 @@
         "device": {
           "additionalProperties": false,
           "properties": {
-            "branchId": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "credentialVersion": {
               "exclusiveMinimum": 0,
               "type": "integer"
@@ -15326,6 +15125,21 @@
                   "type": "null"
                 }
               ]
+            },
+            "locationId": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "merchantId": {
+              "format": "uuid",
+              "type": "string"
             },
             "platform": {
               "enum": [
@@ -15378,10 +15192,6 @@
               ],
               "type": "string"
             },
-            "tenantId": {
-              "format": "uuid",
-              "type": "string"
-            },
             "type": {
               "enum": [
                 "pos_terminal",
@@ -15393,8 +15203,8 @@
           "required": [
             "id",
             "publicId",
-            "tenantId",
-            "branchId",
+            "merchantId",
+            "locationId",
             "displayName",
             "type",
             "platform",
@@ -15487,17 +15297,6 @@
           "items": {
             "additionalProperties": false,
             "properties": {
-              "branchId": {
-                "anyOf": [
-                  {
-                    "format": "uuid",
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
               "claimedAt": {
                 "anyOf": [
                   {
@@ -15536,6 +15335,21 @@
                     "type": "null"
                   }
                 ]
+              },
+              "locationId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "merchantId": {
+                "format": "uuid",
+                "type": "string"
               },
               "platform": {
                 "enum": [
@@ -15580,10 +15394,6 @@
                 ],
                 "type": "string"
               },
-              "tenantId": {
-                "format": "uuid",
-                "type": "string"
-              },
               "type": {
                 "enum": [
                   "pos_terminal",
@@ -15594,8 +15404,8 @@
             },
             "required": [
               "id",
-              "tenantId",
-              "branchId",
+              "merchantId",
+              "locationId",
               "displayName",
               "type",
               "platform",
@@ -15634,17 +15444,6 @@
     "DeviceEnrollmentRequestView": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "anyOf": [
-            {
-              "format": "uuid",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "claimedAt": {
           "anyOf": [
             {
@@ -15683,6 +15482,21 @@
               "type": "null"
             }
           ]
+        },
+        "locationId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
         },
         "platform": {
           "enum": [
@@ -15727,10 +15541,6 @@
           ],
           "type": "string"
         },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "type": {
           "enum": [
             "pos_terminal",
@@ -15741,8 +15551,8 @@
       },
       "required": [
         "id",
-        "tenantId",
-        "branchId",
+        "merchantId",
+        "locationId",
         "displayName",
         "type",
         "platform",
@@ -15809,17 +15619,6 @@
             {
               "additionalProperties": false,
               "properties": {
-                "branchId": {
-                  "anyOf": [
-                    {
-                      "format": "uuid",
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
                 "credentialVersion": {
                   "exclusiveMinimum": 0,
                   "type": "integer"
@@ -15843,6 +15642,21 @@
                       "type": "null"
                     }
                   ]
+                },
+                "locationId": {
+                  "anyOf": [
+                    {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "merchantId": {
+                  "format": "uuid",
+                  "type": "string"
                 },
                 "platform": {
                   "enum": [
@@ -15895,10 +15709,6 @@
                   ],
                   "type": "string"
                 },
-                "tenantId": {
-                  "format": "uuid",
-                  "type": "string"
-                },
                 "type": {
                   "enum": [
                     "pos_terminal",
@@ -15910,8 +15720,8 @@
               "required": [
                 "id",
                 "publicId",
-                "tenantId",
-                "branchId",
+                "merchantId",
+                "locationId",
                 "displayName",
                 "type",
                 "platform",
@@ -16014,17 +15824,6 @@
     "DeviceSummary": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "anyOf": [
-            {
-              "format": "uuid",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "credentialVersion": {
           "exclusiveMinimum": 0,
           "type": "integer"
@@ -16048,6 +15847,21 @@
               "type": "null"
             }
           ]
+        },
+        "locationId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
         },
         "platform": {
           "enum": [
@@ -16100,10 +15914,6 @@
           ],
           "type": "string"
         },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "type": {
           "enum": [
             "pos_terminal",
@@ -16115,8 +15925,8 @@
       "required": [
         "id",
         "publicId",
-        "tenantId",
-        "branchId",
+        "merchantId",
+        "locationId",
         "displayName",
         "type",
         "platform",
@@ -16560,10 +16370,6 @@
     "ElevationGrantView": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "commandFingerprint": {
           "anyOf": [
             {
@@ -16584,6 +16390,14 @@
           "format": "date-time",
           "type": "string"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "method": {
           "enum": [
             "manager_approval",
@@ -16595,17 +16409,13 @@
           "maxLength": 100,
           "minLength": 1,
           "type": "string"
-        },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
         }
       },
       "required": [
         "elevationId",
         "permission",
-        "tenantId",
-        "branchId",
+        "merchantId",
+        "locationId",
         "method",
         "expiresAt"
       ],
@@ -16665,54 +16475,10 @@
     "EntryContextResponse": {
       "additionalProperties": false,
       "properties": {
-        "tenants": {
+        "merchants": {
           "items": {
             "additionalProperties": false,
             "properties": {
-              "branches": {
-                "items": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "deviceAllowed": {
-                      "type": "boolean"
-                    },
-                    "id": {
-                      "format": "uuid",
-                      "type": "string"
-                    },
-                    "name": {
-                      "maxLength": 160,
-                      "minLength": 1,
-                      "type": "string"
-                    },
-                    "operatorAllowed": {
-                      "type": "boolean"
-                    },
-                    "status": {
-                      "enum": [
-                        "active",
-                        "closed"
-                      ],
-                      "type": "string"
-                    },
-                    "tenantId": {
-                      "format": "uuid",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "tenantId",
-                    "name",
-                    "status",
-                    "deviceAllowed",
-                    "operatorAllowed"
-                  ],
-                  "type": "object"
-                },
-                "maxItems": 500,
-                "type": "array"
-              },
               "entitlements": {
                 "items": {
                   "additionalProperties": false,
@@ -16761,6 +16527,50 @@
                 "format": "uuid",
                 "type": "string"
               },
+              "locations": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "deviceAllowed": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "merchantId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "name": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "operatorAllowed": {
+                      "type": "boolean"
+                    },
+                    "status": {
+                      "enum": [
+                        "active",
+                        "closed"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "merchantId",
+                    "name",
+                    "status",
+                    "deviceAllowed",
+                    "operatorAllowed"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 500,
+                "type": "array"
+              },
               "name": {
                 "maxLength": 160,
                 "minLength": 1,
@@ -16790,7 +16600,7 @@
               "name",
               "roles",
               "permissions",
-              "branches",
+              "locations",
               "entitlements"
             ],
             "type": "object"
@@ -16800,57 +16610,13 @@
         }
       },
       "required": [
-        "tenants"
+        "merchants"
       ],
       "type": "object"
     },
-    "EntryTenant": {
+    "EntryMerchant": {
       "additionalProperties": false,
       "properties": {
-        "branches": {
-          "items": {
-            "additionalProperties": false,
-            "properties": {
-              "deviceAllowed": {
-                "type": "boolean"
-              },
-              "id": {
-                "format": "uuid",
-                "type": "string"
-              },
-              "name": {
-                "maxLength": 160,
-                "minLength": 1,
-                "type": "string"
-              },
-              "operatorAllowed": {
-                "type": "boolean"
-              },
-              "status": {
-                "enum": [
-                  "active",
-                  "closed"
-                ],
-                "type": "string"
-              },
-              "tenantId": {
-                "format": "uuid",
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "tenantId",
-              "name",
-              "status",
-              "deviceAllowed",
-              "operatorAllowed"
-            ],
-            "type": "object"
-          },
-          "maxItems": 500,
-          "type": "array"
-        },
         "entitlements": {
           "items": {
             "additionalProperties": false,
@@ -16899,6 +16665,50 @@
           "format": "uuid",
           "type": "string"
         },
+        "locations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "deviceAllowed": {
+                "type": "boolean"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "merchantId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "operatorAllowed": {
+                "type": "boolean"
+              },
+              "status": {
+                "enum": [
+                  "active",
+                  "closed"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "merchantId",
+              "name",
+              "status",
+              "deviceAllowed",
+              "operatorAllowed"
+            ],
+            "type": "object"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
         "name": {
           "maxLength": 160,
           "minLength": 1,
@@ -16928,7 +16738,7 @@
         "name",
         "roles",
         "permissions",
-        "branches",
+        "locations",
         "entitlements"
       ],
       "type": "object"
@@ -17176,17 +16986,6 @@
           ],
           "type": "object"
         },
-        "branchId": {
-          "anyOf": [
-            {
-              "format": "uuid",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "commandId": {
           "format": "uuid",
           "type": "string"
@@ -17219,20 +17018,31 @@
           "format": "uuid",
           "type": "string"
         },
-        "occurredAt": {
-          "format": "date-time",
+        "locationId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "merchantId": {
+          "format": "uuid",
           "type": "string"
         },
-        "tenantId": {
-          "format": "uuid",
+        "occurredAt": {
+          "format": "date-time",
           "type": "string"
         }
       },
       "required": [
         "id",
         "commandId",
-        "tenantId",
-        "branchId",
+        "merchantId",
+        "locationId",
         "aggregateType",
         "aggregateId",
         "aggregateVersion",
@@ -17400,6 +17210,109 @@
       ],
       "type": "object"
     },
+    "LocationAccess": {
+      "additionalProperties": false,
+      "properties": {
+        "deviceAllowed": {
+          "type": "boolean"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "operatorAllowed": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "closed"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "merchantId",
+        "name",
+        "status",
+        "deviceAllowed",
+        "operatorAllowed"
+      ],
+      "type": "object"
+    },
+    "LocationContext": {
+      "additionalProperties": false,
+      "properties": {
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "merchantId",
+        "locationId"
+      ],
+      "type": "object"
+    },
+    "LocationSummaryModel": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "closed"
+          ],
+          "type": "string"
+        },
+        "timezone": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "merchantId",
+        "name",
+        "timezone",
+        "status"
+      ],
+      "type": "object"
+    },
     "LoginRequest": {
       "additionalProperties": false,
       "properties": {
@@ -17424,10 +17337,6 @@
     "ManagerApprovalRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "commandFingerprint": {
           "anyOf": [
             {
@@ -17440,8 +17349,16 @@
           ],
           "default": null
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "managerPin": {
           "pattern": "^\\d{4,8}$",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
           "type": "string"
         },
         "operatorSessionId": {
@@ -17452,18 +17369,14 @@
           "maxLength": 100,
           "minLength": 1,
           "type": "string"
-        },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
         }
       },
       "required": [
         "operatorSessionId",
         "managerPin",
         "permission",
-        "tenantId",
-        "branchId"
+        "merchantId",
+        "locationId"
       ],
       "type": "object"
     },
@@ -17522,10 +17435,10 @@
     "Membership": {
       "additionalProperties": false,
       "properties": {
-        "allBranches": {
+        "allLocations": {
           "type": "boolean"
         },
-        "branchIds": {
+        "locationIds": {
           "items": {
             "format": "uuid",
             "type": "string"
@@ -17543,6 +17456,10 @@
               "type": "null"
             }
           ]
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
         },
         "permissions": {
           "items": {
@@ -17562,10 +17479,6 @@
           "maxItems": 50,
           "type": "array"
         },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "userId": {
           "format": "uuid",
           "type": "string"
@@ -17574,18 +17487,18 @@
       "required": [
         "membershipId",
         "userId",
-        "tenantId",
-        "branchIds",
-        "allBranches",
+        "merchantId",
+        "locationIds",
+        "allLocations",
         "roles",
         "permissions"
       ],
       "type": "object"
     },
-    "MeTenantsResponse": {
+    "MeMerchantsResponse": {
       "additionalProperties": false,
       "properties": {
-        "tenants": {
+        "merchants": {
           "items": {
             "additionalProperties": false,
             "properties": {
@@ -17624,7 +17537,217 @@
         }
       },
       "required": [
-        "tenants"
+        "merchants"
+      ],
+      "type": "object"
+    },
+    "MerchantCommandResult": {
+      "additionalProperties": false,
+      "properties": {
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "correlationId": {
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+          "type": "string"
+        },
+        "duplicate": {
+          "type": "boolean"
+        },
+        "failureClass": {
+          "anyOf": [
+            {
+              "enum": [
+                "validation",
+                "authorization",
+                "conflict",
+                "transient",
+                "permanent",
+                "unknown_outcome"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failureCode": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "result": {
+          "anyOf": [
+            {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "commandId",
+        "status",
+        "duplicate",
+        "retryable",
+        "result",
+        "failureCode",
+        "failureClass",
+        "correlationId"
+      ],
+      "type": "object"
+    },
+    "MerchantContext": {
+      "additionalProperties": false,
+      "properties": {
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "merchantId"
+      ],
+      "type": "object"
+    },
+    "MerchantDate": {
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "type": "string"
+    },
+    "MerchantFailureClass": {
+      "enum": [
+        "validation",
+        "authorization",
+        "conflict",
+        "transient",
+        "permanent",
+        "unknown_outcome"
+      ],
+      "type": "string"
+    },
+    "MerchantMembership": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "roles": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "slug": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "slug",
+        "name",
+        "roles"
+      ],
+      "type": "object"
+    },
+    "MerchantSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "roles": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "slug",
+        "name",
+        "roles",
+        "timezone"
+      ],
+      "type": "object"
+    },
+    "MerchantSummaryModel": {
+      "additionalProperties": false,
+      "properties": {
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locale": {
+          "maxLength": 20,
+          "minLength": 2,
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "timezone": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "timezone",
+        "locale",
+        "currency"
       ],
       "type": "object"
     },
@@ -17748,15 +17871,15 @@
             }
           ]
         },
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "commandId": {
           "format": "uuid",
           "type": "string"
         },
         "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -17775,7 +17898,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "commandId",
         "idempotencyKey",
@@ -18199,10 +18322,6 @@
           "maxItems": 20,
           "type": "array"
         },
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "correlationId": {
           "maxLength": 128,
           "minLength": 8,
@@ -18291,6 +18410,10 @@
           ],
           "type": "object"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "managerApprovalThresholdMinorUnits": {
           "anyOf": [
             {
@@ -18308,16 +18431,16 @@
           "maximum": 86400,
           "type": "integer"
         },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "requiredEntitlement": {
           "const": "pos.offline_cash",
           "type": "string"
         },
         "requiredPermission": {
           "const": "offline.cash.checkout",
-          "type": "string"
-        },
-        "tenantId": {
-          "format": "uuid",
           "type": "string"
         },
         "version": {
@@ -18332,8 +18455,8 @@
         "issuedAt",
         "expiresAt",
         "maxPolicyAgeSeconds",
-        "tenantId",
-        "branchId",
+        "merchantId",
+        "locationId",
         "deviceId",
         "deviceCredentialVersion",
         "currency",
@@ -18357,8 +18480,8 @@
         "operator_invalid",
         "permission_denied",
         "entitlement_disabled",
-        "tenant_mismatch",
-        "branch_mismatch",
+        "merchant_mismatch",
+        "location_mismatch",
         "currency_mismatch",
         "policy_missing",
         "policy_invalid",
@@ -18438,10 +18561,6 @@
                   },
                   "maxItems": 10,
                   "type": "array"
-                },
-                "branchId": {
-                  "format": "uuid",
-                  "type": "string"
                 },
                 "cartId": {
                   "format": "uuid",
@@ -18553,6 +18672,10 @@
                   "type": "integer"
                 },
                 "idempotencyKey": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "locationId": {
                   "format": "uuid",
                   "type": "string"
                 },
@@ -18796,7 +18919,7 @@
               },
               "required": [
                 "cartId",
-                "branchId",
+                "locationId",
                 "operatorSessionId",
                 "expectedCartVersion",
                 "paymentMethod",
@@ -19237,8 +19360,8 @@
                 "operator_invalid",
                 "permission_denied",
                 "entitlement_disabled",
-                "tenant_mismatch",
-                "branch_mismatch",
+                "merchant_mismatch",
+                "location_mismatch",
                 "currency_mismatch",
                 "policy_missing",
                 "policy_invalid",
@@ -19271,7 +19394,7 @@
               "refresh_policy",
               "refresh_data",
               "reauthenticate",
-              "reselect_branch",
+              "reselect_location",
               "reconcile",
               "manager_review",
               "contact_support"
@@ -19350,10 +19473,6 @@
               },
               "maxItems": 10,
               "type": "array"
-            },
-            "branchId": {
-              "format": "uuid",
-              "type": "string"
             },
             "cartId": {
               "format": "uuid",
@@ -19465,6 +19584,10 @@
               "type": "integer"
             },
             "idempotencyKey": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "locationId": {
               "format": "uuid",
               "type": "string"
             },
@@ -19708,7 +19831,7 @@
           },
           "required": [
             "cartId",
-            "branchId",
+            "locationId",
             "operatorSessionId",
             "expectedCartVersion",
             "paymentMethod",
@@ -20112,10 +20235,6 @@
     "OfflineCommand": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "commandId": {
           "format": "uuid",
           "type": "string"
@@ -20156,6 +20275,14 @@
           "format": "uuid",
           "type": "string"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "operatorSessionId": {
           "format": "uuid",
           "type": "string"
@@ -20178,10 +20305,6 @@
         "schemaVersion": {
           "exclusiveMinimum": 0,
           "type": "integer"
-        },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
         }
       },
       "required": [
@@ -20190,8 +20313,8 @@
         "deviceId",
         "deviceCredentialVersion",
         "deviceSequence",
-        "tenantId",
-        "branchId",
+        "merchantId",
+        "locationId",
         "operatorSessionId",
         "commandType",
         "idempotencyKey",
@@ -20206,10 +20329,6 @@
     "OfflineCommandEnvelope": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "commandId": {
           "format": "uuid",
           "type": "string"
@@ -20231,6 +20350,14 @@
           "format": "date-time",
           "type": "string"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "operatorSessionId": {
           "format": "uuid",
           "type": "string"
@@ -20246,17 +20373,13 @@
         "sequence": {
           "exclusiveMinimum": 0,
           "type": "integer"
-        },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
         }
       },
       "required": [
         "commandId",
         "deviceId",
-        "tenantId",
-        "branchId",
+        "merchantId",
+        "locationId",
         "operatorSessionId",
         "sequence",
         "issuedAt",
@@ -20298,10 +20421,6 @@
               },
               "maxItems": 20,
               "type": "array"
-            },
-            "branchId": {
-              "format": "uuid",
-              "type": "string"
             },
             "correlationId": {
               "maxLength": 128,
@@ -20391,6 +20510,10 @@
               ],
               "type": "object"
             },
+            "locationId": {
+              "format": "uuid",
+              "type": "string"
+            },
             "managerApprovalThresholdMinorUnits": {
               "anyOf": [
                 {
@@ -20408,16 +20531,16 @@
               "maximum": 86400,
               "type": "integer"
             },
+            "merchantId": {
+              "format": "uuid",
+              "type": "string"
+            },
             "requiredEntitlement": {
               "const": "pos.offline_cash",
               "type": "string"
             },
             "requiredPermission": {
               "const": "offline.cash.checkout",
-              "type": "string"
-            },
-            "tenantId": {
-              "format": "uuid",
               "type": "string"
             },
             "version": {
@@ -20432,8 +20555,8 @@
             "issuedAt",
             "expiresAt",
             "maxPolicyAgeSeconds",
-            "tenantId",
-            "branchId",
+            "merchantId",
+            "locationId",
             "deviceId",
             "deviceCredentialVersion",
             "currency",
@@ -20537,10 +20660,6 @@
     "OpenCashShiftRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "businessDate": {
           "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
           "type": "string"
@@ -20615,6 +20734,10 @@
           "format": "uuid",
           "type": "string"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "note": {
           "anyOf": [
             {
@@ -20657,7 +20780,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "commandId",
         "idempotencyKey",
@@ -21042,10 +21165,6 @@
               ],
               "type": "string"
             },
-            "branchId": {
-              "format": "uuid",
-              "type": "string"
-            },
             "createdAt": {
               "format": "date-time",
               "type": "string"
@@ -21074,6 +21193,14 @@
               "format": "uuid",
               "type": "string"
             },
+            "locationId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "merchantId": {
+              "format": "uuid",
+              "type": "string"
+            },
             "publicReference": {
               "maxLength": 80,
               "minLength": 1,
@@ -21092,10 +21219,6 @@
               ],
               "type": "string"
             },
-            "tenantId": {
-              "format": "uuid",
-              "type": "string"
-            },
             "version": {
               "exclusiveMinimum": 0,
               "type": "integer"
@@ -21103,8 +21226,8 @@
           },
           "required": [
             "id",
-            "tenantId",
-            "branchId",
+            "merchantId",
+            "locationId",
             "displayName",
             "publicReference",
             "currency",
@@ -21122,10 +21245,6 @@
         "shift": {
           "additionalProperties": false,
           "properties": {
-            "branchId": {
-              "format": "uuid",
-              "type": "string"
-            },
             "businessDate": {
               "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
               "type": "string"
@@ -21160,6 +21279,14 @@
             "ledgerSequence": {
               "minimum": 0,
               "type": "integer"
+            },
+            "locationId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "merchantId": {
+              "format": "uuid",
+              "type": "string"
             },
             "openedAt": {
               "format": "date-time",
@@ -21211,10 +21338,6 @@
                 }
               ]
             },
-            "tenantId": {
-              "format": "uuid",
-              "type": "string"
-            },
             "version": {
               "exclusiveMinimum": 0,
               "type": "integer"
@@ -21222,8 +21345,8 @@
           },
           "required": [
             "id",
-            "tenantId",
-            "branchId",
+            "merchantId",
+            "locationId",
             "registerId",
             "deviceId",
             "deviceCredentialVersion",
@@ -21357,7 +21480,11 @@
     "OperatorContext": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
           "format": "uuid",
           "type": "string"
         },
@@ -21377,15 +21504,11 @@
           },
           "maxItems": 200,
           "type": "array"
-        },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
         }
       },
       "required": [
-        "tenantId",
-        "branchId",
+        "merchantId",
+        "locationId",
         "operatorId",
         "operatorSessionId",
         "permissions"
@@ -21403,10 +21526,6 @@
     "OperatorSessionView": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "deviceId": {
           "format": "uuid",
           "type": "string"
@@ -21467,6 +21586,14 @@
           "format": "date-time",
           "type": "string"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "permissions": {
           "items": {
             "maxLength": 100,
@@ -21492,10 +21619,6 @@
           ],
           "type": "string"
         },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "userId": {
           "format": "uuid",
           "type": "string"
@@ -21505,8 +21628,8 @@
         "id",
         "userId",
         "staffId",
-        "tenantId",
-        "branchId",
+        "merchantId",
+        "locationId",
         "deviceId",
         "state",
         "permissions",
@@ -22125,15 +22248,6 @@
         "receipt": {
           "additionalProperties": false,
           "properties": {
-            "branchId": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "branchName": {
-              "maxLength": 240,
-              "minLength": 1,
-              "type": "string"
-            },
             "businessDate": {
               "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
               "type": "string"
@@ -22304,6 +22418,24 @@
               "maxItems": 500,
               "minItems": 1,
               "type": "array"
+            },
+            "locationId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "locationName": {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
+            },
+            "merchantId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "merchantName": {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
             },
             "operatorName": {
               "maxLength": 240,
@@ -22507,15 +22639,6 @@
               ],
               "type": "object"
             },
-            "tenantId": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "tenantName": {
-              "maxLength": 240,
-              "minLength": 1,
-              "type": "string"
-            },
             "tip": {
               "additionalProperties": false,
               "properties": {
@@ -22542,8 +22665,8 @@
           },
           "required": [
             "receiptRef",
-            "tenantId",
-            "branchId",
+            "merchantId",
+            "locationId",
             "issuedAt",
             "businessDate",
             "lines",
@@ -22889,7 +23012,7 @@
     "PaymentStatusQuery": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -22899,7 +23022,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId"
       ],
       "type": "object"
@@ -23366,10 +23489,6 @@
           ],
           "type": "string"
         },
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "createdAt": {
           "format": "date-time",
           "type": "string"
@@ -23398,6 +23517,14 @@
           "format": "uuid",
           "type": "string"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "publicReference": {
           "maxLength": 80,
           "minLength": 1,
@@ -23416,10 +23543,6 @@
           ],
           "type": "string"
         },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "version": {
           "exclusiveMinimum": 0,
           "type": "integer"
@@ -23427,8 +23550,8 @@
       },
       "required": [
         "id",
-        "tenantId",
-        "branchId",
+        "merchantId",
+        "locationId",
         "displayName",
         "publicReference",
         "currency",
@@ -23465,15 +23588,15 @@
     "PosCustomerSearchQuery": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "limit": {
           "default": 12,
           "maximum": 30,
           "minimum": 1,
           "type": "integer"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
         },
         "operatorSessionId": {
           "format": "uuid",
@@ -23490,7 +23613,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId"
       ],
       "type": "object"
@@ -23568,27 +23691,27 @@
     "PosPinLoginRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
+        "installationId": {
           "format": "uuid",
           "type": "string"
         },
-        "installationId": {
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
           "format": "uuid",
           "type": "string"
         },
         "pin": {
           "pattern": "^\\d{4,8}$",
           "type": "string"
-        },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
         }
       },
       "required": [
         "pin",
-        "tenantId",
-        "branchId",
+        "merchantId",
+        "locationId",
         "installationId"
       ],
       "type": "object"
@@ -23612,6 +23735,95 @@
       ],
       "type": "object"
     },
+    "PosSessionEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "accessExpiresIn": {
+          "type": "number"
+        },
+        "deviceId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "merchants": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "roles": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "slug": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "roles"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "provider": {
+          "const": "local",
+          "type": "string"
+        },
+        "sessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "user": {
+          "additionalProperties": false,
+          "properties": {
+            "displayName": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "email": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "email",
+            "displayName"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "user",
+        "merchants",
+        "provider",
+        "accessExpiresIn",
+        "sessionId",
+        "deviceId"
+      ],
+      "type": "object"
+    },
     "PosSessionResponse": {
       "additionalProperties": false,
       "properties": {
@@ -23632,15 +23844,7 @@
                 }
               ]
             },
-            "provider": {
-              "const": "local",
-              "type": "string"
-            },
-            "sessionId": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "tenants": {
+            "merchants": {
               "items": {
                 "additionalProperties": false,
                 "properties": {
@@ -23670,6 +23874,14 @@
               },
               "type": "array"
             },
+            "provider": {
+              "const": "local",
+              "type": "string"
+            },
+            "sessionId": {
+              "format": "uuid",
+              "type": "string"
+            },
             "user": {
               "additionalProperties": false,
               "properties": {
@@ -23696,7 +23908,7 @@
           },
           "required": [
             "user",
-            "tenants",
+            "merchants",
             "provider",
             "accessExpiresIn",
             "sessionId",
@@ -23754,10 +23966,6 @@
     "PrepareSaleRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "cartId": {
           "format": "uuid",
           "type": "string"
@@ -23770,6 +23978,10 @@
           "format": "uuid",
           "type": "string"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "operatorSessionId": {
           "format": "uuid",
           "type": "string"
@@ -23777,7 +23989,7 @@
       },
       "required": [
         "cartId",
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "expectedVersion",
         "idempotencyKey"
@@ -23933,11 +24145,6 @@
     "ProvisionalReceipt": {
       "additionalProperties": false,
       "properties": {
-        "branchName": {
-          "maxLength": 160,
-          "minLength": 1,
-          "type": "string"
-        },
         "createdAt": {
           "format": "date-time",
           "type": "string"
@@ -23953,20 +24160,16 @@
             }
           ]
         },
+        "locationName": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
         "officialReceipt": {
           "anyOf": [
             {
               "additionalProperties": false,
               "properties": {
-                "branchId": {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "branchName": {
-                  "maxLength": 240,
-                  "minLength": 1,
-                  "type": "string"
-                },
                 "businessDate": {
                   "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
                   "type": "string"
@@ -24137,6 +24340,24 @@
                   "maxItems": 500,
                   "minItems": 1,
                   "type": "array"
+                },
+                "locationId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "locationName": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "merchantId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "merchantName": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "type": "string"
                 },
                 "operatorName": {
                   "maxLength": 240,
@@ -24340,15 +24561,6 @@
                   ],
                   "type": "object"
                 },
-                "tenantId": {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "tenantName": {
-                  "maxLength": 240,
-                  "minLength": 1,
-                  "type": "string"
-                },
                 "tip": {
                   "additionalProperties": false,
                   "properties": {
@@ -24375,8 +24587,8 @@
               },
               "required": [
                 "receiptRef",
-                "tenantId",
-                "branchId",
+                "merchantId",
+                "locationId",
                 "issuedAt",
                 "businessDate",
                 "lines",
@@ -24445,10 +24657,6 @@
                   },
                   "maxItems": 10,
                   "type": "array"
-                },
-                "branchId": {
-                  "format": "uuid",
-                  "type": "string"
                 },
                 "cartId": {
                   "format": "uuid",
@@ -24560,6 +24768,10 @@
                   "type": "integer"
                 },
                 "idempotencyKey": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "locationId": {
                   "format": "uuid",
                   "type": "string"
                 },
@@ -24803,7 +25015,7 @@
               },
               "required": [
                 "cartId",
-                "branchId",
+                "locationId",
                 "operatorSessionId",
                 "expectedCartVersion",
                 "paymentMethod",
@@ -25218,7 +25430,7 @@
       "required": [
         "provisionalSaleId",
         "status",
-        "branchName",
+        "locationName",
         "operatorName",
         "snapshot",
         "createdAt",
@@ -25435,15 +25647,6 @@
     "ReceiptSnapshot": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
-        "branchName": {
-          "maxLength": 240,
-          "minLength": 1,
-          "type": "string"
-        },
         "businessDate": {
           "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
           "type": "string"
@@ -25614,6 +25817,24 @@
           "maxItems": 500,
           "minItems": 1,
           "type": "array"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationName": {
+          "maxLength": 240,
+          "minLength": 1,
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantName": {
+          "maxLength": 240,
+          "minLength": 1,
+          "type": "string"
         },
         "operatorName": {
           "maxLength": 240,
@@ -25817,15 +26038,6 @@
           ],
           "type": "object"
         },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
-        },
-        "tenantName": {
-          "maxLength": 240,
-          "minLength": 1,
-          "type": "string"
-        },
         "tip": {
           "additionalProperties": false,
           "properties": {
@@ -25852,8 +26064,8 @@
       },
       "required": [
         "receiptRef",
-        "tenantId",
-        "branchId",
+        "merchantId",
+        "locationId",
         "issuedAt",
         "businessDate",
         "lines",
@@ -25868,10 +26080,6 @@
     "ReconcileCashShiftRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "commandId": {
           "format": "uuid",
           "type": "string"
@@ -25885,6 +26093,10 @@
           "type": "integer"
         },
         "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -25909,7 +26121,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "commandId",
         "idempotencyKey",
@@ -26082,7 +26294,7 @@
         "conflict_resolution_required",
         "reauthentication_required",
         "device_blocked",
-        "branch_reselection_required",
+        "location_reselection_required",
         "policy_refresh_required",
         "storage_recovery_required",
         "support_required"
@@ -26120,8 +26332,8 @@
                           "sequence_behind",
                           "credential_rotated",
                           "device_revoked",
-                          "tenant_mismatch",
-                          "branch_mismatch",
+                          "merchant_mismatch",
+                          "location_mismatch",
                           "operator_invalid",
                           "permission_revoked",
                           "entitlement_disabled",
@@ -26721,10 +26933,6 @@
     "RecountRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "commandId": {
           "format": "uuid",
           "type": "string"
@@ -26734,6 +26942,10 @@
           "type": "integer"
         },
         "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -26756,7 +26968,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "commandId",
         "idempotencyKey",
@@ -26800,7 +27012,7 @@
             "query_result",
             "refresh_policy",
             "reauthenticate",
-            "reselect_branch",
+            "reselect_location",
             "manager_review",
             "acknowledge",
             "view_receipt",
@@ -26877,7 +27089,7 @@
         "query_result",
         "refresh_policy",
         "reauthenticate",
-        "reselect_branch",
+        "reselect_location",
         "manager_review",
         "acknowledge",
         "view_receipt",
@@ -26919,7 +27131,7 @@
         "replaying",
         "waiting_for_connectivity",
         "waiting_for_authentication",
-        "waiting_for_branch",
+        "waiting_for_location",
         "waiting_for_policy_refresh",
         "waiting_for_operator_action",
         "waiting_for_manager_action",
@@ -27014,10 +27226,6 @@
     "RemoveCartLineRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "cartId": {
           "format": "uuid",
           "type": "string"
@@ -27030,6 +27238,10 @@
           "format": "uuid",
           "type": "string"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "operatorSessionId": {
           "format": "uuid",
           "type": "string"
@@ -27037,7 +27249,7 @@
       },
       "required": [
         "cartId",
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "expectedVersion",
         "idempotencyKey"
@@ -27047,10 +27259,6 @@
     "RenameSuspendedSaleRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "expectedVersion": {
           "exclusiveMinimum": 0,
           "type": "integer"
@@ -27064,13 +27272,17 @@
           "minLength": 1,
           "type": "string"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "operatorSessionId": {
           "format": "uuid",
           "type": "string"
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "idempotencyKey",
         "expectedVersion",
@@ -27081,7 +27293,16 @@
     "ReplaceDeviceRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
+        "displayName": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
           "anyOf": [
             {
               "format": "uuid",
@@ -27091,15 +27312,6 @@
               "type": "null"
             }
           ]
-        },
-        "displayName": {
-          "maxLength": 120,
-          "minLength": 1,
-          "type": "string"
-        },
-        "idempotencyKey": {
-          "format": "uuid",
-          "type": "string"
         },
         "platform": {
           "enum": [
@@ -27125,7 +27337,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "displayName",
         "type",
         "platform",
@@ -27137,10 +27349,6 @@
     "ReplayAuditSummary": {
       "additionalProperties": false,
       "properties": {
-        "branchReference": {
-          "format": "uuid",
-          "type": "string"
-        },
         "commandReference": {
           "anyOf": [
             {
@@ -27164,6 +27372,10 @@
         "eventCategory": {
           "maxLength": 100,
           "minLength": 1,
+          "type": "string"
+        },
+        "locationReference": {
+          "format": "uuid",
           "type": "string"
         },
         "occurredAt": {
@@ -27192,7 +27404,7 @@
         "commandReference",
         "deviceReference",
         "sequence",
-        "branchReference",
+        "locationReference",
         "outcomeCode",
         "resolutionStatus"
       ],
@@ -27205,10 +27417,6 @@
           "items": {
             "additionalProperties": false,
             "properties": {
-              "branchId": {
-                "format": "uuid",
-                "type": "string"
-              },
               "commandId": {
                 "format": "uuid",
                 "type": "string"
@@ -27249,6 +27457,14 @@
                 "format": "uuid",
                 "type": "string"
               },
+              "locationId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "merchantId": {
+                "format": "uuid",
+                "type": "string"
+              },
               "operatorSessionId": {
                 "format": "uuid",
                 "type": "string"
@@ -27271,10 +27487,6 @@
               "schemaVersion": {
                 "exclusiveMinimum": 0,
                 "type": "integer"
-              },
-              "tenantId": {
-                "format": "uuid",
-                "type": "string"
               }
             },
             "required": [
@@ -27283,8 +27495,8 @@
               "deviceId",
               "deviceCredentialVersion",
               "deviceSequence",
-              "tenantId",
-              "branchId",
+              "merchantId",
+              "locationId",
               "operatorSessionId",
               "commandType",
               "idempotencyKey",
@@ -27378,8 +27590,8 @@
                           "sequence_behind",
                           "credential_rotated",
                           "device_revoked",
-                          "tenant_mismatch",
-                          "branch_mismatch",
+                          "merchant_mismatch",
+                          "location_mismatch",
                           "operator_invalid",
                           "permission_revoked",
                           "entitlement_disabled",
@@ -27905,10 +28117,6 @@
     "ReplayCommandResultQuery": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "commandId": {
           "format": "uuid",
           "type": "string"
@@ -27917,13 +28125,17 @@
           "exclusiveMinimum": 0,
           "type": "integer"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "operatorSessionId": {
           "format": "uuid",
           "type": "string"
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "credentialVersion",
         "commandId"
@@ -27933,13 +28145,13 @@
     "ReplayContextQuery": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "credentialVersion": {
           "exclusiveMinimum": 0,
           "type": "integer"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
         },
         "operatorSessionId": {
           "format": "uuid",
@@ -27947,7 +28159,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "credentialVersion"
       ],
@@ -28022,8 +28234,8 @@
                 "sequence_behind",
                 "credential_rotated",
                 "device_revoked",
-                "tenant_mismatch",
-                "branch_mismatch",
+                "merchant_mismatch",
+                "location_mismatch",
                 "operator_invalid",
                 "permission_revoked",
                 "entitlement_disabled",
@@ -28077,8 +28289,8 @@
             "sequence_behind",
             "credential_rotated",
             "device_revoked",
-            "tenant_mismatch",
-            "branch_mismatch",
+            "merchant_mismatch",
+            "location_mismatch",
             "operator_invalid",
             "permission_revoked",
             "entitlement_disabled",
@@ -28212,8 +28424,8 @@
                     "sequence_behind",
                     "credential_rotated",
                     "device_revoked",
-                    "tenant_mismatch",
-                    "branch_mismatch",
+                    "merchant_mismatch",
+                    "location_mismatch",
                     "operator_invalid",
                     "permission_revoked",
                     "entitlement_disabled",
@@ -28764,10 +28976,6 @@
             }
           ]
         },
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "commandId": {
           "format": "uuid",
           "type": "string"
@@ -28781,6 +28989,10 @@
           "type": "integer"
         },
         "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -28821,7 +29033,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "commandId",
         "idempotencyKey",
@@ -28838,15 +29050,15 @@
     "ResumeSaleRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "expectedVersion": {
           "exclusiveMinimum": 0,
           "type": "integer"
         },
         "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -28856,7 +29068,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "idempotencyKey",
         "expectedVersion"
@@ -28998,10 +29210,6 @@
           "items": {
             "additionalProperties": false,
             "properties": {
-              "branchReference": {
-                "format": "uuid",
-                "type": "string"
-              },
               "commandReference": {
                 "anyOf": [
                   {
@@ -29025,6 +29233,10 @@
               "eventCategory": {
                 "maxLength": 100,
                 "minLength": 1,
+                "type": "string"
+              },
+              "locationReference": {
+                "format": "uuid",
                 "type": "string"
               },
               "occurredAt": {
@@ -29053,7 +29265,7 @@
               "commandReference",
               "deviceReference",
               "sequence",
-              "branchReference",
+              "locationReference",
               "outcomeCode",
               "resolutionStatus"
             ],
@@ -29092,8 +29304,8 @@
                 "sequence_behind",
                 "credential_rotated",
                 "device_revoked",
-                "tenant_mismatch",
-                "branch_mismatch",
+                "merchant_mismatch",
+                "location_mismatch",
                 "operator_invalid",
                 "permission_revoked",
                 "entitlement_disabled",
@@ -29147,11 +29359,11 @@
     "SaleContextRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
+        "idempotencyKey": {
           "format": "uuid",
           "type": "string"
         },
-        "idempotencyKey": {
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -29161,7 +29373,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "idempotencyKey"
       ],
@@ -29230,10 +29442,6 @@
               "cart": {
                 "additionalProperties": false,
                 "properties": {
-                  "branchId": {
-                    "format": "uuid",
-                    "type": "string"
-                  },
                   "checkoutEnabled": {
                     "const": false,
                     "type": "boolean"
@@ -29472,6 +29680,14 @@
                     "maxItems": 250,
                     "type": "array"
                   },
+                  "locationId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "merchantId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
                   "operatorSessionId": {
                     "format": "uuid",
                     "type": "string"
@@ -29483,10 +29699,6 @@
                       "committed",
                       "abandoned"
                     ],
-                    "type": "string"
-                  },
-                  "tenantId": {
-                    "format": "uuid",
                     "type": "string"
                   },
                   "totals": {
@@ -29640,8 +29852,8 @@
                 },
                 "required": [
                   "id",
-                  "tenantId",
-                  "branchId",
+                  "merchantId",
+                  "locationId",
                   "operatorSessionId",
                   "status",
                   "version",
@@ -29823,10 +30035,6 @@
     "SaleHistoryQuery": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "cursor": {
           "maxLength": 240,
           "type": "string"
@@ -29836,6 +30044,10 @@
           "maximum": 100,
           "minimum": 1,
           "type": "integer"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
         },
         "operatorSessionId": {
           "format": "uuid",
@@ -29864,7 +30076,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId"
       ],
       "type": "object"
@@ -29883,15 +30095,15 @@
     "SaleMutationRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "expectedVersion": {
           "exclusiveMinimum": 0,
           "type": "integer"
         },
         "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -29901,7 +30113,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "idempotencyKey",
         "expectedVersion"
@@ -29934,15 +30146,6 @@
             {
               "additionalProperties": false,
               "properties": {
-                "branchId": {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "branchName": {
-                  "maxLength": 240,
-                  "minLength": 1,
-                  "type": "string"
-                },
                 "businessDate": {
                   "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
                   "type": "string"
@@ -30113,6 +30316,24 @@
                   "maxItems": 500,
                   "minItems": 1,
                   "type": "array"
+                },
+                "locationId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "locationName": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "merchantId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "merchantName": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "type": "string"
                 },
                 "operatorName": {
                   "maxLength": 240,
@@ -30316,15 +30537,6 @@
                   ],
                   "type": "object"
                 },
-                "tenantId": {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "tenantName": {
-                  "maxLength": 240,
-                  "minLength": 1,
-                  "type": "string"
-                },
                 "tip": {
                   "additionalProperties": false,
                   "properties": {
@@ -30351,8 +30563,8 @@
               },
               "required": [
                 "receiptRef",
-                "tenantId",
-                "branchId",
+                "merchantId",
+                "locationId",
                 "issuedAt",
                 "businessDate",
                 "lines",
@@ -30410,10 +30622,6 @@
         "cart": {
           "additionalProperties": false,
           "properties": {
-            "branchId": {
-              "format": "uuid",
-              "type": "string"
-            },
             "checkoutEnabled": {
               "const": false,
               "type": "boolean"
@@ -30652,6 +30860,14 @@
               "maxItems": 250,
               "type": "array"
             },
+            "locationId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "merchantId": {
+              "format": "uuid",
+              "type": "string"
+            },
             "operatorSessionId": {
               "format": "uuid",
               "type": "string"
@@ -30663,10 +30879,6 @@
                 "committed",
                 "abandoned"
               ],
-              "type": "string"
-            },
-            "tenantId": {
-              "format": "uuid",
               "type": "string"
             },
             "totals": {
@@ -30820,8 +31032,8 @@
           },
           "required": [
             "id",
-            "tenantId",
-            "branchId",
+            "merchantId",
+            "locationId",
             "operatorSessionId",
             "status",
             "version",
@@ -31026,26 +31238,7 @@
         "accessExpiresIn": {
           "type": "number"
         },
-        "deviceId": {
-          "anyOf": [
-            {
-              "format": "uuid",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "provider": {
-          "const": "local",
-          "type": "string"
-        },
-        "sessionId": {
-          "format": "uuid",
-          "type": "string"
-        },
-        "tenants": {
+        "merchants": {
           "items": {
             "additionalProperties": false,
             "properties": {
@@ -31075,6 +31268,10 @@
           },
           "type": "array"
         },
+        "provider": {
+          "const": "local",
+          "type": "string"
+        },
         "user": {
           "additionalProperties": false,
           "properties": {
@@ -31101,11 +31298,9 @@
       },
       "required": [
         "user",
-        "tenants",
+        "merchants",
         "provider",
-        "accessExpiresIn",
-        "sessionId",
-        "deviceId"
+        "accessExpiresIn"
       ],
       "type": "object"
     },
@@ -31118,26 +31313,7 @@
             "accessExpiresIn": {
               "type": "number"
             },
-            "deviceId": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "provider": {
-              "const": "local",
-              "type": "string"
-            },
-            "sessionId": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "tenants": {
+            "merchants": {
               "items": {
                 "additionalProperties": false,
                 "properties": {
@@ -31167,6 +31343,10 @@
               },
               "type": "array"
             },
+            "provider": {
+              "const": "local",
+              "type": "string"
+            },
             "user": {
               "additionalProperties": false,
               "properties": {
@@ -31193,11 +31373,9 @@
           },
           "required": [
             "user",
-            "tenants",
+            "merchants",
             "provider",
-            "accessExpiresIn",
-            "sessionId",
-            "deviceId"
+            "accessExpiresIn"
           ],
           "type": "object"
         }
@@ -31255,10 +31433,6 @@
             }
           ]
         },
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "commandId": {
           "format": "uuid",
           "type": "string"
@@ -31272,6 +31446,10 @@
           "type": "integer"
         },
         "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -31289,7 +31467,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "commandId",
         "idempotencyKey",
@@ -32306,10 +32484,6 @@
                   ],
                   "type": "string"
                 },
-                "branchId": {
-                  "format": "uuid",
-                  "type": "string"
-                },
                 "createdAt": {
                   "format": "date-time",
                   "type": "string"
@@ -32338,6 +32512,14 @@
                   "format": "uuid",
                   "type": "string"
                 },
+                "locationId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "merchantId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
                 "publicReference": {
                   "maxLength": 80,
                   "minLength": 1,
@@ -32356,10 +32538,6 @@
                   ],
                   "type": "string"
                 },
-                "tenantId": {
-                  "format": "uuid",
-                  "type": "string"
-                },
                 "version": {
                   "exclusiveMinimum": 0,
                   "type": "integer"
@@ -32367,8 +32545,8 @@
               },
               "required": [
                 "id",
-                "tenantId",
-                "branchId",
+                "merchantId",
+                "locationId",
                 "displayName",
                 "publicReference",
                 "currency",
@@ -32386,10 +32564,6 @@
             "shift": {
               "additionalProperties": false,
               "properties": {
-                "branchId": {
-                  "format": "uuid",
-                  "type": "string"
-                },
                 "businessDate": {
                   "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
                   "type": "string"
@@ -32424,6 +32598,14 @@
                 "ledgerSequence": {
                   "minimum": 0,
                   "type": "integer"
+                },
+                "locationId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "merchantId": {
+                  "format": "uuid",
+                  "type": "string"
                 },
                 "openedAt": {
                   "format": "date-time",
@@ -32475,10 +32657,6 @@
                     }
                   ]
                 },
-                "tenantId": {
-                  "format": "uuid",
-                  "type": "string"
-                },
                 "version": {
                   "exclusiveMinimum": 0,
                   "type": "integer"
@@ -32486,8 +32664,8 @@
               },
               "required": [
                 "id",
-                "tenantId",
-                "branchId",
+                "merchantId",
+                "locationId",
                 "registerId",
                 "deviceId",
                 "deviceCredentialVersion",
@@ -32823,10 +33001,6 @@
     "ShiftHandoffRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "commandId": {
           "format": "uuid",
           "type": "string"
@@ -32847,6 +33021,10 @@
           "pattern": "^\\d{4,8}$",
           "type": "string"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "operatorSessionId": {
           "format": "uuid",
           "type": "string"
@@ -32857,7 +33035,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "commandId",
         "idempotencyKey",
@@ -33510,10 +33688,6 @@
     "ShiftTransitionRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "commandId": {
           "format": "uuid",
           "type": "string"
@@ -33523,6 +33697,10 @@
           "type": "integer"
         },
         "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
@@ -33548,7 +33726,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "commandId",
         "idempotencyKey",
@@ -33561,17 +33739,6 @@
     "StaffIdentity": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "anyOf": [
-            {
-              "format": "uuid",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "identity": {
           "additionalProperties": false,
           "properties": {
@@ -33603,6 +33770,21 @@
           ],
           "type": "object"
         },
+        "locationId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "position": {
           "anyOf": [
             {
@@ -33624,17 +33806,13 @@
             "inactive"
           ],
           "type": "string"
-        },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
         }
       },
       "required": [
         "staffId",
         "identity",
-        "tenantId",
-        "branchId",
+        "merchantId",
+        "locationId",
         "position",
         "status"
       ],
@@ -33643,28 +33821,24 @@
     "StartOperatorSessionRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
+        "locationId": {
           "format": "uuid",
           "type": "string"
         },
-        "tenantId": {
+        "merchantId": {
           "format": "uuid",
           "type": "string"
         }
       },
       "required": [
-        "tenantId",
-        "branchId"
+        "merchantId",
+        "locationId"
       ],
       "type": "object"
     },
     "SubmitBlindCountRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "commandId": {
           "format": "uuid",
           "type": "string"
@@ -33758,6 +33932,10 @@
           "format": "uuid",
           "type": "string"
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "note": {
           "anyOf": [
             {
@@ -33781,7 +33959,7 @@
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "commandId",
         "idempotencyKey",
@@ -33797,10 +33975,6 @@
     "SuspendSaleRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
-          "format": "uuid",
-          "type": "string"
-        },
         "expectedVersion": {
           "exclusiveMinimum": 0,
           "type": "integer"
@@ -33821,13 +33995,17 @@
           ],
           "default": null
         },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "operatorSessionId": {
           "format": "uuid",
           "type": "string"
         }
       },
       "required": [
-        "branchId",
+        "locationId",
         "operatorSessionId",
         "idempotencyKey",
         "expectedVersion"
@@ -33918,123 +34096,6 @@
       "required": [
         "total",
         "entries"
-      ],
-      "type": "object"
-    },
-    "TenantContext": {
-      "additionalProperties": false,
-      "properties": {
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
-        }
-      },
-      "required": [
-        "tenantId"
-      ],
-      "type": "object"
-    },
-    "TenantMembership": {
-      "additionalProperties": false,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "roles": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "slug": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "slug",
-        "name",
-        "roles"
-      ],
-      "type": "object"
-    },
-    "TenantSummary": {
-      "additionalProperties": false,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "roles": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "slug": {
-          "type": "string"
-        },
-        "timezone": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "id",
-        "slug",
-        "name",
-        "roles",
-        "timezone"
-      ],
-      "type": "object"
-    },
-    "TenantSummaryModel": {
-      "additionalProperties": false,
-      "properties": {
-        "currency": {
-          "pattern": "^[A-Z]{3}$",
-          "type": "string"
-        },
-        "id": {
-          "format": "uuid",
-          "type": "string"
-        },
-        "locale": {
-          "maxLength": 20,
-          "minLength": 2,
-          "type": "string"
-        },
-        "name": {
-          "maxLength": 160,
-          "minLength": 1,
-          "type": "string"
-        },
-        "timezone": {
-          "anyOf": [
-            {
-              "maxLength": 100,
-              "minLength": 1,
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "timezone",
-        "locale",
-        "currency"
       ],
       "type": "object"
     },
@@ -34992,7 +35053,7 @@
     "UpdateStaffRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
+        "locationId": {
           "anyOf": [
             {
               "format": "uuid",
@@ -35070,7 +35131,11 @@
     "VerifyOperatorPinRequest": {
       "additionalProperties": false,
       "properties": {
-        "branchId": {
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
           "format": "uuid",
           "type": "string"
         },
@@ -35082,17 +35147,13 @@
         "pin": {
           "pattern": "^\\d{4,8}$",
           "type": "string"
-        },
-        "tenantId": {
-          "format": "uuid",
-          "type": "string"
         }
       },
       "required": [
         "pin",
         "permission",
-        "tenantId",
-        "branchId"
+        "merchantId",
+        "locationId"
       ],
       "type": "object"
     }
@@ -35103,18 +35164,6 @@
       "retryable": false
     },
     "AUTHENTICATION_REQUIRED": {
-      "public": true,
-      "retryable": false
-    },
-    "BRANCH_DISABLED": {
-      "public": true,
-      "retryable": false
-    },
-    "BRANCH_NOT_FOUND": {
-      "public": true,
-      "retryable": false
-    },
-    "BRANCH_REQUIRED": {
       "public": true,
       "retryable": false
     },
@@ -35182,7 +35231,15 @@
       "public": true,
       "retryable": false
     },
+    "ENTITLEMENT_DISABLED": {
+      "public": true,
+      "retryable": false
+    },
     "IDEMPOTENCY_CONFLICT": {
+      "public": true,
+      "retryable": false
+    },
+    "IDEMPOTENCY_EXPIRED": {
       "public": true,
       "retryable": false
     },
@@ -35191,6 +35248,30 @@
       "retryable": true
     },
     "INVENTORY_UNAVAILABLE": {
+      "public": true,
+      "retryable": false
+    },
+    "LOCATION_DISABLED": {
+      "public": true,
+      "retryable": false
+    },
+    "LOCATION_NOT_FOUND": {
+      "public": true,
+      "retryable": false
+    },
+    "LOCATION_REQUIRED": {
+      "public": true,
+      "retryable": false
+    },
+    "LOCATION_SCOPE_VIOLATION": {
+      "public": true,
+      "retryable": false
+    },
+    "MERCHANT_DISABLED": {
+      "public": true,
+      "retryable": false
+    },
+    "MERCHANT_NOT_FOUND": {
       "public": true,
       "retryable": false
     },
@@ -35254,14 +35335,6 @@
       "public": true,
       "retryable": false
     },
-    "TENANT_DISABLED": {
-      "public": true,
-      "retryable": false
-    },
-    "TENANT_NOT_FOUND": {
-      "public": true,
-      "retryable": false
-    },
     "VALIDATION_FAILED": {
       "public": true,
       "retryable": false
@@ -35272,211 +35345,223 @@
     }
   },
   "invariants": {
-    "BlindCount": "Expected cash remains hidden until the count is durably submitted.",
-    "CashLedger": "Every physical cash effect is one immutable, ordered, shift-scoped ledger fact.",
+    "IdempotencyRetention": "A command result replays for 72 hours, then returns IDEMPOTENCY_EXPIRED.",
     "Money": "minorUnits is an integer and currency is an uppercase ISO 4217 code.",
     "OfflineCommandEnvelope": "sequence is positive and fingerprint is a SHA-256 hexadecimal value.",
     "PaymentAmbiguity": "When status is unknown, queryOnly must be true and canRetryAsNew must be false."
   },
   "manifestVersion": 1,
   "routes": {
-    "DELETE /api/pos/tenants/:tenantId/cart/lines/:lineId": {
+    "DELETE /api/v1/pos/merchants/:merchantId/cart/lines/:lineId": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
-        "OPTIMISTIC_VERSION_CONFLICT"
+        "OPTIMISTIC_VERSION_CONFLICT",
+        "RESOURCE_NOT_FOUND"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cart.write",
       "pin": false,
       "request": "RemoveCartLineRequest",
-      "response": "Cart",
-      "tenantContext": true
+      "response": "Cart"
     },
-    "DELETE /api/pos/tenants/:tenantId/sales/:saleId/customer": {
+    "DELETE /api/v1/pos/merchants/:merchantId/sales/:saleId/customer": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "OPTIMISTIC_VERSION_CONFLICT"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "sale.lifecycle",
       "pin": false,
       "request": "SaleMutationRequest",
-      "response": "SaleSnapshot",
-      "tenantContext": true
+      "response": "SaleSnapshot"
     },
     "GET /api/auth/me": {
       "approval": false,
       "auth": "session",
-      "branchContext": false,
       "errors": [
         "AUTHENTICATION_REQUIRED"
       ],
       "idempotent": true,
+      "locationContext": false,
+      "merchantContext": false,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": null,
-      "response": "SessionResponse",
-      "tenantContext": false
+      "response": "SessionResponse"
     },
-    "GET /api/devices/status": {
-      "approval": false,
-      "auth": "device-credential",
-      "branchContext": false,
-      "errors": [
-        "DEVICE_CREDENTIAL_INVALID",
-        "DEVICE_REVOKED"
-      ],
-      "idempotent": true,
-      "offline": false,
-      "permission": null,
-      "pin": false,
-      "request": null,
-      "response": "DeviceSummary",
-      "tenantContext": false
-    },
-    "GET /api/me/tenants": {
+    "GET /api/me/merchants": {
       "approval": false,
       "auth": "session",
-      "branchContext": false,
       "errors": [
         "AUTHENTICATION_REQUIRED"
       ],
       "idempotent": true,
+      "locationContext": false,
+      "merchantContext": false,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": null,
-      "response": "MeTenantsResponse",
-      "tenantContext": false
+      "response": "MeMerchantsResponse"
     },
-    "GET /api/pos/entry-context": {
+    "GET /api/merchants/:merchantId/audit": {
       "approval": false,
-      "auth": "device-session",
-      "branchContext": false,
+      "auth": "session",
+      "errors": [
+        "PERMISSION_DENIED"
+      ],
+      "idempotent": true,
+      "locationContext": false,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "audit.read",
+      "pin": false,
+      "request": "AuditSearchRequest",
+      "response": "AuditSearchResponse"
+    },
+    "GET /api/v1/devices/status": {
+      "approval": false,
+      "auth": "device",
       "errors": [
         "AUTHENTICATION_REQUIRED",
         "DEVICE_REVOKED"
       ],
       "idempotent": true,
+      "locationContext": false,
+      "merchantContext": false,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": null,
-      "response": null,
-      "tenantContext": false
+      "response": "DeviceSummary"
     },
-    "GET /api/pos/tenants/:tenantId/cart": {
+    "GET /api/v1/pos/entry-context": {
+      "approval": false,
+      "auth": "device",
+      "errors": [
+        "AUTHENTICATION_REQUIRED",
+        "DEVICE_REVOKED",
+        "ENTITLEMENT_DISABLED"
+      ],
+      "idempotent": true,
+      "locationContext": false,
+      "merchantContext": false,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": null,
+      "response": "EntryContextResponse"
+    },
+    "GET /api/v1/pos/merchants/:merchantId/cart": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "RESOURCE_NOT_FOUND"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cart.write",
       "pin": false,
       "request": "CartQuery",
-      "response": "Cart",
-      "tenantContext": true
+      "response": "Cart"
     },
-    "GET /api/pos/tenants/:tenantId/cash": {
+    "GET /api/v1/pos/merchants/:merchantId/cash": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "DEVICE_REVOKED"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cash.shift.read",
       "pin": false,
       "request": "CashCenterQuery",
-      "response": "CashCenterSnapshot",
-      "tenantContext": true
+      "response": "CashCenterSnapshot"
     },
-    "GET /api/pos/tenants/:tenantId/cash/commands/:commandId": {
+    "GET /api/v1/pos/merchants/:merchantId/cash/commands/:commandId": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "DEVICE_REVOKED"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cash.shift.read",
       "pin": false,
       "request": "CashCommandRecoveryQuery",
-      "response": "CashCommandRecoveryResult",
-      "tenantContext": true
+      "response": "CashCommandRecoveryResult"
     },
-    "GET /api/pos/tenants/:tenantId/catalog/categories": {
+    "GET /api/v1/pos/merchants/:merchantId/catalog/categories": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
-        "BRANCH_NOT_FOUND",
-        "FEATURE_UNAVAILABLE"
+        "LOCATION_SCOPE_VIOLATION"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "catalog.read",
       "pin": false,
       "request": "CatalogQuery",
-      "response": "CatalogCategoriesResponse",
-      "tenantContext": true
+      "response": "CatalogCategoriesResponse"
     },
-    "GET /api/pos/tenants/:tenantId/catalog/products": {
+    "GET /api/v1/pos/merchants/:merchantId/catalog/products": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
-        "BRANCH_NOT_FOUND",
-        "FEATURE_UNAVAILABLE"
+        "LOCATION_SCOPE_VIOLATION"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "catalog.read",
       "pin": false,
       "request": "CatalogQuery",
-      "response": "CatalogPage",
-      "tenantContext": true
+      "response": "CatalogPage"
     },
-    "GET /api/pos/tenants/:tenantId/catalog/products/:productId": {
+    "GET /api/v1/pos/merchants/:merchantId/catalog/products/:productId": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
-        "BRANCH_NOT_FOUND",
         "RESOURCE_NOT_FOUND"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "catalog.read",
       "pin": false,
       "request": "CatalogQuery",
-      "response": "CatalogProductDetail",
-      "tenantContext": true
+      "response": "CatalogProductDetail"
     },
-    "GET /api/pos/tenants/:tenantId/checkout/carts/:cartId": {
+    "GET /api/v1/pos/merchants/:merchantId/checkout/carts/:cartId": {
       "approval": false,
-      "auth": "device-session",
-      "branchContext": true,
+      "auth": "operator-session",
       "errors": [
         "AUTHENTICATION_REQUIRED",
         "PERMISSION_DENIED",
@@ -35484,853 +35569,883 @@
         "DEVICE_REVOKED"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "checkout.commit",
       "pin": false,
       "request": "CheckoutRecoveryQuery",
-      "response": "CheckoutRecoverySnapshot",
-      "tenantContext": true
+      "response": "CheckoutRecoverySnapshot"
     },
-    "GET /api/pos/tenants/:tenantId/checkout/payments/:paymentId": {
+    "GET /api/v1/pos/merchants/:merchantId/checkout/payments/:paymentId": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "RESOURCE_NOT_FOUND"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "checkout.commit",
       "pin": false,
       "request": "PaymentStatusQuery",
-      "response": "PaymentOutcome",
-      "tenantContext": true
+      "response": "PaymentOutcome"
     },
-    "GET /api/pos/tenants/:tenantId/offline/conflicts": {
+    "GET /api/v1/pos/merchants/:merchantId/offline/conflicts": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "offline.replay",
       "pin": false,
       "request": "ReplayContextQuery",
-      "response": "ConflictSummary",
-      "tenantContext": true
+      "response": "ConflictSummary"
     },
-    "GET /api/pos/tenants/:tenantId/offline/diagnostics": {
+    "GET /api/v1/pos/merchants/:merchantId/offline/diagnostics": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "offline.replay",
       "pin": false,
       "request": null,
-      "response": "SafeReplayDiagnostic",
-      "tenantContext": true
+      "response": "SafeReplayDiagnostic"
     },
-    "GET /api/pos/tenants/:tenantId/offline/policy": {
+    "GET /api/v1/pos/merchants/:merchantId/offline/policy": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "DEVICE_REVOKED",
         "ENTITLEMENT_DISABLED"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "offline.replay",
       "pin": false,
       "request": "ReplayContextQuery",
-      "response": "OfflinePolicy",
-      "tenantContext": true
+      "response": "OfflinePolicy"
     },
-    "GET /api/pos/tenants/:tenantId/offline/replay/commands/:commandId": {
+    "GET /api/v1/pos/merchants/:merchantId/offline/replay/commands/:commandId": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "RESOURCE_NOT_FOUND"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "offline.replay",
       "pin": false,
       "request": "ReplayCommandResultQuery",
-      "response": "ReplayResult",
-      "tenantContext": true
+      "response": "ReplayResult"
     },
-    "GET /api/pos/tenants/:tenantId/offline/replay/cursor": {
+    "GET /api/v1/pos/merchants/:merchantId/offline/replay/cursor": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "offline.replay",
       "pin": false,
       "request": "ReplayContextQuery",
-      "response": "ReplayCursor",
-      "tenantContext": true
+      "response": "ReplayCursor"
     },
-    "GET /api/pos/tenants/:tenantId/sales": {
+    "GET /api/v1/pos/merchants/:merchantId/sales": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "sale.lifecycle",
       "pin": false,
       "request": "SaleHistoryQuery",
-      "response": "SaleHistoryPage",
-      "tenantContext": true
+      "response": "SaleHistoryPage"
     },
-    "GET /api/pos/tenants/:tenantId/sales/:saleId/receipt": {
+    "GET /api/v1/pos/merchants/:merchantId/sales/:saleId/receipt": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "RESOURCE_NOT_FOUND"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "sale.lifecycle",
       "pin": false,
       "request": "SaleHistoryQuery",
-      "response": "SaleReceiptResult",
-      "tenantContext": true
+      "response": "SaleReceiptResult"
     },
-    "GET /api/pos/tenants/:tenantId/sales/current": {
+    "GET /api/v1/pos/merchants/:merchantId/sales/current": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "RESOURCE_NOT_FOUND"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "sale.lifecycle",
       "pin": false,
       "request": "SaleHistoryQuery",
-      "response": "SaleSnapshot",
-      "tenantContext": true
+      "response": "SaleSnapshot"
     },
-    "GET /api/pos/tenants/:tenantId/sales/customers": {
+    "GET /api/v1/pos/merchants/:merchantId/sales/customers": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "sale.lifecycle",
       "pin": false,
       "request": "PosCustomerSearchQuery",
-      "response": "PosCustomerSearchResult",
-      "tenantContext": true
-    },
-    "GET /api/tenants/:tenantId/devices/enrollment-requests": {
-      "approval": false,
-      "auth": "session",
-      "branchContext": false,
-      "errors": [
-        "PERMISSION_DENIED"
-      ],
-      "idempotent": true,
-      "offline": false,
-      "permission": "devices.manage",
-      "pin": false,
-      "request": null,
-      "response": "DeviceEnrollmentRequestList",
-      "tenantContext": true
+      "response": "PosCustomerSearchResult"
     },
     "PATCH /api/:slug/admin/staff/:staffId": {
       "approval": false,
       "auth": "session",
-      "branchContext": true,
       "errors": [
         "VALIDATION_FAILED",
         "PERMISSION_DENIED",
         "RESOURCE_NOT_FOUND"
       ],
       "idempotent": false,
+      "locationContext": false,
+      "merchantContext": true,
       "offline": false,
-      "permission": "staff.manage",
+      "permission": null,
       "pin": false,
       "request": "UpdateStaffRequest",
-      "response": null,
-      "tenantContext": true
+      "response": null
     },
-    "PATCH /api/pos/tenants/:tenantId/cart/lines/:lineId": {
+    "PATCH /api/v1/pos/merchants/:merchantId/cart/lines/:lineId": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
-        "CART_VALIDATION_FAILED",
-        "OPTIMISTIC_VERSION_CONFLICT"
+        "OPTIMISTIC_VERSION_CONFLICT",
+        "RESOURCE_NOT_FOUND"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cart.write",
       "pin": false,
       "request": "CartLineInput",
-      "response": "Cart",
-      "tenantContext": true
+      "response": "Cart"
     },
     "POST /api/:slug/admin/gift-cards": {
       "approval": false,
       "auth": "session",
-      "branchContext": false,
       "errors": [
         "VALIDATION_FAILED",
-        "PERMISSION_DENIED",
-        "RATE_LIMITED"
+        "PERMISSION_DENIED"
       ],
       "idempotent": false,
+      "locationContext": false,
+      "merchantContext": true,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": "GiftCardCreateRequest",
-      "response": null,
-      "tenantContext": true
+      "response": null
     },
     "POST /api/:slug/admin/purchase": {
       "approval": false,
       "auth": "session",
-      "branchContext": false,
       "errors": [
         "VALIDATION_FAILED",
         "PERMISSION_DENIED",
-        "IDEMPOTENCY_CONFLICT"
+        "RESOURCE_NOT_FOUND"
       ],
-      "idempotent": true,
+      "idempotent": false,
+      "locationContext": false,
+      "merchantContext": true,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": "PurchaseRequest",
-      "response": null,
-      "tenantContext": true
+      "response": null
     },
     "POST /api/:slug/admin/scan": {
       "approval": false,
       "auth": "session",
-      "branchContext": false,
       "errors": [
         "VALIDATION_FAILED",
         "PERMISSION_DENIED",
-        "TENANT_NOT_FOUND"
+        "RESOURCE_NOT_FOUND"
       ],
       "idempotent": false,
+      "locationContext": false,
+      "merchantContext": true,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": "ScanRequest",
-      "response": null,
-      "tenantContext": true
+      "response": null
     },
     "POST /api/:slug/admin/staff": {
       "approval": false,
       "auth": "session",
-      "branchContext": true,
       "errors": [
         "VALIDATION_FAILED",
-        "PERMISSION_DENIED",
-        "TENANT_NOT_FOUND",
-        "BRANCH_NOT_FOUND"
+        "PERMISSION_DENIED"
       ],
       "idempotent": false,
+      "locationContext": false,
+      "merchantContext": true,
       "offline": false,
-      "permission": "staff.manage",
+      "permission": null,
       "pin": false,
       "request": "CreateStaffRequest",
-      "response": null,
-      "tenantContext": true
+      "response": null
     },
     "POST /api/:slug/admin/topup": {
       "approval": false,
       "auth": "session",
-      "branchContext": false,
       "errors": [
         "VALIDATION_FAILED",
         "PERMISSION_DENIED",
-        "IDEMPOTENCY_CONFLICT"
+        "RESOURCE_NOT_FOUND"
       ],
-      "idempotent": true,
+      "idempotent": false,
+      "locationContext": false,
+      "merchantContext": true,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": "TopupRequest",
-      "response": null,
-      "tenantContext": true
+      "response": null
     },
     "POST /api/:slug/customers": {
       "approval": false,
       "auth": "public",
-      "branchContext": false,
       "errors": [
         "VALIDATION_FAILED",
-        "CONFLICT",
         "RATE_LIMITED"
       ],
       "idempotent": false,
+      "locationContext": false,
+      "merchantContext": true,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": "RegisterMemberRequest",
-      "response": null,
-      "tenantContext": true
+      "response": null
     },
     "POST /api/:slug/gift/:code": {
       "approval": false,
       "auth": "public",
-      "branchContext": false,
       "errors": [
         "VALIDATION_FAILED",
         "RESOURCE_NOT_FOUND",
         "RATE_LIMITED"
       ],
       "idempotent": false,
+      "locationContext": false,
+      "merchantContext": true,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": "GiftRedeemRequest",
-      "response": null,
-      "tenantContext": true
+      "response": null
     },
     "POST /api/auth/local/forgot-password": {
       "approval": false,
       "auth": "public",
-      "branchContext": false,
       "errors": [
         "VALIDATION_FAILED",
         "RATE_LIMITED"
       ],
       "idempotent": true,
+      "locationContext": false,
+      "merchantContext": false,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": "ForgotPasswordRequest",
-      "response": "OkResponse",
-      "tenantContext": false
+      "response": "OkResponse"
     },
     "POST /api/auth/local/global-logout": {
       "approval": false,
       "auth": "session",
-      "branchContext": false,
       "errors": [
         "AUTHENTICATION_REQUIRED"
       ],
       "idempotent": true,
+      "locationContext": false,
+      "merchantContext": false,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": "GlobalLogoutRequest",
-      "response": null,
-      "tenantContext": false
+      "response": "OkResponse"
     },
     "POST /api/auth/local/login": {
       "approval": false,
       "auth": "public",
-      "branchContext": false,
       "errors": [
         "VALIDATION_FAILED",
         "AUTHENTICATION_REQUIRED",
         "RATE_LIMITED"
       ],
       "idempotent": false,
+      "locationContext": false,
+      "merchantContext": false,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": "LoginRequest",
-      "response": "SessionResponse",
-      "tenantContext": false
+      "response": "SessionResponse"
     },
     "POST /api/auth/local/logout": {
       "approval": false,
       "auth": "session",
-      "branchContext": false,
       "errors": [],
       "idempotent": true,
+      "locationContext": false,
+      "merchantContext": false,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": null,
-      "response": "OkResponse",
-      "tenantContext": false
+      "response": "OkResponse"
     },
     "POST /api/auth/local/refresh": {
       "approval": false,
       "auth": "refresh-cookie",
-      "branchContext": false,
       "errors": [
         "AUTHENTICATION_REQUIRED",
         "RATE_LIMITED"
       ],
       "idempotent": false,
+      "locationContext": false,
+      "merchantContext": false,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": null,
-      "response": "SessionResponse",
-      "tenantContext": false
+      "response": "SessionResponse"
     },
     "POST /api/auth/local/reset-password": {
       "approval": false,
       "auth": "public",
-      "branchContext": false,
       "errors": [
         "VALIDATION_FAILED",
         "AUTHENTICATION_REQUIRED",
         "RATE_LIMITED"
       ],
       "idempotent": false,
+      "locationContext": false,
+      "merchantContext": false,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": "ResetPasswordRequest",
-      "response": "OkResponse",
-      "tenantContext": false
+      "response": "OkResponse"
     },
-    "POST /api/auth/pos/login": {
+    "POST /api/v1/auth/pos/global-logout": {
       "approval": false,
-      "auth": "device-credential",
-      "branchContext": false,
+      "auth": "device",
       "errors": [
+        "AUTHENTICATION_REQUIRED"
+      ],
+      "idempotent": true,
+      "locationContext": false,
+      "merchantContext": false,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "GlobalLogoutRequest",
+      "response": "OkResponse"
+    },
+    "POST /api/v1/auth/pos/login": {
+      "approval": false,
+      "auth": "device",
+      "errors": [
+        "VALIDATION_FAILED",
         "AUTHENTICATION_REQUIRED",
-        "DEVICE_NOT_ALLOWED",
+        "DEVICE_REVOKED",
+        "ENTITLEMENT_DISABLED",
         "RATE_LIMITED"
       ],
       "idempotent": false,
+      "locationContext": false,
+      "merchantContext": false,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": "PosLoginRequest",
-      "response": "PosSessionResponse",
-      "tenantContext": false
+      "response": "PosSessionResponse"
     },
-    "POST /api/auth/pos/pin-login": {
+    "POST /api/v1/auth/pos/logout": {
       "approval": false,
-      "auth": "device-credential",
-      "branchContext": true,
+      "auth": "device",
+      "errors": [],
+      "idempotent": true,
+      "locationContext": false,
+      "merchantContext": false,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": null,
+      "response": "OkResponse"
+    },
+    "POST /api/v1/auth/pos/pin-login": {
+      "approval": false,
+      "auth": "device",
       "errors": [
-        "PERMISSION_DENIED",
-        "PIN_LOCKED",
-        "RATE_LIMITED",
-        "DEVICE_NOT_ALLOWED",
-        "ENTITLEMENT_DISABLED"
+        "VALIDATION_FAILED",
+        "AUTHENTICATION_REQUIRED",
+        "DEVICE_REVOKED",
+        "ENTITLEMENT_DISABLED",
+        "RATE_LIMITED"
       ],
       "idempotent": false,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": null,
       "pin": true,
       "request": "PosPinLoginRequest",
-      "response": "PosSessionResponse",
-      "tenantContext": true
+      "response": "PosSessionResponse"
     },
-    "POST /api/auth/pos/refresh": {
+    "POST /api/v1/auth/pos/refresh": {
       "approval": false,
-      "auth": "device-credential",
-      "branchContext": false,
+      "auth": "device",
       "errors": [
-        "SESSION_REVOKED",
-        "DEVICE_NOT_ALLOWED",
+        "AUTHENTICATION_REQUIRED",
+        "DEVICE_REVOKED",
         "RATE_LIMITED"
       ],
       "idempotent": false,
+      "locationContext": false,
+      "merchantContext": false,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": "PosRefreshRequest",
-      "response": "PosSessionResponse",
-      "tenantContext": false
+      "response": "PosSessionResponse"
     },
-    "POST /api/devices/pairing/:pairingSessionId/acknowledge": {
+    "POST /api/v1/devices/enrollment/complete": {
       "approval": false,
-      "auth": "polling-credential",
-      "branchContext": false,
+      "auth": "public",
+      "errors": [
+        "VALIDATION_FAILED",
+        "AUTHENTICATION_REQUIRED",
+        "RATE_LIMITED"
+      ],
+      "idempotent": true,
+      "locationContext": false,
+      "merchantContext": false,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "CompleteDeviceEnrollmentRequest",
+      "response": "DeviceCredentialEnvelope"
+    },
+    "POST /api/v1/devices/pairing/:pairingSessionId/acknowledge": {
+      "approval": false,
+      "auth": "public",
       "errors": [
         "ENROLLMENT_REJECTED",
         "RATE_LIMITED"
       ],
       "idempotent": true,
+      "locationContext": false,
+      "merchantContext": false,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": "AcknowledgeDeviceCredentialRequest",
-      "response": "DevicePairingAcknowledgement",
-      "tenantContext": false
+      "response": "DevicePairingAcknowledgement"
     },
-    "POST /api/devices/pairing/:pairingSessionId/poll": {
+    "POST /api/v1/devices/pairing/:pairingSessionId/poll": {
       "approval": false,
-      "auth": "polling-credential",
-      "branchContext": false,
+      "auth": "public",
       "errors": [
         "ENROLLMENT_REJECTED",
         "RATE_LIMITED"
       ],
       "idempotent": true,
+      "locationContext": false,
+      "merchantContext": false,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": "PollDevicePairingRequest",
-      "response": "DevicePairingPollResponse",
-      "tenantContext": false
+      "response": "DevicePairingPollResponse"
     },
-    "POST /api/devices/pairing/claim": {
+    "POST /api/v1/devices/pairing/claim": {
       "approval": false,
-      "auth": "public-pairing-code",
-      "branchContext": false,
+      "auth": "public",
       "errors": [
         "ENROLLMENT_REJECTED",
         "RATE_LIMITED"
       ],
       "idempotent": false,
+      "locationContext": false,
+      "merchantContext": false,
       "offline": false,
       "permission": null,
       "pin": false,
       "request": "ClaimDevicePairingRequest",
-      "response": "DevicePairingSession",
-      "tenantContext": false
+      "response": "DevicePairingSession"
     },
-    "POST /api/pos/elevation/manager-approval": {
-      "approval": true,
-      "auth": "device-session",
-      "branchContext": true,
+    "POST /api/v1/merchants/:merchantId/devices/enrollment": {
+      "approval": false,
+      "auth": "session",
       "errors": [
         "PERMISSION_DENIED",
-        "PIN_LOCKED",
+        "VALIDATION_FAILED",
+        "ENTITLEMENT_DISABLED"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "device.enroll",
+      "pin": false,
+      "request": "BeginDeviceEnrollmentRequest",
+      "response": "EnrollmentChallenge"
+    },
+    "POST /api/v1/pos/elevation/manager-approval": {
+      "approval": true,
+      "auth": "operator-session",
+      "errors": [
+        "AUTHENTICATION_REQUIRED",
+        "PERMISSION_DENIED",
         "RATE_LIMITED"
       ],
       "idempotent": false,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": null,
-      "pin": true,
+      "pin": false,
       "request": "ManagerApprovalRequest",
-      "response": "ElevationGrantView",
-      "tenantContext": true
+      "response": "ElevationGrantView"
     },
-    "POST /api/pos/elevation/pin": {
+    "POST /api/v1/pos/elevation/pin": {
       "approval": false,
-      "auth": "device-session",
-      "branchContext": true,
+      "auth": "operator-session",
       "errors": [
+        "AUTHENTICATION_REQUIRED",
         "PERMISSION_DENIED",
-        "PIN_LOCKED",
         "RATE_LIMITED"
       ],
       "idempotent": false,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": null,
       "pin": true,
       "request": "VerifyOperatorPinRequest",
-      "response": "ElevationGrantView",
-      "tenantContext": true
+      "response": "ElevationGrantView"
     },
-    "POST /api/pos/operator-sessions": {
-      "approval": false,
-      "auth": "device-session",
-      "branchContext": true,
-      "errors": [
-        "BRANCH_NOT_FOUND",
-        "PERMISSION_DENIED",
-        "DEVICE_REVOKED"
-      ],
-      "idempotent": true,
-      "offline": false,
-      "permission": null,
-      "pin": false,
-      "request": "StartOperatorSessionRequest",
-      "response": "OperatorSessionView",
-      "tenantContext": true
-    },
-    "POST /api/pos/tenants/:tenantId/cart": {
+    "POST /api/v1/pos/merchants/:merchantId/cart": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
-        "BRANCH_NOT_FOUND",
-        "IDEMPOTENCY_CONFLICT"
+        "IDEMPOTENCY_CONFLICT",
+        "LOCATION_SCOPE_VIOLATION"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cart.write",
       "pin": false,
       "request": "CreateCartRequest",
-      "response": "Cart",
-      "tenantContext": true
+      "response": "Cart"
     },
-    "POST /api/pos/tenants/:tenantId/cart/clear": {
+    "POST /api/v1/pos/merchants/:merchantId/cart/clear": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "OPTIMISTIC_VERSION_CONFLICT"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cart.write",
       "pin": false,
       "request": "ClearCartRequest",
-      "response": "Cart",
-      "tenantContext": true
+      "response": "Cart"
     },
-    "POST /api/pos/tenants/:tenantId/cart/lines": {
+    "POST /api/v1/pos/merchants/:merchantId/cart/lines": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
-        "CART_VALIDATION_FAILED",
+        "OPTIMISTIC_VERSION_CONFLICT",
         "IDEMPOTENCY_CONFLICT"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cart.write",
       "pin": false,
       "request": "CartLineInput",
-      "response": "Cart",
-      "tenantContext": true
+      "response": "Cart"
     },
-    "POST /api/pos/tenants/:tenantId/cart/prepare": {
+    "POST /api/v1/pos/merchants/:merchantId/cart/prepare": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
-        "CART_VALIDATION_FAILED",
-        "OPTIMISTIC_VERSION_CONFLICT"
+        "OPTIMISTIC_VERSION_CONFLICT",
+        "INVENTORY_UNAVAILABLE"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cart.write",
       "pin": false,
       "request": "PrepareSaleRequest",
-      "response": "Cart",
-      "tenantContext": true
+      "response": "TotalsConfirmation"
     },
-    "POST /api/pos/tenants/:tenantId/cash/shifts": {
+    "POST /api/v1/pos/merchants/:merchantId/cash/shifts": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "IDEMPOTENCY_CONFLICT",
         "OPTIMISTIC_VERSION_CONFLICT"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cash.shift.open",
       "pin": false,
       "request": "OpenCashShiftRequest",
-      "response": "OpenCashShiftResult",
-      "tenantContext": true
+      "response": "OpenCashShiftResult"
     },
-    "POST /api/pos/tenants/:tenantId/cash/shifts/:shiftId/close": {
+    "POST /api/v1/pos/merchants/:merchantId/cash/shifts/:shiftId/close": {
       "approval": true,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "IDEMPOTENCY_CONFLICT",
         "OPTIMISTIC_VERSION_CONFLICT"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cash.shift.close",
       "pin": false,
       "request": "ShiftCloseRequest",
-      "response": "ShiftCloseResult",
-      "tenantContext": true
+      "response": "ShiftCloseResult"
     },
-    "POST /api/pos/tenants/:tenantId/cash/shifts/:shiftId/counts": {
+    "POST /api/v1/pos/merchants/:merchantId/cash/shifts/:shiftId/counts": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "IDEMPOTENCY_CONFLICT",
         "OPTIMISTIC_VERSION_CONFLICT"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cash.count.submit",
       "pin": false,
       "request": "SubmitBlindCountRequest",
-      "response": "CashCountSummary",
-      "tenantContext": true
+      "response": "CashCountSummary"
     },
-    "POST /api/pos/tenants/:tenantId/cash/shifts/:shiftId/counts/recount": {
-      "auth": "session",
-      "idempotent": true,
-      "method": "POST",
-      "offline": false,
-      "path": "/api/pos/tenants/:tenantId/cash/shifts/:shiftId/counts/recount",
-      "permission": "cash.count.recount",
-      "rateLimit": "financial",
-      "replayable": false,
-      "requestModel": "RecountRequest",
-      "responseModel": "CashShift",
-      "tenantScope": "path"
-    },
-    "POST /api/pos/tenants/:tenantId/cash/shifts/:shiftId/handoff": {
+    "POST /api/v1/pos/merchants/:merchantId/cash/shifts/:shiftId/counts/recount": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
+      "errors": [
+        "PERMISSION_DENIED",
+        "OPTIMISTIC_VERSION_CONFLICT"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "cash.count.recount",
+      "pin": false,
+      "request": "RecountRequest",
+      "response": "CashShift"
+    },
+    "POST /api/v1/pos/merchants/:merchantId/cash/shifts/:shiftId/handoff": {
+      "approval": false,
+      "auth": "operator-session",
       "errors": [
         "PERMISSION_DENIED",
         "RATE_LIMITED",
         "OPTIMISTIC_VERSION_CONFLICT"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cash.shift.handoff",
       "pin": true,
       "request": "ShiftHandoffRequest",
-      "response": "ShiftHandoff",
-      "tenantContext": true
+      "response": "ShiftHandoff"
     },
-    "POST /api/pos/tenants/:tenantId/cash/shifts/:shiftId/movements": {
+    "POST /api/v1/pos/merchants/:merchantId/cash/shifts/:shiftId/movements": {
       "approval": true,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "IDEMPOTENCY_CONFLICT",
         "OPTIMISTIC_VERSION_CONFLICT"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cash.movement.*",
       "pin": false,
       "request": "CashMovementRequest",
-      "response": "CashMovement",
-      "tenantContext": true
+      "response": "CashMovement"
     },
-    "POST /api/pos/tenants/:tenantId/cash/shifts/:shiftId/no-sale": {
+    "POST /api/v1/pos/merchants/:merchantId/cash/shifts/:shiftId/no-sale": {
       "approval": true,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "RATE_LIMITED"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cash.drawer.no_sale",
       "pin": false,
       "request": "NoSaleDrawerRequest",
-      "response": "NoSaleDrawerEvent",
-      "tenantContext": true
+      "response": "NoSaleDrawerEvent"
     },
-    "POST /api/pos/tenants/:tenantId/cash/shifts/:shiftId/reconcile": {
+    "POST /api/v1/pos/merchants/:merchantId/cash/shifts/:shiftId/reconcile": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "OPTIMISTIC_VERSION_CONFLICT"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cash.reconcile",
       "pin": false,
       "request": "ReconcileCashShiftRequest",
-      "response": "ShiftReconciliation",
-      "tenantContext": true
+      "response": "ShiftReconciliation"
     },
-    "POST /api/pos/tenants/:tenantId/cash/shifts/:shiftId/resume": {
+    "POST /api/v1/pos/merchants/:merchantId/cash/shifts/:shiftId/resume": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "OPTIMISTIC_VERSION_CONFLICT"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cash.shift.resume",
       "pin": false,
       "request": "ShiftTransitionRequest",
-      "response": "CashShift",
-      "tenantContext": true
+      "response": "CashShift"
     },
-    "POST /api/pos/tenants/:tenantId/cash/shifts/:shiftId/suspend": {
+    "POST /api/v1/pos/merchants/:merchantId/cash/shifts/:shiftId/suspend": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "OPTIMISTIC_VERSION_CONFLICT"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cash.shift.suspend",
       "pin": false,
       "request": "ShiftTransitionRequest",
-      "response": "CashShift",
-      "tenantContext": true
+      "response": "CashShift"
     },
-    "POST /api/pos/tenants/:tenantId/cash/shifts/:shiftId/variance": {
+    "POST /api/v1/pos/merchants/:merchantId/cash/shifts/:shiftId/variance": {
       "approval": true,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "IDEMPOTENCY_CONFLICT"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "cash.reconcile",
       "pin": false,
       "request": "ResolveCashVarianceRequest",
-      "response": "CashVarianceResolution",
-      "tenantContext": true
+      "response": "CashVarianceResolution"
     },
-    "POST /api/pos/tenants/:tenantId/checkout": {
+    "POST /api/v1/pos/merchants/:merchantId/checkout": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
-        "CHECKOUT_CART_CHANGED",
         "INVENTORY_UNAVAILABLE",
         "PAYMENT_UNKNOWN",
         "OPTIMISTIC_VERSION_CONFLICT",
         "IDEMPOTENCY_CONFLICT"
       ],
       "idempotent": true,
-      "offline": false,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": true,
       "permission": "checkout.commit",
       "pin": false,
       "request": "CheckoutCommand",
-      "response": "CheckoutResult",
-      "tenantContext": true
+      "response": "CheckoutResult"
     },
-    "POST /api/pos/tenants/:tenantId/checkout/carts/:cartId/cancel": {
+    "POST /api/v1/pos/merchants/:merchantId/checkout/carts/:cartId/cancel": {
       "approval": true,
-      "auth": "device-session",
-      "branchContext": true,
+      "auth": "operator-session",
       "errors": [
         "AUTHENTICATION_REQUIRED",
         "PERMISSION_DENIED",
@@ -36339,230 +36454,230 @@
         "DEVICE_REVOKED"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "checkout.commit",
       "pin": false,
       "request": "CheckoutCancellationRequest",
-      "response": "CheckoutCancellationResult",
-      "tenantContext": true
+      "response": "CheckoutCancellationResult"
     },
-    "POST /api/pos/tenants/:tenantId/offline/reconcile": {
+    "POST /api/v1/pos/merchants/:merchantId/offline/reconcile": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "offline.replay",
       "pin": false,
       "request": "ReconcileRequest",
-      "response": "ReconciliationSummary",
-      "tenantContext": true
+      "response": "ReconciliationSummary"
     },
-    "POST /api/pos/tenants/:tenantId/offline/reconcile/acknowledge": {
+    "POST /api/v1/pos/merchants/:merchantId/offline/reconcile/acknowledge": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "offline.replay",
       "pin": false,
       "request": "AcknowledgeReconciliationRequest",
-      "response": null,
-      "tenantContext": true
+      "response": null
     },
-    "POST /api/pos/tenants/:tenantId/offline/replay/batch": {
+    "POST /api/v1/pos/merchants/:merchantId/offline/replay/batch": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "IDEMPOTENCY_CONFLICT",
         "DEVICE_REVOKED"
       ],
-      "idempotent": true,
+      "idempotent": false,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "offline.replay",
       "pin": false,
       "request": "ReplayBatch",
-      "response": "ReplayBatchResult",
-      "tenantContext": true
+      "response": "ReplayBatchResult"
     },
-    "POST /api/pos/tenants/:tenantId/offline/replay/begin": {
+    "POST /api/v1/pos/merchants/:merchantId/offline/replay/begin": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "DEVICE_REVOKED",
-        "BRANCH_SCOPE_VIOLATION"
+        "LOCATION_SCOPE_VIOLATION"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "offline.replay",
       "pin": false,
       "request": "BeginReplayRequest",
-      "response": "BeginReplayResponse",
-      "tenantContext": true
+      "response": "BeginReplayResponse"
     },
-    "POST /api/pos/tenants/:tenantId/sales": {
+    "POST /api/v1/pos/merchants/:merchantId/sales": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "IDEMPOTENCY_CONFLICT"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "sale.lifecycle",
       "pin": false,
       "request": "SaleContextRequest",
-      "response": "SaleSnapshot",
-      "tenantContext": true
+      "response": "SaleSnapshot"
     },
-    "POST /api/pos/tenants/:tenantId/sales/:saleId/cancel": {
+    "POST /api/v1/pos/merchants/:merchantId/sales/:saleId/cancel": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "OPTIMISTIC_VERSION_CONFLICT"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "sale.lifecycle",
       "pin": false,
       "request": "CancelSaleRequest",
-      "response": "SaleSnapshot",
-      "tenantContext": true
+      "response": "SaleSnapshot"
     },
-    "POST /api/pos/tenants/:tenantId/sales/:saleId/customer": {
+    "POST /api/v1/pos/merchants/:merchantId/sales/:saleId/customer": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "RESOURCE_NOT_FOUND",
         "OPTIMISTIC_VERSION_CONFLICT"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "sale.lifecycle",
       "pin": false,
       "request": "AttachSaleCustomerRequest",
-      "response": "SaleSnapshot",
-      "tenantContext": true
+      "response": "SaleSnapshot"
     },
-    "POST /api/pos/tenants/:tenantId/sales/:saleId/rename": {
+    "POST /api/v1/pos/merchants/:merchantId/sales/:saleId/rename": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "OPTIMISTIC_VERSION_CONFLICT"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "sale.lifecycle",
       "pin": false,
       "request": "RenameSuspendedSaleRequest",
-      "response": "SaleSnapshot",
-      "tenantContext": true
+      "response": "SaleSnapshot"
     },
-    "POST /api/pos/tenants/:tenantId/sales/:saleId/resume": {
+    "POST /api/v1/pos/merchants/:merchantId/sales/:saleId/resume": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "OPTIMISTIC_VERSION_CONFLICT"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "sale.lifecycle",
       "pin": false,
       "request": "ResumeSaleRequest",
-      "response": "SaleSnapshot",
-      "tenantContext": true
+      "response": "SaleSnapshot"
     },
-    "POST /api/pos/tenants/:tenantId/sales/:saleId/suspend": {
+    "POST /api/v1/pos/merchants/:merchantId/sales/:saleId/suspend": {
       "approval": false,
       "auth": "operator-session",
-      "branchContext": true,
       "errors": [
         "PERMISSION_DENIED",
         "OPTIMISTIC_VERSION_CONFLICT"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
       "permission": "sale.lifecycle",
       "pin": false,
       "request": "SuspendSaleRequest",
-      "response": "SaleSnapshot",
-      "tenantContext": true
+      "response": "SaleSnapshot"
     },
-    "POST /api/tenants/:tenantId/devices/enrollment": {
-      "approval": true,
-      "auth": "session",
-      "branchContext": false,
+    "POST /api/v1/pos/operator-sessions": {
+      "approval": false,
+      "auth": "device",
       "errors": [
         "PERMISSION_DENIED",
-        "BRANCH_NOT_FOUND",
-        "RATE_LIMITED"
+        "DEVICE_REVOKED",
+        "LOCATION_SCOPE_VIOLATION",
+        "ENTITLEMENT_DISABLED"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
-      "permission": "devices.manage",
+      "permission": null,
       "pin": false,
-      "request": "BeginDeviceEnrollmentRequest",
-      "response": "DeviceEnrollmentRequestCreated",
-      "tenantContext": true
+      "request": "StartOperatorSessionRequest",
+      "response": "OperatorSessionView"
     },
-    "POST /api/tenants/:tenantId/devices/enrollment-requests/:requestId/approve": {
-      "approval": true,
-      "auth": "session",
-      "branchContext": false,
+    "POST /api/v1/pos/operator-sessions/:operatorSessionId/end": {
+      "approval": false,
+      "auth": "operator-session",
       "errors": [
         "PERMISSION_DENIED",
-        "ENROLLMENT_EXPIRED",
-        "CONFLICT"
+        "RESOURCE_NOT_FOUND"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
-      "permission": "devices.manage",
+      "permission": null,
       "pin": false,
-      "request": "DecideDeviceEnrollmentRequest",
-      "response": "DeviceEnrollmentDecision",
-      "tenantContext": true
+      "request": null,
+      "response": "OperatorSessionView"
     },
-    "POST /api/tenants/:tenantId/devices/enrollment-requests/:requestId/deny": {
-      "approval": true,
-      "auth": "session",
-      "branchContext": false,
+    "POST /api/v1/pos/operator-sessions/:operatorSessionId/lock": {
+      "approval": false,
+      "auth": "operator-session",
       "errors": [
         "PERMISSION_DENIED",
-        "ENROLLMENT_EXPIRED",
-        "CONFLICT"
+        "RESOURCE_NOT_FOUND"
       ],
       "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
       "offline": false,
-      "permission": "devices.manage",
+      "permission": null,
       "pin": false,
-      "request": "DecideDeviceEnrollmentRequest",
-      "response": "DeviceEnrollmentDecision",
-      "tenantContext": true
+      "request": null,
+      "response": "OperatorSessionView"
     }
   },
   "security": {
-    "branchContextValidatedByApi": true,
     "internalIdsExposed": false,
-    "serviceRoleExposed": false,
-    "tenantContextRequiredForTenantRoutes": true
+    "locationContextValidatedByApi": true,
+    "merchantContextRequiredForMerchantRoutes": true,
+    "serviceRoleExposed": false
   }
 }

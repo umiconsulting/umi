@@ -14,26 +14,25 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { GiftRedeemRequest, RegisterMemberRequest } from '@umi/contract';
-import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
-import { PublicTenantGuard } from '../auth/public-tenant.guard';
-import { PubTenant } from '../auth/current-user.decorator';
-import type { PublicTenant } from '../auth/public-tenant.guard';
+import { PublicMerchantGuard } from '../auth/public-merchant.guard';
+import { PubMerchant } from '../auth/current-user.decorator';
+import type { PublicMerchant } from '../auth/public-merchant.guard';
 import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 import { CashRegisterService } from './cash-register.service';
 import { CashWriteService } from './cash-write.service';
 import { CashWriteRepository } from './cash-write.repository';
+import { GiftRedeemDto, RegisterDto } from './dto/register.dto';
 
 const WINDOW = 15 * 60 * 1000; // 15 min, all gift limits
 
 /**
  * PUBLIC customer self-service (no login): registration + gift-card lookup/redeem.
- * PublicTenantGuard resolves `:slug` → tenant and seeds the RLS context so the
- * tenant-scoped repos work without an auth-set context. Abuse control is the
+ * PublicMerchantGuard resolves `:slug` → merchant and seeds the RLS context so the
+ * merchant-scoped repos work without an auth-set context. Abuse control is the
  * ported per-IP + per-code rate limiter (the only guard on these money-adjacent
- * routes). Tenant-not-found uses umi-cash's `Tenant no encontrado` body.
+ * routes). Merchant-not-found uses umi-cash's `Merchant no encontrado` body.
  */
-@UseGuards(PublicTenantGuard)
+@UseGuards(PublicMerchantGuard)
 @Controller('api/:slug')
 export class CashCustomerController {
   constructor(
@@ -46,16 +45,16 @@ export class CashCustomerController {
   @Post('customers')
   @HttpCode(201)
   registerCustomer(
-    @PubTenant() t: PublicTenant,
-    @Body(new ZodValidationPipe(RegisterMemberRequest)) dto: RegisterMemberRequest,
+    @PubMerchant() t: PublicMerchant,
+    @Body() dto: RegisterDto,
     @Headers('user-agent') ua?: string,
   ) {
-    return this.register.register(t.tenantId, t.name, dto, ua ?? null);
+    return this.register.register(t.merchantId, t.name, dto, ua ?? null);
   }
 
   @Get('gift/:code')
   async giftInfo(
-    @PubTenant() t: PublicTenant,
+    @PubMerchant() t: PublicMerchant,
     @Param('code') code: string,
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
@@ -64,16 +63,16 @@ export class CashCustomerController {
     this.guard(reply, `gift-lookup:${ip}`, 10);
     this.guard(reply, `gift-code:${code.toUpperCase()}`, 5);
 
-    const info = await this.cashRepo.giftCardInfo(t.tenantId, code.toUpperCase());
+    const info = await this.cashRepo.giftCardInfo(t.merchantId, code.toUpperCase());
     if (!info) throw new NotFoundException({ error: 'Código no válido' });
-    return { ...info, tenantName: t.name };
+    return { ...info, merchantName: t.name };
   }
 
   @Post('gift/:code')
   async giftRedeem(
-    @PubTenant() t: PublicTenant,
+    @PubMerchant() t: PublicMerchant,
     @Param('code') code: string,
-    @Body(new ZodValidationPipe(GiftRedeemRequest)) dto: GiftRedeemRequest,
+    @Body() dto: GiftRedeemDto,
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
@@ -84,7 +83,7 @@ export class CashCustomerController {
     if (!dto.phone && !dto.email) {
       throw new BadRequestException({ error: 'Se requiere teléfono o email para identificarte' });
     }
-    return this.cash.redeemGiftCard(t.tenantId, code, {
+    return this.cash.redeemGiftCard(t.merchantId, code, {
       phone: dto.phone,
       email: dto.email,
     });

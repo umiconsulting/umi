@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 
 import { useAuth, signOut } from '@/lib/auth.jsx';
-import { TenantProvider, useTenant } from '@/lib/tenant-context.jsx';
+import { MerchantProvider, useMerchant } from '@/lib/merchant-context.jsx';
 import {
   useTweaks,
   TweaksPanel,
@@ -11,7 +11,7 @@ import {
   TweakRadio,
   TweakToggle,
 } from './tweaks-panel.jsx';
-import { useTenantData, useKdsConnection } from './data.jsx';
+import { useMerchantData, useKdsConnection } from './data.jsx';
 import { Sidebar, Topbar } from './shell.jsx';
 
 import LoginScreen from '@/screens/login.jsx';
@@ -27,7 +27,7 @@ import HoursScreen from '@/screens/hours.jsx';
 import SettingsScreen from '@/screens/settings.jsx';
 import ProductsBillingScreen from '@/screens/products-billing.jsx';
 
-const TWEAK_DEFAULTS = { tenantHue: '#1A5632', density: 'comfy', lang: 'es' };
+const TWEAK_DEFAULTS = { merchantHue: '#1A5632', density: 'comfy', lang: 'es' };
 
 function ProductUnavailable({ moduleName = 'Modulo', product = 'producto' }) {
   return (
@@ -48,7 +48,7 @@ function ProductUnavailable({ moduleName = 'Modulo', product = 'producto' }) {
           <span>PRODUCTO NO ACTIVO</span>
         </div>
         <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>
-          {moduleName} no esta activo para este tenant
+          {moduleName} no esta activo para este merchant
         </h2>
         <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 620 }}>
           Este modulo depende de {product}. El super admin puede revisarlo en Products & Billing,
@@ -60,8 +60,8 @@ function ProductUnavailable({ moduleName = 'Modulo', product = 'producto' }) {
 }
 
 function GuardedScreen({ moduleKey, moduleName, product, children }) {
-  const tenantState = useTenant();
-  if (!tenantState?.canShowModule?.(moduleKey)) {
+  const merchantState = useMerchant();
+  if (!merchantState?.canShowModule?.(moduleKey)) {
     return <ProductUnavailable moduleName={moduleName} product={product} />;
   }
   return children;
@@ -73,9 +73,9 @@ function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [ordersPaused, setOrdersPaused] = useState(false);
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const tenantState = useTenant();
-  const { data: tenant } = useTenantData();
-  const tenantName = tenantState?.selectedTenant?.name || tenant?.name;
+  const merchantState = useMerchant();
+  const { data: merchant } = useMerchantData();
+  const merchantName = merchantState?.selectedMerchant?.name || merchant?.name;
   const connection = useKdsConnection();
 
   const rawScreen = location.pathname.split('/').filter(Boolean)[0] || 'overview';
@@ -83,9 +83,9 @@ function DashboardLayout() {
     rawScreen === 'conversations' || rawScreen === 'insights' ? 'customers' : rawScreen;
 
   useEffect(() => {
-    if (tenant?.primaryColor)
-      document.documentElement.style.setProperty('--tenant-brand', tenant.primaryColor);
-  }, [tenant?.primaryColor]);
+    if (merchant?.primaryColor)
+      document.documentElement.style.setProperty('--merchant-brand', merchant.primaryColor);
+  }, [merchant?.primaryColor]);
 
   useEffect(() => {
     document.documentElement.style.setProperty(
@@ -96,7 +96,7 @@ function DashboardLayout() {
 
   const nav = (id) => navigate('/' + (id === 'overview' ? '' : id));
 
-  if (tenantState?.loading && !tenantState?.capabilities) {
+  if (merchantState?.loading && !merchantState?.capabilities) {
     return (
       <div
         style={{
@@ -108,7 +108,7 @@ function DashboardLayout() {
           fontSize: 14,
         }}
       >
-        Cargando tenant...
+        Cargando merchant...
       </div>
     );
   }
@@ -120,22 +120,22 @@ function DashboardLayout() {
         onChange={nav}
         collapsed={collapsed}
         onToggleCollapse={() => setCollapsed((c) => !c)}
-        tenantName={tenantName}
-        navItems={tenantState?.visibleModules}
-        tenants={tenantState?.tenants}
-        selectedTenantId={tenantState?.selectedTenantId}
-        onTenantChange={tenantState?.setSelectedTenantId}
+        merchantName={merchantName}
+        navItems={merchantState?.visibleModules}
+        merchants={merchantState?.merchants}
+        selectedMerchantId={merchantState?.selectedMerchantId}
+        onMerchantChange={merchantState?.setSelectedMerchantId}
         onSignOut={signOut}
       />
       <main className="main">
         <Topbar
-          business={tenantName || 'Umi Dash'}
+          merchant={merchantName || 'Umi Dash'}
           status="ACTIVE"
           screen={screen}
-          tenantName={tenantName}
-          locations={tenantState?.capabilities?.locations || []}
-          selectedLocationId={tenantState?.selectedLocationId}
-          onLocationChange={tenantState?.setSelectedLocationId}
+          merchantName={merchantName}
+          locations={merchantState?.capabilities?.locations || []}
+          selectedLocationId={merchantState?.selectedLocationId}
+          onLocationChange={merchantState?.setSelectedLocationId}
           connection={connection}
         />
         <div className="screen-body" key={screen}>
@@ -214,12 +214,12 @@ function DashboardLayout() {
       <TweaksPanel title="Tweaks">
         <TweakSection title="Wallet card brand">
           <TweakColor
-            label="Quick tenant"
-            value={tweaks.tenantHue}
+            label="Quick merchant"
+            value={tweaks.merchantHue}
             options={['#B5605A', '#223979', '#5B7A4C', '#B5812A', '#7692CB', '#1F1410']}
             onChange={(v) => {
-              setTweak('tenantHue', v);
-              document.documentElement.style.setProperty('--tenant-brand', v);
+              setTweak('merchantHue', v);
+              document.documentElement.style.setProperty('--merchant-brand', v);
             }}
           />
         </TweakSection>
@@ -287,9 +287,9 @@ export default function App() {
         path="/*"
         element={
           <RequireAuth>
-            <TenantProvider>
+            <MerchantProvider>
               <DashboardLayout />
-            </TenantProvider>
+            </MerchantProvider>
           </RequireAuth>
         }
       />

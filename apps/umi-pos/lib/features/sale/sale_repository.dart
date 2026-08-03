@@ -3,45 +3,45 @@ import 'package:umi_contract/umi_contract.dart';
 import '../../core/network/api_client.dart';
 
 abstract interface class SaleRepository {
-  Future<SaleSnapshot> start(String tenantId, SaleContextRequest request);
-  Future<SaleSnapshot> current(String tenantId, SaleHistoryQuery query);
-  Future<SaleHistoryPage> history(String tenantId, SaleHistoryQuery query);
+  Future<SaleSnapshot> start(String merchantId, SaleContextRequest request);
+  Future<SaleSnapshot> current(String merchantId, SaleHistoryQuery query);
+  Future<SaleHistoryPage> history(String merchantId, SaleHistoryQuery query);
   Future<SaleSnapshot> suspend(
-    String tenantId,
+    String merchantId,
     String saleId,
     SuspendSaleRequest request,
   );
   Future<SaleSnapshot> resume(
-    String tenantId,
+    String merchantId,
     String saleId,
     ResumeSaleRequest request,
   );
   Future<SaleSnapshot> rename(
-    String tenantId,
+    String merchantId,
     String saleId,
     RenameSuspendedSaleRequest request,
   );
   Future<SaleSnapshot> cancel(
-    String tenantId,
+    String merchantId,
     String saleId,
     CancelSaleRequest request,
   );
   Future<SaleSnapshot> attachCustomer(
-    String tenantId,
+    String merchantId,
     String saleId,
     AttachSaleCustomerRequest request,
   );
   Future<SaleSnapshot> detachCustomer(
-    String tenantId,
+    String merchantId,
     String saleId,
     SaleMutationRequest request,
   );
   Future<PosCustomerSearchResult> customers(
-    String tenantId,
+    String merchantId,
     PosCustomerSearchQuery query,
   );
   Future<SaleReceiptResult> receipt(
-    String tenantId,
+    String merchantId,
     String saleId,
     SaleHistoryQuery query,
   );
@@ -53,46 +53,46 @@ final class ApiSaleRepository implements SaleRepository {
 
   @override
   Future<SaleSnapshot> start(
-    String tenantId,
+    String merchantId,
     SaleContextRequest request,
   ) async => SaleSnapshot.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: UmiRoutes.posSales(tenantId),
+      path: UmiRoutes.posSales(merchantId),
       body: request.toJson(),
       idempotent: true,
     ),
   );
 
   @override
-  Future<SaleSnapshot> current(String tenantId, SaleHistoryQuery query) async =>
+  Future<SaleSnapshot> current(String merchantId, SaleHistoryQuery query) async =>
       SaleSnapshot.fromJson(
         await _api.request(
           method: ApiMethod.get,
-          path: _query(UmiRoutes.posCurrentSale(tenantId), query),
+          path: _query(UmiRoutes.posCurrentSale(merchantId), query),
         ),
       );
 
   @override
   Future<SaleHistoryPage> history(
-    String tenantId,
+    String merchantId,
     SaleHistoryQuery query,
   ) async => SaleHistoryPage.fromJson(
     await _api.request(
       method: ApiMethod.get,
-      path: _query(UmiRoutes.posSales(tenantId), query),
+      path: _query(UmiRoutes.posSales(merchantId), query),
     ),
   );
 
   @override
   Future<SaleSnapshot> suspend(
-    String tenantId,
+    String merchantId,
     String saleId,
     SuspendSaleRequest request,
   ) async => SaleSnapshot.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: UmiRoutes.posSaleSuspend(tenantId, saleId),
+      path: UmiRoutes.posSaleSuspend(merchantId, saleId),
       body: request.toJson(),
       idempotent: true,
     ),
@@ -100,13 +100,13 @@ final class ApiSaleRepository implements SaleRepository {
 
   @override
   Future<SaleSnapshot> resume(
-    String tenantId,
+    String merchantId,
     String saleId,
     ResumeSaleRequest request,
   ) async => SaleSnapshot.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: UmiRoutes.posSaleResume(tenantId, saleId),
+      path: UmiRoutes.posSaleResume(merchantId, saleId),
       body: request.toJson(),
       idempotent: true,
     ),
@@ -114,13 +114,13 @@ final class ApiSaleRepository implements SaleRepository {
 
   @override
   Future<SaleSnapshot> rename(
-    String tenantId,
+    String merchantId,
     String saleId,
     RenameSuspendedSaleRequest request,
   ) async => SaleSnapshot.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: UmiRoutes.posSaleRename(tenantId, saleId),
+      path: UmiRoutes.posSaleRename(merchantId, saleId),
       body: request.toJson(),
       idempotent: true,
     ),
@@ -128,13 +128,13 @@ final class ApiSaleRepository implements SaleRepository {
 
   @override
   Future<SaleSnapshot> cancel(
-    String tenantId,
+    String merchantId,
     String saleId,
     CancelSaleRequest request,
   ) async => SaleSnapshot.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: UmiRoutes.posSaleCancel(tenantId, saleId),
+      path: UmiRoutes.posSaleCancel(merchantId, saleId),
       body: request.toJson(),
       idempotent: true,
     ),
@@ -142,13 +142,13 @@ final class ApiSaleRepository implements SaleRepository {
 
   @override
   Future<SaleSnapshot> attachCustomer(
-    String tenantId,
+    String merchantId,
     String saleId,
     AttachSaleCustomerRequest request,
   ) async => SaleSnapshot.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: UmiRoutes.posSaleCustomer(tenantId, saleId),
+      path: UmiRoutes.posSaleCustomerAttach(merchantId, saleId),
       body: request.toJson(),
       idempotent: true,
     ),
@@ -156,13 +156,13 @@ final class ApiSaleRepository implements SaleRepository {
 
   @override
   Future<SaleSnapshot> detachCustomer(
-    String tenantId,
+    String merchantId,
     String saleId,
     SaleMutationRequest request,
   ) async => SaleSnapshot.fromJson(
     await _api.request(
       method: ApiMethod.delete,
-      path: UmiRoutes.posSaleCustomer(tenantId, saleId),
+      path: UmiRoutes.posSaleCustomerDetach(merchantId, saleId),
       body: request.toJson(),
       idempotent: true,
     ),
@@ -170,15 +170,15 @@ final class ApiSaleRepository implements SaleRepository {
 
   @override
   Future<PosCustomerSearchResult> customers(
-    String tenantId,
+    String merchantId,
     PosCustomerSearchQuery query,
   ) async => PosCustomerSearchResult.fromJson(
     await _api.request(
       method: ApiMethod.get,
       path: Uri(
-        path: UmiRoutes.posSaleCustomers(tenantId),
+        path: UmiRoutes.posSaleCustomers(merchantId),
         queryParameters: {
-          'branchId': query.branchId,
+          'locationId': query.locationId,
           'operatorSessionId': query.operatorSessionId,
           'search': query.search ?? '',
           'recent': '${query.recent ?? false}',
@@ -190,20 +190,20 @@ final class ApiSaleRepository implements SaleRepository {
 
   @override
   Future<SaleReceiptResult> receipt(
-    String tenantId,
+    String merchantId,
     String saleId,
     SaleHistoryQuery query,
   ) async => SaleReceiptResult.fromJson(
     await _api.request(
       method: ApiMethod.get,
-      path: _query(UmiRoutes.posSaleReceipt(tenantId, saleId), query),
+      path: _query(UmiRoutes.posSaleReceipt(merchantId, saleId), query),
     ),
   );
 
   String _query(String path, SaleHistoryQuery query) => Uri(
     path: path,
     queryParameters: {
-      'branchId': query.branchId,
+      'locationId': query.locationId,
       'operatorSessionId': query.operatorSessionId,
       if (query.state != null) 'state': query.state!,
       if (query.search != null) 'search': query.search!,

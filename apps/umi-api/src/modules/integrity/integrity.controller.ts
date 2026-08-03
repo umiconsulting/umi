@@ -7,25 +7,25 @@ import {
 } from '@umi/contract';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { AuthGuard } from '../auth/auth.guard';
-import { TenantAccessGuard } from '../auth/tenant-access.guard';
-import { Tenant } from '../auth/current-user.decorator';
-import type { TenantAccess } from '../auth/auth.types';
+import { MerchantAccessGuard } from '../auth/merchant-access.guard';
+import { Merchant } from '../auth/current-user.decorator';
+import type { MerchantAccess } from '../auth/auth.types';
 import { RequirePermission } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { IntegrityRepository } from './integrity.repository';
 
-@UseGuards(AuthGuard, TenantAccessGuard, RolesGuard)
-@Controller('api/tenants/:tenantId/audit')
+@UseGuards(AuthGuard, MerchantAccessGuard, RolesGuard)
+@Controller('api/merchants/:merchantId/audit')
 export class IntegrityController {
   constructor(private readonly repository: IntegrityRepository) {}
 
   @Get()
   @RequirePermission('audit.read')
   async search(
-    @Tenant() tenant: TenantAccess,
+    @Merchant() merchant: MerchantAccess,
     @Query(new ZodValidationPipe(AuditSearchRequest)) query: AuditSearchInput,
   ) {
-    const rows = await this.repository.searchAudit(tenant.tenantId, {
+    const rows = await this.repository.searchAudit(merchant.merchantId, {
       ...query,
       limit: query.limit + 1,
     });

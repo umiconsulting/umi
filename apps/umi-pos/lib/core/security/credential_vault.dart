@@ -10,8 +10,8 @@ final class DeviceIdentity {
     this.publicId,
     this.credential,
     this.credentialVersion,
-    this.tenantId,
-    this.branchId,
+    this.merchantId,
+    this.locationId,
     this.state,
   });
   final String installationId;
@@ -19,8 +19,8 @@ final class DeviceIdentity {
   final String? publicId;
   final String? credential;
   final int? credentialVersion;
-  final String? tenantId;
-  final String? branchId;
+  final String? merchantId;
+  final String? locationId;
   final String? state;
   bool get isEnrolled =>
       deviceId != null && publicId != null && credential != null;
@@ -68,13 +68,13 @@ final class CredentialVault
     final deviceId = await _storage.read(_deviceId);
     final publicId = await _storage.read(_publicId);
     final credential = await _storage.read(_credential);
-    var tenantId = await _storage.read(_deviceTenant);
-    var branchId = await _storage.read(_deviceBranch);
+    var merchantId = await _storage.read(_deviceTenant);
+    var locationId = await _storage.read(_deviceBranch);
     if (deviceId != null && publicId != null && credential != null) {
-      tenantId ??= await _storage.read(_tenant);
-      branchId ??= await _storage.read(_branch);
-      if (tenantId != null) await _storage.write(_deviceTenant, tenantId);
-      if (branchId != null) await _storage.write(_deviceBranch, branchId);
+      merchantId ??= await _storage.read(_tenant);
+      locationId ??= await _storage.read(_branch);
+      if (merchantId != null) await _storage.write(_deviceTenant, merchantId);
+      if (locationId != null) await _storage.write(_deviceBranch, locationId);
     }
     return DeviceIdentity(
       installationId: installationId,
@@ -84,8 +84,8 @@ final class CredentialVault
       credentialVersion: int.tryParse(
         await _storage.read(_credentialVersion) ?? '',
       ),
-      tenantId: tenantId,
-      branchId: branchId,
+      merchantId: merchantId,
+      locationId: locationId,
       state: await _storage.read(_deviceState),
     );
   }
@@ -96,21 +96,21 @@ final class CredentialVault
     required String credential,
     required int credentialVersion,
     required String state,
-    String? tenantId,
-    String? branchId,
+    String? merchantId,
+    String? locationId,
   }) async {
     await _storage.write(_deviceId, id);
     await _storage.write(_publicId, publicId);
     await _storage.write(_credential, credential);
     await _storage.write(_credentialVersion, '$credentialVersion');
     await _storage.write(_deviceState, state);
-    if (tenantId != null) {
-      await _storage.write(_deviceTenant, tenantId);
-      await _storage.write(_tenant, tenantId);
+    if (merchantId != null) {
+      await _storage.write(_deviceTenant, merchantId);
+      await _storage.write(_tenant, merchantId);
     }
-    if (branchId != null) {
-      await _storage.write(_deviceBranch, branchId);
-      await _storage.write(_branch, branchId);
+    if (locationId != null) {
+      await _storage.write(_deviceBranch, locationId);
+      await _storage.write(_branch, locationId);
     }
   }
 
@@ -154,14 +154,14 @@ final class CredentialVault
   Future<String?> refreshToken() => _storage.read(_refresh);
   Future<void> saveOperatorSession(String id) => _storage.write(_operator, id);
 
-  Future<void> selectTenant(String tenantId) async {
-    await _storage.write(_tenant, tenantId);
+  Future<void> selectTenant(String merchantId) async {
+    await _storage.write(_tenant, merchantId);
     await _storage.delete(_branch);
     await _storage.delete(_operator);
   }
 
-  Future<void> selectBranch(String branchId) async {
-    await _storage.write(_branch, branchId);
+  Future<void> selectBranch(String locationId) async {
+    await _storage.write(_branch, locationId);
     await _storage.delete(_operator);
   }
 

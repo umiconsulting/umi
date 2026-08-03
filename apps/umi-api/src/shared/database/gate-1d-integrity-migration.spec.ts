@@ -2,22 +2,21 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const migration = readFileSync(
-  resolve(process.cwd(), '../../supabase/migrations/20260727000200_gate_1d_integrity.sql'),
-  'utf8',
-);
+const migration = ['20_merchant.sql', '30_runtime.sql', '60_triggers.sql', '90_rls.sql']
+  .map((file) => readFileSync(resolve(process.cwd(), `../../docs/migration/build-v3/${file}`), 'utf8'))
+  .join('\n');
 
 describe('Gate 1D integrity migration', () => {
   it('creates canonical idempotency and optimistic concurrency state', () => {
-    expect(migration).toContain('create table tenant.business_command');
-    expect(migration).toContain('unique (business_id, idempotency_key)');
-    expect(migration).toContain('create table tenant.aggregate_version');
-    expect(migration).toContain('force row level security');
+    expect(migration).toContain('create table merchant.business_command');
+    expect(migration).toContain('unique (merchant_id, idempotency_key)');
+    expect(migration).toContain('create table merchant.aggregate_version');
+    expect(migration).toMatch(/force\s+row level security/);
   });
 
   it('makes audit and financial events append-only', () => {
-    expect(migration).toContain('create table tenant.audit_event');
-    expect(migration).toContain('create table tenant.financial_event');
+    expect(migration).toContain('create table merchant.audit_event');
+    expect(migration).toContain('create table merchant.financial_event');
     expect(migration).toContain('audit_event_append_only');
     expect(migration).toContain('financial_event_append_only');
     expect(migration).not.toMatch(
@@ -32,8 +31,8 @@ describe('Gate 1D integrity migration', () => {
     );
   });
 
-  it('rejects cross-tenant branches and compensation references', () => {
-    expect(migration).toContain('branch_tenant_mismatch');
-    expect(migration).toContain('compensation_tenant_mismatch');
+  it('rejects cross-merchant locations and compensation references', () => {
+    expect(migration).toContain('location_merchant_mismatch');
+    expect(migration).toContain('compensation_merchant_mismatch');
   });
 });

@@ -3,9 +3,9 @@ import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 /**
  * Password hashing — preserves the dashboard's exact scrypt scheme so existing
- * `tenant.login` hashes verify without a forced reset (D9). The hash is
+ * `merchant.login` hashes verify without a forced reset (D9). The hash is
  * `scrypt(password, salt, 64)` hex; the salt is a 16-byte hex string. Both
- * columns (`password_salt`, `password_hash`) live in `tenant.login`.
+ * columns (`password_salt`, `password_hash`) live in `merchant.login`.
  *
  * Ported verbatim from `apps/umi-dashboard/server.js`
  * (`hashLocalPassword`/`verifyLocalPassword`) — do not change the parameters

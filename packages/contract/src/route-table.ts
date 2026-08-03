@@ -1,0 +1,1489 @@
+// THE route table. Every HTTP path literal in the Umi platform is written here
+// exactly once, and nowhere else.
+//
+// Three surfaces are DERIVED from this file. None of them may hold a path literal:
+//   - `src/routes.ts`      → the ergonomic accessor the dashboard and umi-cash import.
+//   - `src/catalog.ts`     → `routeCatalog`, the contract manifest (request/response/auth/…).
+//   - `scripts/generate.mjs` → the Dart `UmiRoutes` class the Flutter POS imports.
+//
+// Before this file existed there were three independent lists and they had already
+// drifted on four routes (`/api/auth/local/global-logout` was in two of them,
+// `POST /api/auth/pos/logout` in a different two). The rule is the same one that
+// governs data: one path, one author.
+//
+// ── Versioning ────────────────────────────────────────────────────────────────
+// The major version lives in the path, per the contract-seam decision. It is applied
+// to the surfaces that exist FOR the POS, because the POS is the one client that
+// lives in the field on an old build and must never silently receive new semantics:
+//
+//     /api/v1/auth/pos/**        POS authentication
+//     /api/v1/devices/**         device lifecycle (enrolment, status)
+//     /api/v1/merchants/:id/devices/**
+//     /api/v1/pos/**             the POS surface proper
+//
+// Everything else keeps its unversioned path. The dashboard, umi-cash and the KDS
+// deploy in lockstep with the API, so they gain nothing from a version segment and
+// renaming their routes would be churn. A route the POS calls is always versioned:
+// where a capability is shared, the POS gets its own versioned route in its own
+// namespace rather than reaching into an unversioned one. `auth.posGlobalLogout` is
+// the worked example.
+//
+// ── Scope boundary ────────────────────────────────────────────────────────────
+// This table covers the routes that `routes.ts` and `routeCatalog` already carried,
+// plus the whole POS and device surface. `apps/umi-api` exposes further handlers
+// (KDS dashboard, customers, hours, voice, leads, conversations) that no shared client
+// imports by path. Bringing those in is worthwhile and is deliberately NOT done here,
+// so that this change stays reviewable. The drift test asserts the direction that
+// matters today: every POS and device route in this table resolves to a live handler.
+//
+// This module imports nothing, so the dashboard can consume it without pulling zod
+// into its bundle.
+
+export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+
+/**
+ * How a caller proves who it is.
+ *   public            no credential
+ *   session           browser cookie session (dashboard, umi-cash)
+ *   refresh-cookie    the refresh cookie only
+ *   device            an enrolled device credential, no operator yet
+ *   operator-session  an enrolled device AND an open operator session
+ */
+export type AuthMode = 'public' | 'session' | 'refresh-cookie' | 'device' | 'operator-session';
+
+/** The contract facts for a route. Absent when the route is not yet specified. */
+export interface RouteContract {
+  /** Model name in `modelCatalog`, or null when the route takes no body. */
+  readonly request: string | null;
+  /** Model name in `modelCatalog`, or null when the route returns no body. */
+  readonly response: string | null;
+  readonly auth: AuthMode;
+  /** Permission key checked by the guard chain, or null. */
+  readonly permission: string | null;
+  /** True when a retry with the same Idempotency-Key must replay, not repeat. */
+  readonly idempotent: boolean;
+  readonly merchantContext: boolean;
+  readonly locationContext: boolean;
+  /** True when the command may be journaled and replayed from an offline device. */
+  readonly offline: boolean;
+  /** True when a fresh operator PIN is required. */
+  readonly pin: boolean;
+  /** True when a manager approval token is required. */
+  readonly approval: boolean;
+  readonly errors: readonly string[];
+}
+
+export interface RouteDef {
+  /** Stable dotted id. `routes.ts` and the Dart emitter address routes by this. */
+  readonly id: string;
+  readonly method: HttpMethod;
+  /** The one and only place this path is written. `:name` marks a parameter. */
+  readonly path: string;
+  /** Parameter names in path order. Drives the generated Dart builder signature. */
+  readonly params: readonly string[];
+  /** Member name on the generated Dart `UmiRoutes`, or null when the POS never calls it. */
+  readonly dart: string | null;
+  readonly contract?: RouteContract;
+}
+
+/**
+ * Prefix for a merchant-scoped resource. Exported because the dashboard composes
+ * ad-hoc sub-paths onto it; kept here so `/api/merchants` is also written once.
+ */
+export const merchantBase = (merchantId: string): string =>
+  `/api/merchants/${encodeURIComponent(merchantId)}`;
+
+const E: readonly string[] = [];
+
+const posMerchantRoute = (input: {
+  readonly id: string;
+  readonly method: HttpMethod;
+  readonly suffix: string;
+  readonly params?: readonly string[];
+  readonly dart: string;
+  readonly request: string | null;
+  readonly response: string | null;
+  readonly permission: string;
+  readonly pin?: boolean;
+  readonly approval?: boolean;
+  readonly errors?: readonly string[];
+}): RouteDef => ({
+  id: input.id,
+  method: input.method,
+  path: `/api/v1/pos/merchants/:merchantId${input.suffix}`,
+  params: ['merchantId', ...(input.params ?? E)],
+  dart: input.dart,
+  contract: {
+    request: input.request,
+    response: input.response,
+    auth: 'operator-session',
+    permission: input.permission,
+    idempotent: true,
+    merchantContext: true,
+    locationContext: true,
+    offline: false,
+    pin: input.pin ?? false,
+    approval: input.approval ?? false,
+    errors: input.errors ?? ['PERMISSION_DENIED', 'OPTIMISTIC_VERSION_CONFLICT'],
+  },
+});
+
+export const ROUTE_TABLE: readonly RouteDef[] = [
+  // ── Local authentication (dashboard, umi-cash) ─────────────────────────────
+  {
+    id: 'auth.login',
+    method: 'POST',
+    path: '/api/auth/local/login',
+    params: E,
+    dart: null,
+    contract: {
+      request: 'LoginRequest',
+      response: 'SessionResponse',
+      auth: 'public',
+      permission: null,
+      idempotent: false,
+      merchantContext: false,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'AUTHENTICATION_REQUIRED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'auth.refresh',
+    method: 'POST',
+    path: '/api/auth/local/refresh',
+    params: E,
+    dart: null,
+    contract: {
+      request: null,
+      response: 'SessionResponse',
+      auth: 'refresh-cookie',
+      permission: null,
+      idempotent: false,
+      merchantContext: false,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['AUTHENTICATION_REQUIRED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'auth.logout',
+    method: 'POST',
+    path: '/api/auth/local/logout',
+    params: E,
+    dart: null,
+    contract: {
+      request: null,
+      response: 'OkResponse',
+      auth: 'session',
+      permission: null,
+      idempotent: true,
+      merchantContext: false,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: E,
+    },
+  },
+  {
+    id: 'auth.globalLogout',
+    method: 'POST',
+    path: '/api/auth/local/global-logout',
+    params: E,
+    dart: null,
+    contract: {
+      request: 'GlobalLogoutRequest',
+      response: 'OkResponse',
+      auth: 'session',
+      permission: null,
+      idempotent: true,
+      merchantContext: false,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['AUTHENTICATION_REQUIRED'],
+    },
+  },
+  {
+    id: 'auth.forgotPassword',
+    method: 'POST',
+    path: '/api/auth/local/forgot-password',
+    params: E,
+    dart: null,
+    contract: {
+      request: 'ForgotPasswordRequest',
+      response: 'OkResponse',
+      auth: 'public',
+      permission: null,
+      idempotent: true,
+      merchantContext: false,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'auth.resetPassword',
+    method: 'POST',
+    path: '/api/auth/local/reset-password',
+    params: E,
+    dart: null,
+    contract: {
+      request: 'ResetPasswordRequest',
+      response: 'OkResponse',
+      auth: 'public',
+      permission: null,
+      idempotent: false,
+      merchantContext: false,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'AUTHENTICATION_REQUIRED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'auth.me',
+    method: 'GET',
+    path: '/api/auth/me',
+    params: E,
+    dart: null,
+    contract: {
+      request: null,
+      response: 'SessionResponse',
+      auth: 'session',
+      permission: null,
+      idempotent: true,
+      merchantContext: false,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['AUTHENTICATION_REQUIRED'],
+    },
+  },
+
+  // ── POS authentication (versioned: a field client depends on these) ────────
+  {
+    id: 'auth.posLogin',
+    method: 'POST',
+    path: '/api/v1/auth/pos/login',
+    params: E,
+    dart: 'posLogin',
+    contract: {
+      request: 'PosLoginRequest',
+      response: 'PosSessionResponse',
+      auth: 'device',
+      permission: null,
+      idempotent: false,
+      merchantContext: false,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'VALIDATION_FAILED',
+        'AUTHENTICATION_REQUIRED',
+        'DEVICE_REVOKED',
+        'ENTITLEMENT_DISABLED',
+        'RATE_LIMITED',
+      ],
+    },
+  },
+  {
+    id: 'auth.posPinLogin',
+    method: 'POST',
+    path: '/api/v1/auth/pos/pin-login',
+    params: E,
+    dart: 'posPinLogin',
+    contract: {
+      request: 'PosPinLoginRequest', response: 'PosSessionResponse', auth: 'device',
+      permission: null, idempotent: false, merchantContext: true, locationContext: true,
+      offline: false, pin: true, approval: false,
+      errors: ['VALIDATION_FAILED', 'AUTHENTICATION_REQUIRED', 'DEVICE_REVOKED', 'ENTITLEMENT_DISABLED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'auth.posRefresh',
+    method: 'POST',
+    path: '/api/v1/auth/pos/refresh',
+    params: E,
+    dart: 'posRefresh',
+    contract: {
+      request: 'PosRefreshRequest',
+      response: 'PosSessionResponse',
+      auth: 'device',
+      permission: null,
+      idempotent: false,
+      merchantContext: false,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['AUTHENTICATION_REQUIRED', 'DEVICE_REVOKED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'auth.posLogout',
+    method: 'POST',
+    path: '/api/v1/auth/pos/logout',
+    params: E,
+    dart: 'posLogout',
+    contract: {
+      request: null,
+      response: 'OkResponse',
+      auth: 'device',
+      permission: null,
+      idempotent: true,
+      merchantContext: false,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: E,
+    },
+  },
+  {
+    // The POS gets its own versioned route rather than calling the dashboard's
+    // unversioned `auth.globalLogout`. Same service behind it.
+    id: 'auth.posGlobalLogout',
+    method: 'POST',
+    path: '/api/v1/auth/pos/global-logout',
+    params: E,
+    dart: 'globalLogout',
+    contract: {
+      request: 'GlobalLogoutRequest',
+      response: 'OkResponse',
+      auth: 'device',
+      permission: null,
+      idempotent: true,
+      merchantContext: false,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['AUTHENTICATION_REQUIRED'],
+    },
+  },
+
+  // ── Tenancy ────────────────────────────────────────────────────────────────
+  {
+    id: 'me.merchants',
+    method: 'GET',
+    path: '/api/me/merchants',
+    params: E,
+    dart: null,
+    contract: {
+      request: null,
+      response: 'MeMerchantsResponse',
+      auth: 'session',
+      permission: null,
+      idempotent: true,
+      merchantContext: false,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['AUTHENTICATION_REQUIRED'],
+    },
+  },
+  {
+    id: 'merchants.capabilities',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/capabilities',
+    params: ['merchantId'],
+    dart: null,
+  },
+  {
+    id: 'merchants.settings',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/settings',
+    params: ['merchantId'],
+    dart: null,
+  },
+  {
+    id: 'merchants.locations',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/locations',
+    params: ['merchantId'],
+    dart: null,
+  },
+  {
+    id: 'merchants.audit',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/audit',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'AuditSearchRequest',
+      response: 'AuditSearchResponse',
+      auth: 'session',
+      permission: 'audit.read',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED'],
+    },
+  },
+
+  // ── Cash / loyalty, merchant-scoped (dashboard) ──────────────────────────────
+  {
+    id: 'cash.stats',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/cash/stats',
+    params: ['merchantId'],
+    dart: null,
+  },
+  {
+    id: 'cash.analytics',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/cash/analytics',
+    params: ['merchantId'],
+    dart: null,
+  },
+  {
+    id: 'cash.customers',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/cash/customers',
+    params: ['merchantId'],
+    dart: null,
+  },
+  {
+    id: 'cash.members',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/cash/members',
+    params: ['merchantId'],
+    dart: null,
+  },
+  {
+    id: 'cash.giftCards',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/cash/gift-cards',
+    params: ['merchantId'],
+    dart: null,
+  },
+  {
+    id: 'cash.rewardConfig',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/cash/reward-config',
+    params: ['merchantId'],
+    dart: null,
+  },
+
+  // ── Cash / loyalty, slug-scoped (umi-cash frontend) ────────────────────────
+  {
+    id: 'cash.slug.scan',
+    method: 'POST',
+    path: '/api/:slug/admin/scan',
+    params: ['slug'],
+    dart: null,
+    contract: {
+      request: 'ScanRequest',
+      response: null,
+      auth: 'session',
+      permission: null,
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'cash.slug.topup',
+    method: 'POST',
+    path: '/api/:slug/admin/topup',
+    params: ['slug'],
+    dart: null,
+    contract: {
+      request: 'TopupRequest',
+      response: null,
+      auth: 'session',
+      permission: null,
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'cash.slug.purchase',
+    method: 'POST',
+    path: '/api/:slug/admin/purchase',
+    params: ['slug'],
+    dart: null,
+    contract: {
+      request: 'PurchaseRequest',
+      response: null,
+      auth: 'session',
+      permission: null,
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'cash.slug.giftCards',
+    method: 'POST',
+    path: '/api/:slug/admin/gift-cards',
+    params: ['slug'],
+    dart: null,
+    contract: {
+      request: 'GiftCardCreateRequest',
+      response: null,
+      auth: 'session',
+      permission: null,
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'PERMISSION_DENIED'],
+    },
+  },
+  {
+    id: 'cash.slug.settings',
+    method: 'GET',
+    path: '/api/:slug/admin/settings',
+    params: ['slug'],
+    dart: null,
+  },
+  {
+    id: 'cash.slug.rewardConfig',
+    method: 'GET',
+    path: '/api/:slug/admin/reward-config',
+    params: ['slug'],
+    dart: null,
+  },
+  {
+    id: 'cash.slug.stats',
+    method: 'GET',
+    path: '/api/:slug/admin/stats',
+    params: ['slug'],
+    dart: null,
+  },
+  {
+    id: 'cash.slug.analytics',
+    method: 'GET',
+    path: '/api/:slug/admin/analytics',
+    params: ['slug'],
+    dart: null,
+  },
+  {
+    id: 'cash.slug.registerMember',
+    method: 'POST',
+    path: '/api/:slug/customers',
+    params: ['slug'],
+    dart: null,
+    contract: {
+      request: 'RegisterMemberRequest',
+      response: null,
+      auth: 'public',
+      permission: null,
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'cash.slug.gift',
+    method: 'POST',
+    path: '/api/:slug/gift/:code',
+    params: ['slug', 'code'],
+    dart: null,
+    contract: {
+      request: 'GiftRedeemRequest',
+      response: null,
+      auth: 'public',
+      permission: null,
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'RESOURCE_NOT_FOUND', 'RATE_LIMITED'],
+    },
+  },
+
+  // ── Staff ──────────────────────────────────────────────────────────────────
+  {
+    id: 'staff.create',
+    method: 'POST',
+    path: '/api/:slug/admin/staff',
+    params: ['slug'],
+    dart: null,
+    contract: {
+      request: 'CreateStaffRequest',
+      response: null,
+      auth: 'session',
+      permission: null,
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'PERMISSION_DENIED'],
+    },
+  },
+  {
+    id: 'staff.update',
+    method: 'PATCH',
+    path: '/api/:slug/admin/staff/:staffId',
+    params: ['slug', 'staffId'],
+    dart: null,
+    contract: {
+      request: 'UpdateStaffRequest',
+      response: null,
+      auth: 'session',
+      permission: null,
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+
+  // ── Device lifecycle (versioned) ───────────────────────────────────────────
+  {
+    id: 'devices.beginEnrollment',
+    method: 'POST',
+    path: '/api/v1/merchants/:merchantId/devices/enrollment',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'BeginDeviceEnrollmentRequest',
+      response: 'EnrollmentChallenge',
+      auth: 'session',
+      permission: 'device.enroll',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED', 'ENTITLEMENT_DISABLED'],
+    },
+  },
+  {
+    id: 'devices.completeEnrollment',
+    method: 'POST',
+    path: '/api/v1/devices/enrollment/complete',
+    params: E,
+    dart: 'deviceEnrollmentComplete',
+    contract: {
+      request: 'CompleteDeviceEnrollmentRequest',
+      response: 'DeviceCredentialEnvelope',
+      auth: 'public',
+      permission: null,
+      idempotent: true,
+      merchantContext: false,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'AUTHENTICATION_REQUIRED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'devices.status',
+    method: 'GET',
+    path: '/api/v1/devices/status',
+    params: E,
+    dart: 'deviceStatus',
+    contract: {
+      request: null,
+      response: 'DeviceSummary',
+      auth: 'device',
+      permission: null,
+      idempotent: true,
+      merchantContext: false,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['AUTHENTICATION_REQUIRED', 'DEVICE_REVOKED'],
+    },
+  },
+  {
+    id: 'devices.pairingClaim', method: 'POST', path: '/api/v1/devices/pairing/claim',
+    params: E, dart: 'devicePairingClaim',
+    contract: {
+      request: 'ClaimDevicePairingRequest', response: 'DevicePairingSession', auth: 'public',
+      permission: null, idempotent: false, merchantContext: false, locationContext: false,
+      offline: false, pin: false, approval: false, errors: ['ENROLLMENT_REJECTED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'devices.pairingPoll', method: 'POST',
+    path: '/api/v1/devices/pairing/:pairingSessionId/poll',
+    params: ['pairingSessionId'], dart: 'devicePairingPoll',
+    contract: {
+      request: 'PollDevicePairingRequest', response: 'DevicePairingPollResponse', auth: 'public',
+      permission: null, idempotent: true, merchantContext: false, locationContext: false,
+      offline: false, pin: false, approval: false, errors: ['ENROLLMENT_REJECTED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'devices.pairingAcknowledge', method: 'POST',
+    path: '/api/v1/devices/pairing/:pairingSessionId/acknowledge',
+    params: ['pairingSessionId'], dart: 'devicePairingAcknowledge',
+    contract: {
+      request: 'AcknowledgeDeviceCredentialRequest', response: 'DevicePairingAcknowledgement',
+      auth: 'public', permission: null, idempotent: true, merchantContext: false,
+      locationContext: false, offline: false, pin: false, approval: false,
+      errors: ['ENROLLMENT_REJECTED', 'RATE_LIMITED'],
+    },
+  },
+
+  // ── POS entry: operator sessions and elevation ─────────────────────────────
+  {
+    id: 'pos.entryContext',
+    method: 'GET',
+    path: '/api/v1/pos/entry-context',
+    params: E,
+    dart: 'posEntryContext',
+    contract: {
+      request: null,
+      response: 'EntryContextResponse',
+      auth: 'device',
+      permission: null,
+      idempotent: true,
+      merchantContext: false,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['AUTHENTICATION_REQUIRED', 'DEVICE_REVOKED', 'ENTITLEMENT_DISABLED'],
+    },
+  },
+  {
+    id: 'pos.operatorSessions',
+    method: 'POST',
+    path: '/api/v1/pos/operator-sessions',
+    params: E,
+    dart: 'operatorSessions',
+    contract: {
+      request: 'StartOperatorSessionRequest',
+      response: 'OperatorSessionView',
+      auth: 'device',
+      permission: null,
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'DEVICE_REVOKED',
+        'LOCATION_SCOPE_VIOLATION',
+        'ENTITLEMENT_DISABLED',
+      ],
+    },
+  },
+  {
+    id: 'pos.operatorLock',
+    method: 'POST',
+    path: '/api/v1/pos/operator-sessions/:operatorSessionId/lock',
+    params: ['operatorSessionId'],
+    dart: 'operatorLock',
+    contract: {
+      request: null,
+      response: 'OperatorSessionView',
+      auth: 'operator-session',
+      permission: null,
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'pos.operatorEnd',
+    method: 'POST',
+    path: '/api/v1/pos/operator-sessions/:operatorSessionId/end',
+    params: ['operatorSessionId'],
+    dart: 'operatorEnd',
+    contract: {
+      request: null,
+      response: 'OperatorSessionView',
+      auth: 'operator-session',
+      permission: null,
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'pos.verifyPin',
+    method: 'POST',
+    path: '/api/v1/pos/elevation/pin',
+    params: E,
+    dart: 'operatorPin',
+    contract: {
+      request: 'VerifyOperatorPinRequest',
+      response: 'ElevationGrantView',
+      auth: 'operator-session',
+      permission: null,
+      idempotent: false,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: true,
+      approval: false,
+      errors: ['AUTHENTICATION_REQUIRED', 'PERMISSION_DENIED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    id: 'pos.managerApproval',
+    method: 'POST',
+    path: '/api/v1/pos/elevation/manager-approval',
+    params: E,
+    dart: 'managerApproval',
+    contract: {
+      request: 'ManagerApprovalRequest',
+      response: 'ElevationGrantView',
+      auth: 'operator-session',
+      permission: null,
+      idempotent: false,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: true,
+      errors: ['AUTHENTICATION_REQUIRED', 'PERMISSION_DENIED', 'RATE_LIMITED'],
+    },
+  },
+
+  // ── POS catalog (read model) ───────────────────────────────────────────────
+  {
+    id: 'pos.catalogCategories',
+    method: 'GET',
+    path: '/api/v1/pos/merchants/:merchantId/catalog/categories',
+    params: ['merchantId'],
+    dart: 'posCatalogCategories',
+    contract: {
+      request: 'CatalogQuery',
+      response: 'CatalogCategoriesResponse',
+      auth: 'operator-session',
+      permission: 'catalog.read',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'LOCATION_SCOPE_VIOLATION'],
+    },
+  },
+  {
+    id: 'pos.catalogProducts',
+    method: 'GET',
+    path: '/api/v1/pos/merchants/:merchantId/catalog/products',
+    params: ['merchantId'],
+    dart: 'posCatalogProducts',
+    contract: {
+      request: 'CatalogQuery',
+      response: 'CatalogPage',
+      auth: 'operator-session',
+      permission: 'catalog.read',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'LOCATION_SCOPE_VIOLATION'],
+    },
+  },
+  {
+    id: 'pos.catalogProduct',
+    method: 'GET',
+    path: '/api/v1/pos/merchants/:merchantId/catalog/products/:productId',
+    params: ['merchantId', 'productId'],
+    dart: 'posCatalogProduct',
+    contract: {
+      request: 'CatalogQuery',
+      response: 'CatalogProductDetail',
+      auth: 'operator-session',
+      permission: 'catalog.read',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+
+  // ── POS cart ───────────────────────────────────────────────────────────────
+  {
+    id: 'pos.cartCreate',
+    method: 'POST',
+    path: '/api/v1/pos/merchants/:merchantId/cart',
+    params: ['merchantId'],
+    dart: 'posCart',
+    contract: {
+      request: 'CreateCartRequest',
+      response: 'Cart',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'IDEMPOTENCY_CONFLICT', 'LOCATION_SCOPE_VIOLATION'],
+    },
+  },
+  {
+    id: 'pos.cartGet',
+    method: 'GET',
+    path: '/api/v1/pos/merchants/:merchantId/cart',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'CartQuery',
+      response: 'Cart',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'pos.cartLines',
+    method: 'POST',
+    path: '/api/v1/pos/merchants/:merchantId/cart/lines',
+    params: ['merchantId'],
+    dart: 'posCartLines',
+    contract: {
+      request: 'CartLineInput',
+      response: 'Cart',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'OPTIMISTIC_VERSION_CONFLICT', 'IDEMPOTENCY_CONFLICT'],
+    },
+  },
+  {
+    id: 'pos.cartLineUpdate',
+    method: 'PATCH',
+    path: '/api/v1/pos/merchants/:merchantId/cart/lines/:lineId',
+    params: ['merchantId', 'lineId'],
+    dart: 'posCartLine',
+    contract: {
+      request: 'CartLineInput',
+      response: 'Cart',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'OPTIMISTIC_VERSION_CONFLICT', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'pos.cartLineRemove',
+    method: 'DELETE',
+    path: '/api/v1/pos/merchants/:merchantId/cart/lines/:lineId',
+    params: ['merchantId', 'lineId'],
+    dart: null,
+    contract: {
+      request: 'RemoveCartLineRequest',
+      response: 'Cart',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'OPTIMISTIC_VERSION_CONFLICT', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'pos.cartPrepare',
+    method: 'POST',
+    path: '/api/v1/pos/merchants/:merchantId/cart/prepare',
+    params: ['merchantId'],
+    dart: 'posCartPrepare',
+    contract: {
+      request: 'PrepareSaleRequest',
+      response: 'TotalsConfirmation',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'OPTIMISTIC_VERSION_CONFLICT', 'INVENTORY_UNAVAILABLE'],
+    },
+  },
+
+  // ── POS checkout ───────────────────────────────────────────────────────────
+  {
+    id: 'pos.checkout',
+    method: 'POST',
+    path: '/api/v1/pos/merchants/:merchantId/checkout',
+    params: ['merchantId'],
+    dart: 'posCheckout',
+    contract: {
+      request: 'CheckoutCommand',
+      response: 'CheckoutResult',
+      auth: 'operator-session',
+      permission: 'checkout.commit',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: true,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'INVENTORY_UNAVAILABLE',
+        'PAYMENT_UNKNOWN',
+        'OPTIMISTIC_VERSION_CONFLICT',
+        'IDEMPOTENCY_CONFLICT',
+      ],
+    },
+  },
+  {
+    id: 'pos.checkoutPayment',
+    method: 'GET',
+    path: '/api/v1/pos/merchants/:merchantId/checkout/payments/:paymentId',
+    params: ['merchantId', 'paymentId'],
+    dart: 'posCheckoutPayment',
+    contract: {
+      request: 'PaymentStatusQuery',
+      response: 'PaymentOutcome',
+      auth: 'operator-session',
+      permission: 'checkout.commit',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+
+  // ── POS offline replay ─────────────────────────────────────────────────────
+  {
+    id: 'pos.offlineReplayBegin',
+    method: 'POST',
+    path: '/api/v1/pos/merchants/:merchantId/offline/replay/begin',
+    params: ['merchantId'],
+    dart: 'posOfflineReplayBegin',
+    contract: {
+      request: 'BeginReplayRequest',
+      response: 'BeginReplayResponse',
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'DEVICE_REVOKED', 'LOCATION_SCOPE_VIOLATION'],
+    },
+  },
+  {
+    id: 'pos.offlinePolicy',
+    method: 'GET',
+    path: '/api/v1/pos/merchants/:merchantId/offline/policy',
+    params: ['merchantId'],
+    dart: 'posOfflinePolicy',
+    contract: {
+      request: 'ReplayContextQuery',
+      response: 'OfflinePolicy',
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'DEVICE_REVOKED', 'ENTITLEMENT_DISABLED'],
+    },
+  },
+  {
+    // Deliberately NOT idempotent: a lost response must be queried by command id
+    // before the same batch is sent again. See pos-offline replay engine.
+    id: 'pos.offlineReplayBatch',
+    method: 'POST',
+    path: '/api/v1/pos/merchants/:merchantId/offline/replay/batch',
+    params: ['merchantId'],
+    dart: 'posOfflineReplayBatch',
+    contract: {
+      request: 'ReplayBatch',
+      response: 'ReplayBatchResult',
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'IDEMPOTENCY_CONFLICT', 'DEVICE_REVOKED'],
+    },
+  },
+  {
+    id: 'pos.offlineReplayCursor',
+    method: 'GET',
+    path: '/api/v1/pos/merchants/:merchantId/offline/replay/cursor',
+    params: ['merchantId'],
+    dart: 'posOfflineReplayCursor',
+    contract: {
+      request: 'ReplayContextQuery',
+      response: 'ReplayCursor',
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED'],
+    },
+  },
+  {
+    id: 'pos.offlineReplayCommand',
+    method: 'GET',
+    path: '/api/v1/pos/merchants/:merchantId/offline/replay/commands/:commandId',
+    params: ['merchantId', 'commandId'],
+    dart: 'posOfflineReplayCommand',
+    contract: {
+      request: 'ReplayCommandResultQuery',
+      response: 'ReplayResult',
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'pos.offlineConflicts',
+    method: 'GET',
+    path: '/api/v1/pos/merchants/:merchantId/offline/conflicts',
+    params: ['merchantId'],
+    dart: 'posOfflineConflicts',
+    contract: {
+      request: 'ReplayContextQuery',
+      response: 'ConflictSummary',
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED'],
+    },
+  },
+  {
+    id: 'pos.offlineReconcile',
+    method: 'POST',
+    path: '/api/v1/pos/merchants/:merchantId/offline/reconcile',
+    params: ['merchantId'],
+    dart: 'posOfflineReconcile',
+    contract: {
+      request: 'ReconcileRequest',
+      response: 'ReconciliationSummary',
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED'],
+    },
+  },
+  {
+    id: 'pos.offlineReconcileAcknowledge',
+    method: 'POST',
+    path: '/api/v1/pos/merchants/:merchantId/offline/reconcile/acknowledge',
+    params: ['merchantId'],
+    dart: 'posOfflineReconcileAcknowledge',
+    contract: {
+      request: 'AcknowledgeReconciliationRequest',
+      response: null,
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED'],
+    },
+  },
+  {
+    id: 'pos.offlineDiagnostics',
+    method: 'GET',
+    path: '/api/v1/pos/merchants/:merchantId/offline/diagnostics',
+    params: ['merchantId'],
+    dart: 'posOfflineDiagnostics',
+    contract: {
+      request: null,
+      response: 'SafeReplayDiagnostic',
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED'],
+    },
+  },
+  posMerchantRoute({
+    id: 'pos.checkoutRecovery', method: 'GET', suffix: '/checkout/carts/:cartId',
+    params: ['cartId'], dart: 'posCheckoutRecovery', request: 'CheckoutRecoveryQuery',
+    response: 'CheckoutRecoverySnapshot', permission: 'checkout.commit',
+    errors: ['AUTHENTICATION_REQUIRED', 'PERMISSION_DENIED', 'RESOURCE_NOT_FOUND', 'DEVICE_REVOKED'],
+  }),
+  posMerchantRoute({
+    id: 'pos.cartClear', method: 'POST', suffix: '/cart/clear', dart: 'posCartClear',
+    request: 'ClearCartRequest', response: 'Cart', permission: 'cart.write',
+  }),
+  posMerchantRoute({
+    id: 'pos.checkoutCancel', method: 'POST', suffix: '/checkout/carts/:cartId/cancel',
+    params: ['cartId'], dart: 'posCheckoutCancel', request: 'CheckoutCancellationRequest',
+    response: 'CheckoutCancellationResult', permission: 'checkout.commit', approval: true,
+    errors: ['AUTHENTICATION_REQUIRED', 'PERMISSION_DENIED', 'CONFLICT', 'PAYMENT_OUTCOME_UNKNOWN', 'DEVICE_REVOKED'],
+  }),
+  posMerchantRoute({
+    id: 'pos.cashCenter', method: 'GET', suffix: '/cash', dart: 'posCashCenter',
+    request: 'CashCenterQuery', response: 'CashCenterSnapshot', permission: 'cash.shift.read',
+    errors: ['PERMISSION_DENIED', 'DEVICE_REVOKED'],
+  }),
+  posMerchantRoute({
+    id: 'pos.cashCommand', method: 'GET', suffix: '/cash/commands/:commandId',
+    params: ['commandId'], dart: 'posCashCommand', request: 'CashCommandRecoveryQuery',
+    response: 'CashCommandRecoveryResult', permission: 'cash.shift.read',
+    errors: ['PERMISSION_DENIED', 'DEVICE_REVOKED'],
+  }),
+  posMerchantRoute({
+    id: 'pos.cashShifts', method: 'POST', suffix: '/cash/shifts', dart: 'posCashShifts',
+    request: 'OpenCashShiftRequest', response: 'OpenCashShiftResult', permission: 'cash.shift.open',
+    errors: ['PERMISSION_DENIED', 'IDEMPOTENCY_CONFLICT', 'OPTIMISTIC_VERSION_CONFLICT'],
+  }),
+  posMerchantRoute({
+    id: 'pos.cashMovement', method: 'POST', suffix: '/cash/shifts/:shiftId/movements',
+    params: ['shiftId'], dart: 'posCashMovement', request: 'CashMovementRequest',
+    response: 'CashMovement', permission: 'cash.movement.*', approval: true,
+    errors: ['PERMISSION_DENIED', 'IDEMPOTENCY_CONFLICT', 'OPTIMISTIC_VERSION_CONFLICT'],
+  }),
+  posMerchantRoute({
+    id: 'pos.cashCount', method: 'POST', suffix: '/cash/shifts/:shiftId/counts',
+    params: ['shiftId'], dart: 'posCashCount', request: 'SubmitBlindCountRequest',
+    response: 'CashCountSummary', permission: 'cash.count.submit',
+    errors: ['PERMISSION_DENIED', 'IDEMPOTENCY_CONFLICT', 'OPTIMISTIC_VERSION_CONFLICT'],
+  }),
+  posMerchantRoute({
+    id: 'pos.cashRecount', method: 'POST', suffix: '/cash/shifts/:shiftId/counts/recount',
+    params: ['shiftId'], dart: 'posCashRecount', request: 'RecountRequest',
+    response: 'CashShift', permission: 'cash.count.recount',
+  }),
+  posMerchantRoute({
+    id: 'pos.cashVariance', method: 'POST', suffix: '/cash/shifts/:shiftId/variance',
+    params: ['shiftId'], dart: 'posCashVariance', request: 'ResolveCashVarianceRequest',
+    response: 'CashVarianceResolution', permission: 'cash.reconcile', approval: true,
+    errors: ['PERMISSION_DENIED', 'IDEMPOTENCY_CONFLICT'],
+  }),
+  posMerchantRoute({
+    id: 'pos.cashReconcile', method: 'POST', suffix: '/cash/shifts/:shiftId/reconcile',
+    params: ['shiftId'], dart: 'posCashReconcile', request: 'ReconcileCashShiftRequest',
+    response: 'ShiftReconciliation', permission: 'cash.reconcile',
+  }),
+  posMerchantRoute({
+    id: 'pos.cashClose', method: 'POST', suffix: '/cash/shifts/:shiftId/close',
+    params: ['shiftId'], dart: 'posCashClose', request: 'ShiftCloseRequest',
+    response: 'ShiftCloseResult', permission: 'cash.shift.close', approval: true,
+    errors: ['PERMISSION_DENIED', 'IDEMPOTENCY_CONFLICT', 'OPTIMISTIC_VERSION_CONFLICT'],
+  }),
+  posMerchantRoute({
+    id: 'pos.cashSuspend', method: 'POST', suffix: '/cash/shifts/:shiftId/suspend',
+    params: ['shiftId'], dart: 'posCashSuspend', request: 'ShiftTransitionRequest',
+    response: 'CashShift', permission: 'cash.shift.suspend',
+  }),
+  posMerchantRoute({
+    id: 'pos.cashResume', method: 'POST', suffix: '/cash/shifts/:shiftId/resume',
+    params: ['shiftId'], dart: 'posCashResume', request: 'ShiftTransitionRequest',
+    response: 'CashShift', permission: 'cash.shift.resume',
+  }),
+  posMerchantRoute({
+    id: 'pos.cashHandoff', method: 'POST', suffix: '/cash/shifts/:shiftId/handoff',
+    params: ['shiftId'], dart: 'posCashHandoff', request: 'ShiftHandoffRequest',
+    response: 'ShiftHandoff', permission: 'cash.shift.handoff', pin: true,
+    errors: ['PERMISSION_DENIED', 'RATE_LIMITED', 'OPTIMISTIC_VERSION_CONFLICT'],
+  }),
+  posMerchantRoute({
+    id: 'pos.cashNoSale', method: 'POST', suffix: '/cash/shifts/:shiftId/no-sale',
+    params: ['shiftId'], dart: 'posCashNoSale', request: 'NoSaleDrawerRequest',
+    response: 'NoSaleDrawerEvent', permission: 'cash.drawer.no_sale', approval: true,
+    errors: ['PERMISSION_DENIED', 'RATE_LIMITED'],
+  }),
+  posMerchantRoute({
+    id: 'pos.salesCreate', method: 'POST', suffix: '/sales', dart: 'posSales',
+    request: 'SaleContextRequest', response: 'SaleSnapshot', permission: 'sale.lifecycle',
+    errors: ['PERMISSION_DENIED', 'IDEMPOTENCY_CONFLICT'],
+  }),
+  posMerchantRoute({
+    id: 'pos.salesCurrent', method: 'GET', suffix: '/sales/current', dart: 'posCurrentSale',
+    request: 'SaleHistoryQuery', response: 'SaleSnapshot', permission: 'sale.lifecycle',
+    errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+  }),
+  posMerchantRoute({
+    id: 'pos.salesList', method: 'GET', suffix: '/sales', dart: 'posSaleHistory',
+    request: 'SaleHistoryQuery', response: 'SaleHistoryPage', permission: 'sale.lifecycle',
+    errors: ['PERMISSION_DENIED'],
+  }),
+  posMerchantRoute({
+    id: 'pos.saleSuspend', method: 'POST', suffix: '/sales/:saleId/suspend',
+    params: ['saleId'], dart: 'posSaleSuspend', request: 'SuspendSaleRequest',
+    response: 'SaleSnapshot', permission: 'sale.lifecycle',
+  }),
+  posMerchantRoute({
+    id: 'pos.saleResume', method: 'POST', suffix: '/sales/:saleId/resume',
+    params: ['saleId'], dart: 'posSaleResume', request: 'ResumeSaleRequest',
+    response: 'SaleSnapshot', permission: 'sale.lifecycle',
+  }),
+  posMerchantRoute({
+    id: 'pos.saleRename', method: 'POST', suffix: '/sales/:saleId/rename',
+    params: ['saleId'], dart: 'posSaleRename', request: 'RenameSuspendedSaleRequest',
+    response: 'SaleSnapshot', permission: 'sale.lifecycle',
+  }),
+  posMerchantRoute({
+    id: 'pos.saleCancel', method: 'POST', suffix: '/sales/:saleId/cancel',
+    params: ['saleId'], dart: 'posSaleCancel', request: 'CancelSaleRequest',
+    response: 'SaleSnapshot', permission: 'sale.lifecycle',
+  }),
+  posMerchantRoute({
+    id: 'pos.saleCustomerAttach', method: 'POST', suffix: '/sales/:saleId/customer',
+    params: ['saleId'], dart: 'posSaleCustomerAttach', request: 'AttachSaleCustomerRequest',
+    response: 'SaleSnapshot', permission: 'sale.lifecycle',
+    errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND', 'OPTIMISTIC_VERSION_CONFLICT'],
+  }),
+  posMerchantRoute({
+    id: 'pos.saleCustomerDetach', method: 'DELETE', suffix: '/sales/:saleId/customer',
+    params: ['saleId'], dart: 'posSaleCustomerDetach', request: 'SaleMutationRequest',
+    response: 'SaleSnapshot', permission: 'sale.lifecycle',
+  }),
+  posMerchantRoute({
+    id: 'pos.saleReceipt', method: 'GET', suffix: '/sales/:saleId/receipt',
+    params: ['saleId'], dart: 'posSaleReceipt', request: 'SaleHistoryQuery',
+    response: 'SaleReceiptResult', permission: 'sale.lifecycle',
+    errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+  }),
+  posMerchantRoute({
+    id: 'pos.saleCustomers', method: 'GET', suffix: '/sales/customers',
+    dart: 'posSaleCustomers', request: 'PosCustomerSearchQuery',
+    response: 'PosCustomerSearchResult', permission: 'sale.lifecycle', errors: ['PERMISSION_DENIED'],
+  }),
+];
+
+/** Route ids, for lookups that must fail at compile time when an id is wrong. */
+export type RouteId = (typeof ROUTE_TABLE)[number]['id'];
+
+const byId = new Map<string, RouteDef>(ROUTE_TABLE.map((r) => [r.id, r]));
+
+if (byId.size !== ROUTE_TABLE.length) {
+  throw new Error('ROUTE_TABLE contains duplicate route ids');
+}
+
+/** The route definition for an id. Throws on an unknown id — a typo must not ship. */
+export const route = (id: string): RouteDef => {
+  const found = byId.get(id);
+  if (!found) throw new Error(`Unknown route id: ${id}`);
+  return found;
+};
+
+/** The raw path template for an id, `:params` unsubstituted. */
+export const routePath = (id: string): string => route(id).path;
+
+/**
+ * The path for an id with its parameters substituted and percent-encoded.
+ * Throws when a parameter is missing, so a half-built URL cannot reach the network.
+ */
+export const buildPath = (id: string, params: Readonly<Record<string, string>> = {}): string => {
+  const def = route(id);
+  return def.path.replace(/:([A-Za-z0-9_]+)/g, (_match, name: string) => {
+    const value = params[name];
+    if (value === undefined) {
+      throw new Error(`Route ${id} is missing path parameter "${name}"`);
+    }
+    return encodeURIComponent(value);
+  });
+};

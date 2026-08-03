@@ -16,7 +16,7 @@ const toolUse = (name: string, input: Block = {}, id = 't1'): Block => ({
 });
 
 const CTX: ToolContext = {
-  tenantId: 't1',
+  merchantId: 't1',
   personId: 'p1',
   conversationId: 'c1',
   customerPhone: '+5210000000000',

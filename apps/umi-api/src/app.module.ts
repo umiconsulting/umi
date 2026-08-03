@@ -13,9 +13,9 @@ import { QueueModule } from './jobs/queue.module';
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { IdentityModule } from './modules/identity/identity.module';
-import { TenantsModule } from './modules/tenants/tenants.module';
+import { MerchantsModule } from './modules/merchants/merchants.module';
 import { StaffModule } from './modules/staff/staff.module';
-import { HoursModule } from './modules/hours/hours.module';
+import { BusinessHoursModule } from './modules/business-hours/business-hours.module';
 import { VoiceModule } from './modules/voice/voice.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { CashModule } from './modules/cash/cash.module';
@@ -52,9 +52,9 @@ import { PosCashModule } from './modules/pos-cash/pos-cash.module';
     HealthModule,
     AuthModule,
     IdentityModule,
-    TenantsModule,
+    MerchantsModule,
     StaffModule,
-    HoursModule,
+    BusinessHoursModule,
     VoiceModule,
     CustomersModule,
     CashModule,
@@ -81,9 +81,9 @@ import { PosCashModule } from './modules/pos-cash/pos-cash.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    // Establish the per-request AsyncLocalStorage context (tenant/user/requestId)
+    // Establish the per-request AsyncLocalStorage context (merchant/user/requestId)
     // for the whole request, so repositories can set RLS context. The AuthGuard
-    // (Phase 2) populates tenant/user into this context after authentication.
+    // (Phase 2) populates merchant/user into this context after authentication.
     // NestJS 11 uses path-to-regexp v8 — the bare '*' wildcard is deprecated;
     // '{*splat}' matches all paths including the root.
     consumer.apply(RequestContextMiddleware).forRoutes('{*splat}');

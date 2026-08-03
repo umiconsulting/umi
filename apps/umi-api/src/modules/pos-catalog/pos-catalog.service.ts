@@ -19,21 +19,21 @@ export class PosCatalogService {
     return parsed.data;
   }
 
-  async categories(user: AuthUser, tenantId: string, query: CatalogQueryType) {
-    await this.authorize(user, tenantId, query.branchId);
+  async categories(user: AuthUser, merchantId: string, query: CatalogQueryType) {
+    await this.authorize(user, merchantId, query.locationId);
     const [items, version] = await Promise.all([
-      this.repo.categories(tenantId),
-      this.repo.version(tenantId),
+      this.repo.categories(merchantId),
+      this.repo.version(merchantId),
     ]);
     return { items, catalogVersion: version.version, updatedAt: version.updatedAt };
   }
 
-  async products(user: AuthUser, tenantId: string, query: CatalogQueryType) {
-    await this.authorize(user, tenantId, query.branchId);
+  async products(user: AuthUser, merchantId: string, query: CatalogQueryType) {
+    await this.authorize(user, merchantId, query.locationId);
     const cursor = query.cursor ? this.decodeCursor(query.cursor) : null;
     const rows = await this.repo.products({
-      tenantId,
-      branchId: query.branchId,
+      merchantId,
+      locationId: query.locationId,
       categoryId: query.categoryId,
       search: query.search,
       barcode: query.barcode,
@@ -44,7 +44,7 @@ export class PosCatalogService {
     const more = rows.length > query.limit;
     const items = rows.slice(0, query.limit);
     const last = more ? items.at(-1) : null;
-    const version = await this.repo.version(tenantId);
+    const version = await this.repo.version(merchantId);
     return {
       items,
       nextCursor: last ? this.encodeCursor(last.name, last.id) : null,
@@ -53,16 +53,16 @@ export class PosCatalogService {
     };
   }
 
-  async detail(user: AuthUser, tenantId: string, productId: string, query: CatalogQueryType) {
-    await this.authorize(user, tenantId, query.branchId);
-    const item = await this.repo.detail(tenantId, query.branchId, productId);
+  async detail(user: AuthUser, merchantId: string, productId: string, query: CatalogQueryType) {
+    await this.authorize(user, merchantId, query.locationId);
+    const item = await this.repo.detail(merchantId, query.locationId, productId);
     if (!item) throw new NotFoundException({ code: 'RESOURCE_NOT_FOUND' });
     return item;
   }
 
-  private async authorize(user: AuthUser, tenantId: string, branchId: string) {
+  private async authorize(user: AuthUser, merchantId: string, locationId: string) {
     if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
-    if (!(await this.repo.authorize(user.id, user.sessionId, user.deviceId, tenantId, branchId))) {
+    if (!(await this.repo.authorize(user.id, user.sessionId, user.deviceId, merchantId, locationId))) {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
     }
   }

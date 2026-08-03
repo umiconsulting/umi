@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
-import { TenantsModule } from '../tenants/tenants.module';
+import { MerchantsModule } from '../merchants/merchants.module';
 import { KdsController } from './kds.controller';
 import { KdsAdminController, KdsDashboardController } from './kds-dashboard.controller';
 import { KdsService } from './kds.service';
@@ -19,7 +19,7 @@ import { KdsRepository } from './kds.repository';
  * already deliver as `twilio.status_notification` / `twilio.cancel_notification`.
  */
 @Module({
-  imports: [AuthModule, TenantsModule],
+  imports: [AuthModule, MerchantsModule],
   controllers: [KdsController, KdsDashboardController, KdsAdminController],
   providers: [KdsService, KdsRepository],
 })

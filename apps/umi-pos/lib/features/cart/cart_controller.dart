@@ -26,30 +26,30 @@ final class CartController extends ChangeNotifier {
   final Telemetry _telemetry;
   CartState _state = const CartState();
   CartState get state => _state;
-  String? _tenantId;
-  String? _branchId;
+  String? _merchantId;
+  String? _locationId;
   String? _operatorSessionId;
 
   Future<void> open(
-    String tenantId,
-    String branchId,
+    String merchantId,
+    String locationId,
     String operatorSessionId,
   ) async {
-    final key = '$tenantId:$branchId:$operatorSessionId';
-    if ('$_tenantId:$_branchId:$_operatorSessionId' == key &&
+    final key = '$merchantId:$locationId:$operatorSessionId';
+    if ('$_merchantId:$_locationId:$_operatorSessionId' == key &&
         _state.cart != null) {
       return;
     }
     clearLocal();
-    _tenantId = tenantId;
-    _branchId = branchId;
+    _merchantId = merchantId;
+    _locationId = locationId;
     _operatorSessionId = operatorSessionId;
     _set(const CartState(phase: CartPhase.loading));
     try {
       final cart = await _repository.create(
-        tenantId,
+        merchantId,
         CreateCartRequest(
-          branchId: branchId,
+          locationId: locationId,
           operatorSessionId: operatorSessionId,
           idempotencyKey: _uuid(),
         ),
@@ -62,8 +62,8 @@ final class CartController extends ChangeNotifier {
   }
 
   void restore(Cart cart) {
-    _tenantId = cart.tenantId;
-    _branchId = cart.branchId;
+    _merchantId = cart.merchantId;
+    _locationId = cart.locationId;
     _operatorSessionId = cart.operatorSessionId;
     _set(CartState(phase: CartPhase.ready, cart: cart));
   }
@@ -77,17 +77,17 @@ final class CartController extends ChangeNotifier {
   }) async {
     final cart = _state.cart;
     if (cart == null ||
-        _tenantId == null ||
-        _branchId == null ||
+        _merchantId == null ||
+        _locationId == null ||
         _operatorSessionId == null) {
       return;
     }
     await _mutation(
       () => _repository.add(
-        _tenantId!,
+        _merchantId!,
         CartLineInput(
           cartId: cart.id,
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           productId: productId,
           variantId: variantId,
@@ -110,11 +110,11 @@ final class CartController extends ChangeNotifier {
     if (cart == null) return;
     await _mutation(
       () => _repository.update(
-        _tenantId!,
+        _merchantId!,
         item.id,
         CartLineInput(
           cartId: cart.id,
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           productId: item.productId,
           variantId: item.variant?['variantId'] as String?,
@@ -141,11 +141,11 @@ final class CartController extends ChangeNotifier {
     if (cart == null) return;
     await _mutation(
       () => _repository.remove(
-        _tenantId!,
+        _merchantId!,
         item.id,
         RemoveCartLineRequest(
           cartId: cart.id,
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           expectedVersion: cart.version,
           idempotencyKey: _uuid(),
@@ -160,10 +160,10 @@ final class CartController extends ChangeNotifier {
     if (cart == null || cart.items.isEmpty) return;
     await _mutation(
       () => _repository.clear(
-        _tenantId!,
+        _merchantId!,
         ClearCartRequest(
           cartId: cart.id,
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           expectedVersion: cart.version,
           idempotencyKey: _uuid(),
@@ -184,11 +184,11 @@ final class CartController extends ChangeNotifier {
     if (cart == null) return;
     await _mutation(
       () => _repository.update(
-        _tenantId!,
+        _merchantId!,
         item.id,
         CartLineInput(
           cartId: cart.id,
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           productId: item.productId,
           variantId: variantId,
@@ -208,10 +208,10 @@ final class CartController extends ChangeNotifier {
     if (cart == null || cart.items.isEmpty) return;
     await _mutation(
       () => _repository.prepare(
-        _tenantId!,
+        _merchantId!,
         PrepareSaleRequest(
           cartId: cart.id,
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           expectedVersion: cart.version,
           idempotencyKey: _uuid(),
@@ -224,13 +224,13 @@ final class CartController extends ChangeNotifier {
   void clearLocal() {
     if (_state.phase == CartPhase.idle &&
         _state.cart == null &&
-        _tenantId == null &&
-        _branchId == null &&
+        _merchantId == null &&
+        _locationId == null &&
         _operatorSessionId == null) {
       return;
     }
-    _tenantId = null;
-    _branchId = null;
+    _merchantId = null;
+    _locationId = null;
     _operatorSessionId = null;
     _state = const CartState();
     notifyListeners();

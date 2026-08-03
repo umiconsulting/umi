@@ -34,7 +34,7 @@ export class IntegrityService {
         claimVersion: (aggregateType, aggregateId, expectedVersion) =>
           this.repository.claimVersion(
             client,
-            command.tenantId,
+            command.merchantId,
             aggregateType,
             aggregateId,
             expectedVersion,
@@ -44,7 +44,7 @@ export class IntegrityService {
         appendFinancial: async (event, expectedVersion) => {
           const version = await this.repository.claimVersion(
             client,
-            command.tenantId,
+            command.merchantId,
             event.aggregateType,
             event.aggregateId,
             expectedVersion,
@@ -56,7 +56,7 @@ export class IntegrityService {
       if (!outcome.ok) {
         await this.repository.fail(
           client,
-          command.tenantId,
+          command.merchantId,
           command.idempotencyKey,
           outcome.code,
           outcome.failureClass,
@@ -65,14 +65,14 @@ export class IntegrityService {
       } else {
         await this.repository.succeed(
           client,
-          command.tenantId,
+          command.merchantId,
           command.idempotencyKey,
           outcome.value,
         );
       }
       const completed = await this.repository.getCommand(
         client,
-        command.tenantId,
+        command.merchantId,
         command.idempotencyKey,
       );
       return this.repository.result<T>(completed, false);

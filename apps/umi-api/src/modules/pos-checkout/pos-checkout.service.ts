@@ -42,12 +42,12 @@ export class PosCheckoutService {
     private readonly integrity: IntegrityService,
   ) {}
 
-  async checkout(user: AuthUser, tenantId: string, dto: CheckoutCommand) {
-    const authorization = await this.authorize(user, tenantId, dto.branchId, dto.operatorSessionId);
+  async checkout(user: AuthUser, merchantId: string, dto: CheckoutCommand) {
+    const authorization = await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId);
     const result = await this.integrity.execute<CheckoutResult>(
       {
-        tenantId,
-        branchId: dto.branchId,
+        merchantId,
+        locationId: dto.locationId,
         commandId: dto.commandId ?? randomUUID(),
         idempotencyKey: dto.idempotencyKey,
         commandType: 'pos.checkout',
@@ -56,8 +56,8 @@ export class PosCheckoutService {
       async (context) => {
         const cart = await this.repo.lockCart(
           context.client,
-          tenantId,
-          dto.branchId,
+          merchantId,
+          dto.locationId,
           dto.operatorSessionId,
           dto.cartId,
           dto.expectedCartVersion,
@@ -82,8 +82,8 @@ export class PosCheckoutService {
         }
         const policy = await this.repo.policy(
           context.client,
-          tenantId,
-          dto.branchId,
+          merchantId,
+          dto.locationId,
           repriced.public.totals.grandTotal.currency,
         );
         const calculation = calculateCheckout(
@@ -270,8 +270,8 @@ export class PosCheckoutService {
         if (requiredApprovals.length) {
           const approval = await this.repo.consumeApprovals(context.client, dto.approvalIds, {
             sessionId: user.sessionId,
-            tenantId,
-            branchId: dto.branchId,
+            merchantId,
+            locationId: dto.locationId,
             permissions: requiredApprovals,
             fingerprint: confirmed.fingerprint,
             commandId: context.commandId,
@@ -370,16 +370,16 @@ export class PosCheckoutService {
     return result.result;
   }
 
-  async recovery(user: AuthUser, tenantId: string, cartId: string, query: CheckoutRecoveryQuery) {
+  async recovery(user: AuthUser, merchantId: string, cartId: string, query: CheckoutRecoveryQuery) {
     const authorization = await this.authorize(
       user,
-      tenantId,
-      query.branchId,
+      merchantId,
+      query.locationId,
       query.operatorSessionId,
     );
     const snapshot = await this.repo.recovery(
-      tenantId,
-      query.branchId,
+      merchantId,
+      query.locationId,
       query.operatorSessionId,
       cartId,
       user.id,
@@ -390,8 +390,8 @@ export class PosCheckoutService {
     return snapshot;
   }
 
-  async cancel(user: AuthUser, tenantId: string, cartId: string, dto: CheckoutCancellationRequest) {
-    await this.authorize(user, tenantId, dto.branchId, dto.operatorSessionId);
+  async cancel(user: AuthUser, merchantId: string, cartId: string, dto: CheckoutCancellationRequest) {
+    await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId);
     const result = await this.integrity.execute<{
       cartId: string;
       checkoutId: string | null;
@@ -399,8 +399,8 @@ export class PosCheckoutService {
       cancelledAt: string;
     }>(
       {
-        tenantId,
-        branchId: dto.branchId,
+        merchantId,
+        locationId: dto.locationId,
         commandId: randomUUID(),
         idempotencyKey: dto.idempotencyKey,
         commandType: 'pos.checkout.cancel',
@@ -409,8 +409,8 @@ export class PosCheckoutService {
       async (context) => {
         const cancelled = await this.repo.cancelDraft(
           context.client,
-          tenantId,
-          dto.branchId,
+          merchantId,
+          dto.locationId,
           dto.operatorSessionId,
           cartId,
         );
@@ -449,12 +449,12 @@ export class PosCheckoutService {
 
   async paymentStatus(
     user: AuthUser,
-    tenantId: string,
+    merchantId: string,
     paymentId: string,
     query: PaymentStatusQuery,
   ) {
-    await this.authorize(user, tenantId, query.branchId, query.operatorSessionId);
-    const value = await this.repo.paymentStatus(tenantId, query.branchId, paymentId);
+    await this.authorize(user, merchantId, query.locationId, query.operatorSessionId);
+    const value = await this.repo.paymentStatus(merchantId, query.locationId, paymentId);
     if (!value) throw new NotFoundException({ code: 'RESOURCE_NOT_FOUND' });
     return value;
   }
@@ -471,7 +471,7 @@ export class PosCheckoutService {
     for (const line of cart.lines) {
       const input: CartLineInput = {
         cartId: cart.id,
-        branchId: cart.branchId,
+        locationId: cart.locationId,
         operatorSessionId: cart.operatorSessionId,
         productId: line.productId,
         variantId: line.variantId,
@@ -481,7 +481,7 @@ export class PosCheckoutService {
         expectedVersion: cart.version,
         idempotencyKey,
       };
-      const priced = await this.carts.price(client, cart.tenantId, cart.branchId, input);
+      const priced = await this.carts.price(client, cart.merchantId, cart.locationId, input);
       if (!priced) return null;
       fresh.push({ line, priced });
     }
@@ -581,8 +581,8 @@ export class PosCheckoutService {
     const now = new Date().toISOString();
     return {
       receiptRef: `POS-${payments[0].attempt.id}`,
-      tenantId: cart.tenantId,
-      branchId: cart.branchId,
+      merchantId: cart.merchantId,
+      locationId: cart.locationId,
       issuedAt: now,
       businessDate: cart.businessDate,
       lines: lineSnapshot.map((item) => ({
@@ -602,8 +602,8 @@ export class PosCheckoutService {
       discountTotal: confirmation.discounts.total,
       currency: confirmation.totals.grandTotal.currency,
       version: 1,
-      tenantName: cart.tenantName,
-      branchName: cart.branchName,
+      merchantName: cart.merchantName,
+      locationName: cart.locationName,
       operatorName: cart.operatorName,
       payment: {
         method: payments[0].attempt.method,
@@ -700,8 +700,8 @@ export class PosCheckoutService {
 
   private async authorize(
     user: AuthUser,
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     operatorSessionId: string,
   ) {
     if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
@@ -709,8 +709,8 @@ export class PosCheckoutService {
       user.id,
       user.sessionId,
       user.deviceId,
-      tenantId,
-      branchId,
+      merchantId,
+      locationId,
       operatorSessionId,
     );
     if (!authorization) {

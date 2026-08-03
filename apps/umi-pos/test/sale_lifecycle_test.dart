@@ -11,15 +11,15 @@ import 'package:umi_pos/features/sale/sale_lifecycle_controller.dart';
 import 'package:umi_pos/features/sale/sale_repository.dart';
 import 'package:umi_pos/features/sale/sale_surface.dart';
 
-const tenantId = '00000000-0000-4000-8000-000000000001';
-const branchId = '00000000-0000-4000-8000-000000000002';
+const merchantId = '00000000-0000-4000-8000-000000000001';
+const locationId = '00000000-0000-4000-8000-000000000002';
 const operatorId = '00000000-0000-4000-8000-000000000003';
 const saleId = '00000000-0000-4000-8000-000000000004';
 
 Cart cart({String id = saleId, int version = 1}) => Cart(
   id: id,
-  tenantId: tenantId,
-  branchId: branchId,
+  merchantId: merchantId,
+  locationId: locationId,
   operatorSessionId: operatorId,
   status: 'draft',
   version: version,
@@ -75,7 +75,7 @@ final class _Sales implements SaleRepository {
   String? historyNextCursor;
 
   @override
-  Future<SaleSnapshot> current(String tenantId, SaleHistoryQuery query) async {
+  Future<SaleSnapshot> current(String merchantId, SaleHistoryQuery query) async {
     if (currentSale == null) {
       throw const AppException(
         category: AppErrorCategory.unknown,
@@ -88,7 +88,7 @@ final class _Sales implements SaleRepository {
 
   @override
   Future<SaleSnapshot> start(
-    String tenantId,
+    String merchantId,
     SaleContextRequest request,
   ) async {
     starts++;
@@ -101,7 +101,7 @@ final class _Sales implements SaleRepository {
 
   @override
   Future<SaleSnapshot> suspend(
-    String tenantId,
+    String merchantId,
     String saleId,
     SuspendSaleRequest request,
   ) async {
@@ -116,7 +116,7 @@ final class _Sales implements SaleRepository {
 
   @override
   Future<SaleSnapshot> resume(
-    String tenantId,
+    String merchantId,
     String saleId,
     ResumeSaleRequest request,
   ) async {
@@ -130,7 +130,7 @@ final class _Sales implements SaleRepository {
 
   @override
   Future<SaleSnapshot> rename(
-    String tenantId,
+    String merchantId,
     String saleId,
     RenameSuspendedSaleRequest request,
   ) async {
@@ -144,7 +144,7 @@ final class _Sales implements SaleRepository {
 
   @override
   Future<SaleSnapshot> cancel(
-    String tenantId,
+    String merchantId,
     String saleId,
     CancelSaleRequest request,
   ) async {
@@ -158,7 +158,7 @@ final class _Sales implements SaleRepository {
 
   @override
   Future<SaleSnapshot> attachCustomer(
-    String tenantId,
+    String merchantId,
     String saleId,
     AttachSaleCustomerRequest request,
   ) async {
@@ -175,7 +175,7 @@ final class _Sales implements SaleRepository {
 
   @override
   Future<SaleSnapshot> detachCustomer(
-    String tenantId,
+    String merchantId,
     String saleId,
     SaleMutationRequest request,
   ) async {
@@ -186,7 +186,7 @@ final class _Sales implements SaleRepository {
 
   @override
   Future<SaleHistoryPage> history(
-    String tenantId,
+    String merchantId,
     SaleHistoryQuery query,
   ) async {
     lastHistoryQuery = query;
@@ -201,13 +201,13 @@ final class _Sales implements SaleRepository {
 
   @override
   Future<PosCustomerSearchResult> customers(
-    String tenantId,
+    String merchantId,
     PosCustomerSearchQuery query,
   ) async => const PosCustomerSearchResult(items: []);
 
   @override
   Future<SaleReceiptResult> receipt(
-    String tenantId,
+    String merchantId,
     String saleId,
     SaleHistoryQuery query,
   ) async {
@@ -223,29 +223,29 @@ final class _Sales implements SaleRepository {
 
 final class _Carts implements CartRepository {
   @override
-  Future<Cart> create(String tenantId, CreateCartRequest request) async =>
+  Future<Cart> create(String merchantId, CreateCartRequest request) async =>
       cart();
   @override
-  Future<Cart> read(String tenantId, CartQuery query) async => cart();
+  Future<Cart> read(String merchantId, CartQuery query) async => cart();
   @override
-  Future<Cart> add(String tenantId, CartLineInput input) async => cart();
+  Future<Cart> add(String merchantId, CartLineInput input) async => cart();
   @override
   Future<Cart> update(
-    String tenantId,
+    String merchantId,
     String lineId,
     CartLineInput input,
   ) async => cart();
   @override
   Future<Cart> remove(
-    String tenantId,
+    String merchantId,
     String lineId,
     RemoveCartLineRequest input,
   ) async => cart();
   @override
-  Future<Cart> prepare(String tenantId, PrepareSaleRequest input) async =>
+  Future<Cart> prepare(String merchantId, PrepareSaleRequest input) async =>
       cart();
   @override
-  Future<Cart> clear(String tenantId, ClearCartRequest input) async => cart();
+  Future<Cart> clear(String merchantId, ClearCartRequest input) async => cart();
 }
 
 CartController _cartController() => CartController(
@@ -284,7 +284,7 @@ void main() {
     () async {
       final sales = _Sales();
       final lifecycle = _controller(sales);
-      await lifecycle.open(tenantId, branchId, operatorId);
+      await lifecycle.open(merchantId, locationId, operatorId);
       expect(lifecycle.state.phase, SalePhase.buildingCart);
       expect(lifecycle.state.sale?.id, saleId);
       expect(sales.starts, 0);
@@ -294,16 +294,16 @@ void main() {
   test('startup creates one sale only when no active sale exists', () async {
     final sales = _Sales()..currentSale = null;
     final lifecycle = _controller(sales);
-    await lifecycle.open(tenantId, branchId, operatorId);
+    await lifecycle.open(merchantId, locationId, operatorId);
     expect(sales.starts, 1);
-    await lifecycle.open(tenantId, branchId, operatorId);
+    await lifecycle.open(merchantId, locationId, operatorId);
     expect(sales.starts, 1);
   });
 
   test('suspending the same sale twice creates one transition', () async {
     final sales = _Sales();
     final lifecycle = _controller(sales);
-    await lifecycle.open(tenantId, branchId, operatorId);
+    await lifecycle.open(merchantId, locationId, operatorId);
     await lifecycle.suspend('Mesa 4');
     await lifecycle.suspend('Mesa 4');
     expect(sales.suspends, 1);
@@ -313,7 +313,7 @@ void main() {
   test('successful checkout starts the next sale once', () async {
     final sales = _Sales();
     final lifecycle = _controller(sales);
-    await lifecycle.open(tenantId, branchId, operatorId);
+    await lifecycle.open(merchantId, locationId, operatorId);
     lifecycle.checkoutStarted();
     await lifecycle.checkoutCommitted();
     await lifecycle.checkoutCommitted();
@@ -325,7 +325,7 @@ void main() {
   test('resume cannot replace an active editable sale', () async {
     final sales = _Sales();
     final lifecycle = _controller(sales);
-    await lifecycle.open(tenantId, branchId, operatorId);
+    await lifecycle.open(merchantId, locationId, operatorId);
     await lifecycle.resume(sale(state: 'suspended'));
     expect(sales.resumes, 0);
     expect(lifecycle.state.phase, SalePhase.buildingCart);
@@ -334,7 +334,7 @@ void main() {
   test('cancel is blocked while checkout owns the transition', () async {
     final sales = _Sales();
     final lifecycle = _controller(sales);
-    await lifecycle.open(tenantId, branchId, operatorId);
+    await lifecycle.open(merchantId, locationId, operatorId);
     lifecycle.checkoutStarted();
     await lifecycle.cancel('No debe aplicarse');
     expect(sales.cancels, 0);
@@ -344,7 +344,7 @@ void main() {
   test('operator exit cancels one empty sale and does not orphan it', () async {
     final sales = _Sales();
     final lifecycle = _controller(sales);
-    await lifecycle.open(tenantId, branchId, operatorId);
+    await lifecycle.open(merchantId, locationId, operatorId);
     expect(await lifecycle.prepareForOperatorExit(), isTrue);
     expect(sales.cancels, 1);
     expect(lifecycle.state.phase, SalePhase.cancelled);
@@ -355,7 +355,7 @@ void main() {
     () async {
       final sales = _Sales();
       final lifecycle = _controller(sales);
-      await lifecycle.open(tenantId, branchId, operatorId);
+      await lifecycle.open(merchantId, locationId, operatorId);
       await lifecycle.attachCustomer(
         const SaleCustomerSummary(
           id: '00000000-0000-4000-8000-000000000020',
@@ -370,7 +370,7 @@ void main() {
   test('rapid new sale actions create one editable sale', () async {
     final sales = _Sales()..currentSale = sale(state: 'cancelled');
     final lifecycle = _controller(sales);
-    await lifecycle.open(tenantId, branchId, operatorId);
+    await lifecycle.open(merchantId, locationId, operatorId);
     await Future.wait([lifecycle.newSale(), lifecycle.newSale()]);
     expect(sales.starts, 1);
     expect(lifecycle.state.phase, SalePhase.buildingCart);
@@ -379,7 +379,7 @@ void main() {
   test('a cancelled sale cannot be resumed', () async {
     final sales = _Sales()..currentSale = sale(state: 'cancelled');
     final lifecycle = _controller(sales);
-    await lifecycle.open(tenantId, branchId, operatorId);
+    await lifecycle.open(merchantId, locationId, operatorId);
     await lifecycle.resume(sale(state: 'cancelled'));
     expect(sales.resumes, 0);
     expect(lifecycle.state.phase, SalePhase.cancelled);
@@ -389,12 +389,12 @@ void main() {
     final sales = _Sales();
     final carts = _cartController();
     final lifecycle = _controller(sales, cartController: carts);
-    await lifecycle.open(tenantId, branchId, operatorId);
+    await lifecycle.open(merchantId, locationId, operatorId);
     carts.restore(
       Cart(
         id: saleId,
-        tenantId: tenantId,
-        branchId: branchId,
+        merchantId: merchantId,
+        locationId: locationId,
         operatorSessionId: operatorId,
         status: 'draft',
         version: 2,
@@ -443,7 +443,7 @@ void main() {
           recoverable: true,
         );
       final lifecycle = _controller(sales);
-      await lifecycle.open(tenantId, branchId, operatorId);
+      await lifecycle.open(merchantId, locationId, operatorId);
       await lifecycle.suspend('Mesa 4');
       expect(lifecycle.state.phase, SalePhase.buildingCart);
       expect(lifecycle.state.sale?.id, saleId);
@@ -460,7 +460,7 @@ void main() {
     () async {
       final sales = _Sales();
       final lifecycle = _controller(sales);
-      await lifecycle.open(tenantId, branchId, operatorId);
+      await lifecycle.open(merchantId, locationId, operatorId);
       await lifecycle.attachCustomer(
         const SaleCustomerSummary(
           id: '00000000-0000-4000-8000-000000000020',
@@ -491,7 +491,7 @@ void main() {
     () async {
       final sales = _Sales()..historyNextCursor = 'cursor-2';
       final lifecycle = _controller(sales);
-      await lifecycle.open(tenantId, branchId, operatorId);
+      await lifecycle.open(merchantId, locationId, operatorId);
       await lifecycle.loadHistory(state: 'committed');
       expect(lifecycle.canLoadMoreHistory, isTrue);
       await lifecycle.loadMoreHistory();
@@ -510,7 +510,7 @@ void main() {
     final semantics = tester.ensureSemantics();
     final sales = _Sales();
     final lifecycle = _controller(sales);
-    await lifecycle.open(tenantId, branchId, operatorId);
+    await lifecycle.open(merchantId, locationId, operatorId);
     sales.currentSale = sale(state: 'suspended');
     await tester.pumpWidget(
       MaterialApp(

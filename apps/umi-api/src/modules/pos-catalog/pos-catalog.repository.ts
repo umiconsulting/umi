@@ -17,48 +17,55 @@ export class PosCatalogRepository {
     userId: string,
     sessionId: string,
     deviceId: string,
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
   ): Promise<boolean> {
-    const { rowCount } = await this.pg.worker.query(
-      `SELECT 1
+    return this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      async (client) => {
+        const { rowCount } = await client.query(
+          `SELECT 1
        FROM runtime.operator_session os
-       JOIN tenant.device d ON d.id = os.device_id
-       JOIN tenant.branch b ON b.id = os.branch_id AND b.business_id = os.business_id
+       JOIN merchant.device d ON d.id = os.device_id
+       JOIN merchant.location b ON b.id = os.location_id AND b.merchant_id = os.merchant_id
        WHERE os.durable_session_id = $2::uuid AND os.user_id = $1::uuid
-         AND os.device_id = $3::uuid AND os.business_id = $4::uuid
-         AND os.branch_id = $5::uuid AND os.state = 'active' AND os.expires_at > now()
-         AND d.lifecycle_state = 'active' AND b.status = 'active'
+         AND os.device_id = $3::uuid AND os.merchant_id = $4::uuid
+         AND os.location_id = $5::uuid AND os.state = 'active' AND os.expires_at > now()
+         AND d.status = 'active' AND b.status = 'active'
          AND ('catalog.read' = ANY(os.permissions) OR '*' = ANY(os.permissions))
          AND EXISTS (
            SELECT 1 FROM jsonb_array_elements(os.entitlements) entitlement
            WHERE entitlement->>'featureKey' = 'pos'
              AND COALESCE((entitlement->>'enabled')::boolean, false)
          )`,
-      [userId, sessionId, deviceId, tenantId, branchId],
+          [userId, sessionId, deviceId, merchantId, locationId],
+        );
+        return (rowCount ?? 0) > 0;
+      },
+      locationId,
     );
-    return (rowCount ?? 0) > 0;
   }
 
-  async categories(tenantId: string): Promise<CatalogCategory[]> {
+  async categories(merchantId: string): Promise<CatalogCategory[]> {
     const { rows } = await this.pg.tquery<CatalogCategory>(
-      tenantId,
+      merchantId,
       `SELECT c.id::text, c.name, c.display_order AS "displayOrder", true AS enabled
-       FROM tenant.product_category c
-       WHERE c.business_id = $1::uuid
+       FROM merchant.product_category c
+       WHERE c.merchant_id = $1::uuid
          AND EXISTS (
-           SELECT 1 FROM tenant.product p
-           WHERE p.category_id = c.id AND p.business_id = c.business_id AND p.active
+           SELECT 1 FROM merchant.product p
+           WHERE p.category_id = c.id AND p.merchant_id = c.merchant_id AND p.active
          )
        ORDER BY c.display_order, lower(c.name), c.id`,
-      [tenantId],
+      [merchantId],
     );
     return rows;
   }
 
   async products(input: {
-    tenantId: string;
-    branchId: string;
+    merchantId: string;
+    locationId: string;
     categoryId?: string;
     search?: string;
     barcode?: string;
@@ -68,7 +75,7 @@ export class PosCatalogRepository {
     limit: number;
   }): Promise<CatalogProductSummary[]> {
     const { rows } = await this.pg.tquery<ProductRow>(
-      input.tenantId,
+      input.merchantId,
       `SELECT p.id::text, p.name, p.description, p.sku,
               (p.barcode IS NOT NULL) AS "hasBarcode",
               CASE WHEN c.id IS NULL THEN NULL ELSE jsonb_build_object(
@@ -82,24 +89,24 @@ export class PosCatalogRepository {
               END AS availability,
               a.available_from::text AS "availableFrom",
               media.item AS "primaryMedia",
-              EXISTS (SELECT 1 FROM tenant.product_variant v
+              EXISTS (SELECT 1 FROM merchant.product_variant v
                       WHERE v.product_id = p.id AND v.active) AS "hasVariants",
-              EXISTS (SELECT 1 FROM tenant.product_option_group g
+              EXISTS (SELECT 1 FROM merchant.product_option_group g
                       WHERE g.product_id = p.id) AS "hasModifiers",
               p.updated_at::text AS "updatedAt"
-       FROM tenant.product p
-       JOIN tenant.business business ON business.id = p.business_id
-       LEFT JOIN tenant.product_category c ON c.id = p.category_id
-       LEFT JOIN tenant.product_branch_availability a
-         ON a.product_id = p.id AND a.branch_id = $2::uuid
+       FROM merchant.product p
+       JOIN merchant.merchant business ON business.id = p.merchant_id
+       LEFT JOIN merchant.product_category c ON c.id = p.category_id
+       LEFT JOIN merchant.product_location_availability a
+         ON a.product_id = p.id AND a.location_id = $2::uuid
        LEFT JOIN LATERAL (
          SELECT jsonb_build_object('url', pm.url, 'altText', pm.alt_text,
                   'width', pm.width, 'height', pm.height, 'displayOrder', pm.display_order) item
-         FROM tenant.product_media pm
+         FROM merchant.product_media pm
          WHERE pm.product_id = p.id AND pm.url LIKE 'https://%'
          ORDER BY pm.display_order, pm.id LIMIT 1
        ) media ON true
-       WHERE p.business_id = $1::uuid AND p.active
+       WHERE p.merchant_id = $1::uuid AND p.active
          AND ($3::uuid IS NULL OR p.category_id = $3::uuid)
          AND ($4::text IS NULL OR lower(p.name) LIKE '%' || lower($4) || '%'
               OR lower(COALESCE(p.description,'')) LIKE '%' || lower($4) || '%'
@@ -111,8 +118,8 @@ export class PosCatalogRepository {
        ORDER BY lower(p.name), p.id
        LIMIT $9`,
       [
-        input.tenantId,
-        input.branchId,
+        input.merchantId,
+        input.locationId,
         input.categoryId ?? null,
         input.search ?? null,
         input.barcode ?? null,
@@ -129,51 +136,51 @@ export class PosCatalogRepository {
   }
 
   async detail(
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     productId: string,
   ): Promise<CatalogProductDetail | null> {
-    const summary = (await this.products({ tenantId, branchId, productId, limit: 1 }))[0];
-    return summary ? this.withDetails(tenantId, summary) : null;
+    const summary = (await this.products({ merchantId, locationId, productId, limit: 1 }))[0];
+    return summary ? this.withDetails(merchantId, summary) : null;
   }
 
   private async withDetails(
-    tenantId: string,
+    merchantId: string,
     summary: CatalogProductSummary,
   ): Promise<CatalogProductDetail> {
     const media = await this.pg.tquery(
-      tenantId,
+      merchantId,
       `SELECT url, alt_text AS "altText", width, height, display_order AS "displayOrder"
-       FROM tenant.product_media
-       WHERE business_id=$1::uuid AND product_id=$2::uuid AND url LIKE 'https://%'
+       FROM merchant.product_media
+       WHERE merchant_id=$1::uuid AND product_id=$2::uuid AND url LIKE 'https://%'
        ORDER BY display_order,id`,
-      [tenantId, summary.id],
+      [merchantId, summary.id],
     );
     const variants = await this.pg.tquery(
-      tenantId,
+      merchantId,
       `SELECT id::text,name,attributes,jsonb_build_object('minorUnits',price_delta,'currency',$3::text) AS "priceDelta",
               CASE WHEN active THEN 'enabled' ELSE 'disabled' END availability
-       FROM tenant.product_variant
-       WHERE business_id=$1::uuid AND product_id=$2::uuid ORDER BY display_order,name,id`,
-      [tenantId, summary.id, summary.price.currency],
+       FROM merchant.product_variant
+       WHERE merchant_id=$1::uuid AND product_id=$2::uuid ORDER BY display_order,name,id`,
+      [merchantId, summary.id, summary.price.currency],
     );
     const groups = await this.pg.tquery(
-      tenantId,
+      merchantId,
       `SELECT g.id::text,g.name,(g.min_select>0) required,g.min_select AS "minSelections",
               g.max_select AS "maxSelections",
               COALESCE(jsonb_agg(jsonb_build_object('id',m.id::text,'name',m.name,
                 'priceDelta',jsonb_build_object('minorUnits',m.price_delta,'currency',$3::text),
                 'available',true) ORDER BY m.name) FILTER (WHERE m.id IS NOT NULL),'[]') modifiers
-       FROM tenant.product_option_group g
-       JOIN tenant.product p ON p.id=g.product_id AND p.business_id=$1::uuid
-       LEFT JOIN tenant.product_modifier m ON m.option_group_id=g.id
+       FROM merchant.product_option_group g
+       JOIN merchant.product p ON p.id=g.product_id AND p.merchant_id=$1::uuid
+       LEFT JOIN merchant.product_modifier m ON m.option_group_id=g.id
        WHERE g.product_id=$2::uuid GROUP BY g.id ORDER BY g.name,g.id`,
-      [tenantId, summary.id, summary.price.currency],
+      [merchantId, summary.id, summary.price.currency],
     );
     const barcode = await this.pg.tquery<{ barcode: string | null }>(
-      tenantId,
-      `SELECT barcode FROM tenant.product WHERE business_id=$1::uuid AND id=$2::uuid`,
-      [tenantId, summary.id],
+      merchantId,
+      `SELECT barcode FROM merchant.product WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+      [merchantId, summary.id],
     );
     return {
       ...summary,
@@ -184,13 +191,13 @@ export class PosCatalogRepository {
     };
   }
 
-  async version(tenantId: string): Promise<{ version: string; updatedAt: string }> {
+  async version(merchantId: string): Promise<{ version: string; updatedAt: string }> {
     const { rows } = await this.pg.tquery<{ version: string; updatedAt: string }>(
-      tenantId,
+      merchantId,
       `SELECT COALESCE(extract(epoch FROM max(updated_at))::bigint::text,'0') version,
               COALESCE(max(updated_at), now())::text AS "updatedAt"
-       FROM tenant.product WHERE business_id=$1::uuid`,
-      [tenantId],
+       FROM merchant.product WHERE merchant_id=$1::uuid`,
+      [merchantId],
     );
     return rows[0];
   }

@@ -4,23 +4,23 @@ import '../../core/storage/storage.dart';
 
 final class PendingCashCommand {
   const PendingCashCommand({
-    required this.tenantId,
-    required this.branchId,
+    required this.merchantId,
+    required this.locationId,
     required this.operation,
     required this.commandId,
     required this.idempotencyKey,
   });
 
-  final String tenantId;
-  final String branchId;
+  final String merchantId;
+  final String locationId;
   final String operation;
   final String commandId;
   final String idempotencyKey;
 
   Map<String, Object?> toJson() => {
     'schemaVersion': 1,
-    'tenantId': tenantId,
-    'branchId': branchId,
+    'merchantId': merchantId,
+    'locationId': locationId,
     'operation': operation,
     'commandId': commandId,
     'idempotencyKey': idempotencyKey,
@@ -31,8 +31,8 @@ final class PendingCashCommand {
       throw const FormatException('Unsupported cash recovery schema.');
     }
     return PendingCashCommand(
-      tenantId: json['tenantId']! as String,
-      branchId: json['branchId']! as String,
+      merchantId: json['merchantId']! as String,
+      locationId: json['locationId']! as String,
       operation: json['operation']! as String,
       commandId: json['commandId']! as String,
       idempotencyKey: json['idempotencyKey']! as String,
@@ -41,18 +41,18 @@ final class PendingCashCommand {
 }
 
 abstract interface class CashRecoveryStore {
-  Future<PendingCashCommand?> load(String tenantId, String branchId);
+  Future<PendingCashCommand?> load(String merchantId, String locationId);
   Future<void> save(PendingCashCommand command);
-  Future<void> clear(String tenantId, String branchId);
+  Future<void> clear(String merchantId, String locationId);
 }
 
 final class MemoryCashRecoveryStore implements CashRecoveryStore {
   PendingCashCommand? _command;
 
   @override
-  Future<PendingCashCommand?> load(String tenantId, String branchId) async {
+  Future<PendingCashCommand?> load(String merchantId, String locationId) async {
     final command = _command;
-    if (command?.tenantId != tenantId || command?.branchId != branchId) {
+    if (command?.merchantId != merchantId || command?.locationId != locationId) {
       return null;
     }
     return command;
@@ -64,8 +64,8 @@ final class MemoryCashRecoveryStore implements CashRecoveryStore {
   }
 
   @override
-  Future<void> clear(String tenantId, String branchId) async {
-    if (_command?.tenantId == tenantId && _command?.branchId == branchId) {
+  Future<void> clear(String merchantId, String locationId) async {
+    if (_command?.merchantId == merchantId && _command?.locationId == locationId) {
       _command = null;
     }
   }
@@ -76,19 +76,19 @@ final class SecureCashRecoveryStore implements CashRecoveryStore {
 
   final SecureKeyValueStorage _storage;
 
-  String _key(String tenantId, String branchId) =>
-      'cash.recovery.v1.$tenantId.$branchId';
+  String _key(String merchantId, String locationId) =>
+      'cash.recovery.v1.$merchantId.$locationId';
 
   @override
-  Future<PendingCashCommand?> load(String tenantId, String branchId) async {
-    final encoded = await _storage.read(_key(tenantId, branchId));
+  Future<PendingCashCommand?> load(String merchantId, String locationId) async {
+    final encoded = await _storage.read(_key(merchantId, locationId));
     if (encoded == null) return null;
     final json = jsonDecode(encoded);
     if (json is! Map<String, Object?>) {
       throw const FormatException('Invalid cash recovery state.');
     }
     final command = PendingCashCommand.fromJson(json);
-    if (command.tenantId != tenantId || command.branchId != branchId) {
+    if (command.merchantId != merchantId || command.locationId != locationId) {
       throw const FormatException('Cash recovery scope mismatch.');
     }
     return command;
@@ -96,11 +96,11 @@ final class SecureCashRecoveryStore implements CashRecoveryStore {
 
   @override
   Future<void> save(PendingCashCommand command) => _storage.write(
-    _key(command.tenantId, command.branchId),
+    _key(command.merchantId, command.locationId),
     jsonEncode(command.toJson()),
   );
 
   @override
-  Future<void> clear(String tenantId, String branchId) =>
-      _storage.delete(_key(tenantId, branchId));
+  Future<void> clear(String merchantId, String locationId) =>
+      _storage.delete(_key(merchantId, locationId));
 }

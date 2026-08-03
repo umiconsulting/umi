@@ -1,40 +1,39 @@
 import { Module } from '@nestjs/common';
-import { AuthController } from './auth.controller';
+import { AuthController, PosAuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthRepository } from './auth.repository';
 import { AuthGuard } from './auth.guard';
-import { TenantAccessGuard } from './tenant-access.guard';
-import { PublicTenantGuard } from './public-tenant.guard';
+import { MerchantAccessGuard } from './merchant-access.guard';
+import { PublicMerchantGuard } from './public-merchant.guard';
 import { EntitlementGuard } from './entitlement.guard';
 import { RolesGuard } from './roles.guard';
-import { ElevationGuard } from './elevation.guard';
+import { MfaService } from './mfa.service';
 
 /**
  * Auth domain (D9). Owns login/refresh/logout/reset + the four guards that the
  * rest of the dashboard modules compose with `@UseGuards(...)`:
- *   AuthGuard → TenantAccessGuard → EntitlementGuard → RolesGuard.
+ *   AuthGuard → MerchantAccessGuard → EntitlementGuard → RolesGuard.
  * PasswordService/JwtService come from the global SharedAuthModule.
  */
 @Module({
-  controllers: [AuthController],
+  controllers: [AuthController, PosAuthController],
   providers: [
     AuthService,
     AuthRepository,
+    MfaService,
     AuthGuard,
-    TenantAccessGuard,
-    PublicTenantGuard,
+    MerchantAccessGuard,
+    PublicMerchantGuard,
     EntitlementGuard,
     RolesGuard,
-    ElevationGuard,
   ],
   exports: [
     AuthRepository,
     AuthGuard,
-    TenantAccessGuard,
-    PublicTenantGuard,
+    MerchantAccessGuard,
+    PublicMerchantGuard,
     EntitlementGuard,
     RolesGuard,
-    ElevationGuard,
   ],
 })
 export class AuthModule {}

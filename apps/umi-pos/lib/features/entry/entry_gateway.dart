@@ -15,28 +15,28 @@ abstract interface class EntryGateway {
   Future<PosSessionResponse> login(String username, String password);
   Future<PosSessionResponse> pinLogin({
     required String pin,
-    required String tenantId,
-    required String branchId,
+    required String merchantId,
+    required String locationId,
   });
   Future<PosSessionResponse> refresh();
   Future<void> logout();
   Future<void> globalLogout();
   Future<EntryContextResponse> entryContext();
-  Future<OperatorSessionView> startOperator(String tenantId, String branchId);
+  Future<OperatorSessionView> startOperator(String merchantId, String locationId);
   Future<void> lockOperator(String id);
   Future<void> endOperator(String id);
   Future<ElevationGrantView> verifyPin({
     required String pin,
     required String permission,
-    required String tenantId,
-    required String branchId,
+    required String merchantId,
+    required String locationId,
   });
   Future<ElevationGrantView> requestManagerApproval({
     required String operatorSessionId,
     required String managerPin,
     required String permission,
-    required String tenantId,
-    required String branchId,
+    required String merchantId,
+    required String locationId,
     String? commandFingerprint,
   });
 }
@@ -123,8 +123,8 @@ final class ApiEntryGateway implements EntryGateway {
   @override
   Future<PosSessionResponse> pinLogin({
     required String pin,
-    required String tenantId,
-    required String branchId,
+    required String merchantId,
+    required String locationId,
   }) async {
     final identity = await _vault.deviceIdentity();
     return PosSessionResponse.fromJson(
@@ -133,8 +133,8 @@ final class ApiEntryGateway implements EntryGateway {
         path: UmiRoutes.posPinLogin,
         body: PosPinLoginRequest(
           pin: pin,
-          tenantId: tenantId,
-          branchId: branchId,
+          merchantId: merchantId,
+          locationId: locationId,
           installationId: identity.installationId,
         ).toJson(),
       ),
@@ -195,15 +195,15 @@ final class ApiEntryGateway implements EntryGateway {
 
   @override
   Future<OperatorSessionView> startOperator(
-    String tenantId,
-    String branchId,
+    String merchantId,
+    String locationId,
   ) async => OperatorSessionView.fromJson(
     await _api.request(
       method: ApiMethod.post,
       path: UmiRoutes.operatorSessions,
       body: StartOperatorSessionRequest(
-        tenantId: tenantId,
-        branchId: branchId,
+        merchantId: merchantId,
+        locationId: locationId,
       ).toJson(),
       idempotent: true,
     ),
@@ -231,8 +231,8 @@ final class ApiEntryGateway implements EntryGateway {
   Future<ElevationGrantView> verifyPin({
     required String pin,
     required String permission,
-    required String tenantId,
-    required String branchId,
+    required String merchantId,
+    required String locationId,
   }) async => ElevationGrantView.fromJson(
     await _api.request(
       method: ApiMethod.post,
@@ -240,8 +240,8 @@ final class ApiEntryGateway implements EntryGateway {
       body: VerifyOperatorPinRequest(
         pin: pin,
         permission: permission,
-        tenantId: tenantId,
-        branchId: branchId,
+        merchantId: merchantId,
+        locationId: locationId,
       ).toJson(),
     ),
   );
@@ -251,8 +251,8 @@ final class ApiEntryGateway implements EntryGateway {
     required String operatorSessionId,
     required String managerPin,
     required String permission,
-    required String tenantId,
-    required String branchId,
+    required String merchantId,
+    required String locationId,
     String? commandFingerprint,
   }) async => ElevationGrantView.fromJson(
     await _api.request(
@@ -262,8 +262,8 @@ final class ApiEntryGateway implements EntryGateway {
         operatorSessionId: operatorSessionId,
         managerPin: managerPin,
         permission: permission,
-        tenantId: tenantId,
-        branchId: branchId,
+        merchantId: merchantId,
+        locationId: locationId,
         commandFingerprint: commandFingerprint,
       ).toJson(),
     ),

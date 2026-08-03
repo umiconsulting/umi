@@ -10,14 +10,14 @@ describe('renderTemplate', () => {
   it('renders the reward_earned default copy', () => {
     const out = renderTemplate(DEFAULT_LIFECYCLE_COPY.reward_earned, {
       rewardName: 'Café',
-      tenant: 'Kala',
+      merchant: 'Kala',
     });
     expect(out).toBe('🎉 ¡Ganaste Café! Pasa a canjearla en Kala.');
   });
 });
 
 describe('resolveJourneyTemplate', () => {
-  it('prefers a non-empty tenant override', () => {
+  it('prefers a non-empty merchant override', () => {
     expect(resolveJourneyTemplate({ first_visit: 'custom {name}' }, 'first_visit')).toBe(
       'custom {name}',
     );

@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 // ── Request bodies ────────────────────────────────────────────────────────
 
-/** POST /api/auth/local/login. */
+/** POST /api/auth/local/login — mirrors umi-api LoginDto. */
 export const LoginRequest = z.object({
   username: z.string().min(1),
   password: z.string().min(1),
@@ -14,11 +14,13 @@ export const LoginRequest = z.object({
 });
 export type LoginRequest = z.infer<typeof LoginRequest>;
 
+/** POST /api/auth/local/forgot-password — mirrors umi-api ForgotPasswordDto. */
 export const ForgotPasswordRequest = z.object({
   email: z.string().email(),
 });
 export type ForgotPasswordRequest = z.infer<typeof ForgotPasswordRequest>;
 
+/** POST /api/auth/local/reset-password — mirrors umi-api ResetPasswordDto. */
 export const ResetPasswordRequest = z.object({
   token: z.string().min(1),
   password: z.string().min(8),
@@ -34,30 +36,28 @@ export const SessionUser = z.object({
 });
 export type SessionUser = z.infer<typeof SessionUser>;
 
-/** Tenant membership as embedded in a session (login/refresh/me). Mirrors
- *  auth.repository TenantMembershipSummary. */
-export const TenantMembership = z.object({
+/** Merchant membership as embedded in a session (login/refresh/me). Mirrors
+ *  auth.repository MerchantMembershipSummary. */
+export const MerchantMembership = z.object({
   id: z.string(),
   slug: z.string(),
   name: z.string(),
   roles: z.array(z.string()),
 });
-export type TenantMembership = z.infer<typeof TenantMembership>;
+export type MerchantMembership = z.infer<typeof MerchantMembership>;
 
-/** GET /api/me/tenants row — membership plus timezone. Mirrors tenants.repository
- *  TenantSummary. */
-export const TenantSummary = TenantMembership.extend({
+/** GET /api/me/merchants row — membership plus timezone. Mirrors merchants.repository
+ *  MerchantSummary. */
+export const MerchantSummary = MerchantMembership.extend({
   timezone: z.string().nullable(),
 });
-export type TenantSummary = z.infer<typeof TenantSummary>;
+export type MerchantSummary = z.infer<typeof MerchantSummary>;
 
 export const SessionEnvelope = z.object({
   user: SessionUser,
-  tenants: z.array(TenantMembership),
+  merchants: z.array(MerchantMembership),
   provider: z.literal('local'),
   accessExpiresIn: z.number(),
-  sessionId: z.string().uuid(),
-  deviceId: z.string().uuid().nullable(),
 });
 export type SessionEnvelope = z.infer<typeof SessionEnvelope>;
 
@@ -71,45 +71,43 @@ export type SessionResponse = z.infer<typeof SessionResponse>;
 export const LoginResponse = SessionResponse;
 export type LoginResponse = SessionResponse;
 
-/** GET /api/me/tenants. */
-export const MeTenantsResponse = z.object({ tenants: z.array(TenantSummary) });
-export type MeTenantsResponse = z.infer<typeof MeTenantsResponse>;
+/** GET /api/me/merchants. */
+export const MeMerchantsResponse = z.object({ merchants: z.array(MerchantSummary) });
+export type MeMerchantsResponse = z.infer<typeof MeMerchantsResponse>;
 
 /** logout / forgot-password / reset-password. */
 export const OkResponse = z.object({ ok: z.literal(true) });
 export type OkResponse = z.infer<typeof OkResponse>;
 
+/** POST .../global-logout — revoke every session of the caller. `exceptCurrent`
+ *  keeps the session that issued the request, so "sign out my other devices" does
+ *  not sign the caller out of the device they are holding. */
 export const GlobalLogoutRequest = z.object({
   exceptCurrent: z.boolean().default(false),
 });
 export type GlobalLogoutRequest = z.infer<typeof GlobalLogoutRequest>;
 
+/** POST /api/:slug/admin/staff — mirrors umi-api CreateStaffDto. */
 export const CreateStaffRequest = z
   .object({
     name: z.string().trim().min(1).max(160),
     email: z.string().trim().email(),
     role: z.string().min(1).max(100),
-    branchId: z.string().uuid().nullable().optional(),
+    locationId: z.string().uuid().nullable().optional(),
     position: z.string().trim().max(160).nullable().optional(),
-    operatorPin: z
-      .string()
-      .regex(/^\d{4,8}$/)
-      .optional(),
+    operatorPin: z.string().regex(/^\d{4,8}$/).optional(),
   })
   .strict();
 export type CreateStaffRequest = z.infer<typeof CreateStaffRequest>;
 
+/** PATCH /api/:slug/admin/staff/:staffId — mirrors umi-api UpdateStaffDto. */
 export const UpdateStaffRequest = z
   .object({
     role: z.string().min(1).max(100).optional(),
-    branchId: z.string().uuid().nullable().optional(),
+    locationId: z.string().uuid().nullable().optional(),
     position: z.string().trim().max(160).nullable().optional(),
+    operatorPin: z.string().regex(/^\d{4,8}$/).nullable().optional(),
     status: z.enum(['active', 'inactive']).optional(),
-    operatorPin: z
-      .string()
-      .regex(/^\d{4,8}$/)
-      .nullable()
-      .optional(),
   })
   .strict();
 export type UpdateStaffRequest = z.infer<typeof UpdateStaffRequest>;
@@ -118,7 +116,7 @@ export type UpdateStaffRequest = z.infer<typeof UpdateStaffRequest>;
 // Mirror the live umi-api DTOs 1:1 (apps/umi-api/src/modules/cash/dto/*), so the
 // server (class-validator) and both clients (dashboard, umi-cash frontend) share
 // one shape. Both surfaces call these: slug-scoped `/api/:slug/...` (umi-cash) and
-// tenant-scoped `/api/tenants/:tenantId/cash/...` (dashboard) — see routes.ts.
+// merchant-scoped `/api/merchants/:merchantId/cash/...` (dashboard) — see routes.ts.
 
 /** A real YYYY-MM-DD calendar date — rejects impossible days (e.g. 2026-02-30),
  *  matching the DTO's `@IsISO8601({ strict: true })`. */
@@ -131,7 +129,7 @@ const isCalendarDate = (s: string): boolean => {
 /** Scan actions — mirrors cash/dto/scan.dto.ts `ACTIONS`. */
 export const CASH_SCAN_ACTIONS = ['VISIT', 'REDEEM', 'BIRTHDAY_REDEEM'] as const;
 
-/** POST /api/:slug/admin/scan. */
+/** POST /api/:slug/admin/scan — mirrors ScanDto. */
 export const ScanRequest = z.object({
   qrPayload: z.string(),
   action: z.enum(CASH_SCAN_ACTIONS).optional(),
@@ -139,7 +137,7 @@ export const ScanRequest = z.object({
 });
 export type ScanRequest = z.infer<typeof ScanRequest>;
 
-/** POST /api/:slug/admin/topup (min $1.00). */
+/** POST /api/:slug/admin/topup — mirrors TopupDto (min $1.00). */
 export const TopupRequest = z.object({
   cardId: z.string(),
   amountCentavos: z.number().int().min(100),
@@ -148,7 +146,7 @@ export const TopupRequest = z.object({
 });
 export type TopupRequest = z.infer<typeof TopupRequest>;
 
-/** POST /api/:slug/admin/purchase (min $0.01). */
+/** POST /api/:slug/admin/purchase — mirrors PurchaseDto (min $0.01). */
 export const PurchaseRequest = z.object({
   cardId: z.string(),
   amountCentavos: z.number().int().min(1),
@@ -157,8 +155,12 @@ export const PurchaseRequest = z.object({
 });
 export type PurchaseRequest = z.infer<typeof PurchaseRequest>;
 
-/** POST /api/:slug/admin/gift-cards. Each recipient field is validated only
- *  when it is the sole channel. This preserves the existing v1 behavior. */
+/** POST /api/:slug/admin/gift-cards — mirrors GiftCardCreateDto. The two
+ *  `@ValidateIf` rules mean each recipient field is validated *only when it is the
+ *  sole channel*: email must be a valid email when no phone is given, phone must be
+ *  ≤20 chars when no email is given, and at least one is required. When both are
+ *  present the DTO validates neither — reproduced here so the contract accepts
+ *  exactly what the server accepts. */
 export const GiftCardCreateRequest = z
   .object({
     amountCentavos: z.number().int().min(100),
@@ -200,7 +202,7 @@ export const GiftCardCreateRequest = z
   });
 export type GiftCardCreateRequest = z.infer<typeof GiftCardCreateRequest>;
 
-/** POST /api/:slug/customers (member registration). */
+/** POST /api/:slug/customers — mirrors RegisterDto (member registration). */
 export const RegisterMemberRequest = z.object({
   name: z.string().min(2).max(100),
   phone: z.string().min(7).max(20),
@@ -211,23 +213,27 @@ export const RegisterMemberRequest = z.object({
 });
 export type RegisterMemberRequest = z.infer<typeof RegisterMemberRequest>;
 
-/** POST /api/:slug/gift/:code (public gift redemption). */
+/** POST /api/:slug/gift/:code — mirrors GiftRedeemDto (public gift redemption). */
 export const GiftRedeemRequest = z.object({
   phone: z.string().optional(),
   email: z.string().optional(),
 });
 export type GiftRedeemRequest = z.infer<typeof GiftRedeemRequest>;
 
+// ── Model catalogue ───────────────────────────────────────────────────────
+// The browser-surface half of `modelCatalog`. Names here are what `routeCatalog`
+// refers to, so a route can only name a model that exists.
+
 export const httpModels = {
   LoginRequest,
   ForgotPasswordRequest,
   ResetPasswordRequest,
   SessionUser,
-  TenantMembership,
-  TenantSummary,
+  MerchantMembership,
+  MerchantSummary,
   SessionEnvelope,
   SessionResponse,
-  MeTenantsResponse,
+  MeMerchantsResponse,
   OkResponse,
   GlobalLogoutRequest,
   CreateStaffRequest,

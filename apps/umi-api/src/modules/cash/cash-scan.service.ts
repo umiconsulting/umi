@@ -48,7 +48,7 @@ export class CashScanService {
     private readonly email: EmailAdapter,
   ) {}
 
-  async scan(tenantId: string, userId: string, input: ScanInput) {
+  async scan(merchantId: string, userId: string, input: ScanInput) {
     const requested = new Set<string>(input.actions ?? (input.action ? [input.action] : []));
     if (requested.size === 0) {
       throw new BadRequestException('action or actions required');
@@ -63,7 +63,7 @@ export class CashScanService {
       throw new BadRequestException({ error: 'Código QR inválido o expirado' });
     }
 
-    const card = await this.cards.findCard(tenantId, qrData.cardId);
+    const card = await this.cards.findCard(merchantId, qrData.cardId);
     if (!card) throw new NotFoundException({ error: 'Tarjeta no encontrada' });
 
     // Single-use rotating-token check for in-app QR (wallet barcodes skip it).
@@ -75,34 +75,34 @@ export class CashScanService {
 
     // Wallet replay: block a 2nd visit within 60s of a static-barcode scan.
     if (qrData.isWalletScan && includesVisit) {
-      if (await this.repo.recentVisitWithin(tenantId, card.id, 60)) {
+      if (await this.repo.recentVisitWithin(merchantId, card.id, 60)) {
         tooMany('Visita ya registrada recientemente. Espera un momento.');
       }
     }
 
     const [staffMemberId, userPersonId, cfg] = await Promise.all([
-      this.cards.getStaffMemberId(tenantId, userId),
+      this.cards.getStaffMemberId(merchantId, userId),
       this.cards.getUserPersonId(userId),
-      this.repo.tenantConfig(tenantId),
+      this.repo.merchantConfig(merchantId),
     ]);
     if (userPersonId && userPersonId === card.person_id) {
       throw new ForbiddenException({ error: 'No puedes escanear tu propia tarjeta' });
     }
 
     const tz = cfg?.timezone || DEFAULT_TZ;
-    const afterHours = includesVisit && (await this.repo.isAfterHours(tenantId, tz));
+    const afterHours = includesVisit && (await this.repo.isAfterHours(merchantId, tz));
 
     if (includesVisit) {
-      if (await this.repo.visitedToday(tenantId, card.id, tz)) {
+      if (await this.repo.visitedToday(merchantId, card.id, tz)) {
         tooMany('Ya se registró una visita hoy');
       }
     }
 
-    const rewardConfig = await this.repo.activeRewardConfig(tenantId);
+    const rewardConfig = await this.repo.activeRewardConfig(merchantId);
     const visitsRequired = rewardConfig?.visits_required ?? DEFAULT_VISITS_REQUIRED;
     const rewardName = rewardConfig?.reward_name ?? DEFAULT_REWARD_NAME;
 
-    const activeBirthday = await this.repo.activeBirthdayReward(tenantId, card.id);
+    const activeBirthday = await this.repo.activeBirthdayReward(merchantId, card.id);
     if (includesBirthday && !activeBirthday) {
       throw new BadRequestException({ error: 'No hay regalo de cumpleaños activo' });
     }
@@ -114,7 +114,7 @@ export class CashScanService {
       if (!rewardConfig) {
         throw new BadRequestException({ error: 'No hay configuración de recompensa activa' });
       }
-      if (await this.repo.recentRedemptionWithin(tenantId, card.id, 30)) {
+      if (await this.repo.recentRedemptionWithin(merchantId, card.id, 30)) {
         tooMany('Recompensa ya canjeada. Espera un momento si deseas canjear otra.');
       }
     }
@@ -138,7 +138,7 @@ export class CashScanService {
       if (journey) {
         momentMessage = renderTemplate(resolveJourneyTemplate(cfg?.lifecycleCopy, journey), {
           name: customerName || DEFAULT_CUSTOMER_NAME,
-          tenant: cfg?.name ?? '',
+          merchant: cfg?.name ?? '',
           rewardName,
           visitsThisCycle: earnedReward ? visitsRequired : newVisitsThisCycle,
           visitsRequired,
@@ -147,7 +147,7 @@ export class CashScanService {
     }
 
     const updated = await this.repo.performScan({
-      tenantId,
+      merchantId,
       cardId: card.id,
       staffMemberId,
       doBirthday: includesBirthday && !!activeBirthday,
@@ -214,7 +214,7 @@ export class CashScanService {
   ): string {
     const parts: string[] = [];
     if (performed.includes(BIRTHDAY)) {
-      // Tenants without a configured birthday-reward name would otherwise render
+      // Merchants without a configured birthday-reward name would otherwise render
       // the literal string "null" to the customer.
       parts.push(
         birthdayRewardName

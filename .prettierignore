@@ -15,6 +15,11 @@ pnpm-lock.yaml
 **/next-env.d.ts
 packages/contract/generated/
 
+# The contract artifact. Emitted byte-for-byte by packages/contract/scripts/generate.mjs
+# and guarded by `generate:check`, which compares exact bytes. Prettier reformatting it
+# would make the drift gate fail against its own generator.
+packages/contract/generated/
+
 # Captured evidence + generated diagrams. These are ARTIFACTS of a run, kept so a
 # past result stays auditable. Reformatting them edits the evidence, and the raw
 # audit log is a 309K single-line-heavy JSON dump nobody reads as source.

@@ -4,8 +4,8 @@ import { IntegrityRepository } from './integrity.repository';
 import { IntegrityService } from './integrity.service';
 
 const command = {
-  tenantId: '10000000-0000-4000-8000-000000000001',
-  branchId: '20000000-0000-4000-8000-000000000001',
+  merchantId: '10000000-0000-4000-8000-000000000001',
+  locationId: '20000000-0000-4000-8000-000000000001',
   commandId: '30000000-0000-4000-8000-000000000001',
   idempotencyKey: 'test-command-key',
   commandType: 'test.command',
@@ -127,7 +127,7 @@ describe('IntegrityService', () => {
 
     expect(repository.fail).toHaveBeenCalledWith(
       expect.anything(),
-      command.tenantId,
+      command.merchantId,
       command.idempotencyKey,
       'DEPENDENCY_UNAVAILABLE',
       'transient',

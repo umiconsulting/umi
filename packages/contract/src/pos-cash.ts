@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BusinessDate, CorrelationId, CurrencyCode, IsoTimestamp, Money, Uuid } from './platform';
+import { MerchantDate, CorrelationId, CurrencyCode, IsoTimestamp, Money, Uuid } from './platform';
 
 const Fingerprint = z.string().regex(/^[a-f0-9]{64}$/);
 const PositiveMoney = Money.refine((value) => value.minorUnits > 0, 'Amount must be positive.');
@@ -147,8 +147,8 @@ export const RegisterAssignment = z
 export const PhysicalRegister = z
   .object({
     id: Uuid,
-    tenantId: Uuid,
-    branchId: Uuid,
+    merchantId: Uuid,
+    locationId: Uuid,
     displayName: z.string().trim().min(1).max(80),
     publicReference: z.string().min(1).max(80),
     currency: CurrencyCode,
@@ -192,8 +192,8 @@ export const CashShiftPolicy = z
 export const CashShift = z
   .object({
     id: Uuid,
-    tenantId: Uuid,
-    branchId: Uuid,
+    merchantId: Uuid,
+    locationId: Uuid,
     registerId: Uuid,
     deviceId: Uuid,
     deviceCredentialVersion: z.number().int().positive(),
@@ -201,7 +201,7 @@ export const CashShift = z
     responsibleOperatorId: Uuid,
     operatorSessionId: Uuid,
     currency: CurrencyCode,
-    businessDate: BusinessDate,
+    businessDate: MerchantDate,
     status: CashShiftStatus,
     openingCommandId: Uuid,
     openedAt: IsoTimestamp,
@@ -224,7 +224,7 @@ export const OpeningFloat = z
   );
 
 const CommandContext = {
-  branchId: Uuid,
+  locationId: Uuid,
   operatorSessionId: Uuid,
   commandId: Uuid,
   idempotencyKey: Uuid,
@@ -236,7 +236,7 @@ export const OpenCashShiftRequest = z
     registerId: Uuid,
     openingFloat: NonNegativeMoney,
     denominations: z.array(DenominationCount).max(64),
-    businessDate: BusinessDate,
+    businessDate: MerchantDate,
     note: SafeNote,
     expectedRegisterVersion: z.number().int().positive(),
   })
@@ -259,8 +259,8 @@ export const OpenCashShiftResult = z
 export const CashLedgerEntry = z
   .object({
     id: Uuid,
-    tenantId: Uuid,
-    branchId: Uuid,
+    merchantId: Uuid,
+    locationId: Uuid,
     registerId: Uuid,
     shiftId: Uuid,
     sequence: z.number().int().positive(),
@@ -270,7 +270,7 @@ export const CashLedgerEntry = z
     changeGiven: NonNegativeMoney,
     saleId: Uuid.nullable(),
     commandId: Uuid,
-    businessDate: BusinessDate,
+    businessDate: MerchantDate,
     occurredAt: IsoTimestamp,
   })
   .strict();
@@ -303,7 +303,7 @@ export const CashMovement = z
     operatorId: Uuid,
     shiftId: Uuid,
     registerId: Uuid,
-    businessDate: BusinessDate,
+    businessDate: MerchantDate,
     ledgerEntry: CashLedgerEntry,
     committedAt: IsoTimestamp,
   })
@@ -416,7 +416,7 @@ export const ResolveCashVarianceRequest = z
 
 export const CashApprovalRequest = z
   .object({
-    branchId: Uuid,
+    locationId: Uuid,
     shiftId: Uuid,
     countAttemptId: Uuid,
     variance: Money,
@@ -546,13 +546,13 @@ export const ShiftCloseResult = z
 
 export const CashCenterQuery = z
   .object({
-    branchId: Uuid,
+    locationId: Uuid,
     operatorSessionId: Uuid,
   })
   .strict();
 export const CashCommandRecoveryQuery = z
   .object({
-    branchId: Uuid,
+    locationId: Uuid,
     operatorSessionId: Uuid,
     commandId: Uuid,
     idempotencyKey: Uuid,
@@ -570,7 +570,7 @@ export const CashCommandRecoveryResult = z
   .strict();
 export const CashCenterSnapshot = z
   .object({
-    businessDate: BusinessDate,
+    businessDate: MerchantDate,
     policy: CashShiftPolicy,
     registers: z.array(PhysicalRegister).max(100),
     currentShift: CashShift.nullable(),

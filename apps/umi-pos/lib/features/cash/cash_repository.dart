@@ -3,58 +3,58 @@ import 'package:umi_contract/umi_contract.dart';
 import '../../core/network/api_client.dart';
 
 abstract interface class CashRepository {
-  Future<CashCenterSnapshot> center(String tenantId, CashCenterQuery query);
+  Future<CashCenterSnapshot> center(String merchantId, CashCenterQuery query);
   Future<CashCommandRecoveryResult> commandRecovery(
-    String tenantId,
+    String merchantId,
     CashCommandRecoveryQuery query,
   );
   Future<OpenCashShiftResult> open(
-    String tenantId,
+    String merchantId,
     OpenCashShiftRequest request,
   );
   Future<CashMovement> movement(
-    String tenantId,
+    String merchantId,
     String shiftId,
     CashMovementRequest request,
   );
   Future<CashShift> transition(
-    String tenantId,
+    String merchantId,
     String shiftId,
     ShiftTransitionRequest request, {
     required bool suspend,
   });
   Future<ShiftHandoff> handoff(
-    String tenantId,
+    String merchantId,
     String shiftId,
     ShiftHandoffRequest request,
   );
   Future<CashCountSummary> count(
-    String tenantId,
+    String merchantId,
     String shiftId,
     SubmitBlindCountRequest request,
   );
   Future<CashShift> recount(
-    String tenantId,
+    String merchantId,
     String shiftId,
     RecountRequest request,
   );
   Future<CashVarianceResolution> resolve(
-    String tenantId,
+    String merchantId,
     String shiftId,
     ResolveCashVarianceRequest request,
   );
   Future<ShiftReconciliation> reconcile(
-    String tenantId,
+    String merchantId,
     String shiftId,
     ReconcileCashShiftRequest request,
   );
   Future<ShiftCloseResult> close(
-    String tenantId,
+    String merchantId,
     String shiftId,
     ShiftCloseRequest request,
   );
   Future<NoSaleDrawerEvent> noSale(
-    String tenantId,
+    String merchantId,
     String shiftId,
     NoSaleDrawerRequest request,
   );
@@ -67,15 +67,15 @@ final class ApiCashRepository implements CashRepository {
 
   @override
   Future<CashCenterSnapshot> center(
-    String tenantId,
+    String merchantId,
     CashCenterQuery query,
   ) async => CashCenterSnapshot.fromJson(
     await _api.request(
       method: ApiMethod.get,
       path: Uri(
-        path: UmiRoutes.posCashCenter(tenantId),
+        path: UmiRoutes.posCashCenter(merchantId),
         queryParameters: {
-          'branchId': query.branchId,
+          'locationId': query.locationId,
           'operatorSessionId': query.operatorSessionId,
         },
       ).toString(),
@@ -84,15 +84,15 @@ final class ApiCashRepository implements CashRepository {
 
   @override
   Future<CashCommandRecoveryResult> commandRecovery(
-    String tenantId,
+    String merchantId,
     CashCommandRecoveryQuery query,
   ) async => CashCommandRecoveryResult.fromJson(
     await _api.request(
       method: ApiMethod.get,
       path: Uri(
-        path: UmiRoutes.posCashCommand(tenantId, query.commandId),
+        path: UmiRoutes.posCashCommand(merchantId, query.commandId),
         queryParameters: {
-          'branchId': query.branchId,
+          'locationId': query.locationId,
           'operatorSessionId': query.operatorSessionId,
           'commandId': query.commandId,
           'idempotencyKey': query.idempotencyKey,
@@ -103,12 +103,12 @@ final class ApiCashRepository implements CashRepository {
 
   @override
   Future<OpenCashShiftResult> open(
-    String tenantId,
+    String merchantId,
     OpenCashShiftRequest request,
   ) async => OpenCashShiftResult.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: UmiRoutes.posCashShifts(tenantId),
+      path: UmiRoutes.posCashShifts(merchantId),
       body: request.toJson(),
       idempotent: true,
     ),
@@ -116,13 +116,13 @@ final class ApiCashRepository implements CashRepository {
 
   @override
   Future<CashMovement> movement(
-    String tenantId,
+    String merchantId,
     String shiftId,
     CashMovementRequest request,
   ) async => CashMovement.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: UmiRoutes.posCashMovement(tenantId, shiftId),
+      path: UmiRoutes.posCashMovement(merchantId, shiftId),
       body: request.toJson(),
       idempotent: true,
     ),
@@ -130,7 +130,7 @@ final class ApiCashRepository implements CashRepository {
 
   @override
   Future<CashShift> transition(
-    String tenantId,
+    String merchantId,
     String shiftId,
     ShiftTransitionRequest request, {
     required bool suspend,
@@ -138,8 +138,8 @@ final class ApiCashRepository implements CashRepository {
     await _api.request(
       method: ApiMethod.post,
       path: suspend
-          ? UmiRoutes.posCashSuspend(tenantId, shiftId)
-          : UmiRoutes.posCashResume(tenantId, shiftId),
+          ? UmiRoutes.posCashSuspend(merchantId, shiftId)
+          : UmiRoutes.posCashResume(merchantId, shiftId),
       body: request.toJson(),
       idempotent: true,
     ),
@@ -147,13 +147,13 @@ final class ApiCashRepository implements CashRepository {
 
   @override
   Future<ShiftHandoff> handoff(
-    String tenantId,
+    String merchantId,
     String shiftId,
     ShiftHandoffRequest request,
   ) async => ShiftHandoff.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: UmiRoutes.posCashHandoff(tenantId, shiftId),
+      path: UmiRoutes.posCashHandoff(merchantId, shiftId),
       body: request.toJson(),
       idempotent: true,
     ),
@@ -161,13 +161,13 @@ final class ApiCashRepository implements CashRepository {
 
   @override
   Future<CashCountSummary> count(
-    String tenantId,
+    String merchantId,
     String shiftId,
     SubmitBlindCountRequest request,
   ) async => CashCountSummary.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: UmiRoutes.posCashCount(tenantId, shiftId),
+      path: UmiRoutes.posCashCount(merchantId, shiftId),
       body: request.toJson(),
       idempotent: true,
     ),
@@ -175,13 +175,13 @@ final class ApiCashRepository implements CashRepository {
 
   @override
   Future<CashShift> recount(
-    String tenantId,
+    String merchantId,
     String shiftId,
     RecountRequest request,
   ) async => CashShift.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: UmiRoutes.posCashRecount(tenantId, shiftId),
+      path: UmiRoutes.posCashRecount(merchantId, shiftId),
       body: request.toJson(),
       idempotent: true,
     ),
@@ -189,13 +189,13 @@ final class ApiCashRepository implements CashRepository {
 
   @override
   Future<CashVarianceResolution> resolve(
-    String tenantId,
+    String merchantId,
     String shiftId,
     ResolveCashVarianceRequest request,
   ) async => CashVarianceResolution.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: UmiRoutes.posCashVariance(tenantId, shiftId),
+      path: UmiRoutes.posCashVariance(merchantId, shiftId),
       body: request.toJson(),
       idempotent: true,
     ),
@@ -203,13 +203,13 @@ final class ApiCashRepository implements CashRepository {
 
   @override
   Future<ShiftReconciliation> reconcile(
-    String tenantId,
+    String merchantId,
     String shiftId,
     ReconcileCashShiftRequest request,
   ) async => ShiftReconciliation.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: UmiRoutes.posCashReconcile(tenantId, shiftId),
+      path: UmiRoutes.posCashReconcile(merchantId, shiftId),
       body: request.toJson(),
       idempotent: true,
     ),
@@ -217,13 +217,13 @@ final class ApiCashRepository implements CashRepository {
 
   @override
   Future<ShiftCloseResult> close(
-    String tenantId,
+    String merchantId,
     String shiftId,
     ShiftCloseRequest request,
   ) async => ShiftCloseResult.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: UmiRoutes.posCashClose(tenantId, shiftId),
+      path: UmiRoutes.posCashClose(merchantId, shiftId),
       body: request.toJson(),
       idempotent: true,
     ),
@@ -231,13 +231,13 @@ final class ApiCashRepository implements CashRepository {
 
   @override
   Future<NoSaleDrawerEvent> noSale(
-    String tenantId,
+    String merchantId,
     String shiftId,
     NoSaleDrawerRequest request,
   ) async => NoSaleDrawerEvent.fromJson(
     await _api.request(
       method: ApiMethod.post,
-      path: UmiRoutes.posCashNoSale(tenantId, shiftId),
+      path: UmiRoutes.posCashNoSale(merchantId, shiftId),
       body: request.toJson(),
       idempotent: true,
     ),

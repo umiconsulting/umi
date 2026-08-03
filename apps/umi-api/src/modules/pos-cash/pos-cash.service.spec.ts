@@ -46,7 +46,7 @@ describe('Gate 3C cash application boundary', () => {
     };
     const service = new PosCashService(repo as never, integrity as never);
     const result = await service.open(user, id(5), {
-      branchId: id(6),
+      locationId: id(6),
       registerId: id(8),
       operatorSessionId: id(4),
       openingFloat: money(2_000),
@@ -69,7 +69,7 @@ describe('Gate 3C cash application boundary', () => {
     const service = new PosCashService(repo as never, { execute: vi.fn() } as never);
     await expect(
       service.movement(user, id(5), id(9), {
-        branchId: id(6),
+        locationId: id(6),
         shiftId: id(9),
         operatorSessionId: id(4),
         type: 'paid_in',
@@ -109,7 +109,7 @@ describe('Gate 3C cash application boundary', () => {
     };
     const service = new PosCashService(repo as never, integrity as never);
     const result = await service.count(user, id(5), id(9), {
-      branchId: id(6),
+      locationId: id(6),
       shiftId: id(9),
       operatorSessionId: id(4),
       countedCash: money(7_400),
@@ -128,7 +128,7 @@ describe('Gate 3C cash application boundary', () => {
     const service = new PosCashService({} as never, { execute: vi.fn() } as never);
     await expect(
       service.count(user, id(5), id(90), {
-        branchId: id(6),
+        locationId: id(6),
         shiftId: id(91),
         operatorSessionId: id(4),
         countedCash: money(0),
@@ -149,7 +149,7 @@ describe('Gate 3C cash application boundary', () => {
     );
     await expect(
       service.open({ ...user, deviceId: null }, id(5), {
-        branchId: id(6),
+        locationId: id(6),
         registerId: id(8),
         operatorSessionId: id(4),
         openingFloat: money(0),
@@ -193,7 +193,7 @@ describe('Gate 3C cash application boundary', () => {
     };
     const service = new PosCashService(repo as never, integrity as never);
     await service.noSale(user, id(5), id(9), {
-      branchId: id(6),
+      locationId: id(6),
       shiftId: id(9),
       operatorSessionId: id(4),
       reasonCode: 'operator_request',
@@ -232,7 +232,7 @@ describe('Gate 3C cash application boundary', () => {
     };
     const service = new PosCashService(repo as never, integrity as never);
     await service.close(user, id(5), id(9), {
-      branchId: id(6),
+      locationId: id(6),
       shiftId: id(9),
       operatorSessionId: id(4),
       countAttemptId: id(11),
@@ -266,7 +266,7 @@ describe('Gate 3C cash application boundary', () => {
     };
     const service = new PosCashService(repo as never, { execute: vi.fn() } as never);
     const result = await service.commandRecovery(user, id(5), id(7), {
-      branchId: id(6),
+      locationId: id(6),
       operatorSessionId: id(4),
       commandId: id(7),
       idempotencyKey: id(10),

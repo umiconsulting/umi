@@ -20,8 +20,8 @@ describe('Gate 3B checkout persistence', () => {
     await expect(
       repository.consumeApprovals({ query } as never, [id(1), id(2)], {
         sessionId: id(3),
-        tenantId: id(4),
-        branchId: id(5),
+        merchantId: id(4),
+        locationId: id(5),
         permissions: ['checkout.discount.approve', 'checkout.terminal.approve'],
         fingerprint: 'a'.repeat(64),
         commandId: id(6),
@@ -38,8 +38,8 @@ describe('Gate 3B checkout persistence', () => {
     await expect(
       repository.consumeApprovals({ query } as never, [id(1)], {
         sessionId: id(3),
-        tenantId: id(4),
-        branchId: id(5),
+        merchantId: id(4),
+        locationId: id(5),
         permissions: ['checkout.discount.approve', 'checkout.terminal.approve'],
         fingerprint: 'a'.repeat(64),
         commandId: id(6),
@@ -83,13 +83,13 @@ describe('Gate 3B checkout persistence', () => {
         { query } as never,
         {
           id: id(9),
-          tenantId: id(10),
-          branchId: id(11),
+          merchantId: id(10),
+          locationId: id(11),
           operatorSessionId: id(12),
           version: 1,
           businessDate: '2026-07-29',
-          tenantName: 'Umi',
-          branchName: 'Local',
+          merchantName: 'Umi',
+          locationName: 'Local',
           operatorName: 'Cashier',
           customerId: null,
           lines: [],
@@ -102,10 +102,10 @@ describe('Gate 3B checkout persistence', () => {
     expect(query).toHaveBeenCalledOnce();
   });
 
-  it('uses the worker only for scope proof and applies branch RLS to recovery data', async () => {
-    const worker = { query: vi.fn().mockResolvedValue({ rows: [{ allowed: 1 }] }) };
+  it('uses the RLS request pool for scope proof and recovery data', async () => {
     const appQuery = vi
       .fn()
+      .mockResolvedValueOnce({ rows: [{ allowed: 1 }] })
       .mockResolvedValueOnce({
         rows: [
           {
@@ -130,24 +130,25 @@ describe('Gate 3B checkout persistence', () => {
         ],
       })
       .mockResolvedValueOnce({ rows: [] });
-    const runWithTenant = vi.fn(
+    const runWithMerchant = vi.fn(
       async (
-        _tenantId: string,
+        _merchantId: string,
         _userId: string,
         work: (client: { query: typeof appQuery }) => Promise<unknown>,
-        _branchId: string,
+        _locationId: string,
       ) => work({ query: appQuery }),
     );
-    const repository = new PosCheckoutRepository({ worker, runWithTenant } as never);
+    const repository = new PosCheckoutRepository({ runWithMerchant } as never);
     await expect(
       repository.recovery(id(3), id(4), id(5), id(2), id(6), false),
     ).resolves.toMatchObject({ checkoutId: id(1), paymentOutcome: null });
-    expect(runWithTenant).toHaveBeenCalledWith(
+    expect(runWithMerchant).toHaveBeenCalledWith(
       id(3),
       id(6),
       expect.any(Function),
       id(4),
     );
-    expect(appQuery.mock.calls[0][0]).not.toContain('runtime.operator_session');
+    expect(appQuery.mock.calls[0][0]).toContain('runtime.operator_session');
+    expect(appQuery.mock.calls[1][0]).not.toContain('runtime.operator_session');
   });
 });

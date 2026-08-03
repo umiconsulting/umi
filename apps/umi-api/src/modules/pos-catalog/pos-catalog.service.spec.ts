@@ -7,8 +7,8 @@ const user = {
   sessionId: '00000000-0000-4000-8000-000000000002',
   deviceId: '00000000-0000-4000-8000-000000000003',
 };
-const tenantId = '00000000-0000-4000-8000-000000000004';
-const branchId = '00000000-0000-4000-8000-000000000005';
+const merchantId = '00000000-0000-4000-8000-000000000004';
+const locationId = '00000000-0000-4000-8000-000000000005';
 const product = {
   id: '00000000-0000-4000-8000-000000000006',
   name: 'Café',
@@ -43,7 +43,7 @@ describe('PosCatalogService', () => {
   it('requires the active operator/device/tenant/branch intersection', async () => {
     const { service } = make(false);
     await expect(
-      service.products(user, tenantId, service.parseQuery({ branchId, limit: '40' })),
+      service.products(user, merchantId, service.parseQuery({ locationId, limit: '40' })),
     ).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
   });
 
@@ -51,20 +51,20 @@ describe('PosCatalogService', () => {
     const { service, repo } = make();
     const page = await service.products(
       user,
-      tenantId,
-      service.parseQuery({ branchId, limit: '1', search: 'cafe' }),
+      merchantId,
+      service.parseQuery({ locationId, limit: '1', search: 'cafe' }),
     );
     expect(page.items).toEqual([product]);
     expect(page.nextCursor).toEqual(expect.any(String));
     expect(repo.products).toHaveBeenCalledWith(
-      expect.objectContaining({ tenantId, branchId, search: 'cafe', limit: 2 }),
+      expect.objectContaining({ merchantId, locationId, search: 'cafe', limit: 2 }),
     );
   });
 
   it('rejects malformed cursors before querying catalog data', async () => {
     const { service } = make();
     await expect(
-      service.products(user, tenantId, service.parseQuery({ branchId, cursor: 'not-a-cursor' })),
+      service.products(user, merchantId, service.parseQuery({ locationId, cursor: 'not-a-cursor' })),
     ).rejects.toMatchObject({ response: { code: 'VALIDATION_FAILED' } });
   });
 });

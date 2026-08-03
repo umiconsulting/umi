@@ -13,10 +13,15 @@ import { posPinLookupHash } from '../../shared/auth/pos-pin';
 import { JwtService } from '../../shared/auth/jwt.service';
 import { EmailAdapter } from '../../shared/adapters/email.adapter';
 import type { AppConfig } from '../../shared/config/config.schema';
+import { AuthRepository, type MerchantMembershipSummary } from './auth.repository';
+import { MfaService } from './mfa.service';
 import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
-import { AuthRepository } from './auth.repository';
-import { parseDurationSeconds } from './cookies';
-import type { SessionUser, TenantMembership } from '@umi/contract';
+
+export interface SessionUser {
+  id: string;
+  email: string;
+  displayName: string | null;
+}
 
 export interface TokenPair {
   accessToken: string;
@@ -27,19 +32,28 @@ export interface TokenPair {
 
 export interface LoginResult extends TokenPair {
   user: SessionUser;
-  tenants: TenantMembership[];
+  merchants: MerchantMembershipSummary[];
+}
+
+/**
+ * A correct password, and a second factor still outstanding. Carries NO tokens and no
+ * merchant list — nothing a caller could act on before the code is checked.
+ */
+export interface MfaChallengeResult {
+  mfaRequired: true;
+  method: string;
+  challengeToken: string;
+  expiresInSeconds: number;
+}
+
+export type LoginOutcome = LoginResult | MfaChallengeResult;
+
+/** Narrow a login outcome without reaching for `in` at every call site. */
+export function isMfaChallenge(outcome: LoginOutcome): outcome is MfaChallengeResult {
+  return 'mfaRequired' in outcome;
 }
 
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 min, mirrors the dashboard
-
-export interface SessionClient {
-  app: 'dashboard' | 'kds' | 'pos';
-  deviceId: string | null;
-  ip: string | null;
-  userAgent: string | null;
-  installationId?: string | null;
-  deviceCredential?: string | null;
-}
 
 /**
  * Auth business logic (D9). Verifies scrypt credentials, issues JWT pairs, and
@@ -56,10 +70,11 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly email: EmailAdapter,
     private readonly config: ConfigService<AppConfig, true>,
+    private readonly mfa: MfaService,
     private readonly rateLimit: RateLimitService,
   ) {}
 
-  async login(usernameRaw: string, password: string, client: SessionClient): Promise<LoginResult> {
+  async login(usernameRaw: string, password: string): Promise<LoginOutcome> {
     const username = usernameRaw.trim().toLowerCase();
     if (!username || !password) {
       throw new BadRequestException('username and password are required');
@@ -79,172 +94,62 @@ export class AuthService {
       email: credential.email,
       displayName: credential.displayName,
     };
-    if (
-      client.deviceId &&
-      !(await this.repo.deviceAllowedForUser(
-        user.id,
-        client.deviceId,
-        client.app,
-        client.installationId ? tokenHash(client.installationId) : null,
-        client.deviceCredential ? tokenHash(client.deviceCredential) : null,
-      ))
-    ) {
-      await this.repo.writeSecurityAudit({
-        actorUserId: user.id,
-        sessionId: null,
-        eventType: 'authentication.denied',
-        entityType: 'device',
-        entityId: client.deviceId,
-        outcome: 'denied',
-        reasonCode: 'device_not_allowed',
-        metadata: { app: client.app },
-      });
-      throw new UnauthorizedException('device_not_allowed');
+
+    // The password is right, and that is ALL it buys when a second factor is
+    // enrolled. Nothing below this branch issues a token, loads a merchant list, or
+    // tells the caller anything about the account — the challenge token is inert
+    // everywhere except POST /auth/mfa/verify.
+    if (credential.mfaMethod) {
+      const challengeToken = await this.jwt.signMfaChallenge(user.id, this.mfa.ttlSeconds);
+      // Only email_otp has anything to send. A totp enrolment already holds its
+      // secret, so the challenge alone is the whole prompt.
+      if (credential.mfaMethod === 'email_otp') {
+        await this.mfa.issueChallenge(user);
+      }
+      return {
+        mfaRequired: true,
+        method: credential.mfaMethod,
+        challengeToken,
+        expiresInSeconds: this.mfa.ttlSeconds,
+      };
     }
-    const [tenants, tokens] = await Promise.all([
-      this.repo.findTenantsForUser(user.id),
-      this.createSession(user, client),
+
+    const [merchants, tokens] = await Promise.all([
+      this.repo.findMerchantsForUser(user.id),
+      this.issueTokens(user),
     ]);
-    return { user, tenants, ...tokens };
+    return { user, merchants, ...tokens };
   }
 
-  async pinLogin(
-    pin: string,
-    tenantId: string,
-    branchId: string,
-    client: SessionClient,
-  ): Promise<LoginResult> {
-    if (
-      client.app !== 'pos' ||
-      !client.deviceId ||
-      !client.installationId ||
-      !client.deviceCredential
-    ) {
-      throw new UnauthorizedException({ code: 'DEVICE_NOT_ALLOWED' });
+  /**
+   * Second half of a two-step login. The challenge token proves the password was
+   * already accepted; the code proves the factor. Both are required, and the token
+   * alone can do nothing else in the system.
+   */
+  async verifyMfa(challengeToken: string, code: string): Promise<LoginResult> {
+    if (!challengeToken || !code) {
+      throw new BadRequestException('challengeToken and code are required');
     }
-    this.enforcePinRateLimit(`pos-pin:ip:${client.ip ?? 'unknown'}`, 20, 5 * 60_000);
-    this.enforcePinRateLimit(`pos-pin:device:${client.deviceId}`, 10, 5 * 60_000);
-    this.enforcePinRateLimit(`pos-pin:tenant:${tenantId}`, 100, 5 * 60_000);
+    const userId = await this.jwt.verifyMfaChallenge(challengeToken);
+    await this.mfa.verifyCode(userId, code);
 
-    const lookupHash = this.pinLookupHash(tenantId, pin);
-    let record = await this.repo.findPosPinStaff(tenantId, branchId, lookupHash);
-    if (!record) {
-      const candidates = await this.repo.findLegacyPosPinCandidates(tenantId, branchId);
-      const matches = candidates.filter((candidate) =>
-        this.passwords.verify(pin, candidate.pinSalt, candidate.pinHash),
-      );
-      if (matches.length !== 1) {
-        throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
-      }
-      record = matches[0];
-    }
-    if ((record.lockedUntil?.getTime() ?? 0) > Date.now() || record.failedAttempts >= 10) {
-      throw new ForbiddenException({ code: 'PIN_LOCKED' });
-    }
-    if (!this.passwords.verify(pin, record.pinSalt, record.pinHash)) {
-      await this.repo.recordPosPinFailure(record.staffId);
-      await this.repo.writeSecurityAudit({
-        actorUserId: record.userId,
-        sessionId: null,
-        businessId: tenantId,
-        branchId,
-        eventType: 'authentication.pin_denied',
-        entityType: 'staff',
-        entityId: record.staffId,
-        outcome: 'denied',
-        reasonCode: 'pin_invalid',
-        metadata: { app: 'pos' },
-      });
-      throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
-    }
-    const allowed = await this.repo.deviceAllowedForUser(
-      record.userId,
-      client.deviceId,
-      client.app,
-      tokenHash(client.installationId),
-      tokenHash(client.deviceCredential),
-      tenantId,
-      branchId,
-    );
-    if (!allowed) {
-      throw new UnauthorizedException({ code: 'DEVICE_NOT_ALLOWED' });
-    }
-    const entitlement = await this.repo.effectiveEntitlement(tenantId, 'pos');
-    if (!entitlement?.enabled || !['trialing', 'active'].includes(entitlement.subscriptionStatus)) {
-      throw new ForbiddenException({ code: 'ENTITLEMENT_DISABLED' });
-    }
-    try {
-      if (!(await this.repo.confirmPosPin(record.staffId, tenantId, lookupHash))) {
-        throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
-      }
-    } catch (error) {
-      if ((error as { code?: string }).code === '23505') {
-        throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
-      }
-      throw error;
-    }
-
+    const summary = await this.repo.findUserById(userId);
+    if (!summary) throw new UnauthorizedException('invalid_token');
     const user: SessionUser = {
-      id: record.userId,
-      email: record.email,
-      displayName: record.displayName,
+      id: summary.userId,
+      email: summary.email,
+      displayName: summary.displayName,
     };
-    const [tenants, tokens] = await Promise.all([
-      this.repo.findTenantsForUser(user.id),
-      this.createSession(user, client),
+    const [merchants, tokens] = await Promise.all([
+      this.repo.findMerchantsForUser(user.id),
+      this.issueTokens(user),
     ]);
-    await this.repo.writeSecurityAudit({
-      actorUserId: user.id,
-      sessionId: tokens.sessionId,
-      businessId: tenantId,
-      branchId,
-      eventType: 'authentication.pin_succeeded',
-      entityType: 'staff',
-      entityId: record.staffId,
-      outcome: 'success',
-      metadata: { app: 'pos' },
-    });
-    return { user, tenants, ...tokens };
+    return { user, merchants, ...tokens };
   }
 
   /** Rotate the access token from a valid refresh token. */
-  async refresh(refreshToken: string, client: SessionClient): Promise<LoginResult> {
+  async refresh(refreshToken: string): Promise<LoginResult> {
     const claims = await this.jwt.verifyRefresh(refreshToken);
-    const current = await this.repo.findSession(claims.sessionId);
-    if (
-      !current ||
-      current.userId !== claims.sub ||
-      current.tokenHash !== tokenHash(refreshToken) ||
-      current.revokedAt ||
-      new Date(current.expiresAt) <= new Date()
-    ) {
-      if (current) {
-        await this.repo.revokeSessionFamily(current.id, 'refresh_replay');
-        await this.repo.writeSecurityAudit({
-          actorUserId: claims.sub,
-          sessionId: current.id,
-          eventType: 'authentication.refresh_replay',
-          entityType: 'session',
-          entityId: current.id,
-          outcome: 'denied',
-          reasonCode: 'refresh_replay',
-        });
-      }
-      throw new UnauthorizedException('invalid_token');
-    }
-    if (
-      current.deviceId &&
-      !(await this.repo.deviceAllowedForUser(
-        claims.sub,
-        current.deviceId,
-        current.app,
-        client.installationId ? tokenHash(client.installationId) : null,
-        client.deviceCredential ? tokenHash(client.deviceCredential) : null,
-      ))
-    ) {
-      await this.repo.revokeSession(current.id, 'device_not_allowed');
-      throw new UnauthorizedException('device_not_allowed');
-    }
     const summary = await this.repo.findUserById(claims.sub);
     if (!summary) throw new UnauthorizedException('invalid_token');
     const user: SessionUser = {
@@ -252,54 +157,154 @@ export class AuthService {
       email: summary.email,
       displayName: summary.displayName,
     };
-    const [tenants, tokens] = await Promise.all([
-      this.repo.findTenantsForUser(user.id),
-      this.rotateSession(user, current, refreshToken, client),
+    const [merchants, tokens] = await Promise.all([
+      this.repo.findMerchantsForUser(user.id),
+      this.issueTokens(user, claims.sessionId),
     ]);
-    return { user, tenants, ...tokens };
+    return { user, merchants, ...tokens };
+  }
+
+  async pinLogin(input: {
+    pin: string;
+    merchantId: string;
+    locationId: string;
+    installationId: string;
+    deviceId: string | null;
+    deviceCredential: string | null;
+    ip: string | null;
+  }): Promise<LoginResult> {
+    if (!input.deviceId || !input.deviceCredential) {
+      throw new UnauthorizedException({ code: 'DEVICE_NOT_ALLOWED' });
+    }
+    this.enforcePinRateLimit(`pos-pin:ip:${input.ip ?? 'unknown'}`, 20, 5 * 60_000);
+    this.enforcePinRateLimit(`pos-pin:device:${input.deviceId}`, 10, 5 * 60_000);
+
+    const installationHash = sha256(input.installationId);
+    const credentialHash = sha256(input.deviceCredential);
+    const deviceAllowed = await this.repo.validatePosDevice({
+      deviceId: input.deviceId,
+      merchantId: input.merchantId,
+      locationId: input.locationId,
+      installationHash,
+      credentialHash,
+    });
+    if (!deviceAllowed) {
+      throw new UnauthorizedException({ code: 'DEVICE_NOT_ALLOWED' });
+    }
+
+    const secret = this.config.get('JWT_SECRET', { infer: true });
+    if (!secret) throw new Error('JWT_SECRET is required for POS PIN authentication');
+    const lookupHash = posPinLookupHash(secret, input.merchantId, input.pin);
+    const record = await this.repo.findPosPinStaff(
+      input.merchantId,
+      input.locationId,
+      lookupHash,
+    );
+    if (!record || !this.passwords.verify(input.pin, record.pinSalt, record.pinHash)) {
+      await this.repo.recordPosPinFailure(input.deviceId);
+      throw new ForbiddenException({ code: 'PIN_INVALID' });
+    }
+    if (!record.email) {
+      throw new ForbiddenException({ code: 'OPERATOR_LOGIN_UNAVAILABLE' });
+    }
+    const entitlement = await this.repo.effectiveEntitlement(input.merchantId, 'pos');
+    if (!entitlement?.enabled || !['trialing', 'active'].includes(entitlement.subscriptionStatus)) {
+      throw new ForbiddenException({ code: 'ENTITLEMENT_DISABLED' });
+    }
+
+    await this.repo.clearPosPinFailures(input.deviceId);
+    const user: SessionUser = {
+      id: record.userId,
+      email: record.email,
+      displayName: record.displayName,
+    };
+    const sessionId = randomUUID();
+    const [merchants, tokens] = await Promise.all([
+      this.repo.findMerchantsForUser(user.id),
+      this.issueTokens(user, sessionId, input.deviceId),
+    ]);
+    await this.repo.createPosSession({
+      id: sessionId,
+      merchantId: input.merchantId,
+      locationId: input.locationId,
+      userId: user.id,
+      deviceId: input.deviceId,
+      tokenHash: sha256(tokens.refreshToken),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60_000),
+    });
+    return { user, merchants, ...tokens };
+  }
+
+  async posRefresh(input: {
+    refreshToken: string;
+    installationId: string;
+    deviceCredential: string | null;
+  }): Promise<LoginResult> {
+    if (!input.deviceCredential) {
+      throw new UnauthorizedException({ code: 'DEVICE_NOT_ALLOWED' });
+    }
+    const claims = await this.jwt.verifyRefresh(input.refreshToken);
+    const session = await this.repo.validatePosSession({
+      sessionId: claims.sessionId,
+      userId: claims.sub,
+      installationHash: sha256(input.installationId),
+      credentialHash: sha256(input.deviceCredential),
+    });
+    if (!session) throw new UnauthorizedException({ code: 'DEVICE_NOT_ALLOWED' });
+
+    const summary = await this.repo.findUserById(claims.sub);
+    if (!summary) throw new UnauthorizedException('invalid_token');
+    const user: SessionUser = {
+      id: summary.userId,
+      email: summary.email,
+      displayName: summary.displayName,
+    };
+    const [merchants, tokens] = await Promise.all([
+      this.repo.findMerchantsForUser(user.id),
+      this.issueTokens(user, claims.sessionId, session.deviceId),
+    ]);
+    if (!(await this.repo.rotatePosSessionToken(claims.sessionId, sha256(tokens.refreshToken)))) {
+      throw new UnauthorizedException('invalid_token');
+    }
+    return { user, merchants, ...tokens };
+  }
+
+  async posLogout(refreshToken: string): Promise<void> {
+    const claims = await this.jwt.verifyRefresh(refreshToken);
+    await this.repo.revokePosSession(claims.sessionId, claims.sub, sha256(refreshToken));
+  }
+
+  async posGlobalLogout(userId: string, sessionId: string, exceptCurrent: boolean): Promise<void> {
+    await this.repo.revokePosSessionsForOperator(userId, exceptCurrent ? sessionId : null);
   }
 
   /** Rehydrate the session for `/me` from a verified access cookie. */
-  async session(userId: string): Promise<{ user: SessionUser; tenants: TenantMembership[] }> {
+  async session(
+    userId: string,
+  ): Promise<{ user: SessionUser; merchants: MerchantMembershipSummary[] }> {
     const summary = await this.repo.findUserById(userId);
     if (!summary) throw new UnauthorizedException('invalid_token');
-    const [tenants] = await Promise.all([this.repo.findTenantsForUser(userId)]);
+    const [merchants] = await Promise.all([this.repo.findMerchantsForUser(userId)]);
     return {
       user: {
         id: summary.userId,
         email: summary.email,
         displayName: summary.displayName,
       },
-      tenants,
+      merchants,
     };
   }
 
-  private async createSession(user: SessionUser, client: SessionClient): Promise<TokenPair> {
-    const sessionId = randomUUID();
-    const refreshToken = await this.jwt.signRefresh(user.id, sessionId);
-    const accessToken = await this.jwt.signAccess({
-      sub: user.id,
-      email: user.email,
-      sessionId,
-      deviceId: client.deviceId,
-    });
-    await this.repo.createSession({
-      id: sessionId,
-      userId: user.id,
-      deviceId: client.deviceId,
-      app: client.app,
-      tokenHash: tokenHash(refreshToken),
-      expiresAt: this.refreshExpiry(),
-      ip: client.ip,
-      userAgent: client.userAgent,
-    });
-    return { accessToken, refreshToken, sessionId, deviceId: client.deviceId };
-  }
-
-  private pinLookupHash(tenantId: string, pin: string): string {
-    const secret = this.config.get('JWT_SECRET', { infer: true });
-    if (!secret) throw new Error('JWT_SECRET is required for POS PIN authentication');
-    return posPinLookupHash(secret, tenantId, pin);
+  private async issueTokens(
+    user: SessionUser,
+    sessionId: string = randomUUID(),
+    deviceId: string | null = null,
+  ): Promise<TokenPair> {
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwt.signAccess({ sub: user.id, email: user.email, sessionId, deviceId }),
+      this.jwt.signRefresh(user.id, sessionId),
+    ]);
+    return { accessToken, refreshToken, sessionId, deviceId };
   }
 
   private enforcePinRateLimit(key: string, max: number, windowMs: number): void {
@@ -313,77 +318,6 @@ export class AuthService {
         429,
       );
     }
-  }
-
-  private async rotateSession(
-    user: SessionUser,
-    current: {
-      id: string;
-      deviceId: string | null;
-      app: 'dashboard' | 'kds' | 'pos';
-    },
-    oldRefreshToken: string,
-    client: SessionClient,
-  ): Promise<TokenPair> {
-    const sessionId = randomUUID();
-    const deviceId = current.deviceId ?? client.deviceId;
-    const refreshToken = await this.jwt.signRefresh(user.id, sessionId);
-    const accessToken = await this.jwt.signAccess({
-      sub: user.id,
-      email: user.email,
-      sessionId,
-      deviceId,
-    });
-    const rotated = await this.repo.rotateSession(current.id, tokenHash(oldRefreshToken), {
-      id: sessionId,
-      userId: user.id,
-      deviceId,
-      app: current.app,
-      tokenHash: tokenHash(refreshToken),
-      expiresAt: this.refreshExpiry(),
-      ip: client.ip,
-      userAgent: client.userAgent,
-    });
-    if (!rotated) throw new UnauthorizedException('invalid_token');
-    return { accessToken, refreshToken, sessionId, deviceId };
-  }
-
-  async logout(refreshToken: string | undefined): Promise<void> {
-    if (!refreshToken) return;
-    try {
-      const claims = await this.jwt.verifyRefresh(refreshToken);
-      await this.repo.revokeSession(claims.sessionId, 'logout');
-      await this.repo.writeSecurityAudit({
-        actorUserId: claims.sub,
-        sessionId: claims.sessionId,
-        eventType: 'session.revoked',
-        entityType: 'session',
-        entityId: claims.sessionId,
-        outcome: 'success',
-        reasonCode: 'logout',
-      });
-    } catch {
-      // Logout remains idempotent. Invalid cookies are cleared by the controller.
-    }
-  }
-
-  async globalLogout(userId: string, sessionId: string, exceptCurrent: boolean): Promise<number> {
-    const count = await this.repo.revokeUserSessions(userId, exceptCurrent ? sessionId : null);
-    await this.repo.writeSecurityAudit({
-      actorUserId: userId,
-      sessionId,
-      eventType: 'session.global_logout',
-      entityType: 'user',
-      entityId: userId,
-      outcome: 'success',
-      metadata: { revokedSessionCount: count, exceptCurrent },
-    });
-    return count;
-  }
-
-  private refreshExpiry(): Date {
-    const ttl = parseDurationSeconds(this.config.get('JWT_REFRESH_TTL', { infer: true }));
-    return new Date(Date.now() + ttl * 1000);
   }
 
   /**
@@ -446,19 +380,9 @@ export class AuthService {
     const { salt, hash } = this.passwords.hash(password);
     await this.repo.updatePassword(record.userId, salt, hash);
     await this.repo.markResetTokenUsed(record.id);
-    await this.repo.revokeUserSessions(record.userId, null);
-    await this.repo.writeSecurityAudit({
-      actorUserId: record.userId,
-      sessionId: null,
-      eventType: 'identity.password_changed',
-      entityType: 'user',
-      entityId: record.userId,
-      outcome: 'success',
-      reasonCode: 'password_reset',
-    });
   }
 }
 
-function tokenHash(token: string): string {
-  return createHash('sha256').update(token).digest('hex');
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
 }

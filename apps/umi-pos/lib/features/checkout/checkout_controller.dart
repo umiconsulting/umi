@@ -58,8 +58,8 @@ final class CheckoutController extends ChangeNotifier {
   Map<String, Object?>? get tipDraft => _tipDraft;
   List<Map<String, Object?>> get discountDrafts => _discountDrafts;
   Map<String, Object?> get receiptDelivery => _receiptDelivery;
-  String? _tenantId;
-  String? _branchId;
+  String? _merchantId;
+  String? _locationId;
   String? _operatorSessionId;
   String? _cartId;
   String? _cashShiftId;
@@ -67,7 +67,7 @@ final class CheckoutController extends ChangeNotifier {
   String _paymentMethod = 'cash';
   Cart? _cart;
   OfflineAuthorityContext? _authority;
-  String _branchName = '';
+  String _locationName = '';
   String _operatorName = '';
   int? _cashReceivedMinorUnits;
   List<Map<String, Object?>> _tenderDrafts = const [];
@@ -85,8 +85,8 @@ final class CheckoutController extends ChangeNotifier {
   final Map<String, CheckoutResult> _confirmationCache = {};
 
   Future<void> preview({
-    required String tenantId,
-    required String branchId,
+    required String merchantId,
+    required String locationId,
     required String operatorSessionId,
     required String cartId,
     required int cartVersion,
@@ -94,7 +94,7 @@ final class CheckoutController extends ChangeNotifier {
     String? cashShiftId,
     Cart? cart,
     OfflineAuthorityContext? authority,
-    String branchName = '',
+    String locationName = '',
     String operatorName = '',
     int? cashReceivedMinorUnits,
     List<Map<String, Object?>> tenderDrafts = const [],
@@ -107,8 +107,8 @@ final class CheckoutController extends ChangeNotifier {
       'customerContactId': null,
     },
   }) async {
-    _tenantId = tenantId;
-    _branchId = branchId;
+    _merchantId = merchantId;
+    _locationId = locationId;
     _operatorSessionId = operatorSessionId;
     _cartId = cartId;
     _cartVersion = cartVersion;
@@ -116,7 +116,7 @@ final class CheckoutController extends ChangeNotifier {
     _cashShiftId = cashShiftId;
     _cart = cart;
     _authority = authority;
-    _branchName = branchName;
+    _locationName = locationName;
     _operatorName = operatorName;
     _cashReceivedMinorUnits = cashReceivedMinorUnits;
     _tenderDrafts = List.unmodifiable(tenderDrafts);
@@ -161,23 +161,23 @@ final class CheckoutController extends ChangeNotifier {
   }
 
   Future<void> recover({
-    required String tenantId,
-    required String branchId,
+    required String merchantId,
+    required String locationId,
     required String operatorSessionId,
     required String cartId,
     required int cartVersion,
   }) async {
     try {
-      _tenantId = tenantId;
-      _branchId = branchId;
+      _merchantId = merchantId;
+      _locationId = locationId;
       _operatorSessionId = operatorSessionId;
       _cartId = cartId;
       _cartVersion = cartVersion;
       final recovered = await _repository.recovery(
-        tenantId,
+        merchantId,
         cartId,
         CheckoutRecoveryQuery(
-          branchId: branchId,
+          locationId: locationId,
           operatorSessionId: operatorSessionId,
         ),
       );
@@ -262,8 +262,8 @@ final class CheckoutController extends ChangeNotifier {
   Future<void> queryUnknownPayment() async {
     final payment = _state.result?.payment ?? _recoveredPaymentOutcome;
     if (payment == null ||
-        _tenantId == null ||
-        _branchId == null ||
+        _merchantId == null ||
+        _locationId == null ||
         _operatorSessionId == null) {
       return;
     }
@@ -272,10 +272,10 @@ final class CheckoutController extends ChangeNotifier {
     );
     try {
       final outcome = await _repository.paymentStatus(
-        _tenantId!,
+        _merchantId!,
         attempt.id,
         PaymentStatusQuery(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
         ),
       );
@@ -316,8 +316,8 @@ final class CheckoutController extends ChangeNotifier {
   }
 
   void reset() {
-    _tenantId = null;
-    _branchId = null;
+    _merchantId = null;
+    _locationId = null;
     _operatorSessionId = null;
     _cartId = null;
     _cashShiftId = null;
@@ -325,7 +325,7 @@ final class CheckoutController extends ChangeNotifier {
     _paymentMethod = 'cash';
     _cart = null;
     _authority = null;
-    _branchName = '';
+    _locationName = '';
     _operatorName = '';
     _cashReceivedMinorUnits = null;
     _tenderDrafts = const [];
@@ -344,8 +344,8 @@ final class CheckoutController extends ChangeNotifier {
   }
 
   Future<bool> cancel({String reason = 'operator_cancelled'}) async {
-    if (_tenantId == null ||
-        _branchId == null ||
+    if (_merchantId == null ||
+        _locationId == null ||
         _operatorSessionId == null ||
         _cartId == null) {
       reset();
@@ -354,10 +354,10 @@ final class CheckoutController extends ChangeNotifier {
     if (_state.phase == CheckoutPhase.paymentUnknown) return false;
     try {
       await _repository.cancel(
-        _tenantId!,
+        _merchantId!,
         _cartId!,
         CheckoutCancellationRequest(
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           reason: reason,
           checkoutFingerprint:
@@ -376,8 +376,8 @@ final class CheckoutController extends ChangeNotifier {
   }
 
   Future<void> _submit(String? fingerprint) async {
-    if (_tenantId == null ||
-        _branchId == null ||
+    if (_merchantId == null ||
+        _locationId == null ||
         _operatorSessionId == null ||
         _cartId == null ||
         _cartVersion == null) {
@@ -385,11 +385,11 @@ final class CheckoutController extends ChangeNotifier {
     }
     try {
       final result = await _repository.checkout(
-        _tenantId!,
+        _merchantId!,
         CheckoutCommand(
           commandId: fingerprint == null ? _uuid() : _commitCommandId,
           cartId: _cartId!,
-          branchId: _branchId!,
+          locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
           expectedCartVersion: _cartVersion!,
           paymentMethod: _paymentMethod,
@@ -482,7 +482,7 @@ final class CheckoutController extends ChangeNotifier {
           checkoutCommand: CheckoutCommand(
             commandId: commandId,
             cartId: cart.id,
-            branchId: cart.branchId,
+            locationId: cart.locationId,
             operatorSessionId: cart.operatorSessionId,
             expectedCartVersion: cart.version,
             paymentMethod: 'cash',
@@ -505,7 +505,7 @@ final class CheckoutController extends ChangeNotifier {
           taxSnapshotAt: snapshotAt,
           amountReceivedMinorUnits: _cashReceivedMinorUnits ?? amount,
           businessDate: TotalsPreview.fromJson(totals.totals).businessDate,
-          branchName: _branchName,
+          locationName: _locationName,
           operatorName: _operatorName,
         ),
         facts: OfflineCheckoutFacts(

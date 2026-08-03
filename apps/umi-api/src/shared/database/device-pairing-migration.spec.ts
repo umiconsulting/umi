@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const sql = readFileSync(
-  resolve(process.cwd(), '../../supabase/migrations/20260729000100_device_pairing_approval.sql'),
+  resolve(process.cwd(), '../../docs/migration/build-v3/30_device_pairing.sql'),
   'utf8',
 );
 
@@ -17,11 +17,11 @@ describe('UmiPOS device pairing migration', () => {
     expect(sql).not.toContain('device_credential text');
   });
 
-  it('binds each request to one tenant and branch', () => {
-    expect(sql).toContain('business_id');
-    expect(sql).toContain('branch_id');
-    expect(sql).toContain('device_enrollment_request_branch_scope_fk');
-    expect(sql).toContain('references tenant.branch(business_id, id)');
+  it('binds each request to one merchant and location', () => {
+    expect(sql).toContain('merchant_id');
+    expect(sql).toContain('location_id');
+    expect(sql).toContain('device_enrollment_request_location_scope_fk');
+    expect(sql).toContain('references merchant.location(merchant_id, id)');
   });
 
   it('enforces one session, bounded attempts, and terminal request states', () => {

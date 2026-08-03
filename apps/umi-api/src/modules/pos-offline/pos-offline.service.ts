@@ -29,15 +29,15 @@ export class PosOfflineService {
     private readonly checkout: PosCheckoutService,
   ) {}
 
-  async begin(user: AuthUser, tenantId: string, dto: BeginReplayRequest) {
+  async begin(user: AuthUser, merchantId: string, dto: BeginReplayRequest) {
     const context = await this.authorize(
       user,
-      tenantId,
-      dto.branchId,
+      merchantId,
+      dto.locationId,
       dto.operatorSessionId,
       dto.credentialVersion,
     );
-    const policy = await this.issuePolicy(user, tenantId, dto);
+    const policy = await this.issuePolicy(user, merchantId, dto);
     return {
       replaySessionId: randomUUID(),
       cursor: this.cursor(user.deviceId!, dto.credentialVersion, context.lastAcceptedSequence),
@@ -47,17 +47,17 @@ export class PosOfflineService {
 
   async issuePolicy(
     user: AuthUser,
-    tenantId: string,
+    merchantId: string,
     query: ReplayContextQuery,
   ): Promise<OfflinePolicy> {
     const context = await this.authorize(
       user,
-      tenantId,
-      query.branchId,
+      merchantId,
+      query.locationId,
       query.operatorSessionId,
       query.credentialVersion,
     );
-    const configured = await this.repo.policy(tenantId, query.branchId);
+    const configured = await this.repo.policy(merchantId, query.locationId);
     const hasPermission =
       context.permissions.includes('*') || context.permissions.includes('offline.cash.checkout');
     const hasEntitlement = context.entitlements.some(
@@ -79,8 +79,8 @@ export class PosOfflineService {
       issuedAt: issuedAt.toISOString(),
       expiresAt: (configured?.expiresAt ?? issuedAt).toISOString(),
       maxPolicyAgeSeconds: configured?.maxPolicyAgeSeconds ?? 60,
-      tenantId,
-      branchId: query.branchId,
+      merchantId,
+      locationId: query.locationId,
       deviceId: user.deviceId!,
       deviceCredentialVersion: query.credentialVersion,
       currency: configured?.currency ?? context.currency,
@@ -116,14 +116,14 @@ export class PosOfflineService {
     };
   }
 
-  async batch(user: AuthUser, tenantId: string, batch: ReplayBatch): Promise<ReplayBatchResult> {
+  async batch(user: AuthUser, merchantId: string, batch: ReplayBatch): Promise<ReplayBatchResult> {
     const first = batch.commands[0];
     const release = await this.repo.acquireReplayLock(
       first.deviceId,
       first.deviceCredentialVersion,
     );
     try {
-      return await this.batchLocked(user, tenantId, batch);
+      return await this.batchLocked(user, merchantId, batch);
     } finally {
       await release();
     }
@@ -131,14 +131,14 @@ export class PosOfflineService {
 
   private async batchLocked(
     user: AuthUser,
-    tenantId: string,
+    merchantId: string,
     batch: ReplayBatch,
   ): Promise<ReplayBatchResult> {
     const first = batch.commands[0];
     const replayContext = await this.authorize(
       user,
-      tenantId,
-      first.branchId,
+      merchantId,
+      first.locationId,
       first.operatorSessionId,
       first.deviceCredentialVersion,
     );
@@ -146,9 +146,9 @@ export class PosOfflineService {
     if (
       sorted.some(
         (command, index) =>
-          command.tenantId !== tenantId ||
+          command.merchantId !== merchantId ||
           command.deviceId !== user.deviceId ||
-          command.branchId !== first.branchId ||
+          command.locationId !== first.locationId ||
           command.operatorSessionId !== first.operatorSessionId ||
           command.deviceCredentialVersion !== first.deviceCredentialVersion ||
           command.deviceSequence !== sorted[0].deviceSequence + index,
@@ -199,16 +199,16 @@ export class PosOfflineService {
           stopped = true;
           break;
         }
-        const policy = await this.issuePolicy(user, tenantId, {
-          branchId: command.branchId,
+        const policy = await this.issuePolicy(user, merchantId, {
+          locationId: command.locationId,
           operatorSessionId: command.operatorSessionId,
           credentialVersion: command.deviceCredentialVersion,
         });
         let exposure = exposureByPolicy.get(parsed.data.policyFingerprint);
         if (!exposure) {
           exposure = await this.repo.cashExposure(
-            tenantId,
-            command.branchId,
+            merchantId,
+            command.locationId,
             command.deviceId,
             parsed.data.policyFingerprint,
           );
@@ -231,7 +231,7 @@ export class PosOfflineService {
         const pricingAt = new Date(snapshot.pricingSnapshotAt);
         const taxAt = new Date(snapshot.taxSnapshotAt);
         const invalidSnapshot =
-          snapshot.checkoutCommand.branchId !== command.branchId ||
+          snapshot.checkoutCommand.locationId !== command.locationId ||
           snapshot.checkoutCommand.operatorSessionId !== command.operatorSessionId ||
           snapshot.checkoutCommand.paymentMethod !== 'cash' ||
           snapshot.currency !== policy.cash.currency ||
@@ -254,7 +254,7 @@ export class PosOfflineService {
           stopped = true;
           break;
         }
-        const preview = await this.checkout.checkout(user, tenantId, {
+        const preview = await this.checkout.checkout(user, merchantId, {
           ...snapshot.checkoutCommand,
           totalsFingerprint: null,
           idempotencyKey: command.idempotencyKey,
@@ -278,7 +278,7 @@ export class PosOfflineService {
         }
         const checkout = await this.checkout.checkout(
           user,
-          tenantId,
+          merchantId,
           parsed.data.snapshot.checkoutCommand,
         );
         if (
@@ -334,16 +334,16 @@ export class PosOfflineService {
 
   async reconcile(
     user: AuthUser,
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     operatorSessionId: string,
     credentialVersion: number,
     dto: ReconcileRequest,
   ): Promise<ReconciliationSummary> {
     const context = await this.authorize(
       user,
-      tenantId,
-      branchId,
+      merchantId,
+      locationId,
       operatorSessionId,
       credentialVersion,
     );
@@ -355,8 +355,8 @@ export class PosOfflineService {
     )
       missing.push(value);
     const [conflicts, provisionalMappings] = await Promise.all([
-      this.repo.conflicts(tenantId, branchId, user.deviceId!),
-      this.repo.mappings(tenantId, branchId, user.deviceId!),
+      this.repo.conflicts(merchantId, locationId, user.deviceId!),
+      this.repo.mappings(merchantId, locationId, user.deviceId!),
     ]);
     const summary = {
       deviceId: user.deviceId!,
@@ -375,8 +375,8 @@ export class PosOfflineService {
         conflicts.length > 0,
     };
     const reconciliationId = await this.repo.persistReconciliation({
-      tenantId,
-      branchId,
+      merchantId,
+      locationId,
       deviceId: user.deviceId!,
       credentialVersion,
       summary,
@@ -384,11 +384,11 @@ export class PosOfflineService {
     return { reconciliationId, ...summary };
   }
 
-  async readCursor(user: AuthUser, tenantId: string, query: ReplayContextQuery) {
+  async readCursor(user: AuthUser, merchantId: string, query: ReplayContextQuery) {
     const context = await this.authorize(
       user,
-      tenantId,
-      query.branchId,
+      merchantId,
+      query.locationId,
       query.operatorSessionId,
       query.credentialVersion,
     );
@@ -397,20 +397,20 @@ export class PosOfflineService {
 
   async commandResult(
     user: AuthUser,
-    tenantId: string,
+    merchantId: string,
     query: ReplayContextQuery,
     commandId: string,
   ) {
     await this.authorize(
       user,
-      tenantId,
-      query.branchId,
+      merchantId,
+      query.locationId,
       query.operatorSessionId,
       query.credentialVersion,
     );
     const result = await this.repo.commandResult(
-      tenantId,
-      query.branchId,
+      merchantId,
+      query.locationId,
       user.deviceId!,
       query.credentialVersion,
       commandId,
@@ -419,18 +419,18 @@ export class PosOfflineService {
     return result;
   }
 
-  async diagnostics(user: AuthUser, tenantId: string, query: ReplayContextQuery) {
+  async diagnostics(user: AuthUser, merchantId: string, query: ReplayContextQuery) {
     await this.authorize(
       user,
-      tenantId,
-      query.branchId,
+      merchantId,
+      query.locationId,
       query.operatorSessionId,
       query.credentialVersion,
     );
-    const value = await this.repo.diagnostics(tenantId, user.deviceId!, query.credentialVersion);
+    const value = await this.repo.diagnostics(merchantId, user.deviceId!, query.credentialVersion);
     const [conflicts, audit] = await Promise.all([
-      this.repo.conflicts(tenantId, query.branchId, user.deviceId!),
-      this.repo.audit(tenantId, query.branchId, user.deviceId!),
+      this.repo.conflicts(merchantId, query.locationId, user.deviceId!),
+      this.repo.audit(merchantId, query.locationId, user.deviceId!),
     ]);
     return {
       contractVersion: '1.6.0',
@@ -447,37 +447,37 @@ export class PosOfflineService {
 
   async acknowledge(
     user: AuthUser,
-    tenantId: string,
+    merchantId: string,
     query: ReplayContextQuery,
     reconciliationId: string,
   ) {
     await this.authorize(
       user,
-      tenantId,
-      query.branchId,
+      merchantId,
+      query.locationId,
       query.operatorSessionId,
       query.credentialVersion,
     );
     return {
-      acknowledged: await this.repo.acknowledge(tenantId, user.deviceId!, reconciliationId),
+      acknowledged: await this.repo.acknowledge(merchantId, user.deviceId!, reconciliationId),
     };
   }
 
-  async conflicts(user: AuthUser, tenantId: string, query: ReplayContextQuery) {
+  async conflicts(user: AuthUser, merchantId: string, query: ReplayContextQuery) {
     await this.authorize(
       user,
-      tenantId,
-      query.branchId,
+      merchantId,
+      query.locationId,
       query.operatorSessionId,
       query.credentialVersion,
     );
-    return { items: await this.repo.conflicts(tenantId, query.branchId, user.deviceId!) };
+    return { items: await this.repo.conflicts(merchantId, query.locationId, user.deviceId!) };
   }
 
   private async authorize(
     user: AuthUser,
-    tenantId: string,
-    branchId: string,
+    merchantId: string,
+    locationId: string,
     operatorSessionId: string,
     credentialVersion: number,
   ) {
@@ -485,8 +485,8 @@ export class PosOfflineService {
     const context = await this.repo.context({
       userId: user.id,
       deviceId: user.deviceId,
-      tenantId,
-      branchId,
+      merchantId,
+      locationId,
       operatorSessionId,
       credentialVersion,
     });

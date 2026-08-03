@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  ForbiddenException,
   Get,
   Headers,
   Param,
@@ -22,29 +21,28 @@ import {
 import type { FastifyRequest } from 'fastify';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { AuthGuard } from '../auth/auth.guard';
-import { CurrentUser, Tenant } from '../auth/current-user.decorator';
+import { CurrentUser, Merchant } from '../auth/current-user.decorator';
 import { Public } from '../auth/public.decorator';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
-import { TenantAccessGuard } from '../auth/tenant-access.guard';
-import type { AuthUser, TenantAccess } from '../auth/auth.types';
+import { MerchantAccessGuard } from '../auth/merchant-access.guard';
+import type { AuthUser, MerchantAccess } from '../auth/auth.types';
 import { DevicesService } from './devices.service';
 
 @UseGuards(AuthGuard)
-@Controller('api')
+@Controller('api/v1')
 export class DevicesController {
   constructor(private readonly devices: DevicesService) {}
 
-  @Post('tenants/:tenantId/devices/enrollment')
-  @UseGuards(TenantAccessGuard, RolesGuard)
+  @Post('merchants/:merchantId/devices/enrollment')
+  @UseGuards(MerchantAccessGuard, RolesGuard)
   @Roles('owner', 'admin', 'super_admin')
   begin(
-    @Tenant() tenant: TenantAccess,
+    @Merchant() merchant: MerchantAccess,
     @CurrentUser() user: AuthUser,
     @Body(new ZodValidationPipe(BeginDeviceEnrollmentRequest)) dto: BeginDeviceEnrollmentRequest,
   ) {
-    this.assertBranchAccess(tenant, dto.branchId);
-    return this.devices.begin(tenant.tenantId, user.id, dto);
+    return this.devices.begin(merchant.merchantId, user.id, dto);
   }
 
   @Public()
@@ -57,48 +55,48 @@ export class DevicesController {
     return this.devices.claim(dto, request.ip);
   }
 
-  @Get('tenants/:tenantId/devices/enrollment-requests')
-  @UseGuards(TenantAccessGuard, RolesGuard)
+  @Get('merchants/:merchantId/devices/enrollment-requests')
+  @UseGuards(MerchantAccessGuard, RolesGuard)
   @Roles('owner', 'admin', 'super_admin')
-  list(@Tenant() tenant: TenantAccess) {
-    return this.devices.list(tenant.tenantId, tenant.allBranches ? null : tenant.branchIds);
+  list(@Merchant() merchant: MerchantAccess) {
+    return this.devices.list(merchant.merchantId, null);
   }
 
-  @Post('tenants/:tenantId/devices/enrollment-requests/:requestId/approve')
-  @UseGuards(TenantAccessGuard, RolesGuard)
+  @Post('merchants/:merchantId/devices/enrollment-requests/:requestId/approve')
+  @UseGuards(MerchantAccessGuard, RolesGuard)
   @Roles('owner', 'admin', 'super_admin')
   approve(
-    @Tenant() tenant: TenantAccess,
+    @Merchant() merchant: MerchantAccess,
     @CurrentUser() user: AuthUser,
     @Param('requestId') requestId: string,
     @Body(new ZodValidationPipe(DecideDeviceEnrollmentRequest))
     dto: DecideDeviceEnrollmentRequest,
   ) {
     return this.devices.approve(
-      tenant.tenantId,
+      merchant.merchantId,
       user.id,
       requestId,
       dto.idempotencyKey,
-      tenant.allBranches ? null : tenant.branchIds,
+      null,
     );
   }
 
-  @Post('tenants/:tenantId/devices/enrollment-requests/:requestId/deny')
-  @UseGuards(TenantAccessGuard, RolesGuard)
+  @Post('merchants/:merchantId/devices/enrollment-requests/:requestId/deny')
+  @UseGuards(MerchantAccessGuard, RolesGuard)
   @Roles('owner', 'admin', 'super_admin')
   deny(
-    @Tenant() tenant: TenantAccess,
+    @Merchant() merchant: MerchantAccess,
     @CurrentUser() user: AuthUser,
     @Param('requestId') requestId: string,
     @Body(new ZodValidationPipe(DecideDeviceEnrollmentRequest))
     dto: DecideDeviceEnrollmentRequest,
   ) {
     return this.devices.deny(
-      tenant.tenantId,
+      merchant.merchantId,
       user.id,
       requestId,
       dto.idempotencyKey,
-      tenant.allBranches ? null : tenant.branchIds,
+      null,
     );
   }
 
@@ -134,50 +132,43 @@ export class DevicesController {
     return this.devices.authenticate(publicId, installationId, credential, true);
   }
 
-  @Post('tenants/:tenantId/devices/:deviceId/rotate')
-  @UseGuards(TenantAccessGuard, RolesGuard)
+  @Post('merchants/:merchantId/devices/:deviceId/rotate')
+  @UseGuards(MerchantAccessGuard, RolesGuard)
   @Roles('owner', 'admin', 'super_admin')
   rotate(
-    @Tenant() tenant: TenantAccess,
+    @Merchant() merchant: MerchantAccess,
     @Param('deviceId') deviceId: string,
     @Body(new ZodValidationPipe(RotateDeviceCredentialRequest))
     dto: RotateDeviceCredentialRequest,
   ) {
     return this.devices.rotate(
-      tenant.tenantId,
+      merchant.merchantId,
       deviceId,
       dto.currentCredentialVersion,
       dto.idempotencyKey,
     );
   }
 
-  @Post('tenants/:tenantId/devices/:deviceId/revoke')
-  @UseGuards(TenantAccessGuard, RolesGuard)
+  @Post('merchants/:merchantId/devices/:deviceId/revoke')
+  @UseGuards(MerchantAccessGuard, RolesGuard)
   @Roles('owner', 'admin', 'super_admin')
   async revoke(
-    @Tenant() tenant: TenantAccess,
+    @Merchant() merchant: MerchantAccess,
     @Param('deviceId') deviceId: string,
     @Body(new ZodValidationPipe(RevokeDeviceRequest)) dto: RevokeDeviceRequest,
   ) {
-    await this.devices.revoke(tenant.tenantId, deviceId, dto.reason, dto.idempotencyKey);
+    await this.devices.revoke(merchant.merchantId, deviceId, dto.reason, dto.idempotencyKey);
     return { ok: true as const };
   }
 
-  @Post('tenants/:tenantId/devices/replacement')
-  @UseGuards(TenantAccessGuard, RolesGuard)
+  @Post('merchants/:merchantId/devices/replacement')
+  @UseGuards(MerchantAccessGuard, RolesGuard)
   @Roles('owner', 'admin', 'super_admin')
   replace(
-    @Tenant() tenant: TenantAccess,
+    @Merchant() merchant: MerchantAccess,
     @CurrentUser() user: AuthUser,
     @Body(new ZodValidationPipe(ReplaceDeviceRequest)) dto: ReplaceDeviceRequest,
   ) {
-    this.assertBranchAccess(tenant, dto.branchId);
-    return this.devices.beginForReplacement(tenant.tenantId, user.id, dto, dto.replacedDeviceId);
-  }
-
-  private assertBranchAccess(tenant: TenantAccess, branchId: string | null): void {
-    if (!tenant.allBranches && (branchId === null || !tenant.branchIds.includes(branchId))) {
-      throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
-    }
+    return this.devices.beginForReplacement(merchant.merchantId, user.id, dto, dto.replacedDeviceId);
   }
 }

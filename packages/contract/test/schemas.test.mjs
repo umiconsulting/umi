@@ -123,7 +123,7 @@ test('session schemas (auth surface) — representative parse', () => {
     SessionResponse.safeParse({
       session: {
         user: { id: '1', email: 'a@b.co', displayName: null },
-        tenants: [{ id: 't', slug: 's', name: 'n', roles: ['owner'] }],
+        merchants: [{ id: 't', slug: 's', name: 'n', roles: ['owner'] }],
         provider: 'local',
         accessExpiresIn: 1800,
         sessionId: '00000000-0000-4000-8000-000000000001',
@@ -136,14 +136,14 @@ test('session schemas (auth surface) — representative parse', () => {
 test('POS PIN login requires scoped device input and four to eight digits', () => {
   const request = {
     pin: '2468',
-    tenantId: '00000000-0000-4000-8000-000000000001',
-    branchId: '00000000-0000-4000-8000-000000000002',
+    merchantId: '00000000-0000-4000-8000-000000000001',
+    locationId: '00000000-0000-4000-8000-000000000002',
     installationId: '00000000-0000-4000-8000-000000000003',
   };
   assert.ok(PosPinLoginRequest.safeParse(request).success);
   assert.equal(PosPinLoginRequest.safeParse({ ...request, pin: '123' }).success, false);
   assert.equal(PosPinLoginRequest.safeParse({ ...request, pin: '123456789' }).success, false);
-  assert.equal(PosPinLoginRequest.safeParse({ ...request, branchId: 'wrong' }).success, false);
+  assert.equal(PosPinLoginRequest.safeParse({ ...request, locationId: 'wrong' }).success, false);
 });
 
 test('staff creation accepts a personal operator PIN without exposing it in responses', () => {
@@ -152,6 +152,7 @@ test('staff creation accepts a personal operator PIN without exposing it in resp
       name: 'Cashier',
       email: 'cashier@example.test',
       role: 'cashier',
+      locationId: null,
       operatorPin: '2468',
     }).success,
   );
@@ -160,6 +161,7 @@ test('staff creation accepts a personal operator PIN without exposing it in resp
       name: 'Cashier',
       email: 'cashier@example.test',
       role: 'cashier',
+      locationId: null,
       operatorPin: '12ab',
     }).success,
     false,
