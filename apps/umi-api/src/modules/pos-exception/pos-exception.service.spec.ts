@@ -32,12 +32,7 @@ describe('Gate 3D exception application boundary', () => {
   });
 
   it('binds manager approval to the sale, preview, and command', async () => {
-    const commandFingerprint = exceptionCommandFingerprint(
-      id(7),
-      id(12),
-      'a'.repeat(64),
-      id(8),
-    );
+    const commandFingerprint = exceptionCommandFingerprint(id(7), id(12), 'a'.repeat(64), id(8));
     const repo = {
       authorize: vi.fn().mockResolvedValue(authorization),
       assertPreview: vi.fn(),

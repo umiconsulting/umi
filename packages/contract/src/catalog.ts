@@ -89,8 +89,7 @@ export const invariantCatalog = {
     'Original sale facts stay immutable. Each exception creates linked append-only compensation facts.',
   RefundLimit:
     'Cumulative line, tax, discount, tip, tender, and cash compensation cannot exceed original facts.',
-  RefundAmbiguity:
-    'An unknown terminal refund is query-only and blocks a replacement refund.',
+  RefundAmbiguity: 'An unknown terminal refund is query-only and blocks a replacement refund.',
 } as const;
 
 /** Hours a recorded command result stays replayable. Mirrored by `business_command.expires_at`. */

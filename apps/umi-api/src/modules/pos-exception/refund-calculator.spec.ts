@@ -4,9 +4,7 @@ import { refundApprovalRequired } from './pos-exception.repository';
 
 describe('Gate 3D refund allocation', () => {
   it('requires approval above the dedicated cash threshold', () => {
-    expect(refundApprovalRequired('partial_refund', 500, 1000, 500, 400, false, false)).toBe(
-      true,
-    );
+    expect(refundApprovalRequired('partial_refund', 500, 1000, 500, 400, false, false)).toBe(true);
   });
 
   const sale = {

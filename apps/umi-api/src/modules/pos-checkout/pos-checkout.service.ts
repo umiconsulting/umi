@@ -601,10 +601,7 @@ export class PosCheckoutService {
         orderDiscount += entry.amount.minorUnits;
       }
     }
-    const gross = lineSnapshot.reduce(
-      (total, item) => total + item.price.lineTotal.minorUnits,
-      0,
-    );
+    const gross = lineSnapshot.reduce((total, item) => total + item.price.lineTotal.minorUnits, 0);
     let assignedOrderDiscount = 0;
     let assignedTip = 0;
     const tipTotal = paymentSummary.tip?.amount.minorUnits ?? 0;

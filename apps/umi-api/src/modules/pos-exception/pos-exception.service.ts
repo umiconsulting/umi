@@ -147,12 +147,7 @@ export class PosExceptionService {
           saleId,
           authorization,
           dto,
-          exceptionCommandFingerprint(
-            saleId,
-            dto.previewId,
-            dto.previewFingerprint,
-            dto.commandId,
-          ),
+          exceptionCommandFingerprint(saleId, dto.previewId, dto.previewFingerprint, dto.commandId),
           context.correlationId,
         );
         await context.appendAudit({
