@@ -932,4 +932,187 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get varianceReasonUnknown => 'Operational difference';
+
+  @override
+  String get saleExceptionAction => 'Post-sale actions';
+
+  @override
+  String get saleExceptionTitle => 'Refund or void';
+
+  @override
+  String get fullRefundAction => 'Full refund';
+
+  @override
+  String get partialRefundAction => 'Partial refund';
+
+  @override
+  String get voidSaleAction => 'Void sale';
+
+  @override
+  String get refundableAmountLabel => 'Remaining refundable amount';
+
+  @override
+  String get remainingRefundableQuantityLabel => 'Remaining quantity';
+
+  @override
+  String get alreadyRefundedLabel => 'Already refunded';
+
+  @override
+  String get refundReasonLabel => 'Refund reason';
+
+  @override
+  String get restockAction => 'Restock';
+
+  @override
+  String get doNotRestockAction => 'Do not restock';
+
+  @override
+  String get inspectionRequiredAction => 'Inspection required';
+
+  @override
+  String get taxRefundLabel => 'Tax refund';
+
+  @override
+  String get discountAllocationLabel => 'Discount allocation';
+
+  @override
+  String get tipRefundLabel => 'Tip refund';
+
+  @override
+  String get cashRefundLabel => 'Cash refund';
+
+  @override
+  String get manualTerminalRefundLabel => 'Manual terminal refund';
+
+  @override
+  String get manualTerminalRefundProviderNotice =>
+      'Process the refund in the external terminal. UmiPOS records your observation. It does not prove provider success.';
+
+  @override
+  String get approvalExpiredMessage =>
+      'The approval expired. Request a new approval.';
+
+  @override
+  String get paymentOutcomeUnknownMessage =>
+      'The terminal outcome is unknown. Verify the original terminal operation.';
+
+  @override
+  String get verifyTerminalAction => 'Verify terminal outcome';
+
+  @override
+  String get terminalRefundSuccessAction => 'The external refund succeeded';
+
+  @override
+  String get terminalRefundFailureAction => 'The external refund failed';
+
+  @override
+  String get terminalRefundUnknownAction => 'The outcome is unknown';
+
+  @override
+  String get refundBlockedMessage =>
+      'The server blocked this post-sale action.';
+
+  @override
+  String get refundPolicyExpiredMessage => 'The refund policy window expired.';
+
+  @override
+  String get supportRequiredMessage => 'Support review is required.';
+
+  @override
+  String get compensatingReceiptTitle => 'Refund receipt';
+
+  @override
+  String get fullyRefundedLabel => 'Fully refunded';
+
+  @override
+  String get partiallyRefundedLabel => 'Partially refunded';
+
+  @override
+  String get voidedSaleLabel => 'Voided';
+
+  @override
+  String get recoveredRefundMessage => 'The saved refund result was restored.';
+
+  @override
+  String get refundCommittedMessage => 'The refund was committed.';
+
+  @override
+  String get refundPreviewAction => 'Review refund';
+
+  @override
+  String get commitRefundAction => 'Commit refund';
+
+  @override
+  String get refundConfirmationTitle => 'Commit this refund?';
+
+  @override
+  String get refundConfirmationBody =>
+      'This action creates permanent compensation facts. The original sale stays unchanged.';
+
+  @override
+  String get originalSaleLabel => 'Original sale';
+
+  @override
+  String get exceptionHistoryLabel => 'Exception history';
+
+  @override
+  String get refundOperationFailedMessage =>
+      'The post-sale action could not complete safely.';
+
+  @override
+  String get selectRefundLinesMessage => 'Select at least one refundable line.';
+
+  @override
+  String get refundReasonCustomerChangedMind => 'Customer changed their mind';
+
+  @override
+  String get refundReasonProductDefect => 'Product defect';
+
+  @override
+  String get refundReasonIncorrectItem => 'Incorrect item';
+
+  @override
+  String get refundReasonIncorrectQuantity => 'Incorrect quantity';
+
+  @override
+  String get refundReasonDuplicateCharge => 'Duplicate charge';
+
+  @override
+  String get refundReasonQualityIssue => 'Quality issue';
+
+  @override
+  String get refundReasonOrderPreparationError => 'Order preparation error';
+
+  @override
+  String get refundReasonPricingError => 'Pricing error';
+
+  @override
+  String get voidReasonOperatorError => 'Operator error';
+
+  @override
+  String get voidReasonDuplicateSale => 'Duplicate sale';
+
+  @override
+  String get voidReasonIncorrectTender => 'Incorrect tender';
+
+  @override
+  String get voidReasonSaleEnteredByMistake => 'Sale entered by mistake';
+
+  @override
+  String get otherApprovedReasonLabel => 'Other approved reason';
+
+  @override
+  String get decreaseRefundQuantityTooltip => 'Decrease refund quantity';
+
+  @override
+  String get increaseRefundQuantityTooltip => 'Increase refund quantity';
+
+  @override
+  String get restockIntentLabel => 'Restock intent';
+
+  @override
+  String get restockNotApplicableLabel => 'Restock does not apply';
+
+  @override
+  String get restockInventoryReviewLabel => 'Inventory review required';
 }

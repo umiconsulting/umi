@@ -65,6 +65,18 @@ revoke select on runtime.session, runtime.otp, runtime.password_reset_token,
 -- global catalogs + per-café tables (RLS-scoped); minimal, scoped runtime.
 grant select, insert, update, delete on all tables in schema merchant to api;
 
+-- Gate 3D keeps policy server-owned and committed compensation append-only.
+revoke insert, update, delete on merchant.pos_exception_policy from api;
+revoke delete on merchant.pos_exception_preview from api;
+revoke update, delete on
+  merchant.pos_sale_exception,
+  merchant.pos_sale_exception_line,
+  merchant.pos_tender_compensation,
+  merchant.pos_cash_compensation,
+  merchant.pos_restock_intent,
+  merchant.pos_exception_receipt
+from api;
+
 --   umi global catalogs — same for every merchant, safe to read cross-merchant
 grant select on umi.role, umi.permission, umi.role_permission, umi.channel_type,
                 umi.feature, umi.plan, umi.plan_feature to api;
@@ -424,7 +436,8 @@ begin
   foreach t in array array[
     'device_replay_cursor', 'offline_replay_command', 'offline_reconciliation',
     'offline_replay_conflict', 'offline_provisional_mapping',
-    'pos_checkout_draft', 'cash_shift'
+    'pos_checkout_draft', 'cash_shift',
+    'pos_exception_preview', 'pos_sale_exception'
   ] loop
     execute format($f$create policy device_scoping on merchant.%I as restrictive
       using      (umi.current_device() is not null and device_id = umi.current_device())

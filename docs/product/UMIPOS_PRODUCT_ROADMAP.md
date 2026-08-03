@@ -1,6 +1,6 @@
 # UmiPOS Product Roadmap
 
-Updated: 2026-07-29
+Updated: 2026-08-03
 
 | Gate                                    | Status                     | Dependency             | Next objective                                       | Blocker                                              | Validation                                                                                                               |
 | --------------------------------------- | -------------------------- | ---------------------- | ---------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -13,11 +13,13 @@ Updated: 2026-07-29
 | 2F Offline journal and reconciliation   | Complete with observations | 2E, command envelopes  | Preserve certified offline boundary                  | Historical toolchain observation resolved in Gate 3A | Focused contract, API, Flutter, Web, migration and PostgreSQL negative checks passed                                     |
 | 3A Sale lifecycle foundation            | Complete                   | 2F                     | Maintain cashier sale lifecycle                      | None                                                 | Focused contract, API, Flutter, accessibility, localization, Linux, and PostgreSQL checks passed                         |
 | 3B Advanced checkout and payment        | Complete                   | 3A                     | Maintain the checkout lifecycle                      | None                                                 | Focused contract, API, Flutter, accessibility, localization, Linux, and PostgreSQL checks passed                         |
-| 3C Cash shift and register operations   | Complete                   | 3B                     | Approve the next commercial POS Gate                 | None                                                 | Focused contract, API, Flutter, accessibility, localization, Linux, and PostgreSQL checks passed                         |
-| Later platform work                     | Planned                    | 3C                     | Inventory, refunds, KDS, customer display, Assistant | Next Gate scope approval                             | Not run                                                                                                                  |
+| 3C Cash shift and register operations   | Complete                   | 3B                     | Maintain cash custody controls                        | None                                                 | Focused contract, API, Flutter, accessibility, localization, Linux, and PostgreSQL checks passed                         |
+| 3D Refunds, voids, and exceptions       | Complete                   | 3C                     | Maintain immutable post-sale compensation             | None                                                 | Focused contract, API, Flutter, accessibility, localization, Linux, Web, and PostgreSQL checks passed                    |
+| 3E Inventory synchronization            | Planned                    | 3D                     | Approve the inventory authority and stock ledger scope | Scope approval required                              | Not run                                                                                                                  |
+| Later platform work                     | Planned                    | 3E                     | KDS, loyalty, hardware, CRM, Assistant                 | Gate sequence approval                               | Not run                                                                                                                  |
 
-The latest relevant revision is this PR #72 integration commit.
-PR #72 keeps Gate 3A, Gate 3B, and Gate 3C complete on current `build-v3`.
+The latest relevant revision is the Gate 3D commit in PR #72.
+PR #72 keeps Gate 3A through Gate 3D complete on current `build-v3`.
 Native encrypted offline support covers the explicit allowlist and server-policy-authorized cash;
 Web sensitive journaling remains disabled. UMI remains the
 sole business authority; Flutter owns presentation, hardware integration, encrypted local state,
@@ -33,3 +35,8 @@ payment recovery, receipt intent, and atomic sale, payment, and receipt commit.
 Gate 3C adds the physical register, cash shift, opening float, append-only cash ledger,
 cash movements, handoff, blind count, variance approval, reconciliation, and atomic close.
 Advanced cash operations remain online-only. A cash sale can use the Gate 2F offline policy.
+
+Gate 3D adds server-authorized void and refund eligibility, full and partial refunds, historical
+tax and discount allocation, tender and cash compensation, manager approval, restock intent,
+immutable compensation receipts, history, and recovery. It does not change inventory. Manual
+terminal refund success remains an operator assertion. All exception mutations require online authority.

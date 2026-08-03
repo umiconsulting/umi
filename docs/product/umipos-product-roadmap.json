@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-02",
-  "latestRelevantCommit": "this PR #72 integration commit",
-  "integrationState": "Gate 3A through Gate 3C preserved on current build-v3",
+  "updatedAt": "2026-08-03",
+  "latestRelevantCommit": "HEAD (Gate 3D commit)",
+  "integrationState": "Gate 3A through Gate 3D preserved on current build-v3",
   "items": [
     {
       "id": "platform-certification",
@@ -83,6 +83,14 @@
       "nextObjective": "Approve the scope of the next commercial POS Gate",
       "blockers": [],
       "validationState": "Focused contract, API, Flutter, accessibility, localization, Linux, cash invariants, and disposable PostgreSQL validation passed"
+    },
+    {
+      "id": "3D",
+      "status": "complete",
+      "dependencies": ["3C"],
+      "nextObjective": "Approve Gate 3E inventory synchronization scope",
+      "blockers": [],
+      "validationState": "Focused contract, API, Flutter, accessibility, localization, Linux, Web, refund invariants, and disposable PostgreSQL validation passed"
     }
   ]
 }

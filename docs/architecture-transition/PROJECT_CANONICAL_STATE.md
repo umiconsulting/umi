@@ -1,6 +1,6 @@
 # UMI × UmiPOS — Canonical Project State
 
-Updated: 2026-08-02
+Updated: 2026-08-03
 
 ## Product authority
 
@@ -46,6 +46,8 @@ Future clients use `packages/contract` and controlled UMI APIs.
   policy-controlled tips and discounts, one-use manager approval, recovery, and receipt intent.
 - Gate 3C established the physical register and cash shift lifecycle. It supports opening float,
   append-only cash facts, movements, handoff, blind count, variance, reconciliation, and close.
+- Gate 3D established the post-sale exception lifecycle. It supports narrow voids, full and
+  partial refunds, immutable compensation, exception receipts, approval, and recovery.
 
 ## Current implementation state
 
@@ -89,8 +91,16 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - UmiPOS uses a personal merchant-unique PIN after device trust. The API resolves the staff identity
   and current role without an email or client role selector.
 - `runtime.operator_session` separates operator presence from PIN authentication.
-- UmiPOS consumes contract version `2.1.0`, content hash
-  `33dea07d6f25831f39944c9c4066795cf525c80d42f3bcb2a56da92ba00d23bb`.
+- UmiPOS consumes contract version `2.2.0`, content hash
+  `c8be1d2927a482ea163bcdf81edef3f0947ede2528d80cf305b1f131130106b8`.
+- Original sale, payment, receipt, and cash facts remain immutable after an exception.
+- `merchant.pos_sale_exception` and related tables own append-only compensation history.
+- Refund amounts use original receipt, discount, tax, tip, and tender snapshots.
+- Cash refunds post atomically to the current eligible shift. They never rewrite the source shift.
+- Manual terminal refunds record an operator assertion. They do not claim provider proof.
+- An unknown terminal refund stays query-only and blocks a replacement refund.
+- Restock data is an immutable intent. Gate 3D does not change inventory.
+- Post-sale exception commands require online server authority.
 - Native UmiPOS journal schema version 1 uses AES-256-GCM with platform-secure key storage and
   separate ciphertext persistence. Replay is ordered per device credential version; Web sensitive
   journaling is unsupported.
@@ -161,10 +171,20 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Gate 3C: complete. Cash shift state version 1 supports register assignment, immutable cash
   facts, handoff, blind count, variance approval, reconciliation, close, and restart recovery.
 - Gate 3C produced a successful Linux debug build and disposable PostgreSQL negative matrix.
-- Next gate: scope approval is required for the next commercial POS Gate.
+- Gate 3D: complete. Exception state version 1 supports refund eligibility, narrow voids, full and
+  partial refunds, tender compensation, approval, exception receipts, and restart recovery.
+- Gate 3D produced successful Linux debug and Web builds. Its disposable PostgreSQL matrix passed.
+- Next gate: Gate 3E inventory synchronization requires explicit scope approval.
 
 ## Gate 3C decision basis
 
 - Documented fact: the UMI API owns checkout, cash facts, command idempotency, and audit.
 - Source-backed tradeoff: immutable ledger facts produce expected cash without a mutable authority.
 - Umi-specific inference: a software count records an operator observation, not physical custody.
+
+## Gate 3D decision basis
+
+- Documented fact: the UMI API owns sale, payment, receipt, cash, and command authority.
+- Source-backed tradeoff: append-only compensation preserves the original financial evidence.
+- Umi-specific inference: manual terminal outcomes remain operator assertions until provider integration exists.
+- Umi-specific inference: restock intent does not prove that stock returned to inventory.

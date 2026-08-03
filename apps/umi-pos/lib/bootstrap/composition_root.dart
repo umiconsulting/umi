@@ -17,6 +17,9 @@ import '../features/checkout/checkout_controller.dart';
 import '../features/checkout/checkout_repository.dart';
 import '../features/entry/entry_controller.dart';
 import '../features/entry/entry_gateway.dart';
+import '../features/exception/exception_controller.dart';
+import '../features/exception/exception_recovery_store.dart';
+import '../features/exception/exception_repository.dart';
 import '../features/offline/connectivity_controller.dart';
 import '../features/offline/offline_checkout_service.dart';
 import '../features/offline/offline_journal.dart';
@@ -39,6 +42,7 @@ final class AppCompositionRoot {
     required this.features,
     required this.credentials,
     required this.entry,
+    required this.exceptions,
     required this.catalog,
     required this.cart,
     required this.cash,
@@ -108,6 +112,10 @@ final class AppCompositionRoot {
         vault: credentials,
         telemetry: telemetry,
       ),
+      exceptions: SaleExceptionController(
+        repository: ApiSaleExceptionRepository(apiClient),
+        recoveryStore: SecureSaleExceptionRecoveryStore(secureStorage),
+      ),
       catalog: CatalogController(
         repository: ApiCatalogRepository(apiClient),
         cache: CatalogCache(),
@@ -146,6 +154,7 @@ final class AppCompositionRoot {
   final FeatureFlags features;
   final CredentialVault credentials;
   final EntryController entry;
+  final SaleExceptionController exceptions;
   final CatalogController catalog;
   final CartController cart;
   final CashController cash;
@@ -158,6 +167,7 @@ final class AppCompositionRoot {
   void dispose() {
     controller.dispose();
     entry.dispose();
+    exceptions.dispose();
     catalog.dispose();
     cart.dispose();
     cash.dispose();

@@ -10,6 +10,7 @@ import '../cash/cash_surface.dart';
 import '../checkout/checkout_controller.dart';
 import '../checkout/checkout_surface.dart';
 import '../entry/entry_controller.dart';
+import '../exception/exception_controller.dart';
 import '../offline/connectivity_controller.dart';
 import '../offline/offline_journal.dart';
 import '../offline/recovery_center.dart';
@@ -27,6 +28,7 @@ final class CatalogSurface extends StatefulWidget {
     required this.cash,
     required this.checkout,
     required this.sales,
+    required this.exceptions,
     required this.connectivity,
     required this.telemetry,
     this.offlineJournal,
@@ -39,6 +41,7 @@ final class CatalogSurface extends StatefulWidget {
   final CashController cash;
   final CheckoutController checkout;
   final SaleLifecycleController sales;
+  final SaleExceptionController exceptions;
   final ConnectivityController connectivity;
   final Telemetry telemetry;
   final EncryptedOfflineJournal? offlineJournal;
@@ -116,6 +119,11 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           entry.selectedTenant!.id,
           entry.selectedBranch!.id,
           entry.operator!.id,
+        );
+        await widget.exceptions.setContext(
+          merchantId: entry.selectedTenant!.id,
+          locationId: entry.selectedBranch!.id,
+          operatorSessionId: entry.operator!.id,
         );
         widget.connectivity.apiReachable(authorityValid: true);
       }
@@ -241,7 +249,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           ),
           IconButton(
             tooltip: l.saleHistoryTitle,
-            onPressed: () => showSaleCenter(context, widget.sales),
+            onPressed: () =>
+                showSaleCenter(context, widget.sales, widget.exceptions),
             icon: const Icon(Icons.receipt_long_outlined),
           ),
           IconButton(

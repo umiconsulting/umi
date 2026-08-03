@@ -1819,6 +1819,360 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Diferencia operativa'**
   String get varianceReasonUnknown;
+
+  /// No description provided for @saleExceptionAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Acciones posteriores a la venta'**
+  String get saleExceptionAction;
+
+  /// No description provided for @saleExceptionTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso o anulación'**
+  String get saleExceptionTitle;
+
+  /// No description provided for @fullRefundAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso total'**
+  String get fullRefundAction;
+
+  /// No description provided for @partialRefundAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso parcial'**
+  String get partialRefundAction;
+
+  /// No description provided for @voidSaleAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Anular venta'**
+  String get voidSaleAction;
+
+  /// No description provided for @refundableAmountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Importe restante reembolsable'**
+  String get refundableAmountLabel;
+
+  /// No description provided for @remainingRefundableQuantityLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Cantidad restante'**
+  String get remainingRefundableQuantityLabel;
+
+  /// No description provided for @alreadyRefundedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Ya reembolsado'**
+  String get alreadyRefundedLabel;
+
+  /// No description provided for @refundReasonLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Motivo del reembolso'**
+  String get refundReasonLabel;
+
+  /// No description provided for @restockAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Reponer'**
+  String get restockAction;
+
+  /// No description provided for @doNotRestockAction.
+  ///
+  /// In es, this message translates to:
+  /// **'No reponer'**
+  String get doNotRestockAction;
+
+  /// No description provided for @inspectionRequiredAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Requiere inspección'**
+  String get inspectionRequiredAction;
+
+  /// No description provided for @taxRefundLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso de impuestos'**
+  String get taxRefundLabel;
+
+  /// No description provided for @discountAllocationLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Asignación del descuento'**
+  String get discountAllocationLabel;
+
+  /// No description provided for @tipRefundLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso de propina'**
+  String get tipRefundLabel;
+
+  /// No description provided for @cashRefundLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso en efectivo'**
+  String get cashRefundLabel;
+
+  /// No description provided for @manualTerminalRefundLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso en terminal manual'**
+  String get manualTerminalRefundLabel;
+
+  /// No description provided for @manualTerminalRefundProviderNotice.
+  ///
+  /// In es, this message translates to:
+  /// **'Procesa el reembolso en la terminal externa. UmiPOS registra tu observación. No prueba el éxito del proveedor.'**
+  String get manualTerminalRefundProviderNotice;
+
+  /// No description provided for @approvalExpiredMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'La aprobación venció. Solicita una aprobación nueva.'**
+  String get approvalExpiredMessage;
+
+  /// No description provided for @paymentOutcomeUnknownMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Se desconoce el resultado de la terminal. Verifica la operación original.'**
+  String get paymentOutcomeUnknownMessage;
+
+  /// No description provided for @verifyTerminalAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Verificar resultado de la terminal'**
+  String get verifyTerminalAction;
+
+  /// No description provided for @terminalRefundSuccessAction.
+  ///
+  /// In es, this message translates to:
+  /// **'El reembolso externo tuvo éxito'**
+  String get terminalRefundSuccessAction;
+
+  /// No description provided for @terminalRefundFailureAction.
+  ///
+  /// In es, this message translates to:
+  /// **'El reembolso externo falló'**
+  String get terminalRefundFailureAction;
+
+  /// No description provided for @terminalRefundUnknownAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Se desconoce el resultado'**
+  String get terminalRefundUnknownAction;
+
+  /// No description provided for @refundBlockedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El servidor bloqueó esta acción posterior a la venta.'**
+  String get refundBlockedMessage;
+
+  /// No description provided for @refundPolicyExpiredMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El periodo permitido para el reembolso venció.'**
+  String get refundPolicyExpiredMessage;
+
+  /// No description provided for @supportRequiredMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Se requiere una revisión de soporte.'**
+  String get supportRequiredMessage;
+
+  /// No description provided for @compensatingReceiptTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Recibo de reembolso'**
+  String get compensatingReceiptTitle;
+
+  /// No description provided for @fullyRefundedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso total'**
+  String get fullyRefundedLabel;
+
+  /// No description provided for @partiallyRefundedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso parcial'**
+  String get partiallyRefundedLabel;
+
+  /// No description provided for @voidedSaleLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Venta anulada'**
+  String get voidedSaleLabel;
+
+  /// No description provided for @recoveredRefundMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Se restauró el resultado guardado del reembolso.'**
+  String get recoveredRefundMessage;
+
+  /// No description provided for @refundCommittedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El reembolso quedó confirmado.'**
+  String get refundCommittedMessage;
+
+  /// No description provided for @refundPreviewAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Revisar reembolso'**
+  String get refundPreviewAction;
+
+  /// No description provided for @commitRefundAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirmar reembolso'**
+  String get commitRefundAction;
+
+  /// No description provided for @refundConfirmationTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'¿Confirmar este reembolso?'**
+  String get refundConfirmationTitle;
+
+  /// No description provided for @refundConfirmationBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Esta acción crea ajustes permanentes. La venta original no cambia.'**
+  String get refundConfirmationBody;
+
+  /// No description provided for @originalSaleLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Venta original'**
+  String get originalSaleLabel;
+
+  /// No description provided for @exceptionHistoryLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Historial de ajustes'**
+  String get exceptionHistoryLabel;
+
+  /// No description provided for @refundOperationFailedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'No fue posible completar la acción de forma segura.'**
+  String get refundOperationFailedMessage;
+
+  /// No description provided for @selectRefundLinesMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Selecciona al menos una línea reembolsable.'**
+  String get selectRefundLinesMessage;
+
+  /// No description provided for @refundReasonCustomerChangedMind.
+  ///
+  /// In es, this message translates to:
+  /// **'El cliente cambió de opinión'**
+  String get refundReasonCustomerChangedMind;
+
+  /// No description provided for @refundReasonProductDefect.
+  ///
+  /// In es, this message translates to:
+  /// **'Producto defectuoso'**
+  String get refundReasonProductDefect;
+
+  /// No description provided for @refundReasonIncorrectItem.
+  ///
+  /// In es, this message translates to:
+  /// **'Producto incorrecto'**
+  String get refundReasonIncorrectItem;
+
+  /// No description provided for @refundReasonIncorrectQuantity.
+  ///
+  /// In es, this message translates to:
+  /// **'Cantidad incorrecta'**
+  String get refundReasonIncorrectQuantity;
+
+  /// No description provided for @refundReasonDuplicateCharge.
+  ///
+  /// In es, this message translates to:
+  /// **'Cobro duplicado'**
+  String get refundReasonDuplicateCharge;
+
+  /// No description provided for @refundReasonQualityIssue.
+  ///
+  /// In es, this message translates to:
+  /// **'Problema de calidad'**
+  String get refundReasonQualityIssue;
+
+  /// No description provided for @refundReasonOrderPreparationError.
+  ///
+  /// In es, this message translates to:
+  /// **'Error de preparación del pedido'**
+  String get refundReasonOrderPreparationError;
+
+  /// No description provided for @refundReasonPricingError.
+  ///
+  /// In es, this message translates to:
+  /// **'Error de precio'**
+  String get refundReasonPricingError;
+
+  /// No description provided for @voidReasonOperatorError.
+  ///
+  /// In es, this message translates to:
+  /// **'Error del operador'**
+  String get voidReasonOperatorError;
+
+  /// No description provided for @voidReasonDuplicateSale.
+  ///
+  /// In es, this message translates to:
+  /// **'Venta duplicada'**
+  String get voidReasonDuplicateSale;
+
+  /// No description provided for @voidReasonIncorrectTender.
+  ///
+  /// In es, this message translates to:
+  /// **'Forma de pago incorrecta'**
+  String get voidReasonIncorrectTender;
+
+  /// No description provided for @voidReasonSaleEnteredByMistake.
+  ///
+  /// In es, this message translates to:
+  /// **'Venta registrada por error'**
+  String get voidReasonSaleEnteredByMistake;
+
+  /// No description provided for @otherApprovedReasonLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Otro motivo aprobado'**
+  String get otherApprovedReasonLabel;
+
+  /// No description provided for @decreaseRefundQuantityTooltip.
+  ///
+  /// In es, this message translates to:
+  /// **'Reducir cantidad del reembolso'**
+  String get decreaseRefundQuantityTooltip;
+
+  /// No description provided for @increaseRefundQuantityTooltip.
+  ///
+  /// In es, this message translates to:
+  /// **'Aumentar cantidad del reembolso'**
+  String get increaseRefundQuantityTooltip;
+
+  /// No description provided for @restockIntentLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Decisión de reposición'**
+  String get restockIntentLabel;
+
+  /// No description provided for @restockNotApplicableLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'No aplica la reposición'**
+  String get restockNotApplicableLabel;
+
+  /// No description provided for @restockInventoryReviewLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Se requiere una revisión de inventario'**
+  String get restockInventoryReviewLabel;
 }
 
 class _AppLocalizationsDelegate

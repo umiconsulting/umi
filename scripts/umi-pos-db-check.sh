@@ -94,10 +94,10 @@ expect_error() {  # expect_error <label> <output>
 
 echo "== building a disposable build-v3 in $DB =="
 psql -q -c "create database $DB;" >/dev/null
-for f in 00_foundation 10_umi 20_merchant 30_runtime 30_device_pairing 31_pos_sale 32_pos_checkout 33_pos_cash 50_cross_schema_fk 60_triggers 90_rls 99_verify; do
-  if ! psql -X -q -v ON_ERROR_STOP=1 -d "$DB" -f "$DDL/$f.sql" >/dev/null 2>&1; then
+for f in 00_foundation 10_umi 20_merchant 30_runtime 30_device_pairing 31_pos_sale 32_pos_checkout 33_pos_cash 34_pos_exception 50_cross_schema_fk 60_triggers 90_rls 99_verify; do
+  if ! ddl_output=$(psql -X -q -v ON_ERROR_STOP=1 -d "$DB" -f "$DDL/$f.sql" 2>&1); then
     echo "  DDL FAILED at $f:"
-    psql -X -q -v ON_ERROR_STOP=1 -d "$DB" -f "$DDL/$f.sql" 2>&1 | grep -E 'ERROR|LINE' | head -5
+    printf '%s\n' "$ddl_output" | grep -E 'ERROR|LINE' | head -5
     exit 1
   fi
 done
@@ -212,6 +212,439 @@ expect "durable session is no longer active" "f" \
   "$(q -c "select is_active from runtime.session where id='$SE';")"
 expect "operator session is ended"         "ended" \
   "$(q -c "select state from runtime.operator_session where id='$OS';")"
+
+echo
+echo "== 8. Gate 3D exception isolation and immutability =="
+psql -X -q -v ON_ERROR_STOP=1 -d "$DB" >/dev/null <<SQL
+update merchant.device set status='active',revoked_at=null where id='$D1';
+update runtime.session set is_active=true,revoked_at=null where id='$SE';
+update runtime.operator_session
+set state='active',ended_at=null,expires_at=now()+interval '8 hours' where id='$OS';
+insert into merchant.pos_exception_policy
+  (merchant_id,location_id,version,currency,refunds_enabled,voids_enabled,
+   refund_window_minutes,void_window_minutes,expires_at,fingerprint)
+values
+  ('$A','$A1','gate-3d-a','MXN',true,true,1440,60,now()+interval '1 day',repeat('a',64)),
+  ('$B','b1000000-0000-4000-8000-000000000001','gate-3d-b','MXN',true,false,1440,0,
+   now()+interval '1 day',repeat('b',64));
+
+insert into merchant.product (id,merchant_id,name,price,sku)
+values ('d3000000-0000-4000-8000-000000000001','$A','Refund source',1000,'REF-1');
+insert into merchant.pos_cart
+  (id,merchant_id,location_id,operator_session_id,status,lifecycle_state,version,business_date,
+   original_operator_session_id,original_operator_user_id,operator_user_id)
+values ('d3000000-0000-4000-8000-000000000002','$A','$A1','$OS','committed','committed',1,
+  current_date,'$OS','$U1','$U1');
+insert into merchant.pos_cart_line
+  (id,merchant_id,cart_id,product_id,identity_key,product_name,quantity,base_price,tax_rate_basis_points)
+values ('d3000000-0000-4000-8000-000000000003','$A',
+  'd3000000-0000-4000-8000-000000000002','d3000000-0000-4000-8000-000000000001',
+  repeat('c',64),'Refund source',1,1000,0);
+insert into merchant.customer_order
+  (id,merchant_id,location_id,source,fulfillment_type,status,business_date,external_ref)
+values ('d3000000-0000-4000-8000-000000000004','$A','$A1','pos','dine_in','completed',
+  current_date,'gate-3d-check');
+insert into merchant.pos_payment_attempt
+  (id,merchant_id,location_id,cart_id,method,amount_minor_units,currency,status,query_only,correlation_id)
+values ('d3000000-0000-4000-8000-000000000005','$A','$A1',
+  'd3000000-0000-4000-8000-000000000002','cash',1000,'MXN','succeeded',false,'gate-3d-pay');
+insert into merchant.receipt_snapshot
+  (id,merchant_id,location_id,order_id,payment_attempt_id,receipt_number,business_date,currency,
+   grand_total,snapshot)
+values ('d3000000-0000-4000-8000-000000000006','$A','$A1',
+  'd3000000-0000-4000-8000-000000000004','d3000000-0000-4000-8000-000000000005',
+  'G3D-1',current_date,'MXN',1000,
+  jsonb_build_object('receiptRef','G3D-1','merchantId','$A','locationId','$A1',
+    'issuedAt',now(),'businessDate',current_date,'currency','MXN','version',1,
+    'subtotal',jsonb_build_object('minorUnits',1000,'currency','MXN'),
+    'taxTotal',jsonb_build_object('minorUnits',0,'currency','MXN'),
+    'grandTotal',jsonb_build_object('minorUnits',1000,'currency','MXN'),
+    'lines',jsonb_build_array(jsonb_build_object(
+      'lineRef','d3000000-0000-4000-8000-000000000003','description','Refund source','quantity',1,
+      'unitPrice',jsonb_build_object('minorUnits',1000,'currency','MXN'),
+      'lineTotal',jsonb_build_object('minorUnits',1000,'currency','MXN'),
+      'tax',jsonb_build_object('minorUnits',0,'currency','MXN'),
+      'discount',jsonb_build_object('minorUnits',0,'currency','MXN'),
+      'tip',jsonb_build_object('minorUnits',0,'currency','MXN')))));
+insert into merchant.pos_committed_sale
+  (id,merchant_id,location_id,cart_id,order_id,payment_attempt_id,receipt_snapshot_id,totals_fingerprint)
+values ('d3000000-0000-4000-8000-000000000007','$A','$A1',
+  'd3000000-0000-4000-8000-000000000002','d3000000-0000-4000-8000-000000000004',
+  'd3000000-0000-4000-8000-000000000005','d3000000-0000-4000-8000-000000000006',repeat('d',64));
+insert into merchant.pos_checkout_draft
+  (id,merchant_id,location_id,cart_id,operator_session_id,device_id,state,receipt_delivery)
+values ('d3000000-0000-4000-8000-000000000008','$A','$A1',
+  'd3000000-0000-4000-8000-000000000002','$OS','$D1','completed','{}');
+insert into merchant.pos_tender_fact
+  (id,merchant_id,location_id,checkout_id,cart_id,position,tender_type,status,
+   amount_minor_units,currency,correlation_id,committed_at)
+values ('d3000000-0000-4000-8000-000000000009','$A','$A1',
+  'd3000000-0000-4000-8000-000000000008','d3000000-0000-4000-8000-000000000002',
+  0,'cash','committed',1000,'MXN','gate-3d-tender',now());
+update merchant.pos_payment_attempt set tender_id='d3000000-0000-4000-8000-000000000009'
+where id='d3000000-0000-4000-8000-000000000005';
+
+insert into merchant.pos_exception_preview
+  (id,merchant_id,location_id,sale_id,original_receipt_id,operator_session_id,device_id,
+   exception_type,reason_code,selection,line_allocations,tender_allocations,allocation_policy,
+   restock_intents,merchandise_minor_units,tax_minor_units,discount_minor_units,tip_minor_units,
+   total_minor_units,remaining_after_minor_units,currency,approval_required,sale_version,
+   exception_version,preview_fingerprint,correlation_id,expires_at)
+values ('d3000000-0000-4000-8000-000000000010','$A','$A1',
+  'd3000000-0000-4000-8000-000000000007','d3000000-0000-4000-8000-000000000006',
+  '$OS','$D1','partial_refund','incorrect_item','[]','[]','[]','proportional','[]',
+  500,0,0,0,500,500,'MXN',false,1,0,repeat('e',64),'gate-3d-preview',now()+interval '5 minutes');
+insert into merchant.pos_sale_exception
+  (id,merchant_id,location_id,sale_id,original_receipt_id,preview_id,exception_type,status,
+   reason_code,operator_id,operator_session_id,device_id,device_credential_version,
+   command_id,idempotency_key,command_fingerprint,preview_fingerprint,
+   merchandise_minor_units,tax_minor_units,discount_minor_units,tip_minor_units,total_minor_units,
+   currency,business_date,correlation_id)
+values ('d3000000-0000-4000-8000-000000000011','$A','$A1',
+  'd3000000-0000-4000-8000-000000000007','d3000000-0000-4000-8000-000000000006',
+  'd3000000-0000-4000-8000-000000000010','partial_refund','committed','incorrect_item',
+  '$U1','$OS','$D1',1,'d3000000-0000-4000-8000-000000000012',
+  'd3000000-0000-4000-8000-000000000013',repeat('f',64),repeat('e',64),
+  500,0,0,0,500,'MXN',current_date,'gate-3d-exception');
+insert into merchant.pos_sale_exception_line
+  (merchant_id,location_id,exception_id,sale_id,sale_line_id,original_quantity,
+   compensated_quantity,original_merchandise_minor_units,original_tax_minor_units,
+   original_discount_minor_units,original_tip_minor_units,original_total_minor_units,
+   merchandise_minor_units,tax_minor_units,discount_minor_units,tip_minor_units,total_minor_units,
+   currency,restock_decision)
+values ('$A','$A1','d3000000-0000-4000-8000-000000000011',
+  'd3000000-0000-4000-8000-000000000007','d3000000-0000-4000-8000-000000000003',
+  1,1,1000,0,0,0,1000,500,0,0,0,500,'MXN','restock');
+insert into merchant.pos_tender_compensation
+  (merchant_id,location_id,exception_id,original_tender_id,tender_type,
+   amount_minor_units,currency,reversal_status,correlation_id)
+values ('$A','$A1','d3000000-0000-4000-8000-000000000011',
+  'd3000000-0000-4000-8000-000000000009','cash',500,'MXN','confirmed_success','tender-refund-1');
+insert into merchant.pos_exception_receipt
+  (merchant_id,location_id,exception_id,original_receipt_id,receipt_number,snapshot,
+   business_date,currency,total_minor_units)
+values ('$A','$A1','d3000000-0000-4000-8000-000000000011',
+  'd3000000-0000-4000-8000-000000000006','G3D-R-1','{}',current_date,'MXN',500);
+insert into merchant.business_command
+  (merchant_id,location_id,command_id,idempotency_key,command_type,fingerprint,status,
+   response_data,correlation_id,completed_at)
+values ('$A','$A1','d3000000-0000-4000-8000-000000000012','gate-3d-original',
+  'pos.exception.commit',repeat('f',64),'succeeded','{}','gate-3d-command',now());
+
+insert into merchant.pos_exception_preview
+  (id,merchant_id,location_id,sale_id,original_receipt_id,operator_session_id,device_id,
+   exception_type,reason_code,selection,line_allocations,tender_allocations,terminal_refund_status,
+   allocation_policy,restock_intents,merchandise_minor_units,tax_minor_units,
+   discount_minor_units,tip_minor_units,total_minor_units,remaining_after_minor_units,currency,
+   approval_required,sale_version,exception_version,preview_fingerprint,correlation_id,expires_at)
+values ('d3000000-0000-4000-8000-000000000020','$A','$A1',
+  'd3000000-0000-4000-8000-000000000007','d3000000-0000-4000-8000-000000000006',
+  '$OS','$D1','partial_refund','payment_correction','[]','[]','[]','confirmed_success',
+  'proportional','[]',1,0,0,0,1,999,'MXN',false,1,1,repeat('1',64),'terminal-preview',
+  now()+interval '5 minutes');
+insert into merchant.pos_sale_exception
+  (id,merchant_id,location_id,sale_id,original_receipt_id,preview_id,exception_type,status,
+   reason_code,operator_id,operator_session_id,device_id,device_credential_version,
+   command_id,idempotency_key,command_fingerprint,preview_fingerprint,
+   merchandise_minor_units,tax_minor_units,discount_minor_units,tip_minor_units,total_minor_units,
+   currency,business_date,correlation_id)
+values ('d3000000-0000-4000-8000-000000000021','$A','$A1',
+  'd3000000-0000-4000-8000-000000000007','d3000000-0000-4000-8000-000000000006',
+  'd3000000-0000-4000-8000-000000000020','partial_refund','committed','payment_correction',
+  '$U1','$OS','$D1',1,'d3000000-0000-4000-8000-000000000022',
+  'd3000000-0000-4000-8000-000000000023',repeat('2',64),repeat('1',64),
+  1,0,0,0,1,'MXN',current_date,'gate-3d-exception-2');
+
+insert into merchant.pos_exception_preview
+  (id,merchant_id,location_id,sale_id,original_receipt_id,operator_session_id,device_id,
+   exception_type,reason_code,selection,line_allocations,tender_allocations,allocation_policy,
+   restock_intents,merchandise_minor_units,tax_minor_units,discount_minor_units,tip_minor_units,
+   total_minor_units,remaining_after_minor_units,currency,approval_required,sale_version,
+   exception_version,preview_fingerprint,correlation_id,expires_at)
+values ('d3000000-0000-4000-8000-000000000030','$A','$A1',
+  'd3000000-0000-4000-8000-000000000007','d3000000-0000-4000-8000-000000000006',
+  '$OS','$D1','partial_refund','product_defect','[]','[]','[]','proportional','[]',
+  1,0,0,0,1,998,'MXN',true,1,2,repeat('3',64),'approval-preview',now()+interval '5 minutes');
+insert into runtime.elevation_grant
+  (id,session_id,merchant_id,location_id,permission_key,method,approved_by,expires_at,
+   consumed_at,command_fingerprint,consumed_by_command_id)
+values ('d3000000-0000-4000-8000-000000000031','$SE','$A','$A1','sale.refund.approve',
+  'manager_approval','$U1',now()+interval '5 minutes',now(),repeat('4',64),
+  'd3000000-0000-4000-8000-000000000032');
+insert into merchant.pos_sale_exception
+  (id,merchant_id,location_id,sale_id,original_receipt_id,preview_id,exception_type,status,
+   reason_code,operator_id,operator_session_id,device_id,device_credential_version,approval_id,
+   command_id,idempotency_key,command_fingerprint,preview_fingerprint,
+   merchandise_minor_units,tax_minor_units,discount_minor_units,tip_minor_units,total_minor_units,
+   currency,business_date,correlation_id)
+values ('d3000000-0000-4000-8000-000000000033','$A','$A1',
+  'd3000000-0000-4000-8000-000000000007','d3000000-0000-4000-8000-000000000006',
+  'd3000000-0000-4000-8000-000000000030','partial_refund','committed','product_defect',
+  '$U1','$OS','$D1',1,'d3000000-0000-4000-8000-000000000031',
+  'd3000000-0000-4000-8000-000000000032','d3000000-0000-4000-8000-000000000034',
+  repeat('4',64),repeat('3',64),1,0,0,0,1,'MXN',current_date,'approval-exception');
+
+insert into merchant.physical_register
+  (id,merchant_id,location_id,display_name,public_reference,currency,assigned_device_id,status)
+values ('d3000000-0000-4000-8000-000000000040','$A','$A1','Refund register',
+  'REFUND-REGISTER','MXN','$D1','assigned');
+insert into merchant.cash_shift
+  (id,merchant_id,location_id,register_id,device_id,device_credential_version,
+   opening_operator_id,responsible_operator_id,operator_session_id,currency,business_date,status,
+   opening_command_id,opening_float_minor_units,ledger_sequence)
+values ('d3000000-0000-4000-8000-000000000041','$A','$A1',
+  'd3000000-0000-4000-8000-000000000040','$D1',1,'$U1','$U1','$OS','MXN',current_date,
+  'open','d3000000-0000-4000-8000-000000000042',2000,0);
+update merchant.physical_register
+set current_shift_id='d3000000-0000-4000-8000-000000000041',status='in_use'
+where id='d3000000-0000-4000-8000-000000000040';
+insert into merchant.cash_ledger_entry
+  (id,merchant_id,location_id,register_id,shift_id,sequence,entry_type,amount_minor_units,
+   currency,command_id,business_date)
+values ('d3000000-0000-4000-8000-000000000043','$A','$A1',
+  'd3000000-0000-4000-8000-000000000040','d3000000-0000-4000-8000-000000000041',
+  1,'opening_float',2000,'MXN','d3000000-0000-4000-8000-000000000042',current_date);
+update merchant.cash_shift set ledger_sequence=1,version=version+1
+where id='d3000000-0000-4000-8000-000000000041';
+insert into merchant.cash_ledger_entry
+  (id,merchant_id,location_id,register_id,shift_id,sequence,entry_type,amount_minor_units,
+   currency,command_id,sale_id,sale_exception_id,business_date)
+values ('d3000000-0000-4000-8000-000000000044','$A','$A1',
+  'd3000000-0000-4000-8000-000000000040','d3000000-0000-4000-8000-000000000041',
+  2,'cash_refund',500,'MXN','d3000000-0000-4000-8000-000000000012',
+  'd3000000-0000-4000-8000-000000000007','d3000000-0000-4000-8000-000000000011',current_date);
+update merchant.cash_shift set ledger_sequence=2,version=version+1
+where id='d3000000-0000-4000-8000-000000000041';
+insert into merchant.pos_cash_compensation
+  (merchant_id,location_id,exception_id,original_tender_id,current_shift_id,
+   current_register_id,ledger_entry_id,amount_minor_units,currency)
+values ('$A','$A1','d3000000-0000-4000-8000-000000000011',
+  'd3000000-0000-4000-8000-000000000009','d3000000-0000-4000-8000-000000000041',
+  'd3000000-0000-4000-8000-000000000040','d3000000-0000-4000-8000-000000000044',500,'MXN');
+
+insert into merchant.pos_cart
+  (id,merchant_id,location_id,operator_session_id,status,lifecycle_state,version,business_date,
+   original_operator_session_id,original_operator_user_id,operator_user_id)
+values ('d3000000-0000-4000-8000-000000000060','$A','$A1','$OS','committed','committed',1,
+  current_date,'$OS','$U1','$U1');
+insert into merchant.pos_cart_line
+  (id,merchant_id,cart_id,product_id,identity_key,product_name,quantity,base_price,tax_rate_basis_points)
+values
+  ('d3000000-0000-4000-8000-000000000061','$A','d3000000-0000-4000-8000-000000000060',
+   'd3000000-0000-4000-8000-000000000001',repeat('6',64),'Legacy first',1,1000,0),
+  ('d3000000-0000-4000-8000-000000000062','$A','d3000000-0000-4000-8000-000000000060',
+   'd3000000-0000-4000-8000-000000000001',repeat('7',64),'Legacy last',1,1000,0);
+insert into merchant.customer_order
+  (id,merchant_id,location_id,source,fulfillment_type,status,business_date,external_ref)
+values ('d3000000-0000-4000-8000-000000000063','$A','$A1','pos','dine_in','completed',
+  current_date,'gate-3d-legacy');
+insert into merchant.pos_payment_attempt
+  (id,merchant_id,location_id,cart_id,method,amount_minor_units,currency,status,query_only,correlation_id)
+values ('d3000000-0000-4000-8000-000000000064','$A','$A1',
+  'd3000000-0000-4000-8000-000000000060','cash',2000,'MXN','succeeded',false,'legacy-pay');
+insert into merchant.receipt_snapshot
+  (id,merchant_id,location_id,order_id,payment_attempt_id,receipt_number,business_date,currency,
+   grand_total,snapshot)
+values ('d3000000-0000-4000-8000-000000000065','$A','$A1',
+  'd3000000-0000-4000-8000-000000000063','d3000000-0000-4000-8000-000000000064',
+  'G3D-LEGACY',current_date,'MXN',2000,
+  jsonb_build_object('receiptRef','G3D-LEGACY','currency','MXN',
+    'discountTotal',jsonb_build_object('minorUnits',1,'currency','MXN'),
+    'tip',jsonb_build_object('minorUnits',1,'currency','MXN'),
+    'lines',jsonb_build_array(
+      jsonb_build_object('lineRef','d3000000-0000-4000-8000-000000000061','quantity',1,
+        'lineTotal',jsonb_build_object('minorUnits',1000,'currency','MXN'),
+        'tax',jsonb_build_object('minorUnits',0,'currency','MXN')),
+      jsonb_build_object('lineRef','d3000000-0000-4000-8000-000000000062','quantity',1,
+        'lineTotal',jsonb_build_object('minorUnits',1000,'currency','MXN'),
+        'tax',jsonb_build_object('minorUnits',0,'currency','MXN')))));
+insert into merchant.pos_committed_sale
+  (id,merchant_id,location_id,cart_id,order_id,payment_attempt_id,receipt_snapshot_id,totals_fingerprint)
+values ('d3000000-0000-4000-8000-000000000066','$A','$A1',
+  'd3000000-0000-4000-8000-000000000060','d3000000-0000-4000-8000-000000000063',
+  'd3000000-0000-4000-8000-000000000064','d3000000-0000-4000-8000-000000000065',repeat('6',64));
+insert into merchant.pos_checkout_draft
+  (id,merchant_id,location_id,cart_id,operator_session_id,device_id,state,discount_drafts,
+   receipt_delivery,payment_summary)
+values ('d3000000-0000-4000-8000-000000000067','$A','$A1',
+  'd3000000-0000-4000-8000-000000000060','$OS','$D1','completed',
+  '[{"lineId":null}]','{}','{"discounts":{"entries":[{"amount":{"minorUnits":1}}]}}');
+insert into merchant.pos_exception_preview
+  (id,merchant_id,location_id,sale_id,original_receipt_id,operator_session_id,device_id,
+   exception_type,reason_code,selection,line_allocations,tender_allocations,allocation_policy,
+   restock_intents,merchandise_minor_units,tax_minor_units,discount_minor_units,tip_minor_units,
+   total_minor_units,remaining_after_minor_units,currency,approval_required,sale_version,
+   exception_version,preview_fingerprint,correlation_id,expires_at)
+values ('d3000000-0000-4000-8000-000000000068','$A','$A1',
+  'd3000000-0000-4000-8000-000000000066','d3000000-0000-4000-8000-000000000065',
+  '$OS','$D1','partial_refund','product_defect','[]','[]','[]','proportional','[]',
+  2,0,0,0,2,1998,'MXN',false,1,0,repeat('8',64),'legacy-preview',now()+interval '5 minutes');
+insert into merchant.pos_sale_exception
+  (id,merchant_id,location_id,sale_id,original_receipt_id,preview_id,exception_type,status,
+   reason_code,operator_id,operator_session_id,device_id,device_credential_version,
+   command_id,idempotency_key,command_fingerprint,preview_fingerprint,
+   merchandise_minor_units,tax_minor_units,discount_minor_units,tip_minor_units,total_minor_units,
+   currency,business_date,correlation_id)
+values ('d3000000-0000-4000-8000-000000000069','$A','$A1',
+  'd3000000-0000-4000-8000-000000000066','d3000000-0000-4000-8000-000000000065',
+  'd3000000-0000-4000-8000-000000000068','partial_refund','committed','product_defect',
+  '$U1','$OS','$D1',1,'d3000000-0000-4000-8000-000000000070',
+  'd3000000-0000-4000-8000-000000000071',repeat('7',64),repeat('8',64),
+  2,0,0,0,2,'MXN',current_date,'legacy-exception');
+insert into merchant.pos_sale_exception_line
+  (merchant_id,location_id,exception_id,sale_id,sale_line_id,original_quantity,
+   compensated_quantity,original_merchandise_minor_units,original_tax_minor_units,
+   original_discount_minor_units,original_tip_minor_units,original_total_minor_units,
+   merchandise_minor_units,tax_minor_units,discount_minor_units,tip_minor_units,total_minor_units,
+   currency,restock_decision)
+values
+  ('$A','$A1','d3000000-0000-4000-8000-000000000069',
+   'd3000000-0000-4000-8000-000000000066','d3000000-0000-4000-8000-000000000061',
+   1,1,1000,0,0,0,1000,1,0,0,0,1,'MXN','restock'),
+  ('$A','$A1','d3000000-0000-4000-8000-000000000069',
+   'd3000000-0000-4000-8000-000000000066','d3000000-0000-4000-8000-000000000062',
+   1,1,1000,0,1,1,1000,1,0,0,0,1,'MXN','restock');
+SQL
+expect "merchant A sees only its exception policy" "1" \
+  "$(as_api "$A" "$A1" "$D1" 'select count(*) from merchant.pos_exception_policy;')"
+expect "merchant B cannot see merchant A exception policy" "1" \
+  "$(as_api "$B" "b1000000-0000-4000-8000-000000000001" "" 'select count(*) from merchant.pos_exception_policy;')"
+expect "wrong location cannot read the exception policy" "0" \
+  "$(as_api "$A" "$A2" "$D2" 'select count(*) from merchant.pos_exception_policy;')"
+expect_error "api cannot change exception policy" \
+  "$(as_api_raw "$A" "$A1" "$D1" "update merchant.pos_exception_policy set refunds_enabled=false;")"
+expect "all Gate 3D tables force RLS" "8" \
+  "$(q -c "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='merchant' and c.relname in ('pos_exception_policy','pos_exception_preview',
+      'pos_sale_exception','pos_sale_exception_line','pos_tender_compensation',
+      'pos_cash_compensation','pos_restock_intent','pos_exception_receipt')
+      and c.relkind='r' and c.relrowsecurity and c.relforcerowsecurity;")"
+expect "exception rows and previews require the exact device" "2" \
+  "$(q -c "select count(*) from pg_policy p join pg_class c on c.oid=p.polrelid
+    join pg_namespace n on n.oid=c.relnamespace where n.nspname='merchant'
+      and c.relname in ('pos_exception_preview','pos_sale_exception')
+      and p.polname='device_scoping';")"
+expect "all committed exception facts have append-only triggers" "6" \
+  "$(q -c "select count(*) from pg_trigger t join pg_class c on c.oid=t.tgrelid
+    join pg_namespace n on n.oid=c.relnamespace where n.nspname='merchant'
+      and c.relname in ('pos_sale_exception','pos_sale_exception_line','pos_tender_compensation',
+        'pos_cash_compensation','pos_restock_intent','pos_exception_receipt')
+      and not t.tgisinternal and t.tgname like '%_append_only';")"
+expect "line and tender over-refund guards are installed" "2" \
+  "$(q -c "select count(*) from pg_trigger t where t.tgname in
+    ('pos_exception_line_limit','pos_tender_compensation_limit') and not t.tgisinternal;")"
+expect "legacy one-unit discount and tip use a final-line remainder" "2" \
+  "$(q -c "select count(*) from merchant.pos_sale_exception_line
+    where exception_id='d3000000-0000-4000-8000-000000000069';")"
+expect_error "committed exception rows are append-only" \
+  "$(q -c "update merchant.pos_sale_exception set reason_code='pricing_error'
+    where id='d3000000-0000-4000-8000-000000000011';")"
+expect_error "terminal success cannot become failure or unknown" \
+  "$(q -c "update merchant.pos_exception_preview set terminal_refund_status='outcome_unknown'
+    where id='d3000000-0000-4000-8000-000000000020';")"
+expect_error "preview authority cannot change after creation" \
+  "$(q -c "update merchant.pos_exception_preview set approval_required=true
+    where id='d3000000-0000-4000-8000-000000000020';")"
+expect_error "an approval-required exception cannot omit approval" \
+  "$(q -c "insert into merchant.pos_sale_exception
+    (merchant_id,location_id,sale_id,original_receipt_id,preview_id,exception_type,status,
+     reason_code,operator_id,operator_session_id,device_id,device_credential_version,
+     command_id,idempotency_key,command_fingerprint,preview_fingerprint,
+     merchandise_minor_units,tax_minor_units,discount_minor_units,tip_minor_units,total_minor_units,
+     currency,business_date,correlation_id)
+    select merchant_id,location_id,sale_id,original_receipt_id,id,exception_type,'committed',
+      reason_code,'$U1','$OS','$D1',1,'d3000000-0000-4000-8000-000000000050',
+      'd3000000-0000-4000-8000-000000000051',repeat('5',64),preview_fingerprint,
+      merchandise_minor_units,tax_minor_units,discount_minor_units,tip_minor_units,total_minor_units,
+      currency,current_date,'missing-approval'
+    from merchant.pos_exception_preview where id='d3000000-0000-4000-8000-000000000030';")"
+expect_error "a consumed approval cannot be reused" \
+  "$(q -c "insert into merchant.pos_sale_exception
+    (merchant_id,location_id,sale_id,original_receipt_id,preview_id,exception_type,status,
+     reason_code,operator_id,operator_session_id,device_id,device_credential_version,approval_id,
+     command_id,idempotency_key,command_fingerprint,preview_fingerprint,
+     merchandise_minor_units,tax_minor_units,discount_minor_units,tip_minor_units,total_minor_units,
+     currency,business_date,correlation_id)
+    values ('$A','$A1','d3000000-0000-4000-8000-000000000007',
+      'd3000000-0000-4000-8000-000000000006','d3000000-0000-4000-8000-000000000020',
+      'partial_refund','committed','payment_correction','$U1','$OS','$D1',1,
+      'd3000000-0000-4000-8000-000000000031','d3000000-0000-4000-8000-000000000052',
+      'd3000000-0000-4000-8000-000000000053',repeat('4',64),repeat('1',64),
+      1,0,0,0,1,'MXN',current_date,'reused-approval');")"
+expect_error "an approval with a different command fingerprint fails" \
+  "$(q -c "insert into merchant.pos_sale_exception
+    (merchant_id,location_id,sale_id,original_receipt_id,preview_id,exception_type,status,
+     reason_code,operator_id,operator_session_id,device_id,device_credential_version,approval_id,
+     command_id,idempotency_key,command_fingerprint,preview_fingerprint,
+     merchandise_minor_units,tax_minor_units,discount_minor_units,tip_minor_units,total_minor_units,
+     currency,business_date,correlation_id)
+    select merchant_id,location_id,sale_id,original_receipt_id,id,exception_type,'committed',
+      reason_code,'$U1','$OS','$D1',1,'d3000000-0000-4000-8000-000000000031',
+      'd3000000-0000-4000-8000-000000000032','d3000000-0000-4000-8000-000000000054',
+      repeat('9',64),preview_fingerprint,merchandise_minor_units,tax_minor_units,
+      discount_minor_units,tip_minor_units,total_minor_units,currency,current_date,'wrong-fingerprint'
+    from merchant.pos_exception_preview where id='d3000000-0000-4000-8000-000000000030';")"
+expect_error "cash compensation must match the current shift ledger fact" \
+  "$(q -c "insert into merchant.cash_ledger_entry
+    (id,merchant_id,location_id,register_id,shift_id,sequence,entry_type,amount_minor_units,
+     currency,command_id,sale_id,sale_exception_id,business_date)
+    values ('d3000000-0000-4000-8000-000000000055','$A','$A1',
+      'd3000000-0000-4000-8000-000000000040','d3000000-0000-4000-8000-000000000041',
+      3,'cash_refund',1,'MXN','d3000000-0000-4000-8000-000000000056',
+      'd3000000-0000-4000-8000-000000000007','d3000000-0000-4000-8000-000000000021',current_date);
+    update merchant.cash_shift set ledger_sequence=3,version=version+1
+      where id='d3000000-0000-4000-8000-000000000041';
+    insert into merchant.pos_cash_compensation
+      (merchant_id,location_id,exception_id,original_tender_id,current_shift_id,
+       current_register_id,ledger_entry_id,amount_minor_units,currency)
+    values ('$A','$A1','d3000000-0000-4000-8000-000000000021',
+      'd3000000-0000-4000-8000-000000000009','d3000000-0000-4000-8000-000000000041',
+      'd3000000-0000-4000-8000-000000000040','d3000000-0000-4000-8000-000000000055',2,'MXN');")"
+expect_error "the line guard rejects caller-supplied original amounts" \
+  "$(q -c "insert into merchant.pos_sale_exception_line
+    (merchant_id,location_id,exception_id,sale_id,sale_line_id,original_quantity,
+     compensated_quantity,original_merchandise_minor_units,original_tax_minor_units,
+     original_discount_minor_units,original_tip_minor_units,original_total_minor_units,
+     merchandise_minor_units,tax_minor_units,discount_minor_units,tip_minor_units,total_minor_units,
+     currency,restock_decision)
+    values ('$A','$A1','d3000000-0000-4000-8000-000000000021',
+      'd3000000-0000-4000-8000-000000000007','d3000000-0000-4000-8000-000000000003',
+      1,1,999,0,0,0,999,1,0,0,0,1,'MXN','restock');")"
+expect_error "cumulative line compensation cannot exceed the receipt quantity" \
+  "$(q -c "insert into merchant.pos_sale_exception_line
+    (merchant_id,location_id,exception_id,sale_id,sale_line_id,original_quantity,
+     compensated_quantity,original_merchandise_minor_units,original_tax_minor_units,
+     original_discount_minor_units,original_tip_minor_units,original_total_minor_units,
+     merchandise_minor_units,tax_minor_units,discount_minor_units,tip_minor_units,total_minor_units,
+     currency,restock_decision)
+    values ('$A','$A1','d3000000-0000-4000-8000-000000000021',
+      'd3000000-0000-4000-8000-000000000007','d3000000-0000-4000-8000-000000000003',
+      1,1,1000,0,0,0,1000,1,0,0,0,1,'MXN','restock');")"
+expect_error "cumulative tender compensation cannot exceed the original tender" \
+  "$(q -c "insert into merchant.pos_tender_compensation
+    (merchant_id,location_id,exception_id,original_tender_id,tender_type,
+     amount_minor_units,currency,reversal_status,correlation_id)
+    values ('$A','$A1','d3000000-0000-4000-8000-000000000021',
+      'd3000000-0000-4000-8000-000000000009','cash',600,'MXN',
+      'confirmed_success','tender-refund-2');")"
+expect_error "the original committed sale is immutable" \
+  "$(q -c "update merchant.pos_committed_sale set totals_fingerprint=repeat('9',64)
+    where id='d3000000-0000-4000-8000-000000000007';")"
+expect_error "the original receipt is immutable" \
+  "$(q -c "update merchant.receipt_snapshot set grand_total=1
+    where id='d3000000-0000-4000-8000-000000000006';")"
+expect_error "the compensating receipt is immutable" \
+  "$(q -c "update merchant.pos_exception_receipt set total_minor_units=1
+    where exception_id='d3000000-0000-4000-8000-000000000011';")"
+expect_error "a duplicate command identity is rejected" \
+  "$(q -c "insert into merchant.business_command
+    (merchant_id,location_id,command_id,idempotency_key,command_type,fingerprint,status,
+     correlation_id,completed_at)
+    values ('$A','$A1','d3000000-0000-4000-8000-000000000012','gate-3d-duplicate',
+      'pos.exception.commit',repeat('2',64),'succeeded','duplicate',now());")"
+expect "wrong device cannot read an exception preview" "0" \
+  "$(as_api "$A" "$A1" "$D2" "select count(*) from merchant.pos_exception_preview
+    where id='d3000000-0000-4000-8000-000000000020';")"
 
 echo
 if [ "$fail" -eq 0 ]; then

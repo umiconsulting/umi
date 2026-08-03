@@ -18,6 +18,9 @@ import 'package:umi_pos/features/checkout/checkout_controller.dart';
 import 'package:umi_pos/features/checkout/checkout_repository.dart';
 import 'package:umi_pos/features/entry/entry_controller.dart';
 import 'package:umi_pos/features/entry/entry_gateway.dart';
+import 'package:umi_pos/features/exception/exception_controller.dart';
+import 'package:umi_pos/features/exception/exception_recovery_store.dart';
+import 'package:umi_pos/features/exception/exception_repository.dart';
 import 'package:umi_pos/features/offline/connectivity_controller.dart';
 import 'package:umi_pos/features/offline/offline_journal.dart';
 import 'package:umi_pos/features/sale/sale_lifecycle_controller.dart';
@@ -128,6 +131,10 @@ AppCompositionRoot testRoot({
       gateway: ApiEntryGateway(api, credentials),
       vault: credentials,
       telemetry: telemetry,
+    ),
+    exceptions: SaleExceptionController(
+      repository: ApiSaleExceptionRepository(api),
+      recoveryStore: MemorySaleExceptionRecoveryStore(),
     ),
     catalog: CatalogController(
       repository: ApiCatalogRepository(api),

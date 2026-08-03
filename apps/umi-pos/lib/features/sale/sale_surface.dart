@@ -3,6 +3,8 @@ import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme/umi_theme.dart';
+import '../exception/exception_controller.dart';
+import '../exception/exception_surface.dart';
 import 'sale_lifecycle_controller.dart';
 
 Future<void> showSuspendSaleDialog(
@@ -92,11 +94,12 @@ Future<void> showCustomerPicker(
 Future<void> showSaleCenter(
   BuildContext context,
   SaleLifecycleController lifecycle,
+  [SaleExceptionController? exceptions]
 ) => showModalBottomSheet<void>(
   context: context,
   isScrollControlled: true,
   constraints: const BoxConstraints(maxWidth: 820),
-  builder: (_) => _SaleCenter(lifecycle: lifecycle),
+  builder: (_) => _SaleCenter(lifecycle: lifecycle, exceptions: exceptions),
 );
 
 final class _CustomerPicker extends StatefulWidget {
@@ -199,8 +202,9 @@ final class _CustomerPickerState extends State<_CustomerPicker> {
 }
 
 final class _SaleCenter extends StatefulWidget {
-  const _SaleCenter({required this.lifecycle});
+  const _SaleCenter({required this.lifecycle, this.exceptions});
   final SaleLifecycleController lifecycle;
+  final SaleExceptionController? exceptions;
 
   @override
   State<_SaleCenter> createState() => _SaleCenterState();
@@ -380,6 +384,19 @@ final class _SaleCenterState extends State<_SaleCenter> {
                                           }
                                         : null,
                                     child: Text(l.resumeSaleAction),
+                                  ),
+                                if (sale.state == 'committed' &&
+                                    widget.exceptions != null)
+                                  IconButton(
+                                    tooltip: l.saleExceptionAction,
+                                    onPressed: () => showSaleExceptionDialog(
+                                      context,
+                                      controller: widget.exceptions!,
+                                      saleId: sale.id,
+                                    ),
+                                    icon: const Icon(
+                                      Icons.assignment_return_outlined,
+                                    ),
                                   ),
                                 if (sale.state == 'committed')
                                   IconButton(

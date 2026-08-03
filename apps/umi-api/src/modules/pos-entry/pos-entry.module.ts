@@ -8,5 +8,6 @@ import { PosEntryService } from './pos-entry.service';
   imports: [AuthModule],
   controllers: [PosEntryController],
   providers: [PosEntryRepository, PosEntryService],
+  exports: [PosEntryService],
 })
 export class PosEntryModule {}

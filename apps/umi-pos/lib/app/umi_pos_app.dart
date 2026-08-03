@@ -40,6 +40,7 @@ final class _UmiPosAppState extends State<UmiPosApp> {
     if (widget.root.entry.state.phase != EntryPhase.ready) {
       widget.root.sales.clear();
       widget.root.cash.clear();
+      widget.root.exceptions.clear();
     }
     if (mounted) {
       setState(() {});
@@ -102,6 +103,7 @@ final class _GuardedSurface extends StatelessWidget {
         cash: root.cash,
         checkout: root.checkout,
         sales: root.sales,
+        exceptions: root.exceptions,
         connectivity: root.connectivity,
         telemetry: root.telemetry,
         offlineJournal: root.offlineJournal,

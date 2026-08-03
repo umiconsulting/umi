@@ -38,6 +38,17 @@ begin
     select 1 from pg_trigger where tgname='cash_ledger_immutable'
   ) then raise exception 'missing append-only trigger: cash_ledger'; end if;
   if not exists (
+    select 1 from pg_class cl join pg_namespace ns on ns.oid=cl.relnamespace
+    where ns.nspname='merchant' and cl.relname='pos_sale_exception'
+      and cl.relrowsecurity and cl.relforcerowsecurity
+  ) then raise exception 'Gate 3D sale exception RLS is incomplete'; end if;
+  if not exists (
+    select 1 from pg_trigger where tgname='pos_sale_exception_append_only'
+  ) then raise exception 'missing append-only trigger: pos_sale_exception'; end if;
+  if not exists (
+    select 1 from pg_trigger where tgname='pos_exception_receipt_append_only'
+  ) then raise exception 'missing append-only trigger: pos_exception_receipt'; end if;
+  if not exists (
     select 1 from information_schema.tables
     where table_schema='runtime' and table_name='device_pairing_session'
   ) then raise exception 'missing UmiPOS device pairing session'; end if;

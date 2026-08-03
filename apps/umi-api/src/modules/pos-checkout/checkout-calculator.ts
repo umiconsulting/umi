@@ -86,6 +86,7 @@ export function calculateCheckout(
       code: draft.type,
       label: draft.reason,
       amount: money(amount),
+      lineId: draft.type.startsWith('line_') ? draft.lineId : null,
     });
   }
   if (discountTotal > source.totals.subtotal.minorUnits) {

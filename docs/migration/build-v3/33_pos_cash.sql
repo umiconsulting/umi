@@ -363,7 +363,7 @@ begin
   select * into register_row
   from merchant.physical_register
   where id=new.register_id for update;
-  select merchant_id,location_id,credential_version,lifecycle_state
+  select merchant_id,location_id,credential_version,status
     into device_business,device_location,device_version,device_state
   from merchant.device where id=new.device_id;
   select merchant_id,location_id,device_id,user_id

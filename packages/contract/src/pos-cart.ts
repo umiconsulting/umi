@@ -56,6 +56,7 @@ export const DiscountPreview = z
           code: z.string().max(80),
           label: z.string().max(160),
           amount: CatalogMoney,
+          lineId: Uuid.nullable().default(null),
         }),
       )
       .max(20),

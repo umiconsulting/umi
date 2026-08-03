@@ -35,7 +35,10 @@
     "umi-pos:cash-tests": "cd apps/umi-pos && flutter test test/cash_center_test.dart test/checkout_test.dart",
     "umi-pos:sale-db-check": "bash scripts/umi-pos-sale-db-check.sh",
     "umi-pos:checkout-db-check": "bash scripts/umi-pos-checkout-db-check.sh",
-    "umi-pos:cash-db-check": "bash scripts/umi-pos-cash-db-check.sh"
+    "umi-pos:cash-db-check": "bash scripts/umi-pos-cash-db-check.sh",
+    "umi-pos:exception-api-tests": "pnpm --filter @umi/api exec vitest run src/modules/pos-exception/refund-calculator.spec.ts src/modules/pos-exception/pos-exception.service.spec.ts src/shared/database/gate-3d-exception-migration.spec.ts",
+    "umi-pos:exception-tests": "cd apps/umi-pos && flutter test test/sale_exception_test.dart",
+    "umi-pos:exception-db-check": "bash scripts/umi-pos-exception-db-check.sh"
   },
   "devDependencies": {
     "prettier": "3.9.4",

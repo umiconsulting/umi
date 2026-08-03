@@ -119,6 +119,13 @@
       "id": "PR-72-SYNC",
       "status": "complete",
       "subject": "UmiPOS Gate 1 through Gate 3C synchronization with build-v3"
+    },
+    {
+      "commit": "HEAD (Gate 3D commit)",
+      "id": "3D",
+      "status": "complete",
+      "stateMachineVersion": 1,
+      "subject": "Refunds, voids, immutable compensation, exception receipts, and recovery"
     }
   ]
 }

@@ -41,6 +41,7 @@ export const CashMovementType = z.enum(['paid_in', 'paid_out', 'safe_drop', 'dra
 export const CashLedgerEntryType = z.enum([
   'opening_float',
   'cash_sale',
+  'cash_refund',
   'paid_in',
   'paid_out',
   'safe_drop',

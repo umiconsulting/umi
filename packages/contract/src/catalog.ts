@@ -14,6 +14,7 @@ import { posCheckoutModels } from './pos-checkout';
 import { posOfflineModels } from './pos-offline';
 import { posSaleModels } from './pos-sale';
 import { posCashModels } from './pos-cash';
+import { posExceptionModels } from './pos-exception';
 import { ROUTE_TABLE, type RouteContract } from './route-table';
 
 /**
@@ -26,7 +27,7 @@ import { ROUTE_TABLE, type RouteContract } from './route-table';
  * breaking change to the described paths, so the artifact major moves, even though
  * no client is pinned in the field yet and the URL major is unchanged at 1.
  */
-export const CONTRACT_VERSION = '2.1.0';
+export const CONTRACT_VERSION = '2.2.0';
 
 /** The major in the URL. A v1 client never silently receives v2 behaviour. */
 export const API_MAJOR_VERSION = 1;
@@ -67,6 +68,7 @@ export const modelCatalog = {
   ...posOfflineModels,
   ...posSaleModels,
   ...posCashModels,
+  ...posExceptionModels,
 };
 
 export const invariantCatalog = {
@@ -83,6 +85,12 @@ export const invariantCatalog = {
    * charge — the client must query the command result instead.
    */
   IdempotencyRetention: 'A command result replays for 72 hours, then returns IDEMPOTENCY_EXPIRED.',
+  PostSaleCompensation:
+    'Original sale facts stay immutable. Each exception creates linked append-only compensation facts.',
+  RefundLimit:
+    'Cumulative line, tax, discount, tip, tender, and cash compensation cannot exceed original facts.',
+  RefundAmbiguity:
+    'An unknown terminal refund is query-only and blocks a replacement refund.',
 } as const;
 
 /** Hours a recorded command result stays replayable. Mirrored by `business_command.expires_at`. */

@@ -68,6 +68,9 @@ export const calculateExpectedCash = (
       case 'safe_drop':
         totals.safeDrop = safe(totals.safeDrop + fact.amountMinorUnits);
         break;
+      case 'cash_refund':
+        totals.paidOut = safe(totals.paidOut + fact.amountMinorUnits);
+        break;
       case 'drawer_correction':
       case 'close_adjustment':
         totals.adjustment = safe(totals.adjustment + fact.amountMinorUnits);

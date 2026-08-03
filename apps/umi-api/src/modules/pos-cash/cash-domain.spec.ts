@@ -76,6 +76,18 @@ describe('Gate 3C cash domain', () => {
     expect(result.expectedDrawerCash.minorUnits).toBe(3_000);
   });
 
+  it('subtracts an immutable cash refund from expected drawer cash', () => {
+    const result = calculateExpectedCash(
+      'MXN',
+      [
+        { sequence: 1, type: 'opening_float', amountMinorUnits: 5_000, received: 0, change: 0 },
+        { sequence: 2, type: 'cash_refund', amountMinorUnits: 1_250, received: 0, change: 0 },
+      ],
+      2,
+    );
+    expect(result.expectedDrawerCash.minorUnits).toBe(3_750);
+  });
+
   it('applies Paid In, Paid Out, and Safe Drop with explicit signs', () => {
     expect(cashEntryEffect(2_000, 0)).toBe(2_000);
     const result = calculateExpectedCash(

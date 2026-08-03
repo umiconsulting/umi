@@ -216,6 +216,32 @@ on conflict(merchant_id,location_id) do update set
   currency=excluded.currency,
   updated_at=now();
 
+insert into merchant.pos_exception_policy(
+  merchant_id,location_id,version,currency,refunds_enabled,voids_enabled,
+  refund_window_minutes,void_window_minutes,cashier_refund_threshold,
+  cash_refund_threshold,cash_refund_requires_shift,require_different_approver,
+  tender_allocation_policy,tip_refund_policy,maximum_lines,expires_at,fingerprint
+)
+values (
+  :'merchant_id',:'location_id','demo-1','MXN',true,true,10080,60,5000,
+  5000,true,true,'proportional','proportional',100,now()+interval '30 days',repeat('e',64)
+)
+on conflict(merchant_id,location_id,currency) do update set
+  version=excluded.version,
+  refunds_enabled=excluded.refunds_enabled,
+  voids_enabled=excluded.voids_enabled,
+  refund_window_minutes=excluded.refund_window_minutes,
+  void_window_minutes=excluded.void_window_minutes,
+  cashier_refund_threshold=excluded.cashier_refund_threshold,
+  cash_refund_threshold=excluded.cash_refund_threshold,
+  cash_refund_requires_shift=excluded.cash_refund_requires_shift,
+  require_different_approver=excluded.require_different_approver,
+  tender_allocation_policy=excluded.tender_allocation_policy,
+  tip_refund_policy=excluded.tip_refund_policy,
+  maximum_lines=excluded.maximum_lines,
+  expires_at=excluded.expires_at,
+  fingerprint=excluded.fingerprint;
+
 insert into umi.user(id,email,full_name,status)
 values
   ('30000000-0000-4000-8000-000000000200','owner@umipos.local','Propietaria UmiPOS','active'),

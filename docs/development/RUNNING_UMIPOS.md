@@ -263,3 +263,44 @@ Advanced cash operations require connectivity. UmiPOS does not close or reconcil
 
 Use the disposable database script for destructive validation. The script creates and removes its
 own container. Do not point this command at a shared or production database.
+
+## Post-sale exceptions
+
+Apply the build-v3 chain through `34_pos_exception.sql`.
+
+Run these focused commands from the workspace root:
+
+- Generate contracts: `pnpm umi-pos:generate`.
+- Run exception API tests: `pnpm umi-pos:exception-api-tests`.
+- Run exception Flutter tests: `pnpm umi-pos:exception-tests`.
+- Run the disposable PostgreSQL matrix: `pnpm umi-pos:exception-db-check`.
+- Analyze Flutter: `cd apps/umi-pos && flutter analyze`.
+- Build Linux debug: `cd apps/umi-pos && flutter build linux --debug`.
+- Build Web compatibility: `cd apps/umi-pos && flutter build web`.
+
+Test the exception flow:
+
+1. Start PostgreSQL, the UMI API, and UmiPOS with the normal local commands.
+2. Run `UMI_POS_DEV_SEED_CONFIRM=disposable pnpm umi-pos:demo-seed`.
+3. Enroll the device and sign in with an operator PIN.
+4. Open an eligible cash shift before a cash refund.
+5. Complete a cash, terminal, or mixed-tender sale. This creates the refundable sale.
+6. Open Sales and select the post-sale action for the committed sale.
+7. Confirm server eligibility before you select an action.
+8. Test a full refund and confirm the restock intent.
+9. Test a partial refund with one or more remaining line quantities.
+10. Test a void only when the server returns void eligibility.
+11. Use a different manager PIN when the policy requires approval.
+12. Verify that a cash refund reduces the current shift expected cash once.
+13. Record terminal success only after the external terminal confirms the refund.
+14. Record terminal failure and return to the same refund flow.
+15. Record an unknown result and confirm that no replacement refund action appears.
+16. Restart before commit and confirm that the client invalidates stale preview data.
+17. Simulate response loss after commit and query the original command result.
+18. Open the immutable compensation receipt and exception history.
+
+Use development seed data that contains a committed sale and original receipt facts. Do not edit
+the committed sale, payment, receipt, or cash facts. Reset only disposable development data.
+
+Post-sale exceptions require connectivity. UmiPOS does not create offline refunds or voids.
+Manual terminal results remain operator assertions. Restock intent does not change stock in Gate 3D.

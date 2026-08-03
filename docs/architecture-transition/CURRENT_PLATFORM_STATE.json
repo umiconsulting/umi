@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-02",
+  "updatedAt": "2026-08-03",
   "branch": "architectureUMIposIntegration",
   "certificationSourceCommit": "a1e794d8fe0e9883f5677147ab81c4342f1a3980",
   "certificationDate": "2026-07-27",
@@ -21,7 +21,8 @@
     "2F",
     "3A",
     "3B",
-    "3C"
+    "3C",
+    "3D"
   ],
   "authorities": {
     "api": "apps/umi-api",
@@ -68,8 +69,8 @@
     "gate2AStatus": "complete",
     "flutterVersion": "3.44.6",
     "dartVersion": "3.12.2",
-    "contractVersion": "2.1.0",
-    "contractContentHash": "33dea07d6f25831f39944c9c4066795cf525c80d42f3bcb2a56da92ba00d23bb",
+    "contractVersion": "2.2.0",
+    "contractContentHash": "c8be1d2927a482ea163bcdf81edef3f0947ede2528d80cf305b1f131130106b8",
     "stateManagement": "ChangeNotifier with one explicit composition root",
     "navigation": "central typed route guard",
     "secureStorage": "flutter_secure_storage with no plaintext fallback",
@@ -91,6 +92,20 @@
     "gate3AStatus": "complete",
     "gate3BStatus": "complete",
     "gate3CStatus": "complete",
+    "gate3DStatus": "complete",
+    "saleExceptionLifecycleVersion": 1,
+    "saleExceptionEligibility": "server-authoritative refund and narrow void eligibility with policy, payment, operator, device, merchant, and location checks",
+    "fullRefund": "all remaining historical line, tax, discount, tip-policy, and tender value is compensated",
+    "partialRefund": "selected remaining quantities use deterministic historical integer allocation",
+    "void": "available only inside the policy window without prior refund or external terminal settlement",
+    "tenderCompensation": "append-only cash and manual-terminal compensation links to each original tender fact",
+    "cashRefund": "atomic negative cash fact posts to the current eligible open shift and register",
+    "manualTerminalRefund": "operator assertion only; failure returns safely and unknown remains query-only",
+    "refundApproval": "one-use manager PIN approval is bound to the sale, command, preview, amount, allocation, reason, and restock intent",
+    "restockIntent": "immutable intent only; Gate 3D does not change inventory",
+    "compensatingReceipt": "immutable exception receipt preserves the original sale and receipt",
+    "saleExceptionRecovery": "secure command identity queries the authoritative idempotent result after restart or response loss",
+    "gate3DOfflineBoundary": "all post-sale exception mutations are online-only",
     "cashShiftLifecycleVersion": 1,
     "physicalRegister": "merchant and location scoped physical cash location with one unresolved shift",
     "cashShift": "register, device, credential, operator, currency, and server-derived business-date scoped lifecycle",
@@ -126,7 +141,7 @@
     "offlineCash": "default-deny server-issued branch policy; eligible native cash checkout is encrypted and provisional",
     "offlineRecovery": "generated-SDK gateway, serialized journal mutations, restart deduplication, ordered replay, typed recovery actions, response-loss query, reconciliation, immutable mapping, Recovery Center",
     "offlineDatabaseValidation": "clean migration chain plus merchant, location, device, credential, immutability, revocation and rotation negative matrix passed in disposable PostgreSQL",
-    "nativeBuild": "Linux debug build passed during Gate 3C",
+    "nativeBuild": "Linux debug build passed during Gate 3D",
     "webOfflineCapability": "sensitive journaling unsupported; online operation only",
     "checkoutAuthority": "apps/umi-api/src/modules/pos-checkout",
     "checkoutMode": "online, immediately repriced, explicitly confirmed, idempotent",
@@ -151,9 +166,9 @@
     "pinFoundation": "merchant-unique personal PIN, keyed lookup, server-side scrypt verification, bounded attempts, and no client role selection",
     "managerApprovalFoundation": "single-action scoped five-minute elevation",
     "readyShell": true,
-    "latestLocalCommit": "this PR #72 integration commit",
-    "pushStatus": "use current Git remote evidence",
-    "pullRequestStatus": "use current GitHub PR #72 evidence"
+    "latestLocalCommit": "Gate 3D commit in PR #72",
+    "pushStatus": "publication follows the Gate 3D commit",
+    "pullRequestStatus": "PR #72 targets build-v3"
   },
-  "nextGate": "Scope approval required for the next commercial POS Gate after Gate 3C"
+  "nextGate": "Gate 3E inventory synchronization requires explicit scope approval"
 }

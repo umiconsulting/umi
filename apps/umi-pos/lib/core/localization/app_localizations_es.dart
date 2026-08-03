@@ -937,4 +937,192 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get varianceReasonUnknown => 'Diferencia operativa';
+
+  @override
+  String get saleExceptionAction => 'Acciones posteriores a la venta';
+
+  @override
+  String get saleExceptionTitle => 'Reembolso o anulación';
+
+  @override
+  String get fullRefundAction => 'Reembolso total';
+
+  @override
+  String get partialRefundAction => 'Reembolso parcial';
+
+  @override
+  String get voidSaleAction => 'Anular venta';
+
+  @override
+  String get refundableAmountLabel => 'Importe restante reembolsable';
+
+  @override
+  String get remainingRefundableQuantityLabel => 'Cantidad restante';
+
+  @override
+  String get alreadyRefundedLabel => 'Ya reembolsado';
+
+  @override
+  String get refundReasonLabel => 'Motivo del reembolso';
+
+  @override
+  String get restockAction => 'Reponer';
+
+  @override
+  String get doNotRestockAction => 'No reponer';
+
+  @override
+  String get inspectionRequiredAction => 'Requiere inspección';
+
+  @override
+  String get taxRefundLabel => 'Reembolso de impuestos';
+
+  @override
+  String get discountAllocationLabel => 'Asignación del descuento';
+
+  @override
+  String get tipRefundLabel => 'Reembolso de propina';
+
+  @override
+  String get cashRefundLabel => 'Reembolso en efectivo';
+
+  @override
+  String get manualTerminalRefundLabel => 'Reembolso en terminal manual';
+
+  @override
+  String get manualTerminalRefundProviderNotice =>
+      'Procesa el reembolso en la terminal externa. UmiPOS registra tu observación. No prueba el éxito del proveedor.';
+
+  @override
+  String get approvalExpiredMessage =>
+      'La aprobación venció. Solicita una aprobación nueva.';
+
+  @override
+  String get paymentOutcomeUnknownMessage =>
+      'Se desconoce el resultado de la terminal. Verifica la operación original.';
+
+  @override
+  String get verifyTerminalAction => 'Verificar resultado de la terminal';
+
+  @override
+  String get terminalRefundSuccessAction => 'El reembolso externo tuvo éxito';
+
+  @override
+  String get terminalRefundFailureAction => 'El reembolso externo falló';
+
+  @override
+  String get terminalRefundUnknownAction => 'Se desconoce el resultado';
+
+  @override
+  String get refundBlockedMessage =>
+      'El servidor bloqueó esta acción posterior a la venta.';
+
+  @override
+  String get refundPolicyExpiredMessage =>
+      'El periodo permitido para el reembolso venció.';
+
+  @override
+  String get supportRequiredMessage => 'Se requiere una revisión de soporte.';
+
+  @override
+  String get compensatingReceiptTitle => 'Recibo de reembolso';
+
+  @override
+  String get fullyRefundedLabel => 'Reembolso total';
+
+  @override
+  String get partiallyRefundedLabel => 'Reembolso parcial';
+
+  @override
+  String get voidedSaleLabel => 'Venta anulada';
+
+  @override
+  String get recoveredRefundMessage =>
+      'Se restauró el resultado guardado del reembolso.';
+
+  @override
+  String get refundCommittedMessage => 'El reembolso quedó confirmado.';
+
+  @override
+  String get refundPreviewAction => 'Revisar reembolso';
+
+  @override
+  String get commitRefundAction => 'Confirmar reembolso';
+
+  @override
+  String get refundConfirmationTitle => '¿Confirmar este reembolso?';
+
+  @override
+  String get refundConfirmationBody =>
+      'Esta acción crea ajustes permanentes. La venta original no cambia.';
+
+  @override
+  String get originalSaleLabel => 'Venta original';
+
+  @override
+  String get exceptionHistoryLabel => 'Historial de ajustes';
+
+  @override
+  String get refundOperationFailedMessage =>
+      'No fue posible completar la acción de forma segura.';
+
+  @override
+  String get selectRefundLinesMessage =>
+      'Selecciona al menos una línea reembolsable.';
+
+  @override
+  String get refundReasonCustomerChangedMind => 'El cliente cambió de opinión';
+
+  @override
+  String get refundReasonProductDefect => 'Producto defectuoso';
+
+  @override
+  String get refundReasonIncorrectItem => 'Producto incorrecto';
+
+  @override
+  String get refundReasonIncorrectQuantity => 'Cantidad incorrecta';
+
+  @override
+  String get refundReasonDuplicateCharge => 'Cobro duplicado';
+
+  @override
+  String get refundReasonQualityIssue => 'Problema de calidad';
+
+  @override
+  String get refundReasonOrderPreparationError =>
+      'Error de preparación del pedido';
+
+  @override
+  String get refundReasonPricingError => 'Error de precio';
+
+  @override
+  String get voidReasonOperatorError => 'Error del operador';
+
+  @override
+  String get voidReasonDuplicateSale => 'Venta duplicada';
+
+  @override
+  String get voidReasonIncorrectTender => 'Forma de pago incorrecta';
+
+  @override
+  String get voidReasonSaleEnteredByMistake => 'Venta registrada por error';
+
+  @override
+  String get otherApprovedReasonLabel => 'Otro motivo aprobado';
+
+  @override
+  String get decreaseRefundQuantityTooltip => 'Reducir cantidad del reembolso';
+
+  @override
+  String get increaseRefundQuantityTooltip => 'Aumentar cantidad del reembolso';
+
+  @override
+  String get restockIntentLabel => 'Decisión de reposición';
+
+  @override
+  String get restockNotApplicableLabel => 'No aplica la reposición';
+
+  @override
+  String get restockInventoryReviewLabel =>
+      'Se requiere una revisión de inventario';
 }

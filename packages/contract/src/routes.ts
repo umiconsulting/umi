@@ -136,6 +136,24 @@ export const routes = {
       noSale: (merchantId: string, shiftId: string): string =>
         buildPath('pos.cashNoSale', { merchantId, shiftId }),
     },
+    exceptions: {
+      eligibility: (merchantId: string, saleId: string): string =>
+        buildPath('pos.exceptionEligibility', { merchantId, saleId }),
+      preview: (merchantId: string, saleId: string): string =>
+        buildPath('pos.exceptionPreview', { merchantId, saleId }),
+      approval: (merchantId: string, saleId: string): string =>
+        buildPath('pos.exceptionApproval', { merchantId, saleId }),
+      commit: (merchantId: string, saleId: string): string =>
+        buildPath('pos.exceptionCommit', { merchantId, saleId }),
+      history: (merchantId: string, saleId: string): string =>
+        buildPath('pos.exceptionHistory', { merchantId, saleId }),
+      result: (merchantId: string, saleId: string, exceptionId: string): string =>
+        buildPath('pos.exceptionResult', { merchantId, saleId, exceptionId }),
+      terminalOutcome: (merchantId: string, saleId: string, previewId: string): string =>
+        buildPath('pos.exceptionTerminalOutcome', { merchantId, saleId, previewId }),
+      command: (merchantId: string, commandId: string): string =>
+        buildPath('pos.exceptionCommand', { merchantId, commandId }),
+    },
     sales: {
       create: (merchantId: string): string => buildPath('pos.salesCreate', { merchantId }),
       current: (merchantId: string): string => buildPath('pos.salesCurrent', { merchantId }),

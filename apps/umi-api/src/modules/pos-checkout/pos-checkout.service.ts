@@ -589,23 +589,63 @@ export class PosCheckoutService {
     command: CheckoutCommand,
   ): ReceiptSnapshot {
     const now = new Date().toISOString();
+    const lineDiscounts = new Map<string, number>();
+    let orderDiscount = 0;
+    for (const entry of confirmation.discounts.entries) {
+      if (entry.lineId) {
+        lineDiscounts.set(
+          entry.lineId,
+          (lineDiscounts.get(entry.lineId) ?? 0) + entry.amount.minorUnits,
+        );
+      } else {
+        orderDiscount += entry.amount.minorUnits;
+      }
+    }
+    const gross = lineSnapshot.reduce(
+      (total, item) => total + item.price.lineTotal.minorUnits,
+      0,
+    );
+    let assignedOrderDiscount = 0;
+    let assignedTip = 0;
+    const tipTotal = paymentSummary.tip?.amount.minorUnits ?? 0;
+    const allocate = (amount: number, weight: number): number =>
+      Number((BigInt(amount) * BigInt(weight)) / BigInt(Math.max(gross, 1)));
     return {
       receiptRef: `POS-${payments[0].attempt.id}`,
       merchantId: cart.merchantId,
       locationId: cart.locationId,
       issuedAt: now,
       businessDate: cart.businessDate,
-      lines: lineSnapshot.map((item) => ({
-        lineRef: item.id,
-        description: item.productName,
-        quantity: item.quantity,
-        unitPrice: item.price.unitPrice,
-        lineTotal: item.price.lineTotal,
-        variantName: item.variant?.name ?? null,
-        modifiers: item.modifiers.map((modifier) => modifier.name),
-        tax: item.price.tax,
-        note: item.note,
-      })),
+      lines: lineSnapshot.map((item, index) => {
+        const finalLine = index === lineSnapshot.length - 1;
+        const orderShare = finalLine
+          ? orderDiscount - assignedOrderDiscount
+          : allocate(orderDiscount, item.price.lineTotal.minorUnits);
+        const tipShare = finalLine
+          ? tipTotal - assignedTip
+          : allocate(tipTotal, item.price.lineTotal.minorUnits);
+        assignedOrderDiscount += orderShare;
+        assignedTip += tipShare;
+        return {
+          lineRef: item.id,
+          description: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.price.unitPrice,
+          lineTotal: item.price.lineTotal,
+          variantName: item.variant?.name ?? null,
+          modifiers: item.modifiers.map((modifier) => modifier.name),
+          tax: item.price.tax,
+          discount: {
+            minorUnits: (lineDiscounts.get(item.id) ?? 0) + orderShare,
+            currency: item.price.lineTotal.currency,
+          },
+          tip: {
+            minorUnits: tipShare,
+            currency: item.price.lineTotal.currency,
+          },
+          note: item.note,
+        };
+      }),
       subtotal: confirmation.totals.subtotal,
       taxTotal: confirmation.totals.tax,
       grandTotal: confirmation.totals.grandTotal,

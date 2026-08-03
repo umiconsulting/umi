@@ -342,6 +342,8 @@ export const ReceiptLineSnapshot = z
     variantName: z.string().min(1).max(160).nullable().optional(),
     modifiers: z.array(z.string().min(1).max(160)).max(100).optional(),
     tax: Money.optional(),
+    discount: Money.optional(),
+    tip: Money.optional(),
     note: z.string().max(500).nullable().optional(),
   })
   .strict();

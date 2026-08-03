@@ -1,6 +1,6 @@
 # UmiPOS Owner Review
 
-Updated: 2026-07-28
+Updated: 2026-08-03
 
 This is the owner-maintained visual and interaction review. Future product gates must read it
 before implementation and preserve owner notes.
@@ -137,3 +137,20 @@ Recommended Mac review sequence:
 - Review on tablet: Cash Center action density, count entry, text scaling, and dialog focus.
 - Review the English and Spanish terms for Paid Out, Safe Drop, and variance with operators.
 - Owner approval remains pending. Gate 3C does not include final UX certification.
+
+## Gate 3D refunds, voids, and post-sale exceptions
+
+- Implemented: recent committed sales expose a server-authorized post-sale action.
+- Implemented: the server distinguishes a narrow void from a full or partial refund.
+- Implemented: partial refunds show remaining quantities and use accessible quantity controls.
+- Implemented: the preview separates historical tax, discount, tip, cash, and terminal effects.
+- Implemented: full refunds and voids require an explicit restock decision.
+- Implemented: sensitive actions request a different manager PIN through the current PIN system.
+- Implemented: the terminal flow states that UmiPOS does not prove the provider result.
+- Implemented: an unknown terminal result blocks replacement action and keeps the reference.
+- Implemented: the final receipt is a separate immutable compensation receipt.
+- Implemented: restart and response-loss recovery query the original command result.
+- Review on pilot hardware: partial-line density, reason selection, and confirmation wording.
+- Review on tablet: restock controls, terminal states, text scaling, and dialog focus.
+- Review English and Spanish terms for void, refund, and inventory intent with operators.
+- Owner approval remains pending. Gate 3D does not include final UX certification.
