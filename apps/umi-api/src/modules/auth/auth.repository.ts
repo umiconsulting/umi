@@ -278,7 +278,10 @@ export class AuthRepository {
     );
   }
 
-  async revokePosSessionsForOperator(userId: string, exceptSessionId: string | null): Promise<void> {
+  async revokePosSessionsForOperator(
+    userId: string,
+    exceptSessionId: string | null,
+  ): Promise<void> {
     await this.pg.worker.query(
       `WITH revoked AS (
          UPDATE runtime.session

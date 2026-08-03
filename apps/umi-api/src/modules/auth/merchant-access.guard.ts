@@ -71,15 +71,10 @@ export class MerchantAccessGuard implements CanActivate {
   }
 
   private resolveLocationId(req: AuthedRequest): string | null {
-    const values = [
-      req.params?.locationId,
-      req.query?.locationId,
-      req.body?.locationId,
-    ];
+    const values = [req.params?.locationId, req.query?.locationId, req.body?.locationId];
     return (
-      values.find(
-        (value): value is string => typeof value === 'string' && UUID_RE.test(value),
-      ) ?? null
+      values.find((value): value is string => typeof value === 'string' && UUID_RE.test(value)) ??
+      null
     );
   }
 }

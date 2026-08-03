@@ -62,7 +62,9 @@ export class PosCatalogService {
 
   private async authorize(user: AuthUser, merchantId: string, locationId: string) {
     if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
-    if (!(await this.repo.authorize(user.id, user.sessionId, user.deviceId, merchantId, locationId))) {
+    if (
+      !(await this.repo.authorize(user.id, user.sessionId, user.deviceId, merchantId, locationId))
+    ) {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
     }
   }

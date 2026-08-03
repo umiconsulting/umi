@@ -3,7 +3,9 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const sql = ['20_merchant.sql', '30_runtime.sql', '60_triggers.sql', '90_rls.sql']
-  .map((file) => readFileSync(resolve(process.cwd(), `../../docs/migration/build-v3/${file}`), 'utf8'))
+  .map((file) =>
+    readFileSync(resolve(process.cwd(), `../../docs/migration/build-v3/${file}`), 'utf8'),
+  )
   .join('\n');
 
 describe('Gate 2B device trust migration', () => {
@@ -22,8 +24,12 @@ describe('Gate 2B device trust migration', () => {
   });
 
   it('keeps runtime trust tables RLS-scoped and hidden from readonly access', () => {
-    expect(sql).toContain('alter table runtime.device_enrollment_challenge enable row level security');
-    expect(sql).toContain('create policy merchant_isolation on runtime.device_enrollment_challenge');
+    expect(sql).toContain(
+      'alter table runtime.device_enrollment_challenge enable row level security',
+    );
+    expect(sql).toContain(
+      'create policy merchant_isolation on runtime.device_enrollment_challenge',
+    );
     expect(sql).toContain('runtime.operator_session, runtime.device_enrollment_challenge');
     expect(sql).toContain('from readonly');
   });

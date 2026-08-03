@@ -31,7 +31,9 @@ function make() {
     issueChallenge: vi.fn().mockResolvedValue(undefined),
     verifyCode: vi.fn().mockResolvedValue(undefined),
   };
-  const rateLimit = { hit: vi.fn().mockReturnValue({ allowed: true, resetAt: Date.now() + 1_000 }) };
+  const rateLimit = {
+    hit: vi.fn().mockReturnValue({ allowed: true, resetAt: Date.now() + 1_000 }),
+  };
   const svc = new AuthService(
     repo as never,
     passwords,
@@ -126,11 +128,7 @@ describe('AuthService POS session lifecycle', () => {
 
   it('revokes the original session on logout', async () => {
     await h.svc.posLogout('refresh-token');
-    expect(h.repo.revokePosSession).toHaveBeenCalledWith(
-      'session-1',
-      'u1',
-      expect.any(String),
-    );
+    expect(h.repo.revokePosSession).toHaveBeenCalledWith('session-1', 'u1', expect.any(String));
   });
 });
 

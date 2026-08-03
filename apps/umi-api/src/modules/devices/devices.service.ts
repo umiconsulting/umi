@@ -106,7 +106,10 @@ export class DevicesService {
     };
   }
 
-  async list(merchantId: string, locationIds: string[] | null): Promise<DeviceEnrollmentRequestList> {
+  async list(
+    merchantId: string,
+    locationIds: string[] | null,
+  ): Promise<DeviceEnrollmentRequestList> {
     return { requests: await this.repo.listPairingRequests(merchantId, locationIds) };
   }
 

@@ -34,7 +34,12 @@ export class PosCartService {
       'cart.create',
       dto,
       async (client) => {
-        const id = await this.repo.create(client, merchantId, dto.locationId, dto.operatorSessionId);
+        const id = await this.repo.create(
+          client,
+          merchantId,
+          dto.locationId,
+          dto.operatorSessionId,
+        );
         return this.repo.snapshotWithClient(client, merchantId, id);
       },
     );

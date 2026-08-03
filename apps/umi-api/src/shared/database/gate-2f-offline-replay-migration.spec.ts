@@ -3,7 +3,9 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const sql = ['20_merchant.sql', '60_triggers.sql', '90_rls.sql']
-  .map((file) => readFileSync(resolve(process.cwd(), `../../docs/migration/build-v3/${file}`), 'utf8'))
+  .map((file) =>
+    readFileSync(resolve(process.cwd(), `../../docs/migration/build-v3/${file}`), 'utf8'),
+  )
   .join('\n');
 const finalCloseoutSql = sql;
 

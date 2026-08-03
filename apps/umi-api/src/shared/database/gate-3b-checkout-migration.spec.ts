@@ -30,9 +30,7 @@ describe('Gate 3B checkout persistence', () => {
     expect(repository).toContain('command_fingerprint=$6');
     expect(repository).toContain('consumed_at IS NULL');
     expect(sql).toContain("'checkout.terminal.approve'");
-    expect(sql).toContain(
-      "and p.key in ('checkout.discount.apply','checkout.terminal.confirm')",
-    );
+    expect(sql).toContain("and p.key in ('checkout.discount.apply','checkout.terminal.confirm')");
   });
 
   it('enables and forces merchant and location RLS for all checkout state', () => {
@@ -40,6 +38,8 @@ describe('Gate 3B checkout persistence', () => {
       expect(sql).toContain(`alter table merchant.${table} enable row level security`);
       expect(sql).toContain(`alter table merchant.${table} force row level security`);
     }
-    expect(sql).toContain('merchant_id=umi.current_merchant() and location_id=umi.current_location()');
+    expect(sql).toContain(
+      'merchant_id=umi.current_merchant() and location_id=umi.current_location()',
+    );
   });
 });

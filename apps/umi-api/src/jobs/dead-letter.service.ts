@@ -52,7 +52,7 @@ export class DeadLetterService {
       });
       this.logger.error(
         `dead-lettered ${job.queueName}/${job.name} #${job.id} ` +
-        `after ${job.attemptsMade} attempts: ${category}`,
+          `after ${job.attemptsMade} attempts: ${category}`,
       );
     } catch (err) {
       this.logger.warn(

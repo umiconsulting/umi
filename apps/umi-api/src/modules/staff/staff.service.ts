@@ -158,7 +158,10 @@ export class StaffService {
     if (!ok) throw new NotFoundException('Staff member not found');
   }
 
-  private pinMaterial(merchantId: string, pin: string): {
+  private pinMaterial(
+    merchantId: string,
+    pin: string,
+  ): {
     salt: string;
     hash: string;
     lookupHash: string;

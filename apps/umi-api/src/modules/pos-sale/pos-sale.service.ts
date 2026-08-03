@@ -87,7 +87,12 @@ export class PosSaleService {
     );
   }
 
-  async rename(user: AuthUser, merchantId: string, saleId: string, dto: RenameSuspendedSaleRequest) {
+  async rename(
+    user: AuthUser,
+    merchantId: string,
+    saleId: string,
+    dto: RenameSuspendedSaleRequest,
+  ) {
     await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId);
     return this.command(
       merchantId,
@@ -149,7 +154,12 @@ export class PosSaleService {
     );
   }
 
-  async detachCustomer(user: AuthUser, merchantId: string, saleId: string, dto: SaleMutationRequest) {
+  async detachCustomer(
+    user: AuthUser,
+    merchantId: string,
+    saleId: string,
+    dto: SaleMutationRequest,
+  ) {
     await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId);
     return this.command(
       merchantId,

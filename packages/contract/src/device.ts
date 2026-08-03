@@ -271,7 +271,9 @@ export const EntryMerchant = z
     entitlements: z.array(EffectiveEntitlement).max(200),
   })
   .strict();
-export const EntryContextResponse = z.object({ merchants: z.array(EntryMerchant).max(100) }).strict();
+export const EntryContextResponse = z
+  .object({ merchants: z.array(EntryMerchant).max(100) })
+  .strict();
 
 export const OperatorSessionState = z.enum(['active', 'locked', 'ended']);
 export const OperatorSessionView = z
@@ -291,7 +293,9 @@ export const OperatorSessionView = z
   })
   .strict();
 export type OperatorSessionView = z.infer<typeof OperatorSessionView>;
-export const StartOperatorSessionRequest = z.object({ merchantId: Uuid, locationId: Uuid }).strict();
+export const StartOperatorSessionRequest = z
+  .object({ merchantId: Uuid, locationId: Uuid })
+  .strict();
 export type StartOperatorSessionRequest = z.infer<typeof StartOperatorSessionRequest>;
 
 export const VerifyOperatorPinRequest = z

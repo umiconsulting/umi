@@ -154,8 +154,7 @@ export const routes = {
         buildPath('pos.saleCustomerDetach', { merchantId, saleId }),
       receipt: (merchantId: string, saleId: string): string =>
         buildPath('pos.saleReceipt', { merchantId, saleId }),
-      customers: (merchantId: string): string =>
-        buildPath('pos.saleCustomers', { merchantId }),
+      customers: (merchantId: string): string => buildPath('pos.saleCustomers', { merchantId }),
     },
     offline: {
       policy: (merchantId: string): string => buildPath('pos.offlinePolicy', { merchantId }),

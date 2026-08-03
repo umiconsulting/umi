@@ -195,11 +195,7 @@ export class AuthService {
     const secret = this.config.get('JWT_SECRET', { infer: true });
     if (!secret) throw new Error('JWT_SECRET is required for POS PIN authentication');
     const lookupHash = posPinLookupHash(secret, input.merchantId, input.pin);
-    const record = await this.repo.findPosPinStaff(
-      input.merchantId,
-      input.locationId,
-      lookupHash,
-    );
+    const record = await this.repo.findPosPinStaff(input.merchantId, input.locationId, lookupHash);
     if (!record || !this.passwords.verify(input.pin, record.pinSalt, record.pinHash)) {
       await this.repo.recordPosPinFailure(input.deviceId);
       throw new ForbiddenException({ code: 'PIN_INVALID' });

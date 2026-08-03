@@ -43,7 +43,12 @@ export class PosCheckoutService {
   ) {}
 
   async checkout(user: AuthUser, merchantId: string, dto: CheckoutCommand) {
-    const authorization = await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId);
+    const authorization = await this.authorize(
+      user,
+      merchantId,
+      dto.locationId,
+      dto.operatorSessionId,
+    );
     const result = await this.integrity.execute<CheckoutResult>(
       {
         merchantId,
@@ -390,7 +395,12 @@ export class PosCheckoutService {
     return snapshot;
   }
 
-  async cancel(user: AuthUser, merchantId: string, cartId: string, dto: CheckoutCancellationRequest) {
+  async cancel(
+    user: AuthUser,
+    merchantId: string,
+    cartId: string,
+    dto: CheckoutCancellationRequest,
+  ) {
     await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId);
     const result = await this.integrity.execute<{
       cartId: string;

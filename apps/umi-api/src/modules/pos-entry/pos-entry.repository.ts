@@ -253,7 +253,9 @@ export class PosEntryRepository {
       hash: string | null;
       attempts: number;
       lockedUntil: Date | null;
-    }>(merchantId, locationId,
+    }>(
+      merchantId,
+      locationId,
       `SELECT s.id::text AS "staffId", s.operator_pin_salt AS salt,
               s.operator_pin_hash AS hash, d.pin_failed_attempts AS attempts,
               d.pin_locked_until AS "lockedUntil"
@@ -279,7 +281,9 @@ export class PosEntryRepository {
       salt: string | null;
       hash: string | null;
       lockedUntil: Date | null;
-    }>(merchantId, locationId,
+    }>(
+      merchantId,
+      locationId,
       `SELECT s.id::text AS "staffId",s.user_id::text AS "userId",
               s.operator_pin_salt AS salt,s.operator_pin_hash AS hash,
               d.pin_locked_until AS "lockedUntil"
@@ -301,11 +305,7 @@ export class PosEntryRepository {
     return rows[0] ?? null;
   }
 
-  async recordPinFailure(
-    merchantId: string,
-    locationId: string,
-    deviceId: string,
-  ): Promise<void> {
+  async recordPinFailure(merchantId: string, locationId: string, deviceId: string): Promise<void> {
     await this.scopedQuery(
       merchantId,
       locationId,

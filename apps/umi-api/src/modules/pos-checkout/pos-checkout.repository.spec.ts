@@ -142,12 +142,7 @@ describe('Gate 3B checkout persistence', () => {
     await expect(
       repository.recovery(id(3), id(4), id(5), id(2), id(6), false),
     ).resolves.toMatchObject({ checkoutId: id(1), paymentOutcome: null });
-    expect(runWithMerchant).toHaveBeenCalledWith(
-      id(3),
-      id(6),
-      expect.any(Function),
-      id(4),
-    );
+    expect(runWithMerchant).toHaveBeenCalledWith(id(3), id(6), expect.any(Function), id(4));
     expect(appQuery.mock.calls[0][0]).toContain('runtime.operator_session');
     expect(appQuery.mock.calls[1][0]).not.toContain('runtime.operator_session');
   });

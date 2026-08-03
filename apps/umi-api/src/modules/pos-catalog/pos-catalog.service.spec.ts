@@ -64,7 +64,11 @@ describe('PosCatalogService', () => {
   it('rejects malformed cursors before querying catalog data', async () => {
     const { service } = make();
     await expect(
-      service.products(user, merchantId, service.parseQuery({ locationId, cursor: 'not-a-cursor' })),
+      service.products(
+        user,
+        merchantId,
+        service.parseQuery({ locationId, cursor: 'not-a-cursor' }),
+      ),
     ).rejects.toMatchObject({ response: { code: 'VALIDATION_FAILED' } });
   });
 });

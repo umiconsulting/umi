@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Headers,
-  Param,
-  Post,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Req, UseGuards } from '@nestjs/common';
 import {
   AcknowledgeDeviceCredentialRequest,
   BeginDeviceEnrollmentRequest,
@@ -72,13 +63,7 @@ export class DevicesController {
     @Body(new ZodValidationPipe(DecideDeviceEnrollmentRequest))
     dto: DecideDeviceEnrollmentRequest,
   ) {
-    return this.devices.approve(
-      merchant.merchantId,
-      user.id,
-      requestId,
-      dto.idempotencyKey,
-      null,
-    );
+    return this.devices.approve(merchant.merchantId, user.id, requestId, dto.idempotencyKey, null);
   }
 
   @Post('merchants/:merchantId/devices/enrollment-requests/:requestId/deny')
@@ -91,13 +76,7 @@ export class DevicesController {
     @Body(new ZodValidationPipe(DecideDeviceEnrollmentRequest))
     dto: DecideDeviceEnrollmentRequest,
   ) {
-    return this.devices.deny(
-      merchant.merchantId,
-      user.id,
-      requestId,
-      dto.idempotencyKey,
-      null,
-    );
+    return this.devices.deny(merchant.merchantId, user.id, requestId, dto.idempotencyKey, null);
   }
 
   @Public()
@@ -169,6 +148,11 @@ export class DevicesController {
     @CurrentUser() user: AuthUser,
     @Body(new ZodValidationPipe(ReplaceDeviceRequest)) dto: ReplaceDeviceRequest,
   ) {
-    return this.devices.beginForReplacement(merchant.merchantId, user.id, dto, dto.replacedDeviceId);
+    return this.devices.beginForReplacement(
+      merchant.merchantId,
+      user.id,
+      dto,
+      dto.replacedDeviceId,
+    );
   }
 }

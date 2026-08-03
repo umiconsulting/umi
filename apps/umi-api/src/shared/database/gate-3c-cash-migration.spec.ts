@@ -46,7 +46,9 @@ describe('Gate 3C cash persistence', () => {
   it('enables merchant and location RLS for all cash tables', () => {
     expect(sql).toContain('enable row level security');
     expect(sql).toContain('force row level security');
-    expect(sql).toContain('merchant_id=umi.current_merchant() and location_id=umi.current_location()');
+    expect(sql).toContain(
+      'merchant_id=umi.current_merchant() and location_id=umi.current_location()',
+    );
   });
 
   it('grants the RLS-confined API role the required cash writes', () => {

@@ -169,7 +169,12 @@ export class PosCashService {
           payload: dto,
         },
         async (context) => {
-          const result = await this.repo.submitCount(context.client, merchantId, authorization, dto);
+          const result = await this.repo.submitCount(
+            context.client,
+            merchantId,
+            authorization,
+            dto,
+          );
           await context.appendAudit({
             eventType: 'cash.count_submitted',
             entityType: 'cash_shift',
@@ -203,7 +208,12 @@ export class PosCashService {
       'pos.cash.count.recount',
       dto,
       async (context) => {
-        const result = await this.repo.requestRecount(context.client, merchantId, authorization, dto);
+        const result = await this.repo.requestRecount(
+          context.client,
+          merchantId,
+          authorization,
+          dto,
+        );
         await context.appendAudit({
           eventType: 'cash.recount_requested',
           entityType: 'cash_shift',

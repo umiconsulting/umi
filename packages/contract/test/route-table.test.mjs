@@ -30,10 +30,7 @@ const PENDING = new Map([
   ['auth.posLogin', 'Gate 2.3: auth.controller POS routes'],
   ['auth.globalLogout', 'Gate 2.3: auth.controller global logout'],
   // Gate 2.3 — the POS surface proper
-  ...[
-    'pos.operatorLock',
-    'pos.operatorEnd',
-  ].map((id) => [id, 'Gate 2.3: modules/pos-*']),
+  ...['pos.operatorLock', 'pos.operatorEnd'].map((id) => [id, 'Gate 2.3: modules/pos-*']),
 ]);
 
 const METHOD_DECORATOR = /@(Get|Post|Patch|Put|Delete)\(([^)]*)\)/g;

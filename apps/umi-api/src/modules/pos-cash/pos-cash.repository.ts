@@ -1616,14 +1616,15 @@ export class PosCashRepository {
     await this.pg.runWithMerchant(
       merchantId,
       userId,
-      async (client) => client.query(
-        `UPDATE merchant.device
+      async (client) =>
+        client.query(
+          `UPDATE merchant.device
        SET pin_failed_attempts=least(pin_failed_attempts+1,10),
            pin_locked_until=CASE WHEN pin_failed_attempts+1>=5
              THEN now()+interval '15 minutes' ELSE pin_locked_until END
        WHERE id=$1::uuid`,
-        [deviceId],
-      ),
+          [deviceId],
+        ),
       locationId,
     );
   }

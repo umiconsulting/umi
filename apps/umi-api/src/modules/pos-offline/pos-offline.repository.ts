@@ -57,7 +57,9 @@ export class PosOfflineRepository {
       deviceKind: string;
       currency: string;
       lastAcceptedSequence: string;
-    }>(input.merchantId, input.locationId,
+    }>(
+      input.merchantId,
+      input.locationId,
       `SELECT d.status AS lifecycle, d.credential_version AS "credentialVersion",
               os.permissions, os.entitlements, d.kind AS "deviceKind", b.currency,
               COALESCE(c.last_accepted_sequence, 0)::text AS "lastAcceptedSequence"
@@ -106,7 +108,9 @@ export class PosOfflineRepository {
       maxTaxAgeSeconds: number;
       managerApprovalThresholdMinorUnits: string | null;
       allowedDeviceClasses: string[];
-    }>(merchantId, locationId,
+    }>(
+      merchantId,
+      locationId,
       `SELECT id::text,enabled,version,currency,issued_at AS "issuedAt",expires_at AS "expiresAt",
               max_policy_age_seconds AS "maxPolicyAgeSeconds",
               max_single_sale_minor_units::text AS "maxSingleSaleMinorUnits",
@@ -134,120 +138,125 @@ export class PosOfflineRepository {
       command.merchantId,
       getRequestContext()?.userId ?? null,
       async (client) => {
-      const existing = await client.query<{ fingerprint: string; result: ReplayResult }>(
-        `SELECT fingerprint, result FROM merchant.offline_replay_command
+        const existing = await client.query<{ fingerprint: string; result: ReplayResult }>(
+          `SELECT fingerprint, result FROM merchant.offline_replay_command
          WHERE command_id=$1::uuid FOR SHARE`,
-        [command.commandId],
-      );
-      if (existing.rows[0]) {
-        if (existing.rows[0].fingerprint !== command.fingerprint) {
-          return this.recordConflict(command, 'fingerprint_mismatch', true);
+          [command.commandId],
+        );
+        if (existing.rows[0]) {
+          if (existing.rows[0].fingerprint !== command.fingerprint) {
+            return this.recordConflict(command, 'fingerprint_mismatch', true);
+          }
+          return { ...existing.rows[0].result, status: 'duplicate' };
         }
-        return { ...existing.rows[0].result, status: 'duplicate' };
-      }
-      await client.query(
-        `INSERT INTO merchant.device_replay_cursor
+        await client.query(
+          `INSERT INTO merchant.device_replay_cursor
           (merchant_id,location_id,device_id,credential_version)
          VALUES ($1,$2,$3,$4) ON CONFLICT (device_id,credential_version) DO NOTHING`,
-        [command.merchantId, command.locationId, command.deviceId, command.deviceCredentialVersion],
-      );
-      const cursor = await client.query<{ last: string }>(
-        `SELECT last_accepted_sequence::text AS last FROM merchant.device_replay_cursor
-         WHERE device_id=$1::uuid AND credential_version=$2 FOR UPDATE`,
-        [command.deviceId, command.deviceCredentialVersion],
-      );
-      const last = Number(cursor.rows[0]?.last ?? 0);
-      if (command.deviceSequence !== last + 1) {
-        return this.recordConflict(
-          command,
-          command.deviceSequence <= last ? 'sequence_behind' : 'sequence_gap',
-          true,
-        );
-      }
-      const result: ReplayResult = {
-        commandId: command.commandId,
-        deviceSequence: command.deviceSequence,
-        status: 'accepted',
-        officialId: officialCommit?.officialSaleId ?? null,
-        officialCommit,
-        serverConflictReference: null,
-        failure: null,
-      };
-      await client.query(
-        `INSERT INTO merchant.offline_replay_command
-         (merchant_id,location_id,device_id,credential_version,device_sequence,command_id,
-          operator_session_id,idempotency_key,command_type,fingerprint,contract_version,
-          schema_version,client_created_at,result,provisional_id,payload)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
-        [
-          command.merchantId,
-          command.locationId,
-          command.deviceId,
-          command.deviceCredentialVersion,
-          command.deviceSequence,
-          command.commandId,
-          command.operatorSessionId,
-          command.idempotencyKey,
-          command.commandType,
-          command.fingerprint,
-          command.contractVersion,
-          command.schemaVersion,
-          command.createdAt,
-          JSON.stringify(result),
-          command.provisionalId,
-          JSON.stringify(command.payload),
-        ],
-      );
-      await client.query(
-        `UPDATE merchant.device_replay_cursor SET last_accepted_sequence=$3, updated_at=clock_timestamp()
-         WHERE device_id=$1::uuid AND credential_version=$2`,
-        [command.deviceId, command.deviceCredentialVersion, command.deviceSequence],
-      );
-      if (officialCommit && command.provisionalId) {
-        await client.query(
-          `INSERT INTO merchant.offline_provisional_mapping
-            (merchant_id,location_id,device_id,command_id,provisional_id,official_sale_id,
-             official_receipt_id,official_receipt_number,reconciliation_reference)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-           ON CONFLICT (merchant_id,provisional_id) DO NOTHING`,
           [
             command.merchantId,
             command.locationId,
             command.deviceId,
-            command.commandId,
-            command.provisionalId,
-            officialCommit.officialSaleId,
-            officialCommit.officialReceiptId,
-            officialCommit.officialReceiptNumber,
-            officialCommit.reconciliationReference,
+            command.deviceCredentialVersion,
           ],
         );
-        const mapping = await client.query<{ officialSaleId: string }>(
-          `SELECT official_sale_id::text AS "officialSaleId"
+        const cursor = await client.query<{ last: string }>(
+          `SELECT last_accepted_sequence::text AS last FROM merchant.device_replay_cursor
+         WHERE device_id=$1::uuid AND credential_version=$2 FOR UPDATE`,
+          [command.deviceId, command.deviceCredentialVersion],
+        );
+        const last = Number(cursor.rows[0]?.last ?? 0);
+        if (command.deviceSequence !== last + 1) {
+          return this.recordConflict(
+            command,
+            command.deviceSequence <= last ? 'sequence_behind' : 'sequence_gap',
+            true,
+          );
+        }
+        const result: ReplayResult = {
+          commandId: command.commandId,
+          deviceSequence: command.deviceSequence,
+          status: 'accepted',
+          officialId: officialCommit?.officialSaleId ?? null,
+          officialCommit,
+          serverConflictReference: null,
+          failure: null,
+        };
+        await client.query(
+          `INSERT INTO merchant.offline_replay_command
+         (merchant_id,location_id,device_id,credential_version,device_sequence,command_id,
+          operator_session_id,idempotency_key,command_type,fingerprint,contract_version,
+          schema_version,client_created_at,result,provisional_id,payload)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+          [
+            command.merchantId,
+            command.locationId,
+            command.deviceId,
+            command.deviceCredentialVersion,
+            command.deviceSequence,
+            command.commandId,
+            command.operatorSessionId,
+            command.idempotencyKey,
+            command.commandType,
+            command.fingerprint,
+            command.contractVersion,
+            command.schemaVersion,
+            command.createdAt,
+            JSON.stringify(result),
+            command.provisionalId,
+            JSON.stringify(command.payload),
+          ],
+        );
+        await client.query(
+          `UPDATE merchant.device_replay_cursor SET last_accepted_sequence=$3, updated_at=clock_timestamp()
+         WHERE device_id=$1::uuid AND credential_version=$2`,
+          [command.deviceId, command.deviceCredentialVersion, command.deviceSequence],
+        );
+        if (officialCommit && command.provisionalId) {
+          await client.query(
+            `INSERT INTO merchant.offline_provisional_mapping
+            (merchant_id,location_id,device_id,command_id,provisional_id,official_sale_id,
+             official_receipt_id,official_receipt_number,reconciliation_reference)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+           ON CONFLICT (merchant_id,provisional_id) DO NOTHING`,
+            [
+              command.merchantId,
+              command.locationId,
+              command.deviceId,
+              command.commandId,
+              command.provisionalId,
+              officialCommit.officialSaleId,
+              officialCommit.officialReceiptId,
+              officialCommit.officialReceiptNumber,
+              officialCommit.reconciliationReference,
+            ],
+          );
+          const mapping = await client.query<{ officialSaleId: string }>(
+            `SELECT official_sale_id::text AS "officialSaleId"
            FROM merchant.offline_provisional_mapping
            WHERE merchant_id=$1 AND provisional_id=$2`,
-          [command.merchantId, command.provisionalId],
-        );
-        if (mapping.rows[0]?.officialSaleId !== officialCommit.officialSaleId) {
-          throw new Error('PROVISIONAL_MAPPING_CONFLICT');
+            [command.merchantId, command.provisionalId],
+          );
+          if (mapping.rows[0]?.officialSaleId !== officialCommit.officialSaleId) {
+            throw new Error('PROVISIONAL_MAPPING_CONFLICT');
+          }
         }
-      }
-      await client.query(
-        `INSERT INTO merchant.audit_event
+        await client.query(
+          `INSERT INTO merchant.audit_event
           (merchant_id,location_id,command_id,event_type,entity_type,entity_id,outcome,
            public_data,correlation_id,event_hash)
          VALUES ($1::uuid,$2::uuid,$3::uuid,'offline.replay.accepted',
           'offline_command',$3::uuid,'success',
           jsonb_build_object('commandType',$4::text,'deviceSequence',$5::bigint),$3::text,'')`,
-        [
-          command.merchantId,
-          command.locationId,
-          command.commandId,
-          command.commandType,
-          command.deviceSequence,
-        ],
-      );
-      return result;
+          [
+            command.merchantId,
+            command.locationId,
+            command.commandId,
+            command.commandType,
+            command.deviceSequence,
+          ],
+        );
+        return result;
       },
       command.locationId,
     );
@@ -300,7 +309,9 @@ export class PosOfflineRepository {
       lastAcceptedSequence: string;
       acceptedCount: string;
       lastReplayAt: Date | null;
-    }>(merchantId, getRequestContext()?.locationId ?? '',
+    }>(
+      merchantId,
+      getRequestContext()?.locationId ?? '',
       `SELECT COALESCE(c.last_accepted_sequence,0)::text AS "lastAcceptedSequence",
               count(r.command_id)::text AS "acceptedCount", max(r.accepted_at) AS "lastReplayAt"
        FROM merchant.device_replay_cursor c
@@ -363,7 +374,9 @@ export class PosOfflineRepository {
       correlationId: string;
       officialId: string | null;
       id: string;
-    }>(merchantId, locationId,
+    }>(
+      merchantId,
+      locationId,
       `SELECT command_id::text AS "commandId",device_sequence::text AS "deviceSequence",
               classification,blocks_following AS "blocksFollowing",
               operator_action_required AS "operatorActionRequired",
@@ -398,7 +411,9 @@ export class PosOfflineRepository {
       provisionalId: string;
       officialId: string;
       commandId: string;
-    }>(merchantId, locationId,
+    }>(
+      merchantId,
+      locationId,
       `SELECT provisional_id::text AS "provisionalId",
               official_sale_id::text AS "officialId",
               command_id::text AS "commandId"
@@ -418,7 +433,9 @@ export class PosOfflineRepository {
       commandReference: string | null;
       sequence: string;
       outcomeCode: string;
-    }>(merchantId, locationId,
+    }>(
+      merchantId,
+      locationId,
       `SELECT a.event_type AS "eventCategory",a.occurred_at AS "occurredAt",
               a.correlation_id AS "correlationId",a.command_id::text AS "commandReference",
               COALESCE(a.public_data->>'deviceSequence','0') AS sequence,
