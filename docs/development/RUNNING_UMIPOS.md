@@ -304,3 +304,26 @@ the committed sale, payment, receipt, or cash facts. Reset only disposable devel
 
 Post-sale exceptions require connectivity. UmiPOS does not create offline refunds or voids.
 Manual terminal results remain operator assertions. Restock intent does not change stock in Gate 3D.
+
+## Canonical PR check
+
+Use Node 22 and pnpm 10.29.3. Run this command before each commit and push:
+
+```sh
+pnpm check:pr
+```
+
+Set `PR_BASE_REF` when the PR does not target `main`. PR #72 uses:
+
+```sh
+PR_BASE_REF=origin/build-v3 pnpm check:pr
+```
+
+Run `pnpm format` before the check when you changed Markdown, JSON, TypeScript, or generated files.
+Review all formatting changes. Run `pnpm check:pr` a second time. The second run must change no files.
+
+The command checks contract drift, root lint, the approved warning baseline, root format,
+canonical JSON, the contract checksum, the UmiPOS use-case document, and the full PR Git range.
+Run affected tests and builds separately.
+
+See `docs/development/LINT_AND_PR_CHECKS.md` for the failure diagnosis and troubleshooting steps.

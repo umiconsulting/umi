@@ -15,7 +15,7 @@
     "start:worker": "node dist/worker.js",
     "dev": "nest start --watch",
     "dev:worker": "nest start --watch --entryFile worker",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts"
