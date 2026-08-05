@@ -707,7 +707,8 @@ export class PosExceptionRepository {
       await client.query(
         `INSERT INTO merchant.pos_restock_intent
            (merchant_id,location_id,exception_line_id,sale_line_id,quantity,decision)
-         VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6)`,
+         VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6)
+         RETURNING id::text`,
         [
           merchantId,
           dto.locationId,

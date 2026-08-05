@@ -25,11 +25,11 @@
 
 ## 1. Propósito del documento
 
-Este documento explica el comportamiento operativo que existe en UmiPOS hasta Gate 3D.1. Sirve para operación, soporte, desarrollo, QA y capacitación.
+Este documento explica el comportamiento operativo que existe en UmiPOS hasta Gate 3E. Sirve para operación, soporte, desarrollo, QA y capacitación.
 
-La referencia es el commit funcional de Gate 3D.1, del 4 de agosto de 2026. El contrato canónico es la versión `2.2.0`. Su hash de contenido es `c8be1d2927a482ea163bcdf81edef3f0947ede2528d80cf305b1f131130106b8`.
+La referencia es el commit funcional de Gate 3E, del 5 de agosto de 2026. El contrato canónico es la versión `2.3.0`. Su hash de contenido es `9d6a01b2cb9ac00bf3bfd54c51c4dc689084fa20fa2479b1b1f79bdd1d949454`.
 
-El producto tiene completos los Gates 3A, 3B, 3C y 3D. Gate 3D.1 añade perfiles operativos para el piloto. La certificación final de UX, el inventario final y las integraciones físicas siguen pendientes.
+El producto tiene completos los Gates 3A, 3B, 3C, 3D y 3D.1. Gate 3E añade la autoridad de inventario. La certificación final de UX y las integraciones físicas siguen pendientes.
 
 Cada caso usa uno de estos estados:
 
@@ -103,7 +103,7 @@ La relación operativa es estricta. Un `merchant` contiene una `location`. El di
 | Void                   | Excepción estrecha para una venta todavía elegible. No elimina la venta.                          |
 | Recibo original        | Snapshot inmutable creado con la venta comprometida.                                              |
 | Recibo compensatorio   | Snapshot inmutable creado por un refund o void.                                                   |
-| Restock intent         | Decisión futura sobre reposición. No cambia inventario en Gate 3D.                                |
+| Restock intent         | Decisión inmutable del refund. Gate 3E crea su consecuencia de inventario.                        |
 | Venta provisional      | Resultado local de una venta en efectivo offline. No tiene identidad oficial.                     |
 | Replay                 | Envío ordenado de comandos del journal cuando vuelve la conexión.                                 |
 | Reconciliación offline | Resolución autoritativa de aceptación, duplicado o conflicto durante replay.                      |
@@ -2282,6 +2282,271 @@ Los perfiles operativos reciben lectura según la matriz. Viewer no recibe este 
 
 **Evidencia de implementación:** `apps/umi-pos/lib/features/exception`, `pos-exception.repository.ts`, `34_pos_exception.sql` y `sale_exception_test.dart`.
 
+### UC-INV-001 — Consultar disponibilidad y saldos
+
+**Estado:** IMPLEMENTADO
+
+**Objetivo:** Consultar la disponibilidad autoritativa de un producto y el saldo de su location.
+
+**Actor principal:** Operador con acceso de lectura.
+
+**Actores secundarios:** UMI API, PostgreSQL y dispositivo.
+
+**Permisos requeridos:** `inventory.read`; `inventory.history.read` para el historial.
+
+**Precondiciones:**
+
+- merchant y location válidos;
+- dispositivo confiable;
+- operador autenticado;
+- entitlement POS activo;
+- conexión para el saldo actual.
+
+**Disparador:** El operador abre el catálogo o las Operaciones de inventario.
+
+**Flujo principal:**
+
+1. UMI API resuelve la ubicación de surtido.
+2. La API lee la proyección a una secuencia del ledger.
+3. La API calcula el estado del producto o de la receta.
+4. UmiPOS muestra disponible, bajo, no disponible o desconocido.
+
+**Resultado esperado:** El operador ve un estado de la location actual. El cliente no crea un saldo.
+
+**Flujos alternos:** Un artículo sin seguimiento permanece disponible. Un compuesto usa el componente limitante.
+
+**Errores y recuperación:** Una política vencida bloquea la autoridad. El operador actualiza con conexión.
+
+**Reglas de seguridad:** RLS, permiso, entitlement, lote acotado y location explícita.
+
+**Persistencia y efectos:** Solo lectura de la proyección y del ledger inmutable.
+
+**Disponibilidad:** Online; una caché previa puede mostrar un estado marcado como obsoleto.
+
+**Evidencia de implementación:** `pos-inventory.repository.ts`, `pos-catalog.repository.ts`, `inventory_surface.dart` y `36_pos_inventory.sql`.
+
+### UC-INV-002 — Reservar y consumir existencias con una venta
+
+**Estado:** IMPLEMENTADO
+
+**Objetivo:** Reservar y consumir la cantidad exacta durante un checkout.
+
+**Actor principal:** Cashier o Staff.
+
+**Actores secundarios:** UMI API, checkout, ledger y política.
+
+**Permisos requeridos:** `inventory.read`, `sale.lifecycle` y `checkout.commit`.
+
+**Precondiciones:**
+
+- carrito válido;
+- merchant y location válidos;
+- sesión y dispositivo vigentes;
+- mapeo o receta activos;
+- existencia suficiente bajo la política.
+
+**Disparador:** El operador prepara y confirma el checkout.
+
+**Flujo principal:**
+
+1. El servidor resuelve el consumo versionado.
+2. El servidor crea una reserva idempotente.
+3. El checkout vuelve a validar la reserva.
+4. La transacción compromete venta, tender, recibo e inventario.
+5. El ledger registra `sale_committed` una sola vez.
+
+**Resultado esperado:** La venta y el inventario quedan comprometidos juntos.
+
+**Flujos alternos:** Un producto sin seguimiento no crea efecto. Un cambio del carrito libera la reserva.
+
+**Errores y recuperación:** Una reserva vencida preserva el carrito. La pérdida de respuesta consulta el comando original.
+
+**Reglas de seguridad:** Idempotencia, huella, versión, bloqueo estable, dispositivo y permiso.
+
+**Persistencia y efectos:** Reserva auditable, ledger inmutable y proyección reconstruible.
+
+**Disponibilidad:** Online; offline solo para el replay cash autorizado por política.
+
+**Evidencia de implementación:** `pos-checkout.repository.ts`, `commit_sale_inventory`, `inventory-domain.spec.ts` y `checkout_test.dart`.
+
+### UC-INV-003 — Registrar ajuste, merma, daño o cuarentena
+
+**Estado:** IMPLEMENTADO
+
+**Objetivo:** Registrar una corrección operativa sin modificar el historial.
+
+**Actor principal:** Supervisor, Manager, Admin u Owner según el permiso.
+
+**Actores secundarios:** Aprobador independiente, UMI API y ledger.
+
+**Permisos requeridos:** Un permiso específico `inventory.adjust.*`, `inventory.waste.create`, `inventory.damage.create` o `inventory.quarantine.*`.
+
+**Precondiciones:**
+
+- artículo y ubicación activos;
+- cantidad y unidad válidas;
+- dispositivo, sesión y entitlement vigentes;
+- permiso efectivo;
+- aprobación cuando supera el umbral.
+
+**Disparador:** El operador selecciona una acción en Operaciones de inventario.
+
+**Flujo principal:**
+
+1. El operador captura una cantidad positiva.
+2. La API convierte la unidad de forma exacta.
+3. La política decide si requiere aprobación.
+4. Un segundo operador aprueba el comando cuando aplica.
+5. El ledger agrega el hecho y reconstruye el saldo.
+
+**Resultado esperado:** El historial conserva la razón, el actor y el efecto exacto.
+
+**Flujos alternos:** Una cantidad dañada puede entrar en cuarentena. Una inspección puede devolverla a disponible.
+
+**Errores y recuperación:** Una cantidad superior al estado de origen falla cerrada. Un reintento consulta el mismo comando.
+
+**Reglas de seguridad:** Permiso específico, actor separado, aprobación de un uso, location e idempotencia.
+
+**Persistencia y efectos:** Nuevo hecho de ajuste, merma, daño o cuarentena. No existe un `UPDATE` del ledger.
+
+**Disponibilidad:** Online-only.
+
+**Evidencia de implementación:** `pos-inventory.service.ts`, `pos-inventory.repository.ts`, `inventory_surface.dart` y `pos-inventory.service.spec.ts`.
+
+### UC-INV-004 — Consumir la decisión de restock de un refund
+
+**Estado:** IMPLEMENTADO CON LIMITACIONES
+
+**Objetivo:** Convertir una decisión de refund en una consecuencia física explícita.
+
+**Actor principal:** Manager, Admin u Owner.
+
+**Actores secundarios:** UMI API, aprobador y refund de Gate 3D.
+
+**Permisos requeridos:** `inventory.restock.resolve` y `inventory.restock.approve`.
+
+**Precondiciones:**
+
+- refund comprometido;
+- restock intent inmutable;
+- consumo original existente;
+- merchant y location coincidentes;
+- aprobación válida.
+
+**Disparador:** El refund confirma Restock, DoNotRestock, InspectionRequired o revisión.
+
+**Flujo principal:**
+
+1. La API bloquea el intent elegible.
+2. La API obtiene el consumo histórico de la línea.
+3. La API limita la cantidad al consumo original.
+4. La transacción crea el resultado y los hechos compensatorios.
+5. La proyección cambia solo cuando existe un efecto físico.
+
+**Resultado esperado:** El refund original y su intent no cambian. El ledger muestra la consecuencia.
+
+**Flujos alternos:** DoNotRestock no aumenta la existencia. InspectionRequired usa cuarentena.
+
+**Errores y recuperación:** Un restock duplicado o excesivo falla. La misma huella recupera el resultado.
+
+**Reglas de seguridad:** Aprobación específica, actor separado, scope, idempotencia y cantidad histórica.
+
+**Persistencia y efectos:** Outcome inmutable y entradas compensatorias. Las recetas quedan en revisión por defecto.
+
+**Disponibilidad:** Online-only.
+
+**Evidencia de implementación:** `merchant.pos_restock_intent`, `merchant.inventory_restock_outcome`, `pos-inventory.repository.ts` y `36_pos_inventory.sql`.
+
+### UC-INV-005 — Ejecutar un conteo ciego y reconciliar
+
+**Estado:** IMPLEMENTADO
+
+**Objetivo:** Comparar el conteo físico con una secuencia fija y crear una corrección explícita.
+
+**Actor principal:** Supervisor para contar; Manager, Admin u Owner para reconciliar.
+
+**Actores secundarios:** Aprobador independiente y UMI API.
+
+**Permisos requeridos:** `inventory.count.create`, `inventory.count.submit`, `inventory.count.reconcile` e `inventory.count.approve` según la fase.
+
+**Precondiciones:**
+
+- ubicación apta para conteo;
+- ningún conteo conflictivo activo;
+- artículos activos;
+- sesión, dispositivo y entitlement vigentes;
+- conexión online.
+
+**Disparador:** El operador inicia un conteo ciego.
+
+**Flujo principal:**
+
+1. El servidor fija la secuencia y el scope.
+2. UmiPOS oculta la cantidad esperada.
+3. El operador envía las cantidades observadas.
+4. El servidor calcula la varianza.
+5. El operador selecciona los motivos.
+6. Otro operador aprueba la reconciliación.
+7. El ledger crea las correcciones del conteo.
+
+**Resultado esperado:** El conteo, la cantidad esperada y la corrección permanecen como hechos distintos.
+
+**Flujos alternos:** Una varianza cero no crea una corrección. Un recuento usa un intento nuevo.
+
+**Errores y recuperación:** Una secuencia obsoleta bloquea la reconciliación. El comando se puede recuperar.
+
+**Reglas de seguridad:** Conteo ciego, scope fijo, motivo, aprobación vinculada e idempotencia.
+
+**Persistencia y efectos:** Conteo inmutable y entradas `count_correction`.
+
+**Disponibilidad:** Online-only.
+
+**Evidencia de implementación:** `inventory_count`, `pos-inventory.repository.ts`, `inventory_surface.dart` e `inventory_test.dart`.
+
+### UC-INV-006 — Resolver un conflicto de inventario offline
+
+**Estado:** IMPLEMENTADO CON LIMITACIONES
+
+**Objetivo:** Obtener un resultado oficial para una venta cash provisional sin duplicar existencias.
+
+**Actor principal:** Operador de la venta.
+
+**Actores secundarios:** Replay, Recovery Center y UMI API.
+
+**Permisos requeridos:** `offline.cash.checkout`, `inventory.read` y permisos de venta.
+
+**Precondiciones:**
+
+- cliente nativo;
+- política offline vigente;
+- snapshot de catálogo e inventario vigente;
+- dispositivo y credencial válidos;
+- comando provisional en el journal cifrado.
+
+**Disparador:** El cliente recupera la conexión y ejecuta replay.
+
+**Flujo principal:**
+
+1. Replay conserva la identidad del comando.
+2. La API valida la política, el mapeo, la receta y la existencia.
+3. La API compromete venta e inventario juntos o devuelve un conflicto.
+4. Recovery Center muestra la acción segura.
+5. El resultado oficial se vincula al recibo provisional.
+
+**Resultado esperado:** El ledger oficial contiene como máximo un efecto para la venta.
+
+**Flujos alternos:** AlreadyApplied recupera el resultado. InventoryConflict conserva el comando para soporte.
+
+**Errores y recuperación:** Un cambio de receta, mapping o política bloquea el commit silencioso.
+
+**Reglas de seguridad:** Journal cifrado, secuencia, huella, dispositivo, scope y replay idempotente.
+
+**Persistencia y efectos:** Comando provisional inmutable y resultado oficial del servidor.
+
+**Disponibilidad:** Native offline con replay online; Web no crea journal financiero sensible.
+
+**Evidencia de implementación:** `offline_journal.dart`, `pos-offline.repository.ts`, `pos-checkout.repository.ts` y `recovery_center.dart`.
+
 ## 15. Casos de error y recuperación
 
 | Escenario                           | Qué ve el usuario                | Qué conserva el sistema           | Qué se bloquea                  | Acción segura                                  |
@@ -2427,6 +2692,12 @@ La tabla muestra grants predeterminados. Un override puede negar o conceder un p
 | UC-OFF-004  | Offline     | Recovery Center              | ✅    | ✅    | ✅      | ⚠️         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
 | UC-HIST-001 | Historial   | Ventas y recibos             | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                  |
 | UC-HIST-002 | Historial   | Excepciones y recibos        | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO CON LIMITACIONES |
+| UC-INV-001  | Inventario  | Disponibilidad y saldos      | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
+| UC-INV-002  | Inventario  | Reserva y consumo de venta   | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | ⚠️    | ⚠️       | No         | IMPLEMENTADO                  |
+| UC-INV-003  | Inventario  | Ajuste, merma y cuarentena   | ✅    | ✅    | ✅      | ⚠️         | ❌      | ❌    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO                  |
+| UC-INV-004  | Inventario  | Restock de refund            | ✅    | ✅    | ✅      | ❌         | ❌      | ❌    | ❌     | Sí          | No    | Sí       | Sí         | IMPLEMENTADO CON LIMITACIONES |
+| UC-INV-005  | Inventario  | Conteo y reconciliación      | ✅    | ✅    | ✅      | ⚠️         | ❌      | ❌    | ❌     | Sí          | No    | Sí       | Sí         | IMPLEMENTADO                  |
+| UC-INV-006  | Inventario  | Conflicto offline y replay   | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | ⚠️    | ⚠️       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
 
 ## 18. Funcionalidades no implementadas todavía
 
@@ -2434,8 +2705,8 @@ Estas capacidades permanecen pendientes o fuera del alcance actual. El roadmap n
 
 | Capacidad                                    | Estado actual             | Límite confirmado                                                  |
 | -------------------------------------------- | ------------------------- | ------------------------------------------------------------------ |
-| Inventario sincronizado y stock ledger final | NO IMPLEMENTADO           | Gate 3E requiere aprobación de alcance.                            |
-| Consumo real de restock intent               | FOUNDATION                | Gate 3D solo conserva la intención.                                |
+| Inventario sincronizado y stock ledger final | IMPLEMENTADO              | Gate 3E conserva un ledger inmutable por location.                 |
+| Consumo real de restock intent               | IMPLEMENTADO CON LÍMITES  | Las recetas requieren una decisión de componente.                  |
 | KDS Flutter final                            | FUERA DE ALCANCE ACTUAL   | UmiPOS no implementa el cliente KDS final.                         |
 | Loyalty                                      | NO IMPLEMENTADO EN UMIPOS | El producto Umi Cash tiene otra autoridad.                         |
 | Wallet                                       | NO IMPLEMENTADO EN UMIPOS | No existe tender wallet en checkout.                               |
@@ -2615,9 +2886,29 @@ Antes de empezar, prepare un merchant de prueba, una location, un registro, prod
 
 **Evidencia:** Guarde una línea de tiempo con referencias públicas. No guarde datos sensibles.
 
+### Sesión 9 — Inventario
+
+**Rol requerido:** Cashier para venta; Supervisor para conteo; Manager para aprobación.
+
+1. Verifique la disponibilidad de un producto directo y una receta.
+2. Reserve y complete una venta con seguimiento.
+3. Confirme que una venta fallida no consume existencias.
+4. Fuerce una reserva superior al saldo y conserve el carrito.
+5. Registre un refund con Restock, DoNotRestock e InspectionRequired.
+6. Verifique que una receta queda en revisión por componente.
+7. Registre una merma, un daño y una liberación de cuarentena.
+8. Inicie un conteo ciego y capture todas las cantidades.
+9. Seleccione un motivo para cada varianza.
+10. Use otro PIN para aprobar la reconciliación.
+11. Repita un comando y verifique que el ledger no duplica el efecto.
+
+**Resultado esperado:** El ledger conserva los hechos originales y compensatorios. El saldo se puede reconstruir.
+
+**Evidencia:** Guarde referencias públicas, secuencias y códigos seguros. No guarde el PIN.
+
 ## 20. Mapa de cobertura
 
-El inventario contiene **47 casos de uso**. El conteo se obtiene de los encabezados `UC-*` y sus campos `Estado`.
+El inventario contiene **53 casos de uso**. El conteo se obtiene de los encabezados `UC-*` y sus campos `Estado`.
 
 ### Casos por módulo
 
@@ -2633,27 +2924,28 @@ El inventario contiene **47 casos de uso**. El conteo se obtiene de los encabeza
 | Refund      |      6 |
 | Offline     |      4 |
 | Historial   |      2 |
-| **Total**   | **47** |
+| Inventario  |      6 |
+| **Total**   | **53** |
 
 ### Estado de implementación
 
 | Estado                        |  Casos |
 | ----------------------------- | -----: |
-| IMPLEMENTADO                  |     33 |
-| IMPLEMENTADO CON LIMITACIONES |     13 |
+| IMPLEMENTADO                  |     37 |
+| IMPLEMENTADO CON LIMITACIONES |     15 |
 | FOUNDATION                    |      1 |
 | NO IMPLEMENTADO               |      0 |
-| **Total**                     | **47** |
+| **Total**                     | **53** |
 
-La sección 18 registra 15 capacidades pendientes o limitadas. Estas capacidades no se presentan como casos operativos actuales.
+La sección 18 registra capacidades pendientes o limitadas. Estas capacidades no se presentan como casos operativos actuales.
 
 ### Cobertura transversal
 
 | Medida                                 | Conteo | Criterio                                                          |
 | -------------------------------------- | -----: | ----------------------------------------------------------------- |
-| Online-only                            |     21 | La disponibilidad exige conexión para la autoridad principal.     |
-| Offline-capable                        |      9 | El campo Disponibilidad menciona una capacidad offline explícita. |
-| Requieren o pueden requerir aprobación |     25 | La matriz marca `Sí` o `⚠️` en Aprobación.                        |
+| Online-only                            |     24 | La disponibilidad exige conexión para la autoridad principal.     |
+| Offline-capable                        |     11 | El campo Disponibilidad menciona una capacidad offline explícita. |
+| Requieren o pueden requerir aprobación |     29 | La matriz marca `Sí` o `⚠️` en Aprobación.                        |
 | Native-only estricto                   |      1 | La venta cash provisional requiere journal cifrado nativo.        |
 
 ### Casos disponibles por rol
@@ -2662,12 +2954,12 @@ Este conteo incluye acceso directo y acceso condicionado. Excluye las celdas ❌
 
 | Rol        | Casos con acceso directo o condicionado |
 | ---------- | --------------------------------------: |
-| Owner      |                                      47 |
-| Admin      |                                      47 |
-| Manager    |                                      43 |
-| Supervisor |                                      43 |
-| Cashier    |                                      39 |
-| Staff      |                                      39 |
-| Viewer     |                                       7 |
+| Owner      |                                      53 |
+| Admin      |                                      53 |
+| Manager    |                                      49 |
+| Supervisor |                                      48 |
+| Cashier    |                                      42 |
+| Staff      |                                      42 |
+| Viewer     |                                       8 |
 
 La cifra de un rol no concede autoridad por sí sola. Cada ejecución valida el permiso, la política, el dispositivo y la location.

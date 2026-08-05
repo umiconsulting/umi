@@ -355,7 +355,90 @@ Use development seed data that contains a committed sale and original receipt fa
 the committed sale, payment, receipt, or cash facts. Reset only disposable development data.
 
 Post-sale exceptions require connectivity. UmiPOS does not create offline refunds or voids.
-Manual terminal results remain operator assertions. Restock intent does not change stock in Gate 3D.
+Manual terminal results remain operator assertions. Gate 3E consumes the restock intent after a
+committed refund.
+
+## Inventario de Gate 3E
+
+Ejecuta los comandos desde la raíz del workspace. Usa Node 22 y pnpm 10.29.3.
+
+```sh
+pnpm umi-pos:generate
+UMI_POS_DEV_SEED_CONFIRM=disposable pnpm umi-pos:demo-seed
+pnpm umi-pos:inventory-api-tests
+pnpm umi-pos:inventory-tests
+pnpm umi-pos:inventory-db-check
+```
+
+El seed crea la ubicación, los artículos, las recetas, los mapeos y el saldo inicial. El comando es
+repetible. El seed no crea un segundo saldo inicial.
+
+Prueba el flujo de venta con seguimiento:
+
+1. Inicia PostgreSQL con el procedimiento de Bootstrap.
+2. Inicia UMI API con el procedimiento de Bootstrap.
+3. Inicia UmiPOS y enrola el dispositivo.
+4. Ejecuta el seed desechable.
+5. Abre el catálogo para la location asignada.
+6. Verifica los estados disponible, bajo y no disponible.
+7. Agrega un producto con mapeo directo.
+8. Agrega un producto con receta.
+9. Abre el checkout para crear la reserva.
+10. Confirma la venta.
+11. Abre Operaciones de inventario.
+12. Verifica las entradas `sale_committed` y los saldos nuevos.
+
+Prueba las consecuencias de un refund:
+
+1. Crea una venta con seguimiento.
+2. Confirma un refund con `Restock`.
+3. Verifica el hecho `refund_restocked`.
+4. Repite con `DoNotRestock`.
+5. Verifica que la existencia disponible no aumenta.
+6. Repite con `InspectionRequired`.
+7. Verifica que la cantidad queda en cuarentena.
+8. Usa la resolución de inventario para una receta.
+9. No devuelvas ingredientes preparados sin una decisión explícita.
+
+Prueba las operaciones controladas:
+
+1. Inicia sesión con Manager u Owner.
+2. Abre Operaciones de inventario.
+3. Registra un ajuste, una merma y un daño.
+4. Usa un PIN diferente cuando la política pida aprobación.
+5. Libera una cantidad válida de cuarentena.
+6. Verifica un rechazo por cantidad superior al saldo.
+7. Verifica un rechazo por location incorrecta.
+
+Prueba un conteo:
+
+1. Selecciona `Iniciar conteo ciego`.
+2. Captura todas las cantidades sin consultar el saldo esperado.
+3. Envía el conteo.
+4. Revisa la varianza calculada por el servidor.
+5. Selecciona un motivo para cada diferencia.
+6. Solicita una aprobación independiente.
+7. Confirma la reconciliación.
+8. Verifica las entradas `count_correction`.
+
+Prueba la existencia negativa y la recuperación:
+
+1. Intenta reservar una cantidad mayor que la disponible.
+2. Verifica el código `NEGATIVE_STOCK_BLOCKED` o `INVENTORY_UNAVAILABLE`.
+3. Conserva el carrito y corrige la cantidad.
+4. Simula una pérdida de respuesta después de un comando.
+5. Consulta el comando original antes de repetirlo.
+6. Verifica que el ledger no tiene una entrada duplicada.
+
+Las operaciones de ajuste, merma, daño, cuarentena, conteo y restock son online-only. Una venta cash
+offline usa el journal existente. El replay crea el efecto oficial solo después de la aceptación del
+servidor.
+
+Usa `pnpm umi-pos:inventory-db-check` para la base desechable. El script crea y elimina su contenedor.
+No apuntes el script a una base compartida o de producción.
+
+Para un reinicio desechable, elimina solo el contenedor que creó el script. Conserva cualquier stash
+local. No uses el reset con datos de producción.
 
 ## Canonical PR check
 

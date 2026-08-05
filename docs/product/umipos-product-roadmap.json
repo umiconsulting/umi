@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-04",
-  "latestRelevantCommit": "HEAD (Gate 3D.1 commit)",
-  "integrationState": "Gate 3A through Gate 3D.1 preserved on current build-v3",
+  "updatedAt": "2026-08-05",
+  "latestRelevantCommit": "HEAD (Gate 3E commit)",
+  "integrationState": "Gate 3A through Gate 3E preserved on current build-v3",
   "items": [
     {
       "id": "platform-certification",
@@ -99,6 +99,16 @@
       "nextObjective": "Approve Gate 3E inventory synchronization scope",
       "blockers": [],
       "validationState": "Pilot permission inventory, grant and approval matrices, deterministic seeds, focused API and Flutter authorization, PostgreSQL, RLS, and PR validation passed"
+    },
+    {
+      "id": "3E",
+      "status": "complete",
+      "dependencies": ["3D.1"],
+      "nextObjective": "Approve Gate 3F customers, loyalty, and stored value scope",
+      "blockers": [
+        "Production inventory thresholds and prepared-product disposition require Owner review"
+      ],
+      "validationState": "Contract, API, Flutter, inventory invariants, concurrency, disposable PostgreSQL, RLS, Linux, Web, and deterministic PR validation passed"
     }
   ]
 }

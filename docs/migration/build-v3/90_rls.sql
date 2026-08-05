@@ -68,6 +68,12 @@ grant select, insert, update, delete on all tables in schema merchant to api;
 -- Gate 3D keeps policy server-owned and committed compensation append-only.
 revoke insert, update, delete on merchant.pos_exception_policy from api;
 revoke delete on merchant.pos_exception_preview from api;
+
+-- Gate 3E permits stock changes only through the scoped ledger functions.
+-- The balance is a rebuildable projection. It is not a direct write boundary.
+revoke insert, update, delete on merchant.stock_ledger_entry from api, worker;
+revoke insert, update, delete on merchant.stock_balance from api, worker;
+grant select on merchant.stock_ledger_entry, merchant.stock_balance to api, worker;
 revoke update, delete on
   merchant.pos_sale_exception,
   merchant.pos_sale_exception_line,
@@ -437,7 +443,8 @@ begin
     'device_replay_cursor', 'offline_replay_command', 'offline_reconciliation',
     'offline_replay_conflict', 'offline_provisional_mapping',
     'pos_checkout_draft', 'cash_shift',
-    'pos_exception_preview', 'pos_sale_exception'
+    'pos_exception_preview', 'pos_sale_exception',
+    'inventory_count'
   ] loop
     execute format($f$create policy device_scoping on merchant.%I as restrictive
       using      (umi.current_device() is not null and device_id = umi.current_device())
@@ -451,11 +458,9 @@ end $$;
 do $$
 declare
   undecided text[];
-  -- Empty today: every merchant table with a device_id is device-scoped. Add a name here
-  -- WITH A REASON when one legitimately is not — e.g. a dashboard-readable device
-  -- inventory or a telemetry roll-up. The cast is required: Postgres cannot infer the
-  -- element type of an empty array literal.
-  not_device_scoped constant text[] := array[]::text[];
+  -- Ledger history belongs to the merchant and location. Its device_id records provenance.
+  -- A later trusted device can read the original fact for refund and support workflows.
+  not_device_scoped constant text[] := array['stock_ledger_entry']::text[];
 begin
   select array_agg(c.relname order by c.relname) into undecided
     from pg_class c

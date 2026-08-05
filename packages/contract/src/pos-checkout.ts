@@ -315,7 +315,17 @@ export const PaymentOutcome = z
 export const InventoryReservation = z
   .object({
     id: Uuid,
-    status: z.enum(['reserved', 'released', 'expired', 'commit_prepared']),
+    status: z.enum([
+      'draft',
+      'active',
+      'partially_available',
+      'committed',
+      'released',
+      'expired',
+      'conflict',
+      'reserved',
+      'commit_prepared',
+    ]),
     expiresAt: IsoTimestamp,
     lineCount: z.number().int().positive().max(250),
   })

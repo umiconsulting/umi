@@ -213,4 +213,56 @@ El trigger de RBAC termina las sesiones activas después de un cambio importante
 - El Owner debe decidir si necesita un rol Auditor de negocio.
 - El Dashboard no ofrece un editor libre de permisos en este Gate.
 
-El flujo documentado de seed y API es la autoridad para el piloto. Gate 3D.1 no inicia inventario ni Gate 3E.
+## 11. Permisos de inventario de Gate 3E
+
+Gate 3E añade permisos de inventario a la misma matriz canónica. No usa nombres de rol como
+autoridad.
+
+| Perfil      | Autoridad de inventario                                                        |
+| ----------- | ------------------------------------------------------------------------------ |
+| Cashier     | Lee la disponibilidad de la location asignada.                                 |
+| Staff       | Conserva el mismo acceso de lectura que Cashier.                               |
+| Supervisor  | Lee el historial, registra merma y daño, inicia conteos y entra en cuarentena. |
+| Manager     | Ajusta, aprueba, reconcilia, resuelve restock y libera cuarentena.             |
+| Admin       | Administra la política y conserva las operaciones autorizadas del negocio.     |
+| Owner       | Administra la política y conserva la autoridad del merchant.                   |
+| Viewer      | Lee saldos e historial. No cambia hechos.                                      |
+| super_admin | Permanece fuera del viaje operativo del café.                                  |
+
+Todos los grants de inventario requieren el entitlement `pos`. Las operaciones también requieren un
+dispositivo vigente y una sesión de operador activa.
+
+La location limita los saldos, las reservas, los conteos y los comandos. Un grant de merchant no
+permite una mutación sin un contexto de location.
+
+## 12. Separación de aprobación para inventario
+
+La matriz canónica incluye estas acciones sensibles:
+
+- aumento o reducción por encima del umbral;
+- merma por encima del umbral;
+- disposición de daño;
+- liberación de cuarentena;
+- reconciliación fuera de tolerancia;
+- excepción de existencia negativa en ajuste, checkout o reconciliación;
+- resolución manual del restock.
+
+La aprobación usa un permiso específico. También usa una huella del comando, la location, una
+vigencia corta y un solo uso.
+
+La autoaprobación está bloqueada por defecto. `super_admin` no actúa como un aprobador de respaldo.
+La excepción de existencia negativa es la frontera más restrictiva. Esta aprobación sustituye la aprobación de umbral para el mismo comando.
+
+## 13. Valores de inventario del piloto
+
+- La política bloquea la existencia negativa.
+- La política exige una reserva para los artículos configurados.
+- El conteo es ciego.
+- La tolerancia de conteo es cero en los datos desechables.
+- Los umbrales de ajuste y merma son cero.
+- Una operación sobre el umbral requiere otro operador autorizado.
+- Las mutaciones directas de inventario son online-only.
+
+Estos valores prueban el límite más conservador. El Owner debe definir los valores de producción.
+
+El flujo documentado de seed y API es la autoridad del piloto. Gate 3E no inicia Gate 3F.

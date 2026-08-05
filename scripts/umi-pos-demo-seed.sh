@@ -412,6 +412,193 @@ on conflict (id) do update
 set name=excluded.name,
     price_delta=excluded.price_delta;
 
+insert into merchant.inventory_location(
+  id,merchant_id,location_id,public_reference,display_name,location_type,
+  active,sale_fulfillment_eligible,reservation_eligible,count_eligible
+)
+values (
+  '60000000-0000-4000-8000-000000000101',:'merchant_id',:'location_id',
+  'INV-LOCAL-01','Almacén principal','stock_room',true,true,true,true
+)
+on conflict(id) do update set
+  display_name=excluded.display_name,
+  active=true,
+  sale_fulfillment_eligible=true,
+  reservation_eligible=true,
+  count_eligible=true,
+  archived_at=null;
+
+insert into merchant.inventory_item(
+  id,merchant_id,public_reference,display_name,item_type,base_unit,quantity_scale,
+  tracking_policy,negative_stock_policy,reservation_required,low_stock_threshold
+)
+values
+  ('61000000-0000-4000-8000-000000000101',:'merchant_id','INV-CAFE','Café en grano','ingredient','gram',0,'reservation_required','block',true,1000),
+  ('61000000-0000-4000-8000-000000000102',:'merchant_id','INV-AGUA','Agua filtrada','ingredient','milliliter',0,'reservation_required','block',true,5000),
+  ('61000000-0000-4000-8000-000000000103',:'merchant_id','INV-LECHE','Leche entera','ingredient','milliliter',0,'reservation_required','block',true,4000),
+  ('61000000-0000-4000-8000-000000000104',:'merchant_id','INV-AVENA','Leche de avena','ingredient','milliliter',0,'reservation_required','block',true,2000),
+  ('61000000-0000-4000-8000-000000000105',:'merchant_id','INV-DESLACTOSADA','Leche deslactosada','ingredient','milliliter',0,'reservation_required','block',true,2000),
+  ('61000000-0000-4000-8000-000000000106',:'merchant_id','INV-VAINILLA','Jarabe de vainilla','ingredient','milliliter',0,'reservation_required','block',true,500),
+  ('61000000-0000-4000-8000-000000000107',:'merchant_id','INV-CARAMELO','Jarabe de caramelo','ingredient','milliliter',0,'reservation_required','block',true,500),
+  ('61000000-0000-4000-8000-000000000108',:'merchant_id','INV-MATCHA','Matcha','ingredient','gram',0,'reservation_required','block',true,250),
+  ('61000000-0000-4000-8000-000000000109',:'merchant_id','INV-CHAI','Mezcla chai','ingredient','gram',0,'reservation_required','block',true,250),
+  ('61000000-0000-4000-8000-000000000110',:'merchant_id','INV-COLD-BREW','Cold brew preparado','physical_product','portion',0,'reservation_required','block',true,10),
+  ('61000000-0000-4000-8000-000000000111',:'merchant_id','INV-CROISSANT','Croissant','physical_product','unit',0,'reservation_required','block',true,10),
+  ('61000000-0000-4000-8000-000000000112',:'merchant_id','INV-SANDWICH','Sándwich de pavo','physical_product','unit',0,'reservation_required','block',true,10),
+  ('61000000-0000-4000-8000-000000000113',:'merchant_id','INV-CHEESECAKE','Cheesecake','physical_product','unit',0,'reservation_required','block',true,8),
+  ('61000000-0000-4000-8000-000000000114',:'merchant_id','INV-GALLETA','Galleta de chocolate','physical_product','unit',0,'reservation_required','block',true,12),
+  ('61000000-0000-4000-8000-000000000115',:'merchant_id','INV-CANELA','Rollo de canela','physical_product','unit',0,'reservation_required','block',true,8),
+  ('61000000-0000-4000-8000-000000000116',:'merchant_id','INV-TEMPORADA','Bebida de temporada','physical_product','unit',0,'reservation_required','block',true,5)
+on conflict(id) do update set
+  display_name=excluded.display_name,
+  low_stock_threshold=excluded.low_stock_threshold,
+  active=true,
+  archived_at=null;
+
+insert into merchant.inventory_unit_conversion(
+  id,merchant_id,inventory_item_id,from_unit,to_unit,numerator,denominator,target_scale,
+  rounding_policy,version,active
+)
+values
+  ('62000000-0000-4000-8000-000000000101',:'merchant_id','61000000-0000-4000-8000-000000000101','kilogram','gram',1000,1,0,'exact',1,true),
+  ('62000000-0000-4000-8000-000000000102',:'merchant_id','61000000-0000-4000-8000-000000000103','liter','milliliter',1000,1,0,'exact',1,true)
+on conflict(id) do update set active=true;
+
+insert into merchant.inventory_policy(
+  merchant_id,location_id,inventory_location_id,version,tracking_enabled,
+  default_reservation_required,default_negative_stock_policy,
+  adjustment_approval_threshold,waste_approval_threshold,count_variance_tolerance,
+  blind_count,offline_mutations_allowed,issued_at,expires_at,fingerprint
+)
+values (
+  :'merchant_id',:'location_id','60000000-0000-4000-8000-000000000101','pilot-3e-1',
+  true,true,'block',0,0,0,true,false,now(),now()+interval '30 days',repeat('f',64)
+)
+on conflict(merchant_id,location_id) do update set
+  inventory_location_id=excluded.inventory_location_id,
+  version=excluded.version,
+  tracking_enabled=true,
+  default_reservation_required=true,
+  default_negative_stock_policy='block',
+  adjustment_approval_threshold=0,
+  waste_approval_threshold=0,
+  count_variance_tolerance=0,
+  blind_count=true,
+  offline_mutations_allowed=false,
+  issued_at=excluded.issued_at,
+  expires_at=excluded.expires_at,
+  fingerprint=excluded.fingerprint;
+
+insert into merchant.inventory_recipe(
+  id,merchant_id,product_id,variant_id,version,yield_quantity,yield_scale,yield_unit,active
+)
+values
+  ('63000000-0000-4000-8000-000000000101',:'merchant_id','52000000-0000-4000-8000-000000000101',null,1,1,0,'portion',true),
+  ('63000000-0000-4000-8000-000000000102',:'merchant_id','52000000-0000-4000-8000-000000000102','53000000-0000-4000-8000-000000000101',1,1,0,'portion',true),
+  ('63000000-0000-4000-8000-000000000103',:'merchant_id','52000000-0000-4000-8000-000000000102','53000000-0000-4000-8000-000000000102',1,1,0,'portion',true),
+  ('63000000-0000-4000-8000-000000000104',:'merchant_id','52000000-0000-4000-8000-000000000102','53000000-0000-4000-8000-000000000103',1,1,0,'portion',true),
+  ('63000000-0000-4000-8000-000000000105',:'merchant_id','52000000-0000-4000-8000-000000000103',null,1,1,0,'portion',true),
+  ('63000000-0000-4000-8000-000000000106',:'merchant_id','52000000-0000-4000-8000-000000000105',null,1,1,0,'portion',true),
+  ('63000000-0000-4000-8000-000000000107',:'merchant_id','52000000-0000-4000-8000-000000000106',null,1,1,0,'portion',true)
+on conflict(id) do update set active=true,retired_at=null;
+
+insert into merchant.inventory_recipe_component(
+  id,merchant_id,recipe_id,inventory_item_id,modifier_id,quantity,unit,quantity_scale,
+  conversion_numerator,conversion_denominator,rounding_policy,required
+)
+values
+  ('64000000-0000-4000-8000-000000000101',:'merchant_id','63000000-0000-4000-8000-000000000101','61000000-0000-4000-8000-000000000101',null,18,'gram',0,1,1,'exact',true),
+  ('64000000-0000-4000-8000-000000000102',:'merchant_id','63000000-0000-4000-8000-000000000101','61000000-0000-4000-8000-000000000102',null,220,'milliliter',0,1,1,'exact',true),
+  ('64000000-0000-4000-8000-000000000103',:'merchant_id','63000000-0000-4000-8000-000000000102','61000000-0000-4000-8000-000000000101',null,18,'gram',0,1,1,'exact',true),
+  ('64000000-0000-4000-8000-000000000104',:'merchant_id','63000000-0000-4000-8000-000000000103','61000000-0000-4000-8000-000000000101',null,18,'gram',0,1,1,'exact',true),
+  ('64000000-0000-4000-8000-000000000105',:'merchant_id','63000000-0000-4000-8000-000000000104','61000000-0000-4000-8000-000000000101',null,20,'gram',0,1,1,'exact',true),
+  ('64000000-0000-4000-8000-000000000106',:'merchant_id','63000000-0000-4000-8000-000000000105','61000000-0000-4000-8000-000000000101',null,18,'gram',0,1,1,'exact',true),
+  ('64000000-0000-4000-8000-000000000107',:'merchant_id','63000000-0000-4000-8000-000000000105','61000000-0000-4000-8000-000000000103',null,160,'milliliter',0,1,1,'exact',true),
+  ('64000000-0000-4000-8000-000000000108',:'merchant_id','63000000-0000-4000-8000-000000000106','61000000-0000-4000-8000-000000000108',null,6,'gram',0,1,1,'exact',true),
+  ('64000000-0000-4000-8000-000000000109',:'merchant_id','63000000-0000-4000-8000-000000000106','61000000-0000-4000-8000-000000000103',null,220,'milliliter',0,1,1,'exact',true),
+  ('64000000-0000-4000-8000-000000000110',:'merchant_id','63000000-0000-4000-8000-000000000107','61000000-0000-4000-8000-000000000109',null,12,'gram',0,1,1,'exact',true),
+  ('64000000-0000-4000-8000-000000000111',:'merchant_id','63000000-0000-4000-8000-000000000107','61000000-0000-4000-8000-000000000103',null,220,'milliliter',0,1,1,'exact',true)
+on conflict(id) do update set quantity=excluded.quantity,required=excluded.required;
+
+insert into merchant.inventory_recipe_component(
+  id,merchant_id,recipe_id,inventory_item_id,modifier_id,quantity,unit,quantity_scale,
+  conversion_numerator,conversion_denominator,rounding_policy,required
+)
+select
+  ('65000000-0000-4000-8000-'||lpad((recipe_n*100+component_n)::text,12,'0'))::uuid,
+  :'merchant_id'::uuid,recipe_id,inventory_item_id,modifier_id,quantity,'milliliter',0,1,1,'exact',true
+from (values
+  (2,'63000000-0000-4000-8000-000000000102'::uuid),(3,'63000000-0000-4000-8000-000000000103'::uuid),(4,'63000000-0000-4000-8000-000000000104'::uuid)
+) r(recipe_n,recipe_id)
+cross join lateral (values
+  (1,'61000000-0000-4000-8000-000000000103'::uuid,'55000000-0000-4000-8000-000000000101'::uuid,case when recipe_n=2 then 180 when recipe_n=3 then 240 else 300 end),
+  (2,'61000000-0000-4000-8000-000000000104'::uuid,'55000000-0000-4000-8000-000000000102'::uuid,case when recipe_n=2 then 180 when recipe_n=3 then 240 else 300 end),
+  (3,'61000000-0000-4000-8000-000000000105'::uuid,'55000000-0000-4000-8000-000000000103'::uuid,case when recipe_n=2 then 180 when recipe_n=3 then 240 else 300 end),
+  (4,'61000000-0000-4000-8000-000000000106'::uuid,'55000000-0000-4000-8000-000000000104'::uuid,10),
+  (5,'61000000-0000-4000-8000-000000000107'::uuid,'55000000-0000-4000-8000-000000000105'::uuid,10)
+) c(component_n,inventory_item_id,modifier_id,quantity)
+on conflict(id) do update set quantity=excluded.quantity,required=excluded.required;
+
+insert into merchant.inventory_catalog_mapping(
+  id,merchant_id,product_id,variant_id,mapping_type,inventory_item_id,recipe_id,
+  conversion_numerator,conversion_denominator,version,active
+)
+values
+  ('66000000-0000-4000-8000-000000000101',:'merchant_id','52000000-0000-4000-8000-000000000101',null,'recipe',null,'63000000-0000-4000-8000-000000000101',1,1,1,true),
+  ('66000000-0000-4000-8000-000000000102',:'merchant_id','52000000-0000-4000-8000-000000000102','53000000-0000-4000-8000-000000000101','recipe',null,'63000000-0000-4000-8000-000000000102',1,1,1,true),
+  ('66000000-0000-4000-8000-000000000103',:'merchant_id','52000000-0000-4000-8000-000000000102','53000000-0000-4000-8000-000000000102','recipe',null,'63000000-0000-4000-8000-000000000103',1,1,1,true),
+  ('66000000-0000-4000-8000-000000000104',:'merchant_id','52000000-0000-4000-8000-000000000102','53000000-0000-4000-8000-000000000103','recipe',null,'63000000-0000-4000-8000-000000000104',1,1,1,true),
+  ('66000000-0000-4000-8000-000000000105',:'merchant_id','52000000-0000-4000-8000-000000000103',null,'recipe',null,'63000000-0000-4000-8000-000000000105',1,1,1,true),
+  ('66000000-0000-4000-8000-000000000106',:'merchant_id','52000000-0000-4000-8000-000000000104',null,'direct','61000000-0000-4000-8000-000000000110',null,1,1,1,true),
+  ('66000000-0000-4000-8000-000000000107',:'merchant_id','52000000-0000-4000-8000-000000000105',null,'recipe',null,'63000000-0000-4000-8000-000000000106',1,1,1,true),
+  ('66000000-0000-4000-8000-000000000108',:'merchant_id','52000000-0000-4000-8000-000000000106',null,'recipe',null,'63000000-0000-4000-8000-000000000107',1,1,1,true),
+  ('66000000-0000-4000-8000-000000000109',:'merchant_id','52000000-0000-4000-8000-000000000107',null,'direct','61000000-0000-4000-8000-000000000111',null,1,1,1,true),
+  ('66000000-0000-4000-8000-000000000110',:'merchant_id','52000000-0000-4000-8000-000000000108',null,'direct','61000000-0000-4000-8000-000000000112',null,1,1,1,true),
+  ('66000000-0000-4000-8000-000000000111',:'merchant_id','52000000-0000-4000-8000-000000000109',null,'direct','61000000-0000-4000-8000-000000000113',null,1,1,1,true),
+  ('66000000-0000-4000-8000-000000000112',:'merchant_id','52000000-0000-4000-8000-000000000110',null,'direct','61000000-0000-4000-8000-000000000114',null,1,1,1,true),
+  ('66000000-0000-4000-8000-000000000113',:'merchant_id','52000000-0000-4000-8000-000000000111',null,'direct','61000000-0000-4000-8000-000000000115',null,1,1,1,true),
+  ('66000000-0000-4000-8000-000000000114',:'merchant_id','52000000-0000-4000-8000-000000000112',null,'direct','61000000-0000-4000-8000-000000000116',null,1,1,1,true)
+on conflict(id) do update set active=true,retired_at=null;
+
+insert into merchant.device(
+  id,merchant_id,location_id,name,kind,public_id,status,credential_version,platform
+)
+values (
+  '67000000-0000-4000-8000-000000000101',:'merchant_id',:'location_id',
+  'Autoridad de seed de inventario','pos_terminal',
+  '67000000-0000-4000-8000-000000000102','retired',1,'linux'
+)
+on conflict(id) do nothing;
+
+select count(*) as opening_stock_fact_count from (
+select merchant.append_stock_ledger(
+  :'merchant_id'::uuid,:'location_id'::uuid,'60000000-0000-4000-8000-000000000101'::uuid,
+  inventory_item_id,'opening_balance',opening_quantity,command_id,idempotency_key,
+  repeat(fingerprint_character,64),'controlled_seed',inventory_item_id,
+  '30000000-0000-4000-8000-000000000200'::uuid,
+  '67000000-0000-4000-8000-000000000101'::uuid,1,current_date,'pilot-inventory-seed',
+  null,null,null,null,jsonb_build_object('source','disposable_pilot_seed')
+)
+from (values
+  ('61000000-0000-4000-8000-000000000101'::uuid,10000::bigint,'68000000-0000-4000-8000-000000000101'::uuid,'69000000-0000-4000-8000-000000000101'::uuid,'1'),
+  ('61000000-0000-4000-8000-000000000102'::uuid,50000::bigint,'68000000-0000-4000-8000-000000000102'::uuid,'69000000-0000-4000-8000-000000000102'::uuid,'2'),
+  ('61000000-0000-4000-8000-000000000103'::uuid,30000::bigint,'68000000-0000-4000-8000-000000000103'::uuid,'69000000-0000-4000-8000-000000000103'::uuid,'3'),
+  ('61000000-0000-4000-8000-000000000104'::uuid,12000::bigint,'68000000-0000-4000-8000-000000000104'::uuid,'69000000-0000-4000-8000-000000000104'::uuid,'4'),
+  ('61000000-0000-4000-8000-000000000105'::uuid,12000::bigint,'68000000-0000-4000-8000-000000000105'::uuid,'69000000-0000-4000-8000-000000000105'::uuid,'5'),
+  ('61000000-0000-4000-8000-000000000106'::uuid,4000::bigint,'68000000-0000-4000-8000-000000000106'::uuid,'69000000-0000-4000-8000-000000000106'::uuid,'6'),
+  ('61000000-0000-4000-8000-000000000107'::uuid,4000::bigint,'68000000-0000-4000-8000-000000000107'::uuid,'69000000-0000-4000-8000-000000000107'::uuid,'7'),
+  ('61000000-0000-4000-8000-000000000108'::uuid,2000::bigint,'68000000-0000-4000-8000-000000000108'::uuid,'69000000-0000-4000-8000-000000000108'::uuid,'8'),
+  ('61000000-0000-4000-8000-000000000109'::uuid,2000::bigint,'68000000-0000-4000-8000-000000000109'::uuid,'69000000-0000-4000-8000-000000000109'::uuid,'9'),
+  ('61000000-0000-4000-8000-000000000110'::uuid,80::bigint,'68000000-0000-4000-8000-000000000110'::uuid,'69000000-0000-4000-8000-000000000110'::uuid,'a'),
+  ('61000000-0000-4000-8000-000000000111'::uuid,100::bigint,'68000000-0000-4000-8000-000000000111'::uuid,'69000000-0000-4000-8000-000000000111'::uuid,'b'),
+  ('61000000-0000-4000-8000-000000000112'::uuid,80::bigint,'68000000-0000-4000-8000-000000000112'::uuid,'69000000-0000-4000-8000-000000000112'::uuid,'c'),
+  ('61000000-0000-4000-8000-000000000113'::uuid,60::bigint,'68000000-0000-4000-8000-000000000113'::uuid,'69000000-0000-4000-8000-000000000113'::uuid,'d'),
+  ('61000000-0000-4000-8000-000000000114'::uuid,120::bigint,'68000000-0000-4000-8000-000000000114'::uuid,'69000000-0000-4000-8000-000000000114'::uuid,'e'),
+  ('61000000-0000-4000-8000-000000000115'::uuid,40::bigint,'68000000-0000-4000-8000-000000000115'::uuid,'69000000-0000-4000-8000-000000000115'::uuid,'f'),
+  ('61000000-0000-4000-8000-000000000116'::uuid,20::bigint,'68000000-0000-4000-8000-000000000116'::uuid,'69000000-0000-4000-8000-000000000116'::uuid,'0')
+) opening(inventory_item_id,opening_quantity,command_id,idempotency_key,fingerprint_character)
+) seeded_opening_stock;
+
 insert into merchant.product_media(
   id,merchant_id,product_id,url,alt_text,width,height,display_order
 )
@@ -451,7 +638,7 @@ from merchant.product
 where merchant_id=:'merchant_id'::uuid
   and external_ref like 'demo-%';
 
-select 1 / case when count(*)=216 then 1 else 0 end
+select 1 / case when count(*)=290 then 1 else 0 end
 from umi.role_permission rp
 join umi.role r on r.id=rp.role_id
 join umi.permission p on p.id=rp.permission_id

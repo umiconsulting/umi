@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import type {
   CheckoutCommand,
@@ -39,6 +39,9 @@ export interface CheckoutCart {
 }
 
 export interface CheckoutAuthorization {
+  operatorId: string;
+  deviceId: string;
+  credentialVersion: number;
   operatorName: string;
   permissions: string[];
 }
@@ -60,7 +63,9 @@ export class PosCheckoutRepository {
       userId,
       async (client) => {
         const { rows } = await client.query<CheckoutAuthorization>(
-          `SELECT u.full_name AS "operatorName",os.permissions
+          `SELECT os.user_id::text AS "operatorId",os.device_id::text AS "deviceId",
+                  d.credential_version AS "credentialVersion",
+                  u.full_name AS "operatorName",os.permissions
        FROM runtime.operator_session os
        JOIN merchant.device d ON d.id=os.device_id
        JOIN umi.user u ON u.id=os.user_id
@@ -257,7 +262,11 @@ export class PosCheckoutRepository {
       fingerprint: string;
       commandId: string;
     },
-  ): Promise<{ approved: boolean; missingPermission: string | null }> {
+  ): Promise<{
+    approved: boolean;
+    missingPermission: string | null;
+    approvalIdsByPermission: Record<string, string>;
+  }> {
     const permissions = [...new Set(input.permissions)];
     if (
       approvalIds.length !== permissions.length ||
@@ -267,6 +276,7 @@ export class PosCheckoutRepository {
         approved: false,
         missingPermission:
           permissions[Math.min(approvalIds.length, permissions.length - 1)] ?? null,
+        approvalIdsByPermission: {},
       };
     }
     const matched = await client.query<{ id: string; permission: string }>(
@@ -290,7 +300,11 @@ export class PosCheckoutRepository {
     const missingPermission =
       permissions.find((permission) => !matchedPermissions.has(permission)) ?? null;
     if (missingPermission || matched.rowCount !== permissions.length) {
-      return { approved: false, missingPermission: missingPermission ?? permissions[0] ?? null };
+      return {
+        approved: false,
+        missingPermission: missingPermission ?? permissions[0] ?? null,
+        approvalIdsByPermission: {},
+      };
     }
     const { rowCount } = await client.query(
       `UPDATE runtime.elevation_grant
@@ -301,7 +315,59 @@ export class PosCheckoutRepository {
     return {
       approved: rowCount === permissions.length,
       missingPermission: rowCount === permissions.length ? null : (permissions[0] ?? null),
+      approvalIdsByPermission:
+        rowCount === permissions.length
+          ? Object.fromEntries(matched.rows.map((row) => [row.permission, row.id]))
+          : {},
     };
+  }
+
+  async negativeStockApprovalRequired(client: PoolClient, cart: CheckoutCart): Promise<boolean> {
+    const result = await client.query<{ required: boolean }>(
+      `WITH chosen_mapping AS (
+         SELECT l.id AS sale_line_id,l.quantity,selected.*
+           FROM merchant.pos_cart_line l
+           JOIN LATERAL (
+             SELECT candidate.* FROM merchant.inventory_catalog_mapping candidate
+              WHERE candidate.merchant_id=l.merchant_id AND candidate.product_id=l.product_id
+                AND candidate.active
+                AND (candidate.variant_id=l.variant_id OR candidate.variant_id IS NULL)
+              ORDER BY (candidate.variant_id=l.variant_id) DESC NULLS LAST LIMIT 1
+           ) selected ON true
+          WHERE l.cart_id=$1::uuid AND l.merchant_id=$2::uuid
+       ), direct AS (
+         SELECT m.inventory_item_id,m.quantity::numeric*m.conversion_numerator/
+                m.conversion_denominator AS required
+           FROM chosen_mapping m WHERE m.mapping_type='direct'
+       ), recipe AS (
+         SELECT rc.inventory_item_id,
+                m.quantity::numeric*rc.quantity*coalesce(lm.quantity,1)*rc.conversion_numerator*
+                power(10::numeric,r.yield_scale+i.quantity_scale)/
+                (r.yield_quantity*rc.conversion_denominator*
+                  power(10::numeric,rc.quantity_scale)) AS required
+           FROM chosen_mapping m
+           JOIN merchant.inventory_recipe r ON r.id=m.recipe_id AND r.active
+           JOIN merchant.inventory_recipe_component rc ON rc.recipe_id=r.id
+           JOIN merchant.inventory_item i ON i.id=rc.inventory_item_id AND i.active
+           LEFT JOIN merchant.pos_cart_line_modifier lm
+             ON lm.line_id=m.sale_line_id AND lm.modifier_id=rc.modifier_id
+          WHERE m.mapping_type IN ('recipe','bundle')
+            AND (rc.modifier_id IS NULL OR lm.id IS NOT NULL)
+       ), required AS (
+         SELECT inventory_item_id,sum(required) AS quantity
+           FROM (SELECT * FROM direct UNION ALL SELECT * FROM recipe) source
+          GROUP BY inventory_item_id
+       )
+       SELECT coalesce(bool_or(i.negative_stock_policy='manager_override'
+                AND coalesce(b.available,0)<ceil(required.quantity)),false) AS required
+         FROM required
+         JOIN merchant.inventory_item i ON i.id=required.inventory_item_id
+         JOIN merchant.inventory_policy p ON p.merchant_id=$2::uuid AND p.location_id=$3::uuid
+         LEFT JOIN merchant.stock_balance b ON b.inventory_location_id=p.inventory_location_id
+          AND b.inventory_item_id=required.inventory_item_id`,
+      [cart.id, cart.merchantId, cart.locationId],
+    );
+    return result.rows[0]?.required ?? false;
   }
 
   async lockCart(
@@ -349,7 +415,17 @@ export class PosCheckoutRepository {
     client: PoolClient,
     cart: CheckoutCart,
     lineSnapshot: unknown,
+    authorization: CheckoutAuthorization,
+    commandId: string,
+    idempotencyKey: string,
+    fingerprint: string,
+    correlationId: string,
+    negativeStockApprovalId: string | null,
   ): Promise<InventoryReservation> {
+    await client.query(`SELECT merchant.expire_inventory_reservations($1::uuid,$2::uuid)`, [
+      cart.merchantId,
+      cart.locationId,
+    ]);
     const { rows } = await client.query<{
       id: string;
       status: InventoryReservation['status'];
@@ -365,8 +441,197 @@ export class PosCheckoutRepository {
        RETURNING id::text,status,expires_at::text AS "expiresAt"`,
       [cart.merchantId, cart.locationId, cart.id, cart.version, JSON.stringify(lineSnapshot)],
     );
+    const reservation = rows[0];
+    if (!reservation) throw new Error('RESERVATION_CONFLICT');
+    const policy = await client.query<{ inventoryLocationId: string }>(
+      `SELECT inventory_location_id::text AS "inventoryLocationId"
+         FROM merchant.inventory_policy
+        WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND tracking_enabled
+          AND expires_at>clock_timestamp()`,
+      [cart.merchantId, cart.locationId],
+    );
+    if (policy.rows[0]) {
+      const inventoryLocationId = policy.rows[0].inventoryLocationId;
+      const mappingCoverage = await client.query<{ mapped: number }>(
+        `SELECT count(*)::integer AS mapped FROM merchant.pos_cart_line l
+          WHERE l.cart_id=$1::uuid AND l.merchant_id=$2::uuid AND EXISTS (
+            SELECT 1 FROM merchant.inventory_catalog_mapping m
+             WHERE m.merchant_id=l.merchant_id AND m.product_id=l.product_id AND m.active
+               AND (m.variant_id=l.variant_id OR m.variant_id IS NULL)
+          )`,
+        [cart.id, cart.merchantId],
+      );
+      if (mappingCoverage.rows[0]?.mapped !== cart.lines.length) {
+        throw new ConflictException({ code: 'INVENTORY_MAPPING_REQUIRED' });
+      }
+      await client.query(
+        `UPDATE merchant.inventory_reservation SET status='active',inventory_location_id=$2::uuid,
+          command_id=$3::uuid,command_fingerprint=$4,ledger_sequence_basis=(
+            SELECT coalesce(max(ledger_sequence),0) FROM merchant.stock_balance
+             WHERE inventory_location_id=$2::uuid),updated_at=clock_timestamp()
+          WHERE id=$1::uuid AND status IN ('reserved','active')`,
+        [reservation.id, inventoryLocationId, commandId, fingerprint],
+      );
+      const resolved = await client.query<{
+        inventoryItemId: string;
+        saleLineId: string;
+        requiredQuantity: string | null;
+        scale: number;
+        unit: string;
+        mappingId: string;
+        mappingVersion: number;
+        recipeId: string | null;
+        recipeVersion: number | null;
+      }>(
+        `WITH chosen_mapping AS (
+           SELECT l.id AS sale_line_id,selected.*
+             FROM merchant.pos_cart_line l
+             JOIN LATERAL (
+               SELECT candidate.* FROM merchant.inventory_catalog_mapping candidate
+                WHERE candidate.merchant_id=l.merchant_id AND candidate.product_id=l.product_id
+                  AND candidate.active
+                  AND (candidate.variant_id=l.variant_id OR candidate.variant_id IS NULL)
+                ORDER BY (candidate.variant_id=l.variant_id) DESC NULLS LAST LIMIT 1
+             ) selected ON true
+            WHERE l.cart_id=$1::uuid AND l.merchant_id=$2::uuid
+         ), direct AS (
+           SELECT m.inventory_item_id::text AS "inventoryItemId",l.id::text AS "saleLineId",
+                  ((l.quantity::bigint*m.conversion_numerator)/m.conversion_denominator)::text
+                    AS "requiredQuantity",
+                  i.quantity_scale AS scale,i.base_unit AS unit,m.id::text AS "mappingId",
+                  m.version AS "mappingVersion",null::text AS "recipeId",null::integer AS "recipeVersion"
+             FROM merchant.pos_cart_line l
+             JOIN chosen_mapping m ON m.sale_line_id=l.id AND m.mapping_type='direct'
+             JOIN merchant.inventory_item i ON i.id=m.inventory_item_id AND i.active
+            WHERE l.cart_id=$1::uuid AND l.merchant_id=$2::uuid
+              AND (l.quantity::bigint*m.conversion_numerator)%m.conversion_denominator=0
+         ), recipe_component AS (
+           SELECT rc.inventory_item_id,l.id AS sale_line_id,m.id AS mapping_id,
+                  m.version AS mapping_version,r.id AS recipe_id,r.version AS recipe_version,
+                  i.quantity_scale,i.base_unit,
+                  (l.quantity::numeric*rc.quantity*coalesce(selected_modifier.quantity,1)*
+                    rc.conversion_numerator*
+                    power(10::numeric,r.yield_scale+i.quantity_scale)) AS quantity_numerator,
+                  (r.yield_quantity::numeric*rc.conversion_denominator*
+                    power(10::numeric,rc.quantity_scale)) AS quantity_denominator
+             FROM merchant.pos_cart_line l
+             JOIN chosen_mapping m ON m.sale_line_id=l.id
+              AND m.mapping_type IN ('recipe','bundle')
+             JOIN merchant.inventory_recipe r ON r.id=m.recipe_id AND r.active
+             JOIN merchant.inventory_recipe_component rc ON rc.recipe_id=r.id
+             JOIN merchant.inventory_item i ON i.id=rc.inventory_item_id AND i.active
+             LEFT JOIN LATERAL (
+               SELECT lm.quantity FROM merchant.pos_cart_line_modifier lm
+                WHERE lm.line_id=l.id AND lm.modifier_id=rc.modifier_id
+             ) selected_modifier ON rc.modifier_id IS NOT NULL
+            WHERE l.cart_id=$1::uuid AND l.merchant_id=$2::uuid
+              AND (rc.modifier_id IS NULL OR selected_modifier.quantity IS NOT NULL)
+         ), recipe AS (
+           SELECT inventory_item_id::text AS "inventoryItemId",sale_line_id::text AS "saleLineId",
+                  CASE WHEN bool_and(mod(quantity_numerator,quantity_denominator)=0)
+                    THEN sum(quantity_numerator/quantity_denominator)::text ELSE null END
+                    AS "requiredQuantity",
+                  quantity_scale AS scale,base_unit AS unit,mapping_id::text AS "mappingId",
+                  mapping_version AS "mappingVersion",recipe_id::text AS "recipeId",
+                  recipe_version AS "recipeVersion"
+             FROM recipe_component
+            GROUP BY inventory_item_id,sale_line_id,quantity_scale,base_unit,mapping_id,
+                     mapping_version,recipe_id,recipe_version
+         ) SELECT * FROM direct UNION ALL SELECT * FROM recipe
+           ORDER BY "inventoryItemId","saleLineId"`,
+        [cart.id, cart.merchantId],
+      );
+      if (resolved.rows.some((line) => line.requiredQuantity === null)) {
+        throw new ConflictException({ code: 'INVENTORY_UNIT_CONVERSION_INVALID' });
+      }
+      const expectedStockLines = await client.query<{ saleLineId: string }>(
+        `SELECT l.id::text AS "saleLineId"
+           FROM merchant.pos_cart_line l
+           JOIN LATERAL (
+             SELECT candidate.mapping_type FROM merchant.inventory_catalog_mapping candidate
+              WHERE candidate.merchant_id=l.merchant_id AND candidate.product_id=l.product_id
+                AND candidate.active
+                AND (candidate.variant_id=l.variant_id OR candidate.variant_id IS NULL)
+              ORDER BY (candidate.variant_id=l.variant_id) DESC NULLS LAST LIMIT 1
+           ) selected ON selected.mapping_type<>'non_stock'
+          WHERE l.cart_id=$1::uuid AND l.merchant_id=$2::uuid
+          ORDER BY l.id`,
+        [cart.id, cart.merchantId],
+      );
+      const resolvedSaleLines = new Set(resolved.rows.map((line) => line.saleLineId));
+      if (expectedStockLines.rows.some((line) => !resolvedSaleLines.has(line.saleLineId))) {
+        throw new ConflictException({ code: 'INVENTORY_CONSUMPTION_REQUIRED' });
+      }
+      for (const line of resolved.rows) {
+        const balance = await client.query<{ sequence: string }>(
+          `SELECT coalesce(ledger_sequence,0)::text AS sequence FROM merchant.stock_balance
+            WHERE inventory_location_id=$1::uuid AND inventory_item_id=$2::uuid FOR UPDATE`,
+          [inventoryLocationId, line.inventoryItemId],
+        );
+        await client.query(
+          `INSERT INTO merchant.inventory_reservation_line(
+            merchant_id,location_id,reservation_id,inventory_location_id,inventory_item_id,
+            sale_line_id,required_quantity,quantity_scale,unit,mapping_id,mapping_version,
+            recipe_id,recipe_version,availability_sequence)
+           VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7,$8,$9,$10::uuid,
+                  $11,$12::uuid,$13,$14)
+           ON CONFLICT(reservation_id,inventory_item_id,sale_line_id,mapping_id)
+           DO UPDATE SET required_quantity=excluded.required_quantity
+           WHERE merchant.inventory_reservation_line.required_quantity=excluded.required_quantity
+             AND merchant.inventory_reservation_line.mapping_version=excluded.mapping_version
+             AND merchant.inventory_reservation_line.recipe_version IS NOT DISTINCT FROM excluded.recipe_version`,
+          [
+            cart.merchantId,
+            cart.locationId,
+            reservation.id,
+            inventoryLocationId,
+            line.inventoryItemId,
+            line.saleLineId,
+            line.requiredQuantity!,
+            line.scale,
+            line.unit,
+            line.mappingId,
+            line.mappingVersion,
+            line.recipeId,
+            line.recipeVersion,
+            Number(balance.rows[0]?.sequence ?? 0),
+          ],
+        );
+        await client.query(
+          `SELECT merchant.append_stock_ledger(
+            $1::uuid,$2::uuid,$3::uuid,$4::uuid,'reservation_created',$5,$6::uuid,$7::uuid,$8,
+            'inventory_reservation',$9::uuid,$10::uuid,$11::uuid,$12,$13::date,$14,
+            null,$15::uuid,null,null,$16::jsonb)`,
+          [
+            cart.merchantId,
+            cart.locationId,
+            inventoryLocationId,
+            line.inventoryItemId,
+            line.requiredQuantity!,
+            commandId,
+            idempotencyKey,
+            fingerprint,
+            reservation.id,
+            authorization.operatorId,
+            authorization.deviceId,
+            authorization.credentialVersion,
+            cart.businessDate,
+            correlationId,
+            line.saleLineId,
+            JSON.stringify({
+              mappingId: line.mappingId,
+              mappingVersion: line.mappingVersion,
+              recipeId: line.recipeId,
+              recipeVersion: line.recipeVersion,
+              negativeStockApprovalId,
+            }),
+          ],
+        );
+      }
+      reservation.status = 'active';
+    }
     return {
-      ...rows[0],
+      ...reservation,
       lineCount: cart.lines.length,
     };
   }
@@ -592,6 +857,8 @@ export class PosCheckoutRepository {
     receipt: ReceiptSnapshot,
     cashShiftId: string | null,
     commandId: string,
+    authorization: CheckoutAuthorization,
+    correlationId: string,
   ): Promise<NonNullable<CheckoutResult['sale']>> {
     const cashTenders = paymentSummary.tenders.filter((tender) => tender.type === 'cash');
     if (cashTenders.length > 0 && cashShiftId === null) {
@@ -744,9 +1011,17 @@ export class PosCheckoutRepository {
       );
     }
     await client.query(
-      `UPDATE merchant.inventory_reservation SET status='commit_prepared',updated_at=now()
-       WHERE id=$1::uuid AND status='reserved'`,
-      [reservation.id],
+      `SELECT merchant.commit_sale_inventory($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7::date,$8)`,
+      [
+        reservation.id,
+        sale.rows[0].id,
+        commandId,
+        authorization.operatorId,
+        authorization.deviceId,
+        authorization.credentialVersion,
+        cart.businessDate,
+        correlationId,
+      ],
     );
     await client.query(
       `UPDATE merchant.pos_tender_fact
@@ -960,6 +1235,12 @@ export class PosCheckoutRepository {
            version=version+1,updated_at=now()
        WHERE id=$1::uuid`,
       [draft.id],
+    );
+    await client.query(
+      `SELECT merchant.release_inventory_reservation(id,'reservation_released')
+         FROM merchant.inventory_reservation
+        WHERE cart_id=$1::uuid AND status IN ('active','reserved')`,
+      [cartId],
     );
     return { id: draft.id, blocked: false };
   }

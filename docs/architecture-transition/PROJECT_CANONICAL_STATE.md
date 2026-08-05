@@ -1,6 +1,6 @@
 # UMI × UmiPOS — Canonical Project State
 
-Updated: 2026-08-03
+Updated: 2026-08-05
 
 ## Product authority
 
@@ -50,6 +50,8 @@ Future clients use `packages/contract` and controlled UMI APIs.
   partial refunds, immutable compensation, exception receipts, approval, and recovery.
 - Gate 3D.1 established the pilot RBAC profiles. The canonical matrix gives each café role
   explicit merchant or location grants. Sensitive approvals require a different actor.
+- Gate 3E established the inventory authority. UMI API commits stock effects to an immutable,
+  location-scoped PostgreSQL ledger.
 
 ## Current implementation state
 
@@ -93,15 +95,14 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - UmiPOS uses a personal merchant-unique PIN after device trust. The API resolves the staff identity
   and current role without an email or client role selector.
 - `runtime.operator_session` separates operator presence from PIN authentication.
-- UmiPOS consumes contract version `2.2.0`, content hash
-  `c8be1d2927a482ea163bcdf81edef3f0947ede2528d80cf305b1f131130106b8`.
+- UmiPOS consumes contract version `2.3.0`. The generated checksum is the content-hash authority.
 - Original sale, payment, receipt, and cash facts remain immutable after an exception.
 - `merchant.pos_sale_exception` and related tables own append-only compensation history.
 - Refund amounts use original receipt, discount, tax, tip, and tender snapshots.
 - Cash refunds post atomically to the current eligible shift. They never rewrite the source shift.
 - Manual terminal refunds record an operator assertion. They do not claim provider proof.
 - An unknown terminal refund stays query-only and blocks a replacement refund.
-- Restock data is an immutable intent. Gate 3D does not change inventory.
+- Restock data is an immutable intent. Gate 3E consumes it through one inventory outcome.
 - Post-sale exception commands require online server authority.
 - Native UmiPOS journal schema version 1 uses AES-256-GCM with platform-secure key storage and
   separate ciphertext persistence. Replay is ordered per device credential version; Web sensitive
@@ -112,6 +113,17 @@ Future clients use `packages/contract` and controlled UMI APIs.
   and operator identity can own only one editable sale. Terminal sales are immutable.
 - `merchant.pos_committed_sale` and `merchant.receipt_snapshot` are immutable checkout facts.
   `merchant.inventory_reservation` is a time-bounded preparation record and never decrements stock.
+- `merchant.stock_ledger_entry` owns immutable stock effects. `merchant.stock_balance` is a
+  rebuildable projection and is not a second mutation authority.
+- Inventory quantities use an integer value, an explicit scale, and an explicit unit.
+- Catalog mappings and recipes are explicit and versioned. Historical consumption keeps the
+  mapping and recipe version used during commit.
+- A required reservation and its sale stock effect commit with the sale, tender, cash, receipt,
+  and order facts.
+- A committed refund consumes its immutable restock intent. Recipe components require an explicit
+  disposition and do not return prepared ingredients by default.
+- Adjustments, waste, damage, quarantine, and count reconciliation append compensating stock facts.
+- Inventory mutations are online-only. An approved offline cash sale reuses the Gate 2F replay.
 - Checkout commits atomically through `merchant.business_command`. Cash and manual-terminal
   tender facts use integer minor units. Mixed payment requires full server-confirmed coverage.
 - A manual-terminal result is an operator assertion. An unknown result remains query-only.
@@ -180,7 +192,10 @@ Future clients use `packages/contract` and controlled UMI APIs.
   deterministic matrix in `config/umipos-pilot-role-grants.json`.
 - Gate 3D.1 keeps `super_admin` outside the café journey. Entitlement, device, session, merchant,
   location, permission, policy, and approval checks remain server-authoritative.
-- Next gate: Gate 3E inventory synchronization requires explicit scope approval.
+- Gate 3E: complete. The ledger, projection, reservations, atomic sale synchronization, refund
+  outcomes, inventory operations, blind counts, and reconciliation use server authority.
+- `stash@{0}: pre-gate-3d1-unpublished-pos-runtime-fixes` remains preserved and excluded.
+- Next gate: Gate 3F customers, loyalty, and stored value requires explicit scope approval.
 
 ## Gate 3C decision basis
 
@@ -194,3 +209,10 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Source-backed tradeoff: append-only compensation preserves the original financial evidence.
 - Umi-specific inference: manual terminal outcomes remain operator assertions until provider integration exists.
 - Umi-specific inference: restock intent does not prove that stock returned to inventory.
+
+## Gate 3E decision basis
+
+- Documented fact: UMI API and the build-v3 PostgreSQL chain own merchant mutations.
+- Source-backed tradeoff: an append-only ledger makes each balance reproducible and auditable.
+- Umi-specific inference: a physical count records an observation and does not prove custody.
+- Umi-specific inference: a prepared-product refund does not prove that each ingredient returned.

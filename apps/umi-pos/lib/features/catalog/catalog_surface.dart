@@ -13,6 +13,8 @@ import '../checkout/checkout_controller.dart';
 import '../checkout/checkout_surface.dart';
 import '../entry/entry_controller.dart';
 import '../exception/exception_controller.dart';
+import '../inventory/inventory_controller.dart';
+import '../inventory/inventory_surface.dart';
 import '../offline/connectivity_controller.dart';
 import '../offline/offline_journal.dart';
 import '../offline/recovery_center.dart';
@@ -33,6 +35,7 @@ final class CatalogSurface extends StatefulWidget {
     required this.exceptions,
     required this.connectivity,
     required this.telemetry,
+    this.inventory,
     this.offlineJournal,
     this.offlineRecovery,
     super.key,
@@ -46,6 +49,7 @@ final class CatalogSurface extends StatefulWidget {
   final SaleExceptionController exceptions;
   final ConnectivityController connectivity;
   final Telemetry telemetry;
+  final InventoryController? inventory;
   final EncryptedOfflineJournal? offlineJournal;
   final OfflineRecoveryController? offlineRecovery;
   @override
@@ -265,6 +269,18 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 isLabelVisible: widget.cash.activeShiftId == null,
                 child: const Icon(Icons.point_of_sale_outlined),
               ),
+            ),
+          if (access.showInventory && widget.inventory != null)
+            IconButton(
+              tooltip: Localizations.localeOf(context).languageCode == 'es'
+                  ? 'Operaciones de inventario'
+                  : 'Inventory operations',
+              onPressed: () => showInventoryCenter(
+                context,
+                entry: widget.entry,
+                controller: widget.inventory!,
+              ),
+              icon: const Icon(Icons.inventory_2_outlined),
             ),
           if (access.showSaleHistory)
             IconButton(

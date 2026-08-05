@@ -84,8 +84,23 @@ export class PosCatalogRepository {
               p.price::text AS "priceMinorUnits", business.currency,
               p.tax_rate_basis_points AS "taxRateBasisPoints",
               CASE
-                WHEN a.status = 'future_availability' AND a.available_from <= now() THEN 'enabled'
-                ELSE COALESCE(a.status, 'enabled')
+                WHEN a.status NOT IN ('enabled','future_availability') THEN a.status
+                WHEN a.status = 'future_availability' AND a.available_from > now()
+                  THEN 'future_availability'
+                WHEN im.mapping_type='direct'
+                  AND coalesce(ib.available,0)*im.conversion_denominator<im.conversion_numerator
+                  THEN 'temporarily_unavailable'
+                WHEN im.mapping_type IN ('recipe','bundle') AND EXISTS (
+                  SELECT 1 FROM merchant.inventory_recipe_component irc
+                  LEFT JOIN merchant.stock_balance rb
+                    ON rb.inventory_location_id=ip.inventory_location_id
+                   AND rb.inventory_item_id=irc.inventory_item_id
+                  WHERE irc.recipe_id=im.recipe_id AND irc.required
+                    AND irc.modifier_id IS NULL
+                    AND coalesce(rb.available,0)*irc.conversion_denominator
+                      <irc.quantity*irc.conversion_numerator
+                ) THEN 'temporarily_unavailable'
+                ELSE 'enabled'
               END AS availability,
               a.available_from::text AS "availableFrom",
               media.item AS "primaryMedia",
@@ -99,6 +114,15 @@ export class PosCatalogRepository {
        LEFT JOIN merchant.product_category c ON c.id = p.category_id
        LEFT JOIN merchant.product_location_availability a
          ON a.product_id = p.id AND a.location_id = $2::uuid
+       LEFT JOIN merchant.inventory_catalog_mapping im
+         ON im.merchant_id=p.merchant_id AND im.product_id=p.id
+        AND im.variant_id IS NULL AND im.active
+       LEFT JOIN merchant.inventory_policy ip
+         ON ip.merchant_id=p.merchant_id AND ip.location_id=$2::uuid
+        AND ip.tracking_enabled AND ip.expires_at>clock_timestamp()
+       LEFT JOIN merchant.stock_balance ib
+         ON ib.inventory_location_id=ip.inventory_location_id
+        AND ib.inventory_item_id=im.inventory_item_id
        LEFT JOIN LATERAL (
          SELECT jsonb_build_object('url', pm.url, 'altText', pm.alt_text,
                   'width', pm.width, 'height', pm.height, 'displayOrder', pm.display_order) item
@@ -141,11 +165,12 @@ export class PosCatalogRepository {
     productId: string,
   ): Promise<CatalogProductDetail | null> {
     const summary = (await this.products({ merchantId, locationId, productId, limit: 1 }))[0];
-    return summary ? this.withDetails(merchantId, summary) : null;
+    return summary ? this.withDetails(merchantId, locationId, summary) : null;
   }
 
   private async withDetails(
     merchantId: string,
+    locationId: string,
     summary: CatalogProductSummary,
   ): Promise<CatalogProductDetail> {
     const media = await this.pg.tquery(
@@ -158,11 +183,44 @@ export class PosCatalogRepository {
     );
     const variants = await this.pg.tquery(
       merchantId,
-      `SELECT id::text,name,attributes,jsonb_build_object('minorUnits',price_delta,'currency',$3::text) AS "priceDelta",
-              CASE WHEN active THEN 'enabled' ELSE 'disabled' END availability
-       FROM merchant.product_variant
-       WHERE merchant_id=$1::uuid AND product_id=$2::uuid ORDER BY display_order,name,id`,
-      [merchantId, summary.id, summary.price.currency],
+      `SELECT v.id::text,v.name,v.attributes,
+              jsonb_build_object('minorUnits',v.price_delta,'currency',$3::text) AS "priceDelta",
+              CASE WHEN NOT v.active THEN 'disabled'
+                   WHEN im.mapping_type='direct'
+                     AND coalesce(b.available,0)*im.conversion_denominator<im.conversion_numerator
+                     THEN 'temporarily_unavailable'
+                   WHEN im.mapping_type IN ('recipe','bundle') AND EXISTS (
+                     SELECT 1 FROM merchant.inventory_recipe_component irc
+                     JOIN merchant.inventory_recipe ir ON ir.id=irc.recipe_id AND ir.active
+                     JOIN merchant.inventory_item ii ON ii.id=irc.inventory_item_id AND ii.active
+                     LEFT JOIN merchant.stock_balance rb
+                       ON rb.inventory_location_id=ip.inventory_location_id
+                      AND rb.inventory_item_id=irc.inventory_item_id
+                     WHERE irc.recipe_id=im.recipe_id AND irc.required
+                       AND irc.modifier_id IS NULL
+                       AND coalesce(rb.available,0)*ir.yield_quantity*irc.conversion_denominator*
+                         power(10::numeric,irc.quantity_scale)
+                         <irc.quantity*irc.conversion_numerator*
+                           power(10::numeric,ir.yield_scale+ii.quantity_scale)
+                   ) THEN 'temporarily_unavailable'
+                   ELSE 'enabled' END availability
+       FROM merchant.product_variant v
+       LEFT JOIN LATERAL (
+         SELECT candidate.* FROM merchant.inventory_catalog_mapping candidate
+          WHERE candidate.merchant_id=v.merchant_id AND candidate.product_id=v.product_id
+            AND candidate.active
+            AND (candidate.variant_id=v.id OR candidate.variant_id IS NULL)
+          ORDER BY (candidate.variant_id=v.id) DESC NULLS LAST LIMIT 1
+       ) im ON true
+       LEFT JOIN merchant.inventory_policy ip
+         ON ip.merchant_id=v.merchant_id AND ip.location_id=$4::uuid
+        AND ip.tracking_enabled AND ip.expires_at>clock_timestamp()
+       LEFT JOIN merchant.stock_balance b
+         ON b.inventory_location_id=ip.inventory_location_id
+        AND b.inventory_item_id=im.inventory_item_id
+       WHERE v.merchant_id=$1::uuid AND v.product_id=$2::uuid
+       ORDER BY v.display_order,v.name,v.id`,
+      [merchantId, summary.id, summary.price.currency, locationId],
     );
     const groups = await this.pg.tquery(
       merchantId,

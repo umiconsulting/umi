@@ -87,13 +87,13 @@ for (const [index, match] of matches.entries()) {
 }
 
 const expectedStatuses = new Map([
-  ['IMPLEMENTADO', 33],
-  ['IMPLEMENTADO CON LIMITACIONES', 13],
+  ['IMPLEMENTADO', 37],
+  ['IMPLEMENTADO CON LIMITACIONES', 15],
   ['FOUNDATION', 1],
   ['NO IMPLEMENTADO', 0],
 ]);
-if (matches.length !== 47 || !document.includes('**47 casos de uso**')) {
-  throw new Error(`Expected 47 use cases, found ${matches.length}.`);
+if (matches.length !== 53 || !document.includes('**53 casos de uso**')) {
+  throw new Error(`Expected 53 use cases, found ${matches.length}.`);
 }
 for (const [status, expected] of expectedStatuses) {
   const actual = statusCounts.get(status) ?? 0;
@@ -115,6 +115,7 @@ const expectedModules = new Map([
   ['REF', 6],
   ['OFF', 4],
   ['HIST', 2],
+  ['INV', 6],
 ]);
 for (const [module, expected] of expectedModules) {
   const actual = moduleCounts.get(module) ?? 0;
@@ -160,13 +161,13 @@ const roleColumns = new Map([
   ['Viewer', 9],
 ]);
 const expectedRoleCounts = new Map([
-  ['Owner', 47],
-  ['Admin', 47],
-  ['Manager', 43],
-  ['Supervisor', 43],
-  ['Cashier', 39],
-  ['Staff', 39],
-  ['Viewer', 7],
+  ['Owner', 53],
+  ['Admin', 53],
+  ['Manager', 49],
+  ['Supervisor', 48],
+  ['Cashier', 42],
+  ['Staff', 42],
+  ['Viewer', 8],
 ]);
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 const requireCountRow = (label, expected) => {
@@ -199,6 +200,11 @@ const requiredPermissionByCase = new Map([
   ['UC-REF-004', 'sale.refund.partial'],
   ['UC-OFF-001', 'offline.cash.checkout'],
   ['UC-HIST-002', 'sale.exception.history'],
+  ['UC-INV-001', 'inventory.read'],
+  ['UC-INV-002', 'checkout.commit'],
+  ['UC-INV-004', 'inventory.restock.resolve'],
+  ['UC-INV-005', 'inventory.count.create'],
+  ['UC-INV-006', 'offline.cash.checkout'],
 ]);
 for (const [caseId, permission] of requiredPermissionByCase) {
   const row = matrixRows.find((value) => value[0] === caseId);

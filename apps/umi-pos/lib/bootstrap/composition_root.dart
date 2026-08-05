@@ -20,6 +20,8 @@ import '../features/entry/entry_gateway.dart';
 import '../features/exception/exception_controller.dart';
 import '../features/exception/exception_recovery_store.dart';
 import '../features/exception/exception_repository.dart';
+import '../features/inventory/inventory_controller.dart';
+import '../features/inventory/inventory_repository.dart';
 import '../features/offline/connectivity_controller.dart';
 import '../features/offline/offline_checkout_service.dart';
 import '../features/offline/offline_journal.dart';
@@ -50,6 +52,7 @@ final class AppCompositionRoot {
     required this.sales,
     required this.connectivity,
     required this.offlineJournal,
+    this.inventory,
     this.offlineRecovery,
   });
 
@@ -139,6 +142,7 @@ final class AppCompositionRoot {
       ),
       connectivity: connectivity,
       offlineJournal: offlineJournal,
+      inventory: InventoryController(ApiInventoryRepository(apiClient)),
       offlineRecovery: offlineRecovery,
     );
   }
@@ -162,6 +166,7 @@ final class AppCompositionRoot {
   final SaleLifecycleController sales;
   final ConnectivityController connectivity;
   final EncryptedOfflineJournal offlineJournal;
+  final InventoryController? inventory;
   final OfflineRecoveryController? offlineRecovery;
 
   void dispose() {
@@ -175,6 +180,7 @@ final class AppCompositionRoot {
     sales.dispose();
     connectivity.dispose();
     offlineRecovery?.dispose();
+    inventory?.dispose();
     apiClient.dispose();
   }
 }

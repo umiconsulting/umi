@@ -23,6 +23,7 @@ import type {
 } from '@umi/contract';
 import type { AuthUser } from '../auth/auth.types';
 import { IntegrityService } from '../integrity/integrity.service';
+import { inventoryConflictCode } from '../pos-inventory/inventory-errors';
 import { PosCartRepository, type PricedSelection } from '../pos-cart/pos-cart.repository';
 import { PosCheckoutRepository, type CheckoutCart } from './pos-checkout.repository';
 import { calculateCheckout } from './checkout-calculator';
@@ -49,239 +50,205 @@ export class PosCheckoutService {
       dto.locationId,
       dto.operatorSessionId,
     );
-    const result = await this.integrity.execute<CheckoutResult>(
-      {
-        merchantId,
-        locationId: dto.locationId,
-        commandId: dto.commandId ?? randomUUID(),
-        idempotencyKey: dto.idempotencyKey,
-        commandType: 'pos.checkout',
-        payload: dto,
-      },
-      async (context) => {
-        const cart = await this.repo.lockCart(
-          context.client,
+    const result = await this.withInventoryErrors(
+      this.integrity.execute<CheckoutResult>(
+        {
           merchantId,
-          dto.locationId,
-          dto.operatorSessionId,
-          dto.cartId,
-          dto.expectedCartVersion,
-          authorization.operatorName,
-        );
-        if (!cart) {
-          return {
-            ok: false,
-            code: 'OPTIMISTIC_VERSION_CONFLICT',
-            failureClass: 'conflict',
-            retryable: false,
-          };
-        }
-        const repriced = await this.reprice(context.client, cart, dto.idempotencyKey);
-        if (!repriced) {
-          return {
-            ok: false,
-            code: 'CHECKOUT_CART_CHANGED',
-            failureClass: 'validation',
-            retryable: false,
-          };
-        }
-        const policy = await this.repo.policy(
-          context.client,
-          merchantId,
-          dto.locationId,
-          repriced.public.totals.grandTotal.currency,
-        );
-        const calculation = calculateCheckout(
-          repriced.public,
-          dto,
-          policy,
-          new Map(
-            repriced.lineSnapshot.map((line) => [line.id, line.price.lineSubtotal.minorUnits]),
-          ),
-        );
-        const confirmation = calculation.confirmation;
-        const previewRecoveryState = this.recoveryState(calculation.ok ? null : calculation.code);
-        const previewState =
-          previewRecoveryState === 'terminal_outcome_unknown'
-            ? 'payment_unknown'
-            : calculation.ok
-              ? 'selecting_tender'
-              : 'collecting_payment';
-        const previewDraft = await this.repo.saveDraft(
-          context.client,
-          user.deviceId!,
-          cart,
-          dto,
-          previewState,
-          calculation.summary,
-          previewRecoveryState,
-          confirmation.fingerprint,
-        );
-        const previewSummary = calculation.summary
-          ? { ...calculation.summary, checkoutId: previewDraft.id }
-          : null;
-        if (!calculation.ok && calculation.code === 'TERMINAL_OUTCOME_UNKNOWN') {
-          const unknownPayment = await this.repo.unknownTerminal(
+          locationId: dto.locationId,
+          commandId: dto.commandId ?? randomUUID(),
+          idempotencyKey: dto.idempotencyKey,
+          commandType: 'pos.checkout',
+          payload: dto,
+        },
+        async (context) => {
+          const cart = await this.repo.lockCart(
             context.client,
-            cart,
-            previewDraft.id,
-            previewSummary!.tenders.find((tender) => tender.type === 'manual_terminal')!,
-            context.correlationId,
-          );
-          await context.appendAudit({
-            eventType: 'checkout.terminal_outcome_unknown',
-            entityType: 'pos_checkout',
-            entityId: previewDraft.id,
-            outcome: 'failure',
-            reasonCode: calculation.code,
-            publicData: { recoveryState: previewRecoveryState },
-          });
-          return {
-            ok: true,
-            value: this.recoverableResult(
-              confirmation,
-              previewSummary,
-              policy,
-              dto,
-              calculation.code,
-              context.correlationId,
-              unknownPayment,
-            ),
-          };
-        }
-        if (dto.totalsFingerprint !== confirmation.fingerprint) {
-          const code =
-            dto.totalsFingerprint === null
-              ? 'CHECKOUT_CONFIRMATION_REQUIRED'
-              : 'CHECKOUT_CART_CHANGED';
-          return {
-            ok: true,
-            value: {
-              status: 'confirmation_required',
-              confirmation,
-              payment: null,
-              payments: [],
-              reservation: null,
-              sale: null,
-              receipt: null,
-              failure: {
-                code,
-                retryable: false,
-                operatorGuidance: 'confirm_totals',
-                correlationId: context.correlationId,
-                requiredPermission: null,
-              },
-              paymentSummary: previewSummary,
-              recoveryState: 'none',
-              receiptDelivery: dto.receiptDelivery,
-              policy,
-            },
-          };
-        }
-        const confirmed: TotalsConfirmation = {
-          ...confirmation,
-          confirmedAt: new Date().toISOString(),
-        };
-        const discountPermissionDenied =
-          dto.discountDrafts.length > 0 &&
-          !authorization.permissions.includes('checkout.discount.apply') &&
-          !authorization.permissions.includes('*');
-        const tipPermissionDenied =
-          dto.tipDraft !== null &&
-          policy.tip.requiredPermission !== null &&
-          !authorization.permissions.includes(policy.tip.requiredPermission) &&
-          !authorization.permissions.includes('*');
-        const terminalPermissionDenied =
-          dto.tenderDrafts.some((tender) => tender.type === 'manual_terminal') &&
-          !authorization.permissions.includes('checkout.terminal.confirm') &&
-          !authorization.permissions.includes('*');
-        const calculationCode = calculation.ok ? null : calculation.code;
-        const recoveryState = this.recoveryState(calculationCode);
-        const draftState =
-          recoveryState === 'terminal_outcome_unknown'
-            ? 'payment_unknown'
-            : calculation.ok &&
-                !discountPermissionDenied &&
-                !tipPermissionDenied &&
-                !terminalPermissionDenied
-              ? 'payment_accepted'
-              : calculationCode === 'APPROVAL_REQUIRED'
-                ? 'awaiting_authorization'
-                : 'collecting_payment';
-        const draft = await this.repo.saveDraft(
-          context.client,
-          user.deviceId!,
-          cart,
-          dto,
-          draftState,
-          calculation.summary,
-          recoveryState,
-          confirmed.fingerprint,
-        );
-        const persistedSummary = calculation.summary
-          ? { ...calculation.summary, checkoutId: draft.id }
-          : null;
-        if (!calculation.ok) {
-          await context.appendAudit({
-            eventType: `checkout.${calculation.code.toLowerCase()}`,
-            entityType: 'pos_checkout',
-            entityId: draft.id,
-            outcome: 'failure',
-            reasonCode: calculation.code,
-            publicData: { recoveryState },
-          });
-          return {
-            ok: true,
-            value: this.recoverableResult(
-              confirmed,
-              persistedSummary,
-              policy,
-              dto,
-              calculation.code,
-              context.correlationId,
-            ),
-          };
-        }
-        const summary: PaymentSummary = {
-          ...calculation.summary,
-          checkoutId: draft.id,
-        };
-        if (discountPermissionDenied || tipPermissionDenied || terminalPermissionDenied) {
-          return {
-            ok: true,
-            value: this.recoverableResult(
-              confirmed,
-              summary,
-              policy,
-              dto,
-              terminalPermissionDenied
-                ? 'PERMISSION_REVOKED'
-                : tipPermissionDenied
-                  ? 'TIP_REJECTED'
-                  : 'DISCOUNT_REJECTED',
-              context.correlationId,
-            ),
-          };
-        }
-        const terminalApprovalRequired = summary.tenders.some(
-          (tender) =>
-            tender.type === 'manual_terminal' &&
-            tender.applied.minorUnits > policy.manualTerminalApprovalThreshold.minorUnits,
-        );
-        const requiredApprovals = [
-          ...(calculation.approvalRequired ? [policy.discount.approvalPermission] : []),
-          ...(terminalApprovalRequired ? [policy.manualTerminalApprovalPermission] : []),
-        ];
-        if (requiredApprovals.length) {
-          const approval = await this.repo.consumeApprovals(context.client, dto.approvalIds, {
-            sessionId: user.sessionId,
             merchantId,
-            locationId: dto.locationId,
-            permissions: requiredApprovals,
-            fingerprint: confirmed.fingerprint,
-            commandId: context.commandId,
-          });
-          if (!approval.approved) {
+            dto.locationId,
+            dto.operatorSessionId,
+            dto.cartId,
+            dto.expectedCartVersion,
+            authorization.operatorName,
+          );
+          if (!cart) {
+            return {
+              ok: false,
+              code: 'OPTIMISTIC_VERSION_CONFLICT',
+              failureClass: 'conflict',
+              retryable: false,
+            };
+          }
+          const repriced = await this.reprice(context.client, cart, dto.idempotencyKey);
+          if (!repriced) {
+            return {
+              ok: false,
+              code: 'CHECKOUT_CART_CHANGED',
+              failureClass: 'validation',
+              retryable: false,
+            };
+          }
+          const policy = await this.repo.policy(
+            context.client,
+            merchantId,
+            dto.locationId,
+            repriced.public.totals.grandTotal.currency,
+          );
+          const calculation = calculateCheckout(
+            repriced.public,
+            dto,
+            policy,
+            new Map(
+              repriced.lineSnapshot.map((line) => [line.id, line.price.lineSubtotal.minorUnits]),
+            ),
+          );
+          const confirmation = calculation.confirmation;
+          const previewRecoveryState = this.recoveryState(calculation.ok ? null : calculation.code);
+          const previewState =
+            previewRecoveryState === 'terminal_outcome_unknown'
+              ? 'payment_unknown'
+              : calculation.ok
+                ? 'selecting_tender'
+                : 'collecting_payment';
+          const previewDraft = await this.repo.saveDraft(
+            context.client,
+            user.deviceId!,
+            cart,
+            dto,
+            previewState,
+            calculation.summary,
+            previewRecoveryState,
+            confirmation.fingerprint,
+          );
+          const previewSummary = calculation.summary
+            ? { ...calculation.summary, checkoutId: previewDraft.id }
+            : null;
+          if (!calculation.ok && calculation.code === 'TERMINAL_OUTCOME_UNKNOWN') {
+            const unknownPayment = await this.repo.unknownTerminal(
+              context.client,
+              cart,
+              previewDraft.id,
+              previewSummary!.tenders.find((tender) => tender.type === 'manual_terminal')!,
+              context.correlationId,
+            );
+            await context.appendAudit({
+              eventType: 'checkout.terminal_outcome_unknown',
+              entityType: 'pos_checkout',
+              entityId: previewDraft.id,
+              outcome: 'failure',
+              reasonCode: calculation.code,
+              publicData: { recoveryState: previewRecoveryState },
+            });
+            return {
+              ok: true,
+              value: this.recoverableResult(
+                confirmation,
+                previewSummary,
+                policy,
+                dto,
+                calculation.code,
+                context.correlationId,
+                unknownPayment,
+              ),
+            };
+          }
+          if (dto.totalsFingerprint !== confirmation.fingerprint) {
+            const code =
+              dto.totalsFingerprint === null
+                ? 'CHECKOUT_CONFIRMATION_REQUIRED'
+                : 'CHECKOUT_CART_CHANGED';
+            return {
+              ok: true,
+              value: {
+                status: 'confirmation_required',
+                confirmation,
+                payment: null,
+                payments: [],
+                reservation: null,
+                sale: null,
+                receipt: null,
+                failure: {
+                  code,
+                  retryable: false,
+                  operatorGuidance: 'confirm_totals',
+                  correlationId: context.correlationId,
+                  requiredPermission: null,
+                },
+                paymentSummary: previewSummary,
+                recoveryState: 'none',
+                receiptDelivery: dto.receiptDelivery,
+                policy,
+              },
+            };
+          }
+          const confirmed: TotalsConfirmation = {
+            ...confirmation,
+            confirmedAt: new Date().toISOString(),
+          };
+          const discountPermissionDenied =
+            dto.discountDrafts.length > 0 &&
+            !authorization.permissions.includes('checkout.discount.apply') &&
+            !authorization.permissions.includes('*');
+          const tipPermissionDenied =
+            dto.tipDraft !== null &&
+            policy.tip.requiredPermission !== null &&
+            !authorization.permissions.includes(policy.tip.requiredPermission) &&
+            !authorization.permissions.includes('*');
+          const terminalPermissionDenied =
+            dto.tenderDrafts.some((tender) => tender.type === 'manual_terminal') &&
+            !authorization.permissions.includes('checkout.terminal.confirm') &&
+            !authorization.permissions.includes('*');
+          const calculationCode = calculation.ok ? null : calculation.code;
+          const recoveryState = this.recoveryState(calculationCode);
+          const draftState =
+            recoveryState === 'terminal_outcome_unknown'
+              ? 'payment_unknown'
+              : calculation.ok &&
+                  !discountPermissionDenied &&
+                  !tipPermissionDenied &&
+                  !terminalPermissionDenied
+                ? 'payment_accepted'
+                : calculationCode === 'APPROVAL_REQUIRED'
+                  ? 'awaiting_authorization'
+                  : 'collecting_payment';
+          const draft = await this.repo.saveDraft(
+            context.client,
+            user.deviceId!,
+            cart,
+            dto,
+            draftState,
+            calculation.summary,
+            recoveryState,
+            confirmed.fingerprint,
+          );
+          const persistedSummary = calculation.summary
+            ? { ...calculation.summary, checkoutId: draft.id }
+            : null;
+          if (!calculation.ok) {
+            await context.appendAudit({
+              eventType: `checkout.${calculation.code.toLowerCase()}`,
+              entityType: 'pos_checkout',
+              entityId: draft.id,
+              outcome: 'failure',
+              reasonCode: calculation.code,
+              publicData: { recoveryState },
+            });
+            return {
+              ok: true,
+              value: this.recoverableResult(
+                confirmed,
+                persistedSummary,
+                policy,
+                dto,
+                calculation.code,
+                context.correlationId,
+              ),
+            };
+          }
+          const summary: PaymentSummary = {
+            ...calculation.summary,
+            checkoutId: draft.id,
+          };
+          if (discountPermissionDenied || tipPermissionDenied || terminalPermissionDenied) {
             return {
               ok: true,
               value: this.recoverableResult(
@@ -289,83 +256,138 @@ export class PosCheckoutService {
                 summary,
                 policy,
                 dto,
-                'APPROVAL_REQUIRED',
+                terminalPermissionDenied
+                  ? 'PERMISSION_REVOKED'
+                  : tipPermissionDenied
+                    ? 'TIP_REJECTED'
+                    : 'DISCOUNT_REJECTED',
                 context.correlationId,
-                null,
-                approval.missingPermission,
               ),
             };
           }
-        }
-        const reservation = await this.repo.reserve(context.client, cart, repriced.lineSnapshot);
-        const payments = await this.repo.payments(
-          context.client,
-          cart,
-          draft.id,
-          summary,
-          context.correlationId,
-        );
-        const receipt = this.receipt(
-          cart,
-          confirmed,
-          payments,
-          summary,
-          repriced.lineSnapshot,
-          dto,
-        );
-        const sale = await this.repo.commit(
-          context.client,
-          cart,
-          confirmed,
-          payments,
-          summary,
-          draft.id,
-          reservation,
-          receipt,
-          dto.cashShiftId ?? null,
-          context.commandId,
-        );
-        await context.appendFinancial(
-          {
-            aggregateType: 'pos_sale',
-            aggregateId: sale.id,
-            eventType: 'sale.committed',
-            amountMinorUnits: confirmed.totals.grandTotal.minorUnits,
-            currency: confirmed.totals.grandTotal.currency,
-            publicData: {
-              receiptRef: receipt.receiptRef,
-              tenderCount: summary.tenders.length,
+          const terminalApprovalRequired = summary.tenders.some(
+            (tender) =>
+              tender.type === 'manual_terminal' &&
+              tender.applied.minorUnits > policy.manualTerminalApprovalThreshold.minorUnits,
+          );
+          const negativeStockApprovalRequired = await this.repo.negativeStockApprovalRequired(
+            context.client,
+            cart,
+          );
+          const requiredApprovals = [
+            ...(calculation.approvalRequired ? [policy.discount.approvalPermission] : []),
+            ...(terminalApprovalRequired ? [policy.manualTerminalApprovalPermission] : []),
+            ...(negativeStockApprovalRequired ? ['inventory.negative_stock.override'] : []),
+          ];
+          let approvalIdsByPermission: Record<string, string> = {};
+          if (requiredApprovals.length) {
+            const approval = await this.repo.consumeApprovals(context.client, dto.approvalIds, {
+              sessionId: user.sessionId,
+              merchantId,
+              locationId: dto.locationId,
+              permissions: requiredApprovals,
+              fingerprint: confirmed.fingerprint,
+              commandId: context.commandId,
+            });
+            if (!approval.approved) {
+              return {
+                ok: true,
+                value: this.recoverableResult(
+                  confirmed,
+                  summary,
+                  policy,
+                  dto,
+                  'APPROVAL_REQUIRED',
+                  context.correlationId,
+                  null,
+                  approval.missingPermission,
+                ),
+              };
+            }
+            approvalIdsByPermission = approval.approvalIdsByPermission;
+          }
+          const reservation = await this.repo.reserve(
+            context.client,
+            cart,
+            repriced.lineSnapshot,
+            authorization,
+            context.commandId,
+            dto.idempotencyKey,
+            confirmed.fingerprint,
+            context.correlationId,
+            approvalIdsByPermission['inventory.negative_stock.override'] ?? null,
+          );
+          const payments = await this.repo.payments(
+            context.client,
+            cart,
+            draft.id,
+            summary,
+            context.correlationId,
+          );
+          const receipt = this.receipt(
+            cart,
+            confirmed,
+            payments,
+            summary,
+            repriced.lineSnapshot,
+            dto,
+          );
+          const sale = await this.repo.commit(
+            context.client,
+            cart,
+            confirmed,
+            payments,
+            summary,
+            draft.id,
+            reservation,
+            receipt,
+            dto.cashShiftId ?? null,
+            context.commandId,
+            authorization,
+            context.correlationId,
+          );
+          await context.appendFinancial(
+            {
+              aggregateType: 'pos_sale',
+              aggregateId: sale.id,
+              eventType: 'sale.committed',
+              amountMinorUnits: confirmed.totals.grandTotal.minorUnits,
+              currency: confirmed.totals.grandTotal.currency,
+              publicData: {
+                receiptRef: receipt.receiptRef,
+                tenderCount: summary.tenders.length,
+              },
             },
-          },
-          0,
-        );
-        await context.appendAudit({
-          eventType: 'checkout.completed',
-          entityType: 'pos_sale',
-          entityId: sale.id,
-          outcome: 'success',
-          publicData: { receiptRef: receipt.receiptRef },
-        });
-        const committedResult: CheckoutResult = {
-          status: 'completed',
-          confirmation: confirmed,
-          payment: payments[0] ?? null,
-          payments,
-          reservation,
-          sale,
-          receipt,
-          failure: null,
-          paymentSummary: { ...summary, state: 'completed' },
-          recoveryState: 'none',
-          receiptDelivery: dto.receiptDelivery,
-          policy,
-        };
-        await this.repo.saveCommittedResult(context.client, draft.id, committedResult);
-        return {
-          ok: true,
-          value: committedResult,
-        };
-      },
+            0,
+          );
+          await context.appendAudit({
+            eventType: 'checkout.completed',
+            entityType: 'pos_sale',
+            entityId: sale.id,
+            outcome: 'success',
+            publicData: { receiptRef: receipt.receiptRef },
+          });
+          const committedResult: CheckoutResult = {
+            status: 'completed',
+            confirmation: confirmed,
+            payment: payments[0] ?? null,
+            payments,
+            reservation,
+            sale,
+            receipt,
+            failure: null,
+            paymentSummary: { ...summary, state: 'completed' },
+            recoveryState: 'none',
+            receiptDelivery: dto.receiptDelivery,
+            policy,
+          };
+          await this.repo.saveCommittedResult(context.client, draft.id, committedResult);
+          return {
+            ok: true,
+            value: committedResult,
+          };
+        },
+      ),
     );
     if (result.status !== 'succeeded' || !result.result) {
       throw new ConflictException({
@@ -373,6 +395,16 @@ export class PosCheckoutService {
       });
     }
     return result.result;
+  }
+
+  private async withInventoryErrors<T>(promise: Promise<T>): Promise<T> {
+    try {
+      return await promise;
+    } catch (error) {
+      const code = inventoryConflictCode(error);
+      if (code) throw new ConflictException({ code });
+      throw error;
+    }
   }
 
   async recovery(user: AuthUser, merchantId: string, cartId: string, query: CheckoutRecoveryQuery) {

@@ -123,8 +123,15 @@ function generatedSql() {
   const roleKeys = profiles.map((profile) => quote(profile.role)).join(',');
   const permissionKeys = inventory.permissions.map((permission) => quote(permission.key)).join(',');
   const bootstrapPermissions = inventory.permissions
-    .filter((permission) => permission.source.includes('35_pos_pilot_rbac.sql'))
-    .map((permission) => `  (${quote(permission.key)},${quote(permission.description)})`)
+    .filter(
+      (permission) =>
+        permission.source.includes('35_pos_pilot_rbac.sql') ||
+        permission.key.startsWith('inventory.'),
+    )
+    .map(
+      (permission) =>
+        `  (${quote(permission.key)},${quote(permission.description ?? `UmiPOS permission ${permission.key}`)})`,
+    )
     .join(',\n');
 
   return `-- GENERATED FROM config/umipos-pilot-role-grants.json.

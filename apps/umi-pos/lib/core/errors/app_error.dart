@@ -19,6 +19,7 @@ final class AppException implements Exception {
     required this.code,
     required this.recoverable,
     this.correlationId,
+    this.fieldErrors,
   });
 
   factory AppException.fromApi(ApiError error) => AppException(
@@ -35,12 +36,14 @@ final class AppException implements Exception {
     code: error.code,
     recoverable: error.retryable,
     correlationId: error.correlationId,
+    fieldErrors: error.fieldErrors,
   );
 
   final AppErrorCategory category;
   final String code;
   final bool recoverable;
   final String? correlationId;
+  final Map<String, Object?>? fieldErrors;
 
   @override
   String toString() => 'AppException(${category.name}, $code)';

@@ -94,7 +94,7 @@ expect_error() {  # expect_error <label> <output>
 
 echo "== building a disposable build-v3 in $DB =="
 psql -q -c "create database $DB;" >/dev/null
-for f in 00_foundation 10_umi 20_merchant 30_runtime 30_device_pairing 31_pos_sale 32_pos_checkout 33_pos_cash 34_pos_exception 35_pos_pilot_rbac 50_cross_schema_fk 60_triggers 90_rls 99_verify; do
+for f in 00_foundation 10_umi 20_merchant 30_runtime 30_device_pairing 31_pos_sale 32_pos_checkout 33_pos_cash 34_pos_exception 35_pos_pilot_rbac 36_pos_inventory 50_cross_schema_fk 60_triggers 90_rls 99_verify; do
   if ! ddl_output=$(psql -X -q -v ON_ERROR_STOP=1 -d "$DB" -f "$DDL/$f.sql" 2>&1); then
     echo "  DDL FAILED at $f:"
     printf '%s\n' "$ddl_output" | grep -E 'ERROR|LINE' | head -5
@@ -136,6 +136,8 @@ insert into merchant.device_replay_cursor (merchant_id,location_id,device_id,cre
   ('$A','$A1','$D1',1), ('$A','$A2','$D2',1);
 SQL
 echo "  seeded 2 cafés / 3 locations / 2 devices / 1 operator session"
+
+q -c "create role inventory_api_login inherit; grant api to inventory_api_login;" >/dev/null
 
 echo
 echo "== 1. merchant isolation =="
@@ -307,12 +309,12 @@ values ('d3000000-0000-4000-8000-000000000011','$A','$A1',
   'd3000000-0000-4000-8000-000000000013',repeat('f',64),repeat('e',64),
   500,0,0,0,500,'MXN',current_date,'gate-3d-exception');
 insert into merchant.pos_sale_exception_line
-  (merchant_id,location_id,exception_id,sale_id,sale_line_id,original_quantity,
+  (id,merchant_id,location_id,exception_id,sale_id,sale_line_id,original_quantity,
    compensated_quantity,original_merchandise_minor_units,original_tax_minor_units,
    original_discount_minor_units,original_tip_minor_units,original_total_minor_units,
    merchandise_minor_units,tax_minor_units,discount_minor_units,tip_minor_units,total_minor_units,
    currency,restock_decision)
-values ('$A','$A1','d3000000-0000-4000-8000-000000000011',
+values ('d3000000-0000-4000-8000-000000000014','$A','$A1','d3000000-0000-4000-8000-000000000011',
   'd3000000-0000-4000-8000-000000000007','d3000000-0000-4000-8000-000000000003',
   1,1,1000,0,0,0,1000,500,0,0,0,500,'MXN','restock');
 insert into merchant.pos_tender_compensation
@@ -492,16 +494,16 @@ values ('d3000000-0000-4000-8000-000000000069','$A','$A1',
   'd3000000-0000-4000-8000-000000000071',repeat('7',64),repeat('8',64),
   2,0,0,0,2,'MXN',current_date,'legacy-exception');
 insert into merchant.pos_sale_exception_line
-  (merchant_id,location_id,exception_id,sale_id,sale_line_id,original_quantity,
+  (id,merchant_id,location_id,exception_id,sale_id,sale_line_id,original_quantity,
    compensated_quantity,original_merchandise_minor_units,original_tax_minor_units,
    original_discount_minor_units,original_tip_minor_units,original_total_minor_units,
    merchandise_minor_units,tax_minor_units,discount_minor_units,tip_minor_units,total_minor_units,
    currency,restock_decision)
 values
-  ('$A','$A1','d3000000-0000-4000-8000-000000000069',
+  ('d3000000-0000-4000-8000-000000000072','$A','$A1','d3000000-0000-4000-8000-000000000069',
    'd3000000-0000-4000-8000-000000000066','d3000000-0000-4000-8000-000000000061',
    1,1,1000,0,0,0,1000,1,0,0,0,1,'MXN','restock'),
-  ('$A','$A1','d3000000-0000-4000-8000-000000000069',
+  ('d3000000-0000-4000-8000-000000000073','$A','$A1','d3000000-0000-4000-8000-000000000069',
    'd3000000-0000-4000-8000-000000000066','d3000000-0000-4000-8000-000000000062',
    1,1,1000,0,1,1,1000,1,0,0,0,1,'MXN','restock');
 SQL
@@ -653,13 +655,13 @@ expect "all pilot business roles exist" "7" \
     ('owner','admin','manager','supervisor','cashier','staff','viewer') and not is_platform;")"
 expect "super_admin remains platform-only" "t" \
   "$(q -c "select is_platform from umi.role where key='super_admin';")"
-expect "Cashier receives the exact reviewed grant count" "22" \
+expect "Cashier receives the exact reviewed grant count" "23" \
   "$(q -c "select count(*) from umi.role_permission rp join umi.role r on r.id=rp.role_id
     where r.key='cashier';")"
-expect "Supervisor receives the exact reviewed grant count" "35" \
+expect "Supervisor receives the exact reviewed grant count" "43" \
   "$(q -c "select count(*) from umi.role_permission rp join umi.role r on r.id=rp.role_id
     where r.key='supervisor';")"
-expect "Manager receives the exact reviewed grant count" "42" \
+expect "Manager receives the exact reviewed grant count" "62" \
   "$(q -c "select count(*) from umi.role_permission rp join umi.role r on r.id=rp.role_id
     where r.key='manager';")"
 expect "Viewer receives no mutation permission" "0" \
@@ -704,6 +706,361 @@ expect "Staff resolves no administration or approval authority" "0" \
   "$(q -c "select count(*) from unnest(umi.resolve_staff_permissions('$S1'::uuid)) key
     where key in ('merchant.manage','device.enroll','cash.variance.approve',
       'cash.movement.paid_out.approve','sale.refund.approve');")"
+
+echo
+echo "== 10. Gate 3E inventory authority =="
+IL=e3000000-0000-4000-8000-000000000001
+II=e3000000-0000-4000-8000-000000000002
+II_LAST=e3000000-0000-4000-8000-000000000012
+II_OVERRIDE=e3000000-0000-4000-8000-000000000016
+PRODUCT_A=e3000000-0000-4000-8000-000000000017
+PRODUCT_B=e3000000-0000-4000-8000-000000000018
+II_COMPONENT=e3000000-0000-4000-8000-000000000031
+C1=e3000000-0000-4000-8000-000000000003
+C2=e3000000-0000-4000-8000-000000000004
+C3=e3000000-0000-4000-8000-000000000005
+q -c "insert into merchant.inventory_location
+  (id,merchant_id,location_id,public_reference,display_name,location_type)
+  values ('$IL','$A','$A1','STOCK-MAIN','Main stock','business_location');
+insert into merchant.inventory_item
+  (id,merchant_id,public_reference,display_name,item_type,base_unit,quantity_scale,
+   tracking_policy,negative_stock_policy,reservation_required,low_stock_threshold)
+  values ('$II','$A','ITEM-COFFEE','Coffee bag','physical_product','unit',0,
+    'reservation_required','block',true,2);
+insert into merchant.inventory_item
+  (id,merchant_id,public_reference,display_name,item_type,base_unit,quantity_scale,
+   tracking_policy,negative_stock_policy,reservation_required,low_stock_threshold)
+  values ('$II_LAST','$A','ITEM-LAST','Last unit','physical_product','unit',0,
+    'reservation_required','block',true,1);
+insert into merchant.inventory_item
+  (id,merchant_id,public_reference,display_name,item_type,base_unit,quantity_scale,
+   tracking_policy,negative_stock_policy,reservation_required,low_stock_threshold)
+  values ('$II_OVERRIDE','$A','ITEM-OVERRIDE','Override unit','physical_product','unit',0,
+    'reservation_required','manager_override',true,1);
+insert into merchant.inventory_item
+  (id,merchant_id,public_reference,display_name,item_type,base_unit,quantity_scale,
+   tracking_policy,negative_stock_policy,reservation_required,low_stock_threshold)
+  values ('$II_COMPONENT','$A','ITEM-COMPONENT','Recipe component','ingredient','gram',0,
+    'reservation_required','block',true,2);
+insert into merchant.product(id,merchant_id,name,price,active)
+  values ('$PRODUCT_A','$A','Scoped A',100,true),('$PRODUCT_B','$B','Scoped B',100,true);
+insert into merchant.inventory_policy
+  (merchant_id,location_id,inventory_location_id,version,adjustment_approval_threshold,
+   waste_approval_threshold,count_variance_tolerance,fingerprint)
+  values ('$A','$A1','$IL','pilot-3e',5,2,1,repeat('a',64));
+select merchant.append_stock_ledger('$A','$A1','$IL','$II','opening_balance',10,
+  '$C1','$C1',repeat('1',64),'opening_balance','$C1','$U1','$D1',1,current_date,
+  'gate-3e-opening',null,null,null,null,'{}'::jsonb);
+select merchant.append_stock_ledger('$A','$A1','$IL','$II','reservation_created',3,
+  '$C2','$C2',repeat('2',64),'reservation','$C2','$U1','$D1',1,current_date,
+  'gate-3e-reserve',null,null,null,null,'{}'::jsonb);
+select merchant.append_stock_ledger('$A','$A1','$IL','$II','reservation_released',3,
+  '$C3','$C3',repeat('3',64),'reservation','$C2','$U1','$D1',1,current_date,
+  'gate-3e-release',null,null,null,null,'{}'::jsonb);
+select merchant.append_stock_ledger('$A','$A1','$IL','$II_LAST','opening_balance',1,
+  'e3000000-0000-4000-8000-000000000013','e3000000-0000-4000-8000-000000000013',
+  repeat('5',64),'opening_balance','e3000000-0000-4000-8000-000000000013','$U1','$D1',1,
+  current_date,'gate-3e-last-unit',null,null,null,null,'{}'::jsonb);
+select merchant.append_stock_ledger('$A','$A1','$IL','$II_OVERRIDE','opening_balance',1,
+  'e3000000-0000-4000-8000-000000000019','e3000000-0000-4000-8000-000000000019',
+  repeat('6',64),'opening_balance','e3000000-0000-4000-8000-000000000019','$U1','$D1',1,
+  current_date,'gate-3e-override',null,null,null,null,'{}'::jsonb);" >/dev/null
+expect "ledger facts reproduce the stock balance" "10|0|10|3" \
+  "$(q -c "select on_hand,reserved,available,ledger_sequence from merchant.stock_balance
+    where inventory_location_id='$IL' and inventory_item_id='$II';")"
+expect "an idempotent replay returns the original ledger fact" "1" \
+  "$(q -c "select sequence from merchant.append_stock_ledger(
+    '$A','$A1','$IL','$II','opening_balance',10,'$C1','$C1',repeat('1',64),
+    'opening_balance','$C1','$U1','$D1',1,current_date,'gate-3e-opening',
+    null,null,null,null,'{}'::jsonb);")"
+expect "an idempotent replay creates no duplicate stock fact" "3" \
+  "$(q -c "select count(*) from merchant.stock_ledger_entry
+    where inventory_location_id='$IL' and inventory_item_id='$II';")"
+q -c "insert into merchant.inventory_catalog_mapping(
+    id,merchant_id,product_id,mapping_type,inventory_item_id,version)
+  values('e3000000-0000-4000-8000-000000000021','$A',
+    'd3000000-0000-4000-8000-000000000001','direct','$II',1);
+insert into merchant.inventory_reservation(
+    id,merchant_id,location_id,cart_id,status,cart_version,line_snapshot,expires_at,
+    inventory_location_id,command_id,command_fingerprint)
+  values('e3000000-0000-4000-8000-000000000022','$A','$A1',
+    'd3000000-0000-4000-8000-000000000002','active',1,'[]',now()-interval '1 minute',
+    '$IL','e3000000-0000-4000-8000-000000000024',repeat('8',64));
+insert into merchant.inventory_reservation_line(
+    id,merchant_id,location_id,reservation_id,inventory_location_id,inventory_item_id,
+    sale_line_id,required_quantity,quantity_scale,unit,mapping_id,mapping_version,
+    availability_sequence)
+  values('e3000000-0000-4000-8000-000000000023','$A','$A1',
+    'e3000000-0000-4000-8000-000000000022','$IL','$II',
+    'd3000000-0000-4000-8000-000000000003',2,0,'unit',
+    'e3000000-0000-4000-8000-000000000021',1,3);
+select merchant.append_stock_ledger('$A','$A1','$IL','$II','reservation_created',2,
+    'e3000000-0000-4000-8000-000000000024','e3000000-0000-4000-8000-000000000024',
+    repeat('8',64),'inventory_reservation','e3000000-0000-4000-8000-000000000022',
+    '$U1','$D1',1,current_date,'gate-3e-expiry',null,
+    'd3000000-0000-4000-8000-000000000003',null,null,'{}'::jsonb);
+select merchant.expire_inventory_reservations('$A','$A1');" >/dev/null
+expect "expired reservation releases availability exactly once" "expired|0|1" \
+  "$(q -c "select r.status,b.reserved,
+      (select count(*) from merchant.stock_ledger_entry where
+        source_aggregate_id=r.id and entry_type='reservation_expired')
+    from merchant.inventory_reservation r join merchant.stock_balance b
+      on b.inventory_location_id=r.inventory_location_id and b.inventory_item_id='$II'
+    where r.id='e3000000-0000-4000-8000-000000000022';")"
+expect "a second expiry sweep creates no duplicate release" "0|1" \
+  "$(q -c "select merchant.expire_inventory_reservations('$A','$A1'),
+    (select count(*) from merchant.stock_ledger_entry
+      where source_aggregate_id='e3000000-0000-4000-8000-000000000022'
+        and entry_type='reservation_expired');")"
+q -c "insert into merchant.inventory_reservation(
+    id,merchant_id,location_id,cart_id,status,cart_version,line_snapshot,expires_at,
+    inventory_location_id,command_id,command_fingerprint)
+  values('e3000000-0000-4000-8000-000000000025','$A','$A1',
+    'd3000000-0000-4000-8000-000000000060','active',1,'[]',now()+interval '10 minutes',
+    '$IL','e3000000-0000-4000-8000-000000000027',repeat('9',64));
+insert into merchant.inventory_reservation_line(
+    id,merchant_id,location_id,reservation_id,inventory_location_id,inventory_item_id,
+    sale_line_id,required_quantity,quantity_scale,unit,mapping_id,mapping_version,
+    availability_sequence)
+  values('e3000000-0000-4000-8000-000000000026','$A','$A1',
+    'e3000000-0000-4000-8000-000000000025','$IL','$II',
+    'd3000000-0000-4000-8000-000000000061',2,0,'unit',
+    'e3000000-0000-4000-8000-000000000021',1,5);
+select merchant.append_stock_ledger('$A','$A1','$IL','$II','reservation_created',2,
+    'e3000000-0000-4000-8000-000000000027','e3000000-0000-4000-8000-000000000027',
+    repeat('9',64),'inventory_reservation','e3000000-0000-4000-8000-000000000025',
+    '$U1','$D1',1,current_date,'gate-3e-commit-reservation',null,
+    'd3000000-0000-4000-8000-000000000061',null,null,'{}'::jsonb);
+select merchant.commit_sale_inventory('e3000000-0000-4000-8000-000000000025',
+    'd3000000-0000-4000-8000-000000000066','e3000000-0000-4000-8000-000000000028',
+    '$U1','$D1',1,current_date,'gate-3e-sale-commit');" >/dev/null
+expect "sale inventory commit consumes a reservation exactly once" "committed|8|0|2|1" \
+  "$(q -c "select r.status,b.on_hand,b.reserved,b.committed,
+      (select count(*) from merchant.stock_ledger_entry where
+        sale_id='d3000000-0000-4000-8000-000000000066' and entry_type='sale_committed')
+    from merchant.inventory_reservation r join merchant.stock_balance b
+      on b.inventory_location_id=r.inventory_location_id and b.inventory_item_id='$II'
+    where r.id='e3000000-0000-4000-8000-000000000025';")"
+expect_error "Block policy rejects negative stock" \
+  "$(q -c "select merchant.append_stock_ledger('$A','$A1','$IL','$II','adjustment_decrease',11,
+    'e3000000-0000-4000-8000-000000000006','e3000000-0000-4000-8000-000000000006',
+    repeat('4',64),'adjustment','e3000000-0000-4000-8000-000000000006','$U1','$D1',1,
+    current_date,'gate-3e-negative',null,null,null,null,'{}'::jsonb);")"
+expect_error "ManagerOverride rejects negative stock without a bound approval" \
+  "$(q -c "select merchant.append_stock_ledger('$A','$A1','$IL','$II_OVERRIDE',
+    'adjustment_decrease',2,'e3000000-0000-4000-8000-000000000020',
+    'e3000000-0000-4000-8000-000000000020',repeat('7',64),'adjustment',
+    'e3000000-0000-4000-8000-000000000020','$U1','$D1',1,current_date,
+    'gate-3e-negative-override',null,null,null,null,'{}'::jsonb);")"
+expect_error "a catalog mapping cannot reference another merchant product" \
+  "$(q -c "insert into merchant.inventory_catalog_mapping(
+    merchant_id,product_id,mapping_type,inventory_item_id,version)
+    values('$A','$PRODUCT_B','direct','$II',1);")"
+expect_error "stock ledger update fails" \
+  "$(q -c "update merchant.stock_ledger_entry set quantity=9 where command_id='$C1';")"
+expect_error "stock ledger delete fails" \
+  "$(q -c "delete from merchant.stock_ledger_entry where command_id='$C1';")"
+expect_error "api cannot insert a ledger fact directly" \
+  "$(as_api_raw "$A" "$A1" "$D1" "insert into merchant.stock_ledger_entry(
+    merchant_id,location_id,inventory_location_id,inventory_item_id,sequence,entry_type,
+    quantity,quantity_scale,unit,command_id,idempotency_key,command_fingerprint,
+    source_aggregate_type,source_aggregate_id,operator_id,device_id,credential_version,
+    business_date,correlation_id) values ('$A','$A1','$IL','$II',99,'adjustment_increase',
+    1,0,'unit',gen_random_uuid(),gen_random_uuid(),repeat('9',64),'direct_write',gen_random_uuid(),
+    '$U1','$D1',1,current_date,'direct-write');")"
+expect_error "api cannot update the balance projection directly" \
+  "$(as_api_raw "$A" "$A1" "$D1" "update merchant.stock_balance set on_hand=999
+    where inventory_location_id='$IL' and inventory_item_id='$II';")"
+expect "readonly cannot execute the ledger or projection authority" "f|f" \
+  "$(q -c "select
+    has_function_privilege('readonly','merchant.append_stock_ledger(uuid,uuid,uuid,uuid,text,bigint,uuid,uuid,text,text,uuid,uuid,uuid,integer,date,text,uuid,uuid,uuid,uuid,jsonb)','execute'),
+    has_function_privilege('readonly','merchant.rebuild_stock_balance(uuid,uuid)','execute');")"
+expect_error "api cannot append stock without request scope" \
+  "$(psql -X -q -t -A -d "$DB" -c "set role api" -c "select merchant.append_stock_ledger(
+    '$A','$A1','$IL','$II','adjustment_increase',1,gen_random_uuid(),gen_random_uuid(),
+    repeat('8',64),'scope-test',gen_random_uuid(),'$U1','$D1',1,current_date,'scope-test',
+    null,null,null,null,'{}'::jsonb);" 2>&1)"
+expect_error "api cannot rebuild a projection without request scope" \
+  "$(psql -X -q -t -A -d "$DB" -c "set role api" \
+    -c "select merchant.rebuild_stock_balance('$IL','$II');" 2>&1)"
+expect_error "an inherited API login cannot append stock without request scope" \
+  "$(psql -X -q -t -A -d "$DB" -c "set session authorization inventory_api_login" \
+    -c "select merchant.append_stock_ledger(
+      '$A','$A1','$IL','$II','adjustment_increase',1,gen_random_uuid(),gen_random_uuid(),
+      repeat('8',64),'scope-test',gen_random_uuid(),'$U1','$D1',1,current_date,'scope-test',
+      null,null,null,null,'{}'::jsonb);" 2>&1)"
+expect_error "a scoped function cannot post into another location" \
+  "$(as_api_raw "$A" "$A2" "$D2" "select merchant.append_stock_ledger(
+    '$A','$A1','$IL','$II','adjustment_increase',1,gen_random_uuid(),gen_random_uuid(),
+    repeat('8',64),'scope-test',gen_random_uuid(),'$U1','$D2',1,current_date,'scope-test',
+    null,null,null,null,'{}'::jsonb);")"
+expect "another location cannot read the stock ledger" "0" \
+  "$(as_api "$A" "$A2" "$D2" "select count(*) from merchant.stock_ledger_entry
+    where inventory_item_id='$II';")"
+expect "the assigned device reads its location stock ledger" "7" \
+  "$(as_api "$A" "$A1" "$D1" "select count(*) from merchant.stock_ledger_entry
+    where inventory_item_id='$II';")"
+
+q -c "begin;
+select merchant.append_stock_ledger('$A','$A1','$IL','$II','reservation_created',2,
+  'e3000000-0000-4000-8000-000000000050','e3000000-0000-4000-8000-000000000050',
+  repeat('a',64),'inventory_reservation','e3000000-0000-4000-8000-000000000022',
+  '$U1','$D1',1,current_date,'gate-3e-expired-refresh',null,
+  'd3000000-0000-4000-8000-000000000003',null,null,'{}'::jsonb);
+update merchant.inventory_reservation set status='active',expires_at=now()-interval '1 minute'
+  where id='e3000000-0000-4000-8000-000000000022';
+select merchant.expire_inventory_reservations('$A','$A1');
+insert into merchant.inventory_reservation(
+  merchant_id,location_id,cart_id,status,cart_version,line_snapshot,expires_at)
+values('$A','$A1','d3000000-0000-4000-8000-000000000002','reserved',1,'[]',
+  now()+interval '10 minutes')
+on conflict(cart_id) do update set
+  status=case when merchant.inventory_reservation.status in ('released','expired')
+    then 'reserved' else merchant.inventory_reservation.status end,
+  line_snapshot=excluded.line_snapshot,expires_at=excluded.expires_at,updated_at=now();
+select merchant.append_stock_ledger('$A','$A1','$IL','$II','reservation_created',2,
+  'e3000000-0000-4000-8000-000000000051','e3000000-0000-4000-8000-000000000051',
+  repeat('a',64),'inventory_reservation','e3000000-0000-4000-8000-000000000022',
+  '$U1','$D1',1,current_date,'gate-3e-rollback',null,
+  'd3000000-0000-4000-8000-000000000003',null,null,'{}'::jsonb);
+select merchant.commit_sale_inventory('e3000000-0000-4000-8000-000000000022',
+  'd3000000-0000-4000-8000-000000000007','e3000000-0000-4000-8000-000000000052',
+  '$U1','$D1',1,current_date,'gate-3e-rollback');
+rollback;" >/dev/null
+expect "expired checkout refresh and rollback leave no inventory effect" "expired|0|0|0" \
+  "$(q -c "select r.status,
+    (select count(*) from merchant.stock_ledger_entry where command_id=
+      'e3000000-0000-4000-8000-000000000050'),
+    (select count(*) from merchant.stock_ledger_entry where command_id=
+      'e3000000-0000-4000-8000-000000000051'),
+    (select count(*) from merchant.stock_ledger_entry where command_id=
+      'e3000000-0000-4000-8000-000000000052')
+   from merchant.inventory_reservation r
+   where r.id='e3000000-0000-4000-8000-000000000022';")"
+
+if ! component_output=$(q -c "select merchant.append_stock_ledger('$A','$A1','$IL','$II_COMPONENT','opening_balance',10,
+  'e3000000-0000-4000-8000-000000000034','e3000000-0000-4000-8000-000000000034',
+  repeat('b',64),'opening_balance','e3000000-0000-4000-8000-000000000034',
+  '$U1','$D1',1,current_date,'gate-3e-component-open',null,null,null,null,'{}'::jsonb);
+select merchant.append_stock_ledger('$A','$A1','$IL','$II_COMPONENT','reservation_created',5,
+  'e3000000-0000-4000-8000-000000000035','e3000000-0000-4000-8000-000000000035',
+  repeat('c',64),'inventory_reservation','e3000000-0000-4000-8000-000000000025',
+  '$U1','$D1',1,current_date,'gate-3e-component-reserve',null,
+  'd3000000-0000-4000-8000-000000000061',null,null,'{}'::jsonb);
+select merchant.append_stock_ledger('$A','$A1','$IL','$II_COMPONENT','sale_committed',5,
+  'e3000000-0000-4000-8000-000000000036','e3000000-0000-4000-8000-000000000036',
+  repeat('d',64),'pos_sale','d3000000-0000-4000-8000-000000000066',
+  '$U1','$D1',1,current_date,'gate-3e-component-sale',
+  'd3000000-0000-4000-8000-000000000066','d3000000-0000-4000-8000-000000000061',
+  null,null,jsonb_build_object('recipeId','e3000000-0000-4000-8000-000000000037'));
+insert into merchant.pos_restock_intent(
+  id,merchant_id,location_id,exception_line_id,sale_line_id,quantity,decision,inventory_status)
+values('e3000000-0000-4000-8000-000000000038','$A','$A1',
+  'd3000000-0000-4000-8000-000000000072','d3000000-0000-4000-8000-000000000061',
+  1,'unknown_until_inventory_review','review_required');
+select merchant.append_stock_ledger('$A','$A1','$IL','$II','refund_restocked',2,
+  'e3000000-0000-4000-8000-000000000039','e3000000-0000-4000-8000-000000000039',
+  repeat('e',64),'refund_restock','d3000000-0000-4000-8000-000000000069',
+  '$U1','$D1',1,current_date,'gate-3e-restock',
+  'd3000000-0000-4000-8000-000000000066','d3000000-0000-4000-8000-000000000061',
+  'd3000000-0000-4000-8000-000000000069',null,
+  jsonb_build_object('restockIntentId','e3000000-0000-4000-8000-000000000038'));
+select merchant.append_stock_ledger('$A','$A1','$IL','$II_COMPONENT','inspection_queued',5,
+  'e3000000-0000-4000-8000-000000000039','e3000000-0000-4000-8000-000000000039',
+  repeat('e',64),'refund_restock','d3000000-0000-4000-8000-000000000069',
+  '$U1','$D1',1,current_date,'gate-3e-inspection',
+  'd3000000-0000-4000-8000-000000000066','d3000000-0000-4000-8000-000000000061',
+  'd3000000-0000-4000-8000-000000000069',null,
+  jsonb_build_object('restockIntentId','e3000000-0000-4000-8000-000000000038'));
+insert into merchant.inventory_restock_outcome(
+  merchant_id,location_id,restock_intent_id,outcome,command_id,command_fingerprint,
+  inventory_location_id,resolved_by)
+values('$A','$A1','e3000000-0000-4000-8000-000000000038','component_resolved',
+  'e3000000-0000-4000-8000-000000000039',repeat('e',64),'$IL','$U1');"); then
+  printf '%s\n' "$component_output" >&2
+  exit 1
+fi
+expect "component restock preserves sellable and inspection states" "10|10|5|5|component_resolved" \
+  "$(q -c "select direct.on_hand,component.on_hand,component.quarantine,component.available,o.outcome
+   from merchant.stock_balance direct
+   join merchant.stock_balance component on component.inventory_location_id=direct.inventory_location_id
+    and component.inventory_item_id='$II_COMPONENT'
+   join merchant.inventory_restock_outcome o on o.restock_intent_id=
+    'e3000000-0000-4000-8000-000000000038'
+   where direct.inventory_location_id='$IL' and direct.inventory_item_id='$II';")"
+expect_error "a restock intent accepts one terminal outcome" \
+  "$(q -c "insert into merchant.inventory_restock_outcome(
+    merchant_id,location_id,restock_intent_id,outcome,command_id,command_fingerprint,
+    inventory_location_id,resolved_by)
+   values('$A','$A1','e3000000-0000-4000-8000-000000000038','restocked',
+    gen_random_uuid(),repeat('f',64),'$IL','$U1');")"
+
+q -c "insert into merchant.inventory_count(
+  id,merchant_id,location_id,inventory_location_id,public_reference,count_scope,status,
+  blind,snapshot_ledger_sequence,snapshot_item_sequences,item_scope,operator_id,
+  operator_session_id,device_id,command_id,command_fingerprint)
+select 'e3000000-0000-4000-8000-000000000040','$A','$A1','$IL','COUNT-3E-1',
+  'selected_items','reconciliation_required',true,ledger_sequence,
+  jsonb_build_object('$II',ledger_sequence),array['$II'::uuid],'$U1','$OS','$D1',
+  'e3000000-0000-4000-8000-000000000041',repeat('1',64)
+from merchant.stock_balance where inventory_location_id='$IL' and inventory_item_id='$II';
+insert into merchant.inventory_count_line(
+  merchant_id,count_id,inventory_item_id,expected_quantity,counted_quantity,quantity_scale,unit,
+  reason_code)
+select '$A','e3000000-0000-4000-8000-000000000040','$II',on_hand,on_hand+1,0,'unit',
+  'found_stock' from merchant.stock_balance
+where inventory_location_id='$IL' and inventory_item_id='$II';
+select merchant.append_stock_ledger('$A','$A1','$IL','$II','count_correction',1,
+  'e3000000-0000-4000-8000-000000000042','e3000000-0000-4000-8000-000000000042',
+  repeat('2',64),'inventory_count','e3000000-0000-4000-8000-000000000040',
+  '$U1','$D1',1,current_date,'gate-3e-count',null,null,null,
+  'e3000000-0000-4000-8000-000000000040',jsonb_build_object('direction','increase'));
+insert into merchant.inventory_reconciliation(
+  merchant_id,location_id,count_id,count_attempt,snapshot_ledger_sequence,command_id,
+  command_fingerprint,operator_id,summary)
+select '$A','$A1',id,attempt,snapshot_ledger_sequence,
+  'e3000000-0000-4000-8000-000000000042',repeat('2',64),'$U1',
+  jsonb_build_object('corrections',1) from merchant.inventory_count
+where id='e3000000-0000-4000-8000-000000000040';
+update merchant.inventory_count set status='committed',committed_at=clock_timestamp()
+  where id='e3000000-0000-4000-8000-000000000040';" >/dev/null
+expect "count reconciliation preserves observations and appends correction" "10|11|1|11|1" \
+  "$(q -c "select l.expected_quantity,l.counted_quantity,l.signed_variance,b.on_hand,
+    (select count(*) from merchant.stock_ledger_entry where count_id=c.id
+      and entry_type='count_correction')
+   from merchant.inventory_count c join merchant.inventory_count_line l on l.count_id=c.id
+   join merchant.stock_balance b on b.inventory_location_id=c.inventory_location_id
+    and b.inventory_item_id=l.inventory_item_id
+   where c.id='e3000000-0000-4000-8000-000000000040';")"
+expect_error "submitted count observations are immutable" \
+  "$(q -c "update merchant.inventory_count_line set counted_quantity=12
+   where count_id='e3000000-0000-4000-8000-000000000040';")"
+
+CONCURRENT_ONE="/tmp/umi-pos-inventory-one-$$"
+CONCURRENT_TWO="/tmp/umi-pos-inventory-two-$$"
+psql -X -q -v ON_ERROR_STOP=1 -d "$DB" -c "select merchant.append_stock_ledger(
+  '$A','$A1','$IL','$II_LAST','reservation_created',1,
+  'e3000000-0000-4000-8000-000000000014','e3000000-0000-4000-8000-000000000014',
+  repeat('6',64),'reservation','e3000000-0000-4000-8000-000000000014','$U1','$D1',1,
+  current_date,'gate-3e-concurrent-1',null,null,null,null,'{}'::jsonb);" \
+  >"$CONCURRENT_ONE" 2>&1 &
+PID_ONE=$!
+psql -X -q -v ON_ERROR_STOP=1 -d "$DB" -c "select merchant.append_stock_ledger(
+  '$A','$A1','$IL','$II_LAST','reservation_created',1,
+  'e3000000-0000-4000-8000-000000000015','e3000000-0000-4000-8000-000000000015',
+  repeat('7',64),'reservation','e3000000-0000-4000-8000-000000000015','$U1','$D1',1,
+  current_date,'gate-3e-concurrent-2',null,null,null,null,'{}'::jsonb);" \
+  >"$CONCURRENT_TWO" 2>&1 &
+PID_TWO=$!
+wait "$PID_ONE" || true
+wait "$PID_TWO" || true
+CONCURRENT_ERRORS=$(grep -h -c 'NEGATIVE_STOCK_BLOCKED' "$CONCURRENT_ONE" "$CONCURRENT_TWO" | awk '{s+=$1} END {print s}')
+rm -f "$CONCURRENT_ONE" "$CONCURRENT_TWO"
+expect "two devices cannot reserve the same last unit" "1|1|1" \
+  "$(q -c "select reserved,
+      (select count(*) from merchant.stock_ledger_entry where inventory_item_id='$II_LAST'
+        and entry_type='reservation_created'),$CONCURRENT_ERRORS
+    from merchant.stock_balance where inventory_location_id='$IL' and inventory_item_id='$II_LAST';")"
 
 q -c "update merchant.staff set role_id=(select id from umi.role where key='cashier')
   where id='$S1';" >/dev/null

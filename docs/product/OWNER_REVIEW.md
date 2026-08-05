@@ -154,3 +154,27 @@ Recommended Mac review sequence:
 - Review on tablet: restock controls, terminal states, text scaling, and dialog focus.
 - Review English and Spanish terms for void, refund, and inventory intent with operators.
 - Owner approval remains pending. Gate 3D does not include final UX certification.
+
+## Gate 3E inventory authority
+
+- Implemented: the catalog displays server-issued availability for the current location.
+- Implemented: low, unavailable, unknown, and policy-blocked states have safe operator copy.
+- Implemented: checkout creates a reservation and validates it again during the atomic sale commit.
+- Implemented: the POS preserves the cart after an inventory conflict.
+- Implemented: direct items, variants, recipes, configured modifiers, and bundles use versioned rules.
+- Implemented: Inventory Operations shows on-hand, reserved, available, and immutable history.
+- Implemented: authorized operators can request adjustments, waste, damage, and quarantine release.
+- Implemented: sensitive mutations request an independent PIN approval.
+- Implemented: refund commit preserves the immutable restock intent. A separate approved inventory command consumes the original sale effect.
+- Implemented: a prepared product does not return ingredients without an explicit component review.
+- Implemented: the count flow hides expected stock until submission.
+- Implemented: the variance view requires a reason before reconciliation.
+- Implemented: reconciliation creates count-correction facts. It does not overwrite an observation.
+- Implemented: inventory recovery queries the original command before a retry.
+- Implemented: direct inventory operations are online-only.
+- Review on pilot hardware: quantity-entry speed, unit labels, and count scanning distance.
+- Review on tablet: action density, long item names, text scaling, and variance reason controls.
+- Review English and Spanish terms for on-hand, quarantine, waste, and restock.
+- Owner decision: define production thresholds for adjustments, waste, variance, and low stock.
+- Owner decision: define the allowed disposition for prepared products and packaging.
+- Owner approval remains pending. Gate 3E does not include final UX certification.

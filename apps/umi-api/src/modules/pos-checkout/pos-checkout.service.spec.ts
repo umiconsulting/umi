@@ -90,7 +90,12 @@ function harness() {
       },
     }),
     saveDraft: vi.fn().mockResolvedValue({ id: id(19), version: 1 }),
-    consumeApprovals: vi.fn().mockResolvedValue({ approved: true, missingPermission: null }),
+    consumeApprovals: vi.fn().mockResolvedValue({
+      approved: true,
+      missingPermission: null,
+      approvalIdsByPermission: {},
+    }),
+    negativeStockApprovalRequired: vi.fn().mockResolvedValue(false),
     unknownTerminal: vi.fn(
       async (
         _client: unknown,
@@ -351,6 +356,65 @@ describe('PosCheckoutService', () => {
     );
     expect(result.failure?.requiredPermission).toBe('checkout.terminal.approve');
     expect(repo.commit).not.toHaveBeenCalled();
+  });
+
+  it('requires a command-bound approval before a negative stock reservation', async () => {
+    const { service, repo } = harness();
+    const preview = await service.checkout(user, id(1), base);
+    repo.negativeStockApprovalRequired.mockResolvedValue(true);
+    repo.consumeApprovals.mockResolvedValueOnce({
+      approved: false,
+      missingPermission: 'inventory.negative_stock.override',
+      approvalIdsByPermission: {},
+    });
+
+    const result = await service.checkout(user, id(1), {
+      ...base,
+      totalsFingerprint: preview.confirmation.fingerprint,
+    });
+
+    expect(repo.consumeApprovals).toHaveBeenCalledWith(
+      expect.anything(),
+      [],
+      expect.objectContaining({
+        permissions: ['inventory.negative_stock.override'],
+        fingerprint: preview.confirmation.fingerprint,
+      }),
+    );
+    expect(result.failure?.requiredPermission).toBe('inventory.negative_stock.override');
+    expect(repo.reserve).not.toHaveBeenCalled();
+  });
+
+  it('passes the consumed negative stock approval into the reservation command', async () => {
+    const { service, repo } = harness();
+    const preview = await service.checkout(user, id(1), base);
+    repo.negativeStockApprovalRequired.mockResolvedValue(true);
+    repo.consumeApprovals.mockResolvedValueOnce({
+      approved: true,
+      missingPermission: null,
+      approvalIdsByPermission: {
+        'inventory.negative_stock.override': id(44),
+      },
+    });
+
+    const result = await service.checkout(user, id(1), {
+      ...base,
+      approvalIds: [id(44)],
+      totalsFingerprint: preview.confirmation.fingerprint,
+    });
+
+    expect(result.status).toBe('completed');
+    expect(repo.reserve).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      preview.confirmation.fingerprint,
+      expect.anything(),
+      id(44),
+    );
   });
 
   it('returns the immutable committed result during restart recovery', async () => {

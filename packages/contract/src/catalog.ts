@@ -15,7 +15,9 @@ import { posOfflineModels } from './pos-offline';
 import { posSaleModels } from './pos-sale';
 import { posCashModels } from './pos-cash';
 import { posExceptionModels } from './pos-exception';
+import { posInventoryModels } from './pos-inventory';
 import { ROUTE_TABLE, type RouteContract } from './route-table';
+import type { ZodTypeAny } from 'zod';
 
 /**
  * Semantic version of the generated artifact. This is NOT the URL major — see
@@ -27,7 +29,7 @@ import { ROUTE_TABLE, type RouteContract } from './route-table';
  * breaking change to the described paths, so the artifact major moves, even though
  * no client is pinned in the field yet and the URL major is unchanged at 1.
  */
-export const CONTRACT_VERSION = '2.2.0';
+export const CONTRACT_VERSION = '2.3.0';
 
 /** The major in the URL. A v1 client never silently receives v2 behaviour. */
 export const API_MAJOR_VERSION = 1;
@@ -58,7 +60,7 @@ export const routeCatalog: Readonly<Record<string, RouteContract>> = Object.free
   ),
 );
 
-export const modelCatalog = {
+export const modelCatalog: Readonly<Record<string, ZodTypeAny>> = {
   ...httpModels,
   ...contractModels,
   ...deviceModels,
@@ -69,6 +71,7 @@ export const modelCatalog = {
   ...posSaleModels,
   ...posCashModels,
   ...posExceptionModels,
+  ...posInventoryModels,
 };
 
 export const invariantCatalog = {
@@ -90,6 +93,12 @@ export const invariantCatalog = {
   RefundLimit:
     'Cumulative line, tax, discount, tip, tender, and cash compensation cannot exceed original facts.',
   RefundAmbiguity: 'An unknown terminal refund is query-only and blocks a replacement refund.',
+  InventoryLedger:
+    'Every stock effect is an immutable ledger fact. A projection is never the sole authority.',
+  InventoryAtomicity:
+    'A stock-tracked sale and its inventory effects commit in one database transaction.',
+  InventoryRestockLimit:
+    'A restock cannot exceed the refunded quantity or the original stock consumption.',
 } as const;
 
 /** Hours a recorded command result stays replayable. Mirrored by `business_command.expires_at`. */

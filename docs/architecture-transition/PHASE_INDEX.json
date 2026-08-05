@@ -132,6 +132,12 @@
       "id": "3D.1",
       "status": "complete",
       "subject": "Pilot operational RBAC, deterministic role grants, seeds, and approval separation"
+    },
+    {
+      "commit": "HEAD (Gate 3E commit)",
+      "id": "3E",
+      "status": "complete",
+      "subject": "Inventory authority, stock ledger, reservations, sale and refund synchronization, operations, and counts"
     }
   ]
 }

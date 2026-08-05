@@ -23,6 +23,7 @@ final class OperatorActionAccess {
   bool get showSaleHistory => permissions.allows('sale.lifecycle');
   bool get showSaleActions => permissions.allows('sale.lifecycle');
   bool get showSaleExceptions => permissions.allows('sale.exception.read');
+  bool get showInventory => permissions.allows('inventory.read');
   bool canCash(String permission) => permissions.allows(permission);
   bool get showRecovery => permissions.allowsAny(const [
     'offline.replay',
