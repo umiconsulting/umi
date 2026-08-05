@@ -26,7 +26,14 @@ describe('Gate 3B checkout persistence', () => {
         fingerprint: 'a'.repeat(64),
         commandId: id(6),
       }),
-    ).resolves.toEqual({ approved: true, missingPermission: null });
+    ).resolves.toEqual({
+      approved: true,
+      missingPermission: null,
+      approvalIdsByPermission: {
+        'checkout.discount.approve': id(1),
+        'checkout.terminal.approve': id(2),
+      },
+    });
     expect(query.mock.calls[0][0]).toContain('command_fingerprint=$6');
     expect(query.mock.calls[0][0]).toContain('FOR UPDATE');
     expect(query.mock.calls[1][0]).toContain('consumed_at IS NULL');
@@ -47,6 +54,7 @@ describe('Gate 3B checkout persistence', () => {
     ).resolves.toEqual({
       approved: false,
       missingPermission: 'checkout.terminal.approve',
+      approvalIdsByPermission: {},
     });
     expect(query).not.toHaveBeenCalled();
   });
