@@ -44,29 +44,7 @@ export class PosEntryRepository {
     }>(
       `SELECT b.id::text, b.name,
               ARRAY[r.key] AS roles,
-              COALESCE(array_agg(DISTINCT p.key) FILTER (
-                WHERE p.key IS NOT NULL AND NOT EXISTS (
-                  SELECT 1 FROM merchant.staff_permission_override up
-                  WHERE up.staff_id = s.id AND up.permission_id = p.id
-                    AND up.effect = 'deny'
-                    AND (up.expires_at IS NULL OR up.expires_at > now())
-                )
-              ), '{}') ||
-              COALESCE((
-                SELECT array_agg(DISTINCT p_allow.key)
-                FROM merchant.staff_permission_override up_allow
-                JOIN umi.permission p_allow ON p_allow.id = up_allow.permission_id
-                WHERE up_allow.staff_id = s.id AND up_allow.effect = 'allow'
-                  AND (up_allow.expires_at IS NULL OR up_allow.expires_at > now())
-                  AND NOT EXISTS (
-                    SELECT 1 FROM merchant.staff_permission_override up_deny
-                    WHERE up_deny.staff_id = up_allow.staff_id
-                      AND up_deny.permission_id = up_allow.permission_id
-                      AND up_deny.effect = 'deny'
-                      AND (up_deny.expires_at IS NULL OR up_deny.expires_at > now())
-                  )
-              ), '{}')
-                AS permissions,
+              umi.resolve_staff_permissions(s.id) AS permissions,
               COALESCE((
                 SELECT jsonb_agg(jsonb_build_object(
                   'id', br.id::text, 'merchantId', b.id::text, 'name', br.name,
@@ -93,15 +71,13 @@ export class PosEntryRepository {
        JOIN merchant.staff s ON s.user_id = $1::uuid AND s.merchant_id = b.id
          AND s.status = 'active'
        JOIN umi.role r ON r.id = s.role_id
-       LEFT JOIN umi.role_permission rp ON rp.role_id = r.id
-       LEFT JOIN umi.permission p ON p.id = rp.permission_id
        WHERE d.id = $2::uuid AND d.status = 'active'
          AND EXISTS (
            SELECT 1 FROM umi.effective_entitlement pos_entitlement
            WHERE pos_entitlement.merchant_id=b.id
              AND pos_entitlement.feature_key='pos' AND pos_entitlement.enabled
          )
-       GROUP BY b.id, d.id, s.id, r.key`,
+       ORDER BY b.name`,
       [userId, deviceId],
     );
     return rows;
@@ -120,28 +96,7 @@ export class PosEntryRepository {
       input.locationId,
       `WITH authorized AS (
          SELECT s.id AS staff_id,
-                COALESCE(array_agg(DISTINCT p.key) FILTER (
-                  WHERE p.key IS NOT NULL AND NOT EXISTS (
-                    SELECT 1 FROM merchant.staff_permission_override up
-                    WHERE up.staff_id = s.id AND up.permission_id = p.id
-                      AND up.effect = 'deny'
-                      AND (up.expires_at IS NULL OR up.expires_at > now())
-                  )
-                ), '{}') ||
-                COALESCE((
-                  SELECT array_agg(DISTINCT p_allow.key)
-                  FROM merchant.staff_permission_override up_allow
-                  JOIN umi.permission p_allow ON p_allow.id = up_allow.permission_id
-                  WHERE up_allow.staff_id = s.id AND up_allow.effect = 'allow'
-                    AND (up_allow.expires_at IS NULL OR up_allow.expires_at > now())
-                    AND NOT EXISTS (
-                      SELECT 1 FROM merchant.staff_permission_override up_deny
-                      WHERE up_deny.staff_id = up_allow.staff_id
-                        AND up_deny.permission_id = up_allow.permission_id
-                        AND up_deny.effect = 'deny'
-                        AND (up_deny.expires_at IS NULL OR up_deny.expires_at > now())
-                    )
-                ), '{}') perms,
+                umi.resolve_staff_permissions(s.id) perms,
                 COALESCE((
                   SELECT jsonb_agg(jsonb_build_object(
                     'featureKey', ee.feature_key, 'enabled', ee.enabled,
@@ -154,9 +109,6 @@ export class PosEntryRepository {
          FROM merchant.staff s
          JOIN merchant.device d ON d.id = $3::uuid AND d.merchant_id = s.merchant_id
          JOIN merchant.location b ON b.id = $5::uuid AND b.merchant_id = s.merchant_id
-         JOIN umi.role r ON r.id = s.role_id
-         LEFT JOIN umi.role_permission rp ON rp.role_id = r.id
-         LEFT JOIN umi.permission p ON p.id = rp.permission_id
          WHERE s.user_id = $2::uuid AND s.merchant_id = $4::uuid
            AND s.status = 'active' AND b.status = 'active'
            AND d.status = 'active'
@@ -167,7 +119,6 @@ export class PosEntryRepository {
            )
            AND (s.location_id IS NULL OR s.location_id = b.id)
            AND (d.location_id IS NULL OR d.location_id = b.id)
-         GROUP BY s.id
        ), inserted AS (
          INSERT INTO runtime.operator_session
            (durable_session_id, user_id, staff_id, device_id, merchant_id, location_id,
@@ -274,6 +225,9 @@ export class PosEntryRepository {
     locationId: string,
     permission: string,
     operatorSessionId: string,
+    actingUserId: string,
+    durableSessionId: string,
+    deviceId: string,
   ) {
     const { rows } = await this.scopedQuery<{
       staffId: string;
@@ -288,19 +242,32 @@ export class PosEntryRepository {
               s.operator_pin_salt AS salt,s.operator_pin_hash AS hash,
               d.pin_locked_until AS "lockedUntil"
        FROM merchant.staff s
-       JOIN umi.role r ON r.id=s.role_id
-       LEFT JOIN umi.role_permission rp ON rp.role_id=r.id
-       LEFT JOIN umi.permission p ON p.id=rp.permission_id
        JOIN runtime.operator_session acting ON acting.id=$5::uuid
          AND acting.merchant_id=s.merchant_id AND acting.location_id=$3::uuid
-       JOIN merchant.device d ON d.id=acting.device_id AND d.status='active'
+         AND acting.user_id=$6::uuid AND acting.durable_session_id=$7::uuid
+         AND acting.device_id=$8::uuid
+       JOIN merchant.device d ON d.id=$8::uuid AND d.id=acting.device_id
+         AND d.status='active'
        WHERE s.merchant_id=$2::uuid AND (s.location_id IS NULL OR s.location_id=$3::uuid)
          AND s.operator_pin_lookup=$1 AND s.status='active'
+         AND acting.state='active' AND acting.expires_at>now()
          AND acting.user_id<>s.user_id
-         AND r.key IN ('owner','admin','manager','supervisor','super_admin')
-         AND (p.key=$4 OR r.key='super_admin')
+         AND $4=ANY(umi.resolve_staff_permissions(s.id))
+         AND EXISTS (
+           SELECT 1 FROM umi.effective_entitlement ee
+           WHERE ee.merchant_id=s.merchant_id AND ee.feature_key='pos' AND ee.enabled
+         )
        LIMIT 1`,
-      [lookupHash, merchantId, locationId, permission, operatorSessionId],
+      [
+        lookupHash,
+        merchantId,
+        locationId,
+        permission,
+        operatorSessionId,
+        actingUserId,
+        durableSessionId,
+        deviceId,
+      ],
     );
     return rows[0] ?? null;
   }
@@ -387,14 +354,15 @@ export class PosEntryRepository {
       `WITH manager_allowed AS (
          SELECT 1
          FROM merchant.staff ms
-         JOIN umi.role r ON r.id = ms.role_id
-         JOIN umi.role_permission rp ON rp.role_id = r.id
-         JOIN umi.permission p ON p.id = rp.permission_id
          WHERE ms.user_id = $1::uuid AND ms.merchant_id = $3::uuid
+           AND ms.id = $6::uuid
            AND (ms.location_id IS NULL OR ms.location_id = $4::uuid)
            AND ms.status='active'
-           AND r.key IN ('owner','admin','manager','supervisor','super_admin')
-           AND (p.key = $5 OR r.key = 'super_admin')
+           AND $5=ANY(umi.resolve_staff_permissions(ms.id))
+           AND EXISTS (
+             SELECT 1 FROM umi.effective_entitlement ee
+             WHERE ee.merchant_id=ms.merchant_id AND ee.feature_key='pos' AND ee.enabled
+           )
        ), target AS (
          SELECT durable_session_id, user_id, device_id
          FROM runtime.operator_session

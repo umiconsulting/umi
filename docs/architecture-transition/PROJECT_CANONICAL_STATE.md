@@ -48,6 +48,8 @@ Future clients use `packages/contract` and controlled UMI APIs.
   append-only cash facts, movements, handoff, blind count, variance, reconciliation, and close.
 - Gate 3D established the post-sale exception lifecycle. It supports narrow voids, full and
   partial refunds, immutable compensation, exception receipts, approval, and recovery.
+- Gate 3D.1 established the pilot RBAC profiles. The canonical matrix gives each café role
+  explicit merchant or location grants. Sensitive approvals require a different actor.
 
 ## Current implementation state
 
@@ -174,6 +176,10 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Gate 3D: complete. Exception state version 1 supports refund eligibility, narrow voids, full and
   partial refunds, tender compensation, approval, exception receipts, and restart recovery.
 - Gate 3D produced successful Linux debug and Web builds. Its disposable PostgreSQL matrix passed.
+- Gate 3D.1: complete. Owner, Admin, Manager, Supervisor, Cashier, Staff, and Viewer use the
+  deterministic matrix in `config/umipos-pilot-role-grants.json`.
+- Gate 3D.1 keeps `super_admin` outside the café journey. Entitlement, device, session, merchant,
+  location, permission, policy, and approval checks remain server-authoritative.
 - Next gate: Gate 3E inventory synchronization requires explicit scope approval.
 
 ## Gate 3C decision basis

@@ -103,6 +103,9 @@ export class PosEntryService {
       dto.locationId,
       dto.permission,
       dto.operatorSessionId,
+      user.id,
+      user.sessionId,
+      user.deviceId,
     );
     if (
       !record ||

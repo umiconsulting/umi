@@ -94,7 +94,7 @@ expect_error() {  # expect_error <label> <output>
 
 echo "== building a disposable build-v3 in $DB =="
 psql -q -c "create database $DB;" >/dev/null
-for f in 00_foundation 10_umi 20_merchant 30_runtime 30_device_pairing 31_pos_sale 32_pos_checkout 33_pos_cash 34_pos_exception 50_cross_schema_fk 60_triggers 90_rls 99_verify; do
+for f in 00_foundation 10_umi 20_merchant 30_runtime 30_device_pairing 31_pos_sale 32_pos_checkout 33_pos_cash 34_pos_exception 35_pos_pilot_rbac 50_cross_schema_fk 60_triggers 90_rls 99_verify; do
   if ! ddl_output=$(psql -X -q -v ON_ERROR_STOP=1 -d "$DB" -f "$DDL/$f.sql" 2>&1); then
     echo "  DDL FAILED at $f:"
     printf '%s\n' "$ddl_output" | grep -E 'ERROR|LINE' | head -5
@@ -645,6 +645,80 @@ expect_error "a duplicate command identity is rejected" \
 expect "wrong device cannot read an exception preview" "0" \
   "$(as_api "$A" "$A1" "$D2" "select count(*) from merchant.pos_exception_preview
     where id='d3000000-0000-4000-8000-000000000020';")"
+
+echo
+echo "== 9. Gate 3D.1 pilot RBAC =="
+expect "all pilot business roles exist" "7" \
+  "$(q -c "select count(*) from umi.role where key in
+    ('owner','admin','manager','supervisor','cashier','staff','viewer') and not is_platform;")"
+expect "super_admin remains platform-only" "t" \
+  "$(q -c "select is_platform from umi.role where key='super_admin';")"
+expect "Cashier receives the exact reviewed grant count" "22" \
+  "$(q -c "select count(*) from umi.role_permission rp join umi.role r on r.id=rp.role_id
+    where r.key='cashier';")"
+expect "Supervisor receives the exact reviewed grant count" "35" \
+  "$(q -c "select count(*) from umi.role_permission rp join umi.role r on r.id=rp.role_id
+    where r.key='supervisor';")"
+expect "Manager receives the exact reviewed grant count" "42" \
+  "$(q -c "select count(*) from umi.role_permission rp join umi.role r on r.id=rp.role_id
+    where r.key='manager';")"
+expect "Viewer receives no mutation permission" "0" \
+  "$(q -c "select count(*) from umi.role_permission rp
+    join umi.role r on r.id=rp.role_id join umi.permission p on p.id=rp.permission_id
+    where r.key='viewer' and p.key in
+      ('cart.write','checkout.commit','cash.shift.open','sale.refund.partial');")"
+expect "Cashier receives no approval or administration permission" "0" \
+  "$(q -c "select count(*) from umi.role_permission rp
+    join umi.role r on r.id=rp.role_id join umi.permission p on p.id=rp.permission_id
+    where r.key='cashier' and p.key in
+      ('merchant.manage','device.enroll','checkout.discount.approve',
+       'cash.movement.paid_in.approve','cash.movement.paid_out.approve',
+       'cash.movement.safe_drop.approve','cash.shift.close.approve',
+       'cash.variance.approve','sale.refund.approve');")"
+expect "Supervisor cannot approve sensitive cash, variance, or refund actions" "0" \
+  "$(q -c "select count(*) from umi.role_permission rp
+    join umi.role r on r.id=rp.role_id join umi.permission p on p.id=rp.permission_id
+    where r.key='supervisor' and p.key in
+      ('cash.movement.paid_in.approve','cash.movement.paid_out.approve',
+       'cash.movement.safe_drop.approve','cash.shift.close.approve',
+       'cash.variance.approve','sale.refund.approve');")"
+expect "Manager receives command-specific cash approval permissions" "4" \
+  "$(q -c "select count(*) from umi.role_permission rp
+    join umi.role r on r.id=rp.role_id join umi.permission p on p.id=rp.permission_id
+    where r.key='manager' and p.key in
+      ('cash.movement.paid_in.approve','cash.movement.paid_out.approve',
+       'cash.movement.safe_drop.approve','cash.shift.close.approve');")"
+expect "the role grant table contains no duplicate edge" "0" \
+  "$(q -c "select count(*) from (
+    select role_id,permission_id from umi.role_permission
+    group by role_id,permission_id having count(*)>1
+  ) duplicate_grant;")"
+expect "Staff resolves the complete normal Cashier journey" "0" \
+  "$(q -c "with required(key) as (values
+      ('catalog.read'),('cart.write'),('sale.lifecycle'),('checkout.commit'),
+      ('cash.register.use'),('cash.shift.open'),('cash.movement.paid_in'),
+      ('cash.count.submit'),('cash.reconcile'),('cash.shift.close'))
+    select count(*) from required
+    where key<>all(umi.resolve_staff_permissions('$S1'::uuid));")"
+expect "Staff resolves no administration or approval authority" "0" \
+  "$(q -c "select count(*) from unnest(umi.resolve_staff_permissions('$S1'::uuid)) key
+    where key in ('merchant.manage','device.enroll','cash.variance.approve',
+      'cash.movement.paid_out.approve','sale.refund.approve');")"
+
+q -c "update merchant.staff set role_id=(select id from umi.role where key='cashier')
+  where id='$S1';" >/dev/null
+expect "a role change ends the active operator session" "ended" \
+  "$(q -c "select state from runtime.operator_session where id='$OS';")"
+q -c "update runtime.operator_session set state='active',ended_at=null where id='$OS';
+  update merchant.staff set location_id='$A2' where id='$S1';" >/dev/null
+expect "a location removal ends the active operator session" "ended" \
+  "$(q -c "select state from runtime.operator_session where id='$OS';")"
+q -c "update runtime.operator_session set state='active',ended_at=null where id='$OS';
+  update merchant.staff set status='disabled' where id='$S1';" >/dev/null
+expect "staff suspension ends the active operator session" "ended" \
+  "$(q -c "select state from runtime.operator_session where id='$OS';")"
+expect "suspended staff resolves no effective permission" "0" \
+  "$(q -c "select cardinality(umi.resolve_staff_permissions('$S1'::uuid));")"
 
 echo
 if [ "$fail" -eq 0 ]; then

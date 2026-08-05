@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/localization/app_localizations.dart';
 import '../../core/observability/telemetry.dart';
+import '../../core/security/operator_permissions.dart';
 import '../../core/theme/umi_theme.dart';
 import '../cart/cart_controller.dart';
 import '../cash/cash_controller.dart';
@@ -110,6 +112,9 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               showCashCenter(
                 context,
                 controller: widget.cash,
+                permissions: OperatorPermissions(
+                  entry.operator?.permissions ?? const [],
+                ),
                 onHandoffCompleted: widget.entry.lock,
               );
             }
@@ -190,8 +195,15 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final state = widget.catalog.state;
+    final entryState = widget.entry.state;
+    final permissions = OperatorPermissions(
+      entryState.operator?.permissions ?? const [],
+    );
+    final access = OperatorActionAccess(permissions);
+    final canWriteCart = access.canWriteCart;
     return Scaffold(
-      floatingActionButton: MediaQuery.sizeOf(context).width < 900
+      floatingActionButton:
+          MediaQuery.sizeOf(context).width < 900 && canWriteCart
           ? FloatingActionButton.extended(
               onPressed: () => showModalBottomSheet<void>(
                 context: context,
@@ -204,8 +216,13 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                       checkout: widget.checkout,
                       cash: widget.cash,
                       entry: widget.entry,
+                      permissions: permissions,
                       sales: widget.sales,
-                      onEdit: (item) => _showDetail(item.productId, item),
+                      onEdit: (item) => _showDetail(
+                        item.productId,
+                        item: item,
+                        canWrite: canWriteCart,
+                      ),
                     ),
                   ),
                 ),
@@ -235,79 +252,100 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               ),
             ),
           ),
-          IconButton(
-            tooltip: l.cashCenterAction,
-            onPressed: () => showCashCenter(
-              context,
-              controller: widget.cash,
-              onHandoffCompleted: widget.entry.lock,
+          if (access.showCashCenter)
+            IconButton(
+              tooltip: l.cashCenterAction,
+              onPressed: () => showCashCenter(
+                context,
+                controller: widget.cash,
+                permissions: permissions,
+                onHandoffCompleted: widget.entry.lock,
+              ),
+              icon: Badge(
+                isLabelVisible: widget.cash.activeShiftId == null,
+                child: const Icon(Icons.point_of_sale_outlined),
+              ),
             ),
-            icon: Badge(
-              isLabelVisible: widget.cash.activeShiftId == null,
-              child: const Icon(Icons.point_of_sale_outlined),
+          if (access.showSaleHistory)
+            IconButton(
+              tooltip: l.saleHistoryTitle,
+              onPressed: () => showSaleCenter(
+                context,
+                widget.sales,
+                permissions,
+                widget.exceptions,
+              ),
+              icon: const Icon(Icons.receipt_long_outlined),
             ),
-          ),
-          IconButton(
-            tooltip: l.saleHistoryTitle,
-            onPressed: () =>
-                showSaleCenter(context, widget.sales, widget.exceptions),
-            icon: const Icon(Icons.receipt_long_outlined),
-          ),
-          IconButton(
-            tooltip: l.currentCustomerLabel,
-            onPressed: () => showCustomerPicker(context, widget.sales),
-            icon: Badge(
-              isLabelVisible: widget.sales.state.sale?.customer != null,
-              child: const Icon(Icons.person_outline),
+          if (access.showSaleActions)
+            IconButton(
+              tooltip: l.currentCustomerLabel,
+              onPressed: () => showCustomerPicker(context, widget.sales),
+              icon: Badge(
+                isLabelVisible: widget.sales.state.sale?.customer != null,
+                child: const Icon(Icons.person_outline),
+              ),
             ),
-          ),
-          PopupMenuButton<String>(
-            tooltip: l.saleActionsTitle,
-            icon: const Icon(Icons.more_vert),
-            onSelected: (action) async {
-              switch (action) {
-                case 'new':
-                  await widget.sales.newSale();
-                case 'suspend':
-                  if (context.mounted) {
-                    await showSuspendSaleDialog(context, widget.sales);
-                  }
-                case 'cancel':
-                  if (context.mounted) {
-                    await showCancelSaleDialog(context, widget.sales);
-                  }
-              }
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(value: 'new', child: Text(l.newSaleAction)),
-              PopupMenuItem(value: 'suspend', child: Text(l.suspendSaleAction)),
-              PopupMenuItem(value: 'cancel', child: Text(l.cancelSaleAction)),
-            ],
-          ),
-          IconButton(
-            tooltip: AppLocalizations.of(context).recoveryCenterTitle,
-            onPressed: () {
-              final scope = _scope();
-              if (scope != null &&
-                  widget.offlineJournal != null &&
-                  widget.offlineRecovery != null) {
-                showRecoveryCenter(
-                  context,
-                  journal: widget.offlineJournal!,
-                  recovery: widget.offlineRecovery!,
-                  scope: scope,
-                  entry: widget.entry,
-                  telemetry: widget.telemetry,
-                  refreshSnapshots: () => _loadInitial(
-                    Localizations.localeOf(context).languageCode,
-                  ),
-                  queryAmbiguousPayment: widget.checkout.queryUnknownPayment,
-                  beforeContextExit: widget.sales.prepareForOperatorExit,
-                );
-              }
-            },
-            icon: const Icon(Icons.sync_problem_outlined),
-          ),
+          if (access.showSaleActions)
+            PopupMenuButton<String>(
+              tooltip: l.saleActionsTitle,
+              icon: const Icon(Icons.more_vert),
+              onSelected: (action) async {
+                switch (action) {
+                  case 'new':
+                    await widget.sales.newSale();
+                  case 'suspend':
+                    if (context.mounted) {
+                      await showSuspendSaleDialog(context, widget.sales);
+                    }
+                  case 'cancel':
+                    if (context.mounted) {
+                      await showCancelSaleDialog(context, widget.sales);
+                    }
+                }
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(value: 'new', child: Text(l.newSaleAction)),
+                PopupMenuItem(
+                  value: 'suspend',
+                  child: Text(l.suspendSaleAction),
+                ),
+                PopupMenuItem(value: 'cancel', child: Text(l.cancelSaleAction)),
+              ],
+            ),
+          if (access.showRecovery)
+            IconButton(
+              tooltip: AppLocalizations.of(context).recoveryCenterTitle,
+              onPressed: () {
+                final scope = _scope();
+                if (scope != null &&
+                    widget.offlineJournal != null &&
+                    widget.offlineRecovery != null) {
+                  showRecoveryCenter(
+                    context,
+                    journal: widget.offlineJournal!,
+                    recovery: widget.offlineRecovery!,
+                    scope: scope,
+                    entry: widget.entry,
+                    telemetry: widget.telemetry,
+                    refreshSnapshots: () => _loadInitial(
+                      Localizations.localeOf(context).languageCode,
+                    ),
+                    queryAmbiguousPayment: widget.checkout.queryUnknownPayment,
+                    beforeContextExit: widget.sales.prepareForOperatorExit,
+                  );
+                }
+              },
+              icon: const Icon(Icons.sync_problem_outlined),
+            ),
+          if (kDebugMode)
+            IconButton(
+              tooltip: Localizations.localeOf(context).languageCode == 'es'
+                  ? 'Diagnóstico de autorización'
+                  : 'Authorization diagnostics',
+              onPressed: () => _showAuthorizationDiagnostics(permissions),
+              icon: const Icon(Icons.policy_outlined),
+            ),
           Center(child: Text(widget.entry.state.selectedBranch?.name ?? '—')),
           IconButton(
             tooltip: l.lockAction,
@@ -390,14 +428,54 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                     checkout: widget.checkout,
                     cash: widget.cash,
                     entry: widget.entry,
+                    permissions: permissions,
                     sales: widget.sales,
-                    onEdit: (item) => _showDetail(item.productId, item),
+                    onEdit: (item) => _showDetail(
+                      item.productId,
+                      item: item,
+                      canWrite: canWriteCart,
+                    ),
                   ),
                 ),
               ],
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _showAuthorizationDiagnostics(
+    OperatorPermissions permissions,
+  ) async {
+    final state = widget.entry.state;
+    final spanish = Localizations.localeOf(context).languageCode == 'es';
+    final entitlementEnabled = state.operator?.entitlements.any(
+      (value) => value['featureKey'] == 'pos' && value['enabled'] == true,
+    );
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          spanish ? 'Diagnóstico de autorización' : 'Authorization diagnostics',
+        ),
+        content: SelectableText(
+          [
+            '${spanish ? 'Operador' : 'Operator'}: ${state.operator?.staffId ?? '—'}',
+            '${spanish ? 'Perfil' : 'Profile'}: ${state.selectedTenant?.roles.join(', ') ?? '—'}',
+            'Merchant: ${state.selectedTenant?.name ?? '—'}',
+            'Location: ${state.selectedBranch?.name ?? '—'}',
+            '${spanish ? 'Permisos POS' : 'POS permissions'}: ${permissions.count}',
+            'POS entitlement: ${entitlementEnabled == true ? (spanish ? 'activo' : 'active') : (spanish ? 'inactivo' : 'inactive')}',
+            '${spanish ? 'Dispositivo' : 'Device'}: ${state.device?.state ?? '—'}',
+          ].join('\n'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(spanish ? 'Cerrar' : 'Close'),
+          ),
+        ],
       ),
     );
   }
@@ -499,7 +577,12 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 ? const Center(child: CircularProgressIndicator())
                 : _ProductCard(
                     product: state.products[index],
-                    onTap: () => _showDetail(state.products[index].id),
+                    onTap: () => _showDetail(
+                      state.products[index].id,
+                      canWrite: OperatorPermissions(
+                        widget.entry.state.operator?.permissions ?? const [],
+                      ).allows('cart.write'),
+                    ),
                   ),
           );
         },
@@ -507,7 +590,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     };
   }
 
-  Future<void> _showDetail(String id, [CartItem? item]) async {
+  Future<void> _showDetail(String id, {CartItem? item, bool? canWrite}) async {
     try {
       final detail = await widget.catalog.detail(id);
       if (!mounted) return;
@@ -515,7 +598,16 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         context: context,
         isScrollControlled: true,
         constraints: const BoxConstraints(maxWidth: 760),
-        builder: (_) => _Detail(detail, cart: widget.cart, item: item),
+        builder: (_) => _Detail(
+          detail,
+          cart: widget.cart,
+          item: item,
+          canWrite:
+              canWrite ??
+              OperatorPermissions(
+                widget.entry.state.operator?.permissions ?? const [],
+              ).allows('cart.write'),
+        ),
       );
     } catch (_) {
       if (mounted) {
@@ -644,9 +736,15 @@ final class _ProductCard extends StatelessWidget {
 }
 
 final class _Detail extends StatefulWidget {
-  const _Detail(this.detail, {required this.cart, this.item});
+  const _Detail(
+    this.detail, {
+    required this.cart,
+    required this.canWrite,
+    this.item,
+  });
   final CatalogProductDetail detail;
   final CartController cart;
+  final bool canWrite;
   final CartItem? item;
   @override
   State<_Detail> createState() => _DetailState();
@@ -799,7 +897,9 @@ final class _DetailState extends State<_Detail> {
               ),
               const SizedBox(height: 24),
               FilledButton(
-                onPressed: detail.variants.isNotEmpty && variantId == null
+                onPressed:
+                    !widget.canWrite ||
+                        (detail.variants.isNotEmpty && variantId == null)
                     ? null
                     : () async {
                         final modifiers = selectedModifiers.entries
@@ -896,6 +996,7 @@ final class _CartPanel extends StatelessWidget {
     required this.checkout,
     required this.cash,
     required this.entry,
+    required this.permissions,
     required this.sales,
     required this.onEdit,
   });
@@ -903,6 +1004,7 @@ final class _CartPanel extends StatelessWidget {
   final CheckoutController checkout;
   final CashController cash;
   final EntryController entry;
+  final OperatorPermissions permissions;
   final SaleLifecycleController sales;
   final ValueChanged<CartItem> onEdit;
 
@@ -967,16 +1069,20 @@ final class _CartPanel extends StatelessWidget {
                                 children: [
                                   IconButton(
                                     tooltip: l.decreaseQuantity,
-                                    onPressed: () => controller.quantity(
-                                      item,
-                                      item.quantity - 1,
-                                    ),
+                                    onPressed: permissions.allows('cart.write')
+                                        ? () => controller.quantity(
+                                            item,
+                                            item.quantity - 1,
+                                          )
+                                        : null,
                                     icon: const Icon(Icons.remove),
                                   ),
                                   Text('${item.quantity}'),
                                   IconButton(
                                     tooltip: l.increaseQuantity,
-                                    onPressed: item.quantity < 999
+                                    onPressed:
+                                        permissions.allows('cart.write') &&
+                                            item.quantity < 999
                                         ? () => controller.quantity(
                                             item,
                                             item.quantity + 1,
@@ -987,12 +1093,16 @@ final class _CartPanel extends StatelessWidget {
                                   const Spacer(),
                                   IconButton(
                                     tooltip: l.editCartLineAction,
-                                    onPressed: () => onEdit(item),
+                                    onPressed: permissions.allows('cart.write')
+                                        ? () => onEdit(item)
+                                        : null,
                                     icon: const Icon(Icons.edit_outlined),
                                   ),
                                   IconButton(
                                     tooltip: l.removeFromCartAction,
-                                    onPressed: () => controller.remove(item),
+                                    onPressed: permissions.allows('cart.write')
+                                        ? () => controller.remove(item)
+                                        : null,
                                     icon: const Icon(Icons.delete_outline),
                                   ),
                                 ],
@@ -1015,7 +1125,7 @@ final class _CartPanel extends StatelessWidget {
             Text('${l.businessDateLabel}: ${totals.businessDate}'),
             const SizedBox(height: UmiSpacing.md),
             OutlinedButton.icon(
-              onPressed: items.isEmpty
+              onPressed: items.isEmpty || !permissions.allows('cart.write')
                   ? null
                   : () async {
                       final confirmed = await showDialog<bool>(
@@ -1044,7 +1154,7 @@ final class _CartPanel extends StatelessWidget {
             ),
             const SizedBox(height: UmiSpacing.sm),
             FilledButton(
-              onPressed: items.isEmpty
+              onPressed: items.isEmpty || !permissions.allows('checkout.commit')
                   ? null
                   : () => showCheckoutSheet(
                       context,

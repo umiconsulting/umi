@@ -25,11 +25,11 @@
 
 ## 1. Propósito del documento
 
-Este documento explica el comportamiento operativo que existe en UmiPOS hasta Gate 3D. Sirve para operación, soporte, desarrollo, QA y capacitación.
+Este documento explica el comportamiento operativo que existe en UmiPOS hasta Gate 3D.1. Sirve para operación, soporte, desarrollo, QA y capacitación.
 
-La referencia es el commit `6db49009857cc770d7b26ce1d2901b56ff6a5004`, del 3 de agosto de 2026. El contrato canónico es la versión `2.2.0`. Su hash de contenido es `c8be1d2927a482ea163bcdf81edef3f0947ede2528d80cf305b1f131130106b8`.
+La referencia es el commit funcional de Gate 3D.1, del 4 de agosto de 2026. El contrato canónico es la versión `2.2.0`. Su hash de contenido es `c8be1d2927a482ea163bcdf81edef3f0947ede2528d80cf305b1f131130106b8`.
 
-El producto tiene completos los Gates 3A, 3B, 3C y 3D. Esto incluye venta, checkout, caja y excepciones postventa. La certificación final de UX, el inventario final y las integraciones físicas siguen pendientes.
+El producto tiene completos los Gates 3A, 3B, 3C y 3D. Gate 3D.1 añade perfiles operativos para el piloto. La certificación final de UX, el inventario final y las integraciones físicas siguen pendientes.
 
 Cada caso usa uno de estos estados:
 
@@ -112,34 +112,29 @@ La relación operativa es estricta. Un `merchant` contiene una `location`. El di
 
 La autoridad depende del permiso efectivo. El nombre del rol no basta. La API también valida merchant, location, dispositivo, credencial y sesión.
 
-La cadena canónica crea `owner`, `admin`, `staff` y `viewer`. El seed demo agrega `manager` y `cashier` después de las migraciones Gate 3. Por esto, esos roles no reciben grants Gate 3C o 3D en un entorno demo limpio.
+Gate 3D.1 crea perfiles deterministas para `owner`, `admin`, `manager`, `supervisor`, `cashier`, `staff` y `viewer`. El archivo `config/umipos-pilot-role-grants.json` es la matriz canónica del piloto.
 
-Las migraciones Gate 3 mencionan `supervisor`, pero la cadena y el seed demo no crean ese rol. Es una configuración condicional. `super_admin` y `developer` son roles de plataforma. No existe un rol operativo `auditor`.
+`staff` conserva compatibilidad con `cashier`. Los dos perfiles reciben los mismos permisos operativos. Esta equivalencia evita una elevación durante la migración de usuarios existentes.
 
-Existen dos perfiles reproducibles:
+No existe un rol de negocio `auditor`. El perfil técnico `developer` conserva lectura limitada. `super_admin` es un rol de plataforma. El seed lo suspende y lo excluye del flujo normal del café.
 
-- **Backfill canónico:** Owner, Admin y Staff reciben grants hasta Gate 3C. Ningún rol de café recibe grants Gate 3D.
-- **Seed demo limpio:** Owner, Admin, Manager y Cashier reciben grants hasta Gate 3B. Ningún rol de café recibe Gate 3C o 3D.
-
-Las funciones Gate 3D existen y tienen pruebas. Los roles de café requieren una asignación explícita después de su creación. El repositorio todavía no incluye ese paso canónico. El rol de plataforma `super_admin` recibe todos los permisos existentes mediante un grant explícito. Sus acciones conservan scope, device trust y auditoría.
-
-La matriz siguiente usa el perfil de backfill canónico. Manager, Supervisor y Cashier aparecen como N/A porque ese perfil no crea esos roles.
+La API decide la autoridad efectiva. La decisión combina el permiso, el merchant, la location, el entitlement POS, el dispositivo y la sesión.
 
 | Funcionalidad                           | Owner | Admin | Manager | Supervisor | Cashier | Staff | Viewer |
 | --------------------------------------- | ----- | ----- | ------- | ---------- | ------- | ----- | ------ |
-| Catálogo                                | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     |
-| Carrito y venta                         | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     |
-| Efectivo y terminal manual              | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     |
-| Aprobar descuento o terminal            | ✅    | ✅    | N/A     | N/A        | N/A     | ❌    | ❌     |
-| Recuperar venta o checkout ajeno        | ✅    | ✅    | N/A     | N/A        | N/A     | ❌    | ❌     |
-| Abrir y operar turno propio             | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     |
-| Handoff, recuento y varianza            | ✅    | ✅    | N/A     | N/A        | N/A     | ❌    | ❌     |
-| Refund parcial permitido                | ❌    | ❌    | N/A     | N/A        | N/A     | ❌    | ❌     |
-| Refund total, void y refund en efectivo | ❌    | ❌    | N/A     | N/A        | N/A     | ❌    | ❌     |
-| Enrolar o revocar dispositivo           | ✅    | ✅    | N/A     | N/A        | N/A     | ❌    | ❌     |
-| Auditoría segura                        | ✅    | ✅    | N/A     | N/A        | N/A     | ❌    | ❌     |
+| Catálogo                                | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     |
+| Carrito y venta                         | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     |
+| Efectivo y terminal manual              | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     |
+| Aprobar descuento o terminal            | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     |
+| Recuperar venta o checkout ajeno        | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     |
+| Abrir y operar turno propio             | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     |
+| Handoff, recuento y varianza            | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     |
+| Refund parcial permitido                | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     |
+| Refund total, void y refund en efectivo | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     |
+| Enrolar o revocar dispositivo           | ✅    | ✅    | ❌      | ❌         | ❌      | ❌    | ❌     |
+| Auditoría segura                        | ✅    | ✅    | ❌      | ❌         | ❌      | ❌    | ❌     |
 
-El seed demo cambia la disponibilidad. Owner, Admin, Manager y Cashier pueden usar Gate 3B. Ninguno puede usar caja Gate 3C o excepciones Gate 3D sin grants adicionales.
+El seed del piloto aplica la matriz en una base limpia o existente. La ejecución repetida conserva una sola membresía y una sola asignación.
 
 Leyenda: ✅ permiso predeterminado; ⚠️ requiere permiso, política o aprobación; 👁️ solo lectura; ❌ sin permiso predeterminado; N/A no aplica.
 
@@ -147,19 +142,19 @@ Leyenda: ✅ permiso predeterminado; ⚠️ requiere permiso, política o aproba
 
 - **Objetivo:** Administrar el negocio y controlar su operación.
 - **Operaciones habituales:** Revisar dispositivos, permisos, ventas, caja y auditoría.
-- **Permitido:** El backfill canónico concede todos los módulos hasta Gate 3C.
+- **Permitido:** Administra el merchant y puede ejecutar las operaciones Gate 3A–3D con los controles normales.
 - **Con aprobación:** Toda acción que una política marque como sensible conserva un grant explícito.
 - **Prohibido:** No puede cruzar a otro merchant ni omitir device trust, RLS o idempotencia.
 - **Alcance:** Un merchant y las locations autorizadas por su membresía.
 - **Dependencias:** Dispositivo enrolado y sesión de operador para usar el POS.
 - **Riesgos frecuentes:** Usar un permiso amplio como sustituto de una aprobación o de la location correcta.
-- **Ejemplo:** Revoca una terminal perdida y aprueba una varianza. Refund requiere grants Gate 3D adicionales.
+- **Ejemplo:** Revoca una terminal perdida y aprueba una varianza dentro de su política.
 
 ### Administrator / Admin
 
 - **Objetivo:** Administrar dispositivos, personal y operación local.
 - **Operaciones habituales:** Enrolar terminales, revisar permisos y apoyar cierres o recovery.
-- **Permitido:** Tiene permisos predeterminados equivalentes al Owner hasta Gate 3C en el backfill.
+- **Permitido:** Administra el negocio y opera Gate 3A–3D. No recibe acceso a otra location sin asignación.
 - **Con aprobación:** Debe crear evidencia explícita para una operación sensible.
 - **Prohibido:** No obtiene acceso a otro merchant por el nombre del rol.
 - **Alcance:** Merchant membership y locations autorizadas.
@@ -170,66 +165,66 @@ Leyenda: ✅ permiso predeterminado; ⚠️ requiere permiso, política o aproba
 ### Manager
 
 - **Objetivo:** Supervisar la operación y resolver excepciones autorizadas.
-- **Operaciones habituales:** Aprobar descuentos, recuperar ventas y revisar auditoría en el entorno demo.
-- **Permitido:** El seed demo concede catálogo, venta, checkout, replay y recovery de Gate 3B.
-- **Con aprobación:** Puede aprobar descuento y terminal. No recibe approvals de caja o refund.
-- **Prohibido:** No enrola dispositivos. Tampoco recibe grants Gate 3C o 3D en un seed limpio.
+- **Operaciones habituales:** Aprobar descuentos, recuperar ventas, reconciliar caja y revisar excepciones.
+- **Permitido:** Opera Gate 3A–3D dentro de sus locations asignadas.
+- **Con aprobación:** Puede aprobar descuentos, caja y refunds dentro de la política.
+- **Prohibido:** No administra dispositivos, roles ni la plataforma.
 - **Alcance:** Merchant y location de su sesión. `sale.refund.other_location` no tiene grant predeterminado.
 - **Dependencias:** Dispositivo confiable, sesión de operador y PIN para approvals.
-- **Riesgos frecuentes:** Suponer que el nombre Manager concede permisos que el seed no asignó.
-- **Ejemplo:** Aprueba un descuento. Un Owner o Admin atiende una varianza o refund privilegiado.
+- **Riesgos frecuentes:** Intentar usar una aprobación fuera de su location o después de su expiración.
+- **Ejemplo:** Aprueba un refund y reconcilia un turno excepcional de su location.
 
 ### Supervisor
 
-- **Objetivo:** Representar una futura configuración de supervisión.
-- **Operaciones habituales:** N/A en una instalación canónica limpia.
-- **Permitido:** Las migraciones conceden permisos si el rol existe antes de ejecutarlas.
-- **Con aprobación:** Depende de una creación y asignación administrativa fuera de este seed.
-- **Prohibido:** No debe aparecer como autoridad activa solo porque una migración menciona su key.
-- **Alcance:** No existe una membresía predeterminada.
-- **Dependencias:** El negocio debe crear el rol y asignar permisos de forma explícita.
-- **Riesgos frecuentes:** Documentar una función condicional como grant real.
-- **Ejemplo:** N/A hasta que el proyecto defina un seed canónico del rol.
+- **Objetivo:** Supervisar una location y aprobar operaciones limitadas por política.
+- **Operaciones habituales:** Recuperar ventas ajenas, aprobar descuentos y revisar variancias.
+- **Permitido:** Opera Gate 3A–3D dentro de su location asignada.
+- **Con aprobación:** Aprueba descuentos y terminales. Solicita a Manager las demás aprobaciones.
+- **Prohibido:** No administra roles, dispositivos ni otra location.
+- **Alcance:** Una location explícita del merchant.
+- **Dependencias:** PIN, entitlement, dispositivo y sesión activos.
+- **Riesgos frecuentes:** Superar el umbral de Supervisor. La API exige un Manager.
+- **Ejemplo:** Aprueba un descuento permitido y solicita un recuento.
 
 ### Cashier
 
 - **Objetivo:** Vender, cobrar y mantener su responsabilidad de caja.
-- **Operaciones habituales:** Catálogo, carrito y checkout en el seed demo.
-- **Permitido:** El seed demo concede catálogo, venta, checkout, cash offline y replay.
-- **Con aprobación:** Descuento alto o terminal sensible requieren un aprobador distinto. Caja y refund requieren grants adicionales.
-- **Prohibido:** El seed demo no concede caja Gate 3C ni excepciones Gate 3D.
+- **Operaciones habituales:** Catálogo, carrito, checkout, turno propio y refund parcial de bajo riesgo.
+- **Permitido:** Opera su venta, checkout, caja y recovery propios.
+- **Con aprobación:** Descuento alto, movimiento sensible o refund restringido requieren otro actor.
+- **Prohibido:** No aprueba, no recupera otro operador y no administra el negocio.
 - **Alcance:** Su location, dispositivo, sesión, venta y turno autorizado.
 - **Dependencias:** Dispositivo confiable, PIN y turno para cash cuando la política lo exige.
 - **Riesgos frecuentes:** Confundir un permiso de checkout cash con autoridad para abrir un turno.
-- **Ejemplo:** Cobra por terminal manual. Un rol con cash permissions prepara la caja.
+- **Ejemplo:** Abre su turno, cobra en efectivo y termina un conteo ciego.
 
 ### Staff / Employee
 
 - **Objetivo:** Ejecutar tareas de atención según la asignación local.
 - **Operaciones habituales:** Las mismas funciones base del Cashier.
-- **Permitido:** El backfill le concede venta, checkout y caja. No le concede Gate 3D.
+- **Permitido:** Usa el mismo perfil operativo que Cashier durante el piloto.
 - **Con aprobación:** Usa los mismos umbrales de política que Cashier.
 - **Prohibido:** No recibe grants de supervisión por defecto.
 - **Alcance:** Merchant y location de su staff membership.
 - **Dependencias:** Dispositivo, sesión, permisos y overrides vigentes.
 - **Riesgos frecuentes:** Suponer que `staff` tiene el mismo override en todas las locations.
-- **Ejemplo:** Registra Paid In si conserva el permiso y la política lo permite.
+- **Ejemplo:** Registra Paid In si la política y su turno lo permiten.
 
 ### Viewer
 
 - **Objetivo:** Consultar información expresamente permitida.
-- **Operaciones habituales:** Leer el catálogo cuando usa el seed demo.
-- **Permitido:** El backfill canónico solo concede `insights.read`, que no pertenece a los casos UmiPOS de este documento.
+- **Operaciones habituales:** Leer el catálogo y los insights permitidos.
+- **Permitido:** Solo `catalog.read` e `insights.read`.
 - **Con aprobación:** N/A. Una approval no convierte Viewer en operador financiero.
 - **Prohibido:** Carrito, venta, pago, turno, refund y toda mutación financiera.
 - **Alcance:** Merchant y location de su membresía.
 - **Dependencias:** Contexto de lectura autorizado.
 - **Riesgos frecuentes:** Mostrar un control de mutación por una decisión visual del cliente.
-- **Ejemplo:** El seed demo concede `catalog.read` para revisar precios sin crear un carrito.
+- **Ejemplo:** Revisa precios sin crear un carrito.
 
 ### Auditoría y soporte técnico
 
-No existe un rol `Auditor`. Owner y Admin reciben `audit.read`. El rol de plataforma `developer` tiene lectura limitada de catálogo, insights y auditoría.
+No existe un rol de negocio `Auditor`. Owner y Admin reciben `audit.read`. El rol técnico `developer` conserva lectura limitada.
 
 - **Objetivo:** Revisar evidencia segura sin cambiar hechos.
 - **Operaciones habituales:** Consultar auditoría redactada y diagnósticos acotados.
@@ -1520,7 +1515,7 @@ El efectivo contado nunca reemplaza el esperado. Un conteo manual depende de hon
 
 **Actores secundarios:** UMI API y manager cuando aplica.
 
-**Permisos requeridos:** `cash.movement.paid_in`, `cash.movement.paid_out` o `cash.movement.safe_drop`.
+**Permisos requeridos:** El actor usa el permiso del movimiento. Manager usa el permiso `.approve` cuando supera el umbral.
 
 **Precondiciones:**
 
@@ -1730,7 +1725,7 @@ El efectivo contado nunca reemplaza el esperado. Un conteo manual depende de hon
 
 **Actores secundarios:** UMI API y auditoría.
 
-**Permisos requeridos:** `cash.reconcile`, `cash.shift.close` y `cash.variance.approve` cuando aplica.
+**Permisos requeridos:** `cash.reconcile` y `cash.shift.close`. Manager usa `cash.variance.approve` o `cash.shift.close.approve` cuando aplica.
 
 **Precondiciones:**
 
@@ -2249,7 +2244,7 @@ flowchart LR
 
 **Objetivo:** Ver la venta original y todas sus compensaciones por separado.
 
-La ruta existe, pero los seeds actuales no conceden sus permisos Gate 3D a los roles de café.
+Los perfiles operativos reciben lectura según la matriz. Viewer no recibe este permiso en el piloto.
 
 **Actor principal:** Operador autorizado o personal de supervisión.
 
@@ -2315,13 +2310,13 @@ La ruta existe, pero los seeds actuales no conceden sus permisos Gate 3D a los r
 
 Un problema de PR o de disponibilidad del backend de desarrollo no es un caso de uso del cajero. Soporte debe tratarlo como un incidente técnico.
 
-Se requiere un aprobador con el permiso exacto. Owner y Admin atienden caja en el backfill canónico. Ningún seed concede approvals Gate 3D a roles de café.
+Se requiere un aprobador con el permiso exacto. Supervisor y Manager tienen límites de política. Cashier y Staff no aprueban su propia acción sensible.
 
 ## 16. Jornadas operativas completas por rol
 
 ### Jornada de Cashier
 
-El seed demo no concede permisos Gate 3C o 3D a Cashier. Use Staff para la jornada completa. También puede asignar grants revisados antes de operar.
+El perfil Cashier del piloto permite una jornada normal sin `super_admin`.
 
 1. El cajero usa una terminal enrolada e inicia sesión con su PIN.
 2. UmiPOS recupera el turno exacto o solicita abrir un registro permitido.
@@ -2339,25 +2334,26 @@ El seed demo no concede permisos Gate 3C o 3D a Cashier. Use Staff para la jorna
 
 ### Jornada de Supervisor
 
-Esta jornada es condicional. El repositorio no crea el rol Supervisor en una instalación limpia.
+El seed canónico crea Supervisor y lo limita a una location.
 
 1. El supervisor inicia sesión en el dispositivo autorizado.
 2. Recupera una venta o checkout ajeno con `sale.resume.any` o `checkout.recover.any`.
 3. Aprueba descuentos y terminales sensibles con un grant exacto.
 4. Ejecuta un handoff con PIN del operador entrante.
 5. Solicita un recuento y revisa una varianza.
-6. Aprueba o escala una reconciliación bloqueada.
-7. Revisa elegibilidad y aprueba un refund con permiso.
+6. Escala una reconciliación bloqueada a Manager.
+7. Revisa elegibilidad y solicita a Manager la aprobación del refund.
 8. Confirma que original y compensación permanecen separados.
 
 ### Jornada de Manager
 
-1. El Manager revisa dispositivos, pero el enrolamiento predeterminado corresponde a Owner y Admin.
+1. El Manager inicia sesión en una location asignada.
 2. Aprueba descuentos y terminales con su PIN y permiso exacto.
-3. Recupera una venta o checkout ajeno de Gate 3B.
-4. Ejecuta replay y revisa recovery offline.
-5. Consulta historial de ventas y auditoría segura.
-6. Deriva caja y refunds a Owner o Admin en un seed limpio.
+3. Recupera una venta o checkout de otro operador.
+4. Reconcilia una caja excepcional.
+5. Aprueba refunds dentro de su política.
+6. Revisa el historial operativo de su location.
+7. La API bloquea la administración de plataforma.
 
 ### Jornada de Owner/Admin
 
@@ -2365,16 +2361,16 @@ Esta jornada es condicional. El repositorio no crea el rol Supervisor en una ins
 2. Crea, aprueba, rota o revoca dispositivos.
 3. Revisa roles, permisos y overrides de personal.
 4. Puede operar ventas, checkout y caja con los controles normales.
-5. Solo opera refunds después de recibir grants Gate 3D explícitos.
+5. Opera refunds con los grants Gate 3D del perfil.
 6. Consulta auditoría segura y diagnósticos disponibles.
 7. Reconoce que inventario, proveedor, hardware y certificación final siguen pendientes.
 
 ### Jornada de Viewer/Auditor
 
 1. Viewer inicia una sesión solo cuando el entorno lo permite.
-2. Consulta insights en el perfil canónico o catálogo en el seed demo.
+2. Consulta el catálogo y los insights permitidos.
 3. No crea carrito, venta, pago, turno ni refund.
-4. No existe un rol `Auditor` operativo.
+4. No existe un rol de negocio `Auditor` operativo.
 5. Owner, Admin o `developer` consultan auditoría cuando tienen `audit.read`.
 6. La lectura nunca modifica hechos originales ni compensatorios.
 
@@ -2384,53 +2380,53 @@ La tabla muestra grants predeterminados. Un override puede negar o conceder un p
 
 | ID          | Módulo      | Caso de uso                  | Owner | Admin | Manager | Supervisor | Cashier | Staff | Viewer | Dispositivo | Turno | Conexión | Aprobación | Estado                        |
 | ----------- | ----------- | ---------------------------- | ----- | ----- | ------- | ---------- | ------- | ----- | ------ | ----------- | ----- | -------- | ---------- | ----------------------------- |
-| UC-DEV-001  | Dispositivo | Generar código               | ✅    | ✅    | N/A     | N/A        | N/A     | ❌    | ❌     | No          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-DEV-002  | Dispositivo | Completar enrolamiento       | ✅    | ✅    | N/A     | N/A        | N/A     | ❌    | ❌     | No          | No    | Sí       | Sí         | IMPLEMENTADO                  |
-| UC-DEV-003  | Dispositivo | Rotar, revocar o sustituir   | ✅    | ✅    | N/A     | N/A        | N/A     | ❌    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-DEV-004  | Dispositivo | Recuperar acceso             | ✅    | ✅    | N/A     | N/A        | N/A     | ❌    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
-| UC-AUTH-001 | Acceso      | Abrir sesión por PIN         | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-AUTH-002 | Acceso      | PIN incorrecto y rate limit  | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-AUTH-003 | Acceso      | Cambiar, bloquear o cerrar   | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | ⚠️    | Sí       | No         | IMPLEMENTADO                  |
-| UC-AUTH-004 | Acceso      | Aprobación sensible          | ✅    | ✅    | N/A     | N/A        | N/A     | ❌    | ❌     | Sí          | ⚠️    | Sí       | Sí         | IMPLEMENTADO                  |
-| UC-CAT-001  | Catálogo    | Ver categorías y productos   | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                  |
-| UC-CAT-002  | Catálogo    | Buscar producto              | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-CAT-003  | Catálogo    | Ver detalle y opciones       | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                  |
-| UC-CAT-004  | Catálogo    | Manejar disponibilidad       | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO CON LIMITACIONES |
-| UC-CART-001 | Carrito     | Crear y agregar línea        | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-CART-002 | Carrito     | Editar línea                 | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-CART-003 | Carrito     | Eliminar o vaciar            | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-CART-004 | Carrito     | Recuperar y repricear        | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                  |
-| UC-SALE-001 | Venta       | Iniciar venta única          | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-SALE-002 | Venta       | Suspender y buscar           | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-SALE-003 | Venta       | Reanudar propia o ajena      | ✅    | ✅    | N/A     | N/A        | N/A     | ⚠️    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-SALE-004 | Venta       | Cancelar venta               | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-SALE-005 | Venta       | Completar y abrir siguiente  | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | ⚠️    | ⚠️       | ⚠️         | IMPLEMENTADO                  |
-| UC-PAY-001  | Pago        | Efectivo y cambio            | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | Sí    | ⚠️       | ⚠️         | IMPLEMENTADO                  |
-| UC-PAY-002  | Pago        | Terminal manual              | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
-| UC-PAY-003  | Pago        | Pago mixto y parcial         | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-PAY-004  | Pago        | Propina                      | ✅    | ✅    | N/A     | N/A        | N/A     | ⚠️    | ❌     | Sí          | ⚠️    | ⚠️       | ⚠️         | IMPLEMENTADO                  |
-| UC-PAY-005  | Pago        | Descuento                    | ✅    | ✅    | N/A     | N/A        | N/A     | ⚠️    | ❌     | Sí          | No    | ⚠️       | ⚠️         | IMPLEMENTADO                  |
-| UC-PAY-006  | Pago        | Confirmar o recuperar        | ✅    | ✅    | N/A     | N/A        | N/A     | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-PAY-007  | Pago        | Destino y recibo             | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO CON LIMITACIONES |
-| UC-CASH-001 | Caja        | Abrir turno                  | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-CASH-002 | Caja        | Movimientos                  | ✅    | ✅    | N/A     | N/A        | N/A     | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-CASH-003 | Caja        | Suspender o reanudar         | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-CASH-004 | Caja        | No-sale drawer               | ✅    | ✅    | N/A     | N/A        | N/A     | ❌    | ❌     | Sí          | Sí    | Sí       | ⚠️         | FOUNDATION                    |
-| UC-CASH-005 | Caja        | Handoff                      | ✅    | ✅    | N/A     | N/A        | N/A     | ❌    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-CASH-006 | Caja        | Blind count y recuento       | ✅    | ✅    | N/A     | N/A        | N/A     | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-CASH-007 | Caja        | Reconciliar y cerrar         | ✅    | ✅    | N/A     | N/A        | N/A     | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-REF-001  | Refund      | Elegibilidad                 | ❌    | ❌    | N/A     | N/A        | N/A     | ❌    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO CON LIMITACIONES |
-| UC-REF-002  | Refund      | Void                         | ❌    | ❌    | N/A     | N/A        | N/A     | ❌    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
-| UC-REF-003  | Refund      | Refund total                 | ❌    | ❌    | N/A     | N/A        | N/A     | ❌    | ❌     | Sí          | ⚠️    | Sí       | Sí         | IMPLEMENTADO CON LIMITACIONES |
-| UC-REF-004  | Refund      | Refund parcial               | ❌    | ❌    | N/A     | N/A        | N/A     | ❌    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
-| UC-REF-005  | Refund      | Consecuencia de tender       | ❌    | ❌    | N/A     | N/A        | N/A     | ❌    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
-| UC-REF-006  | Refund      | Approval, restock y recovery | ❌    | ❌    | N/A     | N/A        | N/A     | ❌    | ❌     | Sí          | ⚠️    | Sí       | Sí         | IMPLEMENTADO CON LIMITACIONES |
-| UC-OFF-001  | Offline     | Detectar y aplicar policy    | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | ⚠️    | No       | No         | IMPLEMENTADO                  |
-| UC-OFF-002  | Offline     | Venta cash provisional       | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | Sí    | No       | No         | IMPLEMENTADO CON LIMITACIONES |
-| UC-OFF-003  | Offline     | Replay y respuesta perdida   | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | ⚠️    | Sí       | No         | IMPLEMENTADO                  |
-| UC-OFF-004  | Offline     | Recovery Center              | ✅    | ✅    | N/A     | N/A        | N/A     | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
-| UC-HIST-001 | Historial   | Ventas y recibos             | ✅    | ✅    | N/A     | N/A        | N/A     | ✅    | ❌     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                  |
-| UC-HIST-002 | Historial   | Excepciones y recibos        | ❌    | ❌    | N/A     | N/A        | N/A     | ❌    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO CON LIMITACIONES |
+| UC-DEV-001  | Dispositivo | Generar código               | ✅    | ✅    | ❌      | ❌         | ❌      | ❌    | ❌     | No          | No    | Sí       | No         | IMPLEMENTADO                  |
+| UC-DEV-002  | Dispositivo | Completar enrolamiento       | ✅    | ✅    | ❌      | ❌         | ❌      | ❌    | ❌     | No          | No    | Sí       | Sí         | IMPLEMENTADO                  |
+| UC-DEV-003  | Dispositivo | Rotar, revocar o sustituir   | ✅    | ✅    | ❌      | ❌         | ❌      | ❌    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
+| UC-DEV-004  | Dispositivo | Recuperar acceso             | ✅    | ✅    | ❌      | ❌         | ❌      | ❌    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
+| UC-AUTH-001 | Acceso      | Abrir sesión por PIN         | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ✅     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
+| UC-AUTH-002 | Acceso      | PIN incorrecto y rate limit  | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ✅     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
+| UC-AUTH-003 | Acceso      | Cambiar, bloquear o cerrar   | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ✅     | Sí          | ⚠️    | Sí       | No         | IMPLEMENTADO                  |
+| UC-AUTH-004 | Acceso      | Aprobación sensible          | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | Sí         | IMPLEMENTADO                  |
+| UC-CAT-001  | Catálogo    | Ver categorías y productos   | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                  |
+| UC-CAT-002  | Catálogo    | Buscar producto              | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
+| UC-CAT-003  | Catálogo    | Ver detalle y opciones       | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                  |
+| UC-CAT-004  | Catálogo    | Manejar disponibilidad       | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO CON LIMITACIONES |
+| UC-CART-001 | Carrito     | Crear y agregar línea        | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
+| UC-CART-002 | Carrito     | Editar línea                 | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
+| UC-CART-003 | Carrito     | Eliminar o vaciar            | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
+| UC-CART-004 | Carrito     | Recuperar y repricear        | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                  |
+| UC-SALE-001 | Venta       | Iniciar venta única          | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
+| UC-SALE-002 | Venta       | Suspender y buscar           | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
+| UC-SALE-003 | Venta       | Reanudar propia o ajena      | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO                  |
+| UC-SALE-004 | Venta       | Cancelar venta               | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO                  |
+| UC-SALE-005 | Venta       | Completar y abrir siguiente  | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | ⚠️    | ⚠️       | ⚠️         | IMPLEMENTADO                  |
+| UC-PAY-001  | Pago        | Efectivo y cambio            | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | Sí    | ⚠️       | ⚠️         | IMPLEMENTADO                  |
+| UC-PAY-002  | Pago        | Terminal manual              | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
+| UC-PAY-003  | Pago        | Pago mixto y parcial         | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
+| UC-PAY-004  | Pago        | Propina                      | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | ⚠️    | ⚠️       | ⚠️         | IMPLEMENTADO                  |
+| UC-PAY-005  | Pago        | Descuento                    | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | No    | ⚠️       | ⚠️         | IMPLEMENTADO                  |
+| UC-PAY-006  | Pago        | Confirmar o recuperar        | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO                  |
+| UC-PAY-007  | Pago        | Destino y recibo             | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO CON LIMITACIONES |
+| UC-CASH-001 | Caja        | Abrir turno                  | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO                  |
+| UC-CASH-002 | Caja        | Movimientos                  | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
+| UC-CASH-003 | Caja        | Suspender o reanudar         | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
+| UC-CASH-004 | Caja        | No-sale drawer               | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | Sí    | Sí       | ⚠️         | FOUNDATION                    |
+| UC-CASH-005 | Caja        | Handoff                      | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
+| UC-CASH-006 | Caja        | Blind count y recuento       | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
+| UC-CASH-007 | Caja        | Reconciliar y cerrar         | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
+| UC-REF-001  | Refund      | Elegibilidad                 | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO CON LIMITACIONES |
+| UC-REF-002  | Refund      | Void                         | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
+| UC-REF-003  | Refund      | Refund total                 | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | ⚠️    | Sí       | Sí         | IMPLEMENTADO CON LIMITACIONES |
+| UC-REF-004  | Refund      | Refund parcial               | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
+| UC-REF-005  | Refund      | Consecuencia de tender       | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
+| UC-REF-006  | Refund      | Approval, restock y recovery | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | Sí         | IMPLEMENTADO CON LIMITACIONES |
+| UC-OFF-001  | Offline     | Detectar y aplicar policy    | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | ⚠️    | No       | No         | IMPLEMENTADO                  |
+| UC-OFF-002  | Offline     | Venta cash provisional       | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | Sí    | No       | No         | IMPLEMENTADO CON LIMITACIONES |
+| UC-OFF-003  | Offline     | Replay y respuesta perdida   | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | ⚠️    | Sí       | No         | IMPLEMENTADO                  |
+| UC-OFF-004  | Offline     | Recovery Center              | ✅    | ✅    | ✅      | ⚠️         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
+| UC-HIST-001 | Historial   | Ventas y recibos             | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                  |
+| UC-HIST-002 | Historial   | Excepciones y recibos        | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO CON LIMITACIONES |
 
 ## 18. Funcionalidades no implementadas todavía
 
@@ -2542,7 +2538,7 @@ Antes de empezar, prepare un merchant de prueba, una location, un registro, prod
 
 ### Sesión 5 — Refunds
 
-**Rol requerido:** Un rol de prueba con grants Gate 3D explícitos.
+**Rol requerido:** Manager para el flujo completo. Cashier puede iniciar el refund parcial permitido y solicitar aprobación.
 
 1. Localice una venta cash comprometida.
 2. Revise elegibilidad y remaining refundable.
@@ -2588,7 +2584,7 @@ Antes de empezar, prepare un merchant de prueba, una location, un registro, prod
 
 1. Confirme que Viewer solo lee catálogo.
 2. Confirme que Cashier no reanuda una venta ajena.
-3. Confirme que Supervisor no existe en un seed limpio. Cree y asigne el rol solo en una prueba RBAC autorizada.
+3. Confirme que el seed crea Supervisor con una sola location.
 4. Confirme que Cashier no aprueba descuento, varianza o refund.
 5. Confirme que Manager usa un grant exacto y de uso único.
 6. Cambie la selección después de approval y confirme invalidación.
@@ -2666,12 +2662,12 @@ Este conteo incluye acceso directo y acceso condicionado. Excluye las celdas ❌
 
 | Rol        | Casos con acceso directo o condicionado |
 | ---------- | --------------------------------------: |
-| Owner      |                                      40 |
-| Admin      |                                      40 |
-| Manager    |                                       0 |
-| Supervisor |                                       0 |
-| Cashier    |                                       0 |
-| Staff      |                                      33 |
-| Viewer     |                                       0 |
+| Owner      |                                      47 |
+| Admin      |                                      47 |
+| Manager    |                                      43 |
+| Supervisor |                                      43 |
+| Cashier    |                                      39 |
+| Staff      |                                      39 |
+| Viewer     |                                       7 |
 
 La cifra de un rol no concede autoridad por sí sola. Cada ejecución valida el permiso, la política, el dispositivo y la location.

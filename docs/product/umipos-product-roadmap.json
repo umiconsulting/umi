@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-03",
-  "latestRelevantCommit": "HEAD (Gate 3D commit)",
-  "integrationState": "Gate 3A through Gate 3D preserved on current build-v3",
+  "updatedAt": "2026-08-04",
+  "latestRelevantCommit": "HEAD (Gate 3D.1 commit)",
+  "integrationState": "Gate 3A through Gate 3D.1 preserved on current build-v3",
   "items": [
     {
       "id": "platform-certification",
@@ -91,6 +91,14 @@
       "nextObjective": "Approve Gate 3E inventory synchronization scope",
       "blockers": [],
       "validationState": "Focused contract, API, Flutter, accessibility, localization, Linux, Web, refund invariants, and disposable PostgreSQL validation passed"
+    },
+    {
+      "id": "3D.1",
+      "status": "complete",
+      "dependencies": ["3D"],
+      "nextObjective": "Approve Gate 3E inventory synchronization scope",
+      "blockers": [],
+      "validationState": "Pilot permission inventory, grant and approval matrices, deterministic seeds, focused API and Flutter authorization, PostgreSQL, RLS, and PR validation passed"
     }
   ]
 }

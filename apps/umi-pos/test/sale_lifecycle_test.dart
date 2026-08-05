@@ -5,6 +5,7 @@ import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/errors/app_error.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
+import 'package:umi_pos/core/security/operator_permissions.dart';
 import 'package:umi_pos/features/cart/cart_controller.dart';
 import 'package:umi_pos/features/cart/cart_repository.dart';
 import 'package:umi_pos/features/sale/sale_lifecycle_controller.dart';
@@ -75,7 +76,10 @@ final class _Sales implements SaleRepository {
   String? historyNextCursor;
 
   @override
-  Future<SaleSnapshot> current(String merchantId, SaleHistoryQuery query) async {
+  Future<SaleSnapshot> current(
+    String merchantId,
+    SaleHistoryQuery query,
+  ) async {
     if (currentSale == null) {
       throw const AppException(
         category: AppErrorCategory.unknown,
@@ -525,7 +529,11 @@ void main() {
         home: Builder(
           builder: (context) => Scaffold(
             body: FilledButton(
-              onPressed: () => showSaleCenter(context, lifecycle),
+              onPressed: () => showSaleCenter(
+                context,
+                lifecycle,
+                OperatorPermissions(const ['sale.lifecycle']),
+              ),
               child: const Text('abrir'),
             ),
           ),

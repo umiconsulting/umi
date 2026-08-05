@@ -471,10 +471,28 @@ export class PosCashRepository {
     }
     if (dto.approvalId) {
       if (!dto.actionFingerprint) throw new Error('APPROVAL_FINGERPRINT_REQUIRED');
+      const expectedFingerprint = createHash('sha256')
+        .update(
+          [
+            merchantId,
+            dto.locationId,
+            dto.shiftId,
+            dto.type,
+            dto.amount.minorUnits,
+            dto.amount.currency,
+            dto.reasonCode,
+            dto.note ?? '',
+            dto.expectedShiftVersion,
+          ].join(':'),
+        )
+        .digest('hex');
+      if (dto.actionFingerprint !== expectedFingerprint) {
+        throw new Error('APPROVAL_FINGERPRINT_MISMATCH');
+      }
       await this.consumeApproval(client, dto.approvalId, {
         merchantId,
         locationId: dto.locationId,
-        permission: `cash.movement.${dto.type}`,
+        permission: `cash.movement.${dto.type}.approve`,
         fingerprint: dto.actionFingerprint,
         commandId: dto.commandId,
       });
@@ -1094,7 +1112,7 @@ export class PosCashRepository {
       await this.consumeApproval(client, dto.approvalId, {
         merchantId,
         locationId: dto.locationId,
-        permission: 'cash.shift.close',
+        permission: 'cash.shift.close.approve',
         fingerprint: dto.approvalFingerprint,
         commandId: dto.commandId,
       });

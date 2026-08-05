@@ -80,6 +80,16 @@ describe('PosEntryService', () => {
       commandFingerprint: fingerprint,
     });
     expect(grant.commandFingerprint).toBe(fingerprint);
+    expect(repo.managerPinRecord).toHaveBeenCalledWith(
+      expect.any(String),
+      '00000000-0000-4000-8000-000000000014',
+      '00000000-0000-4000-8000-000000000015',
+      'checkout.discount.approve',
+      '00000000-0000-4000-8000-000000000013',
+      user.id,
+      user.sessionId,
+      user.deviceId,
+    );
     expect(repo.grantManagerElevation).toHaveBeenCalledWith(
       expect.objectContaining({
         managerUserId: '00000000-0000-4000-8000-000000000011',

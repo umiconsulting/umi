@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 
 const path = 'docs/product/UMIPOS_CASOS_DE_USO_Y_ROLES.md';
 const document = await readFile(path, 'utf8');
+const pilotMatrix = JSON.parse(await readFile('config/umipos-pilot-role-grants.json', 'utf8'));
 
 const requiredSections = [
   'Propósito del documento',
@@ -159,13 +160,13 @@ const roleColumns = new Map([
   ['Viewer', 9],
 ]);
 const expectedRoleCounts = new Map([
-  ['Owner', 40],
-  ['Admin', 40],
-  ['Manager', 0],
-  ['Supervisor', 0],
-  ['Cashier', 0],
-  ['Staff', 33],
-  ['Viewer', 0],
+  ['Owner', 47],
+  ['Admin', 47],
+  ['Manager', 43],
+  ['Supervisor', 43],
+  ['Cashier', 39],
+  ['Staff', 39],
+  ['Viewer', 7],
 ]);
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 const requireCountRow = (label, expected) => {
@@ -180,6 +181,37 @@ for (const [role, column] of roleColumns) {
     throw new Error(`Role coverage mismatch for ${role}: expected ${expected}, found ${actual}.`);
   }
   requireCountRow(role, actual);
+}
+
+const requiredPermissionByCase = new Map([
+  ['UC-DEV-001', 'device.enroll'],
+  ['UC-CAT-001', 'catalog.read'],
+  ['UC-CART-001', 'cart.write'],
+  ['UC-SALE-001', 'sale.lifecycle'],
+  ['UC-PAY-001', 'checkout.commit'],
+  ['UC-CASH-001', 'cash.shift.open'],
+  ['UC-CASH-002', 'cash.movement.paid_in'],
+  ['UC-CASH-004', 'cash.drawer.no_sale'],
+  ['UC-CASH-005', 'cash.shift.handoff'],
+  ['UC-REF-001', 'sale.exception.read'],
+  ['UC-REF-002', 'sale.void.create'],
+  ['UC-REF-003', 'sale.refund.full'],
+  ['UC-REF-004', 'sale.refund.partial'],
+  ['UC-OFF-001', 'offline.cash.checkout'],
+  ['UC-HIST-002', 'sale.exception.history'],
+]);
+for (const [caseId, permission] of requiredPermissionByCase) {
+  const row = matrixRows.find((value) => value[0] === caseId);
+  if (!row) throw new Error(`Missing role matrix row for ${caseId}.`);
+  for (const [role, column] of roleColumns) {
+    const profile = pilotMatrix.profiles.find((value) => value.role === role.toLowerCase());
+    if (!profile) throw new Error(`Missing pilot profile for ${role}.`);
+    const documented = !['❌', 'N/A'].includes(row[column]);
+    const granted = profile.permissions.includes(permission);
+    if (documented !== granted) {
+      throw new Error(`${caseId} differs from the canonical ${role} grant for ${permission}.`);
+    }
+  }
 }
 
 const approvalCount = matrixRows.filter((row) => row[13] !== 'No').length;

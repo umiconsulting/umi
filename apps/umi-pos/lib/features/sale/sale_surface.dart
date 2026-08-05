@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/localization/app_localizations.dart';
+import '../../core/security/operator_permissions.dart';
 import '../../core/theme/umi_theme.dart';
 import '../exception/exception_controller.dart';
 import '../exception/exception_surface.dart';
@@ -94,12 +95,17 @@ Future<void> showCustomerPicker(
 Future<void> showSaleCenter(
   BuildContext context,
   SaleLifecycleController lifecycle,
-  [SaleExceptionController? exceptions]
-) => showModalBottomSheet<void>(
+  OperatorPermissions permissions, [
+  SaleExceptionController? exceptions,
+]) => showModalBottomSheet<void>(
   context: context,
   isScrollControlled: true,
   constraints: const BoxConstraints(maxWidth: 820),
-  builder: (_) => _SaleCenter(lifecycle: lifecycle, exceptions: exceptions),
+  builder: (_) => _SaleCenter(
+    lifecycle: lifecycle,
+    permissions: permissions,
+    exceptions: exceptions,
+  ),
 );
 
 final class _CustomerPicker extends StatefulWidget {
@@ -202,8 +208,13 @@ final class _CustomerPickerState extends State<_CustomerPicker> {
 }
 
 final class _SaleCenter extends StatefulWidget {
-  const _SaleCenter({required this.lifecycle, this.exceptions});
+  const _SaleCenter({
+    required this.lifecycle,
+    required this.permissions,
+    this.exceptions,
+  });
   final SaleLifecycleController lifecycle;
+  final OperatorPermissions permissions;
   final SaleExceptionController? exceptions;
 
   @override
@@ -386,7 +397,10 @@ final class _SaleCenterState extends State<_SaleCenter> {
                                     child: Text(l.resumeSaleAction),
                                   ),
                                 if (sale.state == 'committed' &&
-                                    widget.exceptions != null)
+                                    widget.exceptions != null &&
+                                    widget.permissions.allows(
+                                      'sale.exception.read',
+                                    ))
                                   IconButton(
                                     tooltip: l.saleExceptionAction,
                                     onPressed: () => showSaleExceptionDialog(

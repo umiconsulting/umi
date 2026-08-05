@@ -1,6 +1,6 @@
 # UmiPOS Product Roadmap
 
-Updated: 2026-08-03
+Updated: 2026-08-04
 
 | Gate                                    | Status                     | Dependency             | Next objective                                         | Blocker                                              | Validation                                                                                                               |
 | --------------------------------------- | -------------------------- | ---------------------- | ------------------------------------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -15,11 +15,12 @@ Updated: 2026-08-03
 | 3B Advanced checkout and payment        | Complete                   | 3A                     | Maintain the checkout lifecycle                        | None                                                 | Focused contract, API, Flutter, accessibility, localization, Linux, and PostgreSQL checks passed                         |
 | 3C Cash shift and register operations   | Complete                   | 3B                     | Maintain cash custody controls                         | None                                                 | Focused contract, API, Flutter, accessibility, localization, Linux, and PostgreSQL checks passed                         |
 | 3D Refunds, voids, and exceptions       | Complete                   | 3C                     | Maintain immutable post-sale compensation              | None                                                 | Focused contract, API, Flutter, accessibility, localization, Linux, Web, and PostgreSQL checks passed                    |
-| 3E Inventory synchronization            | Planned                    | 3D                     | Approve the inventory authority and stock ledger scope | Scope approval required                              | Not run                                                                                                                  |
+| 3D.1 Pilot RBAC alignment               | Complete                   | 3D                     | Maintain least-privilege pilot grants                  | Production thresholds require Owner approval         | Matrix, seed, API, Flutter, authorization, PostgreSQL, RLS, and deterministic PR checks passed                           |
+| 3E Inventory synchronization            | Planned                    | 3D.1                   | Approve the inventory authority and stock ledger scope | Scope approval required                              | Not run                                                                                                                  |
 | Later platform work                     | Planned                    | 3E                     | KDS, loyalty, hardware, CRM, Assistant                 | Gate sequence approval                               | Not run                                                                                                                  |
 
-The latest relevant revision is the Gate 3D commit in PR #72.
-PR #72 keeps Gate 3A through Gate 3D complete on current `build-v3`.
+The latest relevant revision is the Gate 3D.1 commit in PR #72.
+PR #72 keeps Gate 3A through Gate 3D.1 complete on current `build-v3`.
 Native encrypted offline support covers the explicit allowlist and server-policy-authorized cash;
 Web sensitive journaling remains disabled. UMI remains the
 sole business authority; Flutter owns presentation, hardware integration, encrypted local state,
@@ -40,3 +41,7 @@ Gate 3D adds server-authorized void and refund eligibility, full and partial ref
 tax and discount allocation, tender and cash compensation, manager approval, restock intent,
 immutable compensation receipts, history, and recovery. It does not change inventory. Manual
 terminal refund success remains an operator assertion. All exception mutations require online authority.
+
+Gate 3D.1 adds deterministic pilot profiles for Owner, Admin, Manager, Supervisor, Cashier,
+Staff, and Viewer. It keeps `super_admin` outside the café journey. The API combines permission,
+scope, entitlement, device trust, operator session, policy, and command-bound approval.

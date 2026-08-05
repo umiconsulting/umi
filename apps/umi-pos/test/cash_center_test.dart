@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
+import 'package:umi_pos/core/security/operator_permissions.dart';
 import 'package:umi_pos/features/cash/cash_controller.dart';
 import 'package:umi_pos/features/cash/cash_recovery_store.dart';
 import 'package:umi_pos/features/cash/cash_repository.dart';
@@ -16,6 +17,7 @@ final class _FakeCashRepository implements CashRepository {
       'version': 'cash-v1',
       'blindCountRequired': true,
       'currency': 'MXN',
+      'movementApprovalThreshold': {'minorUnits': 5000, 'currency': 'MXN'},
     },
     registers: [
       {
@@ -37,6 +39,7 @@ final class _FakeCashRepository implements CashRepository {
     summary: null,
   );
   OpenCashShiftRequest? openedWith;
+  ManagerApprovalRequest? approvalRequest;
   CashCommandRecoveryResult recoveryResult = const CashCommandRecoveryResult(
     commandId: '00000000-0000-4000-8000-000000000070',
     commandType: 'pos.cash.paid_in',
@@ -57,6 +60,20 @@ final class _FakeCashRepository implements CashRepository {
     String merchantId,
     CashCommandRecoveryQuery query,
   ) async => recoveryResult;
+
+  @override
+  Future<ElevationGrantView> approve(ManagerApprovalRequest request) async {
+    approvalRequest = request;
+    return ElevationGrantView(
+      elevationId: '00000000-0000-4000-8000-000000000090',
+      permission: request.permission,
+      merchantId: request.merchantId,
+      locationId: request.locationId,
+      method: 'manager_approval',
+      expiresAt: '2026-07-29T20:05:00.000Z',
+      commandFingerprint: request.commandFingerprint,
+    );
+  }
 
   @override
   Future<OpenCashShiftResult> open(
@@ -176,6 +193,43 @@ void main() {
     expect(controller.state.snapshot?.currentShift?['status'], 'open');
   });
 
+  test(
+    'movement approval uses a command fingerprint and approval permission',
+    () async {
+      final repository = _FakeCashRepository();
+      final controller = CashController(repository: repository);
+      controller.setContext(
+        merchantId: '00000000-0000-4000-8000-000000000010',
+        locationId: '00000000-0000-4000-8000-000000000011',
+        operatorSessionId: '00000000-0000-4000-8000-000000000012',
+      );
+      await controller.load();
+      await controller.openShift(
+        registerId: '00000000-0000-4000-8000-000000000001',
+        amountMinorUnits: 2000,
+      );
+
+      expect(controller.movementRequiresApproval(4999), isFalse);
+      expect(controller.movementRequiresApproval(5000), isTrue);
+      final result = await controller.approveMovement(
+        managerPin: '3333',
+        type: 'paid_out',
+        amountMinorUnits: 5000,
+        reasonCode: 'pilot_expense',
+      );
+
+      expect(
+        repository.approvalRequest?.permission,
+        'cash.movement.paid_out.approve',
+      );
+      expect(result.fingerprint, hasLength(64));
+      expect(
+        repository.approvalRequest?.commandFingerprint,
+        result.fingerprint,
+      );
+    },
+  );
+
   testWidgets('Cash Center hides expected cash before a blind count', (
     tester,
   ) async {
@@ -196,7 +250,12 @@ void main() {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        home: Scaffold(body: CashCenter(controller: controller)),
+        home: Scaffold(
+          body: CashCenter(
+            controller: controller,
+            permissions: OperatorPermissions(const ['cash.shift.open']),
+          ),
+        ),
       ),
     );
     await tester.pump();
@@ -260,7 +319,15 @@ void main() {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        home: Scaffold(body: CashCenter(controller: controller)),
+        home: Scaffold(
+          body: CashCenter(
+            controller: controller,
+            permissions: OperatorPermissions(const [
+              'cash.count.recount',
+              'cash.reconcile',
+            ]),
+          ),
+        ),
       ),
     );
     await tester.pump();

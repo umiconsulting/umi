@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-03",
+  "updatedAt": "2026-08-04",
   "branch": "architectureUMIposIntegration",
   "certificationSourceCommit": "a1e794d8fe0e9883f5677147ab81c4342f1a3980",
   "certificationDate": "2026-07-27",
@@ -22,7 +22,8 @@
     "3A",
     "3B",
     "3C",
-    "3D"
+    "3D",
+    "3D.1"
   ],
   "authorities": {
     "api": "apps/umi-api",
@@ -93,6 +94,16 @@
     "gate3BStatus": "complete",
     "gate3CStatus": "complete",
     "gate3DStatus": "complete",
+    "gate3D1Status": "complete",
+    "pilotRoleGrantMatrix": "config/umipos-pilot-role-grants.json",
+    "pilotApprovalMatrix": "config/umipos-pilot-approval-boundaries.json",
+    "pilotPermissionInventory": "config/umipos-permission-inventory.json",
+    "pilotProfiles": ["owner", "admin", "manager", "supervisor", "cashier", "staff", "viewer"],
+    "pilotStaffModel": "staff is the compatibility profile for cashier during the pilot",
+    "pilotSuperAdminBoundary": "platform-only, suspended in the development seed, and excluded from the café journey",
+    "pilotAuthorizationScope": "effective permission plus merchant, location, POS entitlement, device, credential, operator session, policy, object scope, and approval",
+    "pilotApprovalSeparation": "sensitive actions deny self-approval by default and require a one-use fingerprint-bound approval",
+    "pilotSeed": "repeat-safe seven-profile café seed with explicit location assignments, hashed PINs, POS entitlement, register, and policies",
     "saleExceptionLifecycleVersion": 1,
     "saleExceptionEligibility": "server-authoritative refund and narrow void eligibility with policy, payment, operator, device, merchant, and location checks",
     "fullRefund": "all remaining historical line, tax, discount, tip-policy, and tender value is compensated",
@@ -166,8 +177,8 @@
     "pinFoundation": "merchant-unique personal PIN, keyed lookup, server-side scrypt verification, bounded attempts, and no client role selection",
     "managerApprovalFoundation": "single-action scoped five-minute elevation",
     "readyShell": true,
-    "latestLocalCommit": "Gate 3D commit in PR #72",
-    "pushStatus": "publication follows the Gate 3D commit",
+    "latestLocalCommit": "HEAD (Gate 3D.1 commit in PR #72)",
+    "pushStatus": "publication follows the Gate 3D.1 commit",
     "pullRequestStatus": "PR #72 targets build-v3"
   },
   "nextGate": "Gate 3E inventory synchronization requires explicit scope approval"

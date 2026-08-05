@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:umi_contract/umi_contract.dart';
 
@@ -174,6 +176,51 @@ final class CashController extends ChangeNotifier {
       await _completeCommand(ids);
       await _reload();
     });
+  }
+
+  bool movementRequiresApproval(int amountMinorUnits) {
+    final raw = _state.snapshot?.policy['movementApprovalThreshold'];
+    if (raw is! Map<String, Object?>) return true;
+    final threshold = raw['minorUnits'];
+    return threshold is! int || amountMinorUnits >= threshold;
+  }
+
+  Future<({String approvalId, String fingerprint})> approveMovement({
+    required String managerPin,
+    required String type,
+    required int amountMinorUnits,
+    required String reasonCode,
+    String? note,
+  }) async {
+    final shift = _requireShift();
+    final fingerprint = sha256
+        .convert(
+          utf8.encode(
+            [
+              _merchantId!,
+              _locationId!,
+              shift['id']! as String,
+              type,
+              amountMinorUnits,
+              shift['currency']! as String,
+              reasonCode,
+              note ?? '',
+              shift['version']! as int,
+            ].join(':'),
+          ),
+        )
+        .toString();
+    final approval = await _repository.approve(
+      ManagerApprovalRequest(
+        operatorSessionId: _operatorSessionId!,
+        managerPin: managerPin,
+        permission: 'cash.movement.$type.approve',
+        merchantId: _merchantId!,
+        locationId: _locationId!,
+        commandFingerprint: fingerprint,
+      ),
+    );
+    return (approvalId: approval.elevationId, fingerprint: fingerprint);
   }
 
   Future<void> suspendOrResume({required bool suspend}) async {
@@ -376,7 +423,7 @@ final class CashController extends ChangeNotifier {
       ManagerApprovalRequest(
         operatorSessionId: _operatorSessionId!,
         managerPin: managerPin,
-        permission: 'cash.shift.close',
+        permission: 'cash.shift.close.approve',
         merchantId: _merchantId!,
         locationId: _locationId!,
         commandFingerprint: fingerprint,

@@ -2,18 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/localization/app_localizations.dart';
+import '../../core/security/operator_permissions.dart';
 import '../../core/theme/umi_theme.dart';
 import 'cash_controller.dart';
 
 Future<void> showCashCenter(
   BuildContext context, {
   required CashController controller,
+  required OperatorPermissions permissions,
   Future<void> Function()? onHandoffCompleted,
 }) => showDialog<void>(
   context: context,
   builder: (_) => Dialog.fullscreen(
     child: CashCenter(
       controller: controller,
+      permissions: permissions,
       onHandoffCompleted: onHandoffCompleted,
     ),
   ),
@@ -22,11 +25,13 @@ Future<void> showCashCenter(
 final class CashCenter extends StatefulWidget {
   const CashCenter({
     required this.controller,
+    required this.permissions,
     this.onHandoffCompleted,
     super.key,
   });
 
   final CashController controller;
+  final OperatorPermissions permissions;
   final Future<void> Function()? onHandoffCompleted;
 
   @override
@@ -121,11 +126,13 @@ final class _CashCenterState extends State<CashCenter> {
                             if (snapshot.currentShift == null)
                               _OpenShiftSection(
                                 controller: widget.controller,
+                                permissions: widget.permissions,
                                 registers: snapshot.registers,
                               )
                             else
                               _ActiveShiftSection(
                                 controller: widget.controller,
+                                permissions: widget.permissions,
                                 onHandoffCompleted: widget.onHandoffCompleted,
                               ),
                             if (state.busy) ...[
@@ -237,9 +244,14 @@ final class _StatusCard extends StatelessWidget {
 }
 
 final class _OpenShiftSection extends StatefulWidget {
-  const _OpenShiftSection({required this.controller, required this.registers});
+  const _OpenShiftSection({
+    required this.controller,
+    required this.permissions,
+    required this.registers,
+  });
 
   final CashController controller;
+  final OperatorPermissions permissions;
   final List<Map<String, Object?>> registers;
 
   @override
@@ -268,10 +280,11 @@ final class _OpenShiftSectionState extends State<_OpenShiftSection> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final canOpen =
-        widget.controller.state.snapshot?.allowedActions.contains(
-          'open_shift',
-        ) ??
-        false;
+        widget.permissions.allows('cash.shift.open') &&
+        (widget.controller.state.snapshot?.allowedActions.contains(
+              'open_shift',
+            ) ??
+            false);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(UmiSpacing.lg),
@@ -332,10 +345,12 @@ final class _OpenShiftSectionState extends State<_OpenShiftSection> {
 final class _ActiveShiftSection extends StatelessWidget {
   const _ActiveShiftSection({
     required this.controller,
+    required this.permissions,
     required this.onHandoffCompleted,
   });
 
   final CashController controller;
+  final OperatorPermissions permissions;
   final Future<void> Function()? onHandoffCompleted;
 
   @override
@@ -367,37 +382,44 @@ final class _ActiveShiftSection extends StatelessWidget {
           spacing: UmiSpacing.sm,
           runSpacing: UmiSpacing.sm,
           children: [
-            if (actions.contains('movement')) ...[
+            if (actions.contains('movement') &&
+                permissions.allows('cash.movement.paid_in'))
               _Action(
                 icon: Icons.add_circle_outline,
                 label: l.paidInAction,
                 onPressed: () => _movement(context, controller, 'paid_in'),
               ),
+            if (actions.contains('movement') &&
+                permissions.allows('cash.movement.paid_out'))
               _Action(
                 icon: Icons.remove_circle_outline,
                 label: l.paidOutAction,
                 onPressed: () => _movement(context, controller, 'paid_out'),
               ),
+            if (actions.contains('movement') &&
+                permissions.allows('cash.movement.safe_drop'))
               _Action(
                 icon: Icons.savings_outlined,
                 label: l.safeDropAction,
                 onPressed: () => _movement(context, controller, 'safe_drop'),
               ),
-            ],
-            if (actions.contains('suspend'))
+            if (actions.contains('suspend') &&
+                permissions.allows('cash.shift.suspend'))
               _Action(
                 icon: Icons.pause_circle_outline,
                 label: l.suspendShiftAction,
                 onPressed: () => controller.suspendOrResume(suspend: true),
               ),
-            if (actions.contains('handoff'))
+            if (actions.contains('handoff') &&
+                permissions.allows('cash.shift.handoff'))
               _Action(
                 icon: Icons.swap_horiz,
                 label: l.handoffShiftAction,
                 onPressed: () =>
                     _handoff(context, controller, onHandoffCompleted),
               ),
-            if (actions.contains('no_sale'))
+            if (actions.contains('no_sale') &&
+                permissions.allows('cash.drawer.no_sale'))
               _Action(
                 icon: Icons.point_of_sale_outlined,
                 label: l.noSaleDrawerAction,
@@ -410,19 +432,25 @@ final class _ActiveShiftSection extends StatelessWidget {
                   }
                 },
               ),
-            if (actions.contains('resume'))
+            if (actions.contains('resume') &&
+                permissions.allows('cash.shift.resume'))
               _Action(
                 icon: Icons.play_circle_outline,
                 label: l.resumeShiftAction,
                 onPressed: () => controller.suspendOrResume(suspend: false),
               ),
-            if (actions.contains('count'))
+            if (actions.contains('count') &&
+                permissions.allows(
+                  count == null ? 'cash.count.submit' : 'cash.count.recount',
+                ))
               _Action(
                 icon: Icons.calculate_outlined,
                 label: count == null ? l.blindCountAction : l.recountAction,
                 onPressed: () => _count(context, controller),
               ),
-            if (count != null && state.resolution == null)
+            if (count != null &&
+                state.resolution == null &&
+                permissions.allows('cash.reconcile'))
               _Action(
                 icon: Icons.rule,
                 label: l.varianceReasonLabel,
@@ -430,6 +458,7 @@ final class _ActiveShiftSection extends StatelessWidget {
               ),
             if (state.reconciliation == null &&
                 actions.contains('reconcile') &&
+                permissions.allows('cash.reconcile') &&
                 (state.resolution != null ||
                     (variance?['signedVariance']
                             as Map<String, Object?>?)?['minorUnits'] ==
@@ -439,7 +468,9 @@ final class _ActiveShiftSection extends StatelessWidget {
                 label: l.reconcileShiftAction,
                 onPressed: controller.reconcile,
               ),
-            if (state.reconciliation != null && actions.contains('close'))
+            if (state.reconciliation != null &&
+                actions.contains('close') &&
+                permissions.allows('cash.shift.close'))
               _Action(
                 icon: Icons.lock_outline,
                 label: l.closeShiftAction,
@@ -588,14 +619,67 @@ Future<void> _movement(
       ],
     ),
   );
+  if (!context.mounted) {
+    amount.dispose();
+    reason.dispose();
+    return;
+  }
   if ((accepted ?? false) && reason.text.trim().isNotEmpty) {
+    final amountMinorUnits = _minorUnits(amount.text);
+    final reasonCode = reason.text
+        .trim()
+        .replaceAll(RegExp(r'\s+'), '_')
+        .toLowerCase();
+    String? approvalId;
+    String? actionFingerprint;
+    if (controller.movementRequiresApproval(amountMinorUnits)) {
+      final managerPin = TextEditingController();
+      final approvalAccepted = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(l.managerApprovalTitle),
+          content: TextField(
+            controller: managerPin,
+            autofocus: true,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(labelText: l.managerPinLabel),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(l.closeAction),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(l.confirmAction),
+            ),
+          ],
+        ),
+      );
+      if (!(approvalAccepted ?? false)) {
+        managerPin.dispose();
+        amount.dispose();
+        reason.dispose();
+        return;
+      }
+      final approval = await controller.approveMovement(
+        managerPin: managerPin.text,
+        type: type,
+        amountMinorUnits: amountMinorUnits,
+        reasonCode: reasonCode,
+      );
+      approvalId = approval.approvalId;
+      actionFingerprint = approval.fingerprint;
+      managerPin.clear();
+      managerPin.dispose();
+    }
     await controller.movement(
       type: type,
-      amountMinorUnits: _minorUnits(amount.text),
-      reasonCode: reason.text
-          .trim()
-          .replaceAll(RegExp(r'\s+'), '_')
-          .toLowerCase(),
+      amountMinorUnits: amountMinorUnits,
+      reasonCode: reasonCode,
+      approvalId: approvalId,
+      actionFingerprint: actionFingerprint,
     );
   }
   amount.dispose();

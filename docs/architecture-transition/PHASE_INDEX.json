@@ -126,6 +126,12 @@
       "status": "complete",
       "stateMachineVersion": 1,
       "subject": "Refunds, voids, immutable compensation, exception receipts, and recovery"
+    },
+    {
+      "commit": "HEAD (Gate 3D.1 commit)",
+      "id": "3D.1",
+      "status": "complete",
+      "subject": "Pilot operational RBAC, deterministic role grants, seeds, and approval separation"
     }
   ]
 }

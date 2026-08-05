@@ -1,26 +1,134 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { PosCashService } from './pos-cash.service';
 
 const id = (value: number) => `00000000-0000-4000-8000-${String(value).padStart(12, '0')}`;
 const user = { id: id(1), email: 'cashier@example.test', sessionId: id(2), deviceId: id(3) };
 const money = (minorUnits: number) => ({ minorUnits, currency: 'MXN' });
 
+const pilotMatrix = JSON.parse(
+  readFileSync(resolve(__dirname, '../../../../../config/umipos-pilot-role-grants.json'), 'utf8'),
+) as { profiles: Array<{ role: string; permissions: string[] }> };
+const cashierPermissions = pilotMatrix.profiles.find(
+  (profile) => profile.role === 'cashier',
+)!.permissions;
+
 const authorization = {
   operatorSessionId: id(4),
   operatorId: id(1),
   deviceId: id(3),
   credentialVersion: 1,
-  permissions: [
-    'cash.shift.open',
-    'cash.movement.paid_in',
-    'cash.count.submit',
-    'cash.reconcile',
-    'cash.shift.close',
-    'cash.shift.read',
-  ],
+  permissions: cashierPermissions,
 };
 
 describe('Gate 3C cash application boundary', () => {
+  it('executes the canonical Cashier cash journey without super_admin', async () => {
+    const calls: string[] = [];
+    const repo = {
+      authorize: vi.fn().mockResolvedValue(authorization),
+      openShift: vi.fn().mockImplementation(async () => {
+        calls.push('open');
+        return { shift: { id: id(9) }, register: { publicReference: 'REG-01' } };
+      }),
+      movement: vi.fn().mockImplementation(async () => {
+        calls.push('paid_in');
+        return { ledgerEntry: { sequence: 2 } };
+      }),
+      submitCount: vi.fn().mockImplementation(async () => {
+        calls.push('count');
+        return {
+          count: { id: id(11), ledgerSequence: 2 },
+          variance: { outcome: 'balanced', signedVariance: money(0) },
+        };
+      }),
+      reconcile: vi.fn().mockImplementation(async () => {
+        calls.push('reconcile');
+        return { id: id(12), outcome: 'balanced', ledgerSequence: 2 };
+      }),
+      close: vi.fn().mockImplementation(async () => {
+        calls.push('close');
+        return { summary: { expectedCash: { ledgerSequence: 2 } } };
+      }),
+    };
+    const integrity = {
+      execute: vi.fn(async (_input, operation) => {
+        const outcome = await operation({
+          client: {},
+          commandId: id(7),
+          correlationId: 'cashier-journey',
+          appendAudit: vi.fn(),
+        });
+        return { status: 'succeeded', result: outcome.value, failureCode: null };
+      }),
+    };
+    const service = new PosCashService(repo as never, integrity as never);
+
+    await service.open(user, id(5), {
+      locationId: id(6),
+      registerId: id(8),
+      operatorSessionId: id(4),
+      openingFloat: money(2_000),
+      denominations: [],
+      businessDate: '2026-07-29',
+      note: null,
+      commandId: id(7),
+      idempotencyKey: id(10),
+      expectedRegisterVersion: 1,
+    });
+    await service.movement(user, id(5), id(9), {
+      locationId: id(6),
+      shiftId: id(9),
+      operatorSessionId: id(4),
+      type: 'paid_in',
+      amount: money(100),
+      reasonCode: 'pilot_float',
+      note: null,
+      approvalId: null,
+      expectedShiftVersion: 2,
+      commandId: id(7),
+      idempotencyKey: id(10),
+    });
+    await service.count(user, id(5), id(9), {
+      locationId: id(6),
+      shiftId: id(9),
+      operatorSessionId: id(4),
+      countedCash: money(2_100),
+      denominations: [],
+      expectedShiftVersion: 3,
+      expectedLedgerSequence: 2,
+      note: null,
+      commandId: id(7),
+      idempotencyKey: id(10),
+    });
+    await service.reconcile(user, id(5), id(9), {
+      locationId: id(6),
+      shiftId: id(9),
+      operatorSessionId: id(4),
+      countAttemptId: id(11),
+      resolutionId: null,
+      expectedShiftVersion: 4,
+      commandId: id(7),
+      idempotencyKey: id(10),
+    });
+    await service.close(user, id(5), id(9), {
+      locationId: id(6),
+      shiftId: id(9),
+      operatorSessionId: id(4),
+      countAttemptId: id(11),
+      reconciliationId: id(12),
+      approvalId: null,
+      approvalFingerprint: null,
+      expectedShiftVersion: 5,
+      commandId: id(7),
+      idempotencyKey: id(10),
+    });
+
+    expect(calls).toEqual(['open', 'paid_in', 'count', 'reconcile', 'close']);
+    expect(cashierPermissions).not.toContain('*');
+    expect(cashierPermissions).not.toContain('cash.shift.close.approve');
+  });
+
   it('opens one shift through the idempotent transaction boundary', async () => {
     const repo = {
       authorize: vi.fn().mockResolvedValue(authorization),

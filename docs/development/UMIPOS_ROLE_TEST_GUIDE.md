@@ -37,11 +37,13 @@ El registro del dispositivo y el PIN del operador son controles diferentes.
 | ------------- | ------ | ----------------------------------------------------------------- |
 | Propietario   | `1111` | Catálogo, carrito, checkout, auditoría y revisión de recuperación |
 | Administrador | `2222` | Catálogo, carrito, checkout, auditoría y revisión de recuperación |
-| Gerente       | `3333` | Catálogo, carrito, checkout, auditoría y revisión de recuperación |
-| Cajero        | `2468` | Catálogo, carrito y checkout                                      |
-| Consulta      | `5555` | Catálogo de solo lectura                                          |
+| Gerente       | `3333` | Operación, recovery, caja, refunds y approvals                    |
+| Supervisor    | `4444` | Operación y approvals de checkout limitados a la location         |
+| Cajero        | `2468` | Venta, checkout, turno propio y refund parcial permitido          |
+| Consulta      | `5555` | Catálogo e historial permitido de solo lectura                    |
+| Staff         | `6666` | Perfil compatible con Cajero                                      |
 
-La API concede todos los permisos.
+La API concede solo los permisos de `config/umipos-pilot-role-grants.json`.
 
 Usa el Dashboard para administrar el personal.
 
@@ -124,7 +126,9 @@ Ejecuta toda la prueba del Cajero.
 
 El Gerente también tiene estos permisos:
 
-- `audit.read`.
+- approvals de checkout, caja y refund;
+- recovery de otro operador;
+- reconciliación de caja;
 - `offline.recovery.review`.
 - `offline.replay`.
 
@@ -136,13 +140,13 @@ Usa el PIN `2222`.
 
 Ejecuta toda la prueba del Gerente.
 
-El Dashboard administra estas funciones:
+El Dashboard administra estas funciones disponibles:
 
 - Registro y aprobación de dispositivos.
 - Personal.
-- Roles.
-- Permisos.
 - Sucursales.
+
+Use el seed canónico para asignar los perfiles del piloto. El Dashboard no ofrece ese editor en este Gate.
 
 UmiPOS mantiene solo la experiencia operativa.
 
@@ -154,10 +158,23 @@ Ejecuta toda la prueba del Administrador.
 
 El Dashboard mantiene las funciones de propiedad y configuración.
 
+## Prueba del rol Supervisor
+
+Usa el PIN `4444`.
+
+1. Recupera una venta suspendida de otro operador.
+2. Aprueba un descuento dentro de la política.
+3. Solicita un recuento.
+4. Escala una varianza a Manager.
+5. Intenta usar otra location.
+6. Confirma la denegación de scope.
+
+## Prueba del rol Staff
+
+Usa el PIN `6666`. Repite el recorrido del Cajero. Confirma que Staff no recibe approvals.
+
 ## Funciones fuera del alcance actual
 
-- Corte y conciliación de caja.
-- Reembolsos.
 - Ajustes permanentes de inventario.
 - Gestión de clientes.
 - Lealtad.

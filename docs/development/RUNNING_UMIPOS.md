@@ -66,7 +66,7 @@ Each operator enters only a personal PIN after device enrollment. UMI derives th
 branch from the trusted device. The API loads the operator identity, role, permissions, and
 entitlement.
 
-For the disposable local database, the cashier PIN is `2468`.
+For the disposable local database, the cashier PIN is `2468`. The seed prints every approved development PIN.
 
 Seed the POS entitlement only in the disposable local database:
 
@@ -80,7 +80,7 @@ Do not use the disposable seed against a shared, staging, or production database
 
 ## Local role and catalog demo
 
-Seed the disposable local database with five POS roles and 12 products:
+Seed the disposable local database with seven café profiles, one suspended platform profile, and 12 products:
 
 `UMI_POS_DEV_SEED_CONFIRM=disposable pnpm umi-pos:demo-seed`
 
@@ -92,6 +92,58 @@ The seed does not print or store the API JWT secret. It reads the secret from th
 environment or the active Linux API process.
 
 Read `docs/development/UMIPOS_ROLE_TEST_GUIDE.md` for the PIN list and each role test.
+
+## Pilot RBAC
+
+Gate 3D.1 uses one permission inventory, one grant matrix, and one approval matrix.
+
+Run these commands from the workspace root:
+
+```sh
+pnpm umi-pos:check-pilot-rbac
+pnpm umi-pos:print-role-matrix
+UMI_POS_DEV_SEED_CONFIRM=disposable pnpm umi-pos:seed-pilot-roles
+```
+
+The seed prints the development PIN for Owner, Admin, Manager, Supervisor, Cashier, Staff, and Viewer. It hashes every PIN before the database write.
+
+The seed assigns every café user to `Sucursal Local`. It creates one POS entitlement and one development register. It keeps the platform `super_admin` account suspended.
+
+Test the profiles in this order:
+
+1. Use Cashier for a normal sale and shift.
+2. Request a sensitive approval from Cashier.
+3. Use Supervisor for a checkout approval within the pilot policy.
+4. Use Manager for cash, variance, refund, and exceptional reconciliation approvals.
+5. Use Owner and Admin for business administration.
+6. Use Viewer for read-only access.
+7. Use Staff to verify Cashier compatibility.
+
+Test these denials:
+
+1. Use Cashier to approve the same Cashier action.
+2. Use Supervisor outside the assigned location.
+3. Remove a location assignment and retry the mutation.
+4. Disable the POS entitlement and retry login.
+5. Revoke the device and retry a command.
+6. Suspend the staff record and retry PIN login.
+7. Change a command after approval and retry the approval.
+
+Run focused validation:
+
+```sh
+pnpm umi-pos:rbac-api-tests
+pnpm umi-pos:rbac-db-check
+cd apps/umi-pos && flutter test test/operator_permissions_test.dart
+```
+
+Use `pnpm umi-pos:print-role-matrix` to inspect grants. The command does not print secrets.
+
+To reset the disposable pilot data, remove the disposable database container or run the existing disposable database check. Do not point a reset command at shared data.
+
+The Dashboard does not include a pilot role editor in Gate 3D.1. Use the canonical seed for pilot role assignment.
+
+The matrix permits Owner and Admin to assign only reviewed business roles. It excludes `owner` and `super_admin` assignment.
 
 ## One-command targets
 

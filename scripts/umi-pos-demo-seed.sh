@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 container="${UMI_POS_DEV_DB_CONTAINER:-umi-gate2f-postgres}"
 database="${UMI_POS_DEV_DB_NAME:-umi_gate2f}"
 merchant_id="${UMI_POS_DEV_MERCHANT_ID:-${UMI_POS_DEV_TENANT_ID:-10000000-0000-4000-8000-000000000101}}"
@@ -36,14 +37,17 @@ resolve_jwt_secret() {
     return
   fi
   if [[ -d /proc ]]; then
-    local pid
-    pid="$(pgrep -f '/apps/umi-api/dist/main' | head -n 1 || true)"
-    if [[ -n "$pid" && -r "/proc/$pid/environ" ]]; then
-      tr '\0' '\n' <"/proc/$pid/environ" |
-        sed -n 's/^JWT_SECRET=//p' |
-        head -n 1
-      return
-    fi
+    local pid cwd
+    while read -r pid; do
+      [[ -n "$pid" ]] || continue
+      cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null || true)"
+      if [[ "$cwd" == */apps/umi-api && -r "/proc/$pid/environ" ]]; then
+        tr '\0' '\n' <"/proc/$pid/environ" |
+          sed -n 's/^JWT_SECRET=//p' |
+          head -n 1
+        return
+      fi
+    done < <(pgrep -f 'node (dist/main\.js|.*nest.*start)' || true)
   fi
 }
 
@@ -73,8 +77,14 @@ NODE
 IFS='|' read -r owner_salt owner_hash owner_lookup <<<"$(pin_material 1111)"
 IFS='|' read -r admin_salt admin_hash admin_lookup <<<"$(pin_material 2222)"
 IFS='|' read -r manager_salt manager_hash manager_lookup <<<"$(pin_material 3333)"
+IFS='|' read -r supervisor_salt supervisor_hash supervisor_lookup <<<"$(pin_material 4444)"
 IFS='|' read -r cashier_salt cashier_hash cashier_lookup <<<"$(pin_material 2468)"
 IFS='|' read -r viewer_salt viewer_hash viewer_lookup <<<"$(pin_material 5555)"
+IFS='|' read -r staff_salt staff_hash staff_lookup <<<"$(pin_material 6666)"
+
+node "$ROOT/scripts/umipos-pilot-rbac.mjs" check
+docker exec -i "$container" psql -v ON_ERROR_STOP=1 -U postgres -d "$database" \
+  <"$ROOT/docs/migration/build-v3/35_pos_pilot_rbac.sql"
 
 docker exec -i "$container" psql -v ON_ERROR_STOP=1 -U postgres -d "$database" \
   -v merchant_id="$merchant_id" \
@@ -82,92 +92,11 @@ docker exec -i "$container" psql -v ON_ERROR_STOP=1 -U postgres -d "$database" \
   -v owner_salt="$owner_salt" -v owner_hash="$owner_hash" -v owner_lookup="$owner_lookup" \
   -v admin_salt="$admin_salt" -v admin_hash="$admin_hash" -v admin_lookup="$admin_lookup" \
   -v manager_salt="$manager_salt" -v manager_hash="$manager_hash" -v manager_lookup="$manager_lookup" \
+  -v supervisor_salt="$supervisor_salt" -v supervisor_hash="$supervisor_hash" -v supervisor_lookup="$supervisor_lookup" \
   -v cashier_salt="$cashier_salt" -v cashier_hash="$cashier_hash" -v cashier_lookup="$cashier_lookup" \
-  -v viewer_salt="$viewer_salt" -v viewer_hash="$viewer_hash" -v viewer_lookup="$viewer_lookup" <<'SQL'
+  -v viewer_salt="$viewer_salt" -v viewer_hash="$viewer_hash" -v viewer_lookup="$viewer_lookup" \
+  -v staff_salt="$staff_salt" -v staff_hash="$staff_hash" -v staff_lookup="$staff_lookup" <<'SQL'
 begin;
-
-insert into umi.permission(key, description)
-values
-  ('catalog.read', 'Read the operator-safe branch catalog'),
-  ('cart.write', 'Prepare a branch-scoped POS cart'),
-  ('checkout.commit', 'Commit a branch-scoped online POS sale'),
-  ('offline.cash.checkout', 'Create a policy-authorized provisional cash sale'),
-  ('offline.replay', 'Replay and reconcile device-authenticated offline commands'),
-  ('offline.recovery.review', 'Approve one scoped offline recovery action'),
-  ('sale.lifecycle', 'Manage the branch-scoped POS sale lifecycle'),
-  ('sale.resume.any', 'Resume a suspended sale from another operator'),
-  ('checkout.discount.apply', 'Apply a checkout discount within branch policy'),
-  ('checkout.discount.approve', 'Approve a sensitive checkout discount'),
-  ('checkout.terminal.confirm', 'Confirm a manual terminal outcome'),
-  ('checkout.terminal.approve', 'Approve a sensitive manual terminal outcome'),
-  ('checkout.recover.any', 'Recover another operator checkout'),
-  ('audit.read', 'Read tenant-visible, redacted audit events')
-on conflict (key) do update set description=excluded.description;
-
-insert into umi.role(id, key, name, description, is_platform)
-values
-  ('31000000-0000-4000-8000-000000000200','owner','Owner',
-   'Owns the local UmiPOS business.',false),
-  ('31000000-0000-4000-8000-000000000202','admin','Administrator',
-   'Administers the local UmiPOS business.',false),
-  ('31000000-0000-4000-8000-000000000203','manager','Manager',
-   'Supervises branch operations and recovery.',false),
-  ('31000000-0000-4000-8000-000000000201','cashier','Cashier',
-   'Operates catalog, cart, and checkout.',false),
-  ('31000000-0000-4000-8000-000000000204','viewer','Viewer',
-   'Reads the catalog without cart authority.',false)
-on conflict (key) do update
-set name=excluded.name,
-    description=excluded.description,
-    is_platform=excluded.is_platform;
-
-delete from umi.role_permission rp
-using umi.role r, umi.permission p
-where rp.role_id=r.id
-  and rp.permission_id=p.id
-  and r.key in ('owner','admin','manager','cashier','viewer')
-  and p.key in (
-    'catalog.read','cart.write','checkout.commit','offline.cash.checkout',
-    'offline.replay','offline.recovery.review','sale.lifecycle','sale.resume.any',
-    'audit.read','checkout.discount.apply','checkout.discount.approve',
-    'checkout.terminal.confirm','checkout.terminal.approve','checkout.recover.any'
-  );
-
-with grants(role_key, permission_key) as (
-  values
-    ('owner','catalog.read'),('owner','cart.write'),('owner','checkout.commit'),
-    ('owner','offline.cash.checkout'),('owner','offline.replay'),
-    ('owner','offline.recovery.review'),('owner','sale.lifecycle'),
-    ('owner','sale.resume.any'),('owner','audit.read'),
-    ('owner','checkout.discount.apply'),('owner','checkout.discount.approve'),
-    ('owner','checkout.terminal.confirm'),('owner','checkout.terminal.approve'),
-    ('owner','checkout.recover.any'),
-    ('admin','catalog.read'),('admin','cart.write'),('admin','checkout.commit'),
-    ('admin','offline.cash.checkout'),('admin','offline.replay'),
-    ('admin','offline.recovery.review'),('admin','sale.lifecycle'),
-    ('admin','sale.resume.any'),('admin','audit.read'),
-    ('admin','checkout.discount.apply'),('admin','checkout.discount.approve'),
-    ('admin','checkout.terminal.confirm'),('admin','checkout.terminal.approve'),
-    ('admin','checkout.recover.any'),
-    ('manager','catalog.read'),('manager','cart.write'),('manager','checkout.commit'),
-    ('manager','offline.cash.checkout'),('manager','offline.replay'),
-    ('manager','offline.recovery.review'),('manager','sale.lifecycle'),
-    ('manager','sale.resume.any'),('manager','audit.read'),
-    ('manager','checkout.discount.apply'),('manager','checkout.discount.approve'),
-    ('manager','checkout.terminal.confirm'),('manager','checkout.terminal.approve'),
-    ('manager','checkout.recover.any'),
-    ('cashier','catalog.read'),('cashier','cart.write'),('cashier','checkout.commit'),
-    ('cashier','offline.cash.checkout'),('cashier','offline.replay'),
-    ('cashier','sale.lifecycle'),('cashier','checkout.discount.apply'),
-    ('cashier','checkout.terminal.confirm'),
-    ('viewer','catalog.read')
-)
-insert into umi.role_permission(role_id, permission_id)
-select r.id,p.id
-from grants g
-join umi.role r on r.key=g.role_key
-join umi.permission p on p.key=g.permission_key
-on conflict do nothing;
 
 insert into merchant.merchant(id,name,currency,status)
 values (:'merchant_id','UmiPOS Local','MXN','active')
@@ -242,17 +171,70 @@ on conflict(merchant_id,location_id,currency) do update set
   expires_at=excluded.expires_at,
   fingerprint=excluded.fingerprint;
 
+insert into merchant.physical_register(
+  id,merchant_id,location_id,display_name,public_reference,currency,
+  assignment_policy,status
+)
+values (
+  '57000000-0000-4000-8000-000000000101',:'merchant_id',:'location_id',
+  'Caja principal','CAJA-LOCAL-01','MXN','operator_selects','available'
+)
+on conflict(merchant_id,location_id,public_reference) do update set
+  display_name=excluded.display_name,
+  currency=excluded.currency,
+  assignment_policy=excluded.assignment_policy,
+  active=true,
+  archived_at=null;
+
+insert into merchant.cash_shift_policy(
+  merchant_id,location_id,version,cash_shift_required,register_assignment_required,
+  one_shift_per_operator,one_shift_per_register,opening_float_required,
+  maximum_opening_float,allowed_movement_types,movement_approval_threshold,
+  count_method,blind_count_required,handoff_allowed,handoff_count_required,
+  variance_tolerance,close_approval_threshold,no_sale_drawer_allowed,
+  offline_cash_shift_allowed,denominations,currency,expires_at,fingerprint
+)
+values (
+  :'merchant_id',:'location_id','pilot-1',true,false,true,true,true,100000,
+  array['paid_in','paid_out','safe_drop'],5000,'denomination_or_total',true,true,true,
+  100,500,true,false,
+  '[{"denominationMinorUnits":50},{"denominationMinorUnits":100},{"denominationMinorUnits":200},{"denominationMinorUnits":500},{"denominationMinorUnits":1000},{"denominationMinorUnits":2000},{"denominationMinorUnits":5000},{"denominationMinorUnits":10000},{"denominationMinorUnits":20000},{"denominationMinorUnits":50000},{"denominationMinorUnits":100000}]'::jsonb,
+  'MXN',now()+interval '30 days',repeat('c',64)
+)
+on conflict(merchant_id,location_id) do update set
+  version=excluded.version,
+  cash_shift_required=excluded.cash_shift_required,
+  register_assignment_required=excluded.register_assignment_required,
+  opening_float_required=excluded.opening_float_required,
+  maximum_opening_float=excluded.maximum_opening_float,
+  allowed_movement_types=excluded.allowed_movement_types,
+  movement_approval_threshold=excluded.movement_approval_threshold,
+  count_method=excluded.count_method,
+  blind_count_required=excluded.blind_count_required,
+  handoff_allowed=excluded.handoff_allowed,
+  handoff_count_required=excluded.handoff_count_required,
+  variance_tolerance=excluded.variance_tolerance,
+  close_approval_threshold=excluded.close_approval_threshold,
+  no_sale_drawer_allowed=excluded.no_sale_drawer_allowed,
+  denominations=excluded.denominations,
+  expires_at=excluded.expires_at,
+  fingerprint=excluded.fingerprint;
+
 insert into umi.user(id,email,full_name,status)
 values
   ('30000000-0000-4000-8000-000000000200','owner@umipos.local','Propietaria UmiPOS','active'),
   ('30000000-0000-4000-8000-000000000102','admin@umipos.local','Administradora UmiPOS','active'),
   ('30000000-0000-4000-8000-000000000203','manager@umipos.local','Gerente UmiPOS','active'),
+  ('30000000-0000-4000-8000-000000000205','supervisor@umipos.local','Supervisora UmiPOS','active'),
   ('30000000-0000-4000-8000-000000000201','cashier@umipos.local','Cajera UmiPOS','active'),
-  ('30000000-0000-4000-8000-000000000204','viewer@umipos.local','Consulta UmiPOS','active')
+  ('30000000-0000-4000-8000-000000000206','staff@umipos.local','Personal UmiPOS','active'),
+  ('30000000-0000-4000-8000-000000000204','viewer@umipos.local','Consulta UmiPOS','active'),
+  ('30000000-0000-4000-8000-000000000299','platform-admin@umipos.local',
+   'Super Admin de desarrollo','suspended')
 on conflict (id) do update
 set email=excluded.email,
     full_name=excluded.full_name,
-    status='active',
+    status=excluded.status,
     updated_at=now();
 
 insert into merchant.staff(
@@ -269,9 +251,15 @@ values
   ('40000000-0000-4000-8000-000000000203',:'merchant_id',:'location_id',
    '30000000-0000-4000-8000-000000000203',(select id from umi.role where key='manager'),
    'Gerente UmiPOS','manager','active',:'manager_salt',:'manager_hash',:'manager_lookup'),
+  ('40000000-0000-4000-8000-000000000205',:'merchant_id',:'location_id',
+   '30000000-0000-4000-8000-000000000205',(select id from umi.role where key='supervisor'),
+   'Supervisora UmiPOS','supervisor','active',:'supervisor_salt',:'supervisor_hash',:'supervisor_lookup'),
   ('40000000-0000-4000-8000-000000000201',:'merchant_id',:'location_id',
    '30000000-0000-4000-8000-000000000201',(select id from umi.role where key='cashier'),
    'Cajera UmiPOS','cashier','active',:'cashier_salt',:'cashier_hash',:'cashier_lookup'),
+  ('40000000-0000-4000-8000-000000000206',:'merchant_id',:'location_id',
+   '30000000-0000-4000-8000-000000000206',(select id from umi.role where key='staff'),
+   'Personal UmiPOS','staff','active',:'staff_salt',:'staff_hash',:'staff_lookup'),
   ('40000000-0000-4000-8000-000000000204',:'merchant_id',:'location_id',
    '30000000-0000-4000-8000-000000000204',(select id from umi.role where key='viewer'),
    'Consulta UmiPOS','viewer','active',:'viewer_salt',:'viewer_hash',:'viewer_lookup')
@@ -285,6 +273,15 @@ set location_id=excluded.location_id,
     operator_pin_hash=excluded.operator_pin_hash,
     operator_pin_lookup=excluded.operator_pin_lookup,
     updated_at=now();
+
+insert into umi.user_role(user_id,role_id,justification)
+select '30000000-0000-4000-8000-000000000299'::uuid,r.id,
+       'development-only platform profile; not a café operator'
+from umi.role r
+where r.key='super_admin' and r.is_platform
+on conflict(user_id,role_id) do update set
+  justification=excluded.justification,
+  expires_at=null;
 
 insert into merchant.product_category(id,merchant_id,name,display_order)
 values
@@ -441,11 +438,12 @@ set url=excluded.url,
     height=excluded.height,
     display_order=excluded.display_order;
 
-select 1 / case when count(*)=5 then 1 else 0 end
+select 1 / case when count(*)=7 then 1 else 0 end
 from merchant.staff
 where merchant_id=:'merchant_id'::uuid
   and operator_pin_lookup in (
-    :'owner_lookup',:'admin_lookup',:'manager_lookup',:'cashier_lookup',:'viewer_lookup'
+    :'owner_lookup',:'admin_lookup',:'manager_lookup',:'supervisor_lookup',
+    :'cashier_lookup',:'staff_lookup',:'viewer_lookup'
   );
 
 select 1 / case when count(*)=12 then 1 else 0 end
@@ -453,15 +451,12 @@ from merchant.product
 where merchant_id=:'merchant_id'::uuid
   and external_ref like 'demo-%';
 
-select 1 / case when count(*)=27 then 1 else 0 end
+select 1 / case when count(*)=216 then 1 else 0 end
 from umi.role_permission rp
 join umi.role r on r.id=rp.role_id
 join umi.permission p on p.id=rp.permission_id
-where r.key in ('owner','admin','manager','cashier','viewer')
-  and p.key in (
-    'catalog.read','cart.write','checkout.commit','offline.cash.checkout',
-    'offline.replay','offline.recovery.review','audit.read'
-  );
+where r.key in ('owner','admin','manager','supervisor','cashier','staff','viewer')
+  and p.key not in ('loyalty.operate','orders.operate');
 
 commit;
 
@@ -479,4 +474,6 @@ where merchant_id=:'merchant_id'::uuid
   and external_ref like 'demo-%';
 SQL
 
-echo "Use PINs 1111, 2222, 3333, 2468, and 5555 for the local role checks."
+echo "Development PINs: Owner 1111, Admin 2222, Manager 3333, Supervisor 4444."
+echo "Development PINs: Cashier 2468, Viewer 5555, Staff 6666."
+echo "The super_admin development account has no café PIN and remains suspended."

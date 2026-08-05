@@ -79,7 +79,7 @@ describe('Gate 3C cash persistence', () => {
     expect(repository).toContain(
       'expected.expectedDrawerCash.minorUnits > policy.closeApprovalThreshold.minorUnits',
     );
-    expect(repository).toContain("permission: 'cash.shift.close'");
+    expect(repository).toContain("permission: 'cash.shift.close.approve'");
     expect(repository).toContain('APPROVAL_FINGERPRINT_MISMATCH');
   });
 

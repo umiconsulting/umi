@@ -14,15 +14,21 @@ import { AuthGuard } from '../auth/auth.guard';
 import { MerchantAccessGuard } from '../auth/merchant-access.guard';
 import { Merchant } from '../auth/current-user.decorator';
 import type { MerchantAccess } from '../auth/auth.types';
+import { RequirePermission } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
+import { EntitlementGuard } from '../auth/entitlement.guard';
+import { RequireProduct } from '../auth/require-product.decorator';
 import { StaffService } from './staff.service';
 import { CreateStaffDto, UpdateStaffDto } from './dto/staff.dto';
 
 /**
  * Staff CRUD over `merchant.staff`. Slug-routed; MerchantAccessGuard resolves
- * the slug → merchant and verifies membership (no membership check existed in
- * server.js — hardened here). No product entitlement gate, matching server.js.
+ * the slug → merchant and verifies membership. The POS entitlement gate keeps
+ * pilot role administration inside the active merchant product scope.
  */
-@UseGuards(AuthGuard, MerchantAccessGuard)
+@UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard, RolesGuard)
+@RequireProduct('pos')
+@RequirePermission('merchant.manage')
 @Controller('api/:slug/admin/staff')
 export class StaffController {
   constructor(private readonly staff: StaffService) {}
