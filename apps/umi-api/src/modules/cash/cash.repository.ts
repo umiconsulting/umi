@@ -387,7 +387,7 @@ export class CashRepository {
     return this.pg.withMerchant(async (c) => {
       const rows = (
         await c.query<Row>(
-          `SELECT id::text, code, amount_cents AS "amountCentavos", sender_name AS "senderName",
+          `SELECT id::text, masked_code AS code, amount_cents AS "amountCentavos", sender_name AS "senderName",
                   recipient_name AS "recipientName", recipient_email AS "recipientEmail",
                   recipient_phone AS "recipientPhone", message,
                   (redeemed_at IS NOT NULL) AS "isRedeemed",

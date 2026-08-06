@@ -120,7 +120,7 @@ interface StoredLine {
 
 interface StoredTender {
   id: string;
-  type: 'cash' | 'manual_terminal';
+  type: 'cash' | 'manual_terminal' | 'wallet' | 'gift_card';
   amount: number;
 }
 
@@ -292,6 +292,18 @@ export class PosExceptionRepository {
         if (
           calculated.tenders.some((tender) => tender.type === 'manual_terminal') &&
           !hasPermission(authorization, 'sale.refund.manual_terminal')
+        ) {
+          throw new ConflictException({ code: 'PERMISSION_REVOKED' });
+        }
+        if (
+          calculated.tenders.some((tender) => tender.type === 'wallet') &&
+          !hasPermission(authorization, 'wallet.refund')
+        ) {
+          throw new ConflictException({ code: 'PERMISSION_REVOKED' });
+        }
+        if (
+          calculated.tenders.some((tender) => tender.type === 'gift_card') &&
+          !hasPermission(authorization, 'gift_card.refund')
         ) {
           throw new ConflictException({ code: 'PERMISSION_REVOKED' });
         }
@@ -772,7 +784,28 @@ export class PosExceptionRepository {
           preview.currency,
         );
       }
+      if (tender.type === 'wallet' && !hasPermission(authorization, 'wallet.refund')) {
+        throw new ConflictException({ code: 'PERMISSION_REVOKED' });
+      }
+      if (tender.type === 'gift_card' && !hasPermission(authorization, 'gift_card.refund')) {
+        throw new ConflictException({ code: 'PERMISSION_REVOKED' });
+      }
     }
+    await client.query(
+      `SELECT merchant.reverse_customer_value(
+        $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7,current_date,$8::uuid,$9::uuid)`,
+      [
+        merchantId,
+        dto.locationId,
+        saleId,
+        exceptionId,
+        dto.commandId,
+        dto.idempotencyKey,
+        commandFingerprint,
+        authorization.operatorId,
+        authorization.deviceId,
+      ],
+    );
     const allocation = {
       merchandise: money(Number(preview.merchandiseMinorUnits), preview.currency),
       tax: money(Number(preview.taxMinorUnits), preview.currency),
@@ -1296,7 +1329,7 @@ export class PosExceptionRepository {
     });
     const tenderRows = await client.query<{
       id: string;
-      type: 'cash' | 'manual_terminal';
+      type: 'cash' | 'manual_terminal' | 'wallet' | 'gift_card';
       amount: string;
       refunded: string;
       status: string;

@@ -25,6 +25,7 @@ export class PosSaleRepository {
     merchantId: string,
     locationId: string,
     operatorSessionId: string,
+    permission = 'sale.lifecycle',
   ): Promise<boolean> {
     return this.pg.runWithMerchant(
       merchantId,
@@ -43,14 +44,14 @@ export class PosSaleRepository {
          AND os.state='active'
          AND os.expires_at>now()
          AND d.status='active'
-         AND ('sale.lifecycle'=ANY(os.permissions) OR '*'=ANY(os.permissions))
+         AND ($7=ANY(os.permissions) OR '*'=ANY(os.permissions))
          AND EXISTS (
            SELECT 1
            FROM jsonb_array_elements(os.entitlements) e
            WHERE e->>'featureKey'='pos'
              AND COALESCE((e->>'enabled')::boolean,false)
          )`,
-          [userId, sessionId, deviceId, merchantId, locationId, operatorSessionId],
+          [userId, sessionId, deviceId, merchantId, locationId, operatorSessionId, permission],
         );
         return (rowCount ?? 0) > 0;
       },
@@ -256,6 +257,7 @@ export class PosSaleRepository {
              WHERE customer.id=$4::uuid
                AND customer.merchant_id=$1::uuid
                AND customer.merged_into_id IS NULL
+               AND customer.status='active'
            )
          )`,
       [merchantId, saleId, expectedVersion, customerId, operatorSessionId],

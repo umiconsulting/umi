@@ -440,6 +440,68 @@ No apuntes el script a una base compartida o de producción.
 Para un reinicio desechable, elimina solo el contenedor que creó el script. Conserva cualquier stash
 local. No uses el reset con datos de producción.
 
+## Clientes, lealtad y valor almacenado
+
+Usa Node 22 para todos los comandos de Gate 3F. Conserva cualquier stash local.
+
+Ejecuta la migración y la matriz RLS en una base desechable:
+
+```sh
+pnpm umi-pos:customer-value-db-check
+```
+
+Ejecuta las pruebas API enfocadas:
+
+```sh
+pnpm umi-pos:customer-value-api-tests
+```
+
+Ejecuta las pruebas Flutter enfocadas:
+
+```sh
+cd apps/umi-pos
+flutter test test/customer_value_test.dart test/checkout_test.dart
+```
+
+Prueba el cliente:
+
+1. Inicia la base, la API y UmiPOS con los comandos anteriores de este documento.
+2. Ejecuta el seed del piloto en datos desechables.
+3. Abre el Centro de clientes.
+4. Busca un cliente reciente.
+5. Crea un cliente sin correo y sin teléfono.
+6. Confirma que marketing no está seleccionado.
+7. Adjunta el cliente a una venta.
+8. Quita el cliente y completa una venta anónima.
+
+Prueba lealtad y rewards:
+
+1. Crea una cuenta de puntos en la base desechable.
+2. Configura una política y un reward del piloto.
+3. Solicita la vista de valor para una venta editable.
+4. Autoriza el reward.
+5. Libera la autorización y confirma el saldo.
+6. Autoriza otra vez y confirma el checkout.
+7. Verifica `merchant.loyalty_points_ledger` y su proyección.
+
+Prueba wallet y gift card:
+
+1. Crea una wallet de desarrollo para el cliente.
+2. Agrega un hecho `loaded` con una referencia de seed.
+3. Crea una gift card de desarrollo y conserva el código fuera de logs.
+4. Activa la gift card con una aprobación válida.
+5. Autoriza un importe menor que el saldo.
+6. Confirma un pago mixto.
+7. Verifica el tender, el ledger y el saldo restante.
+8. Ejecuta un refund parcial.
+9. Confirma una reversión proporcional y sin duplicados.
+
+Una pérdida de respuesta requiere consultar el comando original. No repitas un débito sin esa consulta.
+
+Las operaciones de customers, rewards, wallet y gift card son online-only. El replay cash puede conservar una referencia limitada del cliente.
+
+El script crea y elimina su base desechable. No lo apuntes a una base compartida. No borres datos de producción.
+
 ## Canonical PR check
 
 Use Node 22 and pnpm 10.29.3. Run this command before each commit and push:

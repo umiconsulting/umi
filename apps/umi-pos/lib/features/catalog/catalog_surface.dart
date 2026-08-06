@@ -11,6 +11,8 @@ import '../cash/cash_controller.dart';
 import '../cash/cash_surface.dart';
 import '../checkout/checkout_controller.dart';
 import '../checkout/checkout_surface.dart';
+import '../customer_value/customer_value_controller.dart';
+import '../customer_value/customer_value_surface.dart';
 import '../entry/entry_controller.dart';
 import '../exception/exception_controller.dart';
 import '../inventory/inventory_controller.dart';
@@ -32,6 +34,7 @@ final class CatalogSurface extends StatefulWidget {
     required this.cash,
     required this.checkout,
     required this.sales,
+    this.customerValue,
     required this.exceptions,
     required this.connectivity,
     required this.telemetry,
@@ -46,6 +49,7 @@ final class CatalogSurface extends StatefulWidget {
   final CashController cash;
   final CheckoutController checkout;
   final SaleLifecycleController sales;
+  final CustomerValueController? customerValue;
   final SaleExceptionController exceptions;
   final ConnectivityController connectivity;
   final Telemetry telemetry;
@@ -222,6 +226,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                       entry: widget.entry,
                       permissions: permissions,
                       sales: widget.sales,
+                      customerValue: widget.customerValue,
                       onEdit: (item) => _showDetail(
                         item.productId,
                         item: item,
@@ -293,6 +298,21 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               ),
               icon: const Icon(Icons.receipt_long_outlined),
             ),
+          if (access.showSaleActions)
+            if (permissions.allows('customer.search') &&
+                widget.customerValue != null)
+              IconButton(
+                tooltip: Localizations.localeOf(context).languageCode == 'es'
+                    ? 'Centro de clientes'
+                    : 'Customer center',
+                onPressed: () => showCustomerCenter(
+                  context,
+                  entry: widget.entry,
+                  controller: widget.customerValue!,
+                  sales: widget.sales,
+                ),
+                icon: const Icon(Icons.people_alt_outlined),
+              ),
           if (access.showSaleActions)
             IconButton(
               tooltip: l.currentCustomerLabel,
@@ -446,6 +466,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                     entry: widget.entry,
                     permissions: permissions,
                     sales: widget.sales,
+                    customerValue: widget.customerValue,
                     onEdit: (item) => _showDetail(
                       item.productId,
                       item: item,
@@ -1014,6 +1035,7 @@ final class _CartPanel extends StatelessWidget {
     required this.entry,
     required this.permissions,
     required this.sales,
+    required this.customerValue,
     required this.onEdit,
   });
   final CartController controller;
@@ -1022,6 +1044,7 @@ final class _CartPanel extends StatelessWidget {
   final EntryController entry;
   final OperatorPermissions permissions;
   final SaleLifecycleController sales;
+  final CustomerValueController? customerValue;
   final ValueChanged<CartItem> onEdit;
 
   String _money(Map<String, Object?> value) {
@@ -1179,6 +1202,7 @@ final class _CartPanel extends StatelessWidget {
                       cart: controller,
                       entry: entry,
                       sales: sales,
+                      customerValue: customerValue,
                     ),
               child: Text(l.checkoutAction),
             ),

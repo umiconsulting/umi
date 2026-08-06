@@ -87,13 +87,16 @@ for (const [index, match] of matches.entries()) {
 }
 
 const expectedStatuses = new Map([
-  ['IMPLEMENTADO', 37],
+  ['IMPLEMENTADO', 41],
   ['IMPLEMENTADO CON LIMITACIONES', 15],
   ['FOUNDATION', 1],
+  ['INCOMPLETO: binding de preview', 1],
+  ['INCOMPLETO: policy y expiry', 1],
+  ['INCOMPLETO: rate limit', 1],
   ['NO IMPLEMENTADO', 0],
 ]);
-if (matches.length !== 53 || !document.includes('**53 casos de uso**')) {
-  throw new Error(`Expected 53 use cases, found ${matches.length}.`);
+if (matches.length !== 60 || !document.includes('**60 casos de uso**')) {
+  throw new Error(`Expected 60 use cases, found ${matches.length}.`);
 }
 for (const [status, expected] of expectedStatuses) {
   const actual = statusCounts.get(status) ?? 0;
@@ -116,6 +119,10 @@ const expectedModules = new Map([
   ['OFF', 4],
   ['HIST', 2],
   ['INV', 6],
+  ['CUST', 3],
+  ['LOY', 2],
+  ['WAL', 1],
+  ['GIFT', 1],
 ]);
 for (const [module, expected] of expectedModules) {
   const actual = moduleCounts.get(module) ?? 0;
@@ -161,12 +168,12 @@ const roleColumns = new Map([
   ['Viewer', 9],
 ]);
 const expectedRoleCounts = new Map([
-  ['Owner', 53],
-  ['Admin', 53],
-  ['Manager', 49],
-  ['Supervisor', 48],
-  ['Cashier', 42],
-  ['Staff', 42],
+  ['Owner', 60],
+  ['Admin', 60],
+  ['Manager', 56],
+  ['Supervisor', 55],
+  ['Cashier', 48],
+  ['Staff', 48],
   ['Viewer', 8],
 ]);
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
@@ -205,6 +212,13 @@ const requiredPermissionByCase = new Map([
   ['UC-INV-004', 'inventory.restock.resolve'],
   ['UC-INV-005', 'inventory.count.create'],
   ['UC-INV-006', 'offline.cash.checkout'],
+  ['UC-CUST-001', 'customer.search'],
+  ['UC-CUST-002', 'customer.create'],
+  ['UC-CUST-003', 'customer.history.read'],
+  ['UC-LOY-001', 'checkout.commit'],
+  ['UC-LOY-002', 'loyalty.reward.authorize'],
+  ['UC-WAL-001', 'wallet.authorize'],
+  ['UC-GIFT-001', 'gift_card.lookup'],
 ]);
 for (const [caseId, permission] of requiredPermissionByCase) {
   const row = matrixRows.find((value) => value[0] === caseId);

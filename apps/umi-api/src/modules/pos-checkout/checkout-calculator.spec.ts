@@ -423,4 +423,40 @@ describe('Gate 3B checkout calculator', () => {
     );
     expect(result).toMatchObject({ ok: false, code: 'DISCOUNT_REJECTED' });
   });
+
+  it('binds an authorized loyalty reward to the financial total', () => {
+    const authorizationId = id(20);
+    const result = calculateCheckout(
+      confirmation,
+      {
+        ...command,
+        customerValue: {
+          previewFingerprint: 'b'.repeat(64),
+          rewardAuthorizationId: authorizationId,
+          storedValueAuthorizationIds: [],
+        },
+        tenderDrafts: [
+          {
+            id: id(21),
+            type: 'cash',
+            amount: money(9_000),
+            amountReceived: money(9_000),
+            status: 'draft',
+            correlationId: null,
+          },
+        ],
+      },
+      policy,
+      new Map(),
+      { authorizationId, amountMinorUnits: 1_000 },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.confirmation.totals.discounts.total.minorUnits).toBe(1_000);
+    expect(result.confirmation.totals.grandTotal.minorUnits).toBe(9_000);
+    expect(result.confirmation.discounts.entries[0]?.label).toBe(
+      `loyalty_reward:${authorizationId}`,
+    );
+    expect(result.approvalRequired).toBe(false);
+  });
 });

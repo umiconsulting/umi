@@ -65,6 +65,20 @@ revoke select on runtime.session, runtime.otp, runtime.password_reset_token,
 -- global catalogs + per-café tables (RLS-scoped); minimal, scoped runtime.
 grant select, insert, update, delete on all tables in schema merchant to api;
 
+-- Gate 3F permits points and stored-value facts only through command boundaries.
+revoke insert, update, delete on
+  merchant.customer_consent_history,
+  merchant.loyalty_points_ledger,
+  merchant.loyalty_stored_value_ledger,
+  merchant.loyalty_gift_card_ledger
+from api, worker;
+grant select on
+  merchant.customer_consent_history,
+  merchant.loyalty_points_ledger,
+  merchant.loyalty_stored_value_ledger,
+  merchant.loyalty_gift_card_ledger
+to api, worker;
+
 -- Gate 3D keeps policy server-owned and committed compensation append-only.
 revoke insert, update, delete on merchant.pos_exception_policy from api;
 revoke delete on merchant.pos_exception_preview from api;
@@ -460,7 +474,12 @@ declare
   undecided text[];
   -- Ledger history belongs to the merchant and location. Its device_id records provenance.
   -- A later trusted device can read the original fact for refund and support workflows.
-  not_device_scoped constant text[] := array['stock_ledger_entry']::text[];
+  not_device_scoped constant text[] := array[
+    'stock_ledger_entry',
+    'loyalty_points_ledger',
+    'loyalty_stored_value_ledger',
+    'loyalty_gift_card_ledger'
+  ]::text[];
 begin
   select array_agg(c.relname order by c.relname) into undecided
     from pg_class c

@@ -12,6 +12,7 @@ import type {
   ReceiptSnapshot,
   TotalsConfirmation,
 } from '@umi/contract';
+import type { CustomerValueCommitResult, CustomerValueSelection } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
 import { writeOrder } from '../../shared/orders/order-writer';
 
@@ -44,6 +45,16 @@ export interface CheckoutAuthorization {
   credentialVersion: number;
   operatorName: string;
   permissions: string[];
+}
+
+export interface CheckoutCustomerValueAllocation {
+  rewardDiscount: { authorizationId: string; amountMinorUnits: number } | null;
+  storedValue: Array<{
+    authorizationId: string;
+    accountType: 'wallet' | 'gift_card';
+    amountMinorUnits: number;
+    currency: string;
+  }>;
 }
 
 @Injectable()
@@ -185,6 +196,82 @@ export class PosCheckoutRepository {
         approvalPermission: 'checkout.discount.approve',
         version: row.version,
       },
+    };
+  }
+
+  async customerValueAllocation(
+    client: PoolClient,
+    cart: CheckoutCart,
+    selection: CustomerValueSelection | null | undefined,
+  ): Promise<CheckoutCustomerValueAllocation> {
+    if (!selection) return { rewardDiscount: null, storedValue: [] };
+    let rewardDiscount: CheckoutCustomerValueAllocation['rewardDiscount'] = null;
+    if (selection.rewardAuthorizationId) {
+      const reward = await client.query<{ authorizationId: string; amountMinorUnits: string }>(
+        `SELECT a.id::text AS "authorizationId",a.benefit_minor_units::text AS "amountMinorUnits"
+           FROM merchant.customer_value_authorization a
+          WHERE a.id=$1::uuid AND a.merchant_id=$2::uuid AND a.location_id=$3::uuid
+            AND a.sale_id=$4::uuid AND a.checkout_version=$5 AND a.customer_id=$6::uuid
+            AND a.account_type='loyalty_reward' AND a.status='authorized'
+            AND a.expires_at>clock_timestamp() AND a.checkout_fingerprint=$7
+          FOR UPDATE OF a`,
+        [
+          selection.rewardAuthorizationId,
+          cart.merchantId,
+          cart.locationId,
+          cart.id,
+          cart.version,
+          cart.customerId,
+          selection.previewFingerprint,
+        ],
+      );
+      if (!reward.rows[0]) throw new ConflictException({ code: 'REWARD_AUTHORIZATION_EXPIRED' });
+      rewardDiscount = {
+        authorizationId: reward.rows[0].authorizationId,
+        amountMinorUnits: Number(reward.rows[0].amountMinorUnits),
+      };
+    }
+    const requested = [...new Set(selection.storedValueAuthorizationIds)].sort();
+    if (requested.length !== selection.storedValueAuthorizationIds.length) {
+      throw new ConflictException({ code: 'STORED_VALUE_AUTHORIZATION_DUPLICATE' });
+    }
+    if (requested.length === 0) return { rewardDiscount, storedValue: [] };
+    const stored = await client.query<{
+      authorizationId: string;
+      accountType: 'wallet' | 'gift_card';
+      amountMinorUnits: string;
+      currency: string;
+    }>(
+      `SELECT id::text AS "authorizationId",account_type AS "accountType",
+              amount_minor_units::text AS "amountMinorUnits",currency
+         FROM merchant.customer_value_authorization
+        WHERE id=ANY($1::uuid[]) AND merchant_id=$2::uuid AND location_id=$3::uuid
+          AND sale_id=$4::uuid AND checkout_version=$5
+          AND customer_id IS NOT DISTINCT FROM $6::uuid
+          AND account_type IN ('wallet','gift_card') AND status='authorized'
+          AND expires_at>clock_timestamp() AND checkout_fingerprint=$7
+        ORDER BY account_type,account_id FOR UPDATE`,
+      [
+        requested,
+        cart.merchantId,
+        cart.locationId,
+        cart.id,
+        cart.version,
+        cart.customerId,
+        selection.previewFingerprint,
+      ],
+    );
+    if (stored.rowCount !== requested.length) {
+      throw new ConflictException({ code: 'STORED_VALUE_AUTHORIZATION_EXPIRED' });
+    }
+    return {
+      rewardDiscount,
+      storedValue: stored.rows.map((row) => ({
+        authorizationId: row.authorizationId,
+        accountType: row.accountType,
+        amountMinorUnits: Number(row.amountMinorUnits),
+        currency: row.currency,
+      })),
     };
   }
 
@@ -683,7 +770,14 @@ export class PosCheckoutRepository {
       if (tenderFact.rowCount !== 1) {
         throw new Error('Tender identity conflicts with another checkout.');
       }
-      const method: PaymentMethod = tender.type === 'cash' ? 'cash' : 'external_terminal';
+      const method: PaymentMethod =
+        tender.type === 'cash'
+          ? 'cash'
+          : tender.type === 'manual_terminal'
+            ? 'external_terminal'
+            : tender.type === 'wallet'
+              ? 'stored_value'
+              : 'gift_card';
       const { rows } = await client.query<{
         id: string;
         method: PaymentMethod;
@@ -859,7 +953,12 @@ export class PosCheckoutRepository {
     commandId: string,
     authorization: CheckoutAuthorization,
     correlationId: string,
-  ): Promise<NonNullable<CheckoutResult['sale']>> {
+    idempotencyKey: string,
+    customerValue: CustomerValueSelection | null,
+  ): Promise<{
+    sale: NonNullable<CheckoutResult['sale']>;
+    customerValue: CustomerValueCommitResult | null;
+  }> {
     const cashTenders = paymentSummary.tenders.filter((tender) => tender.type === 'cash');
     if (cashTenders.length > 0 && cashShiftId === null) {
       throw new Error('CASH_SHIFT_REQUIRED');
@@ -912,7 +1011,7 @@ export class PosCheckoutRepository {
         payments[0].attempt.id,
         orderId,
         payments[0].attempt.amount.minorUnits,
-        payments[0].attempt.method === 'cash' ? 'cash' : 'card',
+        payments[0].attempt.method === 'external_terminal' ? 'card' : payments[0].attempt.method,
       ],
     );
     for (const payment of payments.slice(1)) {
@@ -924,7 +1023,7 @@ export class PosCheckoutRepository {
           payment.attempt.id,
           orderId,
           payment.attempt.amount.minorUnits,
-          payment.attempt.method === 'cash' ? 'cash' : 'card',
+          payment.attempt.method === 'external_terminal' ? 'card' : payment.attempt.method,
         ],
       );
     }
@@ -1023,6 +1122,26 @@ export class PosCheckoutRepository {
         correlationId,
       ],
     );
+    const value = await client.query<{ result: Record<string, unknown> }>(
+      `SELECT merchant.commit_customer_value(
+        $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::uuid,$9,$10::date,
+        $11::uuid,$12::uuid,$13::jsonb) AS result`,
+      [
+        cart.merchantId,
+        cart.locationId,
+        cart.id,
+        sale.rows[0].id,
+        orderId,
+        cart.customerId,
+        commandId,
+        idempotencyKey,
+        customerValue?.previewFingerprint ?? confirmation.fingerprint,
+        cart.businessDate,
+        authorization.operatorId,
+        authorization.deviceId,
+        JSON.stringify(customerValue ?? {}),
+      ],
+    );
     await client.query(
       `UPDATE merchant.pos_tender_fact
        SET status='committed',committed_at=now()
@@ -1042,13 +1161,23 @@ export class PosCheckoutRepository {
       [cart.id, cart.version],
     );
     return {
-      id: sale.rows[0].id,
-      orderId,
-      receiptId: receiptRow.rows[0].id,
-      receiptRef: receipt.receiptRef,
-      status: 'committed',
-      committedAt: sale.rows[0].committedAt,
-      totals: confirmation.totals,
+      sale: {
+        id: sale.rows[0].id,
+        orderId,
+        receiptId: receiptRow.rows[0].id,
+        receiptRef: receipt.receiptRef,
+        status: 'committed',
+        committedAt: sale.rows[0].committedAt,
+        totals: confirmation.totals,
+      },
+      customerValue: {
+        customerId: cart.customerId,
+        earn: null,
+        reward: null,
+        storedValue: [],
+        recovered: false,
+        ...(value.rows[0]?.result ?? {}),
+      },
     };
   }
 

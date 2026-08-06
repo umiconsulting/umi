@@ -18,7 +18,8 @@ routing. What lives here is what no agent can infer.
 | Path                    | Owns                                                                                 |
 | ----------------------- | ------------------------------------------------------------------------------------ |
 | `apps/umi-kds`          | Native iPad Kitchen Display System client                                            |
-| `apps/umi-cash`         | Loyalty, wallet, passes, Cash-specific Prisma                                        |
+| `apps/umi-cash`         | Cash consumer loyalty, wallet, passes, and Cash-specific Prisma behavior             |
+| `apps/umi-api`          | UmiPOS merchant sale, inventory, loyalty, and stored-value transaction authority     |
 | `apps/umi-conversaflow` | Shared Supabase backend, workflow jobs, prompts, traces, cross-channel normalization |
 | `apps/umi-logs`         | ConversaFlow operational logs and trace UI                                           |
 | `apps/umi-dashboard`    | Owner dashboard app shell and live-data UI                                           |
@@ -29,7 +30,8 @@ routing. What lives here is what no agent can infer.
 
 - `conversaflow` — operational runtime: conversations, orders, workflow jobs, outbox
 - `kds` — kitchen read models and projections only
-- `umi_cash` — loyalty and wallet tables
+- `umi_cash` — Cash consumer loyalty, wallet, and pass tables
+- build-v3 `merchant` — UmiPOS merchant loyalty and stored-value transaction facts
 - `platform` — shared organization data (contacts, users, tenants, leads)
 - `public` — temporary compatibility surface; do not add new product logic
 

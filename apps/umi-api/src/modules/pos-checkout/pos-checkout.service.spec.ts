@@ -43,6 +43,7 @@ const cart = {
   merchantName: 'Umi Café',
   locationName: 'Centro',
   operatorName: 'Ada',
+  customerId: null,
   lines: [
     {
       id: id(8),
@@ -88,6 +89,10 @@ function harness() {
         approvalPermission: 'checkout.discount.approve',
         version: '1',
       },
+    }),
+    customerValueAllocation: vi.fn().mockResolvedValue({
+      rewardDiscount: null,
+      storedValue: [],
     }),
     saveDraft: vi.fn().mockResolvedValue({ id: id(19), version: 1 }),
     consumeApprovals: vi.fn().mockResolvedValue({
@@ -153,13 +158,16 @@ function harness() {
         })),
     ),
     commit: vi.fn().mockResolvedValue({
-      id: id(12),
-      orderId: id(13),
-      receiptId: id(14),
-      receiptRef: `POS-${id(11)}`,
-      status: 'committed',
-      committedAt: '2026-07-28T19:00:00.000Z',
-      totals: {},
+      sale: {
+        id: id(12),
+        orderId: id(13),
+        receiptId: id(14),
+        receiptRef: `POS-${id(11)}`,
+        status: 'committed',
+        committedAt: '2026-07-28T19:00:00.000Z',
+        totals: {},
+      },
+      customerValue: null,
     }),
     saveCommittedResult: vi.fn().mockResolvedValue(undefined),
     recovery: vi.fn().mockResolvedValue(null),

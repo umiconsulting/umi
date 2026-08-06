@@ -94,7 +94,7 @@ expect_error() {  # expect_error <label> <output>
 
 echo "== building a disposable build-v3 in $DB =="
 psql -q -c "create database $DB;" >/dev/null
-for f in 00_foundation 10_umi 20_merchant 30_runtime 30_device_pairing 31_pos_sale 32_pos_checkout 33_pos_cash 34_pos_exception 35_pos_pilot_rbac 36_pos_inventory 50_cross_schema_fk 60_triggers 90_rls 99_verify; do
+for f in 00_foundation 10_umi 20_merchant 30_runtime 30_device_pairing 31_pos_sale 32_pos_checkout 33_pos_cash 34_pos_exception 35_pos_pilot_rbac 36_pos_inventory 37_pos_customer_value 50_cross_schema_fk 60_triggers 90_rls 99_verify; do
   if ! ddl_output=$(psql -X -q -v ON_ERROR_STOP=1 -d "$DB" -f "$DDL/$f.sql" 2>&1); then
     echo "  DDL FAILED at $f:"
     printf '%s\n' "$ddl_output" | grep -E 'ERROR|LINE' | head -5
@@ -138,6 +138,7 @@ SQL
 echo "  seeded 2 cafés / 3 locations / 2 devices / 1 operator session"
 
 q -c "create role inventory_api_login inherit; grant api to inventory_api_login;" >/dev/null
+q -c "create role customer_value_worker_login inherit; grant worker to customer_value_worker_login;" >/dev/null
 
 echo
 echo "== 1. merchant isolation =="
@@ -655,13 +656,13 @@ expect "all pilot business roles exist" "7" \
     ('owner','admin','manager','supervisor','cashier','staff','viewer') and not is_platform;")"
 expect "super_admin remains platform-only" "t" \
   "$(q -c "select is_platform from umi.role where key='super_admin';")"
-expect "Cashier receives the exact reviewed grant count" "23" \
+expect "Cashier receives the exact reviewed grant count" "41" \
   "$(q -c "select count(*) from umi.role_permission rp join umi.role r on r.id=rp.role_id
     where r.key='cashier';")"
-expect "Supervisor receives the exact reviewed grant count" "43" \
+expect "Supervisor receives the exact reviewed grant count" "65" \
   "$(q -c "select count(*) from umi.role_permission rp join umi.role r on r.id=rp.role_id
     where r.key='supervisor';")"
-expect "Manager receives the exact reviewed grant count" "62" \
+expect "Manager receives the exact reviewed grant count" "93" \
   "$(q -c "select count(*) from umi.role_permission rp join umi.role r on r.id=rp.role_id
     where r.key='manager';")"
 expect "Viewer receives no mutation permission" "0" \
@@ -1076,6 +1077,240 @@ expect "staff suspension ends the active operator session" "ended" \
   "$(q -c "select state from runtime.operator_session where id='$OS';")"
 expect "suspended staff resolves no effective permission" "0" \
   "$(q -c "select cardinality(umi.resolve_staff_permissions('$S1'::uuid));")"
+
+echo
+echo "== 11. Gate 3F customer, loyalty and stored value =="
+CUST=f3000000-0000-4000-8000-000000000001
+POINTS=f3000000-0000-4000-8000-000000000002
+WALLET=f3000000-0000-4000-8000-000000000003
+GIFT=f3000000-0000-4000-8000-000000000004
+q -c "insert into merchant.customer(id,merchant_id,name,public_reference,status)
+  values('$CUST','$A','Pilot Customer','CUS-PILOT','active');
+insert into merchant.loyalty_program(merchant_id,enabled,points_per_money_unit,money_unit_minor_units,
+  earn_timing,policy_version,policy_fingerprint)
+values('$A',true,1,100,'immediate','pilot-v1',repeat('7',64));
+insert into merchant.customer_consent_history(
+  merchant_id,customer_id,consent_type,status,source,policy_version,command_id)
+values('$A','$CUST','receipt_delivery','granted','pos_operator','pilot-v1',
+  'f3000000-0000-4000-8000-000000000010');
+insert into merchant.customer_consent_current(
+  merchant_id,customer_id,consent_type,history_id,status)
+select merchant_id,customer_id,consent_type,id,status from merchant.customer_consent_history
+where command_id='f3000000-0000-4000-8000-000000000010';
+insert into merchant.loyalty_points_account(
+  id,merchant_id,customer_id,program_reference,public_reference,status)
+values('$POINTS','$A','$CUST','pilot','LOY-PILOT','active');
+insert into merchant.loyalty_card(id,merchant_id,customer_id,public_reference,currency,status)
+values('$WALLET','$A','$CUST','WAL-PILOT','MXN','active');
+insert into merchant.loyalty_gift_card(
+  id,merchant_id,code,status,public_reference,code_hash,masked_code,currency,amount_cents)
+values('$GIFT','$A','PILOT-CARD-SECRET-0001','active','GFT-PILOT',
+  extensions.digest('PILOT-CARD-SECRET-0001','sha256'),'temporary','MXN',1000);" >/dev/null
+expect "gift-card secret is stored only as a hash" "64|f|••••-0001" \
+  "$(q -c "select length(code),(code='PILOT-CARD-SECRET-0001'),masked_code
+    from merchant.loyalty_gift_card where id='$GIFT';")"
+expect_error "consent history cannot be updated" \
+  "$(q -c "update merchant.customer_consent_history set status='granted'
+    where customer_id='$CUST';")"
+q -c "select merchant.append_loyalty_points('$A','$CUST','$POINTS','points_earn_committed',
+  'credit',100,'pos_sale','f3000000-0000-4000-8000-000000000020',null,null,null,null,
+  '$U1','$D1','f3000000-0000-4000-8000-000000000021',
+  'f3000000-0000-4000-8000-000000000022',repeat('a',64),current_date);
+select merchant.append_loyalty_points('$A','$CUST','$POINTS','points_authorized',
+  'hold',40,'reward_authorization','f3000000-0000-4000-8000-000000000023',null,null,null,
+  'f3000000-0000-4000-8000-000000000023','$U1','$D1',
+  'f3000000-0000-4000-8000-000000000024',
+  'f3000000-0000-4000-8000-000000000025',repeat('b',64),current_date);
+select merchant.append_loyalty_points('$A','$CUST','$POINTS','points_released',
+  'release',40,'reward_authorization','f3000000-0000-4000-8000-000000000023',null,null,null,
+  'f3000000-0000-4000-8000-000000000023','$U1','$D1',
+  'f3000000-0000-4000-8000-000000000026',
+  'f3000000-0000-4000-8000-000000000027',repeat('c',64),current_date);" >/dev/null
+expect "points facts rebuild the available and authorized balance" "100|0|3|3" \
+  "$(q -c "select available,authorized,ledger_sequence,
+    (select count(*) from merchant.loyalty_points_ledger where account_id='$POINTS')
+    from merchant.loyalty_points_balance where account_id='$POINTS';")"
+expect_error "points ledger update fails" \
+  "$(q -c "update merchant.loyalty_points_ledger set points=999 where account_id='$POINTS';")"
+expect_error "points ledger delete fails" \
+  "$(q -c "delete from merchant.loyalty_points_ledger where account_id='$POINTS';")"
+expect_error "api cannot insert a points fact directly" \
+  "$(as_api "$A" "$A1" "$D1" "insert into merchant.loyalty_points_ledger default values;")"
+expect_error "api cannot insert a wallet fact directly" \
+  "$(as_api "$A" "$A1" "$D1" "insert into merchant.loyalty_stored_value_ledger default values;")"
+expect_error "api cannot insert a gift-card fact directly" \
+  "$(as_api "$A" "$A1" "$D1" "insert into merchant.loyalty_gift_card_ledger default values;")"
+expect_error "worker cannot insert a points fact directly" \
+  "$(q -c "set role worker; insert into merchant.loyalty_points_ledger default values;")"
+expect_error "an inherited API login cannot append points without request scope" \
+  "$(psql -X -q -t -A -d "$DB" -c "set session authorization inventory_api_login" \
+    -c "select merchant.append_loyalty_points('$A','$CUST','$POINTS',
+      'manual_points_adjustment','credit',1,'scope_test',gen_random_uuid(),null,null,null,null,
+      '$U1','$D1',gen_random_uuid(),gen_random_uuid(),repeat('a',64),current_date);" 2>&1)"
+expect_error "an inherited worker login cannot append points without request scope" \
+  "$(psql -X -q -t -A -d "$DB" -c "set session authorization customer_value_worker_login" \
+    -c "select merchant.append_loyalty_points('$A','$CUST','$POINTS',
+      'manual_points_adjustment','credit',1,'scope_test',gen_random_uuid(),null,null,null,null,
+      '$U1','$D1',gen_random_uuid(),gen_random_uuid(),repeat('a',64),current_date);" 2>&1)"
+expect_error "a scoped points function cannot post into another merchant" \
+  "$(as_api_raw "$A" "$A1" "$D1" "select merchant.append_loyalty_points('$B','$CUST','$POINTS',
+    'manual_points_adjustment','credit',1,'scope_test',gen_random_uuid(),null,null,null,null,
+    '$U1','$D1',gen_random_uuid(),gen_random_uuid(),repeat('a',64),current_date);")"
+expect_error "a scoped points function cannot use another device" \
+  "$(as_api_raw "$A" "$A1" "$D2" "select merchant.append_loyalty_points('$A','$CUST','$POINTS',
+    'manual_points_adjustment','credit',1,'scope_test',gen_random_uuid(),null,null,null,null,
+    '$U1','$D1',gen_random_uuid(),gen_random_uuid(),repeat('a',64),current_date);")"
+expect_error "points authorization cannot exceed available points" \
+  "$(q -c "select merchant.append_loyalty_points('$A','$CUST','$POINTS','points_authorized',
+    'hold',101,'reward_authorization',gen_random_uuid(),null,null,null,gen_random_uuid(),
+    '$U1','$D1',gen_random_uuid(),gen_random_uuid(),repeat('d',64),current_date);")"
+expect "api appends points only through the scoped function" "101|4" \
+  "$(as_api "$A" "$A1" "$D1" "select merchant.append_loyalty_points(
+    '$A','$CUST','$POINTS','manual_points_adjustment','credit',1,'authorized_test',
+    'f3000000-0000-4000-8000-000000000070',null,null,null,null,'$U1','$D1',
+    'f3000000-0000-4000-8000-000000000071','f3000000-0000-4000-8000-000000000072',
+    repeat('a',64),current_date);
+    select available,(select count(*) from merchant.loyalty_points_ledger where account_id='$POINTS')
+    from merchant.loyalty_points_balance where account_id='$POINTS';")"
+q -c "insert into merchant.loyalty_stored_value_ledger(
+  merchant_id,card_id,delta,amount_minor_units,reason,idempotency_key,entry_type,currency,
+  direction,command_id,fingerprint,business_date,source_type,source_id)
+values('$A','$WALLET',1000,1000,'loaded','f3000000-0000-4000-8000-000000000030',
+  'loaded','MXN','credit','f3000000-0000-4000-8000-000000000030',repeat('e',64),
+  current_date,'development_seed','wallet-opening');
+insert into merchant.loyalty_gift_card_ledger(
+  merchant_id,gift_card_id,delta,amount_minor_units,reason,entry_type,currency,direction,
+  command_id,idempotency_key,fingerprint,business_date,source_type,source_id)
+values('$A','$GIFT',1000,1000,'issued','issued','MXN','credit',
+  'f3000000-0000-4000-8000-000000000031','f3000000-0000-4000-8000-000000000031',
+  repeat('f',64),current_date,'development_seed','gift-opening');" >/dev/null
+expect "wallet facts rebuild the available balance" "1000|1|1" \
+  "$(q -c "select available,ledger_sequence,(select count(*) from merchant.loyalty_stored_value_ledger
+    where card_id='$WALLET') from merchant.loyalty_stored_value_balance where card_id='$WALLET';")"
+expect "gift-card facts rebuild the available balance" "1000|1|1" \
+  "$(q -c "select available,ledger_sequence,(select count(*) from merchant.loyalty_gift_card_ledger
+    where gift_card_id='$GIFT') from merchant.loyalty_gift_card_balance where gift_card_id='$GIFT';")"
+q -c "insert into merchant.loyalty_stored_value_ledger(
+  merchant_id,card_id,delta,amount_minor_units,reason,idempotency_key,entry_type,currency,
+  direction,authorization_id,command_id,fingerprint,business_date,source_type,source_id)
+values('$A','$WALLET',0,400,'authorized','f3000000-0000-4000-8000-000000000032',
+  'authorized','MXN','hold','f3000000-0000-4000-8000-000000000033',
+  'f3000000-0000-4000-8000-000000000032',repeat('1',64),current_date,
+  'stored_value_authorization','f3000000-0000-4000-8000-000000000033');" >/dev/null
+expect "wallet authorization separates available and authorized value" "600|400" \
+  "$(q -c "select available,authorized from merchant.loyalty_stored_value_balance where card_id='$WALLET';")"
+q -c "insert into merchant.loyalty_stored_value_ledger(
+  merchant_id,card_id,delta,amount_minor_units,reason,idempotency_key,entry_type,currency,
+  direction,authorization_id,command_id,fingerprint,business_date,source_type,source_id)
+values('$A','$WALLET',0,400,'authorization_released',
+  'f3000000-0000-4000-8000-000000000034','authorization_released','MXN','release',
+  'f3000000-0000-4000-8000-000000000033','f3000000-0000-4000-8000-000000000034',
+  repeat('2',64),current_date,'stored_value_authorization',
+  'f3000000-0000-4000-8000-000000000033');" >/dev/null
+expect "wallet release restores available value once" "1000|0" \
+  "$(q -c "select available,authorized from merchant.loyalty_stored_value_balance where card_id='$WALLET';")"
+q -c "insert into merchant.pos_cart(
+  id,merchant_id,location_id,operator_session_id,customer_id,status,lifecycle_state,version,
+  business_date,original_operator_session_id,original_operator_user_id,operator_user_id)
+values('f3000000-0000-4000-8000-000000000050','$A','$A1','$OS','$CUST','committed',
+  'committed',1,current_date,'$OS','$U1','$U1');
+insert into merchant.customer_order(
+  id,merchant_id,location_id,customer_id,source,fulfillment_type,status,business_date,external_ref)
+values('f3000000-0000-4000-8000-000000000051','$A','$A1','$CUST','pos','dine_in',
+  'completed',current_date,'gate-3f-value');
+insert into merchant.pos_payment_attempt(
+  id,merchant_id,location_id,cart_id,method,amount_minor_units,currency,status,query_only,correlation_id)
+values('f3000000-0000-4000-8000-000000000052','$A','$A1',
+  'f3000000-0000-4000-8000-000000000050','stored_value',1000,'MXN','succeeded',false,
+  'gate-3f-value');
+insert into merchant.receipt_snapshot(
+  id,merchant_id,location_id,order_id,payment_attempt_id,receipt_number,business_date,currency,
+  grand_total,snapshot)
+values('f3000000-0000-4000-8000-000000000053','$A','$A1',
+  'f3000000-0000-4000-8000-000000000051','f3000000-0000-4000-8000-000000000052',
+  'G3F-1',current_date,'MXN',1000,'{}');
+insert into merchant.pos_committed_sale(
+  id,merchant_id,location_id,cart_id,order_id,payment_attempt_id,receipt_snapshot_id,totals_fingerprint)
+values('f3000000-0000-4000-8000-000000000054','$A','$A1',
+  'f3000000-0000-4000-8000-000000000050','f3000000-0000-4000-8000-000000000051',
+  'f3000000-0000-4000-8000-000000000052','f3000000-0000-4000-8000-000000000053',repeat('4',64));
+insert into merchant.customer_value_authorization(
+  id,merchant_id,location_id,account_type,account_id,customer_id,sale_id,checkout_version,
+  amount_minor_units,currency,checkout_fingerprint,policy_version,command_id,idempotency_key,
+  command_fingerprint,status,expires_at,correlation_id)
+values('f3000000-0000-4000-8000-000000000040','$A','$A1','wallet','$WALLET','$CUST',
+  'f3000000-0000-4000-8000-000000000050',1,400,'MXN',repeat('4',64),'pilot-v1',
+  'f3000000-0000-4000-8000-000000000041','f3000000-0000-4000-8000-000000000041',
+  repeat('5',64),'authorized',clock_timestamp()+interval '5 minutes','gate-3f-commit');
+insert into merchant.loyalty_stored_value_ledger(
+  merchant_id,card_id,delta,amount_minor_units,reason,idempotency_key,entry_type,currency,
+  direction,authorization_id,command_id,fingerprint,business_date,source_type,source_id)
+values('$A','$WALLET',0,400,'authorized','f3000000-0000-4000-8000-000000000042',
+  'authorized','MXN','hold','f3000000-0000-4000-8000-000000000040',
+  'f3000000-0000-4000-8000-000000000042',repeat('6',64),current_date,
+  'stored_value_authorization','f3000000-0000-4000-8000-000000000040');" >/dev/null
+expect "sale, points and wallet facts commit in one database transaction" "points_earn_committed|1|committed|600|0|1" \
+  "$(q -c "create temporary table gate3f_commit_result(result jsonb);
+    insert into gate3f_commit_result select merchant.commit_customer_value(
+      '$A','$A1','f3000000-0000-4000-8000-000000000050',
+      'f3000000-0000-4000-8000-000000000054','f3000000-0000-4000-8000-000000000051',
+      '$CUST','f3000000-0000-4000-8000-000000000043',
+      'f3000000-0000-4000-8000-000000000043',repeat('4',64),current_date,'$U1','$D1',
+      jsonb_build_object('rewardAuthorizationId',null,'storedValueAuthorizationIds',
+        jsonb_build_array('f3000000-0000-4000-8000-000000000040')));
+    select result->'earn'->'ledgerEntry'->>'type',jsonb_array_length(result->'storedValue'),
+      result->'storedValue'->0->'authorization'->>'status',
+      (select available from merchant.loyalty_stored_value_balance where card_id='$WALLET'),
+      (select authorized from merchant.loyalty_stored_value_balance where card_id='$WALLET'),
+      (select count(*) from merchant.loyalty_stored_value_ledger
+        where authorization_id='f3000000-0000-4000-8000-000000000040' and entry_type='redeemed')
+    from gate3f_commit_result;")"
+
+VALUE_CONCURRENT_ONE="/tmp/umi-pos-value-one-$$"
+VALUE_CONCURRENT_TWO="/tmp/umi-pos-value-two-$$"
+psql -X -q -v ON_ERROR_STOP=1 -d "$DB" -c "insert into merchant.loyalty_stored_value_ledger(
+  merchant_id,card_id,delta,amount_minor_units,reason,idempotency_key,entry_type,currency,
+  direction,authorization_id,command_id,fingerprint,business_date,source_type,source_id)
+values('$A','$WALLET',0,500,'authorized','f3000000-0000-4000-8000-000000000060',
+  'authorized','MXN','hold','f3000000-0000-4000-8000-000000000061',
+  'f3000000-0000-4000-8000-000000000060',repeat('8',64),current_date,
+  'stored_value_authorization','f3000000-0000-4000-8000-000000000061');" \
+  >"$VALUE_CONCURRENT_ONE" 2>&1 &
+VALUE_PID_ONE=$!
+psql -X -q -v ON_ERROR_STOP=1 -d "$DB" -c "insert into merchant.loyalty_stored_value_ledger(
+  merchant_id,card_id,delta,amount_minor_units,reason,idempotency_key,entry_type,currency,
+  direction,authorization_id,command_id,fingerprint,business_date,source_type,source_id)
+values('$A','$WALLET',0,500,'authorized','f3000000-0000-4000-8000-000000000062',
+  'authorized','MXN','hold','f3000000-0000-4000-8000-000000000063',
+  'f3000000-0000-4000-8000-000000000062',repeat('9',64),current_date,
+  'stored_value_authorization','f3000000-0000-4000-8000-000000000063');" \
+  >"$VALUE_CONCURRENT_TWO" 2>&1 &
+VALUE_PID_TWO=$!
+wait "$VALUE_PID_ONE" || true
+wait "$VALUE_PID_TWO" || true
+VALUE_CONCURRENT_ERRORS=$(grep -h -c 'loyalty_stored_value_balance_available_check' \
+  "$VALUE_CONCURRENT_ONE" "$VALUE_CONCURRENT_TWO" | awk '{s+=$1} END {print s}')
+rm -f "$VALUE_CONCURRENT_ONE" "$VALUE_CONCURRENT_TWO"
+expect "two wallet authorizations cannot spend the same remaining value" "100|500|1|1" \
+  "$(q -c "select available,authorized,
+      (select count(*) from merchant.loyalty_stored_value_ledger where card_id='$WALLET'
+        and entry_type='authorized' and amount_minor_units=500),$VALUE_CONCURRENT_ERRORS
+    from merchant.loyalty_stored_value_balance where card_id='$WALLET';")"
+expect_error "wallet ledger update fails" \
+  "$(q -c "update merchant.loyalty_stored_value_ledger set delta=1 where card_id='$WALLET';")"
+expect_error "gift-card ledger delete fails" \
+  "$(q -c "delete from merchant.loyalty_gift_card_ledger where gift_card_id='$GIFT';")"
+expect "receipt consent does not imply marketing consent" "0" \
+  "$(q -c "select count(*) from merchant.customer_consent_current where customer_id='$CUST'
+    and consent_type in ('marketing_email','marketing_sms') and status='granted';")"
+expect "another merchant cannot read the customer profile" "0" \
+  "$(as_api "$B" "" "" "select count(*) from merchant.customer where id='$CUST';")"
+expect "another merchant cannot read the points ledger" "0" \
+  "$(as_api "$B" "" "" "select count(*) from merchant.loyalty_points_ledger where account_id='$POINTS';")"
+expect_error "a customer cannot link to another merchant" \
+  "$(q -c "insert into merchant.loyalty_points_account(
+    merchant_id,customer_id,program_reference,public_reference,status)
+    values('$B','$CUST','pilot','LOY-CROSS','active');")"
 
 echo
 if [ "$fail" -eq 0 ]; then

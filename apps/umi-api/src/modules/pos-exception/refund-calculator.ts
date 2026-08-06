@@ -9,7 +9,7 @@ export interface RefundSourceLine {
 
 export interface RefundSourceTender {
   id: string;
-  type: 'cash' | 'manual_terminal';
+  type: 'cash' | 'manual_terminal' | 'wallet' | 'gift_card';
   amount: number;
   refunded: number;
 }

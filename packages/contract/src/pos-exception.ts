@@ -282,7 +282,7 @@ export const TipRefundAllocation = z
 export const TenderRefundAllocation = z
   .object({
     originalTenderId: Uuid,
-    tenderType: z.enum(['cash', 'manual_terminal']),
+    tenderType: z.enum(['cash', 'manual_terminal', 'wallet', 'gift_card']),
     amount: PositiveMoney,
     strategy: z.enum(['proportional', 'terminal_first', 'cash_first']),
   })

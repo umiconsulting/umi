@@ -138,6 +138,12 @@
       "id": "3E",
       "status": "complete",
       "subject": "Inventory authority, stock ledger, reservations, sale and refund synchronization, operations, and counts"
+    },
+    {
+      "commit": "HEAD (Gate 3F commit)",
+      "id": "3F",
+      "status": "incomplete",
+      "subject": "Merchant customers, consent, loyalty, rewards, wallet, gift cards, checkout, and refund synchronization"
     }
   ]
 }

@@ -93,6 +93,11 @@ export class PosCheckoutService {
             dto.locationId,
             repriced.public.totals.grandTotal.currency,
           );
+          const customerValueAllocation = await this.repo.customerValueAllocation(
+            context.client,
+            cart,
+            dto.customerValue,
+          );
           const calculation = calculateCheckout(
             repriced.public,
             dto,
@@ -100,6 +105,7 @@ export class PosCheckoutService {
             new Map(
               repriced.lineSnapshot.map((line) => [line.id, line.price.lineSubtotal.minorUnits]),
             ),
+            customerValueAllocation.rewardDiscount,
           );
           const confirmation = calculation.confirmation;
           const previewRecoveryState = this.recoveryState(calculation.ok ? null : calculation.code);
@@ -197,6 +203,38 @@ export class PosCheckoutService {
             dto.tenderDrafts.some((tender) => tender.type === 'manual_terminal') &&
             !authorization.permissions.includes('checkout.terminal.confirm') &&
             !authorization.permissions.includes('*');
+          const walletPermissionDenied =
+            dto.tenderDrafts.some((tender) => tender.type === 'wallet') &&
+            !authorization.permissions.includes('wallet.redeem') &&
+            !authorization.permissions.includes('*');
+          const giftCardPermissionDenied =
+            dto.tenderDrafts.some((tender) => tender.type === 'gift_card') &&
+            !authorization.permissions.includes('gift_card.redeem') &&
+            !authorization.permissions.includes('*');
+          const tenderAuthorizationIds = dto.tenderDrafts
+            .filter((tender) => tender.type === 'wallet' || tender.type === 'gift_card')
+            .map((tender) => tender.authorizationId)
+            .filter((id): id is string => id != null)
+            .sort();
+          const selectedAuthorizationIds = [
+            ...(dto.customerValue?.storedValueAuthorizationIds ?? []),
+          ].sort();
+          const storedValueTenderMismatch = dto.tenderDrafts
+            .filter((tender) => tender.type === 'wallet' || tender.type === 'gift_card')
+            .some((tender) => {
+              const allocation = customerValueAllocation.storedValue.find(
+                (candidate) => candidate.authorizationId === tender.authorizationId,
+              );
+              return (
+                !allocation ||
+                allocation.accountType !== tender.type ||
+                allocation.amountMinorUnits !== tender.amount.minorUnits ||
+                allocation.currency !== tender.amount.currency
+              );
+            });
+          const storedValueSelectionInvalid =
+            JSON.stringify(tenderAuthorizationIds) !== JSON.stringify(selectedAuthorizationIds) ||
+            storedValueTenderMismatch;
           const calculationCode = calculation.ok ? null : calculation.code;
           const recoveryState = this.recoveryState(calculationCode);
           const draftState =
@@ -205,7 +243,10 @@ export class PosCheckoutService {
               : calculation.ok &&
                   !discountPermissionDenied &&
                   !tipPermissionDenied &&
-                  !terminalPermissionDenied
+                  !terminalPermissionDenied &&
+                  !walletPermissionDenied &&
+                  !giftCardPermissionDenied &&
+                  !storedValueSelectionInvalid
                 ? 'payment_accepted'
                 : calculationCode === 'APPROVAL_REQUIRED'
                   ? 'awaiting_authorization'
@@ -248,7 +289,14 @@ export class PosCheckoutService {
             ...calculation.summary,
             checkoutId: draft.id,
           };
-          if (discountPermissionDenied || tipPermissionDenied || terminalPermissionDenied) {
+          if (
+            discountPermissionDenied ||
+            tipPermissionDenied ||
+            terminalPermissionDenied ||
+            walletPermissionDenied ||
+            giftCardPermissionDenied ||
+            storedValueSelectionInvalid
+          ) {
             return {
               ok: true,
               value: this.recoverableResult(
@@ -256,11 +304,13 @@ export class PosCheckoutService {
                 summary,
                 policy,
                 dto,
-                terminalPermissionDenied
+                terminalPermissionDenied || walletPermissionDenied || giftCardPermissionDenied
                   ? 'PERMISSION_REVOKED'
-                  : tipPermissionDenied
-                    ? 'TIP_REJECTED'
-                    : 'DISCOUNT_REJECTED',
+                  : storedValueSelectionInvalid
+                    ? 'INVALID_TENDER_AMOUNT'
+                    : tipPermissionDenied
+                      ? 'TIP_REJECTED'
+                      : 'DISCOUNT_REJECTED',
                 context.correlationId,
               ),
             };
@@ -332,7 +382,7 @@ export class PosCheckoutService {
             repriced.lineSnapshot,
             dto,
           );
-          const sale = await this.repo.commit(
+          const committed = await this.repo.commit(
             context.client,
             cart,
             confirmed,
@@ -345,7 +395,10 @@ export class PosCheckoutService {
             context.commandId,
             authorization,
             context.correlationId,
+            dto.idempotencyKey,
+            dto.customerValue ?? null,
           );
+          const sale = committed.sale;
           await context.appendFinancial(
             {
               aggregateType: 'pos_sale',
@@ -380,6 +433,7 @@ export class PosCheckoutService {
             recoveryState: 'none',
             receiptDelivery: dto.receiptDelivery,
             policy,
+            customerValue: committed.customerValue,
           };
           await this.repo.saveCommittedResult(context.client, draft.id, committedResult);
           return {

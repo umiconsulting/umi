@@ -25,11 +25,11 @@
 
 ## 1. Propósito del documento
 
-Este documento explica el comportamiento operativo que existe en UmiPOS hasta Gate 3E. Sirve para operación, soporte, desarrollo, QA y capacitación.
+Este documento explica el comportamiento operativo que existe en UmiPOS hasta Gate 3F. Sirve para operación, soporte, desarrollo, QA y capacitación.
 
-La referencia es el commit funcional de Gate 3E, del 5 de agosto de 2026. El contrato canónico es la versión `2.3.0`. Su hash de contenido es `9d6a01b2cb9ac00bf3bfd54c51c4dc689084fa20fa2479b1b1f79bdd1d949454`.
+La referencia es el commit funcional de Gate 3F, del 5 de agosto de 2026. El contrato canónico es la versión `2.4.0`. Su hash de contenido es `02b1dd57987050865fa5b81f7a588cc74bb3f9def08be44a3bd225066ce83fe0`.
 
-El producto tiene completos los Gates 3A, 3B, 3C, 3D y 3D.1. Gate 3E añade la autoridad de inventario. La certificación final de UX y las integraciones físicas siguen pendientes.
+El producto conserva Gates 3A a 3E. Gate 3F añade clientes, lealtad y valor almacenado. La certificación final de UX sigue pendiente.
 
 Cada caso usa uno de estos estados:
 
@@ -2547,6 +2547,260 @@ Los perfiles operativos reciben lectura según la matriz. Viewer no recibe este 
 
 **Evidencia de implementación:** `offline_journal.dart`, `pos-offline.repository.ts`, `pos-checkout.repository.ts` y `recovery_center.dart`.
 
+### UC-CUST-001 — Buscar y adjuntar un cliente
+
+**Estado:** IMPLEMENTADO
+
+**Objetivo:** Identificar un cliente del merchant y adjuntarlo a una venta editable.
+
+**Actor principal:** Cashier.
+
+**Actores secundarios:** Staff, Supervisor, Manager, Admin y Owner.
+
+**Permisos requeridos:** `customer.search`, `customer.attach`.
+
+**Precondiciones:** Sesión POS activa, cliente vigente y venta editable.
+
+**Disparador:** El operador abre el Centro de clientes.
+
+**Flujo principal:**
+
+1. La API ejecuta una búsqueda acotada.
+2. La UI muestra contactos protegidos.
+3. El operador confirma el cliente.
+4. La API adjunta el cliente con control de versión.
+
+**Resultado esperado:** La venta conserva una referencia explícita del cliente.
+
+**Flujos alternos:** El operador mantiene la venta anónima.
+
+**Errores y recuperación:** Un cliente inválido conserva la venta y requiere otra selección.
+
+**Reglas de seguridad:** La API valida merchant, location, device, sesión, entitlement y permiso.
+
+**Persistencia y efectos:** La venta conserva la referencia. El perfil no se duplica.
+
+**Disponibilidad:** Online-only.
+
+**Evidencia de implementación:** API `pos-customer-value`, sale attachment y Customer Center.
+
+### UC-CUST-002 — Crear un cliente mínimo
+
+**Estado:** IMPLEMENTADO
+
+**Objetivo:** Crear un perfil con los datos mínimos que el cliente acepta.
+
+**Actor principal:** Cashier.
+
+**Actores secundarios:** Staff, Supervisor, Manager, Admin y Owner.
+
+**Permisos requeridos:** `customer.create`.
+
+**Precondiciones:** Sesión POS activa y política de creación vigente.
+
+**Disparador:** El operador selecciona Crear cliente.
+
+**Flujo principal:**
+
+1. El operador captura el nombre.
+2. El correo y el teléfono permanecen opcionales.
+3. El servidor normaliza los contactos.
+4. El servidor crea el perfil sin marketing implícito.
+
+**Resultado esperado:** El perfil queda disponible dentro del merchant.
+
+**Flujos alternos:** La venta continúa anónima.
+
+**Errores y recuperación:** Un contacto inválido devuelve un error acotado.
+
+**Reglas de seguridad:** La UI no preselecciona consentimiento.
+
+**Persistencia y efectos:** El comando idempotente crea un perfil y un historial de consentimiento explícito.
+
+**Disponibilidad:** Online-only.
+
+**Evidencia de implementación:** `CreateCustomerRequest`, API y prueba Flutter de creación mínima.
+
+### UC-CUST-003 — Consultar el historial del cliente
+
+**Estado:** IMPLEMENTADO
+
+**Objetivo:** Consultar hechos comerciales autorizados del cliente.
+
+**Actor principal:** Supervisor.
+
+**Actores secundarios:** Manager, Admin y Owner.
+
+**Permisos requeridos:** `customer.history.read`.
+
+**Precondiciones:** Cliente del merchant y permiso efectivo.
+
+**Disparador:** El operador selecciona un cliente.
+
+**Flujo principal:**
+
+1. La API valida el alcance.
+2. La API devuelve una página acotada.
+3. La UI muestra referencias seguras.
+
+**Resultado esperado:** El operador consulta ventas y compensaciones sin datos de pago internos.
+
+**Flujos alternos:** Un Cashier ve solo el contexto limitado que exige la venta.
+
+**Errores y recuperación:** El alcance incorrecto devuelve una negación segura.
+
+**Reglas de seguridad:** El permiso de venta no concede acceso a contactos.
+
+**Persistencia y efectos:** La operación no modifica hechos.
+
+**Disponibilidad:** Online-only.
+
+**Evidencia de implementación:** Endpoint paginado de historial y Customer Center.
+
+### UC-LOY-001 — Obtener y comprometer puntos
+
+**Estado:** INCOMPLETO: binding de preview
+
+**Objetivo:** Calcular puntos en el servidor y agregarlos con la venta.
+
+**Actor principal:** Cashier.
+
+**Actores secundarios:** Staff, Supervisor, Manager, Admin y Owner.
+
+**Permisos requeridos:** `loyalty.read`, `checkout.commit`.
+
+**Precondiciones:** Cliente adjunto, cuenta activa y política vigente.
+
+**Disparador:** El operador abre y confirma el checkout.
+
+**Flujo principal:**
+
+1. El servidor calcula la vista previa.
+2. Falta vincular la huella y la versión histórica al checkout.
+3. La transacción puede agregar el hecho de puntos.
+
+**Resultado esperado:** La proyección de puntos se puede reconstruir desde el ledger.
+
+**Flujos alternos:** Una venta anónima no crea puntos.
+
+**Errores y recuperación:** Un reintento devuelve el resultado original.
+
+**Reglas de seguridad:** Flutter no calcula puntos.
+
+**Persistencia y efectos:** Venta, recibo, inventario y puntos se comprometen juntos.
+
+**Disponibilidad:** Online-only.
+
+**Evidencia de implementación:** `commit_customer_value` y ledger de puntos.
+
+### UC-LOY-002 — Autorizar y canjear un reward
+
+**Estado:** INCOMPLETO: policy y expiry
+
+**Objetivo:** Reservar puntos y aplicar un beneficio financiero una vez.
+
+**Actor principal:** Cashier.
+
+**Actores secundarios:** Staff, Supervisor, Manager, Admin y Owner.
+
+**Permisos requeridos:** `loyalty.reward.authorize`, `loyalty.reward.redeem`.
+
+**Precondiciones:** Reward elegible, saldo suficiente y política vigente.
+
+**Disparador:** El operador selecciona un reward.
+
+**Flujo principal:**
+
+1. La API autoriza los puntos.
+2. La autorización reduce el saldo disponible.
+3. El checkout compromete el canje y el beneficio.
+
+**Resultado esperado:** Los puntos y el beneficio se aplican juntos.
+
+**Flujos alternos:** La liberación explícita restaura los puntos una vez. Falta la expiración autoritativa.
+
+**Errores y recuperación:** Una autorización expirada requiere una vista nueva.
+
+**Reglas de seguridad:** La autorización usa cliente, venta, reward y huella.
+
+**Persistencia y efectos:** El ledger conserva autorización, canje, liberación o reversión.
+
+**Disponibilidad:** Online-only.
+
+**Evidencia de implementación:** Endpoints de reward y commit atómico.
+
+### UC-WAL-001 — Pagar con wallet
+
+**Estado:** IMPLEMENTADO
+
+**Objetivo:** Autorizar y comprometer valor de una wallet del cliente.
+
+**Actor principal:** Cashier.
+
+**Actores secundarios:** Staff, Supervisor, Manager, Admin y Owner.
+
+**Permisos requeridos:** `wallet.authorize`, `wallet.redeem`.
+
+**Precondiciones:** Cliente adjunto, wallet activa, moneda igual y saldo suficiente.
+
+**Disparador:** El operador selecciona wallet como tender.
+
+**Flujo principal:**
+
+1. La API crea una autorización temporal.
+2. La UI conserva la autorización en el tender.
+3. El checkout crea el débito final.
+
+**Resultado esperado:** La venta y el débito se comprometen juntos.
+
+**Flujos alternos:** La liberación restaura el saldo una vez.
+
+**Errores y recuperación:** Un saldo insuficiente bloquea el tender y conserva la venta.
+
+**Reglas de seguridad:** La wallet no permite saldo negativo ni otro cliente.
+
+**Persistencia y efectos:** El ledger y su proyección conservan el resultado.
+
+**Disponibilidad:** Online-only.
+
+**Evidencia de implementación:** Autorización de valor, tender wallet y ledger inmutable.
+
+### UC-GIFT-001 — Pagar con gift card
+
+**Estado:** INCOMPLETO: rate limit
+
+**Objetivo:** Usar una gift card activa como tender total o parcial.
+
+**Actor principal:** Cashier.
+
+**Actores secundarios:** Staff, Supervisor, Manager, Admin y Owner.
+
+**Permisos requeridos:** `gift_card.lookup`, `gift_card.authorize`, `gift_card.redeem`.
+
+**Precondiciones:** Tarjeta activa, merchant y moneda correctos, saldo suficiente.
+
+**Disparador:** El operador captura o escanea el código.
+
+**Flujo principal:**
+
+1. La API busca el hash del código. Falta el límite de tasa.
+2. La API autoriza el valor.
+3. El checkout compromete el débito y el tender.
+
+**Resultado esperado:** El recibo muestra una referencia protegida y el saldo restante.
+
+**Flujos alternos:** El pago mixto cubre el saldo restante con otro tender.
+
+**Errores y recuperación:** Una tarjeta inactiva, ajena o agotada falla de forma segura.
+
+**Reglas de seguridad:** El sistema no guarda ni muestra el código completo.
+
+**Persistencia y efectos:** El ledger conserva emisión, autorización, canje y refund.
+
+**Disponibilidad:** Online-only.
+
+**Evidencia de implementación:** Búsqueda con hash, autorización y tender gift card.
+
 ## 15. Casos de error y recuperación
 
 | Escenario                           | Qué ve el usuario                | Qué conserva el sistema           | Qué se bloquea                  | Acción segura                                  |
@@ -2643,83 +2897,90 @@ El seed canónico crea Supervisor y lo limita a una location.
 
 La tabla muestra grants predeterminados. Un override puede negar o conceder un permiso específico. ✅ permite; ⚠️ depende de política, permiso o aprobación; 👁️ solo lectura; ❌ no permite.
 
-| ID          | Módulo      | Caso de uso                  | Owner | Admin | Manager | Supervisor | Cashier | Staff | Viewer | Dispositivo | Turno | Conexión | Aprobación | Estado                        |
-| ----------- | ----------- | ---------------------------- | ----- | ----- | ------- | ---------- | ------- | ----- | ------ | ----------- | ----- | -------- | ---------- | ----------------------------- |
-| UC-DEV-001  | Dispositivo | Generar código               | ✅    | ✅    | ❌      | ❌         | ❌      | ❌    | ❌     | No          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-DEV-002  | Dispositivo | Completar enrolamiento       | ✅    | ✅    | ❌      | ❌         | ❌      | ❌    | ❌     | No          | No    | Sí       | Sí         | IMPLEMENTADO                  |
-| UC-DEV-003  | Dispositivo | Rotar, revocar o sustituir   | ✅    | ✅    | ❌      | ❌         | ❌      | ❌    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-DEV-004  | Dispositivo | Recuperar acceso             | ✅    | ✅    | ❌      | ❌         | ❌      | ❌    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
-| UC-AUTH-001 | Acceso      | Abrir sesión por PIN         | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ✅     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-AUTH-002 | Acceso      | PIN incorrecto y rate limit  | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ✅     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-AUTH-003 | Acceso      | Cambiar, bloquear o cerrar   | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ✅     | Sí          | ⚠️    | Sí       | No         | IMPLEMENTADO                  |
-| UC-AUTH-004 | Acceso      | Aprobación sensible          | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | Sí         | IMPLEMENTADO                  |
-| UC-CAT-001  | Catálogo    | Ver categorías y productos   | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                  |
-| UC-CAT-002  | Catálogo    | Buscar producto              | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-CAT-003  | Catálogo    | Ver detalle y opciones       | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                  |
-| UC-CAT-004  | Catálogo    | Manejar disponibilidad       | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO CON LIMITACIONES |
-| UC-CART-001 | Carrito     | Crear y agregar línea        | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-CART-002 | Carrito     | Editar línea                 | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-CART-003 | Carrito     | Eliminar o vaciar            | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-CART-004 | Carrito     | Recuperar y repricear        | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                  |
-| UC-SALE-001 | Venta       | Iniciar venta única          | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-SALE-002 | Venta       | Suspender y buscar           | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-SALE-003 | Venta       | Reanudar propia o ajena      | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-SALE-004 | Venta       | Cancelar venta               | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-SALE-005 | Venta       | Completar y abrir siguiente  | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | ⚠️    | ⚠️       | ⚠️         | IMPLEMENTADO                  |
-| UC-PAY-001  | Pago        | Efectivo y cambio            | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | Sí    | ⚠️       | ⚠️         | IMPLEMENTADO                  |
-| UC-PAY-002  | Pago        | Terminal manual              | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
-| UC-PAY-003  | Pago        | Pago mixto y parcial         | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-PAY-004  | Pago        | Propina                      | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | ⚠️    | ⚠️       | ⚠️         | IMPLEMENTADO                  |
-| UC-PAY-005  | Pago        | Descuento                    | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | No    | ⚠️       | ⚠️         | IMPLEMENTADO                  |
-| UC-PAY-006  | Pago        | Confirmar o recuperar        | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-PAY-007  | Pago        | Destino y recibo             | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO CON LIMITACIONES |
-| UC-CASH-001 | Caja        | Abrir turno                  | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-CASH-002 | Caja        | Movimientos                  | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-CASH-003 | Caja        | Suspender o reanudar         | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-CASH-004 | Caja        | No-sale drawer               | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | Sí    | Sí       | ⚠️         | FOUNDATION                    |
-| UC-CASH-005 | Caja        | Handoff                      | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-CASH-006 | Caja        | Blind count y recuento       | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-CASH-007 | Caja        | Reconciliar y cerrar         | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-REF-001  | Refund      | Elegibilidad                 | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO CON LIMITACIONES |
-| UC-REF-002  | Refund      | Void                         | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
-| UC-REF-003  | Refund      | Refund total                 | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | ⚠️    | Sí       | Sí         | IMPLEMENTADO CON LIMITACIONES |
-| UC-REF-004  | Refund      | Refund parcial               | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
-| UC-REF-005  | Refund      | Consecuencia de tender       | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
-| UC-REF-006  | Refund      | Approval, restock y recovery | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | Sí         | IMPLEMENTADO CON LIMITACIONES |
-| UC-OFF-001  | Offline     | Detectar y aplicar policy    | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | ⚠️    | No       | No         | IMPLEMENTADO                  |
-| UC-OFF-002  | Offline     | Venta cash provisional       | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | Sí    | No       | No         | IMPLEMENTADO CON LIMITACIONES |
-| UC-OFF-003  | Offline     | Replay y respuesta perdida   | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | ⚠️    | Sí       | No         | IMPLEMENTADO                  |
-| UC-OFF-004  | Offline     | Recovery Center              | ✅    | ✅    | ✅      | ⚠️         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
-| UC-HIST-001 | Historial   | Ventas y recibos             | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                  |
-| UC-HIST-002 | Historial   | Excepciones y recibos        | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO CON LIMITACIONES |
-| UC-INV-001  | Inventario  | Disponibilidad y saldos      | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
-| UC-INV-002  | Inventario  | Reserva y consumo de venta   | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | ⚠️    | ⚠️       | No         | IMPLEMENTADO                  |
-| UC-INV-003  | Inventario  | Ajuste, merma y cuarentena   | ✅    | ✅    | ✅      | ⚠️         | ❌      | ❌    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-INV-004  | Inventario  | Restock de refund            | ✅    | ✅    | ✅      | ❌         | ❌      | ❌    | ❌     | Sí          | No    | Sí       | Sí         | IMPLEMENTADO CON LIMITACIONES |
-| UC-INV-005  | Inventario  | Conteo y reconciliación      | ✅    | ✅    | ✅      | ⚠️         | ❌      | ❌    | ❌     | Sí          | No    | Sí       | Sí         | IMPLEMENTADO                  |
-| UC-INV-006  | Inventario  | Conflicto offline y replay   | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | ⚠️    | ⚠️       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
+| ID          | Módulo      | Caso de uso                  | Owner | Admin | Manager | Supervisor | Cashier | Staff | Viewer | Dispositivo | Turno | Conexión | Aprobación | Estado                         |
+| ----------- | ----------- | ---------------------------- | ----- | ----- | ------- | ---------- | ------- | ----- | ------ | ----------- | ----- | -------- | ---------- | ------------------------------ |
+| UC-DEV-001  | Dispositivo | Generar código               | ✅    | ✅    | ❌      | ❌         | ❌      | ❌    | ❌     | No          | No    | Sí       | No         | IMPLEMENTADO                   |
+| UC-DEV-002  | Dispositivo | Completar enrolamiento       | ✅    | ✅    | ❌      | ❌         | ❌      | ❌    | ❌     | No          | No    | Sí       | Sí         | IMPLEMENTADO                   |
+| UC-DEV-003  | Dispositivo | Rotar, revocar o sustituir   | ✅    | ✅    | ❌      | ❌         | ❌      | ❌    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                   |
+| UC-DEV-004  | Dispositivo | Recuperar acceso             | ✅    | ✅    | ❌      | ❌         | ❌      | ❌    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES  |
+| UC-AUTH-001 | Acceso      | Abrir sesión por PIN         | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ✅     | Sí          | No    | Sí       | No         | IMPLEMENTADO                   |
+| UC-AUTH-002 | Acceso      | PIN incorrecto y rate limit  | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ✅     | Sí          | No    | Sí       | No         | IMPLEMENTADO                   |
+| UC-AUTH-003 | Acceso      | Cambiar, bloquear o cerrar   | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ✅     | Sí          | ⚠️    | Sí       | No         | IMPLEMENTADO                   |
+| UC-AUTH-004 | Acceso      | Aprobación sensible          | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | Sí         | IMPLEMENTADO                   |
+| UC-CAT-001  | Catálogo    | Ver categorías y productos   | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                   |
+| UC-CAT-002  | Catálogo    | Buscar producto              | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     | Sí          | No    | Sí       | No         | IMPLEMENTADO                   |
+| UC-CAT-003  | Catálogo    | Ver detalle y opciones       | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                   |
+| UC-CAT-004  | Catálogo    | Manejar disponibilidad       | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO CON LIMITACIONES  |
+| UC-CART-001 | Carrito     | Crear y agregar línea        | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                   |
+| UC-CART-002 | Carrito     | Editar línea                 | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                   |
+| UC-CART-003 | Carrito     | Eliminar o vaciar            | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                   |
+| UC-CART-004 | Carrito     | Recuperar y repricear        | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                   |
+| UC-SALE-001 | Venta       | Iniciar venta única          | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                   |
+| UC-SALE-002 | Venta       | Suspender y buscar           | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                   |
+| UC-SALE-003 | Venta       | Reanudar propia o ajena      | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO                   |
+| UC-SALE-004 | Venta       | Cancelar venta               | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO                   |
+| UC-SALE-005 | Venta       | Completar y abrir siguiente  | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | ⚠️    | ⚠️       | ⚠️         | IMPLEMENTADO                   |
+| UC-PAY-001  | Pago        | Efectivo y cambio            | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | Sí    | ⚠️       | ⚠️         | IMPLEMENTADO                   |
+| UC-PAY-002  | Pago        | Terminal manual              | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES  |
+| UC-PAY-003  | Pago        | Pago mixto y parcial         | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                   |
+| UC-PAY-004  | Pago        | Propina                      | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | ⚠️    | ⚠️       | ⚠️         | IMPLEMENTADO                   |
+| UC-PAY-005  | Pago        | Descuento                    | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | No    | ⚠️       | ⚠️         | IMPLEMENTADO                   |
+| UC-PAY-006  | Pago        | Confirmar o recuperar        | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO                   |
+| UC-PAY-007  | Pago        | Destino y recibo             | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO CON LIMITACIONES  |
+| UC-CASH-001 | Caja        | Abrir turno                  | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO                   |
+| UC-CASH-002 | Caja        | Movimientos                  | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                   |
+| UC-CASH-003 | Caja        | Suspender o reanudar         | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                   |
+| UC-CASH-004 | Caja        | No-sale drawer               | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | Sí    | Sí       | ⚠️         | FOUNDATION                     |
+| UC-CASH-005 | Caja        | Handoff                      | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                   |
+| UC-CASH-006 | Caja        | Blind count y recuento       | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                   |
+| UC-CASH-007 | Caja        | Reconciliar y cerrar         | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                   |
+| UC-REF-001  | Refund      | Elegibilidad                 | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO CON LIMITACIONES  |
+| UC-REF-002  | Refund      | Void                         | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES  |
+| UC-REF-003  | Refund      | Refund total                 | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | ⚠️    | Sí       | Sí         | IMPLEMENTADO CON LIMITACIONES  |
+| UC-REF-004  | Refund      | Refund parcial               | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES  |
+| UC-REF-005  | Refund      | Consecuencia de tender       | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES  |
+| UC-REF-006  | Refund      | Approval, restock y recovery | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | Sí         | IMPLEMENTADO CON LIMITACIONES  |
+| UC-OFF-001  | Offline     | Detectar y aplicar policy    | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | ⚠️    | No       | No         | IMPLEMENTADO                   |
+| UC-OFF-002  | Offline     | Venta cash provisional       | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | Sí    | No       | No         | IMPLEMENTADO CON LIMITACIONES  |
+| UC-OFF-003  | Offline     | Replay y respuesta perdida   | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | ⚠️    | Sí       | No         | IMPLEMENTADO                   |
+| UC-OFF-004  | Offline     | Recovery Center              | ✅    | ✅    | ✅      | ⚠️         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES  |
+| UC-HIST-001 | Historial   | Ventas y recibos             | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                   |
+| UC-HIST-002 | Historial   | Excepciones y recibos        | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO CON LIMITACIONES  |
+| UC-INV-001  | Inventario  | Disponibilidad y saldos      | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     | Sí          | No    | Sí       | No         | IMPLEMENTADO                   |
+| UC-INV-002  | Inventario  | Reserva y consumo de venta   | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | ⚠️    | ⚠️       | No         | IMPLEMENTADO                   |
+| UC-INV-003  | Inventario  | Ajuste, merma y cuarentena   | ✅    | ✅    | ✅      | ⚠️         | ❌      | ❌    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO                   |
+| UC-INV-004  | Inventario  | Restock de refund            | ✅    | ✅    | ✅      | ❌         | ❌      | ❌    | ❌     | Sí          | No    | Sí       | Sí         | IMPLEMENTADO CON LIMITACIONES  |
+| UC-INV-005  | Inventario  | Conteo y reconciliación      | ✅    | ✅    | ✅      | ⚠️         | ❌      | ❌    | ❌     | Sí          | No    | Sí       | Sí         | IMPLEMENTADO                   |
+| UC-INV-006  | Inventario  | Conflicto offline y replay   | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | ⚠️    | ⚠️       | ⚠️         | IMPLEMENTADO CON LIMITACIONES  |
+| UC-CUST-001 | Cliente     | Buscar y adjuntar            | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                   |
+| UC-CUST-002 | Cliente     | Crear perfil mínimo          | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                   |
+| UC-CUST-003 | Cliente     | Consultar historial          | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                   |
+| UC-LOY-001  | Lealtad     | Obtener puntos               | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | INCOMPLETO: binding de preview |
+| UC-LOY-002  | Lealtad     | Autorizar y canjear reward   | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | INCOMPLETO: policy y expiry    |
+| UC-WAL-001  | Wallet      | Autorizar y comprometer      | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO                   |
+| UC-GIFT-001 | Gift card   | Buscar, autorizar y canjear  | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | INCOMPLETO: rate limit         |
 
 ## 18. Funcionalidades no implementadas todavía
 
 Estas capacidades permanecen pendientes o fuera del alcance actual. El roadmap no define fechas de entrega.
 
-| Capacidad                                    | Estado actual             | Límite confirmado                                                  |
-| -------------------------------------------- | ------------------------- | ------------------------------------------------------------------ |
-| Inventario sincronizado y stock ledger final | IMPLEMENTADO              | Gate 3E conserva un ledger inmutable por location.                 |
-| Consumo real de restock intent               | IMPLEMENTADO CON LÍMITES  | Las recetas requieren una decisión de componente.                  |
-| KDS Flutter final                            | FUERA DE ALCANCE ACTUAL   | UmiPOS no implementa el cliente KDS final.                         |
-| Loyalty                                      | NO IMPLEMENTADO EN UMIPOS | El producto Umi Cash tiene otra autoridad.                         |
-| Wallet                                       | NO IMPLEMENTADO EN UMIPOS | No existe tender wallet en checkout.                               |
-| Gift cards                                   | NO IMPLEMENTADO           | Solo existe arquitectura extensible de tender.                     |
-| CRM completo                                 | NO IMPLEMENTADO           | La venta solo usa customer attachment existente.                   |
-| Hardware real                                | NO IMPLEMENTADO           | No existe adaptador certificado.                                   |
-| Impresora real                               | FOUNDATION                | Print later registra intención.                                    |
-| Cajón real                                   | FOUNDATION                | No-sale registra solicitud, no apertura verificada.                |
-| Proveedor de pago real                       | NO IMPLEMENTADO           | Terminal manual depende de declaración del operador.               |
-| Refund certificado por proveedor             | NO IMPLEMENTADO           | El refund manual no prueba un resultado externo.                   |
-| Reporting final                              | NO IMPLEMENTADO           | Existen historia y resúmenes operativos, no reporting certificado. |
-| UX/UI certification                          | NO IMPLEMENTADO           | OWNER_REVIEW contiene observaciones, no aprobación final.          |
-| Pilot certification                          | NO IMPLEMENTADO           | El roadmap mantiene el piloto como paso futuro.                    |
+| Capacidad                                    | Estado actual            | Límite confirmado                                                  |
+| -------------------------------------------- | ------------------------ | ------------------------------------------------------------------ |
+| Inventario sincronizado y stock ledger final | IMPLEMENTADO             | Gate 3E conserva un ledger inmutable por location.                 |
+| Consumo real de restock intent               | IMPLEMENTADO CON LÍMITES | Las recetas requieren una decisión de componente.                  |
+| KDS Flutter final                            | FUERA DE ALCANCE ACTUAL  | UmiPOS no implementa el cliente KDS final.                         |
+| Loyalty                                      | FOUNDATION               | Falta binding histórico, policy completa y expiry.                 |
+| Wallet                                       | IMPLEMENTADO CON LÍMITES | Gate 3F bloquea retiro, transferencia y funding no autorizado.     |
+| Gift cards                                   | FOUNDATION               | Falta rate limit, emisión y suspensión operativa.                  |
+| CRM completo                                 | NO IMPLEMENTADO          | Gate 3F limita el POS a perfiles, contactos, consent e historial.  |
+| Hardware real                                | NO IMPLEMENTADO          | No existe adaptador certificado.                                   |
+| Impresora real                               | FOUNDATION               | Print later registra intención.                                    |
+| Cajón real                                   | FOUNDATION               | No-sale registra solicitud, no apertura verificada.                |
+| Proveedor de pago real                       | NO IMPLEMENTADO          | Terminal manual depende de declaración del operador.               |
+| Refund certificado por proveedor             | NO IMPLEMENTADO          | El refund manual no prueba un resultado externo.                   |
+| Reporting final                              | NO IMPLEMENTADO          | Existen historia y resúmenes operativos, no reporting certificado. |
+| UX/UI certification                          | NO IMPLEMENTADO          | OWNER_REVIEW contiene observaciones, no aprobación final.          |
+| Pilot certification                          | NO IMPLEMENTADO          | El roadmap mantiene el piloto como paso futuro.                    |
 
 ## 19. Checklist manual para probar UmiPOS
 
@@ -2908,7 +3169,7 @@ Antes de empezar, prepare un merchant de prueba, una location, un registro, prod
 
 ## 20. Mapa de cobertura
 
-El inventario contiene **53 casos de uso**. El conteo se obtiene de los encabezados `UC-*` y sus campos `Estado`.
+El inventario contiene **60 casos de uso**. El conteo se obtiene de los encabezados `UC-*` y sus campos `Estado`.
 
 ### Casos por módulo
 
@@ -2925,17 +3186,24 @@ El inventario contiene **53 casos de uso**. El conteo se obtiene de los encabeza
 | Offline     |      4 |
 | Historial   |      2 |
 | Inventario  |      6 |
-| **Total**   | **53** |
+| Cliente     |      3 |
+| Lealtad     |      2 |
+| Wallet      |      1 |
+| Gift card   |      1 |
+| **Total**   | **60** |
 
 ### Estado de implementación
 
-| Estado                        |  Casos |
-| ----------------------------- | -----: |
-| IMPLEMENTADO                  |     37 |
-| IMPLEMENTADO CON LIMITACIONES |     15 |
-| FOUNDATION                    |      1 |
-| NO IMPLEMENTADO               |      0 |
-| **Total**                     | **53** |
+| Estado                         |  Casos |
+| ------------------------------ | -----: |
+| IMPLEMENTADO                   |     41 |
+| IMPLEMENTADO CON LIMITACIONES  |     15 |
+| FOUNDATION                     |      1 |
+| INCOMPLETO: binding de preview |      1 |
+| INCOMPLETO: policy y expiry    |      1 |
+| INCOMPLETO: rate limit         |      1 |
+| NO IMPLEMENTADO                |      0 |
+| **Total**                      | **60** |
 
 La sección 18 registra capacidades pendientes o limitadas. Estas capacidades no se presentan como casos operativos actuales.
 
@@ -2943,7 +3211,7 @@ La sección 18 registra capacidades pendientes o limitadas. Estas capacidades no
 
 | Medida                                 | Conteo | Criterio                                                          |
 | -------------------------------------- | -----: | ----------------------------------------------------------------- |
-| Online-only                            |     24 | La disponibilidad exige conexión para la autoridad principal.     |
+| Online-only                            |     31 | La disponibilidad exige conexión para la autoridad principal.     |
 | Offline-capable                        |     11 | El campo Disponibilidad menciona una capacidad offline explícita. |
 | Requieren o pueden requerir aprobación |     29 | La matriz marca `Sí` o `⚠️` en Aprobación.                        |
 | Native-only estricto                   |      1 | La venta cash provisional requiere journal cifrado nativo.        |
@@ -2954,12 +3222,12 @@ Este conteo incluye acceso directo y acceso condicionado. Excluye las celdas ❌
 
 | Rol        | Casos con acceso directo o condicionado |
 | ---------- | --------------------------------------: |
-| Owner      |                                      53 |
-| Admin      |                                      53 |
-| Manager    |                                      49 |
-| Supervisor |                                      48 |
-| Cashier    |                                      42 |
-| Staff      |                                      42 |
+| Owner      |                                      60 |
+| Admin      |                                      60 |
+| Manager    |                                      56 |
+| Supervisor |                                      55 |
+| Cashier    |                                      48 |
+| Staff      |                                      48 |
 | Viewer     |                                       8 |
 
 La cifra de un rol no concede autoridad por sí sola. Cada ejecución valida el permiso, la política, el dispositivo y la location.

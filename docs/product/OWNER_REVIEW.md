@@ -178,3 +178,20 @@ Recommended Mac review sequence:
 - Owner decision: define production thresholds for adjustments, waste, variance, and low stock.
 - Owner decision: define the allowed disposition for prepared products and packaging.
 - Owner approval remains pending. Gate 3E does not include final UX certification.
+
+## Gate 3F customers, loyalty, and stored value
+
+- Implemented: merchant-scoped search, recent customers, minimal creation, attach, detach, and anonymous sales.
+- Implemented: contact masking and separate receipt, loyalty, and marketing consent.
+- Implemented: immutable points, wallet, and gift-card facts with server projections.
+- Implemented: temporary reward and stored-value authorization with release and recovery.
+- Implemented: atomic checkout effects and proportional refund reversals.
+- Implemented: Customer Center with keyboard, touch, pointer, English, and Spanish behavior.
+- Incomplete: full reward eligibility, earn-preview binding, and authorization expiry.
+- Incomplete: consent updates, loyalty enrollment, adjustments, issuance, and gift-card suspension.
+- Incomplete: gift-card lookup rate limits and the complete concurrency matrix.
+- Review on pilot hardware: search speed, duplicate warnings, masked contacts, and checkout value density.
+- Owner decision: define the earn rate, reward limits, wallet issuance, and gift-card limits.
+- Owner decision: define the partial-refund policy for rewards.
+- Legal review: approve consent text, retention, anonymization, and gift-card expiry rules.
+- Gate 3F remains incomplete. Owner approval and final UX certification remain pending.

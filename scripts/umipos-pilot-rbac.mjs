@@ -126,6 +126,7 @@ function generatedSql() {
     .filter(
       (permission) =>
         permission.source.includes('35_pos_pilot_rbac.sql') ||
+        permission.source.includes('37_pos_customer_value.sql') ||
         permission.key.startsWith('inventory.'),
     )
     .map(

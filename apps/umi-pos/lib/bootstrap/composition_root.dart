@@ -15,6 +15,8 @@ import '../features/catalog/catalog_controller.dart';
 import '../features/catalog/catalog_repository.dart';
 import '../features/checkout/checkout_controller.dart';
 import '../features/checkout/checkout_repository.dart';
+import '../features/customer_value/customer_value_controller.dart';
+import '../features/customer_value/customer_value_repository.dart';
 import '../features/entry/entry_controller.dart';
 import '../features/entry/entry_gateway.dart';
 import '../features/exception/exception_controller.dart';
@@ -50,6 +52,7 @@ final class AppCompositionRoot {
     required this.cash,
     required this.checkout,
     required this.sales,
+    this.customerValue,
     required this.connectivity,
     required this.offlineJournal,
     this.inventory,
@@ -134,6 +137,9 @@ final class AppCompositionRoot {
         cart: cart,
         telemetry: telemetry,
       ),
+      customerValue: CustomerValueController(
+        ApiCustomerValueRepository(apiClient),
+      ),
       checkout: CheckoutController(
         repository: ApiCheckoutRepository(apiClient),
         offlineCheckout: offlineCheckout,
@@ -164,6 +170,7 @@ final class AppCompositionRoot {
   final CashController cash;
   final CheckoutController checkout;
   final SaleLifecycleController sales;
+  final CustomerValueController? customerValue;
   final ConnectivityController connectivity;
   final EncryptedOfflineJournal offlineJournal;
   final InventoryController? inventory;
@@ -178,6 +185,7 @@ final class AppCompositionRoot {
     cash.dispose();
     checkout.dispose();
     sales.dispose();
+    customerValue?.dispose();
     connectivity.dispose();
     offlineRecovery?.dispose();
     inventory?.dispose();

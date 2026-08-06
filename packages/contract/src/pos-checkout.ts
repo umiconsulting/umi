@@ -10,8 +10,9 @@ import {
   Uuid,
 } from './platform';
 import { CartItem, DiscountPreview, TotalsPreview } from './pos-cart';
+import { CustomerValueCommitResult, CustomerValueSelection } from './pos-customer-value';
 
-export const PaymentMethod = z.enum(['cash', 'external_terminal']);
+export const PaymentMethod = z.enum(['cash', 'external_terminal', 'stored_value', 'gift_card']);
 export const CheckoutState = z.enum([
   'ready',
   'selecting_tender',
@@ -24,7 +25,7 @@ export const CheckoutState = z.enum([
   'completed',
   'recovered',
 ]);
-export const TenderType = z.enum(['cash', 'manual_terminal']);
+export const TenderType = z.enum(['cash', 'manual_terminal', 'wallet', 'gift_card']);
 export const TenderStatus = z.enum([
   'draft',
   'operator_processing_externally',
@@ -58,6 +59,7 @@ export const TenderDraft = z
     amountReceived: Money.nullable().default(null),
     status: TenderStatus.default('draft'),
     correlationId: CorrelationId.nullable().default(null),
+    authorizationId: Uuid.nullable().optional(),
   })
   .strict()
   .superRefine((value, ctx) => {
@@ -70,6 +72,19 @@ export const TenderDraft = z
         message: 'A manual terminal tender cannot include cash received.',
       });
     }
+    const storedValue = value.type === 'wallet' || value.type === 'gift_card';
+    if (storedValue && !value.authorizationId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Stored value requires an authorization.',
+      });
+    }
+    if (storedValue && value.amountReceived !== null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Stored value cannot include cash received.',
+      });
+    }
   });
 export const TenderAllocation = z
   .object({
@@ -79,6 +94,7 @@ export const TenderAllocation = z
     received: Money.nullable(),
     change: Money,
     status: TenderStatus,
+    authorizationId: Uuid.nullable().optional(),
   })
   .strict();
 export const CashTenderInput = z
@@ -385,6 +401,7 @@ export const CheckoutCommand = z
       channel: null,
       customerContactId: null,
     }),
+    customerValue: CustomerValueSelection.nullable().optional(),
   })
   .strict();
 export const CommittedSale = z
@@ -454,6 +471,7 @@ export const CheckoutResult = z
       customerContactId: null,
     }),
     policy: CheckoutPolicy.nullable().default(null),
+    customerValue: CustomerValueCommitResult.nullable().optional(),
   })
   .strict();
 export const CheckoutRecoverySnapshot = z

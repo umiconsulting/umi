@@ -30,6 +30,19 @@
       "policy": "checkout.customDiscountRequiresApproval"
     },
     {
+      "action": "customer_merge",
+      "actingPermission": "customer.merge",
+      "approvalPermission": "customer.merge.approve",
+      "selfApproval": false,
+      "actorSeparation": true,
+      "scope": "location",
+      "lifetimeSeconds": 300,
+      "oneUse": true,
+      "fingerprintBound": true,
+      "auditRequired": true,
+      "policy": "customer.mergeApproval"
+    },
+    {
       "action": "exceptional_checkout_cancellation",
       "actingPermission": "checkout.commit",
       "approvalPermission": "checkout.recover.any",
@@ -67,6 +80,19 @@
       "fingerprintBound": true,
       "auditRequired": true,
       "policy": "exception.cashierRefundThreshold"
+    },
+    {
+      "action": "gift_card_activation",
+      "actingPermission": "gift_card.activate",
+      "approvalPermission": "gift_card.activate.approve",
+      "selfApproval": false,
+      "actorSeparation": true,
+      "scope": "location",
+      "lifetimeSeconds": 300,
+      "oneUse": true,
+      "fingerprintBound": true,
+      "auditRequired": true,
+      "policy": "giftCard.activationThreshold"
     },
     {
       "action": "high_discount",
@@ -212,6 +238,19 @@
       "policy": "inventory.wasteApprovalThreshold"
     },
     {
+      "action": "loyalty_points_adjustment",
+      "actingPermission": "loyalty.adjust",
+      "approvalPermission": "loyalty.adjust.approve",
+      "selfApproval": false,
+      "actorSeparation": true,
+      "scope": "location",
+      "lifetimeSeconds": 300,
+      "oneUse": true,
+      "fingerprintBound": true,
+      "auditRequired": true,
+      "policy": "loyalty.adjustmentThreshold"
+    },
+    {
       "action": "manual_terminal_refund",
       "actingPermission": "sale.refund.manual_terminal",
       "approvalPermission": "sale.refund.approve",
@@ -327,6 +366,19 @@
       "fingerprintBound": true,
       "auditRequired": true,
       "policy": "cash.closeApprovalThreshold"
+    },
+    {
+      "action": "stored_value_conflict",
+      "actingPermission": "stored_value.reconcile",
+      "approvalPermission": "stored_value.approve",
+      "selfApproval": false,
+      "actorSeparation": true,
+      "scope": "location",
+      "lifetimeSeconds": 300,
+      "oneUse": true,
+      "fingerprintBound": true,
+      "auditRequired": true,
+      "policy": "storedValue.conflictThreshold"
     },
     {
       "action": "variance_outside_tolerance",

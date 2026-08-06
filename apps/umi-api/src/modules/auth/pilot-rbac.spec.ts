@@ -158,9 +158,12 @@ describe('Gate 3D.1 pilot RBAC matrix', () => {
   it('keeps Viewer read-only', () => {
     expect(permissions('viewer')).toEqual([
       'catalog.read',
+      'customer.read',
       'insights.read',
       'inventory.history.read',
       'inventory.read',
+      'loyalty.read',
+      'wallet.read',
     ]);
   });
 

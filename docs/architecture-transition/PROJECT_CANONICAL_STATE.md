@@ -194,8 +194,15 @@ Future clients use `packages/contract` and controlled UMI APIs.
   location, permission, policy, and approval checks remain server-authoritative.
 - Gate 3E: complete. The ledger, projection, reservations, atomic sale synchronization, refund
   outcomes, inventory operations, blind counts, and reconciliation use server authority.
+- Gate 3F: incomplete. Merchant customers, immutable ledgers, stored-value authorization,
+  atomic checkout foundations, refund compensation, and scoped RLS exist.
+- Gate 3F still needs policy-complete reward eligibility, earn-preview binding, authorization
+  expiry, rate limits, consent updates, enrollment, adjustments, issuance, and full concurrency tests.
+- Gate 3F contract: version `2.4.0`, content hash
+  `02b1dd57987050865fa5b81f7a588cc74bb3f9def08be44a3bd225066ce83fe0`.
+- Gate 3F keeps rewards and stored value online-only. Cash replay can keep a bounded customer reference.
 - `stash@{0}: pre-gate-3d1-unpublished-pos-runtime-fixes` remains preserved and excluded.
-- Next gate: Gate 3F customers, loyalty, and stored value requires explicit scope approval.
+- Gate 3G is not authorized while Gate 3F remains incomplete.
 
 ## Gate 3C decision basis
 
@@ -216,3 +223,10 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Source-backed tradeoff: an append-only ledger makes each balance reproducible and auditable.
 - Umi-specific inference: a physical count records an observation and does not prove custody.
 - Umi-specific inference: a prepared-product refund does not prove that each ingredient returned.
+
+## Gate 3F decision basis
+
+- Documented fact: the UMI API owns customer-value commands and the build-v3 migration chain.
+- Umi-specific inference: append-only points and money facts make each balance reproducible.
+- Umi-specific inference: receipt delivery and loyalty enrollment do not grant marketing consent.
+- Umi-specific inference: possession of a gift-card code remains a bearer risk.

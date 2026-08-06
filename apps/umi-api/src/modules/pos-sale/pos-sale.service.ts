@@ -136,7 +136,13 @@ export class PosSaleService {
     saleId: string,
     dto: AttachSaleCustomerRequest,
   ) {
-    await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId);
+    await this.authorize(
+      user,
+      merchantId,
+      dto.locationId,
+      dto.operatorSessionId,
+      'customer.attach',
+    );
     return this.command(
       merchantId,
       dto,
@@ -160,7 +166,13 @@ export class PosSaleService {
     saleId: string,
     dto: SaleMutationRequest,
   ) {
-    await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId);
+    await this.authorize(
+      user,
+      merchantId,
+      dto.locationId,
+      dto.operatorSessionId,
+      'customer.detach',
+    );
     return this.command(
       merchantId,
       dto,
@@ -179,7 +191,13 @@ export class PosSaleService {
   }
 
   async customers(user: AuthUser, merchantId: string, query: PosCustomerSearchQuery) {
-    await this.authorize(user, merchantId, query.locationId, query.operatorSessionId);
+    await this.authorize(
+      user,
+      merchantId,
+      query.locationId,
+      query.operatorSessionId,
+      'customer.search',
+    );
     return this.repo.customers(merchantId, query);
   }
 
@@ -272,6 +290,7 @@ export class PosSaleService {
     merchantId: string,
     locationId: string,
     operatorSessionId: string,
+    permission = 'sale.lifecycle',
   ) {
     if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
     const allowed = await this.repo.authorize(
@@ -281,6 +300,7 @@ export class PosSaleService {
       merchantId,
       locationId,
       operatorSessionId,
+      permission,
     );
     if (!allowed) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
   }

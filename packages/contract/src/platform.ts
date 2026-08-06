@@ -379,7 +379,7 @@ export const ReceiptSnapshot = z
         z
           .object({
             tenderId: Uuid,
-            method: z.enum(['cash', 'manual_terminal']),
+            method: z.enum(['cash', 'manual_terminal', 'wallet', 'gift_card']),
             amount: Money,
             received: Money.nullable(),
             change: Money,

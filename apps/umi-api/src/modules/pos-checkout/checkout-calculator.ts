@@ -44,11 +44,27 @@ export function calculateCheckout(
   command: CheckoutCommand,
   policy: CheckoutPolicy,
   lineDiscountBases: ReadonlyMap<string, number> = new Map(),
+  rewardDiscount: { authorizationId: string; amountMinorUnits: number } | null = null,
 ): CheckoutCalculation {
   const currency = source.totals.grandTotal.currency;
   const money = (minorUnits: number) => ({ minorUnits, currency });
-  let discountTotal = 0;
+  let discountTotal = rewardDiscount?.amountMinorUnits ?? 0;
+  let operatorDiscountTotal = 0;
   const discountEntries: TotalsConfirmation['discounts']['entries'] = [];
+  if (rewardDiscount) {
+    if (
+      !Number.isSafeInteger(rewardDiscount.amountMinorUnits) ||
+      rewardDiscount.amountMinorUnits <= 0
+    ) {
+      return failure('DISCOUNT_REJECTED', source, null, false);
+    }
+    discountEntries.push({
+      code: 'order_fixed',
+      label: `loyalty_reward:${rewardDiscount.authorizationId}`,
+      amount: money(rewardDiscount.amountMinorUnits),
+      lineId: null,
+    });
+  }
   const lineDiscountTotals = new Map<string, number>();
 
   if (command.discountDrafts.length && !policy.discount.enabled) {
@@ -82,6 +98,7 @@ export function calculateCheckout(
       lineDiscountTotals.set(lineId, lineDiscount);
     }
     discountTotal = safeAdd(discountTotal, amount);
+    operatorDiscountTotal = safeAdd(operatorDiscountTotal, amount);
     discountEntries.push({
       code: draft.type,
       label: draft.reason,
@@ -93,7 +110,7 @@ export function calculateCheckout(
     return failure('DISCOUNT_REJECTED', source, null, false);
   }
   const approvalRequired =
-    discountTotal > policy.discount.cashierThreshold.minorUnits ||
+    operatorDiscountTotal > policy.discount.cashierThreshold.minorUnits ||
     (policy.discount.customRequiresApproval &&
       command.discountDrafts.some((draft) => draft.type.endsWith('fixed')));
 
@@ -138,6 +155,8 @@ export function calculateCheckout(
         JSON.stringify({
           source: source.fingerprint,
           discounts: command.discountDrafts,
+          customerValue: command.customerValue,
+          rewardDiscount,
           tip: command.tipDraft,
           tenders: command.tenderDrafts,
           receiptDelivery: command.receiptDelivery,
@@ -237,6 +256,7 @@ export function calculateCheckout(
       received,
       change: money(tenderChange),
       status: draft.status,
+      authorizationId: draft.authorizationId ?? null,
     });
   }
 

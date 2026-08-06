@@ -58,6 +58,7 @@ final class CheckoutController extends ChangeNotifier {
   Map<String, Object?>? get tipDraft => _tipDraft;
   List<Map<String, Object?>> get discountDrafts => _discountDrafts;
   Map<String, Object?> get receiptDelivery => _receiptDelivery;
+  CustomerValueSelection? get customerValueSelection => _customerValueSelection;
   String? _merchantId;
   String? _locationId;
   String? _operatorSessionId;
@@ -79,6 +80,7 @@ final class CheckoutController extends ChangeNotifier {
     'channel': null,
     'customerContactId': null,
   };
+  CustomerValueSelection? _customerValueSelection;
   Map<String, Object?>? _recoveredPaymentOutcome;
   String? _commitCommandId;
   String? _commitIdempotencyKey;
@@ -245,6 +247,13 @@ final class CheckoutController extends ChangeNotifier {
     _commitIdempotencyKey = _uuid();
   }
 
+  void applyCustomerValue(CustomerValueSelection? selection) {
+    _customerValueSelection = selection;
+    _commitCommandId = _uuid();
+    _commitIdempotencyKey = _uuid();
+    notifyListeners();
+  }
+
   Future<void> confirm() async {
     final fingerprint = _state.result?.confirmation['fingerprint'] as String?;
     if (fingerprint == null) return;
@@ -332,6 +341,7 @@ final class CheckoutController extends ChangeNotifier {
     _tipDraft = null;
     _discountDrafts = const [];
     _approvalIds = const [];
+    _customerValueSelection = null;
     _receiptDelivery = const {
       'destination': 'display',
       'channel': null,
@@ -403,6 +413,7 @@ final class CheckoutController extends ChangeNotifier {
           approvalIds: _approvalIds,
           receiptDelivery: _receiptDelivery,
           cashShiftId: _cashShiftId,
+          customerValue: _customerValueSelection?.toJson(),
         ),
       );
       final phase = switch (result.status) {
@@ -452,6 +463,7 @@ final class CheckoutController extends ChangeNotifier {
         _tenderDrafts.length != 1 ||
         _tenderDrafts.any((tender) => tender['type'] != 'cash');
     if (unsupportedTender ||
+        _customerValueSelection != null ||
         _tipDraft != null ||
         _discountDrafts.isNotEmpty ||
         _cashShiftId == null) {
@@ -494,6 +506,7 @@ final class CheckoutController extends ChangeNotifier {
             approvalIds: const [],
             receiptDelivery: _receiptDelivery,
             cashShiftId: _cashShiftId,
+            customerValue: null,
           ),
           cart: cart,
           totals: totals,

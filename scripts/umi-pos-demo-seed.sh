@@ -599,6 +599,75 @@ from (values
 ) opening(inventory_item_id,opening_quantity,command_id,idempotency_key,fingerprint_character)
 ) seeded_opening_stock;
 
+insert into merchant.loyalty_program(
+  merchant_id,enabled,program_reference,points_per_money_unit,money_unit_minor_units,
+  points_rounding,earn_timing,redemption_minimum,redemption_maximum,policy_version,
+  policy_fingerprint,policy_expires_at
+)
+values(:'merchant_id',true,'pilot',1,100,'floor','pending',10,1000,
+  'pilot-customer-value-v1',repeat('7',64),now()+interval '30 days')
+on conflict(merchant_id) do update set
+  enabled=excluded.enabled,program_reference=excluded.program_reference,
+  points_per_money_unit=excluded.points_per_money_unit,
+  policy_version=excluded.policy_version,policy_fingerprint=excluded.policy_fingerprint,
+  policy_expires_at=excluded.policy_expires_at;
+
+insert into merchant.customer(
+  id,merchant_id,name,public_reference,status,preferred_language,privacy_state
+)
+values('71000000-0000-4000-8000-000000000101',:'merchant_id','Cliente Piloto',
+  'CUS-PILOT-01','active','es','{"dataMinimized":true,"contactVisibility":"limited"}'::jsonb)
+on conflict(id) do update set name=excluded.name,status='active',updated_at=now();
+
+insert into merchant.loyalty_points_account(
+  id,merchant_id,customer_id,program_reference,public_reference,status
+)
+values('71000000-0000-4000-8000-000000000102',:'merchant_id',
+  '71000000-0000-4000-8000-000000000101','pilot','LOY-PILOT-01','active')
+on conflict(id) do update set status='active';
+
+insert into merchant.loyalty_reward(
+  id,merchant_id,name,description,type,value,active,public_reference,points_cost,reward_type
+)
+values('71000000-0000-4000-8000-000000000103',:'merchant_id','Reward piloto',
+  'Descuento de desarrollo','manual',1000,true,'REW-PILOT-01',100,'fixed_discount')
+on conflict(id) do update set active=true,points_cost=excluded.points_cost,value=excluded.value;
+
+insert into merchant.loyalty_card(
+  id,merchant_id,customer_id,card_number,status,public_reference,currency
+)
+values('71000000-0000-4000-8000-000000000104',:'merchant_id',
+  '71000000-0000-4000-8000-000000000101','WALLET-PILOT-01','active','WAL-PILOT-01','MXN')
+on conflict(id) do update set status='active';
+
+insert into merchant.loyalty_stored_value_ledger(
+  merchant_id,card_id,delta,amount_minor_units,reason,idempotency_key,entry_type,currency,
+  direction,command_id,fingerprint,business_date,source_type,source_id
+)
+values(:'merchant_id','71000000-0000-4000-8000-000000000104',50000,50000,'loaded',
+  '71000000-0000-4000-8000-000000000105','loaded','MXN','credit',
+  '71000000-0000-4000-8000-000000000105',repeat('8',64),current_date,
+  'development_seed','wallet-pilot-opening')
+on conflict(merchant_id,idempotency_key) do nothing;
+
+insert into merchant.loyalty_gift_card(
+  id,merchant_id,code,status,public_reference,currency,amount_cents,activated_at
+)
+values('71000000-0000-4000-8000-000000000106',:'merchant_id',
+  encode(extensions.digest(:'merchant_id'::text||':gate3f-demo','sha256'),'hex'),
+  'active','GFT-PILOT-01','MXN',25000,now())
+on conflict(id) do update set status='active',activated_at=coalesce(merchant.loyalty_gift_card.activated_at,now());
+
+insert into merchant.loyalty_gift_card_ledger(
+  merchant_id,gift_card_id,delta,amount_minor_units,reason,entry_type,currency,direction,
+  command_id,idempotency_key,fingerprint,business_date,source_type,source_id
+)
+values(:'merchant_id','71000000-0000-4000-8000-000000000106',25000,25000,'issued','issued',
+  'MXN','credit','71000000-0000-4000-8000-000000000107',
+  '71000000-0000-4000-8000-000000000107',repeat('9',64),current_date,
+  'development_seed','gift-pilot-opening')
+on conflict(merchant_id,command_id,gift_card_id,entry_type) do nothing;
+
 insert into merchant.product_media(
   id,merchant_id,product_id,url,alt_text,width,height,display_order
 )
