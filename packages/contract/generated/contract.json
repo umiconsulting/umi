@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "02b1dd57987050865fa5b81f7a588cc74bb3f9def08be44a3bd225066ce83fe0",
-  "contractVersion": "2.4.0",
+  "contentHash": "582f9d608ec5f551befc1f2c06e763338175f309c444b603ec0e34234fc4ce4c",
+  "contractVersion": "2.5.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -644,6 +644,43 @@
         "permission",
         "merchantId",
         "locationId"
+      ],
+      "type": "object"
+    },
+    "AuthorizationExpiryRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "batchSize": {
+          "default": 100,
+          "maximum": 500,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "merchantId"
+      ],
+      "type": "object"
+    },
+    "AuthorizationExpiryResult": {
+      "additionalProperties": false,
+      "properties": {
+        "expiredCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "processedAt": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "expiredCount",
+        "processedAt"
       ],
       "type": "object"
     },
@@ -18649,22 +18686,76 @@
           "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
           "type": "string"
         },
+        "correlationReference": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "id": {
           "format": "uuid",
           "type": "string"
         },
         "locationId": {
-          "format": "uuid",
-          "type": "string"
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "occurredAt": {
           "format": "date-time",
           "type": "string"
         },
+        "points": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "publicReference": {
           "maxLength": 80,
           "minLength": 1,
           "type": "string"
+        },
+        "relatedExceptionId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "relatedSaleId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "status": {
           "maxLength": 64,
@@ -18706,7 +18797,9 @@
             "points_earn",
             "reward",
             "wallet",
-            "gift_card"
+            "gift_card",
+            "consent",
+            "merge"
           ],
           "type": "string"
         }
@@ -18734,22 +18827,76 @@
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
                 "type": "string"
               },
+              "correlationReference": {
+                "anyOf": [
+                  {
+                    "maxLength": 120,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
               "id": {
                 "format": "uuid",
                 "type": "string"
               },
               "locationId": {
-                "format": "uuid",
-                "type": "string"
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "occurredAt": {
                 "format": "date-time",
                 "type": "string"
               },
+              "points": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
               "publicReference": {
                 "maxLength": 80,
                 "minLength": 1,
                 "type": "string"
+              },
+              "relatedExceptionId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "relatedSaleId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
               },
               "status": {
                 "maxLength": 64,
@@ -18791,7 +18938,9 @@
                   "points_earn",
                   "reward",
                   "wallet",
-                  "gift_card"
+                  "gift_card",
+                  "consent",
+                  "merge"
                 ],
                 "type": "string"
               }
@@ -18811,6 +18960,69 @@
           "maxItems": 50,
           "type": "array"
         },
+        "loyaltyAccount": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "customerId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "enrolledAt": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "ledgerSequence": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "pointsScale": {
+                  "const": 0,
+                  "type": "number"
+                },
+                "programReference": {
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "active",
+                    "suspended",
+                    "closed",
+                    "merge_reconciliation_required",
+                    "restricted"
+                  ],
+                  "type": "string"
+                },
+                "version": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "customerId",
+                "programReference",
+                "status",
+                "pointsScale",
+                "ledgerSequence",
+                "version",
+                "enrolledAt"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "nextCursor": {
           "anyOf": [
             {
@@ -18821,11 +19033,141 @@
               "type": "null"
             }
           ]
+        },
+        "pointsBalance": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "accountId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "adjusted": {
+                  "type": "integer"
+                },
+                "authorized": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "available": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "calculatedAt": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "earned": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "expired": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "ledgerSequence": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "pending": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "projectionVersion": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                "redeemed": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "reversed": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "accountId",
+                "earned",
+                "pending",
+                "available",
+                "authorized",
+                "redeemed",
+                "reversed",
+                "expired",
+                "adjusted",
+                "ledgerSequence",
+                "projectionVersion",
+                "calculatedAt"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
         "nextCursor",
         "entries"
+      ],
+      "type": "object"
+    },
+    "CustomerHistoryQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "businessDateFrom": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "businessDateTo": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "category": {
+          "default": "all",
+          "enum": [
+            "all",
+            "sale",
+            "receipt",
+            "exception",
+            "loyalty",
+            "reward",
+            "wallet",
+            "gift_card",
+            "consent"
+          ],
+          "type": "string"
+        },
+        "cursor": {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "eventLocationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "limit": {
+          "default": 20,
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "operatorSessionId"
       ],
       "type": "object"
     },
@@ -20809,6 +21151,22 @@
             {
               "additionalProperties": false,
               "properties": {
+                "accountId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "checkoutVersion": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                "customerAttachmentVersion": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                "customerId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
                 "eligibleMinorUnits": {
                   "minimum": 0,
                   "type": "integer"
@@ -20820,6 +21178,10 @@
                 "expectedPoints": {
                   "minimum": 0,
                   "type": "integer"
+                },
+                "expiresAt": {
+                  "format": "date-time",
+                  "type": "string"
                 },
                 "explanationCodes": {
                   "items": {
@@ -20834,7 +21196,24 @@
                   "pattern": "^[a-f0-9]{64}$",
                   "type": "string"
                 },
+                "grossEligibleMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "inputFingerprint": {
+                  "pattern": "^[a-f0-9]{64}$",
+                  "type": "string"
+                },
                 "policyVersion": {
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "previewVersion": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                "programReference": {
                   "maxLength": 80,
                   "minLength": 1,
                   "type": "string"
@@ -20849,12 +21228,21 @@
                 }
               },
               "required": [
+                "customerId",
+                "accountId",
+                "programReference",
+                "grossEligibleMinorUnits",
                 "eligibleMinorUnits",
                 "excludedMinorUnits",
                 "expectedPoints",
                 "status",
                 "policyVersion",
                 "fingerprint",
+                "inputFingerprint",
+                "previewVersion",
+                "checkoutVersion",
+                "customerAttachmentVersion",
+                "expiresAt",
                 "explanationCodes"
               ],
               "type": "object"
@@ -20899,6 +21287,14 @@
           "items": {
             "additionalProperties": false,
             "properties": {
+              "affectedLineIds": {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "type": "array"
+              },
               "approvalPermission": {
                 "anyOf": [
                   {
@@ -20909,6 +21305,10 @@
                     "type": "null"
                   }
                 ]
+              },
+              "authorizationExpiresAt": {
+                "format": "date-time",
+                "type": "string"
               },
               "benefit": {
                 "additionalProperties": false,
@@ -21024,15 +21424,31 @@
                   "version"
                 ],
                 "type": "object"
+              },
+              "state": {
+                "enum": [
+                  "eligible",
+                  "ineligible",
+                  "approval_required",
+                  "replacement_confirmation_required"
+                ],
+                "type": "string"
+              },
+              "taxConsequenceMinorUnits": {
+                "type": "integer"
               }
             },
             "required": [
               "reward",
               "eligible",
+              "state",
               "pointsCost",
               "benefit",
               "remainingPoints",
               "approvalPermission",
+              "affectedLineIds",
+              "taxConsequenceMinorUnits",
+              "authorizationExpiresAt",
               "explanationCodes",
               "fingerprint",
               "policyVersion"
@@ -26201,6 +26617,356 @@
       ],
       "type": "object"
     },
+    "GiftCardIssuancePreview": {
+      "additionalProperties": false,
+      "properties": {
+        "approvalPermission": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "fingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "maximumValueMinorUnits": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "valueMinorUnits": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "currency",
+        "valueMinorUnits",
+        "maximumValueMinorUnits",
+        "approvalPermission",
+        "fingerprint"
+      ],
+      "type": "object"
+    },
+    "GiftCardIssuanceRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "approvalFingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approvalId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "customerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "expectedVersion": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "initialValueMinorUnits": {
+          "exclusiveMinimum": 0,
+          "maximum": 10000000,
+          "type": "integer"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "saleId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source": {
+          "enum": [
+            "sale",
+            "promotion",
+            "development"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "operatorSessionId",
+        "commandId",
+        "idempotencyKey",
+        "currency",
+        "initialValueMinorUnits",
+        "source"
+      ],
+      "type": "object"
+    },
+    "GiftCardIssuanceResult": {
+      "additionalProperties": false,
+      "properties": {
+        "card": {
+          "additionalProperties": false,
+          "properties": {
+            "activatedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "balance": {
+              "additionalProperties": false,
+              "properties": {
+                "accountId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "adjusted": {
+                  "type": "integer"
+                },
+                "authorized": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "available": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "calculatedAt": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "issued": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "ledgerSequence": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "loaded": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "projectionVersion": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                "redeemed": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "refunded": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "reversed": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "accountId",
+                "currency",
+                "issued",
+                "loaded",
+                "available",
+                "authorized",
+                "redeemed",
+                "refunded",
+                "reversed",
+                "adjusted",
+                "ledgerSequence",
+                "projectionVersion",
+                "calculatedAt"
+              ],
+              "type": "object"
+            },
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "customerId": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "expiresAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "initialValue": {
+              "additionalProperties": false,
+              "properties": {
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "minorUnits": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "minorUnits",
+                "currency"
+              ],
+              "type": "object"
+            },
+            "maskedCode": {
+              "maxLength": 32,
+              "minLength": 4,
+              "type": "string"
+            },
+            "publicReference": {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "created",
+                "inactive",
+                "active",
+                "suspended",
+                "depleted",
+                "expired",
+                "closed",
+                "restricted"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "publicReference",
+            "maskedCode",
+            "status",
+            "currency",
+            "initialValue",
+            "balance",
+            "activatedAt",
+            "expiresAt",
+            "customerId",
+            "version"
+          ],
+          "type": "object"
+        },
+        "deliveryExpiresAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "deliveryToken": {
+          "maxLength": 256,
+          "minLength": 32,
+          "type": "string"
+        },
+        "recovered": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "card",
+        "deliveryToken",
+        "deliveryExpiresAt",
+        "recovered"
+      ],
+      "type": "object"
+    },
     "GiftCardLookupRequest": {
       "additionalProperties": false,
       "properties": {
@@ -26222,6 +26988,218 @@
         "locationId",
         "operatorSessionId",
         "code"
+      ],
+      "type": "object"
+    },
+    "GiftCardLookupResult": {
+      "additionalProperties": false,
+      "properties": {
+        "card": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "activatedAt": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "balance": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "accountId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "adjusted": {
+                      "type": "integer"
+                    },
+                    "authorized": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "available": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "calculatedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "issued": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "ledgerSequence": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "loaded": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "projectionVersion": {
+                      "exclusiveMinimum": 0,
+                      "type": "integer"
+                    },
+                    "redeemed": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "refunded": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "reversed": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "accountId",
+                    "currency",
+                    "issued",
+                    "loaded",
+                    "available",
+                    "authorized",
+                    "redeemed",
+                    "refunded",
+                    "reversed",
+                    "adjusted",
+                    "ledgerSequence",
+                    "projectionVersion",
+                    "calculatedAt"
+                  ],
+                  "type": "object"
+                },
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "customerId": {
+                  "anyOf": [
+                    {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "expiresAt": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "initialValue": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "maskedCode": {
+                  "maxLength": 32,
+                  "minLength": 4,
+                  "type": "string"
+                },
+                "publicReference": {
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "created",
+                    "inactive",
+                    "active",
+                    "suspended",
+                    "depleted",
+                    "expired",
+                    "closed",
+                    "restricted"
+                  ],
+                  "type": "string"
+                },
+                "version": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "publicReference",
+                "maskedCode",
+                "status",
+                "currency",
+                "initialValue",
+                "balance",
+                "activatedAt",
+                "expiresAt",
+                "customerId",
+                "version"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "found": {
+          "type": "boolean"
+        },
+        "reasonCode": {
+          "enum": [
+            "available",
+            "unavailable",
+            "temporarily_locked"
+          ],
+          "type": "string"
+        },
+        "retryAfterSeconds": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "found",
+        "retryAfterSeconds",
+        "card",
+        "reasonCode"
       ],
       "type": "object"
     },
@@ -26386,6 +27364,77 @@
         "refundId",
         "amount",
         "reversedAt"
+      ],
+      "type": "object"
+    },
+    "GiftCardSecretRevealRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "deliveryToken": {
+          "maxLength": 256,
+          "minLength": 32,
+          "type": "string"
+        },
+        "expectedVersion": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "operatorSessionId",
+        "commandId",
+        "idempotencyKey",
+        "deliveryToken"
+      ],
+      "type": "object"
+    },
+    "GiftCardSecretRevealResult": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "maxLength": 128,
+          "minLength": 12,
+          "type": "string"
+        },
+        "expiresAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "maskedReference": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "maskedReference",
+        "code",
+        "expiresAt"
       ],
       "type": "object"
     },
@@ -38612,6 +39661,359 @@
       ],
       "type": "object"
     },
+    "PointsAdjustmentPreview": {
+      "additionalProperties": false,
+      "properties": {
+        "accountId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "approvalPermission": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currentAvailable": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "projectedAvailable": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "accountId",
+        "currentAvailable",
+        "projectedAvailable",
+        "approvalPermission",
+        "fingerprint"
+      ],
+      "type": "object"
+    },
+    "PointsAdjustmentReason": {
+      "enum": [
+        "customer_service_correction",
+        "migration_correction",
+        "fraud_correction",
+        "operational_correction",
+        "expired_reward_correction",
+        "authorized_other"
+      ],
+      "type": "string"
+    },
+    "PointsAdjustmentRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "accountId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "approvalFingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approvalId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "customerId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "direction": {
+          "enum": [
+            "increase",
+            "decrease"
+          ],
+          "type": "string"
+        },
+        "expectedVersion": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "points": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000000,
+          "type": "integer"
+        },
+        "reason": {
+          "enum": [
+            "customer_service_correction",
+            "migration_correction",
+            "fraud_correction",
+            "operational_correction",
+            "expired_reward_correction",
+            "authorized_other"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "operatorSessionId",
+        "commandId",
+        "idempotencyKey",
+        "customerId",
+        "accountId",
+        "direction",
+        "points",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "PointsAdjustmentResult": {
+      "additionalProperties": false,
+      "properties": {
+        "balance": {
+          "additionalProperties": false,
+          "properties": {
+            "accountId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "adjusted": {
+              "type": "integer"
+            },
+            "authorized": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "available": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "calculatedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "earned": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "expired": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "ledgerSequence": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "pending": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "projectionVersion": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "redeemed": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reversed": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "accountId",
+            "earned",
+            "pending",
+            "available",
+            "authorized",
+            "redeemed",
+            "reversed",
+            "expired",
+            "adjusted",
+            "ledgerSequence",
+            "projectionVersion",
+            "calculatedAt"
+          ],
+          "type": "object"
+        },
+        "ledgerEntry": {
+          "additionalProperties": false,
+          "properties": {
+            "accountId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "businessDate": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            "commandId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "customerId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "direction": {
+              "enum": [
+                "credit",
+                "debit",
+                "hold",
+                "release"
+              ],
+              "type": "string"
+            },
+            "id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "occurredAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "points": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "refundId": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "rewardId": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "saleId": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "sequence": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "enum": [
+                "points_earn_pending",
+                "points_earn_committed",
+                "points_earn_cancelled",
+                "points_earn_reversed",
+                "points_redeemed",
+                "points_released",
+                "points_reversed",
+                "points_expired_foundation",
+                "manual_points_adjustment"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "accountId",
+            "customerId",
+            "sequence",
+            "type",
+            "points",
+            "direction",
+            "saleId",
+            "refundId",
+            "rewardId",
+            "commandId",
+            "businessDate",
+            "occurredAt"
+          ],
+          "type": "object"
+        },
+        "recovered": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ledgerEntry",
+        "balance",
+        "recovered"
+      ],
+      "type": "object"
+    },
     "PointsBalance": {
       "additionalProperties": false,
       "properties": {
@@ -38895,6 +40297,22 @@
     "PointsEarnPreview": {
       "additionalProperties": false,
       "properties": {
+        "accountId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "checkoutVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "customerAttachmentVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "customerId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "eligibleMinorUnits": {
           "minimum": 0,
           "type": "integer"
@@ -38906,6 +40324,10 @@
         "expectedPoints": {
           "minimum": 0,
           "type": "integer"
+        },
+        "expiresAt": {
+          "format": "date-time",
+          "type": "string"
         },
         "explanationCodes": {
           "items": {
@@ -38920,7 +40342,24 @@
           "pattern": "^[a-f0-9]{64}$",
           "type": "string"
         },
+        "grossEligibleMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "inputFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
         "policyVersion": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "previewVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "programReference": {
           "maxLength": 80,
           "minLength": 1,
           "type": "string"
@@ -38935,12 +40374,21 @@
         }
       },
       "required": [
+        "customerId",
+        "accountId",
+        "programReference",
+        "grossEligibleMinorUnits",
         "eligibleMinorUnits",
         "excludedMinorUnits",
         "expectedPoints",
         "status",
         "policyVersion",
         "fingerprint",
+        "inputFingerprint",
+        "previewVersion",
+        "checkoutVersion",
+        "customerAttachmentVersion",
+        "expiresAt",
         "explanationCodes"
       ],
       "type": "object"
@@ -48012,6 +49460,14 @@
     "RewardEligibility": {
       "additionalProperties": false,
       "properties": {
+        "affectedLineIds": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
         "approvalPermission": {
           "anyOf": [
             {
@@ -48022,6 +49478,10 @@
               "type": "null"
             }
           ]
+        },
+        "authorizationExpiresAt": {
+          "format": "date-time",
+          "type": "string"
         },
         "benefit": {
           "additionalProperties": false,
@@ -48137,15 +49597,31 @@
             "version"
           ],
           "type": "object"
+        },
+        "state": {
+          "enum": [
+            "eligible",
+            "ineligible",
+            "approval_required",
+            "replacement_confirmation_required"
+          ],
+          "type": "string"
+        },
+        "taxConsequenceMinorUnits": {
+          "type": "integer"
         }
       },
       "required": [
         "reward",
         "eligible",
+        "state",
         "pointsCost",
         "benefit",
         "remainingPoints",
         "approvalPermission",
+        "affectedLineIds",
+        "taxConsequenceMinorUnits",
+        "authorizationExpiresAt",
         "explanationCodes",
         "fingerprint",
         "policyVersion"
@@ -58830,7 +60306,7 @@
       "offline": false,
       "permission": "customer.history.read",
       "pin": false,
-      "request": "CustomerSearchRequest",
+      "request": "CustomerHistoryQuery",
       "response": "CustomerHistoryPage"
     },
     "GET /api/v1/pos/merchants/:merchantId/exceptions/commands/:commandId": {
@@ -59831,6 +61307,22 @@
       "request": "CheckoutCancellationRequest",
       "response": "CheckoutCancellationResult"
     },
+    "POST /api/v1/pos/merchants/:merchantId/customer-value/gift-cards": {
+      "approval": true,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "OPTIMISTIC_VERSION_CONFLICT"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "gift_card.issue",
+      "pin": false,
+      "request": "GiftCardIssuanceRequest",
+      "response": "GiftCardIssuanceResult"
+    },
     "POST /api/v1/pos/merchants/:merchantId/customer-value/gift-cards/activate": {
       "approval": true,
       "auth": "operator-session",
@@ -59861,7 +61353,71 @@
       "permission": "gift_card.lookup",
       "pin": false,
       "request": "GiftCardLookupRequest",
-      "response": "GiftCard"
+      "response": "GiftCardLookupResult"
+    },
+    "POST /api/v1/pos/merchants/:merchantId/customer-value/gift-cards/preview": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "OPTIMISTIC_VERSION_CONFLICT"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "gift_card.issue",
+      "pin": false,
+      "request": "GiftCardIssuanceRequest",
+      "response": "GiftCardIssuancePreview"
+    },
+    "POST /api/v1/pos/merchants/:merchantId/customer-value/gift-cards/secret/reveal": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "OPTIMISTIC_VERSION_CONFLICT"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "gift_card.issue",
+      "pin": false,
+      "request": "GiftCardSecretRevealRequest",
+      "response": "GiftCardSecretRevealResult"
+    },
+    "POST /api/v1/pos/merchants/:merchantId/customer-value/points/adjustments": {
+      "approval": true,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "OPTIMISTIC_VERSION_CONFLICT"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "loyalty.adjust",
+      "pin": false,
+      "request": "PointsAdjustmentRequest",
+      "response": "PointsAdjustmentResult"
+    },
+    "POST /api/v1/pos/merchants/:merchantId/customer-value/points/adjustments/preview": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "OPTIMISTIC_VERSION_CONFLICT"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "loyalty.adjust",
+      "pin": false,
+      "request": "PointsAdjustmentRequest",
+      "response": "PointsAdjustmentPreview"
     },
     "POST /api/v1/pos/merchants/:merchantId/customer-value/preview": {
       "approval": false,

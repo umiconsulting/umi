@@ -140,7 +140,7 @@
       "subject": "Inventory authority, stock ledger, reservations, sale and refund synchronization, operations, and counts"
     },
     {
-      "commit": "HEAD (Gate 3F commit)",
+      "commit": "HEAD (Gate 3F closeout commit)",
       "id": "3F",
       "status": "incomplete",
       "subject": "Merchant customers, consent, loyalty, rewards, wallet, gift cards, checkout, and refund synchronization"

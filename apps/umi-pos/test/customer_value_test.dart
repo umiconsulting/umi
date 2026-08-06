@@ -40,6 +40,8 @@ final class FakeCustomerValueRepository implements CustomerValueRepository {
   CreateCustomerRequest? created;
   RewardAuthorizationRequest? rewardCommand;
   StoredValueAuthorizationRequest? storedCommand;
+  PointsAdjustmentRequest? adjustmentCommand;
+  GiftCardIssuanceRequest? issuanceCommand;
 
   @override
   Future<CustomerSearchResult> search(
@@ -64,8 +66,22 @@ final class FakeCustomerValueRepository implements CustomerValueRepository {
   Future<CustomerHistoryPage> history(
     String merchantId,
     String customerId,
-    CustomerSearchRequest query,
-  ) async => const CustomerHistoryPage(nextCursor: null, entries: []);
+    CustomerHistoryQuery query,
+  ) async => const CustomerHistoryPage(
+    nextCursor: null,
+    entries: [],
+    loyaltyAccount: {
+      'id': '10000000-0000-4000-8000-000000000030',
+      'customerId': '10000000-0000-4000-8000-000000000004',
+      'programReference': 'pilot',
+      'status': 'active',
+      'pointsScale': 0,
+      'ledgerSequence': 1,
+      'version': 1,
+      'enrolledAt': '2026-08-05T18:00:00.000Z',
+    },
+    pointsBalance: {'available': 600, 'pending': 20},
+  );
 
   @override
   Future<CustomerValuePreview> preview(
@@ -83,10 +99,92 @@ final class FakeCustomerValueRepository implements CustomerValueRepository {
   );
 
   @override
-  Future<GiftCard> giftCardLookup(
+  Future<GiftCardLookupResult> giftCardLookup(
     String merchantId,
     GiftCardLookupRequest command,
   ) => throw UnimplementedError();
+
+  @override
+  Future<PointsAdjustmentPreview> previewPointsAdjustment(
+    String merchantId,
+    PointsAdjustmentRequest command,
+  ) async {
+    adjustmentCommand = command;
+    return PointsAdjustmentPreview(
+      accountId: command.accountId,
+      currentAvailable: 600,
+      projectedAvailable: command.direction == 'increase' ? 700 : 500,
+      approvalPermission: 'loyalty.adjust.approve',
+      fingerprint: List.filled(64, 'e').join(),
+    );
+  }
+
+  @override
+  Future<PointsAdjustmentResult> commitPointsAdjustment(
+    String merchantId,
+    PointsAdjustmentRequest command,
+  ) async {
+    adjustmentCommand = command;
+    return PointsAdjustmentResult(
+      ledgerEntry: {
+        'id': '10000000-0000-4000-8000-000000000031',
+        'accountId': command.accountId,
+        'customerId': command.customerId,
+        'sequence': 2,
+        'type': 'manual_points_adjustment',
+        'points': command.points,
+        'direction': 'credit',
+        'commandId': command.commandId,
+        'businessDate': '2026-08-05',
+        'occurredAt': '2026-08-05T18:00:00.000Z',
+      },
+      balance: const {'available': 700},
+      recovered: false,
+    );
+  }
+
+  @override
+  Future<GiftCardIssuancePreview> previewGiftCardIssuance(
+    String merchantId,
+    GiftCardIssuanceRequest command,
+  ) async {
+    issuanceCommand = command;
+    return GiftCardIssuancePreview(
+      currency: command.currency,
+      valueMinorUnits: command.initialValueMinorUnits,
+      maximumValueMinorUnits: 10000000,
+      approvalPermission: 'gift_card.issue.approve',
+      fingerprint: List.filled(64, 'f').join(),
+    );
+  }
+
+  @override
+  Future<GiftCardIssuanceResult> issueGiftCard(
+    String merchantId,
+    GiftCardIssuanceRequest command,
+  ) async {
+    issuanceCommand = command;
+    return GiftCardIssuanceResult(
+      card: {
+        'id': '10000000-0000-4000-8000-000000000040',
+        'publicReference': 'GFT-TEST',
+        'status': command.source == 'sale' ? 'inactive' : 'active',
+      },
+      deliveryToken: 'delivery-token',
+      deliveryExpiresAt: '2026-08-05T18:10:00.000Z',
+      recovered: false,
+    );
+  }
+
+  @override
+  Future<GiftCardSecretRevealResult> revealGiftCardSecret(
+    String merchantId,
+    GiftCardSecretRevealRequest command,
+  ) async => const GiftCardSecretRevealResult(
+    maskedReference: 'GFT-••••1234',
+    code: 'TEST-ONLY-CODE',
+    expiresAt: '2026-08-05T18:10:00.000Z',
+  );
 
   @override
   Future<RewardAuthorization> authorizeReward(
@@ -241,6 +339,59 @@ void main() {
         fingerprint: stored.fingerprint,
       );
       expect(controller.selection()?.storedValueAuthorizationIds, isEmpty);
+    },
+  );
+
+  test(
+    'manual points adjustment keeps the preview command and exact approval binding',
+    () async {
+      final repository = FakeCustomerValueRepository();
+      final controller = CustomerValueController(repository);
+      await controller.select(scope, customer());
+      final preview = await controller.previewPointsAdjustment(
+        scope,
+        direction: 'increase',
+        points: 100,
+        reason: 'customer_service_correction',
+      );
+      expect(preview?.projectedAvailable, 700);
+      final commandId = repository.adjustmentCommand!.commandId;
+      await controller.commitPointsAdjustment(
+        scope,
+        approvalId: '10000000-0000-4000-8000-000000000032',
+        approvalFingerprint: preview!.fingerprint,
+      );
+      expect(repository.adjustmentCommand!.commandId, commandId);
+      expect(
+        repository.adjustmentCommand!.approvalFingerprint,
+        preview.fingerprint,
+      );
+    },
+  );
+
+  test(
+    'gift-card issuance recovers one card and reveals through a separate boundary',
+    () async {
+      final repository = FakeCustomerValueRepository();
+      final controller = CustomerValueController(repository);
+      final preview = await controller.previewGiftCardIssuance(
+        scope,
+        valueMinorUnits: 50000,
+        currency: 'MXN',
+      );
+      final commandId = repository.issuanceCommand!.commandId;
+      final issued = await controller.issueGiftCard(
+        scope,
+        approvalId: '10000000-0000-4000-8000-000000000032',
+        approvalFingerprint: preview!.fingerprint,
+      );
+      expect(repository.issuanceCommand!.commandId, commandId);
+      final secret = await controller.revealGiftCardSecret(
+        scope,
+        issued!.deliveryToken,
+      );
+      expect(secret?.code, 'TEST-ONLY-CODE');
+      expect(controller.state.toString(), isNot(contains('TEST-ONLY-CODE')));
     },
   );
 }

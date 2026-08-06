@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   applyPointsFacts,
   applyStoredValueFacts,
+  calculatePointsEarn,
   calculateEarnedPoints,
   calculateRewardReversal,
+  evaluateRewardEligibility,
   normalizeCustomerContact,
 } from './customer-value-domain';
 
@@ -65,5 +67,89 @@ describe('Gate 3F customer and value domain', () => {
   it('limits proportional reward reversal to the original redemption', () => {
     expect(calculateRewardReversal(500, 2_500, 10_000, 0)).toBe(125);
     expect(calculateRewardReversal(500, 10_000, 10_000, 100)).toBe(400);
+  });
+
+  it('uses one integer-safe earn engine for line, tax, tip, discount, tender, and reward rules', () => {
+    expect(
+      calculatePointsEarn({
+        lines: [
+          { amountMinorUnits: 12_000, categoryId: 'coffee', productId: 'latte' },
+          { amountMinorUnits: 3_000, categoryId: 'retail', productId: 'beans' },
+        ],
+        discountMinorUnits: 1_500,
+        taxMinorUnits: 1_600,
+        tipMinorUnits: 800,
+        tenderTypes: ['cash'],
+        rewardBenefitMinorUnits: 500,
+        policy: {
+          moneyUnitMinorUnits: 100,
+          pointsPerUnit: 1,
+          rounding: 'floor',
+          excludedProductIds: ['beans'],
+          excludedCategoryIds: [],
+          excludedTenderTypes: ['gift_card'],
+          includeTax: false,
+          includeTip: true,
+          discountInteraction: 'subtract',
+          rewardInteraction: 'subtract',
+          earnTiming: 'pending',
+        },
+      }),
+    ).toEqual({
+      grossEligibleMinorUnits: 12_000,
+      excludedMinorUnits: 3_000,
+      finalEligibleMinorUnits: 9_200,
+      points: 92,
+      status: 'pending',
+      explanationCodes: [
+        'excluded_product',
+        'discount_subtracted',
+        'tax_excluded',
+        'tip_included',
+        'reward_subtracted',
+      ],
+    });
+  });
+
+  it('denies an incompatible or usage-limited reward', () => {
+    expect(
+      evaluateRewardEligibility({
+        accountActive: true,
+        availablePoints: 500,
+        authorizedPoints: 0,
+        customerActive: true,
+        rewardActive: true,
+        pointsCost: 100,
+        existingDiscount: true,
+        anotherReward: false,
+        tenderTypes: ['cash'],
+        allowedTenderTypes: ['cash'],
+        combinableWithDiscount: false,
+        combinableWithRewards: false,
+        usageCount: 0,
+        usageLimit: 1,
+      }),
+    ).toEqual({ eligible: false, reasonCodes: ['blocked_by_existing_discount'] });
+  });
+
+  it('permits an explicit reward replacement to reuse the current points hold', () => {
+    expect(
+      evaluateRewardEligibility({
+        accountActive: true,
+        availablePoints: 20,
+        authorizedPoints: 100,
+        customerActive: true,
+        rewardActive: true,
+        pointsCost: 100,
+        existingDiscount: false,
+        anotherReward: true,
+        tenderTypes: ['cash'],
+        allowedTenderTypes: ['cash'],
+        combinableWithDiscount: true,
+        combinableWithRewards: false,
+        usageCount: 0,
+        usageLimit: 1,
+      }),
+    ).toEqual({ eligible: false, reasonCodes: ['blocked_by_another_reward'] });
   });
 });

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-05",
-  "latestRelevantCommit": "HEAD (Gate 3F commit)",
-  "integrationState": "Gates 3A through 3E are complete; Gate 3F is incomplete on current build-v3",
+  "updatedAt": "2026-08-06",
+  "latestRelevantCommit": "HEAD (Gate 3F closeout commit)",
+  "integrationState": "Gates 3A through 3E are complete. Gate 3F closeout remains incomplete.",
   "items": [
     {
       "id": "platform-certification",
@@ -114,14 +114,14 @@
       "id": "3F",
       "status": "incomplete",
       "dependencies": ["3E"],
-      "nextObjective": "Complete Gate 3F customer and value authority",
+      "nextObjective": "Complete Gate 3F concurrency, consent, reward approval, lookup proof, and sale-funded gift-card work",
       "blockers": [
-        "Earn preview and historical policy binding remain incomplete",
-        "Reward expiry, full eligibility, operational mutations, and lookup rate limits remain incomplete",
-        "The required concurrency matrix remains incomplete",
-        "Production policy and legal consent text require Owner review"
+        "The full executable concurrency matrix remains open",
+        "Consent mutation and restrictive merge reconciliation remain open",
+        "Stored-value checkout remains fail-closed until tender redistribution has one stable fingerprint",
+        "Approved reward authorization, gift-card payment, and sale-funded activation remain fail-closed"
       ],
-      "validationState": "Core contract, API, Flutter, disposable PostgreSQL, RLS, Linux, and Web checks passed; full Gate 3F validation remains incomplete"
+      "validationState": "Focused contract, API, Flutter, expiry, PostgreSQL, RLS, Linux, Web, and PR checks pass for the committed subset"
     }
   ]
 }

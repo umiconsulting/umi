@@ -25,6 +25,12 @@ final class CustomerValueState {
     this.history,
     this.preview,
     this.giftCard,
+    this.pointsAdjustmentPreview,
+    this.pendingPointsAdjustment,
+    this.pointsAdjustmentResult,
+    this.giftCardIssuance,
+    this.giftCardIssuancePreview,
+    this.pendingGiftCardIssuance,
     this.rewardAuthorization,
     this.storedValueAuthorizations = const [],
     this.ambiguous = false,
@@ -36,6 +42,12 @@ final class CustomerValueState {
   final CustomerHistoryPage? history;
   final CustomerValuePreview? preview;
   final GiftCard? giftCard;
+  final PointsAdjustmentPreview? pointsAdjustmentPreview;
+  final PointsAdjustmentRequest? pendingPointsAdjustment;
+  final PointsAdjustmentResult? pointsAdjustmentResult;
+  final GiftCardIssuanceResult? giftCardIssuance;
+  final GiftCardIssuancePreview? giftCardIssuancePreview;
+  final GiftCardIssuanceRequest? pendingGiftCardIssuance;
   final RewardAuthorization? rewardAuthorization;
   final List<StoredValueAuthorization> storedValueAuthorizations;
   final bool ambiguous;
@@ -141,8 +153,9 @@ final class CustomerValueController extends ChangeNotifier {
 
   Future<void> select(
     CustomerValueScope scope,
-    CustomerProfile customer,
-  ) async {
+    CustomerProfile customer, {
+    String category = 'all',
+  }) async {
     _set(
       CustomerValueState(
         busy: true,
@@ -154,12 +167,11 @@ final class CustomerValueController extends ChangeNotifier {
       final history = await _repository.history(
         scope.merchantId,
         customer.id,
-        CustomerSearchRequest(
+        CustomerHistoryQuery(
           locationId: scope.locationId,
           operatorSessionId: scope.operatorSessionId,
-          query: '',
           limit: 20,
-          recent: false,
+          category: category,
         ),
       );
       _set(
@@ -177,6 +189,42 @@ final class CustomerValueController extends ChangeNotifier {
           errorCode: error.code,
         ),
       );
+    }
+  }
+
+  Future<void> loadMoreHistory(
+    CustomerValueScope scope, {
+    String category = 'all',
+  }) async {
+    final selected = _state.selected;
+    final current = _state.history;
+    if (selected == null || current?.nextCursor == null || _state.busy) return;
+    _set(_copyState(busy: true));
+    try {
+      final page = await _repository.history(
+        scope.merchantId,
+        selected.id,
+        CustomerHistoryQuery(
+          locationId: scope.locationId,
+          operatorSessionId: scope.operatorSessionId,
+          cursor: current!.nextCursor,
+          limit: 20,
+          category: category,
+        ),
+      );
+      _set(
+        _copyState(
+          history: CustomerHistoryPage(
+            entries: [...current.entries, ...page.entries],
+            nextCursor: page.nextCursor,
+            loyaltyAccount: page.loyaltyAccount ?? current.loyaltyAccount,
+            pointsBalance: page.pointsBalance ?? current.pointsBalance,
+          ),
+          busy: false,
+        ),
+      );
+    } on AppException catch (error) {
+      _set(_copyState(busy: false, errorCode: error.code));
     }
   }
 
@@ -343,7 +391,7 @@ final class CustomerValueController extends ChangeNotifier {
     String code,
   ) async {
     try {
-      final card = await _repository.giftCardLookup(
+      final result = await _repository.giftCardLookup(
         scope.merchantId,
         GiftCardLookupRequest(
           locationId: scope.locationId,
@@ -351,8 +399,182 @@ final class CustomerValueController extends ChangeNotifier {
           code: code.trim(),
         ),
       );
-      _set(_copyState(giftCard: card, errorCode: null));
+      final card = result.card == null ? null : GiftCard.fromJson(result.card!);
+      _set(
+        _copyState(
+          giftCard: card,
+          errorCode: result.found ? null : result.reasonCode,
+        ),
+      );
       return card;
+    } on AppException catch (error) {
+      _set(_copyState(errorCode: error.code));
+      return null;
+    }
+  }
+
+  Future<PointsAdjustmentPreview?> previewPointsAdjustment(
+    CustomerValueScope scope, {
+    required String direction,
+    required int points,
+    required String reason,
+    String? note,
+  }) async {
+    final customer = _state.selected;
+    final account =
+        _state.history?.loyaltyAccount ??
+        _state.preview?.summary['loyaltyAccount'] as Map<String, Object?>?;
+    if (customer == null || account == null || points <= 0) return null;
+    final commandId = _uuid();
+    final command = PointsAdjustmentRequest(
+      locationId: scope.locationId,
+      operatorSessionId: scope.operatorSessionId,
+      commandId: commandId,
+      idempotencyKey: commandId,
+      customerId: customer.id,
+      accountId: account['id']! as String,
+      direction: direction,
+      points: points,
+      reason: reason,
+      note: note,
+    );
+    try {
+      final value = await _repository.previewPointsAdjustment(
+        scope.merchantId,
+        command,
+      );
+      _set(
+        _copyState(
+          pointsAdjustmentPreview: value,
+          pendingPointsAdjustment: command,
+          errorCode: null,
+        ),
+      );
+      return value;
+    } on AppException catch (error) {
+      _set(_copyState(errorCode: error.code));
+      return null;
+    }
+  }
+
+  Future<PointsAdjustmentResult?> commitPointsAdjustment(
+    CustomerValueScope scope, {
+    String? approvalId,
+    String? approvalFingerprint,
+  }) async {
+    final pending = _state.pendingPointsAdjustment;
+    if (pending == null) return null;
+    final command = PointsAdjustmentRequest(
+      locationId: pending.locationId,
+      operatorSessionId: pending.operatorSessionId,
+      commandId: pending.commandId,
+      idempotencyKey: pending.idempotencyKey,
+      customerId: pending.customerId,
+      accountId: pending.accountId,
+      direction: pending.direction,
+      points: pending.points,
+      reason: pending.reason,
+      note: pending.note,
+      approvalId: approvalId,
+      approvalFingerprint: approvalFingerprint,
+    );
+    try {
+      final value = await _repository.commitPointsAdjustment(
+        scope.merchantId,
+        command,
+      );
+      _set(_copyState(pointsAdjustmentResult: value, errorCode: null));
+      return value;
+    } on AppException catch (error) {
+      _set(_copyState(errorCode: error.code));
+      return null;
+    }
+  }
+
+  Future<GiftCardIssuancePreview?> previewGiftCardIssuance(
+    CustomerValueScope scope, {
+    required int valueMinorUnits,
+    required String currency,
+  }) async {
+    if (valueMinorUnits <= 0) return null;
+    final commandId = _uuid();
+    try {
+      final command = GiftCardIssuanceRequest(
+        locationId: scope.locationId,
+        operatorSessionId: scope.operatorSessionId,
+        commandId: commandId,
+        idempotencyKey: commandId,
+        currency: currency,
+        initialValueMinorUnits: valueMinorUnits,
+        source: 'promotion',
+        customerId: _state.selected?.id,
+      );
+      final value = await _repository.previewGiftCardIssuance(
+        scope.merchantId,
+        command,
+      );
+      _set(
+        _copyState(
+          giftCardIssuancePreview: value,
+          pendingGiftCardIssuance: command,
+          errorCode: null,
+        ),
+      );
+      return value;
+    } on AppException catch (error) {
+      _set(_copyState(errorCode: error.code));
+      return null;
+    }
+  }
+
+  Future<GiftCardIssuanceResult?> issueGiftCard(
+    CustomerValueScope scope, {
+    String? approvalId,
+    String? approvalFingerprint,
+  }) async {
+    final pending = _state.pendingGiftCardIssuance;
+    if (pending == null) return null;
+    final command = GiftCardIssuanceRequest(
+      locationId: pending.locationId,
+      operatorSessionId: pending.operatorSessionId,
+      commandId: pending.commandId,
+      idempotencyKey: pending.idempotencyKey,
+      currency: pending.currency,
+      initialValueMinorUnits: pending.initialValueMinorUnits,
+      source: pending.source,
+      saleId: pending.saleId,
+      customerId: pending.customerId,
+      approvalId: approvalId,
+      approvalFingerprint: approvalFingerprint,
+    );
+    try {
+      final value = await _repository.issueGiftCard(scope.merchantId, command);
+      _set(_copyState(giftCardIssuance: value, errorCode: null));
+      return value;
+    } on AppException catch (error) {
+      _set(_copyState(errorCode: error.code));
+      return null;
+    }
+  }
+
+  Future<GiftCardSecretRevealResult?> revealGiftCardSecret(
+    CustomerValueScope scope,
+    String deliveryToken,
+  ) async {
+    final commandId = _uuid();
+    try {
+      final value = await _repository.revealGiftCardSecret(
+        scope.merchantId,
+        GiftCardSecretRevealRequest(
+          locationId: scope.locationId,
+          operatorSessionId: scope.operatorSessionId,
+          commandId: commandId,
+          idempotencyKey: commandId,
+          deliveryToken: deliveryToken,
+        ),
+      );
+      _set(_copyState(errorCode: null));
+      return value;
     } on AppException catch (error) {
       _set(_copyState(errorCode: error.code));
       return null;
@@ -385,18 +607,37 @@ final class CustomerValueController extends ChangeNotifier {
   }
 
   CustomerValueState _copyState({
+    bool? busy,
+    CustomerHistoryPage? history,
     GiftCard? giftCard,
+    PointsAdjustmentPreview? pointsAdjustmentPreview,
+    PointsAdjustmentRequest? pendingPointsAdjustment,
+    PointsAdjustmentResult? pointsAdjustmentResult,
+    GiftCardIssuanceResult? giftCardIssuance,
+    GiftCardIssuancePreview? giftCardIssuancePreview,
+    GiftCardIssuanceRequest? pendingGiftCardIssuance,
     RewardAuthorization? rewardAuthorization,
     bool clearRewardAuthorization = false,
     List<StoredValueAuthorization>? storedValueAuthorizations,
     String? errorCode,
   }) => CustomerValueState(
-    busy: false,
+    busy: busy ?? false,
     customers: _state.customers,
     selected: _state.selected,
-    history: _state.history,
+    history: history ?? _state.history,
     preview: _state.preview,
     giftCard: giftCard ?? _state.giftCard,
+    pointsAdjustmentPreview:
+        pointsAdjustmentPreview ?? _state.pointsAdjustmentPreview,
+    pendingPointsAdjustment:
+        pendingPointsAdjustment ?? _state.pendingPointsAdjustment,
+    pointsAdjustmentResult:
+        pointsAdjustmentResult ?? _state.pointsAdjustmentResult,
+    giftCardIssuance: giftCardIssuance ?? _state.giftCardIssuance,
+    giftCardIssuancePreview:
+        giftCardIssuancePreview ?? _state.giftCardIssuancePreview,
+    pendingGiftCardIssuance:
+        pendingGiftCardIssuance ?? _state.pendingGiftCardIssuance,
     rewardAuthorization: clearRewardAuthorization
         ? null
         : rewardAuthorization ?? _state.rewardAuthorization,

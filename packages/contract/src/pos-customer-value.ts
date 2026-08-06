@@ -124,18 +124,56 @@ export const CustomerHistoryEntry = z
       'reward',
       'wallet',
       'gift_card',
+      'consent',
+      'merge',
     ]),
     publicReference: PublicReference,
-    locationId: Uuid,
+    locationId: Uuid.nullable(),
     businessDate: MerchantDate,
     total: Money.nullable(),
+    points: z.number().int().nullable().default(null),
+    relatedSaleId: Uuid.nullable().default(null),
+    relatedExceptionId: Uuid.nullable().default(null),
+    correlationReference: z.string().max(120).nullable().default(null),
     status: z.string().min(1).max(64),
     occurredAt: IsoTimestamp,
   })
   .strict();
 export const CustomerHistoryPage = CursorPage.extend({
   entries: z.array(CustomerHistoryEntry).max(50),
+  loyaltyAccount: z
+    .lazy(() => LoyaltyAccount)
+    .nullable()
+    .default(null),
+  pointsBalance: z
+    .lazy(() => PointsBalance)
+    .nullable()
+    .default(null),
 }).strict();
+export const CustomerHistoryQuery = z
+  .object({
+    locationId: Uuid,
+    operatorSessionId: Uuid,
+    cursor: z.string().max(2048).optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+    category: z
+      .enum([
+        'all',
+        'sale',
+        'receipt',
+        'exception',
+        'loyalty',
+        'reward',
+        'wallet',
+        'gift_card',
+        'consent',
+      ])
+      .default('all'),
+    eventLocationId: Uuid.optional(),
+    businessDateFrom: MerchantDate.optional(),
+    businessDateTo: MerchantDate.optional(),
+  })
+  .strict();
 export const CustomerMergeCandidate = z
   .object({
     source: CustomerProfile,
@@ -279,12 +317,21 @@ export const PointsBalance = z
   .strict();
 export const PointsEarnPreview = z
   .object({
+    customerId: Uuid,
+    accountId: Uuid,
+    programReference: PublicReference,
+    grossEligibleMinorUnits: z.number().int().nonnegative(),
     eligibleMinorUnits: z.number().int().nonnegative(),
     excludedMinorUnits: z.number().int().nonnegative(),
     expectedPoints: z.number().int().nonnegative(),
     status: z.enum(['none', 'pending', 'immediate']),
     policyVersion: z.string().min(1).max(80),
     fingerprint: Fingerprint,
+    inputFingerprint: Fingerprint,
+    previewVersion: z.number().int().positive(),
+    checkoutVersion: z.number().int().positive(),
+    customerAttachmentVersion: z.number().int().positive(),
+    expiresAt: IsoTimestamp,
     explanationCodes: z.array(z.string().min(1).max(80)).max(20),
   })
   .strict();
@@ -320,10 +367,19 @@ export const RewardEligibility = z
   .object({
     reward: Reward,
     eligible: z.boolean(),
+    state: z.enum([
+      'eligible',
+      'ineligible',
+      'approval_required',
+      'replacement_confirmation_required',
+    ]),
     pointsCost: z.number().int().positive(),
     benefit: Money,
     remainingPoints: z.number().int().nonnegative(),
     approvalPermission: z.string().max(100).nullable(),
+    affectedLineIds: z.array(Uuid).max(100),
+    taxConsequenceMinorUnits: z.number().int(),
+    authorizationExpiresAt: IsoTimestamp,
     explanationCodes: z.array(z.string().min(1).max(80)).max(20),
     fingerprint: Fingerprint,
     policyVersion: z.string().min(1).max(80),
@@ -541,6 +597,50 @@ export const GiftCard = z
 export const GiftCardLookupRequest = z
   .object({ locationId: Uuid, operatorSessionId: Uuid, code: z.string().min(12).max(128) })
   .strict();
+export const GiftCardLookupResult = z
+  .object({
+    found: z.boolean(),
+    retryAfterSeconds: z.number().int().nonnegative(),
+    card: GiftCard.nullable(),
+    reasonCode: z.enum(['available', 'unavailable', 'temporarily_locked']),
+  })
+  .strict();
+export const GiftCardIssuanceRequest = CustomerCommandContext.extend({
+  currency: CurrencyCode,
+  initialValueMinorUnits: z.number().int().positive().max(10_000_000),
+  source: z.enum(['sale', 'promotion', 'development']),
+  saleId: Uuid.nullable().default(null),
+  customerId: Uuid.nullable().default(null),
+  approvalId: Uuid.nullable().default(null),
+  approvalFingerprint: Fingerprint.nullable().default(null),
+}).strict();
+export const GiftCardIssuanceResult = z
+  .object({
+    card: GiftCard,
+    deliveryToken: z.string().min(32).max(256),
+    deliveryExpiresAt: IsoTimestamp,
+    recovered: z.boolean(),
+  })
+  .strict();
+export const GiftCardIssuancePreview = z
+  .object({
+    currency: CurrencyCode,
+    valueMinorUnits: z.number().int().positive(),
+    maximumValueMinorUnits: z.number().int().positive(),
+    approvalPermission: z.string().max(100).nullable(),
+    fingerprint: Fingerprint,
+  })
+  .strict();
+export const GiftCardSecretRevealRequest = CustomerCommandContext.extend({
+  deliveryToken: z.string().min(32).max(256),
+}).strict();
+export const GiftCardSecretRevealResult = z
+  .object({
+    maskedReference: PublicReference,
+    code: z.string().min(12).max(128),
+    expiresAt: IsoTimestamp,
+  })
+  .strict();
 export const GiftCardActivation = CustomerCommandContext.extend({
   giftCardId: Uuid,
   initialValue: Money.refine((value) => value.minorUnits > 0),
@@ -641,6 +741,46 @@ export const CustomerValueRecoveryResult = z
     recoveredAt: IsoTimestamp,
   })
   .strict();
+export const PointsAdjustmentReason = z.enum([
+  'customer_service_correction',
+  'migration_correction',
+  'fraud_correction',
+  'operational_correction',
+  'expired_reward_correction',
+  'authorized_other',
+]);
+export const PointsAdjustmentRequest = CustomerCommandContext.extend({
+  customerId: Uuid,
+  accountId: Uuid,
+  direction: z.enum(['increase', 'decrease']),
+  points: z.number().int().positive().max(1_000_000),
+  reason: PointsAdjustmentReason,
+  note: z.string().trim().max(240).nullable().default(null),
+  approvalId: Uuid.nullable().default(null),
+  approvalFingerprint: Fingerprint.nullable().default(null),
+}).strict();
+export const PointsAdjustmentPreview = z
+  .object({
+    accountId: Uuid,
+    currentAvailable: z.number().int().nonnegative(),
+    projectedAvailable: z.number().int().nonnegative(),
+    approvalPermission: z.string().max(100).nullable(),
+    fingerprint: Fingerprint,
+  })
+  .strict();
+export const PointsAdjustmentResult = z
+  .object({
+    ledgerEntry: LoyaltyLedgerEntry,
+    balance: PointsBalance,
+    recovered: z.boolean(),
+  })
+  .strict();
+export const AuthorizationExpiryRequest = z
+  .object({ merchantId: Uuid, batchSize: z.number().int().min(1).max(500).default(100) })
+  .strict();
+export const AuthorizationExpiryResult = z
+  .object({ expiredCount: z.number().int().nonnegative(), processedAt: IsoTimestamp })
+  .strict();
 export const SafeCustomerDiagnostic = z
   .object({
     merchantReference: PublicReference,
@@ -659,6 +799,7 @@ export type CustomerProfile = z.infer<typeof CustomerProfile>;
 export type CustomerSearchRequest = z.infer<typeof CustomerSearchRequest>;
 export type CustomerSearchResult = z.infer<typeof CustomerSearchResult>;
 export type CustomerHistoryPage = z.infer<typeof CustomerHistoryPage>;
+export type CustomerHistoryQuery = z.infer<typeof CustomerHistoryQuery>;
 export type CreateCustomerRequest = z.infer<typeof CreateCustomerRequest>;
 export type CustomerMergeRequest = z.infer<typeof CustomerMergeRequest>;
 export type CustomerValuePreviewRequest = z.infer<typeof CustomerValuePreviewRequest>;
@@ -672,6 +813,15 @@ export type RewardAuthorizationRequest = z.infer<typeof RewardAuthorizationReque
 export type StoredValueAuthorizationRequest = z.infer<typeof StoredValueAuthorizationRequest>;
 export type ValueReleaseRequest = z.infer<typeof ValueReleaseRequest>;
 export type GiftCardLookupRequest = z.infer<typeof GiftCardLookupRequest>;
+export type GiftCardLookupResult = z.infer<typeof GiftCardLookupResult>;
+export type GiftCardIssuanceRequest = z.infer<typeof GiftCardIssuanceRequest>;
+export type GiftCardIssuanceResult = z.infer<typeof GiftCardIssuanceResult>;
+export type GiftCardIssuancePreview = z.infer<typeof GiftCardIssuancePreview>;
+export type GiftCardSecretRevealRequest = z.infer<typeof GiftCardSecretRevealRequest>;
+export type GiftCardSecretRevealResult = z.infer<typeof GiftCardSecretRevealResult>;
+export type PointsAdjustmentRequest = z.infer<typeof PointsAdjustmentRequest>;
+export type PointsAdjustmentPreview = z.infer<typeof PointsAdjustmentPreview>;
+export type PointsAdjustmentResult = z.infer<typeof PointsAdjustmentResult>;
 export type GiftCardActivation = z.infer<typeof GiftCardActivation>;
 export type CustomerValueRecoveryQuery = z.infer<typeof CustomerValueRecoveryQuery>;
 export type CustomerValueRecoveryResult = z.infer<typeof CustomerValueRecoveryResult>;
@@ -694,6 +844,7 @@ export const posCustomerValueModels = {
   CustomerAttachment,
   CustomerHistoryEntry,
   CustomerHistoryPage,
+  CustomerHistoryQuery,
   CustomerMergeCandidate,
   CustomerCommandContext,
   CreateCustomerRequest,
@@ -732,6 +883,12 @@ export const posCustomerValueModels = {
   GiftCardStatus,
   GiftCard,
   GiftCardLookupRequest,
+  GiftCardLookupResult,
+  GiftCardIssuanceRequest,
+  GiftCardIssuanceResult,
+  GiftCardIssuancePreview,
+  GiftCardSecretRevealRequest,
+  GiftCardSecretRevealResult,
   GiftCardActivation,
   GiftCardAuthorization,
   GiftCardRedemption,
@@ -745,5 +902,11 @@ export const posCustomerValueModels = {
   CustomerValueRecoveryState,
   CustomerValueRecoveryQuery,
   CustomerValueRecoveryResult,
+  PointsAdjustmentReason,
+  PointsAdjustmentRequest,
+  PointsAdjustmentPreview,
+  PointsAdjustmentResult,
+  AuthorizationExpiryRequest,
+  AuthorizationExpiryResult,
   SafeCustomerDiagnostic,
 };

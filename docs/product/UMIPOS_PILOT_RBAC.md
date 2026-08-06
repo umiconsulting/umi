@@ -273,8 +273,8 @@ El flujo documentado de seed y API es la autoridad del piloto. Gate 3E no inicia
 | --------------- | ---------------------------------------------------------------------------------------------------------- |
 | Cashier y Staff | Buscan una vista limitada, crean un cliente mínimo, adjuntan, consultan puntos y usan un valor autorizado. |
 | Supervisor      | Añade historial de la location y refunds de wallet o gift card.                                            |
-| Manager         | Tiene grants para ajustes y conflictos. Las rutas completas siguen pendientes.                             |
-| Admin y Owner   | Tienen grants de política. Las rutas completas siguen pendientes.                                          |
+| Manager         | Ejecuta ajustes aprobados, emite gift cards y resuelve conflictos autorizados.                             |
+| Admin y Owner   | Administran políticas y usan las rutas operativas con el control normal.                                   |
 | Viewer          | Lee proyecciones explícitas. No ve contactos completos y no cambia datos.                                  |
 | super_admin     | Permanece fuera del viaje operativo del café.                                                              |
 
@@ -287,7 +287,7 @@ La matriz separa estas acciones:
 - combinación de clientes;
 - ajuste manual de puntos;
 - activación de gift card sobre el umbral;
-- emisión o ajuste de wallet;
+- emisión de gift card o ajuste de wallet;
 - resolución de un conflicto de valor.
 
-La activación y el merge consumen una aprobación vinculada. Las otras rutas sensibles siguen pendientes.
+La activación, la emisión, el ajuste de puntos y el merge consumen una aprobación vinculada cuando aplica el umbral.

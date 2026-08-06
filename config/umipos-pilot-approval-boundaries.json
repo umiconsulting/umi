@@ -95,6 +95,19 @@
       "policy": "giftCard.activationThreshold"
     },
     {
+      "action": "gift_card_issuance",
+      "actingPermission": "gift_card.issue",
+      "approvalPermission": "gift_card.issue.approve",
+      "selfApproval": false,
+      "actorSeparation": true,
+      "scope": "location",
+      "lifetimeSeconds": 300,
+      "oneUse": true,
+      "fingerprintBound": true,
+      "auditRequired": true,
+      "policy": "giftCard.issuanceThreshold"
+    },
+    {
       "action": "high_discount",
       "actingPermission": "checkout.discount.apply",
       "approvalPermission": "checkout.discount.approve",

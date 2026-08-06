@@ -77,6 +77,8 @@ export const configSchema = z
     // landing cutover (and disables the landing cron). Public contact/diagnostic
     // routes stay live regardless — only the background sequence tick is gated.
     LEADS_SEQUENCE_ENABLED: booleanFromEnv.default(false),
+    // Releases expired points and stored-value holds through one idempotent command.
+    CUSTOMER_VALUE_EXPIRY_ENABLED: booleanFromEnv.default(true),
 
     // CORS.
     CORS_ORIGINS: z.string().optional(), // comma-separated origins
@@ -131,6 +133,8 @@ export const configSchema = z
     APP_QR_SECRET: z.string().min(32).optional(),
     JWT_ACCESS_SECRET: z.string().min(32).optional(), // cash CUSTOMER access token (24h)
     JWT_REFRESH_SECRET: z.string().min(32).optional(), // cash CUSTOMER refresh token (30d)
+    // HMAC and AES key source for customer-history cursors and one-time gift-card delivery.
+    CUSTOMER_VALUE_SECRET: z.string().min(32).optional(),
 
     ANTHROPIC_API_KEY: z.string().optional(),
     VOYAGE_API_KEY: z.string().optional(),

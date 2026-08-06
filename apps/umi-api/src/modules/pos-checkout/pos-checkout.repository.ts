@@ -954,6 +954,7 @@ export class PosCheckoutRepository {
     authorization: CheckoutAuthorization,
     correlationId: string,
     idempotencyKey: string,
+    customerValueBasisFingerprint: string,
     customerValue: CustomerValueSelection | null,
   ): Promise<{
     sale: NonNullable<CheckoutResult['sale']>;
@@ -1123,9 +1124,9 @@ export class PosCheckoutRepository {
       ],
     );
     const value = await client.query<{ result: Record<string, unknown> }>(
-      `SELECT merchant.commit_customer_value(
-        $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::uuid,$9,$10::date,
-        $11::uuid,$12::uuid,$13::jsonb) AS result`,
+      `SELECT merchant.commit_customer_value_closeout(
+        $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::uuid,$9,$10,$11,
+        $12::date,$13::uuid,$14::uuid,$15::jsonb) AS result`,
       [
         cart.merchantId,
         cart.locationId,
@@ -1136,6 +1137,8 @@ export class PosCheckoutRepository {
         commandId,
         idempotencyKey,
         customerValue?.previewFingerprint ?? confirmation.fingerprint,
+        cart.version,
+        customerValueBasisFingerprint,
         cart.businessDate,
         authorization.operatorId,
         authorization.deviceId,

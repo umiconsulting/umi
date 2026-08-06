@@ -187,11 +187,16 @@ Recommended Mac review sequence:
 - Implemented: temporary reward and stored-value authorization with release and recovery.
 - Implemented: atomic checkout effects and proportional refund reversals.
 - Implemented: Customer Center with keyboard, touch, pointer, English, and Spanish behavior.
-- Incomplete: full reward eligibility, earn-preview binding, and authorization expiry.
-- Incomplete: consent updates, loyalty enrollment, adjustments, issuance, and gift-card suspension.
-- Incomplete: gift-card lookup rate limits and the complete concurrency matrix.
+- Implemented: historical policy binding, one earn engine, reward scope, usage limits, and automatic expiry.
+- Implemented: reward replacement requires confirmation and releases the prior authorization once.
+- Implemented: manual points adjustment and protected gift-card issuance with one-time code delivery.
+- Blocked safely: sale-funded activation needs an explicit funded-line allocation.
+- Blocked safely: gift-card payment needs a one-use lookup proof bound to the operator and device.
+- Implemented: distributed lookup limits, composite history, signed cursors, and focused database races.
+- Review: explain pending points, reward incompatibility, expiry, approval, lookup lockout, and recovery.
 - Review on pilot hardware: search speed, duplicate warnings, masked contacts, and checkout value density.
 - Owner decision: define the earn rate, reward limits, wallet issuance, and gift-card limits.
+- Engineering blocker: define one stable checkout fingerprint before wallet or gift-card debit becomes operational.
 - Owner decision: define the partial-refund policy for rewards.
 - Legal review: approve consent text, retention, anonymization, and gift-card expiry rules.
-- Gate 3F remains incomplete. Owner approval and final UX certification remain pending.
+- Gate 3F remains incomplete. Executable concurrency, consent reconciliation, reward approval, and sale-funded activation remain open.

@@ -1,115 +1,170 @@
 # UmiPOS: clientes, lealtad y valor almacenado
 
-Actualizado: 2026-08-05
+Actualizado: 2026-08-06
 
 Estado: `INCOMPLETE`.
-
-La base segura existe. El Gate todavía requiere política completa, expiración, operaciones
-administrativas, límites de consulta y la matriz completa de concurrencia.
 
 ## 1. Autoridad
 
 La API de UMI controla los clientes, los puntos y el valor almacenado. PostgreSQL conserva los hechos inmutables. Flutter muestra datos y solicita comandos.
 
-Cada cliente pertenece a un merchant. Una venta puede permanecer anónima. La location limita el acceso operativo cuando la política lo requiere.
+Cada cliente pertenece a un merchant. Una venta puede permanecer anónima. La location limita cada operación y cada consulta.
 
-## 2. Cliente y contactos
+## 2. Cliente, contacto y consentimiento
 
-El cliente tiene una referencia pública, un estado, un idioma y una versión. El correo y el teléfono son opcionales. El servidor normaliza los contactos.
+El servidor normaliza el correo y el teléfono. La búsqueda es acotada y usa el merchant. El resultado normal oculta el contacto.
 
-La búsqueda usa el merchant, la location y un límite. El resultado normal oculta el contacto. El permiso `customer.contact.read` permite una vista más amplia.
+El historial de consentimiento es inmutable. La entrega de recibos, la lealtad y el marketing usan decisiones separadas. La creación mínima no concede marketing.
 
-La detección de duplicados crea candidatos. No combina perfiles. La combinación requiere permiso, aprobación y una huella del comando.
+La detección de duplicados crea candidatos. No combina perfiles. El merge requiere permiso, aprobación y una huella exacta.
 
-Si los perfiles contienen puntos o wallet, la API devuelve `ValueReconciliationRequired`. La API no suma saldos de forma silenciosa. Las gift cards no se combinan.
+El merge bloquea puntos, wallet o gift cards sin conciliación. Conserva el historial de los perfiles.
 
-## 3. Privacidad y consentimiento
+## 3. Política histórica y earn
 
-El historial de consentimiento es inmutable. Cada tipo tiene una decisión separada.
+La vista previa usa una sola función de cálculo en el servidor. La función usa importes enteros y redondeo canónico.
 
-- La entrega de recibo no concede marketing.
-- La inscripción de lealtad no concede marketing.
-- La venta anónima permanece disponible.
-- La creación mínima no preselecciona marketing.
-- La API no registra el correo, el teléfono ni el código completo de una gift card.
+La entrada incluye estos datos:
 
-La combinación restrictiva de consentimientos todavía está pendiente. Este Gate no certifica una ley de privacidad.
+- líneas y categorías;
+- productos excluidos;
+- descuentos;
+- impuestos;
+- propina;
+- tenders;
+- rewards;
+- fecha comercial;
+- versión y huella de la política.
 
-## 4. Venta y cliente
+La vista previa guarda la base bruta, la base excluida, la base final y los puntos. También guarda el estado pendiente o disponible.
 
-El operador puede buscar, crear, adjuntar o quitar un cliente. El cliente debe pertenecer al merchant y estar activo.
+La huella vincula el cliente, el carrito, los totales, los tenders, la location y la política. El commit rechaza una vista previa vencida o diferente.
 
-Un cambio de cliente invalida la vista de lealtad y las autorizaciones de valor. El commit inmutable bloquea cambios posteriores. La recuperación conserva la referencia del cliente.
+El checkout guarda una copia histórica inmutable de la política. El refund usa los hechos y la asignación histórica. Nunca usa una política actual para cambiar una venta anterior.
 
-El historial actual muestra una lista acotada de ventas. Las proyecciones de recibos, refunds, puntos y valor quedan pendientes. El cursor real también queda pendiente.
+## 4. Rewards
 
-## 5. Puntos y recompensas
+El servidor valida la cuenta, los puntos, la vigencia, la location y el alcance de producto. También valida categorías, variantes, modifiers, gasto mínimo y tenders.
 
-Una cuenta de lealtad pertenece a un cliente y a un programa. El ledger de puntos es append-only. La proyección distingue puntos pendientes, disponibles, autorizados, canjeados y revertidos.
+Las reglas de combinación son explícitas. Un descuento o una propina incompatible bloquea la autorización. Otro reward requiere una confirmación de reemplazo. El servidor libera la autorización anterior una vez, renueva la vista y autoriza el nuevo reward. La UI no elimina un beneficio de forma silenciosa.
 
-La política base define earn, escala, redondeo y momento. Falta vincular la vista previa y la versión histórica al checkout.
+Los límites por venta, cliente y fecha comercial usan hechos y autorizaciones. El bloqueo de cuenta evita dos usos simultáneos.
 
-Una autorización de reward reserva puntos por cinco minutos. Falta la liberación automática al vencer y la validación completa de elegibilidad.
+La autorización reserva puntos. No canjea puntos. El checkout convierte la autorización en un hecho de canje.
 
-El canje y el beneficio financiero se comprometen juntos. El refund agrega una reversión proporcional. La reversión acumulada no supera el canje original.
+## 5. Expiración y liberación
 
-El ledger acepta ajustes tipados. La ruta operativa para ajustes todavía está pendiente.
+Un procesador común descubre autorizaciones vencidas. Procesa lotes de hasta 500 filas.
 
-## 6. Wallet
+El procesador usa `FOR UPDATE SKIP LOCKED`. La transición crea un solo hecho de liberación. Un segundo proceso devuelve cero efectos.
 
-La wallet pertenece a un cliente, un merchant y una moneda. El ledger usa unidades monetarias menores enteras. La proyección se reconstruye desde el ledger.
+La expiración cubre rewards, wallet y gift cards. Una autorización comprometida no puede expirar. Una autorización vencida no puede completar checkout.
 
-La autorización reduce el valor disponible y aumenta el valor autorizado. El commit convierte la autorización en un débito. La liberación restaura el valor una vez.
+El orden de lock es estable:
 
-La wallet no permite saldo negativo, retiro de efectivo, transferencia ni crédito. La emisión permanece desactivada fuera de seeds y compensaciones autorizadas.
+1. merchant;
+2. customer;
+3. cuenta de puntos;
+4. wallet;
+5. gift card;
+6. autorización;
+7. venta o refund;
+8. proyección.
 
-## 7. Gift card
+## 6. Ajuste manual de puntos
 
-La gift card pertenece a un merchant y a una moneda. El código usa un hash para búsqueda. La UI muestra un código protegido.
+El Centro de clientes contiene una operación protegida. El operador selecciona dirección, puntos y motivo.
 
-Una tarjeta inactiva no puede pagar. La activación consume una aprobación vinculada. La emisión y la suspensión operativas están pendientes.
+El servidor genera una vista previa. Una disminución no puede crear saldo negativo. El umbral del piloto requiere una aprobación vinculada.
 
-La gift card puede cubrir todo o parte de la venta. La moneda y el merchant deben coincidir. Este Gate no integra una red externa de gift cards.
+El commit agrega un hecho `manual_points_adjustment`. Nunca reemplaza el saldo. La misma identidad de comando devuelve el resultado original.
 
-## 8. Checkout y refund
+## 7. Wallet
 
-Una transacción compromete estos hechos cuando aplican:
+La wallet pertenece a un cliente, un merchant y una moneda. El ledger usa unidades monetarias menores enteras.
 
-1. Venta.
-2. Tender.
-3. Efecto de caja.
-4. Inventario.
-5. Recibo.
-6. Puntos earn.
-7. Reward canjeado.
-8. Débito de wallet o gift card.
-9. Estado de las autorizaciones.
-10. Auditoría y resultado idempotente.
+La autorización separa el saldo disponible del saldo autorizado. La liberación restaura el valor una vez.
 
-Un fallo revierte toda la transacción. Un reintento con el mismo comando devuelve el resultado original.
+El commit de wallet por la ruta de checkout permanece bloqueado. La redistribución de tenders no tiene una huella base estable. La API falla antes del débito.
 
-El refund usa los hechos históricos. Agrega reversiones proporcionales de puntos, wallet y gift card. No sustituye el tender original. No crea store credit sin una política explícita.
+La wallet no permite saldo negativo, retiro, transferencia ni crédito. La emisión general permanece desactivada.
 
-## 9. Offline y recuperación
+## 8. Gift card
 
-Offline puede conservar una referencia limitada del cliente en una venta cash aprobada. El replay vuelve a validar el cliente y la política.
+La gift card pertenece a un merchant y a una moneda. El código usa entropía criptográfica. La base guarda un hash para la búsqueda.
 
-Offline bloquea creación, consentimiento, rewards, wallet y gift cards. No existe un ledger local oficial. La recuperación consulta el comando original antes de repetirlo.
+La emisión promocional requiere permiso y aprobación. La emisión de desarrollo falla en producción. El comando crea una sola tarjeta.
 
-## 10. Permisos y aprobaciones
+La entrega usa un token protegido. El código se cifra con AES-GCM y tiene una duración limitada. La recuperación del comando devuelve el token, no el código.
 
-Los permisos canónicos usan los prefijos `customer`, `loyalty`, `wallet`, `gift_card` y `stored_value`. La API también exige merchant, location, device, credencial, sesión y entitlement `pos`.
+La lectura del código usa una ruta separada. Esta ruta no guarda el código en `business_command`. Flutter muestra el código en un diálogo local y no lo conserva en el estado normal.
 
-Las acciones sensibles usan una aprobación de un solo uso. La aprobación vincula el cliente, la cuenta, el valor, la location y la huella. La autoaprobación está bloqueada por defecto.
+La emisión promocional autorizada está operativa. La emisión financiada por venta permanece bloqueada. Falta una asignación explícita que vincule el valor con una línea financiada. El sistema no crea valor desde una venta ordinaria.
 
-## 11. Seguridad y límites
+La autorización de pago con gift card permanece bloqueada. Falta una prueba de consulta de un solo uso que vincule el código con el operador y el dispositivo.
 
-- La búsqueda de clientes es acotada. El límite de tasa para gift cards está pendiente.
-- La API bloquea acceso entre merchants.
-- Los puntos y el dinero usan enteros.
-- Los ledgers bloquean update y delete.
-- Los códigos de gift card no aparecen en logs.
-- Flutter no usa Supabase directo.
-- Flutter usa el SDK generado.
+## 9. Consulta de gift card
 
-El personal debe confirmar la identidad del cliente. La posesión del código de una gift card conserva riesgo de portador. Este Gate no incluye marketing, banca, suscripciones ni segmentación CRM.
+La consulta usa límites distribuidos en PostgreSQL. Los límites incluyen merchant, location, device, operator y un bucket protegido del código.
+
+El límite global de device y operator evita un bypass con códigos o sesiones nuevas. La limpieza elimina filas vencidas en lotes acotados.
+
+Una consulta inválida devuelve un estado genérico. No revela si el código existe. Una consulta autorizada devuelve solo referencia oculta, estado, moneda y saldo.
+
+## 10. Historial compuesto
+
+El historial combina estos hechos:
+
+- ventas y recibos;
+- referencias provisionales conciliadas;
+- refunds, voids y recibos compensatorios;
+- earn, canje, liberación, reversión y ajustes;
+- autorizaciones de rewards;
+- wallet;
+- emisión, activación, uso y refund de gift cards;
+- merge;
+- consentimiento cuando existe permiso.
+
+La API ordena por fecha, tipo e identidad de evento. El cursor es opaco y usa HMAC. La versión actual del cursor es `2`.
+
+El cursor vincula merchant, cliente, permisos y filtros. Un cursor de otro ámbito falla. La API limita cada página a 50 eventos.
+
+## 11. Checkout, refund y recuperación
+
+El checkout confirma venta, tenders, caja, inventario, recibo, puntos y valor en una transacción. Un error revierte todos los efectos.
+
+El refund agrega hechos de compensación. No elimina el earn, el canje ni el débito original. Una reversión acumulada no supera el valor original.
+
+La recuperación consulta el comando original antes de un reintento. La expiración y la liberación usan identidades deterministas.
+
+## 12. Offline
+
+Offline puede conservar una referencia limitada del cliente en una venta cash aprobada. El replay vuelve a validar el cliente.
+
+Offline bloquea rewards, ajustes, wallet, emisión y gift cards. No existe una autoridad local de puntos o valor.
+
+## 13. Permisos y aprobaciones
+
+La API exige merchant, location, device, versión de credencial, sesión de operador y entitlement `pos`.
+
+Los ajustes usan `loyalty.adjust`. La emisión usa `gift_card.issue`. Las acciones con valor alto usan permisos de aprobación separados.
+
+Cada aprobación vincula la location, la cuenta, el importe, el comando y la huella. La autoaprobación está bloqueada.
+
+## 14. Concurrencia y seguridad
+
+Las cuentas usan locks por fila. Los ledgers usan una secuencia única y hechos append-only.
+
+Las restricciones bloquean doble gasto, doble liberación, saldo negativo y una segunda emisión. Las pruebas ejecutan carreras de wallet y expiración.
+
+La matriz completa de 26 carreras permanece pendiente. Las pruebas estructurales no sustituyen las sesiones simultáneas.
+
+La API no registra contactos, PIN, códigos de gift card ni secretos de recuperación. Flutter usa el SDK generado y no usa Supabase directo.
+
+## 15. Límites y decisiones del Owner
+
+Este Gate no incluye campañas, banca, transferencia, suscripciones ni redes externas de gift cards.
+
+El Owner debe definir la tasa de earn, los límites de rewards y los límites de emisión. El área legal debe revisar retención, anonimización, texto de consentimiento y expiración.
+
+Gate 3F permanece incompleto. Faltan la matriz completa, la conciliación de consentimiento, la aprobación de rewards y los flujos de gift card bloqueados.

@@ -483,18 +483,57 @@ Prueba lealtad y rewards:
 5. Libera la autorización y confirma el saldo.
 6. Autoriza otra vez y confirma el checkout.
 7. Verifica `merchant.loyalty_points_ledger` y su proyección.
+8. Cambia la política y confirma que el commit rechaza la vista previa anterior.
+9. Ejecuta el procesador de expiración en desarrollo:
+
+```sql
+select merchant.expire_customer_value_authorizations('<merchant_uuid>'::uuid, 100);
+```
+
+Prueba un ajuste manual:
+
+1. Abre un cliente con una cuenta de lealtad.
+2. Selecciona **Ajustar puntos**.
+3. Captura una dirección, un importe entero y un motivo.
+4. Revisa el saldo proyectado.
+5. Usa el PIN del responsable cuando la política lo solicite.
+6. Confirma un solo hecho `manual_points_adjustment`.
 
 Prueba wallet y gift card:
 
 1. Crea una wallet de desarrollo para el cliente.
 2. Agrega un hecho `loaded` con una referencia de seed.
-3. Crea una gift card de desarrollo y conserva el código fuera de logs.
-4. Activa la gift card con una aprobación válida.
-5. Autoriza un importe menor que el saldo.
-6. Confirma un pago mixto.
-7. Verifica el tender, el ledger y el saldo restante.
-8. Ejecuta un refund parcial.
-9. Confirma una reversión proporcional y sin duplicados.
+3. Selecciona **Emitir tarjeta** con `gift_card.issue`.
+4. Confirma el importe y la aprobación vinculada.
+5. Entrega el código de una sola lectura. No copies el código a un log.
+6. Para una promoción, confirma que la tarjeta se activa en el comando de emisión.
+7. Confirma que una emisión financiada por venta devuelve `GIFT_CARD_SALE_ISSUANCE_NOT_AVAILABLE`.
+8. Confirma que la autorización devuelve un error genérico hasta que exista una prueba de consulta.
+9. No presentes un débito ni un pago mixto como operativo.
+
+Prueba el límite de consulta:
+
+1. Usa una base desechable.
+2. Ejecuta nueve consultas inválidas con el mismo device y operator.
+3. Confirma `temporarily_locked` sin una señal de existencia.
+4. Ejecuta `pnpm umi-pos:customer-value-db-check` para validar el límite distribuido.
+
+Prueba el historial compuesto:
+
+1. Abre un cliente con ventas, refunds, puntos y valor.
+2. Cambia el filtro de categoría.
+3. Selecciona **Cargar más**.
+4. Confirma que el cursor no repite eventos.
+5. Confirma que otro customer o merchant no puede usar el cursor.
+
+Ejecuta las pruebas estructurales de la matriz de concurrencia:
+
+```sh
+pnpm --filter @umi/api exec vitest run \
+  src/shared/database/gate-3f-customer-value-concurrency.spec.ts
+```
+
+Estas pruebas no certifican las 26 carreras con sesiones simultáneas. Gate 3F permanece incompleto hasta esa certificación.
 
 Una pérdida de respuesta requiere consultar el comando original. No repitas un débito sin esa consulta.
 

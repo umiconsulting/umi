@@ -20,6 +20,7 @@ Future<void> showCustomerCenter(
   await Navigator.of(context).push<void>(
     MaterialPageRoute(
       builder: (_) => CustomerValueSurface(
+        entry: entry,
         controller: controller,
         sales: sales,
         scope: CustomerValueScope(
@@ -35,12 +36,14 @@ Future<void> showCustomerCenter(
 
 final class CustomerValueSurface extends StatefulWidget {
   const CustomerValueSurface({
+    required this.entry,
     required this.controller,
     required this.sales,
     required this.scope,
     required this.permissions,
     super.key,
   });
+  final EntryController entry;
   final CustomerValueController controller;
   final SaleLifecycleController sales;
   final CustomerValueScope scope;
@@ -52,6 +55,7 @@ final class CustomerValueSurface extends StatefulWidget {
 
 final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
   final _search = TextEditingController();
+  String _historyCategory = 'all';
 
   @override
   void initState() {
@@ -245,10 +249,79 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
                   : _copy('Adjuntar a la venta', 'Attach to sale'),
             ),
           ),
+        if (state.history?.pointsBalance case final points?)
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.stars_outlined),
+              title: Text(_copy('Puntos disponibles', 'Available points')),
+              trailing: Text('${points['available'] ?? 0}'),
+              subtitle: Text(
+                _copy(
+                  'Pendientes: ${points['pending'] ?? 0}',
+                  'Pending: ${points['pending'] ?? 0}',
+                ),
+              ),
+            ),
+          ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (widget.permissions.allows('loyalty.adjust'))
+              OutlinedButton.icon(
+                onPressed: state.busy || state.history?.loyaltyAccount == null
+                    ? null
+                    : _adjustPoints,
+                icon: const Icon(Icons.tune),
+                label: Text(_copy('Ajustar puntos', 'Adjust points')),
+              ),
+            if (widget.permissions.allows('gift_card.issue'))
+              OutlinedButton.icon(
+                onPressed: state.busy ? null : _issueGiftCard,
+                icon: const Icon(Icons.card_giftcard),
+                label: Text(_copy('Emitir tarjeta', 'Issue gift card')),
+              ),
+          ],
+        ),
         const SizedBox(height: 16),
-        Text(
-          _copy('Historial', 'History'),
-          style: Theme.of(context).textTheme.titleMedium,
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                _copy('Historial', 'History'),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            DropdownButton<String>(
+              value: _historyCategory,
+              items: const [
+                DropdownMenuItem(value: 'all', child: Text('Todo / All')),
+                DropdownMenuItem(value: 'sale', child: Text('Ventas / Sales')),
+                DropdownMenuItem(
+                  value: 'exception',
+                  child: Text('Reembolsos / Refunds'),
+                ),
+                DropdownMenuItem(
+                  value: 'loyalty',
+                  child: Text('Puntos / Points'),
+                ),
+                DropdownMenuItem(value: 'reward', child: Text('Rewards')),
+                DropdownMenuItem(value: 'wallet', child: Text('Wallet')),
+                DropdownMenuItem(value: 'gift_card', child: Text('Gift cards')),
+              ],
+              onChanged: state.busy
+                  ? null
+                  : (value) async {
+                      if (value == null) return;
+                      setState(() => _historyCategory = value);
+                      await widget.controller.select(
+                        widget.scope,
+                        customer,
+                        category: value,
+                      );
+                    },
+            ),
+          ],
         ),
         if (state.busy) const LinearProgressIndicator(),
         if (state.history?.entries.isEmpty ?? true)
@@ -259,14 +332,334 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
             ),
           )
         else
-          ...state.history!.entries.map(
-            (entry) => ListTile(
-              leading: const Icon(Icons.receipt_long_outlined),
-              title: Text((entry['publicReference'] as String?) ?? ''),
-              subtitle: Text((entry['businessDate'] as String?) ?? ''),
-            ),
+          ...state.history!.entries.map(_historyTile),
+        if (state.history?.nextCursor != null)
+          TextButton.icon(
+            onPressed: state.busy
+                ? null
+                : () => widget.controller.loadMoreHistory(
+                    widget.scope,
+                    category: _historyCategory,
+                  ),
+            icon: const Icon(Icons.expand_more),
+            label: Text(_copy('Cargar más', 'Load more')),
           ),
       ],
+    );
+  }
+
+  Widget _historyTile(Map<String, Object?> entry) {
+    final type = entry['type'] as String? ?? 'sale';
+    final label = switch (type) {
+      'sale' => _copy('Venta', 'Sale'),
+      'receipt' => _copy('Recibo', 'Receipt'),
+      'refund' => _copy('Reembolso', 'Refund'),
+      'void' => _copy('Anulación', 'Void'),
+      'points_earn' => _copy('Puntos', 'Points'),
+      'reward' => _copy('Recompensa', 'Reward'),
+      'wallet' => _copy('Wallet', 'Wallet'),
+      'gift_card' => _copy('Tarjeta de regalo', 'Gift card'),
+      'consent' => _copy('Consentimiento', 'Consent'),
+      _ => _copy('Movimiento', 'Activity'),
+    };
+    final points = entry['points'];
+    final total = entry['total'] as Map<String, Object?>?;
+    final detail = points != null
+        ? '$points ${_copy('puntos', 'points')}'
+        : total != null
+        ? '${total['minorUnits']} ${total['currency']}'
+        : entry['status'] as String? ?? '';
+    return ListTile(
+      leading: const Icon(Icons.receipt_long_outlined),
+      title: Text('$label · ${entry['publicReference'] ?? ''}'),
+      subtitle: Text('${entry['businessDate'] ?? ''} · $detail'),
+    );
+  }
+
+  Future<void> _adjustPoints() async {
+    final amount = TextEditingController();
+    final note = TextEditingController();
+    var direction = 'increase';
+    var reason = 'customer_service_correction';
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(_copy('Ajustar puntos', 'Adjust points')),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: direction,
+                  decoration: InputDecoration(
+                    labelText: _copy('Dirección', 'Direction'),
+                  ),
+                  items: [
+                    DropdownMenuItem(
+                      value: 'increase',
+                      child: Text(_copy('Aumentar', 'Increase')),
+                    ),
+                    DropdownMenuItem(
+                      value: 'decrease',
+                      child: Text(_copy('Disminuir', 'Decrease')),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      setDialogState(() => direction = value ?? direction),
+                ),
+                TextField(
+                  controller: amount,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: _copy('Puntos', 'Points'),
+                  ),
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: reason,
+                  decoration: InputDecoration(
+                    labelText: _copy('Motivo', 'Reason'),
+                  ),
+                  items: [
+                    DropdownMenuItem(
+                      value: 'customer_service_correction',
+                      child: Text(
+                        _copy('Corrección de servicio', 'Service correction'),
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'operational_correction',
+                      child: Text(
+                        _copy('Corrección operativa', 'Operational correction'),
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'fraud_correction',
+                      child: Text(
+                        _copy('Corrección por fraude', 'Fraud correction'),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      setDialogState(() => reason = value ?? reason),
+                ),
+                TextField(
+                  controller: note,
+                  maxLength: 240,
+                  decoration: InputDecoration(
+                    labelText: _copy('Nota opcional', 'Optional note'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(_copy('Cancelar', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(_copy('Revisar', 'Review')),
+            ),
+          ],
+        ),
+      ),
+    );
+    final points = int.tryParse(amount.text);
+    amount.dispose();
+    if (accepted != true || points == null || points <= 0) {
+      note.dispose();
+      return;
+    }
+    final preview = await widget.controller.previewPointsAdjustment(
+      widget.scope,
+      direction: direction,
+      points: points,
+      reason: reason,
+      note: note.text.trim().isEmpty ? null : note.text.trim(),
+    );
+    note.dispose();
+    if (!mounted || preview == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_copy('Confirma el ajuste', 'Confirm adjustment')),
+        content: Text(
+          '${_copy('Saldo actual', 'Current balance')}: ${preview.currentAvailable}\n'
+          '${_copy('Saldo final', 'Final balance')}: ${preview.projectedAvailable}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(_copy('Cancelar', 'Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(_copy('Confirmar', 'Confirm')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    String? approvalId;
+    if (preview.approvalPermission != null) {
+      approvalId = await _requestApproval(
+        preview.approvalPermission!,
+        preview.fingerprint,
+      );
+      if (approvalId == null) return;
+    }
+    final result = await widget.controller.commitPointsAdjustment(
+      widget.scope,
+      approvalId: approvalId,
+      approvalFingerprint: approvalId == null ? null : preview.fingerprint,
+    );
+    if (result != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_copy('Ajuste registrado.', 'Adjustment recorded.')),
+        ),
+      );
+      await widget.controller.select(
+        widget.scope,
+        widget.controller.state.selected!,
+      );
+    }
+  }
+
+  Future<void> _issueGiftCard() async {
+    final amount = TextEditingController();
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(_copy('Emitir tarjeta de regalo', 'Issue gift card')),
+        content: TextField(
+          controller: amount,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: _copy('Valor en centavos', 'Value in minor units'),
+            helperText: _copy(
+              'Ejemplo: 50000 = MXN 500.00',
+              'Example: 50000 = MXN 500.00',
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(_copy('Cancelar', 'Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(_copy('Revisar', 'Review')),
+          ),
+        ],
+      ),
+    );
+    final value = int.tryParse(amount.text);
+    amount.dispose();
+    if (accepted != true || value == null || value <= 0 || !mounted) return;
+    final preview = await widget.controller.previewGiftCardIssuance(
+      widget.scope,
+      valueMinorUnits: value,
+      currency: 'MXN',
+    );
+    if (!mounted || preview == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_copy('Confirma la emisión', 'Confirm issuance')),
+        content: Text(
+          '${preview.valueMinorUnits} ${preview.currency}\n'
+          '${_copy('Límite', 'Limit')}: ${preview.maximumValueMinorUnits}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(_copy('Cancelar', 'Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(_copy('Confirmar', 'Confirm')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    String? approvalId;
+    if (preview.approvalPermission != null) {
+      approvalId = await _requestApproval(
+        preview.approvalPermission!,
+        preview.fingerprint,
+      );
+      if (approvalId == null) return;
+    }
+    final result = await widget.controller.issueGiftCard(
+      widget.scope,
+      approvalId: approvalId,
+      approvalFingerprint: approvalId == null ? null : preview.fingerprint,
+    );
+    if (result == null || !mounted) return;
+    final secret = await widget.controller.revealGiftCardSecret(
+      widget.scope,
+      result.deliveryToken,
+    );
+    if (secret == null || !mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text(_copy('Código de entrega única', 'One-time delivery code')),
+        content: SelectableText('${secret.maskedReference}\n${secret.code}'),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(_copy('Código entregado', 'Code delivered')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<String?> _requestApproval(
+    String permission,
+    String fingerprint,
+  ) async {
+    final pin = TextEditingController();
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(_copy('Aprobación del responsable', 'Manager approval')),
+        content: TextField(
+          controller: pin,
+          obscureText: true,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: _copy('PIN del responsable', 'Manager PIN'),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(_copy('Cancelar', 'Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(_copy('Aprobar', 'Approve')),
+          ),
+        ],
+      ),
+    );
+    final value = pin.text;
+    pin.dispose();
+    if (accepted != true || value.isEmpty) return null;
+    return widget.entry.requestCheckoutApproval(
+      managerPin: value,
+      permission: permission,
+      commandFingerprint: fingerprint,
     );
   }
 

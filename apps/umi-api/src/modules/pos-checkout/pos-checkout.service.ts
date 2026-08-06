@@ -98,15 +98,23 @@ export class PosCheckoutService {
             cart,
             dto.customerValue,
           );
+          const lineAmounts = new Map(
+            repriced.lineSnapshot.map((line) => [line.id, line.price.lineSubtotal.minorUnits]),
+          );
           const calculation = calculateCheckout(
             repriced.public,
             dto,
             policy,
-            new Map(
-              repriced.lineSnapshot.map((line) => [line.id, line.price.lineSubtotal.minorUnits]),
-            ),
+            lineAmounts,
             customerValueAllocation.rewardDiscount,
           );
+          const customerValueBasisFingerprint = calculateCheckout(
+            repriced.public,
+            { ...dto, customerValue: null },
+            policy,
+            lineAmounts,
+            null,
+          ).confirmation.fingerprint;
           const confirmation = calculation.confirmation;
           const previewRecoveryState = this.recoveryState(calculation.ok ? null : calculation.code);
           const previewState =
@@ -233,6 +241,7 @@ export class PosCheckoutService {
               );
             });
           const storedValueSelectionInvalid =
+            selectedAuthorizationIds.length > 0 ||
             JSON.stringify(tenderAuthorizationIds) !== JSON.stringify(selectedAuthorizationIds) ||
             storedValueTenderMismatch;
           const calculationCode = calculation.ok ? null : calculation.code;
@@ -396,6 +405,7 @@ export class PosCheckoutService {
             authorization,
             context.correlationId,
             dto.idempotencyKey,
+            customerValueBasisFingerprint,
             dto.customerValue ?? null,
           );
           const sale = committed.sale;

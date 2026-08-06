@@ -6,6 +6,10 @@ const sql = readFileSync(
   resolve(process.cwd(), '../../docs/migration/build-v3/37_pos_customer_value.sql'),
   'utf8',
 );
+const closeout = readFileSync(
+  resolve(process.cwd(), '../../docs/migration/build-v3/38_pos_customer_value_closeout.sql'),
+  'utf8',
+);
 const checkout = readFileSync(
   resolve(process.cwd(), 'src/modules/pos-checkout/pos-checkout.repository.ts'),
   'utf8',
@@ -101,5 +105,54 @@ describe('Gate 3F customer and value authority', () => {
   it('fails closed for merged profiles with value accounts', () => {
     expect(sql).toContain('VALUE_RECONCILIATION_REQUIRED');
     expect(sql).toContain('most restrictive consent');
+  });
+
+  it('binds immutable loyalty policy and earn preview facts to the sale', () => {
+    expect(closeout).toContain('loyalty_sale_policy_snapshot');
+    expect(closeout).toContain('loyalty_earn_preview');
+    expect(closeout).toContain('loyalty_sale_policy_snapshot_append_only');
+    expect(closeout).toContain('LOYALTY_PREVIEW_STALE');
+  });
+
+  it('expires every authorization through one exact-release command', () => {
+    expect(closeout).toContain('expire_customer_value_authorizations');
+    expect(closeout).toContain('skip locked');
+    expect(closeout).toContain("status='expired'");
+    expect(closeout).toContain('authorization_released');
+    expect(closeout).toContain('points_released');
+  });
+
+  it('supports secure adjustment, issuance, abuse control, and composite history', () => {
+    expect(closeout).toContain('preview_points_adjustment');
+    expect(closeout).toContain('commit_points_adjustment');
+    expect(closeout).toContain('gift_card_secret_delivery');
+    expect(closeout).toContain('gift_card_lookup_attempt');
+    expect(closeout).toContain('customer_history_event');
+    expect(closeout).toContain('CUSTOMER_HISTORY_CURSOR_INVALID');
+    expect(closeout).toContain('store_gift_card_secret_delivery');
+    expect(closeout).toContain('reveal_gift_card_secret_delivery');
+    expect(closeout).not.toContain('grant select,insert,update on merchant.loyalty_earn_preview');
+  });
+
+  it('binds the final checkout and still commits anonymous gift-card tenders', () => {
+    expect(closeout).toContain('merchant.assert_loyalty_earn_preview');
+    expect(closeout).toContain('p_checkout_version');
+    expect(closeout).toContain('p_checkout_fingerprint');
+    expect(closeout).toContain("v_auth.account_type='wallet'");
+    expect(closeout).toContain('WALLET_CUSTOMER_REQUIRED');
+    expect(customerValueRepository).toContain("code: 'GIFT_CARD_CODE_INVALID'");
+  });
+
+  it('binds every closeout relation to the same merchant', () => {
+    expect(closeout).toContain('references merchant.location(merchant_id,id)');
+    expect(closeout).toContain('references merchant.pos_cart(merchant_id,id)');
+    expect(closeout).toContain('references merchant.loyalty_earn_preview(merchant_id,id)');
+    expect(closeout).toContain('references merchant.device(merchant_id,id)');
+  });
+
+  it('fails closed for consent merge conflicts and location history', () => {
+    expect(customerValueRepository).toContain('customer_consent_current');
+    expect(customerValueRepository).toContain('is distinct from');
+    expect(customerValueRepository).toContain('AND location_id=$4::uuid');
   });
 });

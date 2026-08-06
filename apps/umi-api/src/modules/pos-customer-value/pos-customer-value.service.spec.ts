@@ -9,7 +9,13 @@ const authorization = {
   deviceId: user.deviceId,
   durableSessionId: user.sessionId,
   credentialVersion: 1,
-  permissions: ['customer.search', 'customer.create', 'loyalty.reward.authorize'],
+  permissions: [
+    'customer.search',
+    'customer.create',
+    'loyalty.reward.authorize',
+    'loyalty.adjust',
+    'gift_card.issue',
+  ],
 };
 
 describe('Gate 3F customer and value application boundary', () => {
@@ -125,5 +131,99 @@ describe('Gate 3F customer and value application boundary', () => {
         fieldErrors: { approvalPermission: ['gift_card.activate.approve'] },
       },
     });
+  });
+
+  it('commits a points adjustment through command integrity', async () => {
+    const result = { recovered: false, ledgerEntry: { id: id(20) } };
+    const repo = {
+      authorize: vi.fn().mockResolvedValue(authorization),
+      commitPointsAdjustment: vi.fn().mockResolvedValue(result),
+    };
+    const integrity = {
+      execute: vi.fn(async (_input, operation) => {
+        const outcome = await operation({
+          client: {},
+          appendAudit: vi.fn(),
+          correlationId: 'test',
+        });
+        return { status: 'succeeded', result: outcome.value, failureCode: null };
+      }),
+    };
+    const service = new PosCustomerValueService(repo as never, integrity as never);
+    await expect(
+      service.commitPointsAdjustment(user, id(6), {
+        ...context,
+        commandId: id(8),
+        idempotencyKey: id(9),
+        expectedVersion: null,
+        customerId: id(10),
+        accountId: id(11),
+        direction: 'increase',
+        points: 50,
+        reason: 'customer_service_correction',
+        note: null,
+        approvalId: null,
+        approvalFingerprint: null,
+      }),
+    ).resolves.toEqual(result);
+    expect(repo.commitPointsAdjustment).toHaveBeenCalledOnce();
+    expect(integrity.execute).toHaveBeenCalledOnce();
+  });
+
+  it('keeps one gift-card issuance command recoverable', async () => {
+    const stored = { card: { id: id(20) }, deliveryExpiresAt: 'soon', recovered: false };
+    const result = { ...stored, deliveryToken: 'protected-token' };
+    const repo = {
+      authorize: vi.fn().mockResolvedValue(authorization),
+      issueGiftCard: vi.fn().mockResolvedValue(stored),
+      giftCardDeliveryToken: vi.fn().mockReturnValue('protected-token'),
+    };
+    const integrity = {
+      execute: vi.fn(async (_input, operation) => {
+        const outcome = await operation({
+          client: {},
+          appendAudit: vi.fn(),
+          correlationId: 'test',
+        });
+        return { status: 'succeeded', result: outcome.value, failureCode: null, duplicate: false };
+      }),
+    };
+    const service = new PosCustomerValueService(repo as never, integrity as never);
+    await expect(
+      service.issueGiftCard(user, id(6), {
+        ...context,
+        commandId: id(8),
+        idempotencyKey: id(9),
+        expectedVersion: null,
+        currency: 'MXN',
+        initialValueMinorUnits: 1000,
+        source: 'promotion',
+        saleId: null,
+        customerId: null,
+        approvalId: id(21),
+        approvalFingerprint: 'a'.repeat(64),
+      }),
+    ).resolves.toEqual(result);
+    expect(integrity.execute).toHaveBeenCalledOnce();
+  });
+
+  it('never persists the one-time gift-card secret in command recovery', async () => {
+    const secret = { maskedReference: 'GFT-••••1234', code: 'ONE-TIME', expiresAt: 'soon' };
+    const repo = {
+      authorize: vi.fn().mockResolvedValue(authorization),
+      revealGiftCardSecret: vi.fn().mockResolvedValue(secret),
+    };
+    const integrity = { execute: vi.fn() };
+    const service = new PosCustomerValueService(repo as never, integrity as never);
+    await expect(
+      service.revealGiftCardSecret(user, id(6), {
+        ...context,
+        commandId: id(8),
+        idempotencyKey: id(9),
+        expectedVersion: null,
+        deliveryToken: 'protected-token',
+      }),
+    ).resolves.toEqual(secret);
+    expect(integrity.execute).not.toHaveBeenCalled();
   });
 });

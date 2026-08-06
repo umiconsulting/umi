@@ -662,6 +662,10 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                 subtitle: Text(
                   (reward['eligible']! as bool)
                       ? '${reward['pointsCost']} ${es ? 'puntos' : 'points'}'
+                      : reward['state'] == 'replacement_confirmation_required'
+                      ? (es
+                            ? 'Requiere reemplazar el reward actual'
+                            : 'Requires reward replacement')
                       : (es ? 'No disponible' : 'Unavailable'),
                 ),
                 trailing:
@@ -670,7 +674,9 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                     ? const Icon(Icons.check_circle_outline)
                     : TextButton(
                         onPressed:
-                            reward['eligible'] == true &&
+                            (reward['eligible'] == true ||
+                                    reward['state'] ==
+                                        'replacement_confirmation_required') &&
                                 permissions.contains('loyalty.reward.authorize')
                             ? () => _authorizeReward(reward, totals)
                             : null,
@@ -755,12 +761,67 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     final operator = widget.entry.state.operator;
     if (customerId == null || operator == null) return;
     final reward = eligibility['reward']! as Map<String, Object?>;
+    final scope = CustomerValueScope(
+      merchantId: cart.merchantId,
+      locationId: cart.locationId,
+      operatorSessionId: operator.id,
+    );
+    final current = widget.customerValue!.state.rewardAuthorization;
+    if (current != null && current.rewardId != reward['id']) {
+      final replace = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(
+            Localizations.localeOf(context).languageCode == 'es'
+                ? 'Reemplazar reward'
+                : 'Replace reward',
+          ),
+          content: Text(
+            Localizations.localeOf(context).languageCode == 'es'
+                ? 'El sistema liberará el reward actual antes de autorizar el nuevo.'
+                : 'The system will release the current reward before it authorizes the new reward.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(
+                Localizations.localeOf(context).languageCode == 'es'
+                    ? 'Conservar actual'
+                    : 'Keep current',
+              ),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(
+                Localizations.localeOf(context).languageCode == 'es'
+                    ? 'Reemplazar'
+                    : 'Replace',
+              ),
+            ),
+          ],
+        ),
+      );
+      if (replace != true || !mounted) return;
+      final released = await widget.customerValue!.releaseAuthorization(
+        scope,
+        authorizationId: current.id,
+        accountType: 'loyalty_reward',
+        fingerprint: current.fingerprint,
+      );
+      if (!released) return;
+      final checkoutFingerprint =
+          widget.checkout.state.result?.confirmation['fingerprint'] as String?;
+      if (checkoutFingerprint == null) return;
+      await widget.customerValue!.loadPreview(
+        scope,
+        saleId: cart.id,
+        saleVersion: cart.version,
+        customerId: customerId,
+        checkoutFingerprint: checkoutFingerprint,
+      );
+    }
     final authorization = await widget.customerValue!.authorizeReward(
-      CustomerValueScope(
-        merchantId: cart.merchantId,
-        locationId: cart.locationId,
-        operatorSessionId: operator.id,
-      ),
+      scope,
       saleId: cart.id,
       saleVersion: cart.version,
       customerId: customerId,

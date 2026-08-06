@@ -238,6 +238,83 @@ describe('PosCheckoutService', () => {
     expect(repo.commit).toHaveBeenCalledOnce();
   });
 
+  it('binds customer value to the stable checkout basis fingerprint', async () => {
+    const { service, repo } = harness();
+    const initial = await service.checkout(user, id(1), base);
+    const customerValue = {
+      previewFingerprint: 'b'.repeat(64),
+      rewardAuthorizationId: id(40),
+      storedValueAuthorizationIds: [],
+    };
+    const selected = await service.checkout(user, id(1), { ...base, customerValue });
+    expect(selected.confirmation.fingerprint).not.toBe(initial.confirmation.fingerprint);
+    const result = await service.checkout(user, id(1), {
+      ...base,
+      customerValue,
+      totalsFingerprint: selected.confirmation.fingerprint,
+    });
+    expect(result.status).toBe('completed');
+    expect(repo.commit.mock.calls[0]?.[13]).toBe(initial.confirmation.fingerprint);
+  });
+
+  it('fails closed when stored-value redistribution cannot bind to the earn preview', async () => {
+    const { service, repo } = harness();
+    repo.authorize.mockResolvedValue({
+      operatorName: 'Ada',
+      permissions: [
+        'checkout.commit',
+        'checkout.discount.apply',
+        'checkout.terminal.confirm',
+        'wallet.redeem',
+      ],
+    });
+    repo.customerValueAllocation.mockResolvedValue({
+      rewardDiscount: null,
+      storedValue: [
+        {
+          authorizationId: id(40),
+          accountType: 'wallet',
+          amountMinorUnits: 1000,
+          currency: 'MXN',
+        },
+      ],
+    });
+    const cashTender = {
+      ...base.tenderDrafts[0],
+      amount: { minorUnits: 22200, currency: 'MXN' },
+      amountReceived: { minorUnits: 22200, currency: 'MXN' },
+    };
+    await service.checkout(user, id(1), base);
+    const customerValue = {
+      previewFingerprint: 'b'.repeat(64),
+      rewardAuthorizationId: null,
+      storedValueAuthorizationIds: [id(40)],
+    };
+    const command = {
+      ...base,
+      customerValue,
+      tenderDrafts: [
+        cashTender,
+        {
+          id: id(41),
+          type: 'wallet' as const,
+          amount: { minorUnits: 1000, currency: 'MXN' },
+          amountReceived: null,
+          status: 'confirmed_success' as const,
+          correlationId: 'wallet-test',
+          authorizationId: id(40),
+        },
+      ],
+    };
+    const selected = await service.checkout(user, id(1), command);
+    const result = await service.checkout(user, id(1), {
+      ...command,
+      totalsFingerprint: selected.confirmation.fingerprint,
+    });
+    expect(result.failure?.code).toBe('INVALID_TENDER_AMOUNT');
+    expect(repo.commit).not.toHaveBeenCalled();
+  });
+
   it('makes an unknown terminal outcome query-only and never commits', async () => {
     const { service, repo } = harness();
     const preview = await service.checkout(user, id(1), base);

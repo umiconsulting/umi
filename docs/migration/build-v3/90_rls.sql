@@ -78,6 +78,10 @@ grant select on
   merchant.loyalty_stored_value_ledger,
   merchant.loyalty_gift_card_ledger
 to api, worker;
+revoke all on merchant.gift_card_secret_delivery,merchant.gift_card_lookup_attempt
+from api,worker,readonly;
+revoke update,delete on merchant.loyalty_earn_preview,merchant.loyalty_sale_policy_snapshot
+from api,worker;
 
 -- Gate 3D keeps policy server-owned and committed compensation append-only.
 revoke insert, update, delete on merchant.pos_exception_policy from api;

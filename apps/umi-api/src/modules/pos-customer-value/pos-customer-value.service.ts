@@ -6,12 +6,16 @@ import {
 } from '@nestjs/common';
 import type {
   CreateCustomerRequest,
+  CustomerHistoryQuery,
   CustomerMergeRequest,
   CustomerSearchRequest,
   CustomerValuePreviewRequest,
   CustomerValueRecoveryQuery,
   GiftCardActivation,
+  GiftCardIssuanceRequest,
   GiftCardLookupRequest,
+  GiftCardSecretRevealRequest,
+  PointsAdjustmentRequest,
   RewardAuthorizationRequest,
   StoredValueAuthorizationRequest,
   ValueReleaseRequest,
@@ -66,10 +70,10 @@ export class PosCustomerValueService {
     user: AuthUser,
     merchantId: string,
     customerId: string,
-    query: CustomerSearchRequest,
+    query: CustomerHistoryQuery,
   ) {
-    await this.authorize(user, merchantId, query, 'customer.history.read');
-    return this.repo.history(user.id, merchantId, customerId, query);
+    const authorization = await this.authorize(user, merchantId, query, 'customer.history.read');
+    return this.repo.history(user.id, merchantId, customerId, query, authorization);
   }
 
   async preview(user: AuthUser, merchantId: string, dto: CustomerValuePreviewRequest) {
@@ -130,8 +134,72 @@ export class PosCustomerValueService {
   }
 
   async giftCardLookup(user: AuthUser, merchantId: string, dto: GiftCardLookupRequest) {
-    await this.authorize(user, merchantId, dto, 'gift_card.lookup');
-    return this.repo.giftCardLookup(user.id, merchantId, dto);
+    const authorization = await this.authorize(user, merchantId, dto, 'gift_card.lookup');
+    return this.repo.giftCardLookup(user.id, merchantId, dto, authorization);
+  }
+
+  async previewPointsAdjustment(user: AuthUser, merchantId: string, dto: PointsAdjustmentRequest) {
+    await this.authorize(user, merchantId, dto, 'loyalty.adjust');
+    return this.repo.previewPointsAdjustment(user.id, merchantId, dto);
+  }
+
+  async commitPointsAdjustment(user: AuthUser, merchantId: string, dto: PointsAdjustmentRequest) {
+    const authorization = await this.authorize(user, merchantId, dto, 'loyalty.adjust');
+    return this.mutation(user, merchantId, dto, 'pos.points.adjust', (context) =>
+      this.repo.commitPointsAdjustment(context.client, merchantId, dto, authorization),
+    );
+  }
+
+  async issueGiftCard(user: AuthUser, merchantId: string, dto: GiftCardIssuanceRequest) {
+    const authorization = await this.authorize(user, merchantId, dto, 'gift_card.issue');
+    const result = await this.commandResult(
+      this.integrity.execute(
+        {
+          merchantId,
+          locationId: dto.locationId,
+          commandId: dto.commandId,
+          idempotencyKey: dto.idempotencyKey,
+          commandType: 'pos.gift-card.issue',
+          payload: dto,
+        },
+        async (context) => {
+          const value = await this.repo.issueGiftCard(
+            context.client,
+            merchantId,
+            dto,
+            authorization,
+          );
+          await context.appendAudit({
+            eventType: 'pos.gift-card.issue.committed',
+            entityType: 'customer_value',
+            entityId: dto.commandId,
+            outcome: 'success',
+          });
+          return { ok: true, value };
+        },
+      ),
+    );
+    if (result.status !== 'succeeded' || result.result === null) {
+      throw new ConflictException({
+        code: result.failureCode ?? 'CUSTOMER_VALUE_COMMAND_FAILED',
+        correlationId: result.correlationId,
+      });
+    }
+    return {
+      ...result.result,
+      deliveryToken: this.repo.giftCardDeliveryToken(dto.commandId),
+      recovered: result.duplicate,
+    };
+  }
+
+  async previewGiftCardIssuance(user: AuthUser, merchantId: string, dto: GiftCardIssuanceRequest) {
+    await this.authorize(user, merchantId, dto, 'gift_card.issue');
+    return this.repo.previewGiftCardIssuance(dto);
+  }
+
+  async revealGiftCardSecret(user: AuthUser, merchantId: string, dto: GiftCardSecretRevealRequest) {
+    const authorization = await this.authorize(user, merchantId, dto, 'gift_card.issue');
+    return this.repo.revealGiftCardSecret(user.id, merchantId, dto, authorization);
   }
 
   async activateGiftCard(user: AuthUser, merchantId: string, dto: GiftCardActivation) {
@@ -166,8 +234,8 @@ export class PosCustomerValueService {
     commandId: string,
     query: CustomerValueRecoveryQuery,
   ) {
-    await this.authorize(user, merchantId, query, 'customer.read');
-    return this.repo.command(user.id, merchantId, commandId, query);
+    const authorization = await this.authorize(user, merchantId, query, 'customer.read');
+    return this.repo.command(user.id, merchantId, commandId, query, authorization);
   }
 
   private mutation<
@@ -225,6 +293,15 @@ export class PosCustomerValueService {
   }
 
   private async unwrap<T>(promise: Promise<CommandResult<T>>): Promise<T> {
+    const result = await this.commandResult(promise);
+    if (result.status === 'succeeded' && result.result !== null) return result.result;
+    throw new ConflictException({
+      code: result.failureCode ?? 'CUSTOMER_VALUE_COMMAND_FAILED',
+      correlationId: result.correlationId,
+    });
+  }
+
+  private async commandResult<T>(promise: Promise<CommandResult<T>>): Promise<CommandResult<T>> {
     let result: CommandResult<T>;
     try {
       result = await promise;
@@ -233,10 +310,6 @@ export class PosCustomerValueService {
       if (code) throw new ConflictException({ code });
       throw error;
     }
-    if (result.status === 'succeeded' && result.result !== null) return result.result;
-    throw new ConflictException({
-      code: result.failureCode ?? 'CUSTOMER_VALUE_COMMAND_FAILED',
-      correlationId: result.correlationId,
-    });
+    return result;
   }
 }

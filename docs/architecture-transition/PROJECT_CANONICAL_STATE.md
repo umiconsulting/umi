@@ -194,15 +194,15 @@ Future clients use `packages/contract` and controlled UMI APIs.
   location, permission, policy, and approval checks remain server-authoritative.
 - Gate 3E: complete. The ledger, projection, reservations, atomic sale synchronization, refund
   outcomes, inventory operations, blind counts, and reconciliation use server authority.
-- Gate 3F: incomplete. Merchant customers, immutable ledgers, stored-value authorization,
-  atomic checkout foundations, refund compensation, and scoped RLS exist.
-- Gate 3F still needs policy-complete reward eligibility, earn-preview binding, authorization
-  expiry, rate limits, consent updates, enrollment, adjustments, issuance, and full concurrency tests.
-- Gate 3F contract: version `2.4.0`, content hash
-  `02b1dd57987050865fa5b81f7a588cc74bb3f9def08be44a3bd225066ce83fe0`.
+- Gate 3F: incomplete. Historical policy snapshots bind one integer-safe earn engine to checkout and refunds.
+- Gate 3F includes reward scope, usage limits, exact expiry, manual points adjustments, protected gift-card issuance, distributed lookup limits, and composite history.
+- Gate 3F uses signed cursor version `2`. The 26-case executable concurrency matrix remains open.
+- Gate 3F contract: version `2.5.0`, content hash
+  `582f9d608ec5f551befc1f2c06e763338175f309c444b603ec0e34234fc4ce4c`.
 - Gate 3F keeps rewards and stored value online-only. Cash replay can keep a bounded customer reference.
 - `stash@{0}: pre-gate-3d1-unpublished-pos-runtime-fixes` remains preserved and excluded.
-- Gate 3G is not authorized while Gate 3F remains incomplete.
+- Gate 3F keeps reward approval, gift-card payment, and sale-funded activation fail-closed. Consent reconciliation remains open.
+- Gate 3G is not authorized. Gate 3G has not started.
 
 ## Gate 3C decision basis
 

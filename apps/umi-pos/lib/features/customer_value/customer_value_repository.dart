@@ -14,7 +14,7 @@ abstract interface class CustomerValueRepository {
   Future<CustomerHistoryPage> history(
     String merchantId,
     String customerId,
-    CustomerSearchRequest query,
+    CustomerHistoryQuery query,
   );
   Future<CustomerValuePreview> preview(
     String merchantId,
@@ -36,9 +36,29 @@ abstract interface class CustomerValueRepository {
     String merchantId,
     ValueReleaseRequest command,
   );
-  Future<GiftCard> giftCardLookup(
+  Future<GiftCardLookupResult> giftCardLookup(
     String merchantId,
     GiftCardLookupRequest command,
+  );
+  Future<PointsAdjustmentPreview> previewPointsAdjustment(
+    String merchantId,
+    PointsAdjustmentRequest command,
+  );
+  Future<PointsAdjustmentResult> commitPointsAdjustment(
+    String merchantId,
+    PointsAdjustmentRequest command,
+  );
+  Future<GiftCardIssuanceResult> issueGiftCard(
+    String merchantId,
+    GiftCardIssuanceRequest command,
+  );
+  Future<GiftCardIssuancePreview> previewGiftCardIssuance(
+    String merchantId,
+    GiftCardIssuanceRequest command,
+  );
+  Future<GiftCardSecretRevealResult> revealGiftCardSecret(
+    String merchantId,
+    GiftCardSecretRevealRequest command,
   );
 }
 
@@ -84,7 +104,7 @@ final class ApiCustomerValueRepository implements CustomerValueRepository {
   Future<CustomerHistoryPage> history(
     String merchantId,
     String customerId,
-    CustomerSearchRequest query,
+    CustomerHistoryQuery query,
   ) async => CustomerHistoryPage.fromJson(
     await _api.request(
       method: ApiMethod.get,
@@ -93,10 +113,15 @@ final class ApiCustomerValueRepository implements CustomerValueRepository {
         queryParameters: {
           'locationId': query.locationId,
           'operatorSessionId': query.operatorSessionId,
-          'query': '',
-          'recent': 'false',
+          'category': query.category ?? 'all',
           'limit': '${query.limit ?? 20}',
           if (query.cursor != null) 'cursor': query.cursor!,
+          if (query.eventLocationId != null)
+            'eventLocationId': query.eventLocationId!,
+          if (query.businessDateFrom != null)
+            'businessDateFrom': query.businessDateFrom!,
+          if (query.businessDateTo != null)
+            'businessDateTo': query.businessDateTo!,
         },
       ).toString(),
     ),
@@ -167,14 +192,77 @@ final class ApiCustomerValueRepository implements CustomerValueRepository {
   );
 
   @override
-  Future<GiftCard> giftCardLookup(
+  Future<GiftCardLookupResult> giftCardLookup(
     String merchantId,
     GiftCardLookupRequest command,
-  ) async => GiftCard.fromJson(
+  ) async => GiftCardLookupResult.fromJson(
     await _api.request(
       method: ApiMethod.post,
       path: UmiRoutes.posGiftCardLookup(merchantId),
       body: command.toJson(),
+    ),
+  );
+
+  @override
+  Future<PointsAdjustmentPreview> previewPointsAdjustment(
+    String merchantId,
+    PointsAdjustmentRequest command,
+  ) async => PointsAdjustmentPreview.fromJson(
+    await _api.request(
+      method: ApiMethod.post,
+      path: UmiRoutes.posPointsAdjustmentPreview(merchantId),
+      body: command.toJson(),
+    ),
+  );
+
+  @override
+  Future<PointsAdjustmentResult> commitPointsAdjustment(
+    String merchantId,
+    PointsAdjustmentRequest command,
+  ) async => PointsAdjustmentResult.fromJson(
+    await _api.request(
+      method: ApiMethod.post,
+      path: UmiRoutes.posPointsAdjustmentCommit(merchantId),
+      body: command.toJson(),
+      idempotent: true,
+    ),
+  );
+
+  @override
+  Future<GiftCardIssuanceResult> issueGiftCard(
+    String merchantId,
+    GiftCardIssuanceRequest command,
+  ) async => GiftCardIssuanceResult.fromJson(
+    await _api.request(
+      method: ApiMethod.post,
+      path: UmiRoutes.posGiftCardIssue(merchantId),
+      body: command.toJson(),
+      idempotent: true,
+    ),
+  );
+
+  @override
+  Future<GiftCardIssuancePreview> previewGiftCardIssuance(
+    String merchantId,
+    GiftCardIssuanceRequest command,
+  ) async => GiftCardIssuancePreview.fromJson(
+    await _api.request(
+      method: ApiMethod.post,
+      path: UmiRoutes.posGiftCardIssuePreview(merchantId),
+      body: command.toJson(),
+    ),
+  );
+
+  @override
+  Future<GiftCardSecretRevealResult> revealGiftCardSecret(
+    String merchantId,
+    GiftCardSecretRevealRequest command,
+  ) async => GiftCardSecretRevealResult.fromJson(
+    await _api.request(
+      method: ApiMethod.post,
+      path: UmiRoutes.posGiftCardSecretReveal(merchantId),
+      body: command.toJson(),
+      idempotent: true,
     ),
   );
 }

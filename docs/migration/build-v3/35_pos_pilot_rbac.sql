@@ -26,6 +26,8 @@ values
   ('gift_card.activate','UmiPOS Gate 3F permission gift_card.activate'),
   ('gift_card.activate.approve','UmiPOS Gate 3F permission gift_card.activate.approve'),
   ('gift_card.authorize','UmiPOS Gate 3F permission gift_card.authorize'),
+  ('gift_card.issue','Issue a protected merchant gift card'),
+  ('gift_card.issue.approve','Approve a protected gift-card issue command'),
   ('gift_card.lookup','UmiPOS Gate 3F permission gift_card.lookup'),
   ('gift_card.read','UmiPOS Gate 3F permission gift_card.read'),
   ('gift_card.redeem','UmiPOS Gate 3F permission gift_card.redeem'),
@@ -89,7 +91,7 @@ using umi.role r, umi.permission p
 where rp.role_id=r.id
   and rp.permission_id=p.id
   and r.key in ('admin','cashier','manager','owner','staff','supervisor','viewer')
-  and p.key in ('audit.read','cart.write','cash.count.recount','cash.count.submit','cash.drawer.no_sale','cash.movement.paid_in','cash.movement.paid_in.approve','cash.movement.paid_out','cash.movement.paid_out.approve','cash.movement.safe_drop','cash.movement.safe_drop.approve','cash.reconcile','cash.register.use','cash.shift.close','cash.shift.close.approve','cash.shift.handoff','cash.shift.open','cash.shift.read','cash.shift.resume','cash.shift.suspend','cash.variance.approve','catalog.read','checkout.commit','checkout.discount.apply','checkout.discount.approve','checkout.recover.any','checkout.terminal.approve','checkout.terminal.confirm','customer.attach','customer.contact.read','customer.create','customer.detach','customer.history.read','customer.merge','customer.merge.approve','customer.read','customer.search','device.enroll','gift_card.activate','gift_card.activate.approve','gift_card.authorize','gift_card.lookup','gift_card.read','gift_card.redeem','gift_card.refund','gift_card.release','insights.read','inventory.adjust.approve','inventory.adjust.decrease','inventory.adjust.increase','inventory.count.approve','inventory.count.create','inventory.count.reconcile','inventory.count.submit','inventory.damage.approve','inventory.damage.create','inventory.history.read','inventory.negative_stock.override','inventory.policy.manage','inventory.policy.read','inventory.quarantine.approve','inventory.quarantine.enter','inventory.quarantine.release','inventory.read','inventory.restock.approve','inventory.restock.resolve','inventory.waste.approve','inventory.waste.create','loyalty.adjust','loyalty.adjust.approve','loyalty.policy.manage','loyalty.read','loyalty.reward.authorize','loyalty.reward.redeem','loyalty.reward.release','merchant.manage','offline.cash.checkout','offline.recovery.review','offline.replay','sale.exception.history','sale.exception.read','sale.lifecycle','sale.refund.approve','sale.refund.cash','sale.refund.full','sale.refund.manual_terminal','sale.refund.other_location','sale.refund.other_operator','sale.refund.partial','sale.refund.reconcile','sale.resume.any','sale.void.create','stored_value.approve','stored_value.reconcile','wallet.authorize','wallet.read','wallet.redeem','wallet.refund','wallet.release');
+  and p.key in ('audit.read','cart.write','cash.count.recount','cash.count.submit','cash.drawer.no_sale','cash.movement.paid_in','cash.movement.paid_in.approve','cash.movement.paid_out','cash.movement.paid_out.approve','cash.movement.safe_drop','cash.movement.safe_drop.approve','cash.reconcile','cash.register.use','cash.shift.close','cash.shift.close.approve','cash.shift.handoff','cash.shift.open','cash.shift.read','cash.shift.resume','cash.shift.suspend','cash.variance.approve','catalog.read','checkout.commit','checkout.discount.apply','checkout.discount.approve','checkout.recover.any','checkout.terminal.approve','checkout.terminal.confirm','customer.attach','customer.contact.read','customer.create','customer.detach','customer.history.read','customer.merge','customer.merge.approve','customer.read','customer.search','device.enroll','gift_card.activate','gift_card.activate.approve','gift_card.authorize','gift_card.issue','gift_card.issue.approve','gift_card.lookup','gift_card.read','gift_card.redeem','gift_card.refund','gift_card.release','insights.read','inventory.adjust.approve','inventory.adjust.decrease','inventory.adjust.increase','inventory.count.approve','inventory.count.create','inventory.count.reconcile','inventory.count.submit','inventory.damage.approve','inventory.damage.create','inventory.history.read','inventory.negative_stock.override','inventory.policy.manage','inventory.policy.read','inventory.quarantine.approve','inventory.quarantine.enter','inventory.quarantine.release','inventory.read','inventory.restock.approve','inventory.restock.resolve','inventory.waste.approve','inventory.waste.create','loyalty.adjust','loyalty.adjust.approve','loyalty.policy.manage','loyalty.read','loyalty.reward.authorize','loyalty.reward.redeem','loyalty.reward.release','merchant.manage','offline.cash.checkout','offline.recovery.review','offline.replay','sale.exception.history','sale.exception.read','sale.lifecycle','sale.refund.approve','sale.refund.cash','sale.refund.full','sale.refund.manual_terminal','sale.refund.other_location','sale.refund.other_operator','sale.refund.partial','sale.refund.reconcile','sale.resume.any','sale.void.create','stored_value.approve','stored_value.reconcile','wallet.authorize','wallet.read','wallet.redeem','wallet.refund','wallet.release');
 
 with grants(role_key,permission_key) as (
   values
@@ -134,6 +136,8 @@ with grants(role_key,permission_key) as (
   ('admin','gift_card.activate'),
   ('admin','gift_card.activate.approve'),
   ('admin','gift_card.authorize'),
+  ('admin','gift_card.issue'),
+  ('admin','gift_card.issue.approve'),
   ('admin','gift_card.lookup'),
   ('admin','gift_card.read'),
   ('admin','gift_card.redeem'),
@@ -271,6 +275,8 @@ with grants(role_key,permission_key) as (
   ('manager','gift_card.activate'),
   ('manager','gift_card.activate.approve'),
   ('manager','gift_card.authorize'),
+  ('manager','gift_card.issue'),
+  ('manager','gift_card.issue.approve'),
   ('manager','gift_card.lookup'),
   ('manager','gift_card.read'),
   ('manager','gift_card.redeem'),
@@ -366,6 +372,8 @@ with grants(role_key,permission_key) as (
   ('owner','gift_card.activate'),
   ('owner','gift_card.activate.approve'),
   ('owner','gift_card.authorize'),
+  ('owner','gift_card.issue'),
+  ('owner','gift_card.issue.approve'),
   ('owner','gift_card.lookup'),
   ('owner','gift_card.read'),
   ('owner','gift_card.redeem'),
@@ -682,6 +690,8 @@ begin
   ('admin','gift_card.activate'),
   ('admin','gift_card.activate.approve'),
   ('admin','gift_card.authorize'),
+  ('admin','gift_card.issue'),
+  ('admin','gift_card.issue.approve'),
   ('admin','gift_card.lookup'),
   ('admin','gift_card.read'),
   ('admin','gift_card.redeem'),
@@ -819,6 +829,8 @@ begin
   ('manager','gift_card.activate'),
   ('manager','gift_card.activate.approve'),
   ('manager','gift_card.authorize'),
+  ('manager','gift_card.issue'),
+  ('manager','gift_card.issue.approve'),
   ('manager','gift_card.lookup'),
   ('manager','gift_card.read'),
   ('manager','gift_card.redeem'),
@@ -914,6 +926,8 @@ begin
   ('owner','gift_card.activate'),
   ('owner','gift_card.activate.approve'),
   ('owner','gift_card.authorize'),
+  ('owner','gift_card.issue'),
+  ('owner','gift_card.issue.approve'),
   ('owner','gift_card.lookup'),
   ('owner','gift_card.read'),
   ('owner','gift_card.redeem'),

@@ -1,12 +1,16 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import {
   CreateCustomerRequest,
+  CustomerHistoryQuery,
   CustomerMergeRequest,
   CustomerSearchRequest,
   CustomerValuePreviewRequest,
   CustomerValueRecoveryQuery,
   GiftCardActivation,
+  GiftCardIssuanceRequest,
   GiftCardLookupRequest,
+  GiftCardSecretRevealRequest,
+  PointsAdjustmentRequest,
   RewardAuthorizationRequest,
   StoredValueAuthorizationRequest,
   ValueReleaseRequest,
@@ -49,7 +53,7 @@ export class PosCustomerValueController {
     @CurrentUser() user: AuthUser,
     @Param('merchantId') merchantId: string,
     @Param('customerId') customerId: string,
-    @Query(new ZodValidationPipe(CustomerSearchRequest)) query: CustomerSearchRequest,
+    @Query(new ZodValidationPipe(CustomerHistoryQuery)) query: CustomerHistoryQuery,
   ) {
     return this.service.history(user, merchantId, customerId, query);
   }
@@ -116,6 +120,51 @@ export class PosCustomerValueController {
     @Body(new ZodValidationPipe(GiftCardLookupRequest)) dto: GiftCardLookupRequest,
   ) {
     return this.service.giftCardLookup(user, merchantId, dto);
+  }
+
+  @Post('customer-value/points/adjustments/preview')
+  pointsAdjustmentPreview(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Body(new ZodValidationPipe(PointsAdjustmentRequest)) dto: PointsAdjustmentRequest,
+  ) {
+    return this.service.previewPointsAdjustment(user, merchantId, dto);
+  }
+
+  @Post('customer-value/points/adjustments')
+  pointsAdjustmentCommit(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Body(new ZodValidationPipe(PointsAdjustmentRequest)) dto: PointsAdjustmentRequest,
+  ) {
+    return this.service.commitPointsAdjustment(user, merchantId, dto);
+  }
+
+  @Post('customer-value/gift-cards')
+  giftCardIssue(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Body(new ZodValidationPipe(GiftCardIssuanceRequest)) dto: GiftCardIssuanceRequest,
+  ) {
+    return this.service.issueGiftCard(user, merchantId, dto);
+  }
+
+  @Post('customer-value/gift-cards/preview')
+  giftCardIssuePreview(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Body(new ZodValidationPipe(GiftCardIssuanceRequest)) dto: GiftCardIssuanceRequest,
+  ) {
+    return this.service.previewGiftCardIssuance(user, merchantId, dto);
+  }
+
+  @Post('customer-value/gift-cards/secret/reveal')
+  giftCardSecretReveal(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Body(new ZodValidationPipe(GiftCardSecretRevealRequest)) dto: GiftCardSecretRevealRequest,
+  ) {
+    return this.service.revealGiftCardSecret(user, merchantId, dto);
   }
 
   @Post('customer-value/gift-cards/activate')

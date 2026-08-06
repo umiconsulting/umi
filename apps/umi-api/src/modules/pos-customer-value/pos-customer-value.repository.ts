@@ -1,8 +1,18 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
+import { ConfigService } from '@nestjs/config';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  createHmac,
+  randomBytes,
+  randomUUID,
+  timingSafeEqual,
+} from 'node:crypto';
 import type { PoolClient, QueryResultRow } from 'pg';
 import type {
   CreateCustomerRequest,
+  CustomerHistoryQuery,
   CustomerHistoryPage,
   CustomerMergeRequest,
   CustomerProfile,
@@ -14,16 +24,30 @@ import type {
   CustomerValueRecoveryResult,
   GiftCard,
   GiftCardActivation,
+  GiftCardIssuanceRequest,
+  GiftCardIssuancePreview,
+  GiftCardIssuanceResult,
   GiftCardLookupRequest,
+  GiftCardLookupResult,
+  GiftCardSecretRevealRequest,
+  GiftCardSecretRevealResult,
+  PointsAdjustmentPreview,
+  PointsAdjustmentRequest,
+  PointsAdjustmentResult,
   RewardAuthorization,
   RewardAuthorizationRequest,
   StoredValueAuthorization,
   StoredValueAuthorizationRequest,
   ValueReleaseRequest,
 } from '@umi/contract';
+import type { AppConfig } from '../../shared/config/config.schema';
 import { PgService } from '../../shared/database/pg.service';
 import { commandFingerprint } from '../integrity/canonical-json';
-import { calculateEarnedPoints, normalizeCustomerContact } from './customer-value-domain';
+import {
+  calculatePointsEarn,
+  evaluateRewardEligibility,
+  normalizeCustomerContact,
+} from './customer-value-domain';
 
 export interface CustomerValueAuthorization {
   operatorId: string;
@@ -44,7 +68,10 @@ const masks = (type: string, value: string): string => {
 
 @Injectable()
 export class PosCustomerValueRepository {
-  constructor(private readonly pg: PgService) {}
+  constructor(
+    private readonly pg: PgService,
+    private readonly config: ConfigService<AppConfig, true>,
+  ) {}
 
   authorize(
     userId: string,
@@ -87,6 +114,25 @@ export class PosCustomerValueRepository {
       },
       locationId,
     );
+  }
+
+  async expireAllAuthorizations(batchSize = 100): Promise<number> {
+    const merchants = await this.pg.query<{ id: string }>(
+      `SELECT DISTINCT merchant_id::text AS id
+         FROM merchant.customer_value_authorization
+        WHERE status='authorized' AND expires_at<=clock_timestamp()
+        ORDER BY merchant_id LIMIT 500`,
+    );
+    let expired = 0;
+    for (const merchant of merchants.rows) {
+      const result = await this.pg.tquery<{ count: number }>(
+        merchant.id,
+        `SELECT merchant.expire_customer_value_authorizations($1::uuid,$2)::int AS count`,
+        [merchant.id, batchSize],
+      );
+      expired += Number(result.rows[0]?.count ?? 0);
+    }
+    return expired;
   }
 
   search(
@@ -245,7 +291,8 @@ export class PosCustomerValueRepository {
     userId: string,
     merchantId: string,
     customerId: string,
-    query: CustomerSearchRequest,
+    query: CustomerHistoryQuery,
+    authorization: CustomerValueAuthorization,
   ): Promise<CustomerHistoryPage> {
     return this.pg.runWithMerchant(
       merchantId,
@@ -256,17 +303,108 @@ export class PosCustomerValueRepository {
           [customerId, merchantId],
         );
         if (!found.rows[0]) throw new ConflictException({ code: 'CUSTOMER_MERCHANT_SCOPE' });
-        const { rows } = await client.query<Row>(
-          `SELECT o.id::text,'sale' type,coalesce(o.external_ref,o.id::text) AS "publicReference",
-             o.location_id::text AS "locationId",o.business_date::text AS "businessDate",
-             jsonb_build_object('minorUnits',coalesce(sum(p.amount),0),'currency',coalesce(max(p.currency),'MXN')) total,
-             o.status,o.placed_at::text AS "occurredAt"
-           FROM merchant.customer_order o LEFT JOIN merchant.payment p ON p.order_id=o.id
-          WHERE o.merchant_id=$1::uuid AND o.customer_id=$2::uuid
-          GROUP BY o.id ORDER BY o.placed_at DESC,o.id DESC LIMIT $3`,
-          [merchantId, customerId, query.limit],
+        if (query.eventLocationId && query.eventLocationId !== query.locationId) {
+          throw new ConflictException({ code: 'CUSTOMER_HISTORY_LOCATION_SCOPE' });
+        }
+        const loyalty = await client.query<Row>(
+          `SELECT a.id::text,a.customer_id::text AS "customerId",a.program_reference AS "programReference",
+                  a.status,a.ledger_sequence AS "ledgerSequence",a.version,a.enrolled_at::text AS "enrolledAt",
+                  coalesce(b.pending,0) AS pending,coalesce(b.available,0) AS available,
+                  coalesce(b.authorized,0) AS authorized,coalesce(b.redeemed,0) AS redeemed,
+                  coalesce(b.reversed,0) AS reversed,coalesce(b.expired,0) AS expired,
+                  coalesce(b.adjusted,0) AS adjusted,
+                  coalesce(b.projection_version,1) AS "projectionVersion",
+                  coalesce(b.calculated_at,a.enrolled_at)::text AS "calculatedAt"
+             FROM merchant.loyalty_points_account a
+             LEFT JOIN merchant.loyalty_points_balance b ON b.account_id=a.id
+            WHERE a.merchant_id=$1::uuid AND a.customer_id=$2::uuid
+              AND a.status IN ('active','suspended','restricted')
+            ORDER BY a.enrolled_at DESC LIMIT 1`,
+          [merchantId, customerId],
         );
-        return { entries: rows as CustomerHistoryPage['entries'], nextCursor: null };
+        const scope = {
+          merchantId,
+          customerId,
+          category: query.category,
+          eventLocationId: query.locationId,
+          businessDateFrom: query.businessDateFrom ?? null,
+          businessDateTo: query.businessDateTo ?? null,
+          contactAccess:
+            authorization.permissions.includes('*') ||
+            authorization.permissions.includes('customer.consent.read'),
+        };
+        const cursor = query.cursor ? this.decodeHistoryCursor(query.cursor, scope) : null;
+        const { rows } = await client.query<Row>(
+          `SELECT event_id::text AS id,event_type AS "sortType",
+             case
+               when event_type in ('sale') then 'sale'
+               when event_type='receipt' then 'receipt'
+               when event_type in ('refund','void') then event_type
+               when event_type like 'points_%' or event_type='manual_points_adjustment' then 'points_earn'
+               when event_type like 'reward_%' then 'reward'
+               when event_type like 'wallet_%' then 'wallet'
+               when event_type like 'gift_card_%' then 'gift_card'
+               when event_type like 'consent_%' then 'consent'
+               else 'merge' end AS type,
+             public_reference AS "publicReference",location_id::text AS "locationId",
+             business_date::text AS "businessDate",
+             case when safe_data ? 'amountMinorUnits' then jsonb_build_object(
+               'minorUnits',(safe_data->>'amountMinorUnits')::bigint,
+               'currency',coalesce(safe_data->>'currency','MXN')) else null end AS total,
+             case when safe_data ? 'points' then (safe_data->>'points')::bigint else null end AS points,
+             nullif(safe_data->>'saleId','')::text AS "relatedSaleId",
+             nullif(safe_data->>'refundId','')::text AS "relatedExceptionId",
+             null::text AS "correlationReference",coalesce(safe_data->>'status','committed') AS status,
+             occurred_at::text AS "occurredAt"
+           FROM merchant.customer_history_event
+          WHERE merchant_id=$1::uuid AND customer_id=$2::uuid
+            AND ($3='all' OR
+              ($3='sale' AND event_type='sale') OR ($3='receipt' AND event_type='receipt') OR
+              ($3='exception' AND event_type IN ('refund','void')) OR
+              ($3='loyalty' AND (event_type LIKE 'points_%' OR event_type='manual_points_adjustment')) OR
+              ($3='reward' AND event_type LIKE 'reward_%') OR
+              ($3='wallet' AND event_type LIKE 'wallet_%') OR
+              ($3='gift_card' AND event_type LIKE 'gift_card_%') OR
+              ($3='consent' AND event_type LIKE 'consent_%'))
+            AND location_id=$4::uuid
+            AND ($5::date IS NULL OR business_date>=$5::date)
+            AND ($6::date IS NULL OR business_date<=$6::date)
+            AND ($7::timestamptz IS NULL OR
+              (occurred_at,event_type,event_id)<($7::timestamptz,$8::text,$9::uuid))
+            AND ($10 OR event_type NOT LIKE 'consent_%')
+          ORDER BY occurred_at DESC,event_type DESC,event_id DESC LIMIT $11`,
+          [
+            merchantId,
+            customerId,
+            query.category,
+            query.locationId,
+            query.businessDateFrom ?? null,
+            query.businessDateTo ?? null,
+            cursor?.occurredAt ?? null,
+            cursor?.eventType ?? null,
+            cursor?.eventId ?? null,
+            scope.contactAccess,
+            query.limit + 1,
+          ],
+        );
+        const pageRows = rows.slice(0, query.limit);
+        const page = pageRows.map(
+          ({ sortType: _sortType, ...entry }) => entry,
+        ) as CustomerHistoryPage['entries'];
+        const last = pageRows.at(-1);
+        return {
+          entries: page,
+          loyaltyAccount: loyalty.rows[0] ? this.account(loyalty.rows[0]) : null,
+          pointsBalance: loyalty.rows[0] ? this.points(loyalty.rows[0]) : null,
+          nextCursor:
+            rows.length > query.limit && last
+              ? this.encodeHistoryCursor(scope, {
+                  occurredAt: last.occurredAt,
+                  eventType: last.sortType,
+                  eventId: last.id,
+                })
+              : null,
+        };
       },
       query.locationId,
     );
@@ -283,10 +421,13 @@ export class PosCustomerValueRepository {
       async (client) => {
         const cart = await client.query<Row>(
           `SELECT c.id::text,c.customer_id::text AS "customerId",c.version,c.currency,
-             coalesce(sum(l.quantity*l.unit_price),0)::bigint AS total
+             c.business_date::text AS "businessDate",
+             coalesce(sum(l.quantity*(l.base_price+l.variant_delta+l.modifier_total)),0)::bigint AS total,
+             coalesce(d.payment_summary,'{}'::jsonb) AS "paymentSummary"
            FROM merchant.pos_cart c LEFT JOIN merchant.pos_cart_line l ON l.cart_id=c.id
+           LEFT JOIN merchant.pos_checkout_draft d ON d.cart_id=c.id AND d.merchant_id=c.merchant_id
           WHERE c.id=$1::uuid AND c.merchant_id=$2::uuid AND c.location_id=$3::uuid
-          GROUP BY c.id`,
+          GROUP BY c.id,d.payment_summary`,
           [dto.saleId, merchantId, dto.locationId],
         );
         const row = cart.rows[0];
@@ -297,10 +438,27 @@ export class PosCustomerValueRepository {
         ) {
           throw new ConflictException({ code: 'CUSTOMER_UNAVAILABLE' });
         }
+        const lines = await client.query<Row>(
+          `SELECT l.id::text,l.product_id::text AS "productId",p.category_id::text AS "categoryId",
+             l.variant_id::text AS "variantId",
+             coalesce((select array_agg(m.modifier_id::text) from merchant.pos_cart_line_modifier m
+               where m.line_id=l.id),'{}') AS "modifierIds",
+             (l.quantity*(l.base_price+l.variant_delta+l.modifier_total))::bigint AS amount
+           FROM merchant.pos_cart_line l JOIN merchant.product p ON p.id=l.product_id
+          WHERE l.cart_id=$1::uuid AND l.merchant_id=$2::uuid ORDER BY l.id LIMIT 501`,
+          [dto.saleId, merchantId],
+        );
         const policy = await client.query<Row>(
-          `SELECT enabled,points_per_money_unit AS "pointsPerUnit",money_unit_minor_units AS "moneyUnit",
+          `SELECT merchant_id::text AS id,program_reference AS "programReference",enabled,
+             points_per_money_unit AS "pointsPerUnit",money_unit_minor_units AS "moneyUnit",
              points_rounding AS rounding,earn_timing AS "earnTiming",policy_version AS "policyVersion",
-             policy_fingerprint AS fingerprint,policy_expires_at::text AS "expiresAt"
+             policy_fingerprint AS fingerprint,policy_expires_at::text AS "expiresAt",
+             include_tax AS "includeTax",include_tip AS "includeTip",
+             discount_interaction AS "discountInteraction",reward_interaction AS "rewardInteraction",
+             excluded_product_ids::text[] AS "excludedProductIds",
+             excluded_category_ids::text[] AS "excludedCategoryIds",
+             excluded_tender_types AS "excludedTenderTypes",pending_days AS "pendingDays",
+             expiration_days AS "expirationDays",authorization_ttl_seconds AS "authorizationTtlSeconds"
            FROM merchant.loyalty_program WHERE merchant_id=$1::uuid`,
           [merchantId],
         );
@@ -325,14 +483,58 @@ export class PosCustomerValueRepository {
             ).rows[0] ?? null)
           : null;
         const p = policy.rows[0];
-        const expectedPoints = p?.enabled
-          ? calculateEarnedPoints(
-              Number(row.total),
-              Number(p.moneyUnit),
-              Number(p.pointsPerUnit),
-              p.rounding,
-            )
-          : 0;
+        const payment = row.paymentSummary ?? {};
+        const discountMinorUnits = Number(payment.discounts?.total?.minorUnits ?? 0);
+        const taxMinorUnits = Number(
+          payment.tax?.minorUnits ?? payment.totals?.tax?.minorUnits ?? 0,
+        );
+        const tipMinorUnits = Number(payment.tip?.amount?.minorUnits ?? 0);
+        const tenderTypes = Array.isArray(payment.tenders)
+          ? payment.tenders.map((tender: Row) => String(tender.type))
+          : [];
+        const earnCalculation = p?.enabled
+          ? calculatePointsEarn({
+              lines: lines.rows.map((line) => ({
+                amountMinorUnits: Number(line.amount),
+                productId: line.productId,
+                categoryId: line.categoryId,
+              })),
+              discountMinorUnits,
+              taxMinorUnits,
+              tipMinorUnits,
+              tenderTypes,
+              rewardBenefitMinorUnits: 0,
+              policy: {
+                moneyUnitMinorUnits: Number(p.moneyUnit),
+                pointsPerUnit: Number(p.pointsPerUnit),
+                rounding: p.rounding,
+                excludedProductIds: p.excludedProductIds ?? [],
+                excludedCategoryIds: p.excludedCategoryIds ?? [],
+                excludedTenderTypes: p.excludedTenderTypes ?? [],
+                includeTax: p.includeTax,
+                includeTip: p.includeTip,
+                discountInteraction: p.discountInteraction,
+                rewardInteraction: p.rewardInteraction,
+                earnTiming: p.earnTiming,
+              },
+            })
+          : null;
+        const inputFingerprint = commandFingerprint('pos.customer-value.earn-input', {
+          merchantId,
+          locationId: dto.locationId,
+          saleId: dto.saleId,
+          checkoutVersion: dto.checkoutVersion,
+          customerId: dto.customerId,
+          checkoutFingerprint: dto.checkoutFingerprint,
+          lines: lines.rows,
+          discountMinorUnits,
+          taxMinorUnits,
+          tipMinorUnits,
+          tenderTypes,
+          policyVersion: p?.policyVersion ?? 'disabled',
+          policyFingerprint: p?.fingerprint ?? null,
+          businessDate: row.businessDate,
+        });
         const fingerprint = commandFingerprint('pos.customer-value.preview', {
           merchantId,
           locationId: dto.locationId,
@@ -341,7 +543,63 @@ export class PosCustomerValueRepository {
           customerId: dto.customerId,
           checkoutFingerprint: dto.checkoutFingerprint,
           policyVersion: p?.policyVersion ?? 'disabled',
+          policyFingerprint: p?.fingerprint ?? null,
+          inputFingerprint,
+          businessDate: row.businessDate,
         });
+        const previewExpiresAt = new Date(
+          Math.min(new Date(p?.expiresAt ?? Date.now() + 300_000).getTime(), Date.now() + 300_000),
+        ).toISOString();
+        if (account && p?.enabled && dto.customerId && earnCalculation) {
+          await client.query(
+            `INSERT INTO merchant.loyalty_earn_preview(
+              merchant_id,location_id,cart_id,customer_id,account_id,checkout_version,
+              customer_attachment_version,loyalty_program_id,loyalty_policy_version,
+              loyalty_policy_fingerprint,checkout_fingerprint,preview_fingerprint,input_fingerprint,
+              gross_eligible_minor_units,excluded_minor_units,final_eligible_minor_units,
+              expected_points,earn_status,explanation_codes,effective_rules,business_date,expires_at)
+             VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7,$8::uuid,$9,$10,$11,$12,$13,
+               $14,$15,$16,$17,$18,$19::text[],$20::jsonb,$21::date,$22::timestamptz)
+             ON CONFLICT(merchant_id,preview_fingerprint) DO NOTHING`,
+            [
+              merchantId,
+              dto.locationId,
+              dto.saleId,
+              dto.customerId,
+              account.id,
+              dto.checkoutVersion,
+              Number(row.version),
+              p.id,
+              p.policyVersion,
+              p.fingerprint,
+              dto.checkoutFingerprint,
+              fingerprint,
+              inputFingerprint,
+              earnCalculation.grossEligibleMinorUnits,
+              earnCalculation.excludedMinorUnits,
+              earnCalculation.finalEligibleMinorUnits,
+              earnCalculation.points,
+              earnCalculation.status,
+              earnCalculation.explanationCodes,
+              JSON.stringify({
+                includeTax: p.includeTax,
+                includeTip: p.includeTip,
+                discountInteraction: p.discountInteraction,
+                rewardInteraction: p.rewardInteraction,
+                excludedProductIds: p.excludedProductIds,
+                excludedCategoryIds: p.excludedCategoryIds,
+                excludedTenderTypes: p.excludedTenderTypes,
+                pendingDays: p.pendingDays,
+                expirationDays: p.expirationDays,
+                rounding: p.rounding,
+                moneyUnitMinorUnits: Number(p.moneyUnit),
+                pointsPerUnit: Number(p.pointsPerUnit),
+              }),
+              row.businessDate,
+              previewExpiresAt,
+            ],
+          );
+        }
         const wallet = dto.customerId
           ? ((
               await client.query<Row>(
@@ -388,13 +646,36 @@ export class PosCustomerValueRepository {
                   `SELECT id::text,public_reference AS "publicReference",name AS "displayName",
                  reward_type AS type,points_cost::int AS "pointsCost",active,
                  valid_from::text AS "validFrom",valid_until::text AS "validUntil",version,
-                 value::int AS "benefitMinorUnits"
+                 value::int AS "benefitMinorUnits",location_ids::text[] AS "locationIds",
+                 product_ids::text[] AS "productIds",category_ids::text[] AS "categoryIds",
+                 variant_ids::text[] AS "variantIds",modifier_ids::text[] AS "modifierIds",
+                 minimum_spend_minor_units::bigint AS "minimumSpendMinorUnits",
+                 maximum_benefit_minor_units::bigint AS "maximumBenefitMinorUnits",
+                 allowed_tender_types AS "allowedTenderTypes",
+                 combinable_with_discounts AS "combinableWithDiscounts",
+                 combinable_with_rewards AS "combinableWithRewards",
+                 combinable_with_tips AS "combinableWithTips",
+                 usage_per_sale AS "usagePerSale",usage_per_customer AS "usagePerCustomer",
+                 usage_per_business_date AS "usagePerBusinessDate",
+                 approval_permission AS "approvalPermission",policy_fingerprint AS "policyFingerprint",
+                 (SELECT count(*)::int FROM merchant.loyalty_points_ledger u
+                    WHERE u.reward_id=loyalty_reward.id AND u.customer_id=$2::uuid
+                      AND u.entry_type='points_redeemed') AS "customerUsageCount",
+                 (SELECT count(*)::int FROM merchant.loyalty_points_ledger u
+                    WHERE u.reward_id=loyalty_reward.id AND u.customer_id=$2::uuid
+                      AND u.entry_type='points_redeemed' AND u.business_date=$3::date) AS "businessDateUsageCount"
+                 ,(SELECT count(*)::int FROM merchant.customer_value_authorization u
+                    WHERE u.reward_id=loyalty_reward.id AND u.sale_id=$4::uuid
+                      AND u.status IN ('authorized','committed')) AS "saleUsageCount"
+                 ,(SELECT count(*)::int FROM merchant.customer_value_authorization u
+                    WHERE u.reward_id<>loyalty_reward.id AND u.sale_id=$4::uuid
+                      AND u.status='authorized') AS "otherRewardCount"
                FROM merchant.loyalty_reward
               WHERE merchant_id=$1::uuid AND active
                 AND valid_from<=clock_timestamp()
                 AND (valid_until IS NULL OR valid_until>clock_timestamp())
               ORDER BY points_cost,id LIMIT 50`,
-                  [merchantId],
+                  [merchantId, dto.customerId, row.businessDate, dto.saleId],
                 )
               ).rows
             : [];
@@ -409,17 +690,94 @@ export class PosCustomerValueRepository {
           earn:
             account && p?.enabled
               ? {
-                  eligibleMinorUnits: Number(row.total),
-                  excludedMinorUnits: 0,
-                  expectedPoints,
-                  status: p.earnTiming,
+                  customerId: dto.customerId!,
+                  accountId: account.id,
+                  programReference: p.programReference,
+                  grossEligibleMinorUnits: earnCalculation!.grossEligibleMinorUnits,
+                  eligibleMinorUnits: earnCalculation!.finalEligibleMinorUnits,
+                  excludedMinorUnits: earnCalculation!.excludedMinorUnits,
+                  expectedPoints: earnCalculation!.points,
+                  status: earnCalculation!.points === 0 ? 'none' : p.earnTiming,
                   policyVersion: p.policyVersion,
                   fingerprint,
-                  explanationCodes: expectedPoints > 0 ? ['eligible_sale'] : ['zero_earn'],
+                  inputFingerprint,
+                  previewVersion: 1,
+                  checkoutVersion: dto.checkoutVersion,
+                  customerAttachmentVersion: Number(row.version),
+                  expiresAt: previewExpiresAt,
+                  explanationCodes:
+                    earnCalculation!.points > 0
+                      ? [...earnCalculation!.explanationCodes, 'eligible_sale']
+                      : [...earnCalculation!.explanationCodes, 'zero_earn'],
                 }
               : null,
           rewards: rewards.map((reward) => {
-            const eligible = Number(account?.available ?? 0) >= Number(reward.pointsCost);
+            const locationAllowed =
+              reward.locationIds.length === 0 || reward.locationIds.includes(dto.locationId);
+            const productScoped =
+              reward.productIds.length === 0 ||
+              lines.rows.some((line) => reward.productIds.includes(line.productId));
+            const categoryScoped =
+              reward.categoryIds.length === 0 ||
+              lines.rows.some(
+                (line) => line.categoryId && reward.categoryIds.includes(line.categoryId),
+              );
+            const variantScoped =
+              reward.variantIds.length === 0 ||
+              lines.rows.some(
+                (line) => line.variantId && reward.variantIds.includes(line.variantId),
+              );
+            const modifierScoped =
+              reward.modifierIds.length === 0 ||
+              lines.rows.some((line) =>
+                line.modifierIds.some((id: string) => reward.modifierIds.includes(id)),
+              );
+            const usageLimitReached =
+              (reward.usagePerCustomer !== null &&
+                Number(reward.customerUsageCount) >= Number(reward.usagePerCustomer)) ||
+              (reward.usagePerBusinessDate !== null &&
+                Number(reward.businessDateUsageCount) >= Number(reward.usagePerBusinessDate));
+            const eligibility = evaluateRewardEligibility({
+              accountActive: account?.status === 'active',
+              availablePoints: Number(account?.available ?? 0),
+              authorizedPoints: Number(account?.authorized ?? 0),
+              customerActive: customer?.status === 'active',
+              rewardActive:
+                reward.active &&
+                locationAllowed &&
+                productScoped &&
+                categoryScoped &&
+                variantScoped &&
+                modifierScoped &&
+                Number(row.total) >= Number(reward.minimumSpendMinorUnits),
+              pointsCost: Number(reward.pointsCost),
+              existingDiscount: discountMinorUnits > 0,
+              anotherReward: Number(reward.otherRewardCount) > 0,
+              tenderTypes,
+              allowedTenderTypes: reward.allowedTenderTypes,
+              combinableWithDiscount: reward.combinableWithDiscounts,
+              combinableWithRewards: reward.combinableWithRewards,
+              usageCount: usageLimitReached ? 1 : 0,
+              usageLimit: 1,
+            });
+            const reasonCodes = [...eligibility.reasonCodes];
+            if (!locationAllowed) reasonCodes.push('blocked_by_location');
+            if (!productScoped || !categoryScoped || !variantScoped || !modifierScoped) {
+              reasonCodes.push('blocked_by_product_scope');
+            }
+            if (Number(reward.saleUsageCount) >= Number(reward.usagePerSale)) {
+              reasonCodes.push('usage_limit_reached');
+            }
+            if (tipMinorUnits > 0 && !reward.combinableWithTips) reasonCodes.push('blocked_by_tip');
+            const eligible = reasonCodes.length === 0;
+            const replacementRequired =
+              reasonCodes.length === 1 && reasonCodes[0] === 'blocked_by_another_reward';
+            const approvalRequired = eligible && Boolean(reward.approvalPermission);
+            const benefitMinorUnits = Math.min(
+              Number(reward.benefitMinorUnits),
+              Number(reward.maximumBenefitMinorUnits ?? reward.benefitMinorUnits),
+              Number(row.total),
+            );
             return {
               reward: {
                 id: reward.id,
@@ -432,16 +790,43 @@ export class PosCustomerValueRepository {
                 validUntil: reward.validUntil,
                 version: Number(reward.version),
               },
-              eligible,
+              eligible: eligible && !approvalRequired,
+              state: replacementRequired
+                ? 'replacement_confirmation_required'
+                : approvalRequired
+                  ? 'approval_required'
+                  : eligible
+                    ? 'eligible'
+                    : 'ineligible',
               pointsCost: Number(reward.pointsCost),
-              benefit: { minorUnits: Number(reward.benefitMinorUnits), currency: row.currency },
+              benefit: { minorUnits: benefitMinorUnits, currency: row.currency },
               remainingPoints: Math.max(
                 0,
                 Number(account?.available ?? 0) - Number(reward.pointsCost),
               ),
-              approvalPermission: null,
-              explanationCodes: [eligible ? 'eligible' : 'insufficient_points'],
-              fingerprint,
+              approvalPermission: reward.approvalPermission,
+              affectedLineIds: lines.rows
+                .filter(
+                  (line) =>
+                    (reward.productIds.length === 0 ||
+                      reward.productIds.includes(line.productId)) &&
+                    (reward.categoryIds.length === 0 ||
+                      reward.categoryIds.includes(line.categoryId)) &&
+                    (reward.variantIds.length === 0 ||
+                      reward.variantIds.includes(line.variantId)) &&
+                    (reward.modifierIds.length === 0 ||
+                      line.modifierIds.some((id: string) => reward.modifierIds.includes(id))),
+                )
+                .map((line) => line.id),
+              taxConsequenceMinorUnits: 0,
+              authorizationExpiresAt: previewExpiresAt,
+              explanationCodes: eligible ? ['eligible'] : [...new Set(reasonCodes)],
+              fingerprint: commandFingerprint('pos.reward.eligibility', {
+                previewFingerprint: fingerprint,
+                rewardId: reward.id,
+                rewardVersion: reward.version,
+                rewardPolicyFingerprint: reward.policyFingerprint,
+              }),
               policyVersion: p.policyVersion,
             };
           }),
@@ -465,19 +850,132 @@ export class PosCustomerValueRepository {
   ): Promise<RewardAuthorization> {
     const reward = await client.query<Row>(
       `SELECT r.id::text,r.points_cost::int AS "pointsCost",r.value::bigint AS benefit,
-         r.version,p.policy_version AS "policyVersion",a.id::text AS "accountId",
-         coalesce(b.available,0)::bigint AS available,c.currency
+         r.version,p.policy_version AS "policyVersion",p.policy_fingerprint AS "policyFingerprint",
+         a.id::text AS "accountId",
+         coalesce(b.available,0)::bigint AS available,coalesce(b.authorized,0)::bigint AS authorized,
+         c.currency,c.business_date::text AS "businessDate",
+         coalesce(d.payment_summary,'{}'::jsonb) AS "paymentSummary",
+         coalesce((select sum(l.quantity*(l.base_price+l.variant_delta+l.modifier_total))
+           from merchant.pos_cart_line l where l.cart_id=c.id),0)::bigint AS "cartTotal",
+         r.location_ids::text[] AS "locationIds",r.product_ids::text[] AS "productIds",
+         r.category_ids::text[] AS "categoryIds",r.variant_ids::text[] AS "variantIds",
+         r.modifier_ids::text[] AS "modifierIds",
+         r.minimum_spend_minor_units::bigint AS "minimumSpendMinorUnits",
+         r.maximum_benefit_minor_units::bigint AS "maximumBenefitMinorUnits",
+         r.allowed_tender_types AS "allowedTenderTypes",
+         r.combinable_with_discounts AS "combinableWithDiscounts",
+         r.combinable_with_rewards AS "combinableWithRewards",
+         r.combinable_with_tips AS "combinableWithTips",
+         r.approval_permission AS "approvalPermission",
+         r.usage_per_sale AS "usagePerSale",r.usage_per_customer AS "usagePerCustomer",
+         r.usage_per_business_date AS "usagePerBusinessDate",
+         (select array_agg(distinct l.product_id::text) from merchant.pos_cart_line l
+           where l.cart_id=c.id) AS "cartProductIds",
+         (select array_agg(distinct pr.category_id::text) from merchant.pos_cart_line l
+           join merchant.product pr on pr.id=l.product_id where l.cart_id=c.id) AS "cartCategoryIds",
+         (select array_agg(distinct l.variant_id::text) from merchant.pos_cart_line l
+           where l.cart_id=c.id and l.variant_id is not null) AS "cartVariantIds",
+         (select array_agg(distinct m.modifier_id::text) from merchant.pos_cart_line l
+           join merchant.pos_cart_line_modifier m on m.line_id=l.id where l.cart_id=c.id)
+           AS "cartModifierIds",
+         (select count(*)::int from merchant.loyalty_points_ledger u
+           where u.reward_id=r.id and u.customer_id=$2::uuid and u.entry_type='points_redeemed')
+           AS "customerUsageCount",
+         (select count(*)::int from merchant.loyalty_points_ledger u
+           where u.reward_id=r.id and u.customer_id=$2::uuid and u.entry_type='points_redeemed'
+             and u.business_date=c.business_date) AS "businessDateUsageCount",
+         (select count(*)::int from merchant.customer_value_authorization u
+           where u.reward_id=r.id and u.sale_id=c.id and u.status in ('authorized','committed'))
+           AS "saleUsageCount",
+         (select count(*)::int from merchant.customer_value_authorization u
+           where u.reward_id<>r.id and u.sale_id=c.id and u.status='authorized')
+           AS "otherRewardCount"
        FROM merchant.loyalty_reward r JOIN merchant.loyalty_program p ON p.merchant_id=r.merchant_id
        JOIN merchant.loyalty_points_account a ON a.merchant_id=r.merchant_id AND a.customer_id=$2::uuid
        JOIN merchant.loyalty_points_balance b ON b.account_id=a.id
        JOIN merchant.pos_cart c ON c.id=$3::uuid AND c.merchant_id=r.merchant_id AND c.customer_id=$2::uuid
+       LEFT JOIN merchant.pos_checkout_draft d ON d.cart_id=c.id AND d.merchant_id=c.merchant_id
+       JOIN merchant.loyalty_earn_preview ep ON ep.cart_id=c.id AND ep.customer_id=$2::uuid
+         AND ep.preview_fingerprint=$5 AND ep.checkout_version=$6 AND ep.expires_at>clock_timestamp()
       WHERE r.id=$1::uuid AND r.merchant_id=$4::uuid AND r.active AND r.points_cost>0
-        AND (r.valid_until IS NULL OR r.valid_until>clock_timestamp()) FOR UPDATE OF a,b,r`,
-      [dto.rewardId, dto.customerId, dto.saleId, merchantId],
+        AND r.valid_from<=clock_timestamp()
+        AND (r.valid_until IS NULL OR r.valid_until>clock_timestamp())
+        AND p.policy_version=ep.loyalty_policy_version
+        AND p.policy_fingerprint=ep.loyalty_policy_fingerprint FOR UPDATE OF a,b,r`,
+      [
+        dto.rewardId,
+        dto.customerId,
+        dto.saleId,
+        merchantId,
+        dto.previewFingerprint,
+        dto.checkoutVersion,
+      ],
     );
     const row = reward.rows[0];
-    if (!row || Number(row.available) < Number(row.pointsCost)) {
+    const payment = row?.paymentSummary ?? {};
+    const tenderTypes = Array.isArray(payment.tenders)
+      ? payment.tenders.map((tender: Row) => String(tender.type))
+      : [];
+    const discountMinorUnits = Number(payment.discounts?.total?.minorUnits ?? 0);
+    const tipMinorUnits = Number(payment.tip?.amount?.minorUnits ?? 0);
+    const locationAllowed = row
+      ? row.locationIds.length === 0 || row.locationIds.includes(dto.locationId)
+      : false;
+    const productScoped = row
+      ? row.productIds.length === 0 ||
+        row.productIds.some((id: string) => (row.cartProductIds ?? []).includes(id))
+      : false;
+    const categoryScoped = row
+      ? row.categoryIds.length === 0 ||
+        row.categoryIds.some((id: string) => (row.cartCategoryIds ?? []).includes(id))
+      : false;
+    const variantScoped = row
+      ? row.variantIds.length === 0 ||
+        row.variantIds.some((id: string) => (row.cartVariantIds ?? []).includes(id))
+      : false;
+    const modifierScoped = row
+      ? row.modifierIds.length === 0 ||
+        row.modifierIds.some((id: string) => (row.cartModifierIds ?? []).includes(id))
+      : false;
+    const usageLimitReached = row
+      ? (row.usagePerCustomer !== null &&
+          Number(row.customerUsageCount) >= Number(row.usagePerCustomer)) ||
+        (row.usagePerBusinessDate !== null &&
+          Number(row.businessDateUsageCount) >= Number(row.usagePerBusinessDate))
+      : false;
+    const eligibility = row
+      ? evaluateRewardEligibility({
+          accountActive: true,
+          availablePoints: Number(row.available),
+          authorizedPoints: Number(row.authorized),
+          customerActive: true,
+          rewardActive:
+            locationAllowed &&
+            productScoped &&
+            categoryScoped &&
+            variantScoped &&
+            modifierScoped &&
+            Number(row.cartTotal) >= Number(row.minimumSpendMinorUnits) &&
+            (tipMinorUnits === 0 || row.combinableWithTips),
+          pointsCost: Number(row.pointsCost),
+          existingDiscount: discountMinorUnits > 0,
+          anotherReward: Number(row.otherRewardCount) > 0,
+          tenderTypes,
+          allowedTenderTypes: row.allowedTenderTypes,
+          combinableWithDiscount: row.combinableWithDiscounts,
+          combinableWithRewards: row.combinableWithRewards,
+          usageCount: usageLimitReached ? 1 : 0,
+          usageLimit: 1,
+        })
+      : { eligible: false, reasonCodes: ['reward_unavailable'] };
+    if (!row || !eligibility.eligible || Number(row.saleUsageCount) >= Number(row.usagePerSale)) {
       throw new ConflictException({ code: 'REWARD_INELIGIBLE' });
+    }
+    if (row.approvalPermission) {
+      throw new ConflictException({
+        code: 'APPROVAL_REQUIRED',
+        fieldErrors: { approvalPermission: [row.approvalPermission] },
+      });
     }
     const id = randomUUID();
     const fingerprint = commandFingerprint('pos.reward.authorize', dto);
@@ -485,9 +983,11 @@ export class PosCustomerValueRepository {
       `INSERT INTO merchant.customer_value_authorization(
         id,merchant_id,location_id,account_type,account_id,customer_id,reward_id,sale_id,
         checkout_version,points,benefit_minor_units,checkout_fingerprint,policy_version,reward_version,command_id,
-        idempotency_key,command_fingerprint,status,expires_at,correlation_id)
+        idempotency_key,command_fingerprint,status,expires_at,correlation_id,policy_fingerprint,
+        reward_policy_snapshot,operator_id,device_id,credential_version)
        VALUES($1::uuid,$2::uuid,$3::uuid,'loyalty_reward',$4::uuid,$5::uuid,$6::uuid,$7::uuid,
-        $8,$9,$10,$11,$12,$13,$14::uuid,$15::uuid,$16,'authorized',clock_timestamp()+interval '5 minutes',$17)
+        $8,$9,$10,$11,$12,$13,$14::uuid,$15::uuid,$16,'authorized',clock_timestamp()+interval '5 minutes',$17,
+        $18,jsonb_build_object('rewardVersion',$13,'policyVersion',$12),$19::uuid,$20::uuid,$21)
        RETURNING created_at::text AS "createdAt",expires_at::text AS "expiresAt"`,
       [
         id,
@@ -499,7 +999,11 @@ export class PosCustomerValueRepository {
         dto.saleId,
         dto.checkoutVersion,
         row.pointsCost,
-        row.benefit,
+        Math.min(
+          Number(row.benefit),
+          Number(row.maximumBenefitMinorUnits ?? row.benefit),
+          Number(row.cartTotal),
+        ),
         dto.previewFingerprint,
         row.policyVersion,
         row.version,
@@ -507,6 +1011,10 @@ export class PosCustomerValueRepository {
         dto.idempotencyKey,
         fingerprint,
         correlationId,
+        row.policyFingerprint ?? createHash('sha256').update(row.policyVersion).digest('hex'),
+        authorization.operatorId,
+        authorization.deviceId,
+        authorization.credentialVersion,
       ],
     );
     await client.query(
@@ -535,7 +1043,14 @@ export class PosCustomerValueRepository {
       saleId: dto.saleId,
       checkoutVersion: dto.checkoutVersion,
       points: Number(row.pointsCost),
-      benefit: { minorUnits: Number(row.benefit ?? 0), currency: row.currency },
+      benefit: {
+        minorUnits: Math.min(
+          Number(row.benefit ?? 0),
+          Number(row.maximumBenefitMinorUnits ?? row.benefit ?? 0),
+          Number(row.cartTotal),
+        ),
+        currency: row.currency,
+      },
       rewardVersion: Number(row.version),
       policyVersion: row.policyVersion,
       fingerprint,
@@ -552,6 +1067,9 @@ export class PosCustomerValueRepository {
     authorization: CustomerValueAuthorization,
     correlationId: string,
   ): Promise<StoredValueAuthorization> {
+    if (dto.accountType === 'gift_card') {
+      throw new ConflictException({ code: 'GIFT_CARD_CODE_INVALID' });
+    }
     const table = dto.accountType === 'wallet' ? 'loyalty_card' : 'loyalty_gift_card';
     const key = dto.accountType === 'wallet' ? 'card_id' : 'gift_card_id';
     const ledger =
@@ -580,9 +1098,11 @@ export class PosCustomerValueRepository {
       `INSERT INTO merchant.customer_value_authorization(
         id,merchant_id,location_id,account_type,account_id,customer_id,sale_id,checkout_version,
         amount_minor_units,currency,checkout_fingerprint,policy_version,command_id,idempotency_key,
-        command_fingerprint,status,expires_at,correlation_id)
+        command_fingerprint,status,expires_at,correlation_id,policy_fingerprint,operator_id,device_id,
+        credential_version)
        VALUES($1::uuid,$2::uuid,$3::uuid,$4,$5::uuid,$6::uuid,$7::uuid,$8,$9,$10,$11,
-        'pilot-deny-v1',$12::uuid,$13::uuid,$14,'authorized',clock_timestamp()+interval '5 minutes',$15)
+        'pilot-deny-v1',$12::uuid,$13::uuid,$14,'authorized',clock_timestamp()+interval '5 minutes',$15,
+        $16,$17::uuid,$18::uuid,$19)
        RETURNING created_at::text AS "createdAt",expires_at::text AS "expiresAt"`,
       [
         id,
@@ -600,6 +1120,10 @@ export class PosCustomerValueRepository {
         dto.idempotencyKey,
         fingerprint,
         correlationId,
+        createHash('sha256').update(`pilot-deny-v1:${dto.accountType}`).digest('hex'),
+        authorization.operatorId,
+        authorization.deviceId,
+        authorization.credentialVersion,
       ],
     );
     if (dto.accountType === 'wallet') {
@@ -757,11 +1281,36 @@ export class PosCustomerValueRepository {
     userId: string,
     merchantId: string,
     dto: GiftCardLookupRequest,
-  ): Promise<GiftCard> {
+    authorization: CustomerValueAuthorization,
+  ): Promise<GiftCardLookupResult> {
     return this.pg.runWithMerchant(
       merchantId,
       userId,
       async (client) => {
+        const codeHash = createHash('sha256').update(dto.code).digest();
+        const bucket = (dimension: string) =>
+          createHmac('sha256', this.customerValueKey()).update(dimension).digest();
+        const bucketHashes = [
+          bucket(`device:${merchantId}:${dto.locationId}:${authorization.deviceId}`),
+          bucket(`operator:${merchantId}:${authorization.operatorId}`),
+          bucket(`code:${merchantId}:${codeHash.subarray(0, 4).toString('hex')}`),
+        ];
+        const budget = await client.query<{ allowed: boolean; retryAfterSeconds: number }>(
+          `SELECT bool_and(result.allowed) AS allowed,
+                  max(result.retry_after_seconds)::int AS "retryAfterSeconds"
+             FROM unnest($3::bytea[]) key(bucket_hash)
+             CROSS JOIN LATERAL merchant.consume_gift_card_lookup_budget(
+               $1::uuid,$2::uuid,key.bucket_hash) result`,
+          [merchantId, dto.locationId, bucketHashes],
+        );
+        if (!budget.rows[0]?.allowed) {
+          return {
+            found: false,
+            retryAfterSeconds: Number(budget.rows[0]?.retryAfterSeconds ?? 30),
+            card: null,
+            reasonCode: 'temporarily_locked',
+          };
+        }
         const { rows } = await client.query<Row>(
           `SELECT g.id::text,g.public_reference AS "publicReference",g.masked_code AS "maskedCode",
           g.status,g.currency,g.amount_cents::int AS "initialValue",g.activated_at::text AS "activatedAt",
@@ -772,8 +1321,301 @@ export class PosCustomerValueRepository {
         GROUP BY g.id LIMIT 1`,
           [merchantId, dto.code],
         );
-        if (!rows[0]) throw new ConflictException({ code: 'GIFT_CARD_NOT_FOUND' });
-        return this.giftCard(rows[0]);
+        if (!rows[0]) {
+          return { found: false, retryAfterSeconds: 0, card: null, reasonCode: 'unavailable' };
+        }
+        return {
+          found: true,
+          retryAfterSeconds: 0,
+          card: this.giftCard(rows[0]),
+          reasonCode: 'available',
+        };
+      },
+      dto.locationId,
+    );
+  }
+
+  async previewPointsAdjustment(
+    userId: string,
+    merchantId: string,
+    dto: PointsAdjustmentRequest,
+  ): Promise<PointsAdjustmentPreview> {
+    return this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      async (client) => {
+        const fingerprint = this.approvalFingerprint('pos.points.adjust', dto);
+        const { rows } = await client.query<Row>(
+          `SELECT merchant.preview_points_adjustment($1::uuid,$2::uuid,$3::uuid,$4,$5,$6,$7) value`,
+          [
+            merchantId,
+            dto.customerId,
+            dto.accountId,
+            dto.direction,
+            dto.points,
+            dto.reason,
+            fingerprint,
+          ],
+        );
+        const value = rows[0].value;
+        return {
+          accountId: dto.accountId,
+          currentAvailable: Number(value.currentPoints),
+          projectedAvailable: Number(value.projectedPoints),
+          approvalPermission: value.approvalRequired ? 'loyalty.adjust.approve' : null,
+          fingerprint,
+        };
+      },
+      dto.locationId,
+    );
+  }
+
+  async commitPointsAdjustment(
+    client: PoolClient,
+    merchantId: string,
+    dto: PointsAdjustmentRequest,
+    authorization: CustomerValueAuthorization,
+  ): Promise<PointsAdjustmentResult> {
+    const fingerprint = this.approvalFingerprint('pos.points.adjust', dto);
+    if (dto.points > 500) {
+      await this.consumeApproval(
+        client,
+        merchantId,
+        dto,
+        authorization,
+        'loyalty.adjust.approve',
+        fingerprint,
+      );
+    }
+    const result = await client.query<{ id: string }>(
+      `SELECT merchant.commit_points_adjustment(
+        $1::uuid,$2::uuid,$3::uuid,$4,$5,$6,$7::uuid,$8::uuid,$9::uuid,$10::uuid,$11,current_date
+      )::text id`,
+      [
+        merchantId,
+        dto.customerId,
+        dto.accountId,
+        dto.direction,
+        dto.points,
+        dto.reason,
+        authorization.operatorId,
+        authorization.deviceId,
+        dto.commandId,
+        dto.idempotencyKey,
+        fingerprint,
+      ],
+    );
+    const { rows } = await client.query<Row>(
+      `SELECT l.id::text,l.account_id::text AS "accountId",l.customer_id::text AS "customerId",
+        l.sequence::int,l.entry_type AS type,l.points::int,l.direction,l.sale_id::text AS "saleId",
+        l.refund_id::text AS "refundId",l.reward_id::text AS "rewardId",l.command_id::text AS "commandId",
+        l.business_date::text AS "businessDate",l.occurred_at::text AS "occurredAt",
+        b.pending::int,b.available::int,b.authorized::int,b.redeemed::int,b.reversed::int,
+        b.expired::int,b.adjusted::int,b.ledger_sequence::int AS "ledgerSequence",
+        b.projection_version::int AS "projectionVersion",b.calculated_at::text AS "calculatedAt"
+       FROM merchant.loyalty_points_ledger l
+       JOIN merchant.loyalty_points_balance b ON b.account_id=l.account_id
+       WHERE l.id=$1::uuid`,
+      [result.rows[0].id],
+    );
+    const row = rows[0];
+    return {
+      ledgerEntry: {
+        id: row.id,
+        accountId: row.accountId,
+        customerId: row.customerId,
+        sequence: Number(row.sequence),
+        type: row.type,
+        points: Number(row.points),
+        direction: row.direction,
+        saleId: row.saleId,
+        refundId: row.refundId,
+        rewardId: row.rewardId,
+        commandId: row.commandId,
+        businessDate: row.businessDate,
+        occurredAt: row.occurredAt,
+      },
+      balance: {
+        accountId: row.accountId,
+        earned: Number(row.available) + Number(row.redeemed),
+        pending: Number(row.pending),
+        available: Number(row.available),
+        authorized: Number(row.authorized),
+        redeemed: Number(row.redeemed),
+        reversed: Number(row.reversed),
+        expired: Number(row.expired),
+        adjusted: Number(row.adjusted),
+        ledgerSequence: Number(row.ledgerSequence),
+        projectionVersion: Number(row.projectionVersion),
+        calculatedAt: row.calculatedAt,
+      },
+      recovered: false,
+    };
+  }
+
+  async issueGiftCard(
+    client: PoolClient,
+    merchantId: string,
+    dto: GiftCardIssuanceRequest,
+    authorization: CustomerValueAuthorization,
+  ): Promise<Omit<GiftCardIssuanceResult, 'deliveryToken'>> {
+    const fingerprint = this.approvalFingerprint('pos.gift-card.issue', dto);
+    if (dto.source !== 'development') {
+      await this.consumeApproval(
+        client,
+        merchantId,
+        dto,
+        authorization,
+        'gift_card.issue.approve',
+        fingerprint,
+      );
+    } else if (this.config.get('NODE_ENV', { infer: true }) === 'production') {
+      throw new ConflictException({ code: 'GIFT_CARD_DEVELOPMENT_ISSUANCE_DISABLED' });
+    }
+    if (dto.source === 'sale' && !dto.saleId) {
+      throw new ConflictException({ code: 'GIFT_CARD_FUNDING_REQUIRED' });
+    }
+    if (dto.source === 'sale') {
+      throw new ConflictException({ code: 'GIFT_CARD_SALE_ISSUANCE_NOT_AVAILABLE' });
+    }
+    const code = `UMI-${randomBytes(18).toString('base64url')}`;
+    const deliveryToken = this.giftCardDeliveryToken(dto.commandId);
+    const id = randomUUID();
+    const active = dto.source === 'promotion' || dto.source === 'development';
+    const card = await client.query<Row>(
+      `INSERT INTO merchant.loyalty_gift_card(
+        id,merchant_id,code,public_reference,status,currency,amount_cents,customer_id,location_id,
+        issuance_command_id,issuance_fingerprint,issuance_policy_version,issuer_operator_id,
+        issuer_device_id,issuance_source,activated_at)
+       VALUES($1::uuid,$2::uuid,$3,'GFT-'||$1::text,$4,$5,$6,$7::uuid,$8::uuid,$9::uuid,$10,
+        'pilot-v1',$11::uuid,$12::uuid,$13,
+        case when $4='active' then clock_timestamp() end)
+       RETURNING id::text,public_reference AS "publicReference",masked_code AS "maskedCode",status,
+        currency,amount_cents::int AS "initialValue",activated_at::text AS "activatedAt",
+        expires_at::text AS "expiresAt",customer_id::text AS "customerId",version`,
+      [
+        id,
+        merchantId,
+        code,
+        active ? 'active' : 'inactive',
+        dto.currency,
+        dto.initialValueMinorUnits,
+        dto.customerId,
+        dto.locationId,
+        dto.commandId,
+        fingerprint,
+        authorization.operatorId,
+        authorization.deviceId,
+        dto.source,
+      ],
+    );
+    if (active) {
+      await client.query(
+        `SELECT merchant.append_gift_card_fact($1::uuid,$2::uuid,jsonb_build_object(
+          'delta',$3,'amountMinorUnits',$3,'reason','issued','entryType','issued','currency',$4,
+          'direction','credit','commandId',$5::text,'idempotencyKey',$6::text,'fingerprint',$7,
+          'operatorId',$8::text,'deviceId',$9::text,'businessDate',current_date,
+          'sourceType','gift_card_issuance','sourceId',$2::text,'saleId',$10::text))`,
+        [
+          merchantId,
+          id,
+          dto.initialValueMinorUnits,
+          dto.currency,
+          dto.commandId,
+          dto.idempotencyKey,
+          fingerprint,
+          authorization.operatorId,
+          authorization.deviceId,
+          dto.saleId,
+        ],
+      );
+    }
+    const nonce = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', this.customerValueKey(), nonce);
+    const ciphertext = Buffer.concat([cipher.update(code, 'utf8'), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    const deliveryExpiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
+    await client.query(
+      `SELECT merchant.store_gift_card_secret_delivery(
+        $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::bytea,$6::bytea,$7::bytea,$8::bytea,
+        $9::uuid,$10::uuid,$11::timestamptz)`,
+      [
+        merchantId,
+        dto.locationId,
+        id,
+        dto.commandId,
+        createHash('sha256').update(deliveryToken).digest(),
+        ciphertext,
+        nonce,
+        tag,
+        authorization.operatorId,
+        authorization.deviceId,
+        deliveryExpiresAt,
+      ],
+    );
+    return {
+      card: this.giftCard({
+        ...card.rows[0],
+        available: active ? dto.initialValueMinorUnits : 0,
+        sequence: active ? 1 : 0,
+      }),
+      deliveryExpiresAt,
+      recovered: false,
+    };
+  }
+
+  giftCardDeliveryToken(commandId: string): string {
+    return createHmac('sha256', this.customerValueKey())
+      .update(`gift-card-delivery:${commandId}`)
+      .digest('base64url');
+  }
+
+  previewGiftCardIssuance(dto: GiftCardIssuanceRequest): GiftCardIssuancePreview {
+    const maximumValueMinorUnits = 10_000_000;
+    if (dto.initialValueMinorUnits > maximumValueMinorUnits) {
+      throw new ConflictException({ code: 'GIFT_CARD_VALUE_LIMIT' });
+    }
+    return {
+      currency: dto.currency,
+      valueMinorUnits: dto.initialValueMinorUnits,
+      maximumValueMinorUnits,
+      approvalPermission: dto.source === 'development' ? null : 'gift_card.issue.approve',
+      fingerprint: this.approvalFingerprint('pos.gift-card.issue', dto),
+    };
+  }
+
+  async revealGiftCardSecret(
+    userId: string,
+    merchantId: string,
+    dto: GiftCardSecretRevealRequest,
+    authorization: CustomerValueAuthorization,
+  ): Promise<GiftCardSecretRevealResult> {
+    return this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      async (client) => {
+        const tokenHash = createHash('sha256').update(dto.deliveryToken).digest();
+        const { rows } = await client.query<Row>(
+          `SELECT public_reference,ciphertext,nonce,auth_tag,expires_at::text AS "expiresAt"
+           FROM merchant.reveal_gift_card_secret_delivery(
+             $1::uuid,$2::uuid,$3::bytea,$4::uuid,$6::uuid,$5::uuid)`,
+          [
+            merchantId,
+            dto.locationId,
+            tokenHash,
+            authorization.operatorId,
+            dto.commandId,
+            authorization.deviceId,
+          ],
+        );
+        if (!rows[0]) throw new ConflictException({ code: 'GIFT_CARD_SECRET_UNAVAILABLE' });
+        const decipher = createDecipheriv('aes-256-gcm', this.customerValueKey(), rows[0].nonce);
+        decipher.setAuthTag(rows[0].auth_tag);
+        const code = Buffer.concat([
+          decipher.update(rows[0].ciphertext),
+          decipher.final(),
+        ]).toString('utf8');
+        return { maskedReference: rows[0].public_reference, code, expiresAt: rows[0].expiresAt };
       },
       dto.locationId,
     );
@@ -784,6 +1626,7 @@ export class PosCustomerValueRepository {
     merchantId: string,
     commandId: string,
     query: CustomerValueRecoveryQuery,
+    authorization: CustomerValueAuthorization,
   ): Promise<CustomerValueRecoveryResult> {
     return this.pg.runWithMerchant(
       merchantId,
@@ -794,18 +1637,28 @@ export class PosCustomerValueRepository {
           response: unknown;
           failureCode: string | null;
           correlationId: string;
+          commandType: string;
         }>(
           `SELECT status,response_data AS response,failure_code AS "failureCode",
+                  command_type AS "commandType",
                   correlation_id AS "correlationId"
              FROM merchant.business_command
             WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND command_id=$3::uuid
               AND (command_type LIKE 'pos.customer%'
                 OR command_type IN ('pos.reward.authorize','pos.reward.release',
-                  'pos.stored-value.authorize','pos.stored-value.release','pos.gift-card.activate'))
+                  'pos.stored-value.authorize','pos.stored-value.release','pos.gift-card.activate',
+                  'pos.gift-card.issue','pos.points.adjust'))
             LIMIT 1`,
           [merchantId, query.locationId, commandId],
         );
         const row = rows[0];
+        if (
+          row?.commandType === 'pos.gift-card.issue' &&
+          !authorization.permissions.includes('*') &&
+          !authorization.permissions.includes('gift_card.issue')
+        ) {
+          throw new ConflictException({ code: 'PERMISSION_DENIED' });
+        }
         const responseStatus =
           row?.response && typeof row.response === 'object' && 'status' in row.response
             ? String(row.response.status)
@@ -889,9 +1742,47 @@ export class PosCustomerValueRepository {
     dto: CustomerMergeRequest,
     authorization: CustomerValueAuthorization,
   ) {
+    const customers = await client.query(
+      `SELECT id FROM merchant.customer
+       WHERE merchant_id=$1::uuid AND id=ANY($2::uuid[]) AND status='active'
+       ORDER BY id FOR UPDATE`,
+      [merchantId, [dto.sourceCustomerId, dto.targetCustomerId]],
+    );
+    if (customers.rowCount !== 2) {
+      throw new ConflictException({ code: 'CUSTOMER_MERCHANT_SCOPE' });
+    }
+    await client.query(
+      `SELECT id FROM merchant.loyalty_points_account
+       WHERE merchant_id=$1::uuid AND customer_id=ANY($2::uuid[]) ORDER BY id FOR UPDATE`,
+      [merchantId, [dto.sourceCustomerId, dto.targetCustomerId]],
+    );
+    await client.query(
+      `SELECT id FROM merchant.loyalty_card
+       WHERE merchant_id=$1::uuid AND customer_id=ANY($2::uuid[]) ORDER BY id FOR UPDATE`,
+      [merchantId, [dto.sourceCustomerId, dto.targetCustomerId]],
+    );
+    await client.query(
+      `SELECT id FROM merchant.loyalty_gift_card
+       WHERE merchant_id=$1::uuid AND customer_id=ANY($2::uuid[]) ORDER BY id FOR UPDATE`,
+      [merchantId, [dto.sourceCustomerId, dto.targetCustomerId]],
+    );
+    await client.query(
+      `SELECT customer_id,consent_type FROM merchant.customer_consent_current
+       WHERE merchant_id=$1::uuid AND customer_id=ANY($2::uuid[])
+       ORDER BY customer_id,consent_type FOR UPDATE`,
+      [merchantId, [dto.sourceCustomerId, dto.targetCustomerId]],
+    );
     const value = await client.query(
       `SELECT exists(select 1 from merchant.loyalty_points_account where merchant_id=$1::uuid and customer_id in ($2::uuid,$3::uuid))
-        or exists(select 1 from merchant.loyalty_card where merchant_id=$1::uuid and customer_id in ($2::uuid,$3::uuid)) AS conflict`,
+        or exists(select 1 from merchant.loyalty_card where merchant_id=$1::uuid and customer_id in ($2::uuid,$3::uuid))
+        or exists(select 1 from merchant.loyalty_gift_card where merchant_id=$1::uuid
+          and customer_id in ($2::uuid,$3::uuid))
+        or (select coalesce(jsonb_object_agg(consent_type,status),'{}'::jsonb)
+              from merchant.customer_consent_current where merchant_id=$1::uuid and customer_id=$2::uuid)
+           is distinct from
+           (select coalesce(jsonb_object_agg(consent_type,status),'{}'::jsonb)
+              from merchant.customer_consent_current where merchant_id=$1::uuid and customer_id=$3::uuid)
+        AS conflict`,
       [merchantId, dto.sourceCustomerId, dto.targetCustomerId],
     );
     if (value.rows[0]?.conflict) {
@@ -1136,5 +2027,62 @@ export class PosCustomerValueRepository {
       customerId: row.customerId,
       version: Number(row.version),
     };
+  }
+
+  private customerValueKey(): Buffer {
+    const secret =
+      this.config.get('CUSTOMER_VALUE_SECRET', { infer: true }) ??
+      this.config.get('APP_QR_SECRET', { infer: true }) ??
+      this.config.get('JWT_ACCESS_SECRET', { infer: true });
+    if (!secret) throw new ConflictException({ code: 'CUSTOMER_VALUE_SECRET_UNAVAILABLE' });
+    return createHash('sha256').update(`umi-customer-value:${secret}`).digest();
+  }
+
+  private encodeHistoryCursor(
+    scope: object,
+    position: { occurredAt: string; eventType: string; eventId: string },
+  ) {
+    const body = Buffer.from(JSON.stringify({ version: 2, scope, ...position }), 'utf8').toString(
+      'base64url',
+    );
+    const signature = createHmac('sha256', this.customerValueKey())
+      .update(body)
+      .digest('base64url');
+    return `${body}.${signature}`;
+  }
+
+  private decodeHistoryCursor(cursor: string, scope: object) {
+    const [body, signature, extra] = cursor.split('.');
+    if (!body || !signature || extra) {
+      throw new ConflictException({ code: 'CUSTOMER_HISTORY_CURSOR_INVALID' });
+    }
+    const expected = createHmac('sha256', this.customerValueKey()).update(body).digest();
+    const actual = Buffer.from(signature, 'base64url');
+    if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+      throw new ConflictException({ code: 'CUSTOMER_HISTORY_CURSOR_INVALID' });
+    }
+    try {
+      const parsed = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as {
+        version: number;
+        scope: object;
+        occurredAt: string;
+        eventType: string;
+        eventId: string;
+      };
+      if (
+        parsed.version !== 2 ||
+        JSON.stringify(parsed.scope) !== JSON.stringify(scope) ||
+        !/^\d{4}-\d{2}-\d{2}T/.test(parsed.occurredAt) ||
+        typeof parsed.eventType !== 'string' ||
+        parsed.eventType.length === 0 ||
+        parsed.eventType.length > 80 ||
+        !/^[0-9a-f-]{36}$/i.test(parsed.eventId)
+      ) {
+        throw new Error('scope');
+      }
+      return parsed;
+    } catch {
+      throw new ConflictException({ code: 'CUSTOMER_HISTORY_CURSOR_INVALID' });
+    }
   }
 }

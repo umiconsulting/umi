@@ -62,6 +62,152 @@ export const calculateEarnedPoints = (
   return safe(result, 'LOYALTY_POINTS_OUT_OF_RANGE');
 };
 
+export interface PointsEarnPolicy {
+  moneyUnitMinorUnits: number;
+  pointsPerUnit: number;
+  rounding: 'floor' | 'half_up';
+  excludedProductIds: string[];
+  excludedCategoryIds: string[];
+  excludedTenderTypes: string[];
+  includeTax: boolean;
+  includeTip: boolean;
+  discountInteraction: 'ignore' | 'subtract';
+  rewardInteraction: 'ignore' | 'subtract';
+  earnTiming: 'immediate' | 'pending';
+}
+
+export interface PointsEarnInput {
+  lines: Array<{ amountMinorUnits: number; productId: string; categoryId: string | null }>;
+  discountMinorUnits: number;
+  taxMinorUnits: number;
+  tipMinorUnits: number;
+  tenderTypes: string[];
+  rewardBenefitMinorUnits: number;
+  policy: PointsEarnPolicy;
+}
+
+export const calculatePointsEarn = (input: PointsEarnInput) => {
+  if (input.lines.length > 500) throw new RangeError('LOYALTY_LINE_LIMIT_EXCEEDED');
+  const explanationCodes: string[] = [];
+  let grossEligibleMinorUnits = 0;
+  let excludedMinorUnits = 0;
+  for (const line of input.lines) {
+    safe(line.amountMinorUnits, 'LOYALTY_AMOUNT_INVALID');
+    const excluded =
+      input.policy.excludedProductIds.includes(line.productId) ||
+      (line.categoryId !== null && input.policy.excludedCategoryIds.includes(line.categoryId));
+    if (excluded) {
+      excludedMinorUnits += line.amountMinorUnits;
+      explanationCodes.push(
+        input.policy.excludedProductIds.includes(line.productId)
+          ? 'excluded_product'
+          : 'excluded_category',
+      );
+    } else {
+      grossEligibleMinorUnits += line.amountMinorUnits;
+    }
+  }
+  for (const value of [
+    input.discountMinorUnits,
+    input.taxMinorUnits,
+    input.tipMinorUnits,
+    input.rewardBenefitMinorUnits,
+  ]) {
+    safe(value, 'LOYALTY_AMOUNT_INVALID');
+  }
+  if (input.tenderTypes.some((type) => input.policy.excludedTenderTypes.includes(type))) {
+    return {
+      grossEligibleMinorUnits,
+      excludedMinorUnits: excludedMinorUnits + grossEligibleMinorUnits,
+      finalEligibleMinorUnits: 0,
+      points: 0,
+      status: input.policy.earnTiming,
+      explanationCodes: [...new Set([...explanationCodes, 'excluded_tender'])],
+    };
+  }
+  let finalEligibleMinorUnits = grossEligibleMinorUnits;
+  if (input.policy.discountInteraction === 'subtract' && input.discountMinorUnits > 0) {
+    finalEligibleMinorUnits -= input.discountMinorUnits;
+    explanationCodes.push('discount_subtracted');
+  }
+  if (!input.policy.includeTax && input.taxMinorUnits > 0) {
+    finalEligibleMinorUnits -= input.taxMinorUnits;
+    explanationCodes.push('tax_excluded');
+  } else if (input.policy.includeTax && input.taxMinorUnits > 0) {
+    explanationCodes.push('tax_included');
+  }
+  if (input.policy.includeTip && input.tipMinorUnits > 0) {
+    finalEligibleMinorUnits += input.tipMinorUnits;
+    explanationCodes.push('tip_included');
+  } else if (!input.policy.includeTip && input.tipMinorUnits > 0) {
+    explanationCodes.push('tip_excluded');
+  }
+  if (input.policy.rewardInteraction === 'subtract' && input.rewardBenefitMinorUnits > 0) {
+    finalEligibleMinorUnits -= input.rewardBenefitMinorUnits;
+    explanationCodes.push('reward_subtracted');
+  }
+  finalEligibleMinorUnits = Math.max(0, finalEligibleMinorUnits);
+  return {
+    grossEligibleMinorUnits,
+    excludedMinorUnits,
+    finalEligibleMinorUnits,
+    points: calculateEarnedPoints(
+      finalEligibleMinorUnits,
+      input.policy.moneyUnitMinorUnits,
+      input.policy.pointsPerUnit,
+      input.policy.rounding,
+    ),
+    status: input.policy.earnTiming,
+    explanationCodes: [...new Set(explanationCodes)],
+  };
+};
+
+export interface RewardEligibilityInput {
+  accountActive: boolean;
+  availablePoints: number;
+  authorizedPoints: number;
+  customerActive: boolean;
+  rewardActive: boolean;
+  pointsCost: number;
+  existingDiscount: boolean;
+  anotherReward: boolean;
+  tenderTypes: string[];
+  allowedTenderTypes: string[];
+  combinableWithDiscount: boolean;
+  combinableWithRewards: boolean;
+  usageCount: number;
+  usageLimit: number | null;
+}
+
+export const evaluateRewardEligibility = (input: RewardEligibilityInput) => {
+  const reasonCodes: string[] = [];
+  if (!input.customerActive) reasonCodes.push('customer_unavailable');
+  if (!input.accountActive) reasonCodes.push('loyalty_account_suspended');
+  if (!input.rewardActive) reasonCodes.push('reward_unavailable');
+  const replacementBalance = input.anotherReward
+    ? input.availablePoints + input.authorizedPoints
+    : input.availablePoints;
+  if (replacementBalance < input.pointsCost) {
+    reasonCodes.push('insufficient_points');
+  }
+  if (input.existingDiscount && !input.combinableWithDiscount) {
+    reasonCodes.push('blocked_by_existing_discount');
+  }
+  if (input.anotherReward && !input.combinableWithRewards) {
+    reasonCodes.push('blocked_by_another_reward');
+  }
+  if (
+    input.allowedTenderTypes.length > 0 &&
+    input.tenderTypes.some((type) => !input.allowedTenderTypes.includes(type))
+  ) {
+    reasonCodes.push('blocked_by_tender');
+  }
+  if (input.usageLimit !== null && input.usageCount >= input.usageLimit) {
+    reasonCodes.push('usage_limit_reached');
+  }
+  return { eligible: reasonCodes.length === 0, reasonCodes };
+};
+
 export const applyPointsFacts = (
   facts: Array<{ sequence: number; type: PointsFactType; points: number }>,
 ) => {

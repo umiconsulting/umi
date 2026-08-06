@@ -87,16 +87,16 @@ for (const [index, match] of matches.entries()) {
 }
 
 const expectedStatuses = new Map([
-  ['IMPLEMENTADO', 41],
-  ['IMPLEMENTADO CON LIMITACIONES', 15],
+  ['IMPLEMENTADO', 43],
+  ['IMPLEMENTADO CON LIMITACIONES', 19],
   ['FOUNDATION', 1],
-  ['INCOMPLETO: binding de preview', 1],
-  ['INCOMPLETO: policy y expiry', 1],
-  ['INCOMPLETO: rate limit', 1],
+  ['INCOMPLETO: binding de preview', 0],
+  ['INCOMPLETO: policy y expiry', 0],
+  ['INCOMPLETO: rate limit', 0],
   ['NO IMPLEMENTADO', 0],
 ]);
-if (matches.length !== 60 || !document.includes('**60 casos de uso**')) {
-  throw new Error(`Expected 60 use cases, found ${matches.length}.`);
+if (matches.length !== 63 || !document.includes('**63 casos de uso**')) {
+  throw new Error(`Expected 63 use cases, found ${matches.length}.`);
 }
 for (const [status, expected] of expectedStatuses) {
   const actual = statusCounts.get(status) ?? 0;
@@ -119,10 +119,10 @@ const expectedModules = new Map([
   ['OFF', 4],
   ['HIST', 2],
   ['INV', 6],
-  ['CUST', 3],
-  ['LOY', 2],
+  ['CUST', 4],
+  ['LOY', 3],
   ['WAL', 1],
-  ['GIFT', 1],
+  ['GIFT', 2],
 ]);
 for (const [module, expected] of expectedModules) {
   const actual = moduleCounts.get(module) ?? 0;
@@ -168,10 +168,10 @@ const roleColumns = new Map([
   ['Viewer', 9],
 ]);
 const expectedRoleCounts = new Map([
-  ['Owner', 60],
-  ['Admin', 60],
-  ['Manager', 56],
-  ['Supervisor', 55],
+  ['Owner', 63],
+  ['Admin', 63],
+  ['Manager', 59],
+  ['Supervisor', 56],
   ['Cashier', 48],
   ['Staff', 48],
   ['Viewer', 8],
@@ -215,10 +215,13 @@ const requiredPermissionByCase = new Map([
   ['UC-CUST-001', 'customer.search'],
   ['UC-CUST-002', 'customer.create'],
   ['UC-CUST-003', 'customer.history.read'],
+  ['UC-CUST-004', 'customer.history.read'],
   ['UC-LOY-001', 'checkout.commit'],
   ['UC-LOY-002', 'loyalty.reward.authorize'],
+  ['UC-LOY-003', 'loyalty.adjust'],
   ['UC-WAL-001', 'wallet.authorize'],
   ['UC-GIFT-001', 'gift_card.lookup'],
+  ['UC-GIFT-002', 'gift_card.issue'],
 ]);
 for (const [caseId, permission] of requiredPermissionByCase) {
   const row = matrixRows.find((value) => value[0] === caseId);
