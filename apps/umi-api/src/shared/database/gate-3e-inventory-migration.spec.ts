@@ -84,9 +84,7 @@ describe('Gate 3E inventory authority', () => {
     expect(sql).toContain('enable row level security');
     expect(sql).toContain('force row level security');
     expect(rls).toContain("'stock_ledger_entry'");
-    expect(rls).toMatch(
-      /not_device_scoped constant text\[\] := array\[\s*'stock_ledger_entry'/,
-    );
+    expect(rls).toMatch(/not_device_scoped constant text\[\] := array\[\s*'stock_ledger_entry'/);
     expect(rls).toContain('location_id = umi.current_location()');
   });
 
