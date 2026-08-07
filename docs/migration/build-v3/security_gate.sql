@@ -194,6 +194,66 @@ select * from (values
   -- public schema hardening -------------------------------------------------
   ('PUBLIC cannot CREATE in schema public',
     case when has_schema_privilege('public','public','create') then 'FAIL' else 'PASS' end),
+  -- D7 · extensions (SECURITY_GATE.md §4) -----------------------------------
+  -- Asserted by PLACEMENT and CAPABILITY, not as a fixed list of names. §4 used to
+  -- name an exact set — {plpgsql, vector, pg_trgm} — which was already wrong: the
+  -- database also carries pgcrypto, uuid-ossp, pg_stat_statements and (since the
+  -- location search) unaccent. A frozen allowlist rots on the first legitimate
+  -- addition and then gets ignored, which is worse than no check.
+  ('no extension installed outside pg_catalog/extensions',
+    (select case when count(*)=0 then 'PASS' else 'FAIL' end
+       from pg_extension e join pg_namespace n on n.oid = e.extnamespace
+      where n.nspname not in ('pg_catalog','extensions'))),
+  -- These reach OUT of the database — the network, the filesystem, or a shell. None
+  -- has a use in build-v3, and postgres_fdw is the one P7's replay installs on
+  -- purpose and must remove afterwards (D8).
+  ('no network/exec-capable extension installed',
+    (select case when count(*)=0 then 'PASS' else 'FAIL' end from pg_extension
+      where extname in ('postgres_fdw','dblink','file_fdw','plpythonu','plpython3u',
+                        'plperlu','pltclu','plsh','adminpack'))),
+  ('api/worker have USAGE but NOT CREATE on extensions',
+    (select case
+       when bool_and(has_schema_privilege(r,'extensions','usage'))
+        and not bool_or(has_schema_privilege(r,'extensions','create')) then 'PASS' else 'FAIL' end
+       from unnest(array['api','worker']) r)),
+  -- D8 · no FDW remnants (SECURITY_GATE.md §4) ------------------------------
+  -- P7 backfills prod through postgres_fdw. A foreign server EMBEDS the source
+  -- credentials in the target database, and a user mapping holds the password. Left
+  -- behind, the migration tool becomes a permanent unaudited path back to the source.
+  -- Zero today; the check earns its place the moment the replay runs.
+  ('0 foreign servers / user mappings / FDWs remain',
+    (select case when (select count(*) from pg_foreign_server)
+                    + (select count(*) from pg_user_mapping)
+                    + (select count(*) from pg_foreign_data_wrapper) = 0
+                then 'PASS' else 'FAIL' end)),
+  -- D10 · request-path log redaction (SECURITY_GATE.md §4) ------------------
+  -- Session tokens, OTP hashes, reset tokens and merchant ids all travel as BOUND
+  -- PARAMETERS. Every grant in this file is undone if those land in a log file that
+  -- nobody put under the same access control as the table they came from.
+  ('log_statement is none (no statement logging)',
+    (select case when setting = 'none' then 'PASS' else 'FAIL' end
+       from pg_settings where name = 'log_statement')),
+  -- A cluster-wide 'none' is undone by one `ALTER ROLE api SET log_statement = 'all'`,
+  -- which is invisible in pg_settings when read as anyone else.
+  ('no role-level override re-enables statement logging',
+    (select case when count(*)=0 then 'PASS' else 'FAIL' end
+       from pg_db_role_setting s
+       left join pg_roles r on r.oid = s.setrole
+      where array_to_string(s.setconfig, ',') ~ 'log_statement=(all|mod|ddl)'
+        and (r.rolname is null or r.rolname in ('api','worker','readonly')))),
+  -- WARN, NOT FAIL — and deliberately so. -1 means "log bind parameters IN FULL",
+  -- which is the PostgreSQL default. It leaks nothing today because no statement is
+  -- logged at all (the two checks above). It becomes a credential sink the moment
+  -- anyone enables slow-query logging to debug a production incident — which is
+  -- precisely when someone will. 0 disables parameter logging outright, so the
+  -- safe posture survives a future operator turning logging on.
+  -- ⚠️ This is a CLUSTER setting: set it in Supabase and re-run before cutover.
+  ('bind parameters are never logged (log_parameter_max_length = 0)',
+    (select case when setting = '0' then 'PASS' else 'WARN' end
+       from pg_settings where name = 'log_parameter_max_length')),
+  ('bind parameters are never logged on error',
+    (select case when setting = '0' then 'PASS' else 'FAIL' end
+       from pg_settings where name = 'log_parameter_max_length_on_error')),
   -- Append-only audit --------------------------------------------------------
   ('no role holds UPDATE/DELETE on audit_log',
     (select case when bool_or(p) then 'FAIL' else 'PASS' end from (
