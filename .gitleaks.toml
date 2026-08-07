@@ -1,0 +1,43 @@
+# Secret scanning for CI (`lint` workflow) and for local runs.
+#
+# WHY THIS EXISTS. GitHub gives PUBLIC repositories secret scanning and push
+# protection for free; PRIVATE repositories on the free plan get neither. This
+# repository is going private, which is right — it carries the platform
+# architecture, the build-v3 DDL and the security gate — but it means the safety
+# net that would BLOCK a credential at push time disappears on the same day.
+# So the scan moves in here.
+#
+# It is not hypothetical. On 2026-08-07 the (then public) umiconsulting/umi-cash
+# repository was found to hold `passes/apple/certificates/signerKey.pem` in HEAD:
+# an unencrypted RSA private key, beside its certificate and the WWDR chain — a
+# complete, working kit for signing Apple Wallet passes as Umi. Push protection
+# is exactly the control that stops that at the moment of the push, rather than
+# months later during an unrelated audit.
+#
+# Run it the same way CI does:
+#   gitleaks git --no-banner --redact --exit-code 1 --log-opts="--all"
+
+[extend]
+useDefault = true
+
+# ---------------------------------------------------------------------------
+# Allowlist. Keep this SHORT and SPECIFIC.
+#
+# Every entry is a place we have decided a match is not a secret. A broad rule
+# here (a whole directory, a whole file type) silently disarms the scanner for
+# everything that lands there later, which is how a real key gets through a
+# check that reports green. Prefer an exact value over a path, and a path over
+# a pattern.
+# ---------------------------------------------------------------------------
+[[allowlists]]
+description = "Test fixtures that are hashes, not credentials"
+# A SHA-256 digest used as a fake `tokenHash` in an auth unit-test mock
+# (apps/umi-api/src/modules/auth/auth.service.spec.ts). It is high-entropy hex,
+# so `generic-api-key` matches it, but it authenticates nothing.
+#
+# Matched by VALUE rather than by path or commit on purpose: a path allowlist
+# would blind the scanner to a real secret pasted into that same spec file, and
+# a commit allowlist breaks the moment history is rebased.
+regexes = [
+  '''75da00f6378d098bbe2e19dd7ce73a633c0f0f56aa876e9741e37974f1e68ed9''',
+]
