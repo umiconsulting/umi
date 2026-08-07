@@ -230,9 +230,34 @@ select * from (values
   -- Session tokens, OTP hashes, reset tokens and merchant ids all travel as BOUND
   -- PARAMETERS. Every grant in this file is undone if those land in a log file that
   -- nobody put under the same access control as the table they came from.
-  ('log_statement is none (no statement logging)',
-    (select case when setting = 'none' then 'PASS' else 'FAIL' end
-       from pg_settings where name = 'log_statement')),
+  -- Assert the property, NOT one particular way of satisfying it. An earlier version
+  -- of this check demanded a cluster-wide `log_statement = none`, and it was wrong:
+  -- production runs `ddl`, deliberately, because the DDL trail is how an unauthorised
+  -- schema change gets noticed. `ddl` logs no DML and no SELECT, so it leaks no
+  -- request-path parameter. What actually matters is that the roles the REQUEST PATH
+  -- connects as never log statements — satisfied by a cluster `none`, or by a per-role
+  -- `none` (the pattern Supabase itself applies to supabase_admin / _auth_admin /
+  -- _storage_admin, and now to umi_app / umi_worker).
+  ('request-path roles never log statements',
+    (select case
+       when count(*) filter (where not silenced) = 0 and count(*) > 0 then 'PASS'
+       when count(*) = 0 then 'WARN'   -- no request-path role present to judge
+       else 'FAIL' end
+       from (
+         select r.rolname,
+                (select setting from pg_settings where name='log_statement') = 'none'
+                or exists (
+                  select 1 from pg_db_role_setting s
+                   where s.setrole = r.oid
+                     and array_to_string(s.setconfig, ',') ~ 'log_statement=none'
+                ) as silenced
+           from pg_roles r
+          where r.rolcanlogin                        -- a NOLOGIN group logs nothing
+            and not r.rolsuper                       -- superuser is not the request path
+            and (r.rolname in ('api_login','worker_login','umi_app','umi_worker')
+                 or pg_has_role(r.oid, 'api', 'usage')
+                 or pg_has_role(r.oid, 'worker', 'usage'))
+       ) x)),
   -- A cluster-wide 'none' is undone by one `ALTER ROLE api SET log_statement = 'all'`,
   -- which is invisible in pg_settings when read as anyone else.
   ('no role-level override re-enables statement logging',
@@ -240,17 +265,49 @@ select * from (values
        from pg_db_role_setting s
        left join pg_roles r on r.oid = s.setrole
       where array_to_string(s.setconfig, ',') ~ 'log_statement=(all|mod|ddl)'
-        and (r.rolname is null or r.rolname in ('api','worker','readonly')))),
+        and (r.rolname is null or r.rolname in ('api','worker','readonly',
+                                                'api_login','worker_login',
+                                                'umi_app','umi_worker')))),
   -- WARN, NOT FAIL — and deliberately so. -1 means "log bind parameters IN FULL",
-  -- which is the PostgreSQL default. It leaks nothing today because no statement is
-  -- logged at all (the two checks above). It becomes a credential sink the moment
-  -- anyone enables slow-query logging to debug a production incident — which is
-  -- precisely when someone will. 0 disables parameter logging outright, so the
-  -- safe posture survives a future operator turning logging on.
-  -- ⚠️ This is a CLUSTER setting: set it in Supabase and re-run before cutover.
+  -- the PostgreSQL default.
+  --
+  -- ⚠️ DO NOT read the check above as covering this one. `log_statement` and
+  -- `log_min_duration_statement` are INDEPENDENT triggers. Silencing the first does
+  -- nothing about the second: one `log_min_duration_statement = 500ms` — the most
+  -- ordinary thing anyone does while debugging a slow production incident — logs the
+  -- request path's statements again, bind parameters and all. Session tokens, OTP
+  -- hashes and reset tokens all travel as bound parameters.
+  --
+  -- ⚠️ SUPERUSER-GATED ON SUPABASE. Verified 2026-08-06 on xbudk as `postgres`:
+  -- `ALTER DATABASE postgres SET log_parameter_max_length = 0` → permission denied,
+  -- while `ALTER ROLE … SET log_statement` on the same cluster SUCCEEDS. PostgreSQL 15+
+  -- `GRANT SET ON PARAMETER` is what differs; read `pg_parameter_acl` to see which
+  -- parameters the platform actually permits. If this one is ungrantable, pin
+  -- `log_min_duration_statement = -1` per request-path role instead — that closes the
+  -- real path and is BETTER than the global setting, being scoped to the request path.
   ('bind parameters are never logged (log_parameter_max_length = 0)',
     (select case when setting = '0' then 'PASS' else 'WARN' end
        from pg_settings where name = 'log_parameter_max_length')),
+  -- The independent trigger named above. PASS when duration logging is off entirely,
+  -- or pinned off for every request-path role.
+  ('request-path roles are not exposed to duration-based logging',
+    (select case
+       when (select setting from pg_settings where name='log_min_duration_statement') = '-1'
+         then 'PASS'
+       when not exists (
+         select 1 from pg_roles r
+          where r.rolcanlogin
+            and not r.rolsuper
+            and (r.rolname in ('api_login','worker_login','umi_app','umi_worker')
+                 or pg_has_role(r.oid, 'api', 'usage')
+                 or pg_has_role(r.oid, 'worker', 'usage'))
+            and not exists (
+              select 1 from pg_db_role_setting s
+               where s.setrole = r.oid
+                 and array_to_string(s.setconfig, ',') ~ 'log_min_duration_statement=-1'
+            )
+       ) then 'PASS'
+       else 'WARN' end)),
   ('bind parameters are never logged on error',
     (select case when setting = '0' then 'PASS' else 'FAIL' end
        from pg_settings where name = 'log_parameter_max_length_on_error')),
