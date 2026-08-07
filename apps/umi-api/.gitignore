@@ -6,3 +6,8 @@ dist/
 !.env.example
 *.log
 coverage/
+
+# TLS certificates for D4 (SECURITY_GATE.md §4). Mounted read-only into both
+# containers as /certs. Public CA files, not secrets — ignored because they are
+# provisioned per host and must survive deploy.sh's `git reset --hard`.
+certs/

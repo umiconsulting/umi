@@ -29,6 +29,12 @@ export const configSchema = z.object({
   DATABASE_URL_APP: z.string().url(), // umi_app (RLS request role)
   DATABASE_URL_WORKER: z.string().url(), // umi_worker (BYPASSRLS)
   DATABASE_URL_READONLY: z.string().url().optional(), // umi_readonly (analytics)
+  // Postgres root CA — a filesystem path, or the PEM itself. Presence is what
+  // switches TLS on, so LEAVING IT UNSET keeps today's behaviour exactly (local
+  // dev talks plaintext to localhost). Set in production. Do NOT put `sslmode`
+  // in the URLs above: this variable governs TLS, and sslmode=require would
+  // encrypt WITHOUT verifying, which is the failure this exists to prevent.
+  PGSSLROOTCERT: z.string().optional(),
 
   // Redis / BullMQ.
   REDIS_URL: z.string().url(),

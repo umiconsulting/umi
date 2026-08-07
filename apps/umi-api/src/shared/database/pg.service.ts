@@ -5,6 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { readFileSync } from 'node:fs';
 import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 import type { AppConfig } from '../config/config.schema';
 import { getRequestContext } from './request-context';
@@ -21,15 +22,42 @@ import { getRequestContext } from './request-context';
 @Injectable()
 export class PgService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PgService.name);
+  private readonly tlsEnforced: boolean;
   readonly app: Pool;
   readonly worker: Pool;
 
   constructor(config: ConfigService<AppConfig, true>) {
+    // D4 (SECURITY_GATE.md §4) — verify-full TLS to Postgres when a CA is
+    // provisioned; plaintext otherwise, which is what local dev against
+    // localhost wants. `rejectUnauthorized: true` is the whole point: TLS alone
+    // only stops passive reading, and an unverified certificate still lets an
+    // interceptor terminate the connection and read everything in clear. It is
+    // what makes a wrong CA or a wrong hostname FAIL AT CONNECT rather than
+    // succeed quietly.
+    //
+    // Accepts a path or an inline PEM, so the value can come from a mounted file
+    // (how the VPS does it) or straight from the environment.
+    //
+    // The pools carry the café's whole request path across the public internet:
+    // customer phone numbers, orders, loyalty balances, session tokens.
+    const caValue = config.get('PGSSLROOTCERT', { infer: true });
+    const ssl = caValue
+      ? {
+          ca: caValue.includes('BEGIN CERTIFICATE')
+            ? caValue
+            : readFileSync(caValue),
+          rejectUnauthorized: true,
+        }
+      : undefined;
+    this.tlsEnforced = ssl !== undefined;
+
     this.app = new Pool({
       connectionString: config.get('DATABASE_URL_APP', { infer: true }),
+      ssl,
     });
     this.worker = new Pool({
       connectionString: config.get('DATABASE_URL_WORKER', { infer: true }),
+      ssl,
     });
     // pg.Pool emits 'error' for idle clients (DB restart, network drop). Without
     // a listener, that unhandled event would crash the process — log and let the
@@ -49,7 +77,39 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
       this.app.query('SELECT 1'),
       this.worker.query('SELECT 1'),
     ]);
-    this.logger.log('Postgres pools ready (umi_app, umi_worker)');
+
+    if (!this.tlsEnforced) {
+      this.logger.log(
+        'Postgres pools ready (umi_app, umi_worker — no TLS, local/dev)',
+      );
+      return;
+    }
+    // TLS is already enforced at connect: a wrong CA or hostname threw above and
+    // the process never got here. This only confirms the SERVER also reports SSL,
+    // so a silent misconfiguration surfaces at boot rather than in an audit.
+    //
+    // A false report is a WARNING, not a boot failure. Production reaches
+    // Postgres through Supavisor (transaction pooling), and `pg_stat_ssl`
+    // describes the POOLER-to-database leg, not ours. The leg this service is
+    // responsible for — VPS to endpoint, the one crossing the public internet —
+    // is already proven by the handshake.
+    for (const [name, pool] of [
+      ['app', this.app],
+      ['worker', this.worker],
+    ] as const) {
+      const { rows } = await pool.query<{ ssl: boolean }>(
+        'SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()',
+      );
+      if (!rows[0]?.ssl) {
+        this.logger.warn(
+          `${name} pool: server reports no SSL on this backend (pooler leg?); ` +
+            'client→endpoint TLS is still verified by rejectUnauthorized.',
+        );
+      }
+    }
+    this.logger.log(
+      'Postgres pools ready (umi_app, umi_worker — TLS verify-full)',
+    );
   }
 
   async onModuleDestroy(): Promise<void> {
