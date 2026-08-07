@@ -195,7 +195,7 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
    * site (it almost always is: it is usually the method's first argument).
    *
    * Legitimate uses are narrow: work that RESOLVES which merchant a request belongs
-   * to (merchant-by-slug at login, inbound WhatsApp number -> merchant), work that
+   * to (merchant-by-handle at login, inbound WhatsApp number -> merchant), work that
    * is genuinely cross-merchant (outbox draining, cron enumerating active merchants,
    * reconciliation), and the sealed auth substrate.
    */

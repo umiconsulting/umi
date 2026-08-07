@@ -10,7 +10,7 @@ import { UpdateHoursDto } from './dto/update-hours.dto';
 /**
  * Merchant-routed hours façade the dashboard SPA calls
  * (`/api/merchants/:merchantId/conversaflow/hours`). Dispatches directly to the same
- * BusinessHoursService as the slug route, mirroring CashMerchantController. Without it the
+ * BusinessHoursService as the reference-addressed route, mirroring CashMerchantController. Without it the
  * SPA's merchant-routed hours calls 404 against umi-api in cookie mode. The
  * `:merchantId` is resolved + membership-checked by the same guard stack.
  */

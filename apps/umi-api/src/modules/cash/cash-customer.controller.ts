@@ -27,13 +27,13 @@ const WINDOW = 15 * 60 * 1000; // 15 min, all gift limits
 
 /**
  * PUBLIC customer self-service (no login): registration + gift-card lookup/redeem.
- * PublicMerchantGuard resolves `:slug` → merchant and seeds the RLS context so the
+ * PublicMerchantGuard resolves `:merchantRef` → merchant and seeds the RLS context so the
  * merchant-scoped repos work without an auth-set context. Abuse control is the
  * ported per-IP + per-code rate limiter (the only guard on these money-adjacent
  * routes). Merchant-not-found uses umi-cash's `Merchant no encontrado` body.
  */
 @UseGuards(PublicMerchantGuard)
-@Controller('api/:slug')
+@Controller('api/:merchantRef')
 export class CashCustomerController {
   constructor(
     private readonly register: CashRegisterService,

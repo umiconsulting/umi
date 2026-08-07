@@ -15,7 +15,7 @@ import { CashReadService } from './cash-read.service';
  */
 @UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard)
 @RequireProduct('cash')
-@Controller('api/:slug/admin')
+@Controller('api/:merchantRef/admin')
 export class CashController {
   constructor(private readonly cash: CashReadService) {}
 

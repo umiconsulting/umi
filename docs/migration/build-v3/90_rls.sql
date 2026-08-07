@@ -170,6 +170,30 @@ grant  select (id, email, full_name, status, last_login_at, created_at, updated_
 --   because api holds no table-level INSERT here to override it.
 grant  insert (email, full_name, status) on umi.user to api;
 
+-- ---- The wallet web-service token is a bearer secret, not a merchant fact ----
+--   merchant.loyalty_wallet_pass.web_service_token is Apple's `authenticationToken`,
+--   signed into the .pkpass and replayed on every callback. Holding it is sufficient to
+--   read a customer's card and re-download their pass. Apple's call arrives with NO
+--   session and NO merchant context, so it is served by the worker pool, never by api.
+--   Same generated form as the UPDATE lock above: a table-level SELECT covers every
+--   column, so the column must be subtracted by revoking the table grant and granting
+--   the rest back.
+do $$
+declare cols text;
+begin
+  select string_agg(quote_ident(column_name), ', ' order by ordinal_position)
+    into cols
+    from information_schema.columns
+   where table_schema = 'merchant'
+     and table_name   = 'loyalty_wallet_pass'
+     and column_name <> 'web_service_token';
+  execute 'revoke select on merchant.loyalty_wallet_pass from api, readonly';
+  execute format('grant select (%s) on merchant.loyalty_wallet_pass to api, readonly', cols);
+  execute 'revoke insert, update on merchant.loyalty_wallet_pass from api';
+  execute format('grant insert (%s), update (%s) on merchant.loyalty_wallet_pass to api',
+                 cols, cols);
+end $$;
+
 -- ---- Append-only audit: nobody (not even worker) updates/deletes an audit row ----
 revoke update, delete on umi.audit_log, merchant.audit_log from api, worker, readonly;
 

@@ -39,8 +39,11 @@
 
 -- Set INSIDE the file, the way security_gate.sql does, and not left to the caller.
 -- Without it psql PRINTS an exception and then carries on to the next statement, exiting
--- 0 — so the guard below would report a missing address and seed the roles anyway. The
--- pipeline (00_run_backfill.sh) passes the flag; a hand-run `psql -f` would not.
+-- 0 — so the guard below would report a missing address and seed the roles anyway.
+--
+-- 00_run_backfill.sh passes the flag from $BOOTSTRAP_EMAIL. It did NOT when this guard
+-- first landed, which broke the whole rehearsal pipeline at this step; the guard was
+-- right and the caller was never updated.
 \set ON_ERROR_STOP on
 
 -- `\quit` always exits 0, so it cannot fail this script on its own. The \if prints a

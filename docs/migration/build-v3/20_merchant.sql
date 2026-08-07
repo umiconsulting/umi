@@ -25,6 +25,25 @@ create table merchant.merchant (
   id                uuid primary key default gen_random_uuid(),
   name              text not null,
   legal_name        text,
+  -- The URL key, and the ONLY thing left of the old `slug`. Everything routes by `id`;
+  -- this exists because four things already published a café's name inside a URL and
+  -- cannot be recalled:
+  --   1. 350 Apple Wallet passes are installed on customers' phones. A .pkpass is a
+  --      SIGNED bundle and its `webServiceURL` is frozen at generation time, so every
+  --      one of them will call /api/{handle}/passes/apple forever. Apple does not
+  --      require the café in that path — the serial number identifies the card — so
+  --      this dependency is self-inflicted, and NEW passes need not repeat it. It is
+  --      still permanent for the passes already issued.
+  --   2. umi-cash serves its whole customer site under /{handle}/... .
+  --   3. Brand assets are files named /logos/{handle}-wallet-logo.png.
+  --   4. The dashboard prints umi.app/{handle} as the café's public address.
+  --
+  -- NULLABLE and NOT auto-assigned, which is the difference between this and `slug`.
+  -- A café created after cutover gets no handle and is reached by id; a handle appears
+  -- only when somebody publishes a URL that has to keep working. The column is designed
+  -- to stop growing.
+  handle            text unique
+                      check (handle is null or handle ~ '^[a-z0-9][a-z0-9-]{1,62}$'),
   city              text,
   timezone          text not null default 'America/Mexico_City',
   currency          text not null default 'MXN',
@@ -116,6 +135,22 @@ create table merchant.location (
   merchant_id  uuid not null references merchant.merchant(id) on delete cascade,
   name         text not null,
   address      text,
+  -- How a customer may pay AT THIS COUNTER, in the order the bot should say them.
+  -- Umi takes no money online: an order arrives on WhatsApp and is paid in person, so
+  -- this is a fact about the physical place, exactly like `address` one line up.
+  --
+  -- It lived on the merchant until now, and that was demonstrably the wrong home:
+  -- Kalala has two locations and the merchant-level config carried ONE address and ONE
+  -- payment list, so every customer who chose Congreso was told the Chapultepec
+  -- address. A merchant-level answer to a per-location question is not a shortcut, it
+  -- is a wrong answer.
+  --
+  -- NOT NULL with an empty default, deliberately NOT the nullable-inherit rule that
+  -- `timezone` and `open_hours` below use. For an array that rule is ambiguous —
+  -- NULL would mean "ask the café" while '{}' would mean "accepts nothing", and no
+  -- caller can act on that difference. Empty simply means "not recorded", and the bot
+  -- says so.
+  payment_methods text[] not null default '{}',
   lat          numeric(9,6),          -- captured pin (all prod locations have coords); not derived
   lng          numeric(10,6),
   timezone     text,                  -- null = inherit merchant.timezone
@@ -138,6 +173,20 @@ create table merchant.location (
   open_hours   jsonb                  -- null = inherit merchant.open_hours
                  check (open_hours is null or jsonb_typeof(open_hours) = 'object'),
   status       text not null default 'active' check (status in ('active','closed')),
+  -- What the customer CALLS this place, which is rarely its registered name. The bot
+  -- resolves free text ("chapu") to a location ("Chapultepec"), and the owner curates the
+  -- nicknames it should also accept. Written by the dashboard's Sucursales editor.
+  --
+  -- These were dropped from the first build-v3 draft as "empty" — and they are empty, in
+  -- a café that has one location and no reason to nickname it. That reasoning read the
+  -- DATA and not the WRITER: the editor ships, it saves aliases and descriptor, and the
+  -- columns simply were not there to receive them. Empty is not the same as unused.
+  aliases      text[] not null default '{}',
+  descriptor   text,                  -- a human hint for disambiguation ("la del centro")
+  -- Stored, not computed per query, because the trigram index below has to be built on
+  -- the same expression the query scores against.
+  search_text  text generated always as
+                 (merchant.location_search_text(name, aliases)) stored,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
   -- Redundant against the PK, and load-bearing: it lets child tables carry a COMPOSITE
@@ -146,6 +195,11 @@ create table merchant.location (
   -- exact failure this prevents.
   unique (merchant_id, id)
 );
+
+-- The fuzzy half of location resolution. word_similarity() is only fast with this index;
+-- without it every customer message that names a location sequentially scans.
+create index location_search_text_trgm
+  on merchant.location using gin (search_text extensions.gin_trgm_ops);
 -- Search via expression index, NOT a stored search_text column.
 create index location_name_lower on merchant.location (lower(name));
 comment on column merchant.location.open_hours is
@@ -616,11 +670,24 @@ create table merchant.loyalty_wallet_pass (
   card_id            uuid not null references merchant.loyalty_card(id) on delete cascade,
   platform           text not null check (platform in ('apple','google')),
   external_object_id text,          -- Google object id / Apple serial
+  -- Apple's `authenticationToken`. It is SIGNED INTO the .pkpass at generation
+  -- (pass-apple.ts:117) and sent back on every web-service call as
+  -- `Authorization: ApplePass <token>`. The server must hold the SAME value or the
+  -- call is refused, so this CANNOT be regenerated for a pass already on a phone —
+  -- the copy in the customer's Wallet is immutable. Carry it verbatim at cutover.
+  -- Null for Google, which pushes updates and never calls back.
+  -- It is a bearer secret: column-locked away from the request path in 90_rls.
+  web_service_token  text,
   status             text not null default 'active' check (status in ('active','removed')),
   created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now(),
   unique (card_id, platform)
 );
+-- The web service authenticates by (serial, token) with no session and no merchant
+-- context — Apple knows neither. This is the lookup that call makes.
+create unique index loyalty_wallet_pass_apple_serial_uidx
+  on merchant.loyalty_wallet_pass (external_object_id)
+  where platform = 'apple' and external_object_id is not null;
 
 -- ----------------------------------------------------------------------------
 -- COMMERCE  (generic — no "menu")

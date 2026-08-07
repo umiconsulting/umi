@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "1ae9a338439bdd9756f1dceec5a99cb73dcdc7d965c4af7799bb3a4dab507077",
+  "contentHash": "76109b14503bbfd423459e7172bdaf3ba5b2eb24d255f690152d36b71f90264f",
   "contractVersion": "2.0.0",
   "definitions": {
     "AcknowledgeReconciliationRequest": {
@@ -6401,6 +6401,12 @@
           "items": {
             "additionalProperties": false,
             "properties": {
+              "handle": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "id": {
                 "type": "string"
               },
@@ -6413,9 +6419,6 @@
                 },
                 "type": "array"
               },
-              "slug": {
-                "type": "string"
-              },
               "timezone": {
                 "type": [
                   "string",
@@ -6425,7 +6428,7 @@
             },
             "required": [
               "id",
-              "slug",
+              "handle",
               "name",
               "roles",
               "timezone"
@@ -6549,6 +6552,12 @@
     "MerchantMembership": {
       "additionalProperties": false,
       "properties": {
+        "handle": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -6560,14 +6569,11 @@
             "type": "string"
           },
           "type": "array"
-        },
-        "slug": {
-          "type": "string"
         }
       },
       "required": [
         "id",
-        "slug",
+        "handle",
         "name",
         "roles"
       ],
@@ -6576,6 +6582,12 @@
     "MerchantSummary": {
       "additionalProperties": false,
       "properties": {
+        "handle": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -6587,9 +6599,6 @@
             "type": "string"
           },
           "type": "array"
-        },
-        "slug": {
-          "type": "string"
         },
         "timezone": {
           "type": [
@@ -6600,7 +6609,7 @@
       },
       "required": [
         "id",
-        "slug",
+        "handle",
         "name",
         "roles",
         "timezone"
@@ -9483,6 +9492,12 @@
           "items": {
             "additionalProperties": false,
             "properties": {
+              "handle": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "id": {
                 "type": "string"
               },
@@ -9494,14 +9509,11 @@
                   "type": "string"
                 },
                 "type": "array"
-              },
-              "slug": {
-                "type": "string"
               }
             },
             "required": [
               "id",
-              "slug",
+              "handle",
               "name",
               "roles"
             ],
@@ -9575,6 +9587,12 @@
               "items": {
                 "additionalProperties": false,
                 "properties": {
+                  "handle": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "id": {
                     "type": "string"
                   },
@@ -9586,14 +9604,11 @@
                       "type": "string"
                     },
                     "type": "array"
-                  },
-                  "slug": {
-                    "type": "string"
                   }
                 },
                 "required": [
                   "id",
-                  "slug",
+                  "handle",
                   "name",
                   "roles"
                 ],
@@ -14112,6 +14127,12 @@
           "items": {
             "additionalProperties": false,
             "properties": {
+              "handle": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "id": {
                 "type": "string"
               },
@@ -14123,14 +14144,11 @@
                   "type": "string"
                 },
                 "type": "array"
-              },
-              "slug": {
-                "type": "string"
               }
             },
             "required": [
               "id",
-              "slug",
+              "handle",
               "name",
               "roles"
             ],
@@ -14187,6 +14205,12 @@
               "items": {
                 "additionalProperties": false,
                 "properties": {
+                  "handle": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "id": {
                     "type": "string"
                   },
@@ -14198,14 +14222,11 @@
                       "type": "string"
                     },
                     "type": "array"
-                  },
-                  "slug": {
-                    "type": "string"
                   }
                 },
                 "required": [
                   "id",
-                  "slug",
+                  "handle",
                   "name",
                   "roles"
                 ],
@@ -15526,7 +15547,7 @@
       "request": "ReplayContextQuery",
       "response": "ReplayCursor"
     },
-    "PATCH /api/:slug/admin/staff/:staffId": {
+    "PATCH /api/:merchantRef/admin/staff/:staffId": {
       "approval": false,
       "auth": "session",
       "errors": [
@@ -15560,7 +15581,7 @@
       "request": "CartLineInput",
       "response": "Cart"
     },
-    "POST /api/:slug/admin/gift-cards": {
+    "POST /api/:merchantRef/admin/gift-cards": {
       "approval": false,
       "auth": "session",
       "errors": [
@@ -15576,7 +15597,7 @@
       "request": "GiftCardCreateRequest",
       "response": null
     },
-    "POST /api/:slug/admin/purchase": {
+    "POST /api/:merchantRef/admin/purchase": {
       "approval": false,
       "auth": "session",
       "errors": [
@@ -15593,7 +15614,7 @@
       "request": "PurchaseRequest",
       "response": null
     },
-    "POST /api/:slug/admin/scan": {
+    "POST /api/:merchantRef/admin/scan": {
       "approval": false,
       "auth": "session",
       "errors": [
@@ -15610,7 +15631,7 @@
       "request": "ScanRequest",
       "response": null
     },
-    "POST /api/:slug/admin/staff": {
+    "POST /api/:merchantRef/admin/staff": {
       "approval": false,
       "auth": "session",
       "errors": [
@@ -15626,7 +15647,7 @@
       "request": "CreateStaffRequest",
       "response": null
     },
-    "POST /api/:slug/admin/topup": {
+    "POST /api/:merchantRef/admin/topup": {
       "approval": false,
       "auth": "session",
       "errors": [
@@ -15643,7 +15664,7 @@
       "request": "TopupRequest",
       "response": null
     },
-    "POST /api/:slug/customers": {
+    "POST /api/:merchantRef/customers": {
       "approval": false,
       "auth": "public",
       "errors": [
@@ -15659,7 +15680,7 @@
       "request": "RegisterMemberRequest",
       "response": null
     },
-    "POST /api/:slug/gift/:code": {
+    "POST /api/:merchantRef/gift/:code": {
       "approval": false,
       "auth": "public",
       "errors": [

@@ -4,7 +4,7 @@ import { XSep } from '@/shell.jsx';
 import { useMembersData } from '@/data.jsx';
 
 // Screen 7 — Miembros / Loyalty Members
-// Data: umi-cash GET /api/[slug]/admin/customers (role: CUSTOMER)
+// Data: umi-cash GET /api/[merchantRef]/admin/customers (role: CUSTOMER)
 // Schema: User + LoyaltyCard (balanceCentavos, totalVisits, visitsThisCycle, pendingRewards)
 
 const MembersScreen = () => {
@@ -242,7 +242,7 @@ const MembersScreen = () => {
             fontFamily: 'var(--font-mono)',
           }}
         >
-          GET /api/:slug/admin/customers
+          GET /api/:merchantRef/admin/customers
         </span>
       </div>
 

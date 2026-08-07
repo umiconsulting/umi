@@ -27,6 +27,13 @@ create extension if not exists vector schema extensions;   -- pgvector -> runtim
 -- search_path can never decide which implementation a security-definer trigger gets.
 create extension if not exists pgcrypto schema extensions;
 -- gen_random_uuid() is core in PG13+ (pg_catalog); no extension needed.
+-- Location resolution: the WhatsApp bot matches free customer text ("chapu") against a
+-- café's locations ("Chapultepec"). Two votes, and each needs one of these — a literal
+-- match on accent-stripped text (unaccent) and a word_similarity fuzzy score (pg_trgm).
+-- Both live in prod already; build-v3 simply had not carried them, so every location
+-- statement that scores a name would have failed at parse time.
+create extension if not exists pg_trgm  schema extensions;
+create extension if not exists unaccent schema extensions;
 
 -- Putting pgvector in its own schema is right, but it is only half the job: with no
 -- USAGE grant and `extensions` off the search_path, EVERY vector operation in the
@@ -125,4 +132,27 @@ create or replace function merchant.normalize_identity(p_channel text, p_value t
     when p_channel = 'email'                         then lower(btrim(p_value))
     else nullif(btrim(p_value), '')
   end;
+$$;
+
+-- Accent-stripping, marked IMMUTABLE so it can sit in a generated column and an index.
+-- `unaccent()` on its own is only STABLE — it reads a text-search dictionary that an
+-- operator could in principle replace — so PostgreSQL refuses it in both places. Pinning
+-- the dictionary by name and asserting immutability is the standard answer, and it is
+-- what prod already does (core.f_unaccent).
+create or replace function merchant.unaccent(p_text text) returns text
+  language sql immutable strict parallel safe
+  set search_path = pg_catalog as $$
+  select extensions.unaccent('extensions.unaccent'::regdictionary, p_text)
+$$;
+
+-- The text the bot matches a location against: its name plus the owner's aliases, all
+-- lowercased and accent-stripped. Kept as ONE function so the stored column and any ad
+-- hoc query cannot disagree about what "searchable" means.
+create or replace function merchant.location_search_text(p_name text, p_aliases text[])
+  returns text
+  language sql immutable parallel safe
+  set search_path = pg_catalog as $$
+  select lower(merchant.unaccent(
+    coalesce(p_name, '') || ' ' || coalesce(array_to_string(p_aliases, ' '), '')
+  ))
 $$;

@@ -10,7 +10,7 @@ import { CustomersService } from './customers.service';
  * no product gate, matching server.js. Reads `merchant.conversation` + `merchant.customer`.
  */
 @UseGuards(AuthGuard, MerchantAccessGuard)
-@Controller('api/:slug/admin/conversations')
+@Controller('api/:merchantRef/admin/conversations')
 export class ConversationsController {
   constructor(private readonly customers: CustomersService) {}
 
