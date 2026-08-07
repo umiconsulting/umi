@@ -17,6 +17,22 @@ services:
     env_file: .env
     environment:
       - NODE_ENV=production
+    volumes:
+      # D4 (SECURITY_GATE.md §4) — the CA that verifies the Postgres endpoint.
+      # Read-only, and mounted rather than baked into the image: a certificate
+      # rotates on the provider's schedule, not on ours, and rebuilding the image
+      # to replace one would tie a TLS renewal to a deploy.
+      #
+      # WHY ./certs AND NOT /etc/umi: deploy.sh runs `git reset --hard` on the
+      # checkout before every `compose up`, so a host path outside the repo is
+      # invisible to the container and a path inside a TRACKED directory is wiped.
+      # ./certs is gitignored, so it survives the reset, and it sits beside the
+      # .env that names it.
+      #
+      # The directory must exist on the host before `compose up` — Docker silently
+      # creates a DIRECTORY at a missing bind-mount source, and readFileSync on a
+      # directory fails the boot with EISDIR.
+      - ./certs:/certs:ro
     expose:
       - "3000"
     depends_on:
@@ -34,6 +50,11 @@ services:
     env_file: .env
     environment:
       - NODE_ENV=production
+    volumes:
+      # Same CA. The worker opens its own pools from the same PGSSLROOTCERT, so
+      # mounting it on only one service would boot the web container and fail the
+      # worker — with the queue silently not draining.
+      - ./certs:/certs:ro
     depends_on:
       redis:
         condition: service_healthy
