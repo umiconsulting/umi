@@ -7,7 +7,8 @@ export interface AuthUser {
 /** Resolved merchant membership attached by MerchantAccessGuard. */
 export interface MerchantAccess {
   merchantId: string;
-  slug: string;
+  /** The published URL key. Null for a café created after cutover — route by id. */
+  handle: string | null;
   name: string;
   timezone: string | null;
   // null for a synthesized global-super_admin access (no explicit edge in this
@@ -15,7 +16,7 @@ export interface MerchantAccess {
   membershipId: string | null;
   role: string | null;
   roles: string[];
-  permissions: string[]; // ['*'] for super_admin
+  permissions: string[];
 }
 
 /**

@@ -7,6 +7,10 @@ export type { Routes } from './routes';
 // surfaces can import it directly.
 export { ROUTE_TABLE, route, routePath, buildPath, merchantBase } from './route-table';
 export type { RouteDef, RouteContract, RouteId, HttpMethod, AuthMode } from './route-table';
+// The one rule for a customer-typed phone number, shared by the zod schema here and
+// the class-validator DTO in umi-api so the two cannot drift.
+export { nationalDigitsAreValid, splitPhone, phoneLengthMessage } from './phone';
+export type { PhoneParts } from './phone';
 export * from './schemas';
 // Cross-cutting vocabulary (money, ids, pagination, errors, tenancy) shared by every
 // surface. Also published as '@umi/contract/platform'.

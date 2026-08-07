@@ -21,7 +21,7 @@ import { CustomerSessionService } from './customer-session.service';
  * writes on canonical loyalty.*: top-up, purchase, gift-card issue/redeem, the
  * loyalty scan (visit/redeem/birthday), and customer self-registration. Staff
  * routes are dashboard-auth gated; the gift redeem/info + registration routes
- * are public (slug-resolved, rate-limited). QrService/WalletPassAdapter/
+ * are public (handle-resolved, rate-limited). QrService/WalletPassAdapter/
  * RateLimitService come from global modules.
  */
 @Module({

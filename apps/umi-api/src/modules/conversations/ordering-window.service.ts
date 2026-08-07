@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { MerchantConfigService } from './merchant-config.service';
+import { MerchantsRepository } from '../merchants/merchants.repository';
 import { BusinessHoursService } from '../business-hours/business-hours.service';
 import {
   activeWindowAt,
@@ -134,6 +135,7 @@ export class OrderingWindowService {
   constructor(
     private readonly hours: BusinessHoursService,
     private readonly merchantConfig: MerchantConfigService,
+    private readonly merchants: MerchantsRepository,
   ) {}
 
   async getMerchantInfo(
@@ -154,12 +156,17 @@ export class OrderingWindowService {
       this.merchantConfig.fetchConfigRow(merchantId),
     ]);
     const config = row?.config ?? {};
+    // The SAME location the hours came from — the customer is told one café's address,
+    // hours and payment methods, so they must all describe one counter.
+    const contact = bot.locationId
+      ? await this.merchants.locationContactWorker(merchantId, bot.locationId)
+      : null;
 
     return {
       name: row?.name ?? 'el café',
-      address: config.address ?? null,
+      address: contact?.address ?? null,
       whatsapp: config.whatsapp ?? null,
-      paymentMethods: config.payment_methods ?? [],
+      paymentMethods: contact?.paymentMethods ?? [],
       timezone: bot.timezone,
       weeklyHours: buildWeeklyHours(bot.hours),
       acceptsWhatsappOrders: bot.ordering.acceptsOrders,

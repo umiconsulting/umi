@@ -46,6 +46,14 @@ export interface BotHours {
    */
   hours: OpenHours;
   ordering: OrderingSettings;
+  /**
+   * WHICH location answered. Returned rather than kept private because the bot quotes
+   * the address, the hours and the payment methods in one breath, and they must all
+   * describe the SAME counter. The caller cannot re-derive it: this is the resolved id
+   * (the requested location, else the café's oldest active one), not what was asked for.
+   * Null when the café has no active location at all.
+   */
+  locationId: string | null;
 }
 
 /**
@@ -161,6 +169,6 @@ export class BusinessHoursService {
       this.ordering.readWorker(merchantId),
       this.merchants.getMerchantTimezoneWorker(merchantId),
     ]);
-    return { timezone: tz || DEFAULT_TZ, hours: effective.hours, ordering };
+    return { timezone: tz || DEFAULT_TZ, hours: effective.hours, ordering, locationId };
   }
 }

@@ -435,12 +435,12 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     dart: null,
   },
 
-  // ── Cash / loyalty, slug-scoped (umi-cash frontend) ────────────────────────
+  // ── Cash / loyalty, addressed by merchant reference (umi-cash frontend) ────
   {
-    id: 'cash.slug.scan',
+    id: 'cash.byRef.scan',
     method: 'POST',
-    path: '/api/:slug/admin/scan',
-    params: ['slug'],
+    path: '/api/:merchantRef/admin/scan',
+    params: ['merchantRef'],
     dart: null,
     contract: {
       request: 'ScanRequest',
@@ -457,10 +457,10 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     },
   },
   {
-    id: 'cash.slug.topup',
+    id: 'cash.byRef.topup',
     method: 'POST',
-    path: '/api/:slug/admin/topup',
-    params: ['slug'],
+    path: '/api/:merchantRef/admin/topup',
+    params: ['merchantRef'],
     dart: null,
     contract: {
       request: 'TopupRequest',
@@ -477,10 +477,10 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     },
   },
   {
-    id: 'cash.slug.purchase',
+    id: 'cash.byRef.purchase',
     method: 'POST',
-    path: '/api/:slug/admin/purchase',
-    params: ['slug'],
+    path: '/api/:merchantRef/admin/purchase',
+    params: ['merchantRef'],
     dart: null,
     contract: {
       request: 'PurchaseRequest',
@@ -497,10 +497,10 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     },
   },
   {
-    id: 'cash.slug.giftCards',
+    id: 'cash.byRef.giftCards',
     method: 'POST',
-    path: '/api/:slug/admin/gift-cards',
-    params: ['slug'],
+    path: '/api/:merchantRef/admin/gift-cards',
+    params: ['merchantRef'],
     dart: null,
     contract: {
       request: 'GiftCardCreateRequest',
@@ -517,38 +517,38 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     },
   },
   {
-    id: 'cash.slug.settings',
+    id: 'cash.byRef.settings',
     method: 'GET',
-    path: '/api/:slug/admin/settings',
-    params: ['slug'],
+    path: '/api/:merchantRef/admin/settings',
+    params: ['merchantRef'],
     dart: null,
   },
   {
-    id: 'cash.slug.rewardConfig',
+    id: 'cash.byRef.rewardConfig',
     method: 'GET',
-    path: '/api/:slug/admin/reward-config',
-    params: ['slug'],
+    path: '/api/:merchantRef/admin/reward-config',
+    params: ['merchantRef'],
     dart: null,
   },
   {
-    id: 'cash.slug.stats',
+    id: 'cash.byRef.stats',
     method: 'GET',
-    path: '/api/:slug/admin/stats',
-    params: ['slug'],
+    path: '/api/:merchantRef/admin/stats',
+    params: ['merchantRef'],
     dart: null,
   },
   {
-    id: 'cash.slug.analytics',
+    id: 'cash.byRef.analytics',
     method: 'GET',
-    path: '/api/:slug/admin/analytics',
-    params: ['slug'],
+    path: '/api/:merchantRef/admin/analytics',
+    params: ['merchantRef'],
     dart: null,
   },
   {
-    id: 'cash.slug.registerMember',
+    id: 'cash.byRef.registerMember',
     method: 'POST',
-    path: '/api/:slug/customers',
-    params: ['slug'],
+    path: '/api/:merchantRef/customers',
+    params: ['merchantRef'],
     dart: null,
     contract: {
       request: 'RegisterMemberRequest',
@@ -565,10 +565,10 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     },
   },
   {
-    id: 'cash.slug.gift',
+    id: 'cash.byRef.gift',
     method: 'POST',
-    path: '/api/:slug/gift/:code',
-    params: ['slug', 'code'],
+    path: '/api/:merchantRef/gift/:code',
+    params: ['merchantRef', 'code'],
     dart: null,
     contract: {
       request: 'GiftRedeemRequest',
@@ -589,8 +589,8 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
   {
     id: 'staff.create',
     method: 'POST',
-    path: '/api/:slug/admin/staff',
-    params: ['slug'],
+    path: '/api/:merchantRef/admin/staff',
+    params: ['merchantRef'],
     dart: null,
     contract: {
       request: 'CreateStaffRequest',
@@ -609,8 +609,8 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
   {
     id: 'staff.update',
     method: 'PATCH',
-    path: '/api/:slug/admin/staff/:staffId',
-    params: ['slug', 'staffId'],
+    path: '/api/:merchantRef/admin/staff/:staffId',
+    params: ['merchantRef', 'staffId'],
     dart: null,
     contract: {
       request: 'UpdateStaffRequest',

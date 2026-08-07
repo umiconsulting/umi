@@ -4,8 +4,14 @@
 begin;
 
 -- 1. merchant <- core.tenants
-insert into merchant.merchant (id, name, timezone, status, created_at, updated_at)
-select t.id, t.name, coalesce(t.timezone,'America/Mexico_City'),
+--   slug -> handle, and this carry is NOT cosmetic. Every one of the 350 Apple Wallet
+--   passes installed on a customer's phone has /api/{slug}/passes/apple SIGNED into it
+--   and cannot be re-pointed; umi-cash serves its customer site under /{slug}/; the
+--   logo files are named /logos/{slug}-*.png. A handle that does not match its source
+--   slug EXACTLY is a café whose wallet passes stop updating, silently, forever.
+--   reconcile_v3 asserts that equality rather than trusting this line.
+insert into merchant.merchant (id, handle, name, timezone, status, created_at, updated_at)
+select t.id, t.slug, t.name, coalesce(t.timezone,'America/Mexico_City'),
        case when t.status='suspended' then 'suspended' else 'active' end,
        t.created_at, coalesce(t.updated_at, t.created_at)
 from core.tenants t;

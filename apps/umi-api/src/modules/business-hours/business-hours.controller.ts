@@ -13,7 +13,7 @@ import { UpdateHoursDto } from './dto/update-hours.dto';
  * location is resolved from `?locationId` or the merchant default.
  */
 @UseGuards(AuthGuard, MerchantAccessGuard)
-@Controller('api/:slug/admin/hours')
+@Controller('api/:merchantRef/admin/hours')
 export class BusinessHoursController {
   constructor(
     private readonly hours: BusinessHoursService,

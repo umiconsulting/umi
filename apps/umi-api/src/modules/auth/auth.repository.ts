@@ -29,7 +29,8 @@ export interface UserSummary {
 
 export interface MerchantMembershipSummary {
   id: string;
-  slug: string;
+  /** The published URL key. Null for a café created after cutover — route by `id`. */
+  handle: string | null;
   name: string;
   roles: string[];
 }
@@ -40,7 +41,8 @@ export interface MembershipAccess {
   // informational membership id — never a DB write key.
   membershipId: string | null;
   merchantId: string;
-  slug: string;
+  /** The published URL key. Null for a café created after cutover — route by `id`. */
+  handle: string | null;
   name: string;
   timezone: string | null;
   roles: string[];
@@ -78,10 +80,15 @@ export interface ResetTokenRecord {
  *   umi.user_role    the PLATFORM grant, and nothing else: Umi's own operators, who
  *                    are employees of no café.
  *
- * STILL PENDING (P5, "route by id"): `merchantIdForSlug` / `merchantBySlug` read the
- * dropped `slug` column, and the queries above return the merchant id AS "slug" as an
- * interim. Closing both halves changes the /me/merchants + merchant-access API contract,
- * so it lands as a coordinated @umi/contract release with the dashboard.
+ * ROUTING (P5, done). Everything routes by `id`. `merchant.handle` is the published URL
+ * key and nothing else — see the column comment in 20_merchant.sql for the four things
+ * that already published a café's name inside a URL. The resolvers below accept a handle
+ * because those URLs exist, not because a handle is an identifier.
+ *
+ * The interim this replaced returned the merchant ID under the name "slug", which was
+ * worse than it looked: the dashboard prints that value as the café's public address and
+ * builds /logos/{value}-wallet-logo.png from it, so both had been showing and fetching a
+ * uuid. Neither failed loudly.
  */
 @Injectable()
 export class AuthRepository {
@@ -247,7 +254,7 @@ export class AuthRepository {
       `WITH ${PLATFORM_GRANT_CTE}
        SELECT
          t.id::text AS "id",
-         t.id::text AS "slug",
+         t.handle   AS "handle",
          t.name     AS "name",
          COALESCE(array_agg(r.key) FILTER (WHERE r.key IS NOT NULL),
                   ARRAY[(SELECT platform_role FROM sa)]) AS "roles"
@@ -257,7 +264,7 @@ export class AuthRepository {
        LEFT JOIN umi.role AS r ON r.id = s.role_id
        WHERE t.status = 'active'
          AND (s.id IS NOT NULL OR ${HAS_PLATFORM_GRANT})
-       GROUP BY t.id, t.name
+       GROUP BY t.id, t.handle, t.name
        ORDER BY t.name`,
       [userId],
     );
@@ -295,7 +302,7 @@ export class AuthRepository {
        SELECT
          (SELECT id::text FROM grants ORDER BY id LIMIT 1) AS "membershipId",
          t.id::text  AS "merchantId",
-         t.id::text  AS "slug",
+         t.handle    AS "handle",
          t.name      AS "name",
          t.timezone  AS "timezone",
          COALESCE((SELECT array_agg(role_key) FROM grants),
@@ -321,20 +328,39 @@ export class AuthRepository {
     return rows[0] ?? null;
   }
 
-  /** Resolve a merchant id from its slug (for the legacy `/:slug/...` routes). */
-  async merchantIdForSlug(slug: string): Promise<string | null> {
+  /**
+   * Resolve a merchant id from its published handle, for the `/api/:handle/...` routes
+   * that umi-cash and every issued wallet pass already call.
+   */
+  async merchantIdForHandle(handle: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ id: string }>(
-      `SELECT id::text AS id FROM merchant.merchant WHERE slug = $1 LIMIT 1`,
-      [slug],
+      `SELECT id::text AS id FROM merchant.merchant WHERE handle = $1 LIMIT 1`,
+      [handle],
     );
     return rows[0]?.id ?? null;
   }
 
-  /** Resolve merchant id + name from a slug (public routes need the name). */
-  async merchantBySlug(slug: string): Promise<{ id: string; name: string; slug: string } | null> {
-    const { rows } = await this.pg.query<{ id: string; name: string; slug: string }>(
-      `SELECT id::text AS id, name, slug FROM merchant.merchant WHERE slug = $1 LIMIT 1`,
-      [slug],
+  /** Resolve merchant id + name from a handle (public routes need the name). */
+  async merchantByHandle(
+    handle: string,
+  ): Promise<{ id: string; name: string; handle: string | null } | null> {
+    const { rows } = await this.pg.query<{ id: string; name: string; handle: string | null }>(
+      `SELECT id::text AS id, name, handle FROM merchant.merchant WHERE handle = $1 LIMIT 1`,
+      [handle],
+    );
+    return rows[0] ?? null;
+  }
+
+  /**
+   * The same lookup by id — the path a café created after cutover takes, because it has
+   * no handle to be found by.
+   */
+  async merchantById(
+    id: string,
+  ): Promise<{ id: string; name: string; handle: string | null } | null> {
+    const { rows } = await this.pg.query<{ id: string; name: string; handle: string | null }>(
+      `SELECT id::text AS id, name, handle FROM merchant.merchant WHERE id = $1::uuid LIMIT 1`,
+      [id],
     );
     return rows[0] ?? null;
   }

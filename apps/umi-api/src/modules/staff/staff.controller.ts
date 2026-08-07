@@ -19,11 +19,11 @@ import { CreateStaffDto, UpdateStaffDto } from './dto/staff.dto';
 
 /**
  * Staff CRUD over `merchant.staff`. Slug-routed; MerchantAccessGuard resolves
- * the slug → merchant and verifies membership (no membership check existed in
+ * the reference → merchant and verifies membership (no membership check existed in
  * server.js — hardened here). No product entitlement gate, matching server.js.
  */
 @UseGuards(AuthGuard, MerchantAccessGuard)
-@Controller('api/:slug/admin/staff')
+@Controller('api/:merchantRef/admin/staff')
 export class StaffController {
   constructor(private readonly staff: StaffService) {}
 

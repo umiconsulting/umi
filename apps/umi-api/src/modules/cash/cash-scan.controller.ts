@@ -19,7 +19,7 @@ const STAFF_ROLES = ['super_admin', 'owner', 'admin', 'staff'];
 @UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard, RolesGuard)
 @RequireProduct('cash')
 @Roles(...STAFF_ROLES)
-@Controller('api/:slug/admin/scan')
+@Controller('api/:merchantRef/admin/scan')
 export class CashScanController {
   constructor(private readonly scan: CashScanService) {}
 

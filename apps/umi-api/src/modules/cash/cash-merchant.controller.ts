@@ -9,10 +9,10 @@ import { CashReadService } from './cash-read.service';
 
 /**
  * Merchant-scoped cash façade the dashboard SPA calls (`/api/merchants/:merchantId/cash/*`).
- * server.js exposes the same surface by 307-redirecting these to `/api/:slug/admin/*`;
+ * server.js exposes the same surface by 307-redirecting these to `/api/:merchantRef/admin/*`;
  * we dispatch directly to CashReadService instead (one round-trip, no redirect), which
  * keeps the dashboard's existing paths working unchanged against umi-api. The `:merchantId`
- * is resolved + membership-checked by the same guard stack as the slug routes.
+ * is resolved + membership-checked by the same guard stack as the reference-addressed routes.
  */
 @UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard)
 @RequireProduct('cash')

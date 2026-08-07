@@ -38,17 +38,17 @@ test('cash merchant-scoped routes (dashboard surface)', () => {
   assert.equal(routes.cash.rewardConfig('abc'), '/api/merchants/abc/cash/reward-config');
 });
 
-test('cash slug-scoped routes (umi-cash surface) — byte-exact to controllers', () => {
-  assert.equal(routes.cash.slug.scan('cafe'), '/api/cafe/admin/scan');
-  assert.equal(routes.cash.slug.topup('cafe'), '/api/cafe/admin/topup');
-  assert.equal(routes.cash.slug.purchase('cafe'), '/api/cafe/admin/purchase');
-  assert.equal(routes.cash.slug.giftCards('cafe'), '/api/cafe/admin/gift-cards');
-  assert.equal(routes.cash.slug.settings('cafe'), '/api/cafe/admin/settings');
-  assert.equal(routes.cash.slug.rewardConfig('cafe'), '/api/cafe/admin/reward-config');
-  assert.equal(routes.cash.slug.stats('cafe'), '/api/cafe/admin/stats');
-  assert.equal(routes.cash.slug.analytics('cafe'), '/api/cafe/admin/analytics');
-  assert.equal(routes.cash.slug.registerMember('cafe'), '/api/cafe/customers');
-  assert.equal(routes.cash.slug.gift('cafe', 'GIFT-1'), '/api/cafe/gift/GIFT-1');
+test('cash routes addressed by merchant reference (umi-cash surface) — byte-exact to controllers', () => {
+  assert.equal(routes.cash.byRef.scan('cafe'), '/api/cafe/admin/scan');
+  assert.equal(routes.cash.byRef.topup('cafe'), '/api/cafe/admin/topup');
+  assert.equal(routes.cash.byRef.purchase('cafe'), '/api/cafe/admin/purchase');
+  assert.equal(routes.cash.byRef.giftCards('cafe'), '/api/cafe/admin/gift-cards');
+  assert.equal(routes.cash.byRef.settings('cafe'), '/api/cafe/admin/settings');
+  assert.equal(routes.cash.byRef.rewardConfig('cafe'), '/api/cafe/admin/reward-config');
+  assert.equal(routes.cash.byRef.stats('cafe'), '/api/cafe/admin/stats');
+  assert.equal(routes.cash.byRef.analytics('cafe'), '/api/cafe/admin/analytics');
+  assert.equal(routes.cash.byRef.registerMember('cafe'), '/api/cafe/customers');
+  assert.equal(routes.cash.byRef.gift('cafe', 'GIFT-1'), '/api/cafe/gift/GIFT-1');
 });
 
 test('routes entry is zod-free (dashboard bundle constraint)', () => {
@@ -59,7 +59,7 @@ test('routes entry is zod-free (dashboard bundle constraint)', () => {
   assert.equal(/require\(['"]zod['"]\)/.test(src), false);
 });
 
-test('slug + gift code are URL-encoded', () => {
-  assert.equal(routes.cash.slug.scan('a b'), '/api/a%20b/admin/scan');
-  assert.equal(routes.cash.slug.gift('a/b', 'c d'), '/api/a%2Fb/gift/c%20d');
+test('merchant reference + gift code are URL-encoded', () => {
+  assert.equal(routes.cash.byRef.scan('a b'), '/api/a%20b/admin/scan');
+  assert.equal(routes.cash.byRef.gift('a/b', 'c d'), '/api/a%2Fb/gift/c%20d');
 });

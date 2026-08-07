@@ -13,9 +13,9 @@ import {
 import { useMerchant } from '@/lib/merchant-context.jsx';
 
 // Screen 5 — Settings (Branding + Loyalty + Promotions)
-// Data: useMerchantData() → umi-cash GET /api/[slug]/admin/settings + reward-config
-// Save: saveMerchantSettings(patch) → PATCH /api/[slug]/admin/settings
-//       saveRewardConfig(patch)   → PATCH /api/[slug]/admin/reward-config
+// Data: useMerchantData() → umi-cash GET /api/[merchantRef]/admin/settings + reward-config
+// Save: saveMerchantSettings(patch) → PATCH /api/[merchantRef]/admin/settings
+//       saveRewardConfig(patch)   → PATCH /api/[merchantRef]/admin/reward-config
 
 const DOW = [
   { id: 'dom', l: 'Dom' },
@@ -81,7 +81,7 @@ const SettingsScreen = () => {
     setBiz({
       name: merchant.name,
       city: merchant.city,
-      slug: merchant.slug,
+      handle: merchant.handle,
       cardPrefix: merchant.cardPrefix,
       subscription: merchant.subscriptionStatus,
     });
@@ -320,10 +320,10 @@ const SettingsScreen = () => {
             </span>
           </div>
           <div className="field">
-            <label>Slug</label>
+            <label>Handle</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span className="chip read" style={{ height: 44, fontSize: 13 }}>
-                umi.app/{biz.slug}
+                {biz.handle ? `umi.app/${biz.handle}` : 'Sin dirección publicada'}
               </span>
               <button className="btn-icon" aria-label="Copy">
                 <I.Refresh size={14} />
@@ -829,9 +829,9 @@ const SettingsScreen = () => {
 // ── Live wallet pass component ─────────────────────────────────────────────────
 const WalletPass = ({ brand, biz, stamps, loyalty, birthday, topupEnabled }) => {
   const remaining = Math.max(0, loyalty.visitsRequired - stamps);
-  const logo = normalizeAssetUrl(brand.logoUrl) || assetPath(biz.slug, 'wallet-logo');
-  const filledStamp = assetPath(biz.slug, 'stamp-filled');
-  const emptyStamp = assetPath(biz.slug, 'stamp-empty');
+  const logo = normalizeAssetUrl(brand.logoUrl) || assetPath(biz.handle, 'wallet-logo');
+  const filledStamp = assetPath(biz.handle, 'stamp-filled');
+  const emptyStamp = assetPath(biz.handle, 'stamp-empty');
   const stampCols = loyalty.visitsRequired <= 8 ? 4 : 5;
   const barcode = `${biz.cardPrefix || 'UMI'}-0004821`;
 
@@ -919,8 +919,10 @@ const FakeQr = () => {
   );
 };
 
-function assetPath(slug, kind) {
-  return `/logos/${slug}-${kind}.png`;
+// Brand assets are files named for the published handle. A cafe with no handle has no
+// such file, so return '' and let the caller fall back rather than fetch /logos/null-*.
+function assetPath(handle, kind) {
+  return handle ? `/logos/${handle}-${kind}.png` : '';
 }
 
 function normalizeAssetUrl(url) {

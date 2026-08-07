@@ -23,13 +23,26 @@ export class CatalogTools {
     private readonly hours: OrderingWindowService,
   ) {}
 
+  /**
+   * Address and payment, both describing the SAME counter — the location the customer
+   * chose, else the café's default one.
+   *
+   * The payment line says WHERE before it says HOW, because that is the fact the
+   * customer actually needs: Umi takes no money online, so an order placed here is paid
+   * in person when it is collected. The old line read "Métodos de pago: no
+   * especificados" whenever the list was empty, which answers nothing and reads as a
+   * fault. "El pago es en el local" is true for every café whether or not anybody has
+   * recorded which methods that counter takes.
+   */
   async getMerchantInfo(ctx: ToolContext): Promise<ToolResult> {
     const info = await this.hours.getMerchantInfo(ctx.merchantId, ctx.locationId ?? null);
+    const payment =
+      info.paymentMethods.length > 0
+        ? `El pago es en el local: ${info.paymentMethods.join(', ')}.`
+        : 'El pago es en el local.';
     return {
       ...info,
-      message: `Dirección: ${info.address ?? 'consulta directamente con el local'}. Métodos de pago: ${
-        info.paymentMethods.length > 0 ? info.paymentMethods.join(', ') : 'no especificados'
-      }.`,
+      message: `Dirección: ${info.address ?? 'consulta directamente con el local'}. ${payment}`,
     };
   }
 

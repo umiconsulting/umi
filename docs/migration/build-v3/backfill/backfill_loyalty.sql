@@ -187,12 +187,19 @@ from loyalty.gift_card_ledger gl;
 --    platform <- provider (apple/google). external_object_id: apple=serial_number,
 --    google=provider_object_id (verified: no nulls either side).
 --    status [C2]: active→active, disabled/archived→removed.
---    DROP: auth_token (Apple web-service secret, regenerated), serial_number
---    (folded into external_object_id), metadata (all '{}').
---    Verified: no dup (card_id, platform); 417/417 card_ids resolve.
+--    CARRY: auth_token → web_service_token, VERBATIM.
+--      [C4] This column was previously dropped as "regenerated". That was wrong, and it
+--      would have silently bricked every installed Apple pass. The token is signed INTO
+--      the .pkpass and replayed by Apple as `Authorization: ApplePass <token>`; the web
+--      service matches it exactly. A pass already on a customer's phone is immutable, so
+--      a new token matches nothing and every callback returns 401 — for all 350 of them,
+--      forever. Nothing would fail at cutover: the passes simply stop updating.
+--    DROP: serial_number (folded into external_object_id), metadata (all '{}').
+--    Verified: no dup (card_id, platform); 417/417 card_ids resolve;
+--      350/350 apple rows carry an auth_token and 350 distinct serials.
 -- ----------------------------------------------------------------------------
 insert into merchant.loyalty_wallet_pass
-  (id, card_id, platform, external_object_id, status, created_at, updated_at)
+  (id, card_id, platform, external_object_id, web_service_token, status, created_at, updated_at)
 select
   p.id,
   p.loyalty_card_id                            as card_id,
@@ -200,6 +207,7 @@ select
   case when p.provider = 'apple'
        then nullif(p.serial_number, '')
        else nullif(p.provider_object_id, '') end as external_object_id,
+  nullif(p.auth_token, '')                     as web_service_token,
   case when p.status = 'active' then 'active' else 'removed' end as status,
   p.created_at,
   p.updated_at

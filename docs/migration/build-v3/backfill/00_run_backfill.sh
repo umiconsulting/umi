@@ -7,6 +7,10 @@
 #   usage: ./00_run_backfill.sh [target_db] [template_db]
 #          defaults: umi_backfill_v3   umi_prod_snapshot
 #          (local PG is on PORT 5233 — export PGPORT=5233)
+#          BOOTSTRAP_EMAIL=<address> names the first platform administrator; it is
+#          passed to seed_rbac.sql, which refuses to run without it. Defaults to a
+#          LOCAL-ONLY address so a throwaway rehearsal needs no argument — always
+#          set it explicitly for anything a real operator will log in to.
 #
 # ORDER MATTERS. Two ordering rules the hard way:
 #   1. The loyalty VERTICAL (backfill_loyalty_v3) runs FIRST — it is the only
@@ -21,6 +25,7 @@
 set -euo pipefail
 DB="${1:-umi_backfill_v3}"
 TEMPLATE="${2:-umi_prod_snapshot}"
+BOOTSTRAP_EMAIL="${BOOTSTRAP_EMAIL:-bootstrap@localhost.invalid}"
 DDL="$(cd "$(dirname "$0")/.." && pwd)"     # docs/migration/build-v3
 BF="$(cd "$(dirname "$0")" && pwd)"         # .../backfill
 
@@ -41,7 +46,7 @@ for d in loyalty_v3 identity loyalty commerce comms device growth; do
 done
 
 echo "== seed: RBAC role -> permission grants (source had none) =="
-psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$BF/seed_rbac.sql"
+psql -v ON_ERROR_STOP=1 -q -d "$DB" -v bootstrap_email="$BOOTSTRAP_EMAIL" -f "$BF/seed_rbac.sql"
 
 echo "== cross-schema FKs + RLS (data now present) =="
 for f in 50_cross_schema_fk 90_rls; do
