@@ -1,7 +1,13 @@
 import type { ConfigService } from '@nestjs/config';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppConfig } from '../config/config.schema';
-import { PgService, poolRoleProblem, type PoolRoleAttributes } from './pg.service';
+import {
+  PgService,
+  poolRoleProblem,
+  poolLoggingProblem,
+  type PoolRoleAttributes,
+  type PoolLoggingPosture,
+} from './pg.service';
 
 /**
  * D1 boot-guard tests (SECURITY_GATE.md §4). The guard is exercised at two
@@ -135,5 +141,79 @@ describe('PgService.onModuleInit — D1 boot guard', () => {
     const err = await pg.onModuleInit().catch((e: unknown) => e);
     expect(String(err)).toMatch(/app pool/);
     expect(String(err)).toMatch(/worker pool/);
+  });
+});
+
+describe('poolLoggingProblem — D10 pure decision', () => {
+  const posture = (over: Partial<PoolLoggingPosture> = {}): PoolLoggingPosture => ({
+    role: 'umi_app',
+    logStatement: 'none',
+    logMinDurationStatement: -1,
+    logParameterMaxLength: -1,
+    ...over,
+  });
+
+  it('is silent when nothing is logged, even with parameters unrestricted', () => {
+    // log_parameter_max_length = -1 means "log parameters IN FULL" — harmless while
+    // no statement is logged at all. This is the state umi_app reached on 2026-08-06.
+    expect(poolLoggingProblem('app', posture())).toBeNull();
+  });
+
+  it('accepts log_statement=ddl — the production cluster default', () => {
+    // The request path executes no DDL, so `ddl` logs none of its statements. A check
+    // demanding 'none' would report a correct configuration as broken, and the obvious
+    // way to satisfy it would destroy the schema-change audit trail for every role.
+    expect(poolLoggingProblem('worker', posture({ logStatement: 'ddl' }))).toBeNull();
+  });
+
+  it('flags category logging that would carry parameters', () => {
+    const p = poolLoggingProblem('app', posture({ logStatement: 'all' }));
+    expect(p).toMatch(/BOUND PARAMETERS/);
+    expect(p).toMatch(/log_statement=all/);
+  });
+
+  it('flags DURATION logging, which log_statement=none does NOT prevent', () => {
+    // The independent trigger. Silencing log_statement does nothing about this one:
+    // one `log_min_duration_statement = 500ms` during an incident logs the request
+    // path again, parameters and all.
+    const p = poolLoggingProblem('worker', posture({ logMinDurationStatement: 500 }));
+    expect(p).toMatch(/log_min_duration_statement=500ms/);
+    expect(p).not.toMatch(/log_statement=/);
+  });
+
+  it('is silent when statements ARE logged but parameters never are', () => {
+    expect(
+      poolLoggingProblem(
+        'app',
+        posture({ logStatement: 'all', logMinDurationStatement: 0, logParameterMaxLength: 0 }),
+      ),
+    ).toBeNull();
+  });
+
+  it('names both triggers when both fire, and quotes the role to fix', () => {
+    const p = poolLoggingProblem(
+      'worker',
+      posture({ role: 'postgres', logStatement: 'mod', logMinDurationStatement: 250 }),
+    );
+    expect(p).toMatch(/log_statement=mod and log_min_duration_statement=250ms/);
+    expect(p).toMatch(/ALTER ROLE "postgres"/);
+  });
+
+  it('reports rather than assumes when the settings cannot be read', () => {
+    expect(poolLoggingProblem('app', undefined)).toMatch(/cannot verify D10/);
+  });
+
+  it('catches the real production shape: the worker pool connected as postgres', () => {
+    // Found 2026-08-06. DATABASE_URL_WORKER connects as `postgres`, not `umi_worker`.
+    // umi_app was pinned (log_statement=none, log_min_duration_statement=-1) and is
+    // clean; the worker role was never covered, and the auth substrate — every session
+    // token and password-reset token, all bound parameters — runs ONLY there (D11).
+    // A cluster-wide slow-query enable during an incident exposes exactly those.
+    expect(poolLoggingProblem('app', posture({ role: 'umi_app' }))).toBeNull();
+    const worker = poolLoggingProblem(
+      'worker',
+      posture({ role: 'postgres', logStatement: 'ddl', logMinDurationStatement: 500 }),
+    );
+    expect(worker).toMatch(/worker pool role "postgres"/);
   });
 });
