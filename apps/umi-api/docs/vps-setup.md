@@ -186,8 +186,46 @@ VITE_API_BASE=https://api.umiconsulting.co
 **Rollback:** delete those two vars → redeploy → the SPA is back on `server.js`
 (same-origin, `X-UMI-User-ID` header) with zero backend change.
 
+---
+
+## Plane (self-hosted) shares this Caddy
+
+Plane runs as its **own** compose project out of `/opt/plane` — separate stack,
+separate Postgres, nothing to do with umi-api beyond sharing the box and the
+proxy. This Caddy terminates TLS for both.
+
+Why it is wired this way:
+
+- **Caddy already owns 80/443.** Plane's bundled proxy would collide with it, so
+  Plane is pinned to `172.17.0.1:8080` (the Docker bridge IP) via
+  `LISTEN_HTTP_PORT` in `/opt/plane/plane.env`. Binding to the bridge instead of
+  `0.0.0.0` means the port is **structurally** unreachable from the internet —
+  no firewall rule to maintain, and nothing to forget after a reboot. `ufw` would
+  not have helped anyway: Docker's published ports bypass its `INPUT` chain.
+- **`extra_hosts: host.docker.internal:host-gateway`** on the caddy service is
+  what lets it reach that bridge IP. Plane is a different compose project, so
+  service-name resolution is not available.
+- **`PLANE_DOMAIN` lives only in the VPS `.env`** (gitignored). Never edit the
+  `Caddyfile` or `docker-compose.yml` on the box: `deploy/deploy.sh` runs
+  `git reset --hard` before every `compose up`, so the edit is destroyed on the
+  next deploy — silently. Route changes go through a PR, like this one did.
+
+Operating it:
+
+```sh
+cd /opt/plane && ./setup.sh     # 2=start 3=stop 4=restart 5=upgrade 6=logs
+```
+
+Plane's installer **regenerates its `docker-compose.yaml` on every upgrade**, so
+all configuration must live in `plane.env` or it is lost.
+
+**Rollback:** remove `PLANE_DOMAIN` from `apps/umi-api/.env`, then
+`docker compose up -d caddy`. umi-api is untouched either way.
+
 ### Not yet done
 
+- **Plane volumes are not backed up.** `docker volume ls | grep plane` (pgdata +
+  MinIO). This VPS has no backup schedule at all yet.
 - **Stage 4 — dual-writer cutover:** `umi-cash` still live-writes `loyalty.*`.
   Both writers coexist safely (append-only ledger, `balance = SUM`); retiring
   umi-cash's writes is a separate decision.
