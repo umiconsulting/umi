@@ -1,9 +1,5 @@
 {
   "mcpServers": {
-    "trello": {
-      "type": "http",
-      "url": "https://mcp.trello.com/v1"
-    },
     "playwright-mcp": {
       "type": "stdio",
       "command": "npx",

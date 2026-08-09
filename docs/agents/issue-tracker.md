@@ -1,71 +1,107 @@
-# Issue tracker: Trello (+ GitHub PRs as the review surface)
+# Issue tracker: Plane (+ GitHub PRs as the review surface)
 
-Work items and PRDs for this repo live as **Trello cards**; code review happens on **GitHub PRs**. A card is the *spec* (what the change must do); a PR is the *implementation and review*. Use the official **Trello MCP** (`https://mcp.trello.com/v1`) for all card operations, and the `gh` CLI for pull requests.
+Work items and PRDs for this repo live in **self-hosted Plane**; code review happens on **GitHub PRs**. A work item is the *spec* (what the change must do); a PR is the *implementation and review*. Use the **Plane MCP** for all work-item operations, and the `gh` CLI for pull requests.
 
-The connected Trello workspace is Umi's — one workspace per MCP connection. If the Trello MCP is not connected in the current session, say so and stop; do not guess a card's contents.
+- Instance: `https://plane.umiconsulting.co`
+- Workspace: `umi`
+- Project for this repo: **`UMI`** — identifiers read `UMI-42`
 
-Cards and PRs are independent. A card can exist with no PR — future work, a bug handed to another dev, a request a client phoned in — and a PR can exist with no card (a small fix). A card may be created by the ticket skills (`to-tickets`, `to-spec`, `triage`) **or** by a person straight on the board; both are equally valid, and nothing here assumes a card came from an agent. Linking a PR to a card (below) is an optional enrichment, never a requirement.
+If the Plane MCP is not connected in the current session, say so and stop. Do not guess the contents of a work item.
+
+Work items and PRs are independent. A work item can exist with no PR — future work, a bug handed to another dev, a request a client phoned in. A PR can exist with no work item (a small fix). A work item can come from the ticket skills (`to-tickets`, `to-spec`, `triage`) **or** from a person straight in the UI. Both are equally valid, and nothing here assumes an agent wrote it. Linking a PR to a work item is an optional enrichment, never a requirement.
+
+## One project per repo, not per app
+
+The `UMI` project holds the whole monorepo. Use **modules** for the area: `umi-api`, `dashboard`, `landing`, `kds`, `infra`.
+
+The reason is cycles. Plane scopes a cycle to one project, so four projects need four parallel sprints, and a team of five cannot plan across them. Cross-cutting work has no home either: a change that touches `packages/contract` plus `umi-api` plus `dashboard` is one work item in one project, or three hand-synchronised items in three.
+
+**The rule: the project boundary follows the repo and its deploy, not the directory.** The monorepo deploys as a unit, so it plans as a unit. A separate repo — `umi-eventos`, for example — gets its own project when it starts.
 
 ## Where the spec lives
 
-The spec/PRD for a change is its linked **Trello card**:
+The spec/PRD for a change is its **work item**:
 
-- **Description** — the requirement / problem statement.
-- **Checklist items** — acceptance criteria.
+- **Description** — the requirement or problem statement.
+- **Sub-work-items** — acceptance criteria, when the item needs them broken out.
 - **Comments** — clarifications and decisions.
-- **List (column)** — status; **labels** — type / area.
+- **State** — triage status (below); **labels** — type; **module** — area.
 
-## Linking a PR to its card — optional
+## Triage states — the state machine lives in states, not labels
 
-Linking is opportunistic, never required — most PRs won't carry one. When a PR *does* implement a specific card, it can declare it with a line in the **PR description**:
+The engineering skills name five canonical triage roles. In Plane each one is a **state**, because that is what Plane states are for. This differs from the previous Trello setup, where a list carried the status.
+
+| Canonical role | Plane state | State group |
+| --- | --- | --- |
+| `needs-triage` | **Needs triage** | Backlog |
+| `needs-info` | **Needs info** | Backlog |
+| `ready-for-agent` | **Ready for agent** | Unstarted |
+| `ready-for-human` | **Ready for human** | Unstarted |
+| `wontfix` | **Won't fix** | Cancelled |
+
+Plus the ordinary lifecycle states: **In progress** (Started) and **Done** (Completed).
+
+A new work item starts in **Needs triage**. From there it moves to **Needs info**, **Ready for agent**, **Ready for human** or **Won't fix**. **Needs info** returns to **Needs triage** once the reporter replies.
+
+Every item carries exactly one state, so the "two conflicting state labels" problem from label-based trackers cannot happen here. That is the reason for the mapping.
+
+Labels stay free for **type**: `bug`, `task`, `debt`, `spec`, plus the `wayfinder:*` set below.
+
+## Linking a PR to its work item — optional
+
+Linking is opportunistic, never required. Most PRs will not carry one. When a PR does implement a specific item, declare it with a line in the **PR description**:
 
 ```
-Trello: https://trello.com/c/<shortLink>
+Plane: UMI-42
 ```
 
-Resolve the card shortLink in this order:
+Resolve the identifier in this order:
 
-1. A `Trello:` line in the PR body.
-2. Any `trello.com/c/<shortLink>` URL in the PR body or the latest commit trailer.
-3. A card shortLink embedded in the branch name (`feat/<shortLink>-...`).
+1. A `Plane:` line in the PR body.
+2. Any `UMI-<number>` reference in the PR body or the latest commit trailer.
+3. An identifier embedded in the branch name (`feat/UMI-42-short-slug`).
 
-If none resolve, that is normal: `code-review` runs its Standards axis and simply skips the Spec axis — a missing link is **not** a finding. The Trello GitHub Power-Up, when enabled, also attaches the PR to the card and back-links automatically — a convenience for humans, not something the skills depend on.
+If none resolve, that is normal: `code-review` runs its Standards axis and skips the Spec axis. A missing link is **not** a finding.
 
-## Conventions (via the Trello MCP)
+## Conventions (via the Plane MCP)
 
-- **Fetch a card** — get the card by its shortLink or id, then read its description, checklists, and comments.
-- **Search** — search cards across the connected workspace by text, list, or label.
-- **Create a card** — create it in the agreed intake list with a title, a structured description, and a checklist of acceptance criteria.
-- **Comment** — add a comment to a card.
-- **Label / status** — apply a label, or move the card to the target list.
+- **Fetch a work item** — get it by identifier (`UMI-42`), then read its description, sub-items and comments.
+- **Search** — search across the workspace by text, state, label or module.
+- **Create a work item** — create it in the `UMI` project in state **Needs triage**, with a title, a structured description, and sub-items for acceptance criteria. Set the module when the area is clear.
+- **Comment** — add a comment to the item.
+- **State / label / module** — set the triage state, apply a type label, assign the area module.
 
-Discover the exact `mcp__trello__*` tool names at runtime; the operations above map to whatever the connected server exposes (boards, lists, cards, checklists, search).
+Discover the exact `mcp__plane__*` tool names at runtime. The operations above map to whatever the connected server exposes.
 
 ## When a skill says "publish to the issue tracker"
 
-Create a Trello card, or comment on the relevant one, via the Trello MCP. For AI-authored triage output, start the card or comment body with:
+Create a Plane work item, or comment on the relevant one, via the Plane MCP. For AI-authored triage output, start the body with:
 
 ```
 > This was generated by AI.
 ```
 
-Cards a person creates by hand — e.g. straight from a client message — are ordinary cards and need no disclaimer.
+Items a person creates by hand — straight from a client message, for example — are ordinary items and need no disclaimer.
 
 ## When a skill says "fetch the relevant ticket"
 
-Resolve the card shortLink (order above) and read the card via the Trello MCP — its description, checklists, and comments are the full ticket.
+Resolve the identifier (order above) and read the item via the Plane MCP. Its description, sub-items and comments are the full ticket.
 
 ## Pull requests as a triage surface
 
-**PRs as a request surface: no.** PRs are the review surface for internal changes, not an external feature-request queue. `code-review`'s Spec axis reviews a PR's code against its linked Trello card; `triage` operates on Trello cards, not PRs.
+**PRs as a request surface: no.** PRs are the review surface for internal changes, not an external feature-request queue. `code-review`'s Spec axis reviews a PR's code against its linked work item; `triage` operates on work items, not PRs.
 
 ## Wayfinding operations
 
-Used by `wayfinder`. The **map** is a single Trello card; **child tickets** are cards linked to it.
+Used by `wayfinder`. The **map** is a single work item; **child tickets** are work items under it.
 
-- **Map** — a card labelled `wayfinder:map`, holding the Notes / Decisions-so-far / Fog body.
-- **Child ticket** — a card linked to the map (as a checklist item or an attached card link), labelled `wayfinder:<type>` (`research` / `prototype` / `grilling` / `task`), assigned to the driving dev once claimed.
-- **Blocking** — express with a `Blocked by: <shortLink>, <shortLink>` line at the top of the child card's description (Trello has no native issue-dependency graph). A child is unblocked when every blocker card sits in the Done list.
-- **Frontier query** — list the map's open child cards, drop any with an unmet `Blocked by` line or an assignee; first in map order wins.
-- **Claim** — assign the card to yourself.
-- **Resolve** — comment the answer on the card, move it to Done, then append a pointer to the map's Decisions-so-far.
+- **Map** — a work item labelled `wayfinder:map`, holding the Notes / Decisions-so-far / Fog body.
+- **Child ticket** — a **sub-work-item** of the map, labelled `wayfinder:<type>` (`research` / `prototype` / `grilling` / `task`), assigned to the driving dev once claimed.
+- **Blocking** — use Plane's native **"Blocked by"** relation between work items. A child is unblocked when every blocker sits in **Done**.
+- **Frontier query** — list the map's open sub-items, drop any with an unresolved blocker or an assignee; first in map order wins.
+- **Claim** — assign the item to yourself.
+- **Resolve** — comment the answer, move the item to **Done**, then append a pointer to the map's Decisions-so-far.
+
+Blocking is the one place where Plane beats the previous setup outright. Trello has no dependency graph, so blockers were a `Blocked by:` line typed into the description and checked by hand. Plane models the edge natively, so the frontier query reads a real graph.
+
+> **Verify once against the live instance:** native work-item relations must be available on the current plan. If `Blocked by` is missing in the UI or through the MCP, fall back to a `Blocked by: UMI-12, UMI-19` line at the top of the child's description and delete this note.

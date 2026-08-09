@@ -16,7 +16,7 @@ BASE=$(git merge-base origin/main HEAD)
 ## Before — local, before the PR exists
 
 1. **Tests-first** (`tdd` skill) — new behavior ships with tests written test-first; the full affected suite is green, and every regression test is red-green verified (revert the fix → test fails → restore → passes). No test, no code.
-2. **Review** (`code-review` skill) — review `git diff $BASE...HEAD` for **Standards** (repo conventions); resolve every finding. If the PR links a Trello card (see `docs/agents/issue-tracker.md`), the **Spec** axis also checks the code against that card — resolve or consciously accept each Spec finding. An unlinked PR is normal; Standards gates on its own.
+2. **Review** (`code-review` skill) — review `git diff $BASE...HEAD` for **Standards** (repo conventions); resolve every finding. If the PR links a Plane work item (see `docs/agents/issue-tracker.md`), the **Spec** axis also checks the code against that item — resolve or consciously accept each Spec finding. An unlinked PR is normal; Standards gates on its own.
 3. **Mechanical green** — all return **0 errors, 0 warnings**, read from real output (never "should pass"):
    ```
    pnpm turbo run build lint test --filter=...[origin/main]

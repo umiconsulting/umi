@@ -35,28 +35,23 @@ pnpm turbo run build                  # build everything, in dependency order
 Filter by the **package name** (`@umi/dashboard`), not the directory — see
 [CONVENTIONS.md](./CONVENTIONS.md).
 
-## Plane — on trial, not authoritative
+## Project tracking (Plane)
 
-> **Trello is still the issue tracker.** Work items and PRDs live as Trello cards
-> and the agent skills depend on that: `code-review` resolves a PR's Spec axis
-> against its linked card, and `to-tickets` / `to-spec` / `triage` publish there.
-> See [AGENTS.md](./AGENTS.md) and [docs/agents/issue-tracker.md](./docs/agents/issue-tracker.md).
-> Nothing in this section changes that.
+Work items and PRDs live in self-hosted **Plane** at
+**https://plane.umiconsulting.co** — workspace `umi`, project **`UMI`**, so
+identifiers read `UMI-42`. Trello is retired.
 
-Self-hosted Plane runs at **https://plane.umiconsulting.co** (workspace `umi`) as
-a **time-boxed evaluation**, deliberately scoped so it cannot become a second
-source of truth by drift:
+One project holds the whole monorepo, with **modules** for the area (`umi-api`,
+`dashboard`, `landing`, `kds`, `infra`). Plane scopes a cycle to one project, so
+splitting the repo across projects would force parallel sprints that five people
+cannot plan across, and cross-cutting work would have no home. A separate repo
+gets its own project. See
+[docs/agents/issue-tracker.md](./docs/agents/issue-tracker.md) for the triage
+states, the PR↔item link, and how the agent skills use it.
 
-- **In Plane:** bugs only.
-- **In Trello:** everything else — PRDs, specs, client work. Unchanged.
-- **The decision, on a date, not "eventually":** if devs file bugs in Plane
-  without being reminded and cycles get real use, Plane replaces Trello outright
-  and `AGENTS.md` plus the skills get rewritten to match. If it needs pushing,
-  Plane gets switched off. Two trackers is the one outcome to avoid — it is worse
-  than either alone, because things get lost at the boundary.
-
-`.mcp.json` wires Plane into Claude Code so an agent can read and update work
-items. The token is **per-person**, so each dev supplies their own:
+`.mcp.json` wires Plane into Claude Code, so agents raise work items as issues
+surface instead of waiting for someone to file them. The token is **per-person**,
+so each dev supplies their own:
 
 1. In Plane: avatar → **Settings → Personal Access Tokens → Add**. Copy it once;
    it is not shown again. Name it something you can revoke in isolation.
