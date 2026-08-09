@@ -35,6 +35,37 @@ pnpm turbo run build                  # build everything, in dependency order
 Filter by the **package name** (`@umi/dashboard`), not the directory — see
 [CONVENTIONS.md](./CONVENTIONS.md).
 
+## Project tracking (Plane)
+
+Work items live in self-hosted Plane at **https://plane.umiconsulting.co**
+(workspace `umi`). `.mcp.json` wires it into Claude Code so an agent can read and
+update work items directly — but the token is **per-person**, so each dev supplies
+their own:
+
+1. In Plane: avatar → **Settings → Personal Access Tokens → Add**. Copy it once;
+   it is not shown again. Name it something you can revoke in isolation.
+2. Export it where your shell will pick it up (`~/.zshrc`, direnv, 1Password CLI —
+   whatever you already use for `SLACK_BOT_TOKEN` and friends):
+
+   ```bash
+   export PLANE_API_KEY=plane_api_...
+   ```
+
+3. Verify before wiring anything up — a 200 means the token and the base URL are
+   both right:
+
+   ```bash
+   curl -s -o /dev/null -w '%{http_code}\n' -H "X-API-Key: $PLANE_API_KEY" \
+     https://plane.umiconsulting.co/api/v1/workspaces/umi/projects/
+   ```
+
+Never put the token in `.mcp.json`. Every server in that file reads its secrets
+through `${VAR}` expansion for this reason.
+
+The instance runs on the same VPS as `@umi/api`, behind the same Caddy — see
+[apps/umi-api/docs/vps-setup.md](./apps/umi-api/docs/vps-setup.md) for how it is
+wired and what to check after a Plane upgrade.
+
 ## How it deploys
 
 - **`@umi/api`** ships on merge to `main` touching `apps/umi-api/**` (or the
