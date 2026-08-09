@@ -8,6 +8,7 @@
       "type": "stdio",
       "command": "npx",
       "args": [
+        "-y",
         "@playwright/mcp@latest"
       ],
       "env": {}
@@ -46,6 +47,7 @@
       "type": "stdio",
       "command": "npx",
       "args": [
+        "-y",
         "nano-banana-mcp"
       ],
       "env": {
