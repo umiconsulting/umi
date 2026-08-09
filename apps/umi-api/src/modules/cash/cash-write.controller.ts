@@ -22,7 +22,7 @@ const STAFF_ROLES = ['super_admin', 'owner', 'admin', 'staff'];
 @UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard, RolesGuard)
 @RequireProduct('cash')
 @Roles(...STAFF_ROLES)
-@Controller('api/:slug/admin')
+@Controller('api/:merchantRef/admin')
 export class CashWriteController {
   constructor(private readonly cash: CashWriteService) {}
 

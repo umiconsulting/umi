@@ -52,25 +52,30 @@ export const routes = {
     members: (merchantId: string): string => buildPath('cash.members', { merchantId }),
     giftCards: (merchantId: string): string => buildPath('cash.giftCards', { merchantId }),
     rewardConfig: (merchantId: string): string => buildPath('cash.rewardConfig', { merchantId }),
-    // Slug-scoped surface (umi-cash frontend). The write plus primary read paths both
+    // The umi-cash surface, addressed by merchant REFERENCE: an id, or the published
+    // handle those URLs were built with. The write plus primary read paths both
     // surfaces call; not an exhaustive mirror of every GET.
-    slug: {
-      scan: (slug: string): string => buildPath('cash.slug.scan', { slug }),
-      topup: (slug: string): string => buildPath('cash.slug.topup', { slug }),
-      purchase: (slug: string): string => buildPath('cash.slug.purchase', { slug }),
-      giftCards: (slug: string): string => buildPath('cash.slug.giftCards', { slug }),
-      settings: (slug: string): string => buildPath('cash.slug.settings', { slug }),
-      rewardConfig: (slug: string): string => buildPath('cash.slug.rewardConfig', { slug }),
-      stats: (slug: string): string => buildPath('cash.slug.stats', { slug }),
-      analytics: (slug: string): string => buildPath('cash.slug.analytics', { slug }),
-      // POST /api/:slug/customers — member registration (name↔path: registers a member).
-      registerMember: (slug: string): string => buildPath('cash.slug.registerMember', { slug }),
-      gift: (slug: string, code: string): string => buildPath('cash.slug.gift', { slug, code }),
+    byRef: {
+      scan: (ref: string): string => buildPath('cash.byRef.scan', { merchantRef: ref }),
+      topup: (ref: string): string => buildPath('cash.byRef.topup', { merchantRef: ref }),
+      purchase: (ref: string): string => buildPath('cash.byRef.purchase', { merchantRef: ref }),
+      giftCards: (ref: string): string => buildPath('cash.byRef.giftCards', { merchantRef: ref }),
+      settings: (ref: string): string => buildPath('cash.byRef.settings', { merchantRef: ref }),
+      rewardConfig: (ref: string): string =>
+        buildPath('cash.byRef.rewardConfig', { merchantRef: ref }),
+      stats: (ref: string): string => buildPath('cash.byRef.stats', { merchantRef: ref }),
+      analytics: (ref: string): string => buildPath('cash.byRef.analytics', { merchantRef: ref }),
+      // POST /api/:merchantRef/customers — member registration (name↔path: registers a member).
+      registerMember: (ref: string): string =>
+        buildPath('cash.byRef.registerMember', { merchantRef: ref }),
+      gift: (ref: string, code: string): string =>
+        buildPath('cash.byRef.gift', { merchantRef: ref, code }),
     },
   },
   staff: {
-    create: (slug: string): string => buildPath('staff.create', { slug }),
-    update: (slug: string, staffId: string): string => buildPath('staff.update', { slug, staffId }),
+    create: (ref: string): string => buildPath('staff.create', { merchantRef: ref }),
+    update: (ref: string, staffId: string): string =>
+      buildPath('staff.update', { merchantRef: ref, staffId }),
   },
   devices: {
     beginEnrollment: (merchantId: string): string =>

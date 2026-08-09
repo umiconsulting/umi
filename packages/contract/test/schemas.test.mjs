@@ -85,21 +85,27 @@ test('GiftCardCreateRequest — mirrors the DTO @ValidateIf conditionals', () =>
 
 test('RegisterMemberRequest — real calendar birthDate', () => {
   assert.ok(
-    RegisterMemberRequest.safeParse({ name: 'Ana', phone: '5550001', birthDate: '1990-02-28' })
-      .success,
+    RegisterMemberRequest.safeParse({
+      name: 'Ana',
+      phone: '+525512345678',
+      birthDate: '1990-02-28',
+    }).success,
   );
   assert.equal(
-    RegisterMemberRequest.safeParse({ name: 'Ana', phone: '5550001', birthDate: '1990-2-8' })
-      .success,
-    false,
-  );
-  assert.equal(
-    RegisterMemberRequest.safeParse({ name: 'Ana', phone: '5550001', birthDate: '2026-02-30' })
+    RegisterMemberRequest.safeParse({ name: 'Ana', phone: '+525512345678', birthDate: '1990-2-8' })
       .success,
     false,
   );
   assert.equal(
-    RegisterMemberRequest.safeParse({ name: 'A', phone: '5550001', birthDate: '1990-02-28' })
+    RegisterMemberRequest.safeParse({
+      name: 'Ana',
+      phone: '+525512345678',
+      birthDate: '2026-02-30',
+    }).success,
+    false,
+  );
+  assert.equal(
+    RegisterMemberRequest.safeParse({ name: 'A', phone: '+525512345678', birthDate: '1990-02-28' })
       .success,
     false,
   );
@@ -111,7 +117,7 @@ test('RegisterMemberRequest — real calendar birthDate', () => {
 
 test('GiftRedeemRequest — both channels optional', () => {
   assert.ok(GiftRedeemRequest.safeParse({}).success);
-  assert.ok(GiftRedeemRequest.safeParse({ phone: '5550001' }).success);
+  assert.ok(GiftRedeemRequest.safeParse({ phone: '+525512345678' }).success);
 });
 
 test('session schemas (auth surface) — representative parse', () => {
@@ -123,7 +129,7 @@ test('session schemas (auth surface) — representative parse', () => {
     SessionResponse.safeParse({
       session: {
         user: { id: '1', email: 'a@b.co', displayName: null },
-        merchants: [{ id: 't', slug: 's', name: 'n', roles: ['owner'] }],
+        merchants: [{ id: 't', handle: 's', name: 'n', roles: ['owner'] }],
         provider: 'local',
         accessExpiresIn: 1800,
         sessionId: '00000000-0000-4000-8000-000000000001',
@@ -166,4 +172,24 @@ test('staff creation accepts a personal operator PIN without exposing it in resp
     }).success,
     false,
   );
+});
+
+test('RegisterMemberRequest — national digit count, not string length', () => {
+  const ok = (phone) =>
+    RegisterMemberRequest.safeParse({ name: 'Ana Torres', phone, birthDate: '1994-03-02' }).success;
+  // Exactly 10 national digits for +52; the picker supplies the country code.
+  assert.equal(ok('+525512345678'), true);
+  // Every one of these is a REAL row that got in under the old min(7).max(20) rule.
+  for (const bad of [
+    '+5266748626', //  8 national digits
+    '+52787878787', //  9
+    '+5266716222762', // 11
+    '+5266718054238', // 11
+    '+52556672675598', // 12
+  ]) {
+    assert.equal(ok(bad), false, `${bad} must be rejected`);
+  }
+  // NANP is 10 too; a country we never measured falls back to the E.164 bounds.
+  assert.equal(ok('+14804016182'), true);
+  assert.equal(ok('+34612345678'), true);
 });

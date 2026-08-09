@@ -3,6 +3,7 @@
 // type (z.infer), so the server and client share one definition. Mirrors the
 // live umi-api controllers/DTOs (verified against apps/umi-api/src/modules/**).
 import { z } from 'zod';
+import { nationalDigitsAreValid, phoneLengthMessage } from './phone';
 
 // ── Request bodies ────────────────────────────────────────────────────────
 
@@ -37,10 +38,16 @@ export const SessionUser = z.object({
 export type SessionUser = z.infer<typeof SessionUser>;
 
 /** Merchant membership as embedded in a session (login/refresh/me). Mirrors
- *  auth.repository MerchantMembershipSummary. */
+ *  auth.repository MerchantMembershipSummary.
+ *
+ *  BREAKING (v2): `slug` became `handle`, and it is NULLABLE. Route by `id`. The handle
+ *  is the café's PUBLISHED address — the one baked into issued wallet passes, umi-cash
+ *  URLs and /logos/{handle}-*.png — and a café created after cutover has none. Callers
+ *  that used `slug` to build an API path must use `id`; callers that displayed it to a
+ *  human, or built an asset URL from it, want `handle` and must handle null. */
 export const MerchantMembership = z.object({
   id: z.string(),
-  slug: z.string(),
+  handle: z.string().nullable(),
   name: z.string(),
   roles: z.array(z.string()),
 });
@@ -87,7 +94,7 @@ export const GlobalLogoutRequest = z.object({
 });
 export type GlobalLogoutRequest = z.infer<typeof GlobalLogoutRequest>;
 
-/** POST /api/:slug/admin/staff — mirrors umi-api CreateStaffDto. */
+/** POST /api/:merchantRef/admin/staff — mirrors umi-api CreateStaffDto. */
 export const CreateStaffRequest = z
   .object({
     name: z.string().trim().min(1).max(160),
@@ -103,7 +110,7 @@ export const CreateStaffRequest = z
   .strict();
 export type CreateStaffRequest = z.infer<typeof CreateStaffRequest>;
 
-/** PATCH /api/:slug/admin/staff/:staffId — mirrors umi-api UpdateStaffDto. */
+/** PATCH /api/:merchantRef/admin/staff/:staffId — mirrors umi-api UpdateStaffDto. */
 export const UpdateStaffRequest = z
   .object({
     role: z.string().min(1).max(100).optional(),
@@ -122,7 +129,7 @@ export type UpdateStaffRequest = z.infer<typeof UpdateStaffRequest>;
 // ── Cash / loyalty product-write requests ─────────────────────────────────
 // Mirror the live umi-api DTOs 1:1 (apps/umi-api/src/modules/cash/dto/*), so the
 // server (class-validator) and both clients (dashboard, umi-cash frontend) share
-// one shape. Both surfaces call these: slug-scoped `/api/:slug/...` (umi-cash) and
+// one shape. Both surfaces call these: reference-addressed `/api/:merchantRef/...` (umi-cash) and
 // merchant-scoped `/api/merchants/:merchantId/cash/...` (dashboard) — see routes.ts.
 
 /** A real YYYY-MM-DD calendar date — rejects impossible days (e.g. 2026-02-30),
@@ -136,7 +143,7 @@ const isCalendarDate = (s: string): boolean => {
 /** Scan actions — mirrors cash/dto/scan.dto.ts `ACTIONS`. */
 export const CASH_SCAN_ACTIONS = ['VISIT', 'REDEEM', 'BIRTHDAY_REDEEM'] as const;
 
-/** POST /api/:slug/admin/scan — mirrors ScanDto. */
+/** POST /api/:merchantRef/admin/scan — mirrors ScanDto. */
 export const ScanRequest = z.object({
   qrPayload: z.string(),
   action: z.enum(CASH_SCAN_ACTIONS).optional(),
@@ -144,7 +151,7 @@ export const ScanRequest = z.object({
 });
 export type ScanRequest = z.infer<typeof ScanRequest>;
 
-/** POST /api/:slug/admin/topup — mirrors TopupDto (min $1.00). */
+/** POST /api/:merchantRef/admin/topup — mirrors TopupDto (min $1.00). */
 export const TopupRequest = z.object({
   cardId: z.string(),
   amountCentavos: z.number().int().min(100),
@@ -153,7 +160,7 @@ export const TopupRequest = z.object({
 });
 export type TopupRequest = z.infer<typeof TopupRequest>;
 
-/** POST /api/:slug/admin/purchase — mirrors PurchaseDto (min $0.01). */
+/** POST /api/:merchantRef/admin/purchase — mirrors PurchaseDto (min $0.01). */
 export const PurchaseRequest = z.object({
   cardId: z.string(),
   amountCentavos: z.number().int().min(1),
@@ -162,7 +169,7 @@ export const PurchaseRequest = z.object({
 });
 export type PurchaseRequest = z.infer<typeof PurchaseRequest>;
 
-/** POST /api/:slug/admin/gift-cards — mirrors GiftCardCreateDto. The two
+/** POST /api/:merchantRef/admin/gift-cards — mirrors GiftCardCreateDto. The two
  *  `@ValidateIf` rules mean each recipient field is validated *only when it is the
  *  sole channel*: email must be a valid email when no phone is given, phone must be
  *  ≤20 chars when no email is given, and at least one is required. When both are
@@ -209,10 +216,17 @@ export const GiftCardCreateRequest = z
   });
 export type GiftCardCreateRequest = z.infer<typeof GiftCardCreateRequest>;
 
-/** POST /api/:slug/customers — mirrors RegisterDto (member registration). */
+/** POST /api/:merchantRef/customers — mirrors RegisterDto (member registration). */
 export const RegisterMemberRequest = z.object({
   name: z.string().min(2).max(100),
-  phone: z.string().min(7).max(20),
+  // The country picker supplies the code; the customer types ONLY the national digits,
+  // and they must be the count that country actually uses. `min(7).max(20)` was a string
+  // length, not a phone rule, and it let 8-, 11- and 12-digit Mexican numbers through.
+  phone: z
+    .string()
+    .min(7)
+    .max(20)
+    .refine(nationalDigitsAreValid, (v) => ({ message: phoneLengthMessage(v) })),
   birthDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'birthDate must be YYYY-MM-DD')
@@ -220,7 +234,7 @@ export const RegisterMemberRequest = z.object({
 });
 export type RegisterMemberRequest = z.infer<typeof RegisterMemberRequest>;
 
-/** POST /api/:slug/gift/:code — mirrors GiftRedeemDto (public gift redemption). */
+/** POST /api/:merchantRef/gift/:code — mirrors GiftRedeemDto (public gift redemption). */
 export const GiftRedeemRequest = z.object({
   phone: z.string().optional(),
   email: z.string().optional(),

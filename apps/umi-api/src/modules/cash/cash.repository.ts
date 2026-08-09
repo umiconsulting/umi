@@ -30,26 +30,36 @@ export class CashRepository {
     const { rows } = await this.pg.withMerchant((c) =>
       c.query<Row>(
         `SELECT
-           t.id::text, t.slug, t.name, t.timezone, t.status,
-           ob.city,
-           p.id::text                     AS "programId",
+           t.id::text, t.handle, t.name, t.timezone, t.status,
+           t.city,
+           -- The program is keyed BY the merchant (merchant_id is its primary key), so
+           -- the merchant id IS the program id. Callers only test it for null — "does
+           -- this café run loyalty at all" — and the LEFT JOIN keeps that answer honest.
+           p.merchant_id::text            AS "programId",
            p.card_prefix                  AS "cardPrefix",
            p.pass_style                   AS "passStyle",
            p.self_registration            AS "selfRegistration",
            p.topup_enabled                AS "topupEnabled",
            p.birthday_reward_enabled      AS "birthdayRewardEnabled",
            p.birthday_reward_name         AS "birthdayRewardName",
-           p.branding->>'primary_color'   AS "primaryColor",
-           p.branding->>'secondary_color' AS "secondaryColor",
-           p.branding->>'logo_url'        AS "logoUrl",
-           p.branding->>'strip_image_url' AS "stripImageUrl",
-           p.branding->>'promo_message'   AS "promoMessage",
-           p.branding->>'promo_starts_at' AS "promoStartsAt",
-           p.branding->>'promo_ends_at'   AS "promoEndsAt",
-           p.branding->>'promo_days'      AS "promoDays"
+           -- Typed columns, not a branding jsonb blob. The blob was replaced when the
+           -- program branding layer landed; this reader kept addressing the old shape
+           -- and no gate could see it, because a statement reports only its FIRST
+           -- unresolved name and a dead join upstream was answering first.
+           p.primary_color                AS "primaryColor",
+           p.secondary_color              AS "secondaryColor",
+           p.logo_url                     AS "logoUrl",
+           p.strip_image_url              AS "stripImageUrl",
+           p.promo_message                AS "promoMessage",
+           p.promo_starts_at              AS "promoStartsAt",
+           p.promo_ends_at                AS "promoEndsAt",
+           p.promo_days                   AS "promoDays"
+         -- city used to come from a second table: ops.businesses, the CHILD row that
+         -- carried a tenant's trading details. build-v3 dissolved that child into the
+         -- merchant itself, and the rename sweep turned the join into merchant.merchant
+         -- joined to merchant.merchant on a column that never existed. Read t.city.
          FROM merchant.merchant AS t
-         LEFT JOIN merchant.loyalty_program AS p  ON p.merchant_id = t.id
-         LEFT JOIN merchant.merchant          AS ob ON ob.merchant_id = t.id
+         LEFT JOIN merchant.loyalty_program AS p ON p.merchant_id = t.id
          WHERE t.id = $1::uuid
          LIMIT 1`,
         [merchantId],

@@ -18,7 +18,7 @@ function make() {
 
 const ACCESS: MerchantAccess = {
   merchantId: 't1',
-  slug: 'kala',
+  handle: 'kala',
   name: 'Kala',
   timezone: 'America/Mexico_City',
   membershipId: 'm1',
@@ -28,8 +28,8 @@ const ACCESS: MerchantAccess = {
 };
 
 const LOCS = [
-  { id: 'l1', slug: 'centro', name: 'Centro', timezone: 'tz', status: 'inactive' },
-  { id: 'l2', slug: 'chapultepec', name: 'Chapultepec', timezone: 'tz', status: 'active' },
+  { id: 'l1', name: 'Centro', timezone: 'tz', status: 'inactive' },
+  { id: 'l2', name: 'Chapultepec', timezone: 'tz', status: 'active' },
 ];
 
 describe('MerchantsService.buildCapabilities', () => {

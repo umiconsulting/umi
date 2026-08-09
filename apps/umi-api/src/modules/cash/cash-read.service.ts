@@ -36,7 +36,7 @@ export class CashReadService {
       birthdayRewardEnabled: t.birthdayRewardEnabled,
       birthdayRewardName: t.birthdayRewardName,
       cardPrefix: t.cardPrefix,
-      slug: t.slug,
+      handle: t.handle,
     };
   }
 

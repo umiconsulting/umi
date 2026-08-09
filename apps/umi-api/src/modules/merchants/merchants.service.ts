@@ -12,7 +12,8 @@ import { buildModuleAvailability, type ModuleAvailability } from './module-regis
 export interface Capabilities {
   merchant: {
     id: string;
-    slug: string;
+    /** The published URL key. Null for a café created after cutover — route by id. */
+    handle: string | null;
     name: string;
     timezone: string | null;
     brandColor: string | null;
@@ -68,7 +69,7 @@ export class MerchantsService {
     const base = {
       merchant: {
         id: access.merchantId,
-        slug: access.slug,
+        handle: access.handle,
         name: access.name,
         timezone: access.timezone,
         brandColor: branding.brandColor,
@@ -95,7 +96,7 @@ export class MerchantsService {
     return {
       id: capabilities.merchant.id,
       name: capabilities.merchant.name,
-      slug: capabilities.merchant.slug,
+      handle: capabilities.merchant.handle,
       timezone: capabilities.merchant.timezone,
       subscriptionStatus: dashboard?.status?.toUpperCase?.() ?? 'ACTIVE',
       primaryColor: capabilities.merchant.brandColor ?? '#B5605A',

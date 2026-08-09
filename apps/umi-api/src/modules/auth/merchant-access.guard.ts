@@ -13,11 +13,12 @@ import type { AuthedRequest, MerchantAccess } from './auth.types';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Resolves the active merchant from the route (`:merchantId` uuid or `:slug`),
- * verifies the authed user has an active membership, and attaches
- * `req.merchantAccess` + the RLS `merchantId` to the request context.
+ * Resolves the active merchant from the route (`:merchantId` uuid, or `:merchantRef`
+ * which is an id or a published handle), verifies the authed user has an active
+ * membership, and attaches `req.merchantAccess` + the RLS `merchantId` to the request
+ * context.
  *
- * Note (intentional hardening, D9): the legacy `/:slug/admin/*` routes had no
+ * Note (intentional hardening, D9): the legacy `/:merchantRef/admin/*` routes had no
  * membership check in `server.js`. Under unified auth every merchant-scoped route
  * verifies membership here — closing that gap. Missing membership → 404
  * `merchant_not_found` (same shape as the dashboard's `requireMerchantAccess`).
@@ -40,7 +41,7 @@ export class MerchantAccessGuard implements CanActivate {
     const role = normalizeRoleKey(access.roles);
     const merchantAccess: MerchantAccess = {
       merchantId: access.merchantId,
-      slug: access.slug,
+      handle: access.handle,
       name: access.name,
       timezone: access.timezone,
       membershipId: access.membershipId,
@@ -61,12 +62,15 @@ export class MerchantAccessGuard implements CanActivate {
   }
 
   private async resolveMerchantId(req: AuthedRequest): Promise<string | null> {
-    const rawValues = [req.params?.merchantId, req.query?.merchantId, req.body?.merchantId];
+    const rawValues = [
+      req.params?.merchantId,
+      req.params?.merchantRef,
+      req.query?.merchantId,
+      req.body?.merchantId,
+    ];
     const raw = rawValues.find((value): value is string => typeof value === 'string');
     if (raw && UUID_RE.test(raw)) return raw;
-    if (req.params?.slug) return this.repo.merchantIdForSlug(req.params.slug);
-    // A non-uuid :merchantId could still be a slug in some routes.
-    if (raw) return this.repo.merchantIdForSlug(raw);
+    if (raw) return this.repo.merchantIdForHandle(raw);
     return null;
   }
 

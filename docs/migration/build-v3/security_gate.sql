@@ -194,6 +194,123 @@ select * from (values
   -- public schema hardening -------------------------------------------------
   ('PUBLIC cannot CREATE in schema public',
     case when has_schema_privilege('public','public','create') then 'FAIL' else 'PASS' end),
+  -- D7 · extensions (SECURITY_GATE.md §4) -----------------------------------
+  -- Asserted by PLACEMENT and CAPABILITY, not as a fixed list of names. §4 used to
+  -- name an exact set — {plpgsql, vector, pg_trgm} — which was already wrong: the
+  -- database also carries pgcrypto, uuid-ossp, pg_stat_statements and (since the
+  -- location search) unaccent. A frozen allowlist rots on the first legitimate
+  -- addition and then gets ignored, which is worse than no check.
+  ('no extension installed outside pg_catalog/extensions',
+    (select case when count(*)=0 then 'PASS' else 'FAIL' end
+       from pg_extension e join pg_namespace n on n.oid = e.extnamespace
+      where n.nspname not in ('pg_catalog','extensions'))),
+  -- These reach OUT of the database — the network, the filesystem, or a shell. None
+  -- has a use in build-v3, and postgres_fdw is the one P7's replay installs on
+  -- purpose and must remove afterwards (D8).
+  ('no network/exec-capable extension installed',
+    (select case when count(*)=0 then 'PASS' else 'FAIL' end from pg_extension
+      where extname in ('postgres_fdw','dblink','file_fdw','plpythonu','plpython3u',
+                        'plperlu','pltclu','plsh','adminpack'))),
+  ('api/worker have USAGE but NOT CREATE on extensions',
+    (select case
+       when bool_and(has_schema_privilege(r,'extensions','usage'))
+        and not bool_or(has_schema_privilege(r,'extensions','create')) then 'PASS' else 'FAIL' end
+       from unnest(array['api','worker']) r)),
+  -- D8 · no FDW remnants (SECURITY_GATE.md §4) ------------------------------
+  -- P7 backfills prod through postgres_fdw. A foreign server EMBEDS the source
+  -- credentials in the target database, and a user mapping holds the password. Left
+  -- behind, the migration tool becomes a permanent unaudited path back to the source.
+  -- Zero today; the check earns its place the moment the replay runs.
+  ('0 foreign servers / user mappings / FDWs remain',
+    (select case when (select count(*) from pg_foreign_server)
+                    + (select count(*) from pg_user_mapping)
+                    + (select count(*) from pg_foreign_data_wrapper) = 0
+                then 'PASS' else 'FAIL' end)),
+  -- D10 · request-path log redaction (SECURITY_GATE.md §4) ------------------
+  -- Session tokens, OTP hashes, reset tokens and merchant ids all travel as BOUND
+  -- PARAMETERS. Every grant in this file is undone if those land in a log file that
+  -- nobody put under the same access control as the table they came from.
+  -- Assert the property, NOT one particular way of satisfying it. An earlier version
+  -- of this check demanded a cluster-wide `log_statement = none`, and it was wrong:
+  -- production runs `ddl`, deliberately, because the DDL trail is how an unauthorised
+  -- schema change gets noticed. `ddl` logs no DML and no SELECT, so it leaks no
+  -- request-path parameter. What actually matters is that the roles the REQUEST PATH
+  -- connects as never log statements — satisfied by a cluster `none`, or by a per-role
+  -- `none` (the pattern Supabase itself applies to supabase_admin / _auth_admin /
+  -- _storage_admin, and now to umi_app / umi_worker).
+  ('request-path roles never log statements',
+    (select case
+       when count(*) filter (where not silenced) = 0 and count(*) > 0 then 'PASS'
+       when count(*) = 0 then 'WARN'   -- no request-path role present to judge
+       else 'FAIL' end
+       from (
+         select r.rolname,
+                (select setting from pg_settings where name='log_statement') = 'none'
+                or exists (
+                  select 1 from pg_db_role_setting s
+                   where s.setrole = r.oid
+                     and array_to_string(s.setconfig, ',') ~ 'log_statement=none'
+                ) as silenced
+           from pg_roles r
+          where r.rolcanlogin                        -- a NOLOGIN group logs nothing
+            and not r.rolsuper                       -- superuser is not the request path
+            and (r.rolname in ('api_login','worker_login','umi_app','umi_worker')
+                 or pg_has_role(r.oid, 'api', 'usage')
+                 or pg_has_role(r.oid, 'worker', 'usage'))
+       ) x)),
+  -- A cluster-wide 'none' is undone by one `ALTER ROLE api SET log_statement = 'all'`,
+  -- which is invisible in pg_settings when read as anyone else.
+  ('no role-level override re-enables statement logging',
+    (select case when count(*)=0 then 'PASS' else 'FAIL' end
+       from pg_db_role_setting s
+       left join pg_roles r on r.oid = s.setrole
+      where array_to_string(s.setconfig, ',') ~ 'log_statement=(all|mod|ddl)'
+        and (r.rolname is null or r.rolname in ('api','worker','readonly',
+                                                'api_login','worker_login',
+                                                'umi_app','umi_worker')))),
+  -- WARN, NOT FAIL — and deliberately so. -1 means "log bind parameters IN FULL",
+  -- the PostgreSQL default.
+  --
+  -- ⚠️ DO NOT read the check above as covering this one. `log_statement` and
+  -- `log_min_duration_statement` are INDEPENDENT triggers. Silencing the first does
+  -- nothing about the second: one `log_min_duration_statement = 500ms` — the most
+  -- ordinary thing anyone does while debugging a slow production incident — logs the
+  -- request path's statements again, bind parameters and all. Session tokens, OTP
+  -- hashes and reset tokens all travel as bound parameters.
+  --
+  -- ⚠️ SUPERUSER-GATED ON SUPABASE. Verified 2026-08-06 on xbudk as `postgres`:
+  -- `ALTER DATABASE postgres SET log_parameter_max_length = 0` → permission denied,
+  -- while `ALTER ROLE … SET log_statement` on the same cluster SUCCEEDS. PostgreSQL 15+
+  -- `GRANT SET ON PARAMETER` is what differs; read `pg_parameter_acl` to see which
+  -- parameters the platform actually permits. If this one is ungrantable, pin
+  -- `log_min_duration_statement = -1` per request-path role instead — that closes the
+  -- real path and is BETTER than the global setting, being scoped to the request path.
+  ('bind parameters are never logged (log_parameter_max_length = 0)',
+    (select case when setting = '0' then 'PASS' else 'WARN' end
+       from pg_settings where name = 'log_parameter_max_length')),
+  -- The independent trigger named above. PASS when duration logging is off entirely,
+  -- or pinned off for every request-path role.
+  ('request-path roles are not exposed to duration-based logging',
+    (select case
+       when (select setting from pg_settings where name='log_min_duration_statement') = '-1'
+         then 'PASS'
+       when not exists (
+         select 1 from pg_roles r
+          where r.rolcanlogin
+            and not r.rolsuper
+            and (r.rolname in ('api_login','worker_login','umi_app','umi_worker')
+                 or pg_has_role(r.oid, 'api', 'usage')
+                 or pg_has_role(r.oid, 'worker', 'usage'))
+            and not exists (
+              select 1 from pg_db_role_setting s
+               where s.setrole = r.oid
+                 and array_to_string(s.setconfig, ',') ~ 'log_min_duration_statement=-1'
+            )
+       ) then 'PASS'
+       else 'WARN' end)),
+  ('bind parameters are never logged on error',
+    (select case when setting = '0' then 'PASS' else 'FAIL' end
+       from pg_settings where name = 'log_parameter_max_length_on_error')),
   -- Append-only audit --------------------------------------------------------
   ('no role holds UPDATE/DELETE on audit_log',
     (select case when bool_or(p) then 'FAIL' else 'PASS' end from (

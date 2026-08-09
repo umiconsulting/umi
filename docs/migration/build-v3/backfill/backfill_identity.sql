@@ -108,14 +108,40 @@ from core.permissions p;
 -- 5. merchant.location  <- core.locations   (MAP, 4 rows)
 --   id/merchant_id preserved. status: active->active, else->closed (all 4 active).
 --   timezone NULL (inherit merchant).
---   DROP columns: slug (naming/derived), aliases (empty), descriptor (null),
---     metadata (legacy {source_system,source_location_id} linkage),
---     search_text (generated).
+--   DROP columns: slug, metadata (legacy {source_system,source_location_id} linkage).
+--     search_text is GENERATED here too, so it must not be inserted.
 --   KEEP lat/lng: all 4 locations have real captured coordinates (owner: preserve).
+--
+--   `slug` is dropped and NOT carried to a handle, unlike the merchant one step up.
+--   Nothing routes by a location: no wallet pass, no umi-cash URL, no asset file names
+--   one. The values are also derived and already wrong — the row named "Chapultepec"
+--   carries the slug `kalalacafe-sucursal-centro`, and "Congreso" carries
+--   `kalalacafe-sucursal-norte`. Carrying that would preserve a mislabel, not an address.
+--
+--   `aliases` and `descriptor` ARE carried, reversing an earlier decision to drop them
+--   as "empty". They are empty, and the dashboard's Sucursales editor writes them — it
+--   is the nickname list the WhatsApp bot matches "chapu" against. Reading the data and
+--   not the writer is how a shipped screen loses its columns.
 -- ----------------------------------------------------------------------------
-insert into merchant.location (id, merchant_id, name, address, lat, lng, timezone, status, created_at, updated_at)
-select l.id, l.tenant_id, l.name, l.address, l.lat, l.lng, null::text,
+--   `payment_methods` comes DOWN from ops.businesses.config, which held one list for
+--   the whole café. Every location of that café inherits it, because that is the only
+--   honest reading of the source: the café said "we take cash and transfer" and could
+--   not say it per counter. Kalala is the case that matters — two locations, one list —
+--   and from here on each can be corrected on its own.
+insert into merchant.location (id, merchant_id, name, address, payment_methods,
+                               lat, lng, timezone, status,
+                               aliases, descriptor, created_at, updated_at)
+select l.id, l.tenant_id, l.name, l.address,
+       coalesce(
+         (select array_agg(value::text order by ordinality)
+            from ops.businesses b,
+                 jsonb_array_elements_text(b.config->'payment_methods')
+                   with ordinality as e(value, ordinality)
+           where b.tenant_id = l.tenant_id),
+         '{}')::text[],
+       l.lat, l.lng, null::text,
        case l.status when 'active' then 'active' else 'closed' end,
+       coalesce(l.aliases, '{}'), l.descriptor,
        l.created_at, l.updated_at
 from core.locations l;
 

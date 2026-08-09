@@ -4,7 +4,8 @@ import { HAS_PLATFORM_GRANT, PLATFORM_GRANT_CTE } from '../auth/rbac.sql';
 
 export interface MerchantSummary {
   id: string;
-  slug: string;
+  /** The published URL key. Null for a café created after cutover — route by `id`. */
+  handle: string | null;
   name: string;
   timezone: string | null;
   roles: string[];
@@ -18,7 +19,6 @@ export interface ProductInstance {
 
 export interface LocationRow {
   id: string;
-  slug: string;
   name: string;
   timezone: string | null;
   status: string;
@@ -59,7 +59,7 @@ export class MerchantsRepository {
       `WITH ${PLATFORM_GRANT_CTE}
        SELECT
          t.id::text AS "id",
-         t.id::text AS "slug",
+         t.handle   AS "handle",
          t.name     AS "name",
          t.timezone AS "timezone",
          COALESCE(array_agg(r.key) FILTER (WHERE r.key IS NOT NULL),
@@ -70,7 +70,7 @@ export class MerchantsRepository {
        LEFT JOIN umi.role AS r ON r.id = s.role_id
        WHERE t.status = 'active'
          AND (s.id IS NOT NULL OR ${HAS_PLATFORM_GRANT})
-       GROUP BY t.id, t.name, t.timezone
+       GROUP BY t.id, t.handle, t.name, t.timezone
        ORDER BY t.name`,
       [userId],
     );
@@ -131,7 +131,7 @@ export class MerchantsRepository {
   async loadLocations(merchantId: string): Promise<LocationRow[]> {
     const { rows } = await this.pg.withMerchant((c) =>
       c.query<LocationRow>(
-        `SELECT l.id::text, l.slug, l.name, t.timezone, l.status
+        `SELECT l.id::text, l.name, t.timezone, l.status
          FROM merchant.location AS l
          JOIN merchant.merchant AS t ON t.id = l.merchant_id
          WHERE l.merchant_id = $1::uuid
@@ -177,7 +177,7 @@ export class MerchantsRepository {
   async findActiveLocation(merchantId: string, locationId: string): Promise<LocationRow | null> {
     const { rows } = await this.pg.withMerchant((c) =>
       c.query<LocationRow>(
-        `SELECT id::text, slug, name, NULL::text AS timezone, status
+        `SELECT id::text, name, NULL::text AS timezone, status
          FROM merchant.location
          WHERE merchant_id = $1::uuid AND id = $2::uuid AND status = 'active'
          LIMIT 1`,
@@ -274,6 +274,28 @@ export class MerchantsRepository {
     }));
   }
 
+  /**
+   * The contact facts a customer asks for, read from ONE location. Worker pool, because
+   * the WhatsApp path has no authenticated member and so no RLS context.
+   *
+   * Both columns used to be read from the merchant, out of a config blob. That was not
+   * merely untyped, it was the wrong grain: Kalala has two locations and the blob held
+   * one address, so every customer who chose Congreso was given the Chapultepec street.
+   */
+  async locationContactWorker(
+    merchantId: string,
+    locationId: string,
+  ): Promise<{ address: string | null; paymentMethods: string[] } | null> {
+    const { rows } = await this.pg.query<{ address: string | null; paymentMethods: string[] }>(
+      `SELECT address, payment_methods AS "paymentMethods"
+         FROM merchant.location
+        WHERE merchant_id = $1::uuid AND id = $2::uuid
+        LIMIT 1`,
+      [merchantId, locationId],
+    );
+    return rows[0] ?? null;
+  }
+
   /** Worker-pool read of the merchant's canonical timezone (`merchant.merchant.timezone`). */
   async getMerchantTimezoneWorker(merchantId: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ timezone: string | null }>(
@@ -324,7 +346,7 @@ export class MerchantsRepository {
              descriptor = CASE WHEN $7::boolean THEN $8 ELSE descriptor END,
              updated_at = now()
          WHERE id = $2::uuid AND merchant_id = $1::uuid
-         RETURNING id::text, slug, name, timezone, status, aliases, descriptor`,
+         RETURNING id::text, name, timezone, status, aliases, descriptor`,
         [
           merchantId,
           locationId,
@@ -342,16 +364,28 @@ export class MerchantsRepository {
 
   /**
    * Per-location profiles for the dashboard location editor: name + owner-curated
-   * aliases + descriptor. Reads the Phase 2 columns, so it is a dedicated read
-   * (NOT folded into loadLocations / buildCapabilities) — a pre-migration deploy
-   * only breaks the location-settings section, never the whole dashboard.
+   * aliases + descriptor. A dedicated read (NOT folded into loadLocations /
+   * buildCapabilities) so a partial deploy only breaks the location-settings section,
+   * never the whole dashboard.
+   *
+   * EVERY location, closed ones included, and that is required rather than merely
+   * tolerated: `updateLocation` deliberately does not filter on status so a closed
+   * location can be REOPENED with `status:'active'`. A read that hid them would leave
+   * the one row you need to reopen invisible to the screen that reopens it.
+   *
+   * This used to say `AND status <> 'archived'`. build-v3 narrowed the location
+   * statuses to ('active','closed'), so that predicate could no longer exclude
+   * anything — it read as a filter and behaved as a no-op. `sql-preflight` cannot see
+   * this class of defect: 'archived' is a VALUE, and Postgres only tests a CHECK at
+   * run time (23514), never at PREPARE time. Same species as the hours comparison that
+   * made every late-night scan read as after-hours.
    */
   async listLocationProfiles(merchantId: string): Promise<LocationProfileRow[]> {
     const { rows } = await this.pg.withMerchant((c) =>
       c.query<LocationProfileRow>(
-        `SELECT id::text, slug, name, NULL::text AS timezone, status, aliases, descriptor
+        `SELECT id::text, name, NULL::text AS timezone, status, aliases, descriptor
          FROM merchant.location
-         WHERE merchant_id = $1::uuid AND status <> 'archived'
+         WHERE merchant_id = $1::uuid
          ORDER BY created_at ASC, id ASC`,
         [merchantId],
       ),

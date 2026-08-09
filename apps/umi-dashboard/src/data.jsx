@@ -306,10 +306,14 @@ async function _loadDevicePairings(ctx) {
 
 async function _loadMerchant(ctx) {
   const s = await _apiFetch(_merchantPath(ctx, '/settings'));
-  const cashSettings =
-    _active(ctx, 'cash') && s?.slug
-      ? await _apiFetch(`/api/${encodeURIComponent(s.slug)}/admin/settings`).catch(() => null)
-      : null;
+  // Reach the cash admin surface by merchant ID, not by the published handle. The two
+  // used to be the same string; they are not, and a café created after cutover has no
+  // handle at all. The route accepts either, and the id is the one that always exists.
+  const cashSettings = _active(ctx, 'cash')
+    ? await _apiFetch(`/api/${encodeURIComponent(_merchantId(ctx))}/admin/settings`).catch(
+        () => null,
+      )
+    : null;
   const rc = _active(ctx, 'cash')
     ? await _apiFetch(_merchantPath(ctx, '/cash/reward-config')).catch(() => null)
     : null;
@@ -317,7 +321,7 @@ async function _loadMerchant(ctx) {
   return {
     name: cashSettings?.name || s.name,
     city: cashSettings?.city || s.city,
-    slug: cashSettings?.slug || s.slug,
+    handle: cashSettings?.handle || s.handle || null,
     cardPrefix: cashSettings?.cardPrefix || s.cardPrefix || '',
     primaryColor: cashSettings?.primaryColor || s.primaryColor || '#B5605A',
     secondaryColor: cashSettings?.secondaryColor || s.secondaryColor || '#E8C9A3',

@@ -142,14 +142,14 @@ export class KdsDashboardController {
 }
 
 /**
- * Legacy slug alias surface (`/api/:slug/admin/devices`, `/orders`,
- * `/orders/:ticketId/transition`) so the dashboard's `/api/:slug/admin/*`
- * device/order calls stop 404ing. Same service, same guard stack; slug→merchantId
+ * Legacy alias surface (`/api/:merchantRef/admin/devices`, `/orders`,
+ * `/orders/:ticketId/transition`) so the dashboard's `/api/:merchantRef/admin/*`
+ * device/order calls stop 404ing. Same service, same guard stack; reference→merchantId
  * is resolved by MerchantAccessGuard.
  */
 @UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard)
 @RequireProduct('kds')
-@Controller('api/:slug/admin')
+@Controller('api/:merchantRef/admin')
 export class KdsAdminController {
   constructor(private readonly kds: KdsService) {}
 

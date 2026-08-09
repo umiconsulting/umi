@@ -170,9 +170,86 @@ select count(*) as non_canonical_bypass_phones
   from merchant.merchant b, unnest(b.whatsapp_bypass_phone) as p
  where p !~ '^\+?[0-9]+$';
 
-\echo '-- POS permissions have a holder (expect 21 grants across owner/admin/staff):'
-select count(*) as pos_role_grants
+\echo ''
+\echo '========== G. HANDLE · the published URL key (2026-08-01) =========='
+\echo '-- Every merchant handle equals its source slug, character for character. A pass'
+\echo '   already on a phone has /api/{handle}/passes/apple SIGNED into it and cannot be'
+\echo '   re-pointed, so a drift here is a café whose wallet passes stop updating and'
+\echo '   never report an error (expect 0):'
+select count(*) as handle_slug_mismatch
+  from core.tenants t
+  join merchant.merchant b on b.id = t.id
+ where b.handle is distinct from t.slug;
+\echo '-- Nobody with an ISSUED pass lost their handle. This is the subset that can still'
+\echo '   be hurt — 350 Apple passes across 4 cafes today (expect 0):'
+select count(*) as merchants_with_passes_missing_handle
+  from (select distinct tenant_id from loyalty.passes) p
+  join merchant.merchant b on b.id = p.tenant_id
+ where b.handle is null;
+\echo '-- Handles are unique. The column carries a UNIQUE constraint, so this can only'
+\echo '   fail if the SOURCE had duplicates the insert would have rejected (expect 0):'
+select count(*) as duplicate_handles
+  from (select handle from merchant.merchant
+         where handle is not null group by handle having count(*) > 1) d;
+\echo '-- Every Apple pass kept the token SIGNED INTO IT. Apple replays this value on every'
+\echo '   callback and the server must match it; a regenerated token matches nothing on a'
+\echo '   pass already installed, and the failure is 350 silent 401s, not an error anyone'
+\echo '   sees. Handle and token are the TWO halves of the same guarantee — the handle gets'
+\echo '   the call to us, the token lets it in (expect src = dst = 350, missing = 0):'
+select (select count(auth_token) from loyalty.passes where provider = 'apple')  as src_apple_tokens,
+       (select count(web_service_token) from merchant.loyalty_wallet_pass
+         where platform = 'apple')                                             as dst_apple_tokens,
+       (select count(*) from merchant.loyalty_wallet_pass
+         where platform = 'apple' and web_service_token is null)               as apple_missing_token;
+\echo '-- The carried token is the SAME STRING, not merely present (expect 0):'
+select count(*) as apple_token_mismatch
+  from loyalty.passes p
+  join merchant.loyalty_wallet_pass w on w.id = p.id
+ where p.provider = 'apple'
+   and w.web_service_token is distinct from nullif(p.auth_token, '');
+\echo '-- LOCATION aliases and descriptor survived the fold. They are empty in prod today,'
+\echo '   which is exactly why an unasserted carry would go unnoticed if it broke'
+\echo '   (expect source = target on both):'
+select (select count(*) from core.locations where coalesce(array_length(aliases,1),0) > 0) as src_with_aliases,
+       (select count(*) from merchant.location where coalesce(array_length(aliases,1),0) > 0) as dst_with_aliases,
+       (select count(*) from core.locations where descriptor is not null) as src_with_descriptor,
+       (select count(*) from merchant.location where descriptor is not null) as dst_with_descriptor;
+\echo '-- search_text is DERIVED on every location, never null — the bot fuzzy-matches'
+\echo '   against it, and a null would silently score every location 0 (expect 0):'
+select count(*) as locations_missing_search_text
+  from merchant.location where search_text is null;
+
+\echo '-- PAYMENT METHODS reached the counter. The source held ONE list per cafe in a'
+\echo '   config blob; every location of that cafe must now carry it, IN ORDER. Kalala'
+\echo '   is the case that matters — 2 locations, 1 list (expect 0 mismatches):'
+select count(*) as locations_missing_payment_methods
+  from core.locations l
+  join ops.businesses b   on b.tenant_id = l.tenant_id
+  join merchant.location d on d.id = l.id
+ where b.config ? 'payment_methods'
+   and d.payment_methods is distinct from (
+     select coalesce(array_agg(value::text order by ordinality), '{}')::text[]
+       from jsonb_array_elements_text(b.config->'payment_methods')
+              with ordinality as e(value, ordinality));
+\echo '-- and no location INVENTED methods the source never gave it (expect 0):'
+select count(*) as locations_with_fabricated_payment_methods
+  from merchant.location d
+  left join ops.businesses b on b.tenant_id = d.merchant_id
+ where cardinality(d.payment_methods) > 0
+   and coalesce(b.config ? 'payment_methods', false) is not true;
+
+\echo ''
+\echo '-- POS permissions have a holder. Expect 31, BY ROLE — a bare total hides which'
+\echo '   role gained a key. owner 8 + admin 8 + staff 5 (no device.enroll, no approval,'
+\echo '   no audit) + super_admin 8 (every key, one row each — the seed IS the review)'
+\echo '   + developer 2 (catalog.read, audit.read — read-only across every cafe).'
+\echo '   This said "expect 21" until 2026-08-02: the platform roles arrived with the'
+\echo '   wildcard removal and the count was never updated, so the line asserted a'
+\echo '   number the seed could no longer produce.'
+select r.key as role, count(*) as pos_grants
   from umi.role_permission rp
   join umi.permission p on p.id = rp.permission_id
+  join umi.role r       on r.id = rp.role_id
  where p.key in ('catalog.read','cart.write','checkout.commit','offline.replay',
-                 'offline.cash.checkout','device.enroll','offline.recovery.review','audit.read');
+                 'offline.cash.checkout','device.enroll','offline.recovery.review','audit.read')
+ group by r.key order by r.key;

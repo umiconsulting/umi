@@ -59,20 +59,20 @@ describe('MerchantAccessGuard', () => {
   it('404s when the user has no active membership', async () => {
     const repo = {
       findMembershipAccess: vi.fn().mockResolvedValue(null),
-      merchantIdForSlug: vi.fn(),
+      merchantIdForHandle: vi.fn(),
     };
     const guard = new MerchantAccessGuard(repo as never);
     const req = { authUser: { id: 'u1' }, params: { merchantId: ACCESS } };
     await expect(guard.canActivate(ctxFor(req))).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('resolves a slug → merchant and attaches membership access', async () => {
+  it('resolves a handle → merchant and attaches membership access', async () => {
     const repo = {
-      merchantIdForSlug: vi.fn().mockResolvedValue(ACCESS),
+      merchantIdForHandle: vi.fn().mockResolvedValue(ACCESS),
       findMembershipAccess: vi.fn().mockResolvedValue({
         membershipId: 'm1',
         merchantId: ACCESS,
-        slug: 'kala',
+        handle: 'kala',
         name: 'Kala',
         timezone: 'America/Mexico_City',
         roles: ['owner'],
@@ -82,20 +82,20 @@ describe('MerchantAccessGuard', () => {
     const guard = new MerchantAccessGuard(repo as never);
     const req: Record<string, unknown> = {
       authUser: { id: 'u1' },
-      params: { slug: 'kala' },
+      params: { merchantRef: 'kala' },
     };
     expect(await guard.canActivate(ctxFor(req))).toBe(true);
-    expect(repo.merchantIdForSlug).toHaveBeenCalledWith('kala');
+    expect(repo.merchantIdForHandle).toHaveBeenCalledWith('kala');
     expect((req.merchantAccess as { role: string }).role).toBe('owner');
   });
 
   it('resolves the merchant and location from a POS request body', async () => {
     const repo = {
-      merchantIdForSlug: vi.fn(),
+      merchantIdForHandle: vi.fn(),
       findMembershipAccess: vi.fn().mockResolvedValue({
         membershipId: 'm1',
         merchantId: ACCESS,
-        slug: 'kala',
+        handle: 'kala',
         name: 'Kala',
         timezone: 'America/Mexico_City',
         roles: ['staff'],

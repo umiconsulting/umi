@@ -58,6 +58,65 @@ export function poolRoleProblem(
   );
 }
 
+/** The EFFECTIVE logging settings of the role a pool actually connected as. */
+export interface PoolLoggingPosture {
+  role: string;
+  /** none | ddl | mod | all */
+  logStatement: string;
+  /** milliseconds; -1 = duration logging off */
+  logMinDurationStatement: number;
+  /** bytes; -1 = log bind parameters IN FULL, 0 = never log them */
+  logParameterMaxLength: number;
+}
+
+/**
+ * D10 boot check (SECURITY_GATE.md §4) — can this pool's role leak a bound
+ * parameter into a log file?
+ *
+ * WHY IT LIVES HERE AND NOT IN `security_gate.sql`. The gate is SQL, so it can only
+ * judge a hardcoded list of role names. It cannot see which role a pool actually
+ * connects as — and that is exactly where the truth hid: production's worker pool
+ * connects as `postgres`, not `umi_worker`, so a gate that checked `umi_worker`
+ * reported D10 covered while the AUTH SUBSTRATE — every session token, password-reset
+ * token and OTP, all bound parameters, all worker-pool by design (D11) — ran on a role
+ * nobody had checked. Only the process holding the connection string knows the truth,
+ * so the check belongs next to the connection string.
+ *
+ * THE CONDITION IS PRECISE, NOT BLUNT. A parameter can only be written to a log if a
+ * statement carrying it is logged at all. Two independent triggers do that:
+ *   - `log_statement` in ('all','mod')  — by category
+ *   - `log_min_duration_statement` >= 0 — by duration
+ * `log_statement = 'ddl'` is NOT one of them: the request path executes no DDL, so it
+ * logs none of its statements. That distinction matters — production runs `ddl` on
+ * purpose to keep an audit trail of schema changes, and a check demanding `none`
+ * would push someone into destroying it for no security gain.
+ *
+ * And if neither trigger fires, or `log_parameter_max_length` is 0, nothing leaks.
+ */
+export function poolLoggingProblem(
+  pool: 'app' | 'worker',
+  posture: PoolLoggingPosture | undefined,
+): string | null {
+  if (!posture) return `${pool} pool: could not read logging settings (cannot verify D10).`;
+  const byCategory = posture.logStatement === 'all' || posture.logStatement === 'mod';
+  const byDuration = posture.logMinDurationStatement >= 0;
+  // No statement is logged → no parameter can ride along.
+  if (!byCategory && !byDuration) return null;
+  // Statements are logged, but parameters are never recorded with them.
+  if (posture.logParameterMaxLength === 0) return null;
+  const triggers = [
+    byCategory ? `log_statement=${posture.logStatement}` : null,
+    byDuration ? `log_min_duration_statement=${posture.logMinDurationStatement}ms` : null,
+  ].filter(Boolean);
+  return (
+    `D10: ${pool} pool role "${posture.role}" can write BOUND PARAMETERS to the Postgres log ` +
+    `(${triggers.join(' and ')}, log_parameter_max_length=${posture.logParameterMaxLength}). ` +
+    `Session tokens, OTP hashes and password-reset tokens all travel as bound parameters. ` +
+    `Fix with: ALTER ROLE "${posture.role}" SET log_min_duration_statement = -1; ` +
+    `ALTER ROLE "${posture.role}" SET log_statement = 'none'; — see SECURITY_GATE.md §4 D10.`
+  );
+}
+
 /**
  * The single data-access primitive. No ORM (D8) — raw parameterized SQL.
  * Two pools, one per Postgres role — the role is embedded in each connection
@@ -156,12 +215,21 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
     const read = async (
       pool: Pool,
       group: 'api' | 'worker',
-    ): Promise<PoolRoleAttributes | undefined> => {
-      const { rows } = await pool.query<PoolRoleAttributes>(
+    ): Promise<(PoolRoleAttributes & PoolLoggingPosture) | undefined> => {
+      const { rows } = await pool.query<PoolRoleAttributes & PoolLoggingPosture>(
         `SELECT current_user::text AS role,
                 rolsuper           AS superuser,
                 rolbypassrls       AS bypassrls,
-                pg_has_role(current_user, $1, 'USAGE') AS "inheritsGroup"
+                pg_has_role(current_user, $1, 'USAGE') AS "inheritsGroup",
+                -- pg_settings reflects THIS session, so a per-role ALTER ROLE ... SET
+                -- is already folded in. That is the point: we want what this pool's
+                -- role actually gets, not the cluster default.
+                (select setting      from pg_settings where name='log_statement')
+                  AS "logStatement",
+                (select setting::int from pg_settings where name='log_min_duration_statement')
+                  AS "logMinDurationStatement",
+                (select setting::int from pg_settings where name='log_parameter_max_length')
+                  AS "logParameterMaxLength"
          FROM pg_roles WHERE rolname = current_user`,
         [group],
       );
@@ -179,6 +247,21 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
       throw new Error(`D1 boot guard — refusing to boot. ${problems.join(' | ')}`);
     }
     this.logger.log('D1 role guard OK (app = RLS-confined api, worker = BYPASSRLS worker)');
+
+    // D10 — reported, NOT fatal, and the distinction is deliberate. A logging
+    // misconfiguration does not make the process unsafe to run: it widens what a
+    // LATER incident could expose. Refusing to boot over it would let a console
+    // setting change take a café's till offline at opening time, which is a worse
+    // outcome than the risk it prevents. Logged at ERROR (not warn) so it is
+    // alertable and greppable, because "the gate didn't flag it" is not evidence
+    // that it is fine — and a warning nobody reads is a failure that was renamed.
+    for (const [name, posture] of [
+      ['app', appAttrs],
+      ['worker', workerAttrs],
+    ] as const) {
+      const problem = poolLoggingProblem(name, posture);
+      if (problem) this.logger.error(problem);
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -195,7 +278,7 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
    * site (it almost always is: it is usually the method's first argument).
    *
    * Legitimate uses are narrow: work that RESOLVES which merchant a request belongs
-   * to (merchant-by-slug at login, inbound WhatsApp number -> merchant), work that
+   * to (merchant-by-handle at login, inbound WhatsApp number -> merchant), work that
    * is genuinely cross-merchant (outbox draining, cron enumerating active merchants,
    * reconciliation), and the sealed auth substrate.
    */

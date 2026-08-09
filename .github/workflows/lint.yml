@@ -45,6 +45,11 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
+          # Full history — the secret scan below reads every commit, not just the
+          # tip. A secret that was committed and then "removed" in a later commit
+          # is still in the pack and still clonable; a depth-1 checkout would
+          # report the repository clean while the credential sits one commit back.
+          fetch-depth: 0
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -74,3 +79,39 @@ jobs:
       - name: Format check
         if: '!cancelled()'
         run: pnpm format:check
+
+      # Secret scan. A STEP in this job, not a job of its own — the `lint` context
+      # is REQUIRED by branch protection, and a new job would add a context that
+      # protection does not know about, i.e. an unenforced check (see the header).
+      #
+      # WHY IT IS HERE AT ALL: GitHub gives PUBLIC repositories secret scanning and
+      # push protection free; PRIVATE repositories on the free plan get neither.
+      # This repository is going private, so the control that would BLOCK a
+      # credential at push time has to be replaced rather than simply lost.
+      #
+      # The binary is installed directly instead of using gitleaks/gitleaks-action:
+      # that action requires a paid GITLEAKS_LICENSE for repositories owned by an
+      # ORGANIZATION, and umiconsulting is one. The CLI is the same scanner with no
+      # such condition.
+      #
+      # Pinned by version and verified by checksum — an unpinned installer in a
+      # security check is its own supply-chain hole.
+      #
+      # `!cancelled()` for the same reason as the format check: one CI round should
+      # report every problem, not just the first.
+      - name: Secret scan (gitleaks)
+        if: '!cancelled()'
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          set -euo pipefail
+          curl -sSLo gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+          ./gitleaks version
+          # --log-opts="--all" scans every ref, so a secret on a side branch or in
+          # rewritten history is caught too. --redact keeps the finding out of the
+          # CI log, which is itself readable by anyone who can see the run.
+          ./gitleaks git --no-banner --redact --exit-code 1 --log-opts="--all"
