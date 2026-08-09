@@ -87,9 +87,9 @@ for (const [index, match] of matches.entries()) {
 }
 
 const expectedStatuses = new Map([
-  ['IMPLEMENTADO', 43],
+  ['IMPLEMENTADO', 44],
   ['IMPLEMENTADO CON LIMITACIONES', 19],
-  ['FOUNDATION', 1],
+  ['FOUNDATION', 0],
   ['INCOMPLETO: binding de preview', 0],
   ['INCOMPLETO: policy y expiry', 0],
   ['INCOMPLETO: rate limit', 0],

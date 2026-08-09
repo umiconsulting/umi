@@ -470,7 +470,8 @@ export const NoSaleDrawerRequest = z
     ...CommandContext,
     shiftId: Uuid,
     reasonCode: z.string().min(1).max(80),
-    approvalId: Uuid.nullable(),
+    approvalId: Uuid,
+    approvalFingerprint: Fingerprint,
   })
   .strict();
 export const NoSaleDrawerEvent = z

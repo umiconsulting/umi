@@ -144,6 +144,13 @@
       "id": "3F",
       "status": "complete",
       "subject": "Merchant customers, consent, loyalty, rewards, wallet, gift cards, checkout, and refund synchronization"
+    },
+    {
+      "commit": "HEAD (Gate 3G-A commit)",
+      "id": "3G-A",
+      "status": "complete",
+      "stateMachineVersion": 1,
+      "subject": "Hardware registry, command runtime, printer queue, device simulators, diagnostics, and recovery"
     }
   ]
 }

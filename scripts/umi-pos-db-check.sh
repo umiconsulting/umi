@@ -100,7 +100,7 @@ expect_error() {  # expect_error <label> <output>
 
 echo "== building a disposable build-v3 in $DB =="
 psql -q -c "create database $DB;" >/dev/null
-for f in 00_foundation 10_umi 20_merchant 30_runtime 30_device_pairing 31_pos_sale 32_pos_checkout 33_pos_cash 34_pos_exception 35_pos_pilot_rbac 36_pos_inventory 37_pos_customer_value 38_pos_customer_value_closeout 39_pos_customer_value_final_closeout 50_cross_schema_fk 60_triggers 90_rls 99_verify; do
+for f in 00_foundation 10_umi 20_merchant 30_runtime 30_device_pairing 31_pos_sale 32_pos_checkout 33_pos_cash 34_pos_exception 35_pos_pilot_rbac 36_pos_inventory 37_pos_customer_value 38_pos_customer_value_closeout 39_pos_customer_value_final_closeout 40_pos_hardware_runtime 50_cross_schema_fk 60_triggers 90_rls 99_verify; do
   if ! ddl_output=$(psql -X -q -v ON_ERROR_STOP=1 -d "$DB" -f "$DDL/$f.sql" 2>&1); then
     echo "  DDL FAILED at $f:"
     printf '%s\n' "$ddl_output" | grep -E 'ERROR|LINE' | head -5
@@ -662,13 +662,13 @@ expect "all pilot business roles exist" "7" \
     ('owner','admin','manager','supervisor','cashier','staff','viewer') and not is_platform;")"
 expect "super_admin remains platform-only" "t" \
   "$(q -c "select is_platform from umi.role where key='super_admin';")"
-expect "Cashier receives the exact reviewed grant count" "41" \
+expect "Cashier receives the exact reviewed grant count" "47" \
   "$(q -c "select count(*) from umi.role_permission rp join umi.role r on r.id=rp.role_id
     where r.key='cashier';")"
-expect "Supervisor receives the exact reviewed grant count" "65" \
+expect "Supervisor receives the exact reviewed grant count" "76" \
   "$(q -c "select count(*) from umi.role_permission rp join umi.role r on r.id=rp.role_id
     where r.key='supervisor';")"
-expect "Manager receives the exact reviewed grant count" "97" \
+expect "Manager receives the exact reviewed grant count" "110" \
   "$(q -c "select count(*) from umi.role_permission rp join umi.role r on r.id=rp.role_id
     where r.key='manager';")"
 expect "Viewer receives no mutation permission" "0" \
@@ -1549,6 +1549,161 @@ expect_error "a customer cannot link to another merchant" \
   "$(q -c "insert into merchant.loyalty_points_account(
     merchant_id,customer_id,program_reference,public_reference,status)
     values('$B','$CUST','pilot','LOY-CROSS','active');")"
+
+echo
+echo "== 12. Gate 3G-A hardware runtime =="
+q -c "update runtime.operator_session set
+  permissions=array[
+    'hardware.read','hardware.manage','hardware.assign','hardware.diagnostics',
+    'hardware.command.execute',
+    'hardware.printer.print','hardware.printer.reprint','hardware.printer.test',
+    'hardware.drawer.open','hardware.drawer.test','hardware.scanner.use',
+    'hardware.scanner.test','hardware.customer_display.use','hardware.customer_display.test'
+  ],entitlements='[{\"featureKey\":\"pos\",\"enabled\":true}]',
+  state='active',ended_at=null,expires_at=clock_timestamp()+interval '5 minutes'
+  where id='$OS';" >/dev/null
+HARDWARE_ID="$(as_api "$A" "$A1" "$D1" "select merchant.register_hardware_device(
+  jsonb_build_object('merchantId','$A','locationId','$A1','operatorSessionId','$OS',
+    'registerId',null,'assignedPosDeviceId',null,'deviceType','printer',
+    'manufacturer','Simulator','model','receipt-v1','publicReference','SIM-PRINTER-1',
+    'transport','simulator','capabilities',jsonb_build_array('printer.receipt','printer.test_page')));" )"
+expect "hardware registration creates one scoped device" "1" \
+  "$(q -c "select count(*) from merchant.hardware_device where id='$HARDWARE_ID'
+    and merchant_id='$A' and location_id='$A1' and device_type='printer';")"
+as_api "$A" "$A1" "$D1" "select merchant.assign_hardware_device(jsonb_build_object(
+  'merchantId','$A','locationId','$A1','operatorSessionId','$OS','hardwareId','$HARDWARE_ID',
+  'registerId',null,'assignedPosDeviceId','$D1','primary',true,'expectedVersion',1));" >/dev/null
+expect "hardware assignment binds the enrolled POS device" "1|1" \
+  "$(q -c "select (assigned_pos_device_id='$D1')::int,
+    (select primary_device::int from merchant.hardware_assignment
+      where hardware_id='$HARDWARE_ID' and released_at is null)
+    from merchant.hardware_device where id='$HARDWARE_ID';")"
+HARDWARE_COMMAND='a9000000-0000-4000-8000-000000000101'
+expect_error "an official receipt command requires an authoritative receipt" \
+  "$(as_api_raw "$A" "$A1" "$D1" "select merchant.create_hardware_command(jsonb_build_object(
+    'merchantId','$A','locationId','$A1','operatorSessionId','$OS','registerId',null,
+    'commandId','a9000000-0000-4000-8000-000000000199','idempotencyKey','forged-receipt',
+    'hardwareId','$HARDWARE_ID','commandType','print_receipt','sourceAggregateType','receipt',
+    'sourceAggregateId','a9000000-0000-4000-8000-000000000198','configurationVersion',2,
+    'payloadFingerprint',repeat('f',64),'correlationId','forged-receipt'));")"
+as_api "$A" "$A1" "$D1" "select merchant.create_hardware_command(jsonb_build_object(
+  'merchantId','$A','locationId','$A1','operatorSessionId','$OS','registerId',null,
+  'commandId','$HARDWARE_COMMAND','idempotencyKey','hardware-print-command-1',
+  'hardwareId','$HARDWARE_ID','commandType','print_receipt','sourceAggregateType','receipt',
+  'sourceAggregateId','d3000000-0000-4000-8000-000000000006','configurationVersion',2,
+  'payloadFingerprint',repeat('a',64),'correlationId','hardware-db-check',
+  'printJobId','$HARDWARE_COMMAND','safePayload',jsonb_build_object('receiptRef','receipt-safe-1')));" >/dev/null
+as_api "$A" "$A1" "$D1" "select merchant.transition_hardware_command(
+  '$A','$A1','$OS','$HARDWARE_COMMAND','dispatching',null,'{}');
+  select merchant.transition_hardware_command(
+  '$A','$A1','$OS','$HARDWARE_COMMAND','succeeded',null,'{\"acknowledged\":true}');" >/dev/null
+expect "printer command and persistent queue reach one terminal result" "succeeded|printed|1|1" \
+  "$(q -c "select
+    (select status from merchant.hardware_command_event where command_id='$HARDWARE_COMMAND'
+      order by sequence desc limit 1),
+    (select status from merchant.hardware_print_job_event where print_job_id='$HARDWARE_COMMAND'
+      order by sequence desc limit 1),
+    (select count(*) from merchant.hardware_command where id='$HARDWARE_COMMAND'),
+    (select count(*) from merchant.hardware_print_job where id='$HARDWARE_COMMAND');")"
+expect "hardware command retry returns the original identity" "$HARDWARE_COMMAND" \
+  "$(as_api "$A" "$A1" "$D1" "select merchant.create_hardware_command(jsonb_build_object(
+    'merchantId','$A','locationId','$A1','operatorSessionId','$OS','registerId',null,
+    'commandId','$HARDWARE_COMMAND','idempotencyKey','hardware-print-command-1',
+    'hardwareId','$HARDWARE_ID','commandType','print_receipt','sourceAggregateType','receipt',
+    'sourceAggregateId','d3000000-0000-4000-8000-000000000006','configurationVersion',2,
+    'payloadFingerprint',repeat('a',64),'correlationId','hardware-db-check'));")"
+HARDWARE_RETRY_COMMAND='a9000000-0000-4000-8000-000000000103'
+as_api "$A" "$A1" "$D1" "select merchant.create_hardware_command(jsonb_build_object(
+  'merchantId','$A','locationId','$A1','operatorSessionId','$OS','registerId',null,
+  'commandId','$HARDWARE_RETRY_COMMAND','idempotencyKey','hardware-retry-command-1',
+  'hardwareId','$HARDWARE_ID','commandType','print_test_page','sourceAggregateType','diagnostic',
+  'sourceAggregateId','persistent-retry-limit','configurationVersion',2,
+  'payloadFingerprint',repeat('d',64),'correlationId','hardware-retry-limit',
+  'printJobId','$HARDWARE_RETRY_COMMAND','safePayload','{}'::jsonb));
+  select merchant.transition_hardware_command(
+    '$A','$A1','$OS','$HARDWARE_RETRY_COMMAND','dispatching',null,'{}');
+  select merchant.transition_hardware_command(
+    '$A','$A1','$OS','$HARDWARE_RETRY_COMMAND','retryable','busy','{}');
+  select merchant.transition_hardware_command(
+    '$A','$A1','$OS','$HARDWARE_RETRY_COMMAND','dispatching',null,'{}');
+  select merchant.transition_hardware_command(
+    '$A','$A1','$OS','$HARDWARE_RETRY_COMMAND','retryable','busy','{}');
+  select merchant.transition_hardware_command(
+    '$A','$A1','$OS','$HARDWARE_RETRY_COMMAND','dispatching',null,'{}');
+  select merchant.transition_hardware_command(
+    '$A','$A1','$OS','$HARDWARE_RETRY_COMMAND','retryable','busy','{}');" >/dev/null
+expect "hardware retry limit remains terminal across runtime restarts" "failed|terminal_hardware_failure|3" \
+  "$(q -c "select e.status,e.failure_code,
+    (select count(*) from merchant.hardware_command_event d
+      where d.command_id='$HARDWARE_RETRY_COMMAND' and d.status='dispatching')
+    from merchant.hardware_command_event e where e.command_id='$HARDWARE_RETRY_COMMAND'
+    order by e.sequence desc limit 1;")"
+expect "No Sale persistence requires an approval fact" "NO" \
+  "$(q -c "select is_nullable from information_schema.columns
+    where table_schema='merchant' and table_name='no_sale_drawer_event'
+      and column_name='approval_id';")"
+expect "another location cannot read hardware command events" "0" \
+  "$(as_api "$A" "$A2" "$D2" "select count(*) from merchant.hardware_command_event
+    where command_id='$HARDWARE_COMMAND';")"
+expect_error "another location cannot use assigned hardware" \
+  "$(as_api_raw "$A" "$A2" "$D2" "select merchant.create_hardware_command(jsonb_build_object(
+    'merchantId','$A','locationId','$A2','operatorSessionId','$OS','registerId',null,
+    'commandId','a9000000-0000-4000-8000-000000000102',
+    'idempotencyKey','hardware-cross-location-1','hardwareId','$HARDWARE_ID',
+    'commandType','print_receipt','sourceAggregateType','receipt',
+    'sourceAggregateId','d3000000-0000-4000-8000-000000000006',
+    'configurationVersion',2,'payloadFingerprint',repeat('b',64),'correlationId','cross'));")"
+DRAWER_ID="$(as_api "$A" "$A1" "$D1" "select merchant.register_hardware_device(
+  jsonb_build_object('merchantId','$A','locationId','$A1','operatorSessionId','$OS',
+    'registerId','d3000000-0000-4000-8000-000000000040','assignedPosDeviceId','$D1',
+    'deviceType','cash_drawer','manufacturer','Simulator','model','drawer-v1',
+    'publicReference','SIM-DRAWER-1','transport','simulator',
+    'capabilities',jsonb_build_array('drawer.open','drawer.status')));")"
+as_api "$A" "$A1" "$D1" "select merchant.assign_hardware_device(jsonb_build_object(
+  'merchantId','$A','locationId','$A1','operatorSessionId','$OS','hardwareId','$DRAWER_ID',
+  'registerId','d3000000-0000-4000-8000-000000000040','assignedPosDeviceId','$D1',
+  'primary',false,'expectedVersion',1));" >/dev/null
+expect_error "drawer open rejects an arbitrary source" \
+  "$(as_api_raw "$A" "$A1" "$D1" "select merchant.create_hardware_command(jsonb_build_object(
+    'merchantId','$A','locationId','$A1','operatorSessionId','$OS',
+    'registerId','d3000000-0000-4000-8000-000000000040',
+    'commandId','a9000000-0000-4000-8000-000000000110','idempotencyKey','drawer-forged',
+    'hardwareId','$DRAWER_ID','commandType','open_drawer','sourceAggregateType','cash_action',
+    'sourceAggregateId','a9000000-0000-4000-8000-000000000111','configurationVersion',2,
+    'payloadFingerprint',repeat('c',64),'correlationId','drawer-forged',
+    'safePayload',jsonb_build_object('drawer',jsonb_build_object(
+      'reason','cash_refund','cashReference','a9000000-0000-4000-8000-000000000111'))));")"
+DRAWER_COMMAND='a9000000-0000-4000-8000-000000000112'
+as_api "$A" "$A1" "$D1" "select merchant.create_hardware_command(jsonb_build_object(
+  'merchantId','$A','locationId','$A1','operatorSessionId','$OS',
+  'registerId','d3000000-0000-4000-8000-000000000040',
+  'commandId','$DRAWER_COMMAND','idempotencyKey','drawer-refund-1',
+  'hardwareId','$DRAWER_ID','commandType','open_drawer','sourceAggregateType','cash_action',
+  'sourceAggregateId','d3000000-0000-4000-8000-000000000011','configurationVersion',2,
+  'payloadFingerprint',repeat('d',64),'correlationId','drawer-refund',
+  'safePayload',jsonb_build_object('drawer',jsonb_build_object(
+    'reason','cash_refund','cashReference','d3000000-0000-4000-8000-000000000011'))));" >/dev/null
+expect "drawer open binds to one committed cash fact" "1" \
+  "$(q -c "select count(*) from merchant.hardware_command where id='$DRAWER_COMMAND';")"
+expect_error "a committed cash fact cannot emit a second drawer pulse" \
+  "$(as_api_raw "$A" "$A1" "$D1" "select merchant.create_hardware_command(jsonb_build_object(
+    'merchantId','$A','locationId','$A1','operatorSessionId','$OS',
+    'registerId','d3000000-0000-4000-8000-000000000040',
+    'commandId','a9000000-0000-4000-8000-000000000113','idempotencyKey','drawer-refund-2',
+    'hardwareId','$DRAWER_ID','commandType','open_drawer','sourceAggregateType','cash_action',
+    'sourceAggregateId','d3000000-0000-4000-8000-000000000011','configurationVersion',2,
+    'payloadFingerprint',repeat('e',64),'correlationId','drawer-refund-duplicate',
+    'safePayload',jsonb_build_object('drawer',jsonb_build_object(
+      'reason','cash_refund','cashReference','d3000000-0000-4000-8000-000000000011'))));")"
+expect_error "api cannot mutate hardware command history" \
+  "$(as_api_raw "$A" "$A1" "$D1" "update merchant.hardware_command_event
+    set status='failed' where command_id='$HARDWARE_COMMAND';")"
+expect "all hardware authority tables force RLS" "7" \
+  "$(q -c "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='merchant' and c.relname in (
+      'hardware_device','hardware_assignment','hardware_command','hardware_command_event',
+      'hardware_print_job','hardware_print_job_event','hardware_diagnostic')
+      and c.relrowsecurity and c.relforcerowsecurity;")"
 
 echo
 if [ "$fail" -eq 0 ]; then

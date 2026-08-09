@@ -37,6 +37,7 @@ import { PosCashModule } from './modules/pos-cash/pos-cash.module';
 import { PosExceptionModule } from './modules/pos-exception/pos-exception.module';
 import { PosInventoryModule } from './modules/pos-inventory/pos-inventory.module';
 import { PosCustomerValueModule } from './modules/pos-customer-value/pos-customer-value.module';
+import { PosHardwareModule } from './modules/pos-hardware/pos-hardware.module';
 
 /**
  * Root module for the WEB process. Imports shared infrastructure + domain
@@ -77,6 +78,7 @@ import { PosCustomerValueModule } from './modules/pos-customer-value/pos-custome
     PosExceptionModule,
     PosInventoryModule,
     PosCustomerValueModule,
+    PosHardwareModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

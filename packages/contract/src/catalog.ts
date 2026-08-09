@@ -17,6 +17,7 @@ import { posCashModels } from './pos-cash';
 import { posExceptionModels } from './pos-exception';
 import { posInventoryModels } from './pos-inventory';
 import { posCustomerValueModels } from './pos-customer-value';
+import { posHardwareModels } from './pos-hardware';
 import { ROUTE_TABLE, type RouteContract } from './route-table';
 import type { ZodTypeAny } from 'zod';
 
@@ -30,7 +31,7 @@ import type { ZodTypeAny } from 'zod';
  * breaking change to the described paths, so the artifact major moves, even though
  * no client is pinned in the field yet and the URL major is unchanged at 1.
  */
-export const CONTRACT_VERSION = '2.6.0';
+export const CONTRACT_VERSION = '2.7.0';
 
 /** The major in the URL. A v1 client never silently receives v2 behaviour. */
 export const API_MAJOR_VERSION = 1;
@@ -74,6 +75,7 @@ export const modelCatalog: Readonly<Record<string, ZodTypeAny>> = {
   ...posExceptionModels,
   ...posInventoryModels,
   ...posCustomerValueModels,
+  ...posHardwareModels,
 };
 
 export const invariantCatalog = {
@@ -106,6 +108,8 @@ export const invariantCatalog = {
   LoyaltyLedger:
     'Every points effect is an immutable ledger fact. A projection is never the sole authority.',
   StoredValueAtomicity: 'A stored-value debit and its committed sale are one database transaction.',
+  HardwareSideEffect:
+    'A hardware command has stable identity. An unknown physical outcome is never retried blindly.',
 } as const;
 
 /** Hours a recorded command result stays replayable. Mirrored by `business_command.expires_at`. */

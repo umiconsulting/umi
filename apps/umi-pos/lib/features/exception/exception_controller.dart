@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -52,11 +53,14 @@ final class SaleExceptionController extends ChangeNotifier {
   SaleExceptionController({
     required SaleExceptionRepository repository,
     required SaleExceptionRecoveryStore recoveryStore,
+    Future<void> Function(SaleExceptionResult result)? afterCommit,
   }) : _repository = repository,
-       _recoveryStore = recoveryStore;
+       _recoveryStore = recoveryStore,
+       _afterCommit = afterCommit;
 
   final SaleExceptionRepository _repository;
   final SaleExceptionRecoveryStore _recoveryStore;
+  final Future<void> Function(SaleExceptionResult result)? _afterCommit;
   SaleExceptionState _state = const SaleExceptionState();
   SaleExceptionState get state => _state;
   String? _merchantId;
@@ -353,6 +357,7 @@ final class SaleExceptionController extends ChangeNotifier {
           history: _state.history,
         ),
       );
+      _runPostCommit(result);
     } on AppException catch (error) {
       await recoverPending(fallbackError: error.code);
     } finally {
@@ -376,13 +381,15 @@ final class SaleExceptionController extends ChangeNotifier {
       );
       if (recovery.result != null) {
         await _recoveryStore.clear(pending.merchantId, pending.locationId);
+        final result = SaleExceptionResult.fromJson(recovery.result!);
         _set(
           SaleExceptionState(
             phase: SaleExceptionPhase.recovered,
             saleId: pending.saleId,
-            result: SaleExceptionResult.fromJson(recovery.result!),
+            result: result,
           ),
         );
+        _runPostCommit(result);
       } else if (recovery.terminalOutcome != null) {
         final preview = RefundPreview.fromJson(pending.preview);
         final terminal = ManualTerminalRefundOutcomeResult.fromJson(
@@ -458,6 +465,12 @@ final class SaleExceptionController extends ChangeNotifier {
     } on AppException catch (error) {
       _failure(pending.saleId, fallbackError ?? error.code);
     }
+  }
+
+  void _runPostCommit(SaleExceptionResult result) {
+    final callback = _afterCommit;
+    if (callback == null) return;
+    unawaited(callback(result).catchError((Object _) {}));
   }
 
   void clear() {

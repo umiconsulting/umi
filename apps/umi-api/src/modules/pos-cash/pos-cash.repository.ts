@@ -1772,6 +1772,28 @@ export class PosCashRepository {
     if (!shift.rows[0]) throw new Error('SHIFT_NOT_OPEN');
     const policy = await this.policy(client, merchantId, dto.locationId, shift.rows[0].currency);
     if (!policy.noSaleDrawerAllowed) throw new Error('NO_SALE_DRAWER_DISABLED');
+    const expectedFingerprint = createHash('sha256')
+      .update(
+        [
+          merchantId,
+          dto.locationId,
+          dto.shiftId,
+          dto.reasonCode,
+          authorization.operatorId,
+          authorization.deviceId,
+        ].join(':'),
+      )
+      .digest('hex');
+    if (dto.approvalFingerprint !== expectedFingerprint) {
+      throw new Error('APPROVAL_FINGERPRINT_MISMATCH');
+    }
+    await this.consumeApproval(client, dto.approvalId, {
+      merchantId,
+      locationId: dto.locationId,
+      permission: 'cash.drawer.no_sale.approve',
+      fingerprint: dto.approvalFingerprint,
+      commandId: dto.commandId,
+    });
     const recent = await client.query<{ total: string }>(
       `SELECT count(*)::text AS total
        FROM merchant.no_sale_drawer_event

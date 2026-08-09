@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-05",
+  "updatedAt": "2026-08-09",
   "branch": "architectureUMIposIntegration",
   "certificationSourceCommit": "a1e794d8fe0e9883f5677147ab81c4342f1a3980",
   "certificationDate": "2026-07-27",
@@ -24,7 +24,9 @@
     "3C",
     "3D",
     "3D.1",
-    "3E"
+    "3E",
+    "3F",
+    "3G-A"
   ],
   "authorities": {
     "api": "apps/umi-api",
@@ -44,6 +46,9 @@
     "loyaltyLedger": "merchant.loyalty_points_ledger",
     "walletLedger": "merchant.loyalty_stored_value_ledger",
     "giftCardLedger": "merchant.loyalty_gift_card_ledger",
+    "hardwareRegistry": "merchant.hardware_device and merchant.hardware_assignment",
+    "hardwareCommands": "merchant.hardware_command and append-only merchant.hardware_command_event",
+    "printerQueue": "merchant.hardware_print_job and append-only merchant.hardware_print_job_event",
     "operationalTelemetry": "apps/umi-api/src/shared/operations",
     "health": "apps/umi-api/src/modules/health"
   },
@@ -78,8 +83,8 @@
     "gate2AStatus": "complete",
     "flutterVersion": "3.44.6",
     "dartVersion": "3.12.2",
-    "contractVersion": "2.6.0",
-    "contractContentHash": "cfe933a00f07b8972d28fad536001d1260cc259c2d3bed56efec5a2c9a0278c9",
+    "contractVersion": "2.7.0",
+    "contractContentHash": "7223f72894a444d32735ba8e1a325a160bc09a394bca222d12a8bb2545da6323",
     "stateManagement": "ChangeNotifier with one explicit composition root",
     "navigation": "central typed route guard",
     "secureStorage": "flutter_secure_storage with no plaintext fallback",
@@ -105,6 +110,7 @@
     "gate3D1Status": "complete",
     "gate3EStatus": "complete",
     "gate3FStatus": "complete",
+    "gate3GAStatus": "complete",
     "pilotRoleGrantMatrix": "config/umipos-pilot-role-grants.json",
     "pilotApprovalMatrix": "config/umipos-pilot-approval-boundaries.json",
     "pilotPermissionInventory": "config/umipos-permission-inventory.json",
@@ -156,6 +162,16 @@
     "customerValueRefund": "historical points and value effects receive bounded proportional compensating facts",
     "customerValueOfflineBoundary": "customer reference only for eligible cash replay; reward and stored value remain online-only",
     "customerValuePermissions": "least-privilege customer, loyalty, wallet, gift-card, and approval grants",
+    "hardwareRuntime": "one HardwareService, HardwareCoordinator, DeviceAdapter, and transport abstraction path",
+    "hardwareRegistry": "server-owned merchant, location, register, enrolled-device, capability, and version scope",
+    "hardwareCommands": "persistent fingerprinted commands with idempotency, correlation, append-only events, and explicit unknown outcomes",
+    "printerRuntime": "persistent bounded queue, authoritative receipt payload, controlled reprint, and unknown-outcome recovery",
+    "drawerRuntime": "permission and policy controlled commands after committed cash facts",
+    "scannerRuntime": "bounded canonical scan events with duplicate suppression and PIN-entry exclusion",
+    "customerDisplayRuntime": "customer-safe sale, payment, and completion projections",
+    "hardwareSimulators": "deterministic printer, drawer, scanner, and customer display adapters",
+    "hardwareFoundations": "payment terminal and scale remain disabled adapter foundations",
+    "hardwareOfflineBoundary": "native command journal foundation only; Web has no secure native hardware parity",
     "compensatingReceipt": "immutable exception receipt preserves the original sale and receipt",
     "saleExceptionRecovery": "secure command identity queries the authoritative idempotent result after restart or response loss",
     "gate3DOfflineBoundary": "all post-sale exception mutations are online-only",
@@ -194,7 +210,7 @@
     "offlineCash": "default-deny server-issued branch policy; eligible native cash checkout is encrypted and provisional",
     "offlineRecovery": "generated-SDK gateway, serialized journal mutations, restart deduplication, ordered replay, typed recovery actions, response-loss query, reconciliation, immutable mapping, Recovery Center",
     "offlineDatabaseValidation": "clean migration chain plus merchant, location, device, credential, immutability, revocation and rotation negative matrix passed in disposable PostgreSQL",
-    "nativeBuild": "Linux debug build passed for the complete Gate 3F closeout",
+    "nativeBuild": "Linux debug build passed for Gate 3G-A",
     "webOfflineCapability": "sensitive journaling unsupported; online operation only",
     "checkoutAuthority": "apps/umi-api/src/modules/pos-checkout",
     "checkoutMode": "online, immediately repriced, explicitly confirmed, idempotent",
@@ -218,9 +234,9 @@
     "pinFoundation": "merchant-unique personal PIN, keyed lookup, server-side scrypt verification, bounded attempts, and no client role selection",
     "managerApprovalFoundation": "single-action scoped five-minute elevation",
     "readyShell": true,
-    "latestLocalCommit": "HEAD (Gate 3F closeout commit in PR #72)",
-    "pushStatus": "Gate 3F closeout publication uses PR #72",
+    "latestLocalCommit": "HEAD (Gate 3G-A commit in PR #72)",
+    "pushStatus": "Gate 3G-A publication uses PR #72",
     "pullRequestStatus": "PR #72 targets build-v3"
   },
-  "nextGate": "Gate 3G hardware foundations is authorized. Gate 3G has not started."
+  "nextGate": "Gate 3G-B pilot hardware integration is authorized. Gate 3G-B has not started."
 }

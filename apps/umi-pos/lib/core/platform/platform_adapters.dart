@@ -12,18 +12,6 @@ final class CapabilityResult<T> {
   final T? value;
 }
 
-abstract interface class ReceiptPrinter {
-  Future<CapabilityResult<void>> printReceipt();
-}
-
-abstract interface class BarcodeScanner {
-  Future<CapabilityResult<String>> scan();
-}
-
-abstract interface class CashDrawer {
-  Future<CapabilityResult<void>> open();
-}
-
 abstract interface class ConnectivityAdapter {
   Future<CapabilityResult<bool>> isOnline();
 }
@@ -34,27 +22,6 @@ abstract interface class DeviceIdentityAdapter {
 
 abstract interface class AppLifecycleAdapter {
   CapabilityResult<void> observe();
-}
-
-final class UnsupportedReceiptPrinter implements ReceiptPrinter {
-  const UnsupportedReceiptPrinter();
-  @override
-  Future<CapabilityResult<void>> printReceipt() async =>
-      const CapabilityResult.unsupported();
-}
-
-final class UnsupportedBarcodeScanner implements BarcodeScanner {
-  const UnsupportedBarcodeScanner();
-  @override
-  Future<CapabilityResult<String>> scan() async =>
-      const CapabilityResult.unsupported();
-}
-
-final class UnsupportedCashDrawer implements CashDrawer {
-  const UnsupportedCashDrawer();
-  @override
-  Future<CapabilityResult<void>> open() async =>
-      const CapabilityResult.unsupported();
 }
 
 final class UnsupportedConnectivity implements ConnectivityAdapter {
@@ -79,25 +46,16 @@ final class UnsupportedAppLifecycle implements AppLifecycleAdapter {
 
 final class PlatformAdapters {
   const PlatformAdapters({
-    required this.printer,
-    required this.scanner,
-    required this.drawer,
     required this.connectivity,
     required this.deviceIdentity,
     required this.lifecycle,
   });
 
   const PlatformAdapters.unsupported()
-    : printer = const UnsupportedReceiptPrinter(),
-      scanner = const UnsupportedBarcodeScanner(),
-      drawer = const UnsupportedCashDrawer(),
-      connectivity = const UnsupportedConnectivity(),
+    : connectivity = const UnsupportedConnectivity(),
       deviceIdentity = const UnsupportedDeviceIdentity(),
       lifecycle = const UnsupportedAppLifecycle();
 
-  final ReceiptPrinter printer;
-  final BarcodeScanner scanner;
-  final CashDrawer drawer;
   final ConnectivityAdapter connectivity;
   final DeviceIdentityAdapter deviceIdentity;
   final AppLifecycleAdapter lifecycle;

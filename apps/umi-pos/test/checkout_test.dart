@@ -289,19 +289,22 @@ final class _CartRepository implements CartRepository {
   Future<Cart> clear(String merchantId, ClearCartRequest input) async => cart;
 }
 
-CheckoutController _controller(_CheckoutRepository repository) =>
-    CheckoutController(
-      repository: repository,
-      telemetry: const SafeTelemetry(
-        enabled: false,
-        context: TelemetryContext(
-          appVersion: 'test',
-          environment: 'test',
-          platform: 'test',
-        ),
-        exporter: NoopTelemetryExporter(),
-      ),
-    );
+CheckoutController _controller(
+  _CheckoutRepository repository, {
+  Future<void> Function(CheckoutResult result)? afterCommit,
+}) => CheckoutController(
+  repository: repository,
+  afterCommit: afterCommit,
+  telemetry: const SafeTelemetry(
+    enabled: false,
+    context: TelemetryContext(
+      appVersion: 'test',
+      environment: 'test',
+      platform: 'test',
+    ),
+    exporter: NoopTelemetryExporter(),
+  ),
+);
 
 void main() {
   test('requires server repricing then explicit confirmation', () async {
@@ -327,6 +330,26 @@ void main() {
       repository.commands[0].idempotencyKey,
       isNot(repository.commands[1].idempotencyKey),
     );
+  });
+
+  test('completed sale requests hardware after the financial result', () async {
+    final repository = _CheckoutRepository();
+    CheckoutResult? hardwareResult;
+    final controller = _controller(
+      repository,
+      afterCommit: (result) async => hardwareResult = result,
+    );
+    await controller.preview(
+      merchantId: '00000000-0000-4000-8000-000000000001',
+      locationId: '00000000-0000-4000-8000-000000000002',
+      operatorSessionId: '00000000-0000-4000-8000-000000000003',
+      cartId: '00000000-0000-4000-8000-000000000004',
+      cartVersion: 3,
+      paymentMethod: 'cash',
+    );
+    await controller.confirm();
+    await Future<void>.delayed(Duration.zero);
+    expect(hardwareResult?.status, 'completed');
   });
 
   test(

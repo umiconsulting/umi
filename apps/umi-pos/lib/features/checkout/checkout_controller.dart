@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -43,15 +44,18 @@ final class CheckoutController extends ChangeNotifier {
     OfflineCheckoutService? offlineCheckout,
     ConnectivityController? connectivity,
     required Telemetry telemetry,
+    Future<void> Function(CheckoutResult result)? afterCommit,
   }) : _repository = repository,
        _offlineCheckout = offlineCheckout,
        _connectivity = connectivity,
-       _telemetry = telemetry;
+       _telemetry = telemetry,
+       _afterCommit = afterCommit;
 
   final CheckoutRepository _repository;
   final OfflineCheckoutService? _offlineCheckout;
   final ConnectivityController? _connectivity;
   final Telemetry _telemetry;
+  final Future<void> Function(CheckoutResult result)? _afterCommit;
   CheckoutState _state = const CheckoutState();
   CheckoutState get state => _state;
   List<Map<String, Object?>> get tenderDrafts => _tenderDrafts;
@@ -237,6 +241,9 @@ final class CheckoutController extends ChangeNotifier {
               : recovered.recoveryState,
         ),
       );
+      if (phase == CheckoutPhase.completed && recoveredResult != null) {
+        _runPostCommit(recoveredResult);
+      }
       _event('checkout_recovered');
     } on AppException catch (error) {
       if (error.code != 'RESOURCE_NOT_FOUND') _failure(error);
@@ -458,12 +465,23 @@ final class CheckoutController extends ChangeNotifier {
       if (phase == CheckoutPhase.completed) {
         _event('payment_completed');
         _event('receipt_created');
+        _runPostCommit(result);
       } else if (phase == CheckoutPhase.paymentUnknown) {
         _event('payment_unknown');
       }
     } on AppException catch (error) {
       _failure(error);
     }
+  }
+
+  void _runPostCommit(CheckoutResult result) {
+    final callback = _afterCommit;
+    if (callback == null) return;
+    unawaited(
+      callback(result).catchError((Object _) {
+        _event('hardware_recovery_required');
+      }),
+    );
   }
 
   Future<void> _submitOffline(String fingerprint) async {

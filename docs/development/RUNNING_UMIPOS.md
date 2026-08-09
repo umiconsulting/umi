@@ -310,7 +310,7 @@ command after an unknown response.
 When the close threshold applies, enter a different manager PIN in the close dialog. The approval
 is short-lived and applies only to the selected count and ledger sequence.
 
-The Cash Center records a no-sale drawer request only. Gate 3C does not control drawer hardware.
+Gate 3G-A sends an approved no-sale request through Hardware Runtime after the server records the event.
 Advanced cash operations require connectivity. UmiPOS does not close or reconcile a shift offline.
 
 Use the disposable database script for destructive validation. The script creates and removes its
@@ -552,6 +552,58 @@ Una pérdida de respuesta requiere consultar el comando original. No repitas un 
 Las operaciones de customers, rewards, wallet y gift card son online-only. El replay cash puede conservar una referencia limitada del cliente.
 
 El script crea y elimina su base desechable. No lo apuntes a una base compartida. No borres datos de producción.
+
+## Runtime de hardware de Gate 3G-A
+
+Genera y verifica los contratos de hardware:
+
+```sh
+pnpm --filter @umi/contract generate
+pnpm --filter @umi/contract generate:check
+```
+
+Ejecuta las pruebas específicas de la API y Flutter:
+
+```sh
+pnpm umi-pos:hardware-api-tests
+pnpm umi-pos:hardware-tests
+```
+
+Ejecuta la matriz desechable de PostgreSQL y RLS:
+
+```sh
+pnpm umi-pos:hardware-db-check
+```
+
+El comando crea y elimina una base desechable. No uses una base compartida.
+
+Usa el laboratorio de simuladores para el desarrollo local. Registra el simulador con la API de hardware.
+Asígnalo a la ubicación y al dispositivo POS inscritos. El Centro de hardware resuelve el adaptador.
+
+Prueba la recuperación de la impresora con estos estados deterministas:
+
+- `success` guarda un artefacto de impresión seguro.
+- `offline`, `busy` y `paper_out` devuelven fallas tipadas.
+- `timeout` y `unknown_outcome` no imprimen otro recibo automáticamente.
+- Una reimpresión controlada crea un trabajo nuevo con la referencia original.
+
+Prueba el cajón con una acción de efectivo confirmada y permitida. Repite la solicitud con el mismo comando.
+Confirma que el runtime devuelve el comando original y no emite otro pulso.
+
+Prueba el escáner con código de barras, QR, ráfaga duplicada y desconexión. Activa la protección del PIN.
+Confirma que el adaptador de teclado no captura el PIN.
+
+Prueba la pantalla con los estados de venta, pago, finalización y desconexión. Confirma que no hay datos privados.
+
+Compila los destinos de compatibilidad:
+
+```sh
+cd apps/umi-pos
+flutter build linux --debug
+flutter build web --debug
+```
+
+Gate 3G-A no requiere hardware físico, un SDK de fabricante o un proveedor de pagos.
 
 ## Canonical PR check
 

@@ -296,3 +296,32 @@ La activación, la emisión, el ajuste de puntos y el merge consumen una aprobac
 `loyalty.reward.approve` vincula la vista del reward y la huella de tenders. `customer.history.global` permite hechos globales aprobados.
 
 `customer.history.admin` limita los hechos administrativos a Admin y Owner. Una location nula no concede acceso.
+
+## 16. Permisos de hardware de Gate 3G-A
+
+Gate 3G-A añade permisos específicos a la misma matriz. Ninguna decisión usa el nombre del rol.
+
+| Perfil          | Autoridad de hardware                                                                              |
+| --------------- | -------------------------------------------------------------------------------------------------- |
+| Cashier y Staff | Lee asignaciones, imprime recibos, usa el scanner, actualiza el display y abre el cajón permitido. |
+| Supervisor      | Añade diagnósticos seleccionados, pruebas y reimpresión controlada.                                |
+| Manager         | Añade diagnósticos completos del piloto y la prueba del cajón.                                     |
+| Admin y Owner   | Registra, asigna, activa, desactiva y diagnostica hardware.                                        |
+| Viewer          | No recibe acceso al hardware por defecto.                                                          |
+| super_admin     | Permanece fuera del viaje operativo del café.                                                      |
+
+Los permisos canónicos son:
+
+- `hardware.read`;
+- `hardware.command.execute`;
+- `hardware.manage`;
+- `hardware.assign`;
+- `hardware.diagnostics`;
+- `hardware.printer.print`, `hardware.printer.reprint` y `hardware.printer.test`;
+- `hardware.drawer.open` y `hardware.drawer.test`;
+- `hardware.scanner.use` y `hardware.scanner.test`;
+- `hardware.customer_display.use` y `hardware.customer_display.test`.
+
+Cada comando valida el entitlement POS, el dispositivo, la credencial, la sesión, el merchant y la location.
+El permiso `hardware.drawer.open` no permite una apertura arbitraria. La política de efectivo valida la razón.
+Un comando `NoSale` requiere `cash.drawer.no_sale.approve` de otro operador. La autoaprobación permanece bloqueada.

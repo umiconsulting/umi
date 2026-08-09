@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -29,15 +30,30 @@ final class CashState {
   final ShiftCloseResult? closeResult;
 }
 
+final class CommittedCashHardwareAction {
+  const CommittedCashHardwareAction({
+    required this.reason,
+    required this.reference,
+    required this.registerId,
+  });
+
+  final String reason;
+  final String reference;
+  final String? registerId;
+}
+
 final class CashController extends ChangeNotifier {
   CashController({
     required CashRepository repository,
     CashRecoveryStore? recoveryStore,
+    Future<void> Function(CommittedCashHardwareAction action)? afterCommit,
   }) : _repository = repository,
-       _recoveryStore = recoveryStore ?? MemoryCashRecoveryStore();
+       _recoveryStore = recoveryStore ?? MemoryCashRecoveryStore(),
+       _afterCommit = afterCommit;
 
   final CashRepository _repository;
   final CashRecoveryStore _recoveryStore;
+  final Future<void> Function(CommittedCashHardwareAction action)? _afterCommit;
   CashState _state = const CashState();
   CashState get state => _state;
   String? _merchantId;
@@ -54,6 +70,11 @@ final class CashController extends ChangeNotifier {
       return null;
     }
     return shift['id'] as String?;
+  }
+
+  String? get activeRegisterId {
+    final shift = _state.snapshot?.currentShift;
+    return shift?['status'] == 'open' ? shift!['registerId'] as String? : null;
   }
 
   void setContext({
@@ -117,7 +138,11 @@ final class CashController extends ChangeNotifier {
       (item) => item['id'] == registerId,
     );
     await _perform(() async {
-      final ids = await _commandIds('open_shift');
+      final ids = await _commandIds(
+        'open_shift',
+        hardwareReason: 'register_open',
+        registerId: registerId,
+      );
       await _repository.open(
         _merchantId!,
         OpenCashShiftRequest(
@@ -138,6 +163,13 @@ final class CashController extends ChangeNotifier {
       );
       await _completeCommand(ids);
       await _reload();
+      _runPostCommit(
+        CommittedCashHardwareAction(
+          reason: 'register_open',
+          reference: ids.commandId,
+          registerId: registerId,
+        ),
+      );
     });
   }
 
@@ -151,7 +183,14 @@ final class CashController extends ChangeNotifier {
   }) async {
     final shift = _requireShift();
     await _perform(() async {
-      final ids = await _commandIds('cash_movement');
+      final ids = await _commandIds(
+        'cash_movement',
+        hardwareReason:
+            const {'paid_in', 'paid_out', 'safe_drop'}.contains(type)
+            ? type
+            : null,
+        registerId: shift['registerId'] as String?,
+      );
       await _repository.movement(
         _merchantId!,
         shift['id']! as String,
@@ -175,6 +214,15 @@ final class CashController extends ChangeNotifier {
       );
       await _completeCommand(ids);
       await _reload();
+      if (const {'paid_in', 'paid_out', 'safe_drop'}.contains(type)) {
+        _runPostCommit(
+          CommittedCashHardwareAction(
+            reason: type,
+            reference: ids.commandId,
+            registerId: shift['registerId'] as String?,
+          ),
+        );
+      }
     });
   }
 
@@ -469,10 +517,50 @@ final class CashController extends ChangeNotifier {
     });
   }
 
-  Future<void> requestNoSale(String reasonCode) async {
+  Future<({String approvalId, String fingerprint})> approveNoSale({
+    required String managerPin,
+    required String reasonCode,
+  }) async {
+    final shift = _requireShift();
+    final fingerprint = sha256
+        .convert(
+          utf8.encode(
+            [
+              _merchantId!,
+              _locationId!,
+              shift['id']! as String,
+              reasonCode,
+              shift['responsibleOperatorId']! as String,
+              shift['deviceId']! as String,
+            ].join(':'),
+          ),
+        )
+        .toString();
+    final approval = await _repository.approve(
+      ManagerApprovalRequest(
+        operatorSessionId: _operatorSessionId!,
+        managerPin: managerPin,
+        permission: 'cash.drawer.no_sale.approve',
+        merchantId: _merchantId!,
+        locationId: _locationId!,
+        commandFingerprint: fingerprint,
+      ),
+    );
+    return (approvalId: approval.elevationId, fingerprint: fingerprint);
+  }
+
+  Future<void> requestNoSale(
+    String reasonCode, {
+    required String approvalId,
+    required String approvalFingerprint,
+  }) async {
     final shift = _requireShift();
     await _perform(() async {
-      final ids = await _commandIds('no_sale_drawer');
+      final ids = await _commandIds(
+        'no_sale_drawer',
+        hardwareReason: 'no_sale',
+        registerId: shift['registerId'] as String?,
+      );
       await _repository.noSale(
         _merchantId!,
         shift['id']! as String,
@@ -483,11 +571,19 @@ final class CashController extends ChangeNotifier {
           idempotencyKey: ids.idempotencyKey,
           shiftId: shift['id']! as String,
           reasonCode: reasonCode,
-          approvalId: null,
+          approvalId: approvalId,
+          approvalFingerprint: approvalFingerprint,
         ),
       );
       await _completeCommand(ids);
       await _reload();
+      _runPostCommit(
+        CommittedCashHardwareAction(
+          reason: 'no_sale',
+          reference: ids.commandId,
+          registerId: shift['registerId'] as String?,
+        ),
+      );
     });
   }
 
@@ -583,7 +679,11 @@ final class CashController extends ChangeNotifier {
     }
   }
 
-  Future<PendingCashCommand> _commandIds(String operation) async {
+  Future<PendingCashCommand> _commandIds(
+    String operation, {
+    String? hardwareReason,
+    String? registerId,
+  }) async {
     final merchantId = _merchantId!;
     final locationId = _locationId!;
     final pending = await _recoveryStore.load(merchantId, locationId);
@@ -637,6 +737,8 @@ final class CashController extends ChangeNotifier {
       operation: operation,
       commandId: _uuid(),
       idempotencyKey: _uuid(),
+      hardwareReason: hardwareReason,
+      registerId: registerId,
     );
     await _recoveryStore.save(command);
     return command;
@@ -644,6 +746,12 @@ final class CashController extends ChangeNotifier {
 
   Future<void> _completeCommand(PendingCashCommand command) =>
       _recoveryStore.clear(command.merchantId, command.locationId);
+
+  void _runPostCommit(CommittedCashHardwareAction action) {
+    final callback = _afterCommit;
+    if (callback == null) return;
+    unawaited(callback(action).catchError((Object _) {}));
+  }
 
   Future<String?> _recoverPendingCommand() async {
     final pending = await _recoveryStore.load(_merchantId!, _locationId!);
@@ -659,6 +767,15 @@ final class CashController extends ChangeNotifier {
     );
     if (result.status == 'succeeded') {
       await _completeCommand(pending);
+      if (pending.hardwareReason != null) {
+        _runPostCommit(
+          CommittedCashHardwareAction(
+            reason: pending.hardwareReason!,
+            reference: pending.commandId,
+            registerId: pending.registerId,
+          ),
+        );
+      }
       return 'CASH_COMMAND_RECOVERED';
     }
     if (result.status == 'processing') return 'CASH_COMMAND_PENDING';

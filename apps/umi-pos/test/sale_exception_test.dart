@@ -272,9 +272,11 @@ final class TestExceptionRepository implements SaleExceptionRepository {
 SaleExceptionController controller(
   TestExceptionRepository repository, {
   MemorySaleExceptionRecoveryStore? recovery,
+  Future<void> Function(SaleExceptionResult result)? afterCommit,
 }) => SaleExceptionController(
   repository: repository,
   recoveryStore: recovery ?? MemorySaleExceptionRecoveryStore(),
+  afterCommit: afterCommit,
 );
 
 Future<void> setContext(SaleExceptionController value) => value.setContext(
@@ -481,6 +483,30 @@ void main() {
     expect(repository.commitRequest?.offline, isFalse);
     expect(recovery.value, isNull);
   });
+
+  test(
+    'committed refund requests hardware after the financial result',
+    () async {
+      final repository = TestExceptionRepository();
+      SaleExceptionResult? hardwareResult;
+      final value = controller(
+        repository,
+        afterCommit: (result) async => hardwareResult = result,
+      );
+      await setContext(value);
+      await value.load(sale);
+      await value.createPreview(
+        exceptionType: 'partial_refund',
+        reason: 'product_defect',
+        lines: [
+          {'saleLineId': line, 'quantity': 1, 'restockDecision': 'restock'},
+        ],
+      );
+      await value.commit();
+      await Future<void>.delayed(Duration.zero);
+      expect(hardwareResult?.exceptionId, testResult().exceptionId);
+    },
+  );
 
   test('recovers the original result after response loss', () async {
     final repository = TestExceptionRepository()

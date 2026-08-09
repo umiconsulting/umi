@@ -9,6 +9,8 @@ final class PendingCashCommand {
     required this.operation,
     required this.commandId,
     required this.idempotencyKey,
+    this.hardwareReason,
+    this.registerId,
   });
 
   final String merchantId;
@@ -16,18 +18,22 @@ final class PendingCashCommand {
   final String operation;
   final String commandId;
   final String idempotencyKey;
+  final String? hardwareReason;
+  final String? registerId;
 
   Map<String, Object?> toJson() => {
-    'schemaVersion': 1,
+    'schemaVersion': 2,
     'merchantId': merchantId,
     'locationId': locationId,
     'operation': operation,
     'commandId': commandId,
     'idempotencyKey': idempotencyKey,
+    'hardwareReason': hardwareReason,
+    'registerId': registerId,
   };
 
   factory PendingCashCommand.fromJson(Map<String, Object?> json) {
-    if (json['schemaVersion'] != 1) {
+    if (json['schemaVersion'] != 1 && json['schemaVersion'] != 2) {
       throw const FormatException('Unsupported cash recovery schema.');
     }
     return PendingCashCommand(
@@ -36,6 +42,8 @@ final class PendingCashCommand {
       operation: json['operation']! as String,
       commandId: json['commandId']! as String,
       idempotencyKey: json['idempotencyKey']! as String,
+      hardwareReason: json['hardwareReason'] as String?,
+      registerId: json['registerId'] as String?,
     );
   }
 }

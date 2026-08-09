@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../core/config/app_config.dart';
 import '../core/contracts/contract_gateway.dart';
 import '../core/feature_flags/feature_flags.dart';
@@ -22,6 +24,10 @@ import '../features/entry/entry_gateway.dart';
 import '../features/exception/exception_controller.dart';
 import '../features/exception/exception_recovery_store.dart';
 import '../features/exception/exception_repository.dart';
+import '../features/hardware/hardware_recovery_store.dart';
+import '../features/hardware/hardware_repository.dart';
+import '../features/hardware/hardware_runtime.dart';
+import '../features/hardware/hardware_service.dart';
 import '../features/inventory/inventory_controller.dart';
 import '../features/inventory/inventory_repository.dart';
 import '../features/offline/connectivity_controller.dart';
@@ -56,6 +62,7 @@ final class AppCompositionRoot {
     required this.connectivity,
     required this.offlineJournal,
     this.inventory,
+    this.hardware,
     this.offlineRecovery,
   });
 
@@ -78,6 +85,13 @@ final class AppCompositionRoot {
       deviceCredentialProvider: credentials,
     );
     final connectivity = ConnectivityController();
+    final hardwareLab = SimulatorHardwareLab();
+    final hardware = HardwareService(
+      repository: ApiHardwareRepository(apiClient),
+      coordinator: HardwareCoordinator(adapters: const {}, devices: const []),
+      recovery: SecureHardwareRecoveryStore(secureStorage),
+      adapterResolver: hardwareLab,
+    );
     final offlineJournal = EncryptedOfflineJournal(
       PlatformJournalCipherStore(preferences, secureStorage),
     );
@@ -98,6 +112,32 @@ final class AppCompositionRoot {
       secureStorage: secureStorage,
       telemetry: telemetry,
     );
+    final entry = EntryController(
+      gateway: ApiEntryGateway(apiClient, credentials),
+      vault: credentials,
+      telemetry: telemetry,
+    );
+    final cash = CashController(
+      repository: ApiCashRepository(apiClient),
+      recoveryStore: SecureCashRecoveryStore(secureStorage),
+      afterCommit: (action) async {
+        final state = entry.state;
+        final merchant = state.selectedTenant;
+        final location = state.selectedBranch;
+        final operator = state.operator;
+        if (merchant == null || location == null || operator == null) return;
+        await hardware.afterCashAction(
+          HardwareScope(
+            merchantId: merchant.id,
+            locationId: location.id,
+            operatorSessionId: operator.id,
+            registerId: action.registerId,
+          ),
+          reason: action.reason,
+          reference: action.reference,
+        );
+      },
+    );
     final cart = CartController(
       repository: ApiCartRepository(apiClient),
       telemetry: telemetry,
@@ -113,14 +153,26 @@ final class AppCompositionRoot {
       apiClient: apiClient,
       features: FeatureFlags.bootstrap(config.featureBootstrapMode),
       credentials: credentials,
-      entry: EntryController(
-        gateway: ApiEntryGateway(apiClient, credentials),
-        vault: credentials,
-        telemetry: telemetry,
-      ),
+      entry: entry,
       exceptions: SaleExceptionController(
         repository: ApiSaleExceptionRepository(apiClient),
         recoveryStore: SecureSaleExceptionRecoveryStore(secureStorage),
+        afterCommit: (result) async {
+          final state = entry.state;
+          final merchant = state.selectedTenant;
+          final location = state.selectedBranch;
+          final operator = state.operator;
+          if (merchant == null || location == null || operator == null) return;
+          await hardware.afterRefundCompleted(
+            HardwareScope(
+              merchantId: merchant.id,
+              locationId: location.id,
+              operatorSessionId: operator.id,
+              registerId: cash.activeRegisterId,
+            ),
+            result,
+          );
+        },
       ),
       catalog: CatalogController(
         repository: ApiCatalogRepository(apiClient),
@@ -128,10 +180,7 @@ final class AppCompositionRoot {
         telemetry: telemetry,
       ),
       cart: cart,
-      cash: CashController(
-        repository: ApiCashRepository(apiClient),
-        recoveryStore: SecureCashRecoveryStore(secureStorage),
-      ),
+      cash: cash,
       sales: SaleLifecycleController(
         repository: ApiSaleRepository(apiClient),
         cart: cart,
@@ -145,10 +194,27 @@ final class AppCompositionRoot {
         offlineCheckout: offlineCheckout,
         connectivity: connectivity,
         telemetry: telemetry,
+        afterCommit: (result) async {
+          final state = entry.state;
+          final merchant = state.selectedTenant;
+          final location = state.selectedBranch;
+          final operator = state.operator;
+          if (merchant == null || location == null || operator == null) return;
+          await hardware.afterCheckoutCompleted(
+            HardwareScope(
+              merchantId: merchant.id,
+              locationId: location.id,
+              operatorSessionId: operator.id,
+              registerId: cash.activeRegisterId,
+            ),
+            result,
+          );
+        },
       ),
       connectivity: connectivity,
       offlineJournal: offlineJournal,
       inventory: InventoryController(ApiInventoryRepository(apiClient)),
+      hardware: hardware,
       offlineRecovery: offlineRecovery,
     );
   }
@@ -174,6 +240,7 @@ final class AppCompositionRoot {
   final ConnectivityController connectivity;
   final EncryptedOfflineJournal offlineJournal;
   final InventoryController? inventory;
+  final HardwareService? hardware;
   final OfflineRecoveryController? offlineRecovery;
 
   void dispose() {
@@ -189,6 +256,8 @@ final class AppCompositionRoot {
     connectivity.dispose();
     offlineRecovery?.dispose();
     inventory?.dispose();
+    final hardwareDispose = hardware?.dispose();
+    if (hardwareDispose != null) unawaited(hardwareDispose);
     apiClient.dispose();
   }
 }

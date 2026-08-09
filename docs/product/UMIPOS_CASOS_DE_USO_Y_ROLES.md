@@ -22,12 +22,13 @@
 18. [Funcionalidades no implementadas todavía](#18-funcionalidades-no-implementadas-todavía)
 19. [Checklist manual para probar UmiPOS](#19-checklist-manual-para-probar-umipos)
 20. [Mapa de cobertura](#20-mapa-de-cobertura)
+21. [Hardware Runtime](#21-hardware-runtime)
 
 ## 1. Propósito del documento
 
-Este documento explica el comportamiento operativo que existe en UmiPOS hasta Gate 3F. Sirve para operación, soporte, desarrollo, QA y capacitación.
+Este documento explica el comportamiento operativo que existe en UmiPOS hasta Gate 3G-A. Sirve para operación, soporte, desarrollo, QA y capacitación.
 
-La referencia es el cierre final de Gate 3F, del 8 de agosto de 2026. El contrato canónico es la versión `2.6.0`. Su hash es `cfe933a00f07b8972d28fad536001d1260cc259c2d3bed56efec5a2c9a0278c9`.
+La referencia es Gate 3G-A, del 9 de agosto de 2026. El contrato canónico es la versión `2.7.0`. Su hash es `7223f72894a444d32735ba8e1a325a160bc09a394bca222d12a8bb2545da6323`.
 
 El producto conserva Gates 3A a 3E. Gate 3F añade clientes, lealtad y valor almacenado. La certificación final de UX sigue pendiente.
 
@@ -1591,15 +1592,15 @@ El efectivo contado nunca reemplaza el esperado. Un conteo manual depende de hon
 
 ### UC-CASH-004 — Solicitar no-sale drawer
 
-**Estado:** FOUNDATION
+**Estado:** IMPLEMENTADO
 
 **Objetivo:** Registrar una solicitud de apertura sin venta.
 
-**Actor principal:** Owner o Admin autorizado en la configuración canónica.
+**Actor principal:** Un Supervisor autorizado.
 
-**Actores secundarios:** UMI API y futuro adaptador de hardware.
+**Actores secundarios:** Un Manager que aprueba, UMI API y Hardware Runtime.
 
-**Permisos requeridos:** `cash.drawer.no_sale` y aprobación cuando la política lo exige.
+**Permisos requeridos:** `cash.drawer.no_sale` y `cash.drawer.no_sale.approve`.
 
 **Precondiciones:**
 
@@ -1612,10 +1613,12 @@ El efectivo contado nunca reemplaza el esperado. Un conteo manual depende de hon
 
 **Flujo principal:**
 
-1. UMI API valida permiso, política y rate limit.
-2. UMI API registra `NoSaleDrawerRequested`.
-3. UmiPOS informa que la solicitud quedó registrada.
-4. El ledger permanece sin cambio.
+1. UmiPOS solicita el PIN de otro Manager.
+2. UMI API crea una aprobación exacta, de un solo uso y con caducidad.
+3. UMI API valida el permiso, la política y el rate limit.
+4. UMI API registra `NoSaleDrawerRequested`.
+5. Hardware Runtime emite un comando de cajón con la referencia del evento.
+6. El ledger permanece sin cambio.
 
 **Resultado esperado:** Existe evidencia de solicitud, no evidencia física de apertura.
 
@@ -1627,7 +1630,7 @@ El efectivo contado nunca reemplaza el esperado. Un conteo manual depende de hon
 
 **Persistencia y efectos:** Evento sin efecto de balance.
 
-**Disponibilidad:** Online-only; hardware no implementado.
+**Disponibilidad:** Online-only. El simulador prueba el efecto físico canónico.
 
 **Evidencia de implementación:** Ruta `pos.cashNoSale`, `NoSaleDrawerEvent` y `cash_surface.dart`.
 
@@ -3041,7 +3044,7 @@ La tabla muestra grants predeterminados. Un override puede negar o conceder un p
 | UC-CASH-001 | Caja        | Abrir turno                  | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO                  |
 | UC-CASH-002 | Caja        | Movimientos                  | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
 | UC-CASH-003 | Caja        | Suspender o reanudar         | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-CASH-004 | Caja        | No-sale drawer               | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | Sí    | Sí       | ⚠️         | FOUNDATION                    |
+| UC-CASH-004 | Caja        | No-sale drawer               | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
 | UC-CASH-005 | Caja        | Handoff                      | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
 | UC-CASH-006 | Caja        | Blind count y recuento       | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
 | UC-CASH-007 | Caja        | Reconciliar y cerrar         | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
@@ -3346,9 +3349,9 @@ El inventario contiene **63 casos de uso**. El conteo se obtiene de los encabeza
 
 | Estado                         |  Casos |
 | ------------------------------ | -----: |
-| IMPLEMENTADO                   |     43 |
+| IMPLEMENTADO                   |     44 |
 | IMPLEMENTADO CON LIMITACIONES  |     19 |
-| FOUNDATION                     |      1 |
+| FOUNDATION                     |      0 |
 | INCOMPLETO: binding de preview |      0 |
 | INCOMPLETO: policy y expiry    |      0 |
 | INCOMPLETO: rate limit         |      0 |
@@ -3381,3 +3384,48 @@ Este conteo incluye acceso directo y acceso condicionado. Excluye las celdas ❌
 | Viewer     |                                       8 |
 
 La cifra de un rol no concede autoridad por sí sola. Cada ejecución valida el permiso, la política, el dispositivo y la location.
+
+## 21. Hardware Runtime
+
+Gate 3G-A añade una ruta canónica para el hardware. Los simuladores prueban el flujo sin hardware físico.
+
+### Registro y asignación
+
+Owner y Admin registran, asignan, activan y desactivan dispositivos. La API valida el merchant, la location y el register.
+Una asignación también puede vincular el dispositivo POS enrolado. Una versión obsoleta produce un conflicto seguro.
+
+### Impresión y recuperación
+
+Un recibo comprometido crea un trabajo de impresión persistente. La impresora no calcula importes.
+Una pérdida de respuesta devuelve el comando original. Un resultado físico desconocido no imprime otra copia.
+El operador puede crear una reimpresión controlada. La nueva copia conserva una referencia al trabajo original.
+
+### Cajón de efectivo
+
+El ledger de efectivo se compromete antes del comando del cajón. La razón del comando es obligatoria.
+Cashier puede abrir el cajón después de una venta o una operación permitida. Manager puede ejecutar una prueba.
+La apertura `NoSale` permanece cerrada sin la aprobación requerida.
+
+### Escáner y customer display
+
+El escáner emite eventos canónicos de barcode y QR. El catálogo decide si el código existe.
+El adaptador de teclado desactiva la captura durante la entrada de un PIN.
+
+El customer display recibe una proyección segura. No recibe contactos, códigos de gift card, tokens ni identificadores internos.
+
+### Terminal y scale
+
+La terminal integrada y la scale son foundations. Gate 3G-A no ejecuta pagos ni calcula precios por peso.
+
+### Matriz operativa
+
+| Operación                       | Cashier | Supervisor | Manager | Owner/Admin | Viewer |
+| ------------------------------- | ------- | ---------- | ------- | ----------- | ------ |
+| Imprimir recibo                 | ✅      | ✅         | ✅      | ✅          | ❌     |
+| Reimpresión controlada          | ❌      | ✅         | ✅      | ✅          | ❌     |
+| Abrir cajón por acción elegible | ✅      | ✅         | ✅      | ✅          | ❌     |
+| Probar impresora o escáner      | ❌      | ✅         | ✅      | ✅          | ❌     |
+| Probar cajón                    | ❌      | ❌         | ✅      | ✅          | ❌     |
+| Registrar o asignar hardware    | ❌      | ❌         | ❌      | ✅          | ❌     |
+
+La tabla explica el perfil del piloto. El permiso efectivo sigue como la única autoridad.

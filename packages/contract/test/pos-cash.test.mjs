@@ -10,6 +10,7 @@ const {
   CashMovementRequest,
   ShiftCloseRequest,
   CashCommandRecoveryQuery,
+  NoSaleDrawerRequest,
 } = require('../dist/index.cjs');
 const { routes } = require('../dist/routes.cjs');
 
@@ -133,6 +134,29 @@ test('Gate 3C contracts enforce cash facts and blind-count boundaries', () => {
       commandId: id(11),
       idempotencyKey: id(12),
     }).success,
+  );
+  assert.ok(
+    NoSaleDrawerRequest.safeParse({
+      locationId: id(1),
+      shiftId: id(6),
+      operatorSessionId: id(3),
+      reasonCode: 'operator_request',
+      approvalId: id(9),
+      approvalFingerprint: 'b'.repeat(64),
+      commandId: id(11),
+      idempotencyKey: id(12),
+    }).success,
+  );
+  assert.equal(
+    NoSaleDrawerRequest.safeParse({
+      locationId: id(1),
+      shiftId: id(6),
+      operatorSessionId: id(3),
+      reasonCode: 'operator_request',
+      commandId: id(11),
+      idempotencyKey: id(12),
+    }).success,
+    false,
   );
   assert.equal(routes.pos.cash.shifts(id(1)), `/api/v1/pos/merchants/${id(1)}/cash/shifts`);
   assert.equal(

@@ -40,6 +40,7 @@ final class _FakeCashRepository implements CashRepository {
   );
   OpenCashShiftRequest? openedWith;
   ManagerApprovalRequest? approvalRequest;
+  NoSaleDrawerRequest? noSaleRequest;
   CashCommandRecoveryResult recoveryResult = const CashCommandRecoveryResult(
     commandId: '00000000-0000-4000-8000-000000000070',
     commandType: 'pos.cash.paid_in',
@@ -93,6 +94,8 @@ final class _FakeCashRepository implements CashRepository {
         'ledgerSequence': 1,
         'currency': 'MXN',
         'operatorSessionId': '00000000-0000-4000-8000-000000000012',
+        'responsibleOperatorId': '00000000-0000-4000-8000-000000000013',
+        'deviceId': '00000000-0000-4000-8000-000000000014',
       },
       expectedCash: null,
       latestCount: null,
@@ -113,6 +116,23 @@ final class _FakeCashRepository implements CashRepository {
       policy: snapshot.policy,
       correlationId: 'cash-open',
       recovered: false,
+    );
+  }
+
+  @override
+  Future<NoSaleDrawerEvent> noSale(
+    String merchantId,
+    String shiftId,
+    NoSaleDrawerRequest request,
+  ) async {
+    noSaleRequest = request;
+    return NoSaleDrawerEvent(
+      id: '00000000-0000-4000-8000-000000000091',
+      shiftId: shiftId,
+      status: 'requested',
+      verifiedHardwareResult: false,
+      requestedAt: '2026-08-09T00:00:00.000Z',
+      correlationId: 'cash-no-sale',
     );
   }
 
@@ -191,6 +211,28 @@ void main() {
     );
     expect(repository.openedWith?.openingFloat['minorUnits'], 2000);
     expect(controller.state.snapshot?.currentShift?['status'], 'open');
+  });
+
+  test('committed opening float requests hardware after the ledger', () async {
+    final repository = _FakeCashRepository();
+    CommittedCashHardwareAction? action;
+    final controller = CashController(
+      repository: repository,
+      afterCommit: (value) async => action = value,
+    );
+    controller.setContext(
+      merchantId: '00000000-0000-4000-8000-000000000010',
+      locationId: '00000000-0000-4000-8000-000000000011',
+      operatorSessionId: '00000000-0000-4000-8000-000000000012',
+    );
+    await controller.load();
+    await controller.openShift(
+      registerId: '00000000-0000-4000-8000-000000000001',
+      amountMinorUnits: 2000,
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(action?.reason, 'register_open');
+    expect(action?.registerId, '00000000-0000-4000-8000-000000000001');
   });
 
   test(
@@ -336,6 +378,47 @@ void main() {
     expect(find.text('Start recount'), findsOneWidget);
     expect(find.text('Reconcile shift'), findsOneWidget);
   });
+
+  test(
+    'no-sale drawer request consumes an exact separate manager approval',
+    () async {
+      final repository = _FakeCashRepository();
+      final controller = CashController(repository: repository);
+      controller.setContext(
+        merchantId: '00000000-0000-4000-8000-000000000010',
+        locationId: '00000000-0000-4000-8000-000000000011',
+        operatorSessionId: '00000000-0000-4000-8000-000000000012',
+      );
+      await controller.load();
+      await controller.openShift(
+        registerId: '00000000-0000-4000-8000-000000000001',
+        amountMinorUnits: 2000,
+      );
+      final approval = await controller.approveNoSale(
+        managerPin: '1234',
+        reasonCode: 'operator_request',
+      );
+      await controller.requestNoSale(
+        'operator_request',
+        approvalId: approval.approvalId,
+        approvalFingerprint: approval.fingerprint,
+      );
+
+      expect(
+        repository.approvalRequest?.permission,
+        'cash.drawer.no_sale.approve',
+      );
+      expect(
+        repository.approvalRequest?.commandFingerprint,
+        approval.fingerprint,
+      );
+      expect(repository.noSaleRequest?.approvalId, approval.approvalId);
+      expect(
+        repository.noSaleRequest?.approvalFingerprint,
+        approval.fingerprint,
+      );
+    },
+  );
 
   test(
     'restart queries a durable command and does not repeat its effect',

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:umi_contract/umi_contract.dart';
@@ -15,6 +17,9 @@ import '../customer_value/customer_value_controller.dart';
 import '../customer_value/customer_value_surface.dart';
 import '../entry/entry_controller.dart';
 import '../exception/exception_controller.dart';
+import '../hardware/hardware_runtime.dart';
+import '../hardware/hardware_service.dart';
+import '../hardware/hardware_surface.dart';
 import '../inventory/inventory_controller.dart';
 import '../inventory/inventory_surface.dart';
 import '../offline/connectivity_controller.dart';
@@ -39,6 +44,7 @@ final class CatalogSurface extends StatefulWidget {
     required this.connectivity,
     required this.telemetry,
     this.inventory,
+    this.hardware,
     this.offlineJournal,
     this.offlineRecovery,
     super.key,
@@ -54,6 +60,7 @@ final class CatalogSurface extends StatefulWidget {
   final ConnectivityController connectivity;
   final Telemetry telemetry;
   final InventoryController? inventory;
+  final HardwareService? hardware;
   final EncryptedOfflineJournal? offlineJournal;
   final OfflineRecoveryController? offlineRecovery;
   @override
@@ -67,6 +74,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   bool _initialLoadStarted = false;
   bool _cashPromptShown = false;
   String? _lastSaleErrorCode;
+  StreamSubscription<CanonicalScanEvent>? _scanSubscription;
 
   @override
   void initState() {
@@ -138,12 +146,35 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           locationId: entry.selectedBranch!.id,
           operatorSessionId: entry.operator!.id,
         );
+        await _startScanner(entry.operator!.permissions);
         widget.connectivity.apiReachable(authorityValid: true);
       }
       await _recover();
     } catch (_) {
       widget.connectivity.apiFailure();
     }
+  }
+
+  Future<void> _startScanner(List<String> permissions) async {
+    final hardware = widget.hardware;
+    if (hardware == null || !permissions.contains('hardware.scanner.use')) {
+      return;
+    }
+    await _scanSubscription?.cancel();
+    final entry = widget.entry.state;
+    await hardware.snapshot(
+      HardwareScope(
+        merchantId: entry.selectedTenant!.id,
+        locationId: entry.selectedBranch!.id,
+        operatorSessionId: entry.operator!.id,
+        registerId: widget.cash.activeRegisterId,
+      ),
+    );
+    _scanSubscription = hardware.scanEvents.listen((event) {
+      if (!mounted) return;
+      _search.text = event.value;
+      widget.catalog.search(event.value);
+    });
   }
 
   void _changed() {
@@ -188,6 +219,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
 
   @override
   void dispose() {
+    _scanSubscription?.cancel();
     widget.catalog.removeListener(_changed);
     widget.cart.removeListener(_changed);
     widget.cash.removeListener(_changed);
@@ -286,6 +318,19 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 controller: widget.inventory!,
               ),
               icon: const Icon(Icons.inventory_2_outlined),
+            ),
+          if (permissions.allows('hardware.read') && widget.hardware != null)
+            IconButton(
+              tooltip: Localizations.localeOf(context).languageCode == 'es'
+                  ? 'Centro de hardware'
+                  : 'Hardware center',
+              onPressed: () => showHardwareCenter(
+                context,
+                entry: widget.entry,
+                service: widget.hardware!,
+                permissions: permissions,
+              ),
+              icon: const Icon(Icons.devices_other_outlined),
             ),
           if (access.showSaleHistory)
             IconButton(

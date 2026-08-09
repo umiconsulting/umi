@@ -129,6 +129,7 @@ function generatedSql() {
         permission.source.includes('37_pos_customer_value.sql') ||
         permission.source.includes('38_pos_customer_value_closeout.sql') ||
         permission.source.includes('39_pos_customer_value_final_closeout.sql') ||
+        permission.source.includes('40_pos_hardware_runtime.sql') ||
         permission.key.startsWith('inventory.'),
     )
     .map(

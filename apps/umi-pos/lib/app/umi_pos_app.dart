@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../bootstrap/bootstrap_controller.dart';
@@ -12,6 +13,33 @@ import '../features/entry/entry_controller.dart';
 import '../features/entry/entry_surface.dart';
 import '../shared/widgets/status_card.dart';
 
+final class HardwareKeyboardWedgeRouter {
+  KeyEventResult route({
+    required bool Function(int codeUnit, DateTime at)? acceptCodeUnit,
+    required KeyEvent event,
+    required bool textInputFocused,
+    DateTime? occurredAt,
+  }) {
+    if (event is! KeyDownEvent || textInputFocused || acceptCodeUnit == null) {
+      return KeyEventResult.ignored;
+    }
+    final at = occurredAt ?? DateTime.now().toUtc();
+    if (event.logicalKey == LogicalKeyboardKey.enter) {
+      return acceptCodeUnit('\n'.codeUnitAt(0), at)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+    final character = event.character;
+    if (character != null && character.runes.length == 1) {
+      final codeUnit = character.runes.single;
+      if (codeUnit >= 0x20 && codeUnit <= 0x7e) {
+        acceptCodeUnit(codeUnit, at);
+      }
+    }
+    return KeyEventResult.ignored;
+  }
+}
+
 final class UmiPosApp extends StatefulWidget {
   const UmiPosApp({required this.root, super.key});
   final AppCompositionRoot root;
@@ -21,17 +49,48 @@ final class UmiPosApp extends StatefulWidget {
 }
 
 final class _UmiPosAppState extends State<UmiPosApp> {
+  final HardwareKeyboardWedgeRouter _keyboardRouter =
+      HardwareKeyboardWedgeRouter();
+
   @override
   void initState() {
     super.initState();
     widget.root.controller.addListener(_changed);
     widget.root.entry.addListener(_changed);
+    FocusManager.instance.addListener(_focusChanged);
+    FocusManager.instance.addEarlyKeyEventHandler(_hardwareKeyEvent);
+  }
+
+  KeyEventResult _hardwareKeyEvent(KeyEvent event) {
+    final context = FocusManager.instance.primaryFocus?.context;
+    final own = context?.widget;
+    final editable = own is EditableText
+        ? own
+        : context?.findAncestorWidgetOfExactType<EditableText>();
+    return _keyboardRouter.route(
+      acceptCodeUnit: widget.root.hardware?.acceptKeyboardCodeUnit,
+      event: event,
+      textInputFocused: editable != null,
+    );
+  }
+
+  void _focusChanged() {
+    final context = FocusManager.instance.primaryFocus?.context;
+    final own = context?.widget;
+    final editable = own is EditableText
+        ? own
+        : context?.findAncestorWidgetOfExactType<EditableText>();
+    widget.root.hardware?.setSensitiveInputActive(
+      editable?.obscureText ?? false,
+    );
   }
 
   @override
   void dispose() {
     widget.root.controller.removeListener(_changed);
     widget.root.entry.removeListener(_changed);
+    FocusManager.instance.removeListener(_focusChanged);
+    FocusManager.instance.removeEarlyKeyEventHandler(_hardwareKeyEvent);
     widget.root.dispose();
     super.dispose();
   }
@@ -106,6 +165,7 @@ final class _GuardedSurface extends StatelessWidget {
         customerValue: root.customerValue,
         exceptions: root.exceptions,
         inventory: root.inventory,
+        hardware: root.hardware,
         connectivity: root.connectivity,
         telemetry: root.telemetry,
         offlineJournal: root.offlineJournal,

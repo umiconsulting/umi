@@ -290,6 +290,19 @@
       "policy": "checkout.manualTerminalApprovalThreshold"
     },
     {
+      "action": "no_sale_drawer_open",
+      "actingPermission": "cash.drawer.no_sale",
+      "approvalPermission": "cash.drawer.no_sale.approve",
+      "selfApproval": false,
+      "actorSeparation": true,
+      "scope": "location",
+      "lifetimeSeconds": 300,
+      "oneUse": true,
+      "fingerprintBound": true,
+      "auditRequired": true,
+      "policy": "cash.noSaleDrawerAllowed"
+    },
+    {
       "action": "other_operator_sale",
       "actingPermission": "sale.refund.other_operator",
       "approvalPermission": "sale.refund.approve",

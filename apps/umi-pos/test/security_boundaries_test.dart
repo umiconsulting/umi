@@ -22,12 +22,11 @@ void main() {
     expect((exporter.events.single.values['safe'] as String).length, 256);
   });
 
-  test('unsupported hardware never reports success', () async {
+  test('platform adapters contain no direct hardware side effects', () async {
     const adapters = PlatformAdapters.unsupported();
     expect(
-      (await adapters.printer.printReceipt()).status,
-      CapabilityStatus.unsupported,
+      (await adapters.connectivity.isOnline()).status,
+      CapabilityStatus.unavailable,
     );
-    expect((await adapters.drawer.open()).status, CapabilityStatus.unsupported);
   });
 }

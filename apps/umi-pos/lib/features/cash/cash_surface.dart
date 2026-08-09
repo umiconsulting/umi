@@ -424,7 +424,48 @@ final class _ActiveShiftSection extends StatelessWidget {
                 icon: Icons.point_of_sale_outlined,
                 label: l.noSaleDrawerAction,
                 onPressed: () async {
-                  await controller.requestNoSale('operator_request');
+                  const reasonCode = 'operator_request';
+                  final managerPin = TextEditingController();
+                  final accepted = await showDialog<bool>(
+                    context: context,
+                    builder: (dialogContext) => AlertDialog(
+                      title: Text(l.managerApprovalTitle),
+                      content: TextField(
+                        controller: managerPin,
+                        autofocus: true,
+                        obscureText: true,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: l.managerPinLabel,
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext, false),
+                          child: Text(l.closeAction),
+                        ),
+                        FilledButton(
+                          onPressed: () => Navigator.pop(dialogContext, true),
+                          child: Text(l.confirmAction),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (!(accepted ?? false)) {
+                    managerPin.dispose();
+                    return;
+                  }
+                  final approval = await controller.approveNoSale(
+                    managerPin: managerPin.text,
+                    reasonCode: reasonCode,
+                  );
+                  managerPin.clear();
+                  managerPin.dispose();
+                  await controller.requestNoSale(
+                    reasonCode,
+                    approvalId: approval.approvalId,
+                    approvalFingerprint: approval.fingerprint,
+                  );
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text(l.drawerRequestRecordedMessage)),

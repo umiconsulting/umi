@@ -9,7 +9,7 @@ abstract interface class ContractGateway {
 final class GeneratedContractGateway implements ContractGateway {
   const GeneratedContractGateway();
 
-  static const supportedMajor = 1;
+  static const supportedMajor = 2;
 
   @override
   String get version => contractVersion;

@@ -26,6 +26,7 @@ export * from './pos-cash';
 export * from './pos-exception';
 export * from './pos-inventory';
 export * from './pos-customer-value';
+export * from './pos-hardware';
 // The generated-artifact manifest: versions, error/route/model/invariant catalogues.
 export * from './catalog';
 // Zero-dep entitlement vocabulary. Also published as '@umi/contract/entitlements'

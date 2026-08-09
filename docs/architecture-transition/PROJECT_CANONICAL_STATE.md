@@ -95,7 +95,7 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - UmiPOS uses a personal merchant-unique PIN after device trust. The API resolves the staff identity
   and current role without an email or client role selector.
 - `runtime.operator_session` separates operator presence from PIN authentication.
-- UmiPOS consumes contract version `2.3.0`. The generated checksum is the content-hash authority.
+- UmiPOS consumes contract version `2.7.0`. The generated checksum is the content-hash authority.
 - Original sale, payment, receipt, and cash facts remain immutable after an exception.
 - `merchant.pos_sale_exception` and related tables own append-only compensation history.
 - Refund amounts use original receipt, discount, tax, tip, and tender snapshots.
@@ -204,7 +204,14 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Gate 3F keeps rewards and stored value online-only. Cash replay can keep a bounded customer reference.
 - `stash@{0}: pre-gate-3d1-unpublished-pos-runtime-fixes` remains preserved and excluded.
 - Gate 3F passed focused privacy, security, contract, API, Flutter, PostgreSQL, RLS, Linux, and Web checks.
-- Gate 3G is authorized. Gate 3G has not started.
+- Gate 3G-A: complete. One registry, coordinator, adapter, and transport path owns hardware access.
+- Gate 3G-A persists scoped commands, print jobs, assignments, diagnostics, and append-only event history.
+- Gate 3G-A provides deterministic printer, drawer, scanner, and customer display simulators.
+- Gate 3G-A keeps payment terminal and scale support as disabled foundations.
+- Gate 3G-A contract: version `2.7.0`, content hash
+  `7223f72894a444d32735ba8e1a325a160bc09a394bca222d12a8bb2545da6323`.
+- Gate 3G-A passed focused contract, API, Flutter, simulator, recovery, PostgreSQL, and RLS checks.
+- Gate 3G-B is authorized. Gate 3G-B has not started.
 
 ## Gate 3C decision basis
 
@@ -232,3 +239,10 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Umi-specific inference: append-only points and money facts make each balance reproducible.
 - Umi-specific inference: receipt delivery and loyalty enrollment do not grant marketing consent.
 - Umi-specific inference: possession of a gift-card code remains a bearer risk.
+
+## Gate 3G-A decision basis
+
+- Documented fact: the UMI API owns the hardware registry and persistent command history.
+- Umi-specific inference: an unknown physical result cannot authorize an automatic second side effect.
+- Umi-specific inference: a hardware failure cannot change a committed financial fact.
+- Umi-specific inference: future vendor adapters must implement the canonical adapter interfaces.

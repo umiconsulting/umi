@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "cfe933a00f07b8972d28fad536001d1260cc259c2d3bed56efec5a2c9a0278c9",
-  "contractVersion": "2.6.0",
+  "contentHash": "7223f72894a444d32735ba8e1a325a160bc09a394bca222d12a8bb2545da6323",
+  "contractVersion": "2.7.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -116,6 +116,16 @@
             "AUDIT_INTEGRITY_FAILURE",
             "PAYMENT_OUTCOME_UNKNOWN",
             "RESOURCE_NOT_FOUND",
+            "HARDWARE_NOT_FOUND",
+            "HARDWARE_DISABLED",
+            "HARDWARE_NOT_ASSIGNED",
+            "HARDWARE_CAPABILITY_UNSUPPORTED",
+            "HARDWARE_DISCONNECTED",
+            "HARDWARE_BUSY",
+            "HARDWARE_PAPER_OUT",
+            "HARDWARE_COMMAND_TIMEOUT",
+            "HARDWARE_OUTCOME_UNKNOWN",
+            "HARDWARE_CONFIGURATION_STALE",
             "INTERNAL_ERROR"
           ],
           "type": "string"
@@ -230,6 +240,16 @@
                 "AUDIT_INTEGRITY_FAILURE",
                 "PAYMENT_OUTCOME_UNKNOWN",
                 "RESOURCE_NOT_FOUND",
+                "HARDWARE_NOT_FOUND",
+                "HARDWARE_DISABLED",
+                "HARDWARE_NOT_ASSIGNED",
+                "HARDWARE_CAPABILITY_UNSUPPORTED",
+                "HARDWARE_DISCONNECTED",
+                "HARDWARE_BUSY",
+                "HARDWARE_PAPER_OUT",
+                "HARDWARE_COMMAND_TIMEOUT",
+                "HARDWARE_OUTCOME_UNKNOWN",
+                "HARDWARE_CONFIGURATION_STALE",
                 "INTERNAL_ERROR"
               ],
               "type": "string"
@@ -269,6 +289,68 @@
       },
       "required": [
         "error"
+      ],
+      "type": "object"
+    },
+    "AssignHardwareRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "assignedPosDeviceId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "expectedVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "maxLength": 128,
+          "minLength": 8,
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "primary": {
+          "default": false,
+          "type": "boolean"
+        },
+        "registerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "locationId",
+        "operatorSessionId",
+        "registerId",
+        "assignedPosDeviceId",
+        "expectedVersion",
+        "commandId",
+        "idempotencyKey"
       ],
       "type": "object"
     },
@@ -881,6 +963,288 @@
         "correlationId"
       ],
       "type": "object"
+    },
+    "BarcodeScanEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "correlationId": {
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+          "type": "string"
+        },
+        "eventSequence": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "normalizedValue": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "occurredAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "posDeviceId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "registerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scannerId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "symbology": {
+          "enum": [
+            "ean",
+            "upc",
+            "code128",
+            "qr",
+            "unknown_symbology"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "scannerId",
+        "posDeviceId",
+        "merchantId",
+        "locationId",
+        "registerId",
+        "symbology",
+        "normalizedValue",
+        "occurredAt",
+        "eventSequence",
+        "correlationId"
+      ],
+      "type": "object"
+    },
+    "BarcodeScannerDevice": {
+      "additionalProperties": false,
+      "properties": {
+        "archivedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assignedPosDeviceId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "capabilities": {
+          "items": {
+            "enum": [
+              "printer.receipt",
+              "printer.image",
+              "printer.qr",
+              "printer.cut",
+              "printer.test_page",
+              "printer.kitchen_ticket_foundation",
+              "drawer.open",
+              "drawer.status",
+              "scanner.barcode",
+              "scanner.qr",
+              "scanner.continuous",
+              "scanner.single",
+              "customer_display.text",
+              "customer_display.totals",
+              "customer_display.qr",
+              "terminal.connect_foundation",
+              "terminal.payment_foundation",
+              "terminal.refund_foundation",
+              "scale.read_weight_foundation",
+              "scale.tare_foundation"
+            ],
+            "type": "string"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "configurationVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "connectionState": {
+          "enum": [
+            "connected",
+            "disconnected",
+            "connecting",
+            "busy",
+            "error",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "firmwareVersion": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "lastDiagnosticAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastHeartbeatAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "manufacturer": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "model": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "optimisticVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "primary": {
+          "default": false,
+          "type": "boolean"
+        },
+        "publicReference": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "registerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transport": {
+          "enum": [
+            "simulator",
+            "usb_foundation",
+            "bluetooth_foundation",
+            "network_foundation",
+            "serial_foundation",
+            "platform_channel_foundation"
+          ],
+          "type": "string"
+        },
+        "type": {
+          "const": "barcode_scanner",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "merchantId",
+        "locationId",
+        "registerId",
+        "assignedPosDeviceId",
+        "type",
+        "manufacturer",
+        "model",
+        "publicReference",
+        "transport",
+        "capabilities",
+        "enabled",
+        "configurationVersion",
+        "connectionState",
+        "firmwareVersion",
+        "lastHeartbeatAt",
+        "lastDiagnosticAt",
+        "createdAt",
+        "updatedAt",
+        "archivedAt",
+        "optimisticVersion"
+      ],
+      "type": "object"
+    },
+    "BarcodeType": {
+      "enum": [
+        "ean",
+        "upc",
+        "code128",
+        "qr",
+        "unknown_symbology"
+      ],
+      "type": "string"
     },
     "BeginDeviceEnrollmentRequest": {
       "additionalProperties": false,
@@ -5284,6 +5648,254 @@
         "count",
         "variance",
         "approvalFingerprint"
+      ],
+      "type": "object"
+    },
+    "CashDrawerCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "approvalId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cashReference": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "enum": [
+            "cash_sale",
+            "cash_refund",
+            "paid_in",
+            "paid_out",
+            "safe_drop",
+            "register_open",
+            "register_close_foundation",
+            "no_sale",
+            "manager_test"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason",
+        "cashReference",
+        "approvalId"
+      ],
+      "type": "object"
+    },
+    "CashDrawerDevice": {
+      "additionalProperties": false,
+      "properties": {
+        "archivedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assignedPosDeviceId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "capabilities": {
+          "items": {
+            "enum": [
+              "printer.receipt",
+              "printer.image",
+              "printer.qr",
+              "printer.cut",
+              "printer.test_page",
+              "printer.kitchen_ticket_foundation",
+              "drawer.open",
+              "drawer.status",
+              "scanner.barcode",
+              "scanner.qr",
+              "scanner.continuous",
+              "scanner.single",
+              "customer_display.text",
+              "customer_display.totals",
+              "customer_display.qr",
+              "terminal.connect_foundation",
+              "terminal.payment_foundation",
+              "terminal.refund_foundation",
+              "scale.read_weight_foundation",
+              "scale.tare_foundation"
+            ],
+            "type": "string"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "configurationVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "connectionState": {
+          "enum": [
+            "connected",
+            "disconnected",
+            "connecting",
+            "busy",
+            "error",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "firmwareVersion": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "lastDiagnosticAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastHeartbeatAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "manufacturer": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "model": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "optimisticVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "primary": {
+          "default": false,
+          "type": "boolean"
+        },
+        "publicReference": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "registerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transport": {
+          "enum": [
+            "simulator",
+            "usb_foundation",
+            "bluetooth_foundation",
+            "network_foundation",
+            "serial_foundation",
+            "platform_channel_foundation"
+          ],
+          "type": "string"
+        },
+        "type": {
+          "const": "cash_drawer",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "merchantId",
+        "locationId",
+        "registerId",
+        "assignedPosDeviceId",
+        "type",
+        "manufacturer",
+        "model",
+        "publicReference",
+        "transport",
+        "capabilities",
+        "enabled",
+        "configurationVersion",
+        "connectionState",
+        "firmwareVersion",
+        "lastHeartbeatAt",
+        "lastDiagnosticAt",
+        "createdAt",
+        "updatedAt",
+        "archivedAt",
+        "optimisticVersion"
       ],
       "type": "object"
     },
@@ -17780,6 +18392,767 @@
       ],
       "type": "string"
     },
+    "ControlledReprintRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "maxLength": 128,
+          "minLength": 8,
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "operator_verified_missing",
+            "customer_copy",
+            "diagnostic_recovery"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "operatorSessionId",
+        "commandId",
+        "idempotencyKey",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "ControlledReprintResult": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "additionalProperties": false,
+          "properties": {
+            "commandId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "commandType": {
+              "enum": [
+                "print_receipt",
+                "print_kitchen_ticket_foundation",
+                "print_test_page",
+                "controlled_reprint",
+                "cancel_pending_print",
+                "query_printer_status",
+                "open_drawer",
+                "query_drawer_status",
+                "test_drawer",
+                "begin_scanner_session",
+                "end_scanner_session",
+                "update_customer_display",
+                "clear_customer_display",
+                "run_diagnostic",
+                "terminal_connect_foundation",
+                "terminal_disconnect_foundation",
+                "scale_read_foundation"
+              ],
+              "type": "string"
+            },
+            "display": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "amountDueMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "changeMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "discountMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "items": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "modifiers": {
+                            "items": {
+                              "maxLength": 120,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "maxItems": 40,
+                            "type": "array"
+                          },
+                          "name": {
+                            "maxLength": 160,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "exclusiveMinimum": 0,
+                            "type": "integer"
+                          },
+                          "totalMinorUnits": {
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "quantity",
+                          "totalMinorUnits",
+                          "modifiers"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 100,
+                      "type": "array"
+                    },
+                    "messageCode": {
+                      "anyOf": [
+                        {
+                          "maxLength": 80,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "receiptQr": {
+                      "anyOf": [
+                        {
+                          "maxLength": 512,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "receivedMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "state": {
+                      "enum": [
+                        "idle",
+                        "sale_active",
+                        "payment",
+                        "completed",
+                        "error_safe"
+                      ],
+                      "type": "string"
+                    },
+                    "subtotalMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "taxMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "tipMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "totalMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "state",
+                    "items",
+                    "subtotalMinorUnits",
+                    "discountMinorUnits",
+                    "taxMinorUnits",
+                    "tipMinorUnits",
+                    "totalMinorUnits",
+                    "amountDueMinorUnits",
+                    "receivedMinorUnits",
+                    "changeMinorUnits",
+                    "currency",
+                    "receiptQr",
+                    "messageCode"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "drawer": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "approvalId": {
+                      "anyOf": [
+                        {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "cashReference": {
+                      "anyOf": [
+                        {
+                          "maxLength": 160,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "reason": {
+                      "enum": [
+                        "cash_sale",
+                        "cash_refund",
+                        "paid_in",
+                        "paid_out",
+                        "safe_drop",
+                        "register_open",
+                        "register_close_foundation",
+                        "no_sale",
+                        "manager_test"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reason",
+                    "cashReference",
+                    "approvalId"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "expectedConfigurationVersion": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "idempotencyKey": {
+              "maxLength": 128,
+              "minLength": 8,
+              "type": "string"
+            },
+            "locationId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "operatorSessionId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "payloadFingerprint": {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            "printPayload": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "businessDate": {
+                      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                      "type": "string"
+                    },
+                    "changeMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "customerValueSummary": {
+                      "anyOf": [
+                        {
+                          "maxLength": 240,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "discountMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "exceptionMarker": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "refund",
+                            "void"
+                          ],
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "footer": {
+                      "anyOf": [
+                        {
+                          "maxLength": 500,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "items": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "modifiers": {
+                            "items": {
+                              "maxLength": 120,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "maxItems": 40,
+                            "type": "array"
+                          },
+                          "name": {
+                            "maxLength": 160,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "exclusiveMinimum": 0,
+                            "type": "integer"
+                          },
+                          "totalMinorUnits": {
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "quantity",
+                          "totalMinorUnits",
+                          "modifiers"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 500,
+                      "type": "array"
+                    },
+                    "locationName": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "loyaltySummary": {
+                      "anyOf": [
+                        {
+                          "maxLength": 240,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "merchantName": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "qrValue": {
+                      "anyOf": [
+                        {
+                          "maxLength": 512,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "receiptId": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "receiptNumber": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "registerName": {
+                      "anyOf": [
+                        {
+                          "maxLength": 160,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "subtotalMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "taxMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "tenders": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "amountMinorUnits": {
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "maskedReference": {
+                            "anyOf": [
+                              {
+                                "maxLength": 80,
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "type": {
+                            "enum": [
+                              "cash",
+                              "manual_terminal",
+                              "wallet",
+                              "gift_card",
+                              "other"
+                            ],
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "amountMinorUnits",
+                          "maskedReference"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 16,
+                      "type": "array"
+                    },
+                    "tipMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "totalMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "receiptId",
+                    "merchantName",
+                    "locationName",
+                    "registerName",
+                    "receiptNumber",
+                    "businessDate",
+                    "currency",
+                    "items",
+                    "subtotalMinorUnits",
+                    "discountMinorUnits",
+                    "taxMinorUnits",
+                    "tipMinorUnits",
+                    "totalMinorUnits",
+                    "tenders",
+                    "changeMinorUnits",
+                    "loyaltySummary",
+                    "customerValueSummary",
+                    "exceptionMarker",
+                    "qrValue",
+                    "footer"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "registerId": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "sourceAggregateId": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "sourceAggregateType": {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            "targetHardwareId": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "locationId",
+            "registerId",
+            "operatorSessionId",
+            "commandId",
+            "idempotencyKey",
+            "targetHardwareId",
+            "commandType",
+            "sourceAggregateType",
+            "sourceAggregateId",
+            "expectedConfigurationVersion",
+            "payloadFingerprint"
+          ],
+          "type": "object"
+        },
+        "job": {
+          "additionalProperties": false,
+          "properties": {
+            "attempts": {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "completedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "copies": {
+              "maximum": 10,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "correlationId": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            },
+            "createdAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "failure": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "enum": [
+                        "hardware_not_found",
+                        "hardware_disabled",
+                        "hardware_not_assigned",
+                        "capability_unsupported",
+                        "disconnected",
+                        "busy",
+                        "paper_out",
+                        "cover_open_foundation",
+                        "transport_unavailable",
+                        "command_timeout",
+                        "unknown_outcome",
+                        "permission_denied",
+                        "location_mismatch",
+                        "register_mismatch",
+                        "configuration_stale",
+                        "retryable_transport_failure",
+                        "terminal_hardware_failure"
+                      ],
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "anyOf": [
+                        {
+                          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null
+                    },
+                    "operatorGuidance": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "safeDetail": {
+                      "anyOf": [
+                        {
+                          "maxLength": 240,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "retryable",
+                    "operatorGuidance"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "idempotencyKey": {
+              "maxLength": 128,
+              "minLength": 8,
+              "type": "string"
+            },
+            "jobId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "originalJobId": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "payloadFingerprint": {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            "sourceAggregateId": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "sourceAggregateType": {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            "startedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "status": {
+              "enum": [
+                "queued",
+                "printing",
+                "printed",
+                "retryable_failure",
+                "terminal_failure",
+                "cancelled",
+                "unknown_outcome"
+              ],
+              "type": "string"
+            },
+            "targetPrinterId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "official_receipt",
+                "receipt_copy",
+                "test_page",
+                "kitchen_ticket_foundation",
+                "diagnostic_page_foundation"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "jobId",
+            "targetPrinterId",
+            "type",
+            "sourceAggregateType",
+            "sourceAggregateId",
+            "correlationId",
+            "idempotencyKey",
+            "payloadFingerprint",
+            "copies",
+            "status",
+            "attempts",
+            "createdAt",
+            "startedAt",
+            "completedAt",
+            "failure",
+            "originalJobId"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "job",
+        "command"
+      ],
+      "type": "object"
+    },
     "CorrelationMetadata": {
       "additionalProperties": false,
       "properties": {
@@ -19244,6 +20617,474 @@
         "provider_unavailable"
       ],
       "type": "string"
+    },
+    "CustomerDisplayCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "displayId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "state": {
+          "additionalProperties": false,
+          "properties": {
+            "amountDueMinorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "changeMinorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "discountMinorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "modifiers": {
+                    "items": {
+                      "maxLength": 120,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 40,
+                    "type": "array"
+                  },
+                  "name": {
+                    "maxLength": 160,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "quantity": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  "totalMinorUnits": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "name",
+                  "quantity",
+                  "totalMinorUnits",
+                  "modifiers"
+                ],
+                "type": "object"
+              },
+              "maxItems": 100,
+              "type": "array"
+            },
+            "messageCode": {
+              "anyOf": [
+                {
+                  "maxLength": 80,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "receiptQr": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "receivedMinorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "state": {
+              "enum": [
+                "idle",
+                "sale_active",
+                "payment",
+                "completed",
+                "error_safe"
+              ],
+              "type": "string"
+            },
+            "subtotalMinorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "taxMinorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "tipMinorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "totalMinorUnits": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "state",
+            "items",
+            "subtotalMinorUnits",
+            "discountMinorUnits",
+            "taxMinorUnits",
+            "tipMinorUnits",
+            "totalMinorUnits",
+            "amountDueMinorUnits",
+            "receivedMinorUnits",
+            "changeMinorUnits",
+            "currency",
+            "receiptQr",
+            "messageCode"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "displayId",
+        "state"
+      ],
+      "type": "object"
+    },
+    "CustomerDisplayDevice": {
+      "additionalProperties": false,
+      "properties": {
+        "archivedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assignedPosDeviceId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "capabilities": {
+          "items": {
+            "enum": [
+              "printer.receipt",
+              "printer.image",
+              "printer.qr",
+              "printer.cut",
+              "printer.test_page",
+              "printer.kitchen_ticket_foundation",
+              "drawer.open",
+              "drawer.status",
+              "scanner.barcode",
+              "scanner.qr",
+              "scanner.continuous",
+              "scanner.single",
+              "customer_display.text",
+              "customer_display.totals",
+              "customer_display.qr",
+              "terminal.connect_foundation",
+              "terminal.payment_foundation",
+              "terminal.refund_foundation",
+              "scale.read_weight_foundation",
+              "scale.tare_foundation"
+            ],
+            "type": "string"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "configurationVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "connectionState": {
+          "enum": [
+            "connected",
+            "disconnected",
+            "connecting",
+            "busy",
+            "error",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "firmwareVersion": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "lastDiagnosticAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastHeartbeatAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "manufacturer": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "model": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "optimisticVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "primary": {
+          "default": false,
+          "type": "boolean"
+        },
+        "publicReference": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "registerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transport": {
+          "enum": [
+            "simulator",
+            "usb_foundation",
+            "bluetooth_foundation",
+            "network_foundation",
+            "serial_foundation",
+            "platform_channel_foundation"
+          ],
+          "type": "string"
+        },
+        "type": {
+          "const": "customer_display",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "merchantId",
+        "locationId",
+        "registerId",
+        "assignedPosDeviceId",
+        "type",
+        "manufacturer",
+        "model",
+        "publicReference",
+        "transport",
+        "capabilities",
+        "enabled",
+        "configurationVersion",
+        "connectionState",
+        "firmwareVersion",
+        "lastHeartbeatAt",
+        "lastDiagnosticAt",
+        "createdAt",
+        "updatedAt",
+        "archivedAt",
+        "optimisticVersion"
+      ],
+      "type": "object"
+    },
+    "CustomerDisplayState": {
+      "additionalProperties": false,
+      "properties": {
+        "amountDueMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "changeMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "discountMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "modifiers": {
+                "items": {
+                  "maxLength": 120,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 40,
+                "type": "array"
+              },
+              "name": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "quantity": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "totalMinorUnits": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "name",
+              "quantity",
+              "totalMinorUnits",
+              "modifiers"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "messageCode": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "receiptQr": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "receivedMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "state": {
+          "enum": [
+            "idle",
+            "sale_active",
+            "payment",
+            "completed",
+            "error_safe"
+          ],
+          "type": "string"
+        },
+        "subtotalMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "taxMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tipMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "totalMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "state",
+        "items",
+        "subtotalMinorUnits",
+        "discountMinorUnits",
+        "taxMinorUnits",
+        "tipMinorUnits",
+        "totalMinorUnits",
+        "amountDueMinorUnits",
+        "receivedMinorUnits",
+        "changeMinorUnits",
+        "currency",
+        "receiptQr",
+        "messageCode"
+      ],
+      "type": "object"
     },
     "CustomerHistoryEntry": {
       "additionalProperties": false,
@@ -28519,6 +30360,3359 @@
       },
       "type": "object"
     },
+    "HardwareAssignment": {
+      "additionalProperties": false,
+      "properties": {
+        "assignedPosDeviceId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "primary": {
+          "type": "boolean"
+        },
+        "registerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "merchantId",
+        "locationId",
+        "registerId",
+        "assignedPosDeviceId",
+        "primary"
+      ],
+      "type": "object"
+    },
+    "HardwareCapability": {
+      "enum": [
+        "printer.receipt",
+        "printer.image",
+        "printer.qr",
+        "printer.cut",
+        "printer.test_page",
+        "printer.kitchen_ticket_foundation",
+        "drawer.open",
+        "drawer.status",
+        "scanner.barcode",
+        "scanner.qr",
+        "scanner.continuous",
+        "scanner.single",
+        "customer_display.text",
+        "customer_display.totals",
+        "customer_display.qr",
+        "terminal.connect_foundation",
+        "terminal.payment_foundation",
+        "terminal.refund_foundation",
+        "scale.read_weight_foundation",
+        "scale.tare_foundation"
+      ],
+      "type": "string"
+    },
+    "HardwareCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "commandType": {
+          "enum": [
+            "print_receipt",
+            "print_kitchen_ticket_foundation",
+            "print_test_page",
+            "controlled_reprint",
+            "cancel_pending_print",
+            "query_printer_status",
+            "open_drawer",
+            "query_drawer_status",
+            "test_drawer",
+            "begin_scanner_session",
+            "end_scanner_session",
+            "update_customer_display",
+            "clear_customer_display",
+            "run_diagnostic",
+            "terminal_connect_foundation",
+            "terminal_disconnect_foundation",
+            "scale_read_foundation"
+          ],
+          "type": "string"
+        },
+        "completedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "correlationId": {
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+          "type": "string"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "failureCode": {
+          "anyOf": [
+            {
+              "enum": [
+                "hardware_not_found",
+                "hardware_disabled",
+                "hardware_not_assigned",
+                "capability_unsupported",
+                "disconnected",
+                "busy",
+                "paper_out",
+                "cover_open_foundation",
+                "transport_unavailable",
+                "command_timeout",
+                "unknown_outcome",
+                "permission_denied",
+                "location_mismatch",
+                "register_mismatch",
+                "configuration_stale",
+                "retryable_transport_failure",
+                "terminal_hardware_failure"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "idempotencyKey": {
+          "maxLength": 128,
+          "minLength": 8,
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "originatingPosDeviceId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "payloadFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "registerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "safeResultMetadata": {
+          "additionalProperties": false,
+          "properties": {
+            "acknowledged": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "artifactReference": {
+              "anyOf": [
+                {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "latencyMs": {
+              "anyOf": [
+                {
+                  "maximum": 120000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "statusMessage": {
+              "anyOf": [
+                {
+                  "maxLength": 240,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "sourceAggregateId": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "sourceAggregateType": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "startedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "dispatching",
+            "succeeded",
+            "failed",
+            "retryable",
+            "cancelled",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "targetHardwareId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "commandId",
+        "commandType",
+        "targetHardwareId",
+        "merchantId",
+        "locationId",
+        "registerId",
+        "originatingPosDeviceId",
+        "operatorId",
+        "sourceAggregateType",
+        "sourceAggregateId",
+        "payloadFingerprint",
+        "idempotencyKey",
+        "correlationId",
+        "status",
+        "createdAt",
+        "startedAt",
+        "completedAt",
+        "failureCode",
+        "safeResultMetadata"
+      ],
+      "type": "object"
+    },
+    "HardwareCommandRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "commandType": {
+          "enum": [
+            "print_receipt",
+            "print_kitchen_ticket_foundation",
+            "print_test_page",
+            "controlled_reprint",
+            "cancel_pending_print",
+            "query_printer_status",
+            "open_drawer",
+            "query_drawer_status",
+            "test_drawer",
+            "begin_scanner_session",
+            "end_scanner_session",
+            "update_customer_display",
+            "clear_customer_display",
+            "run_diagnostic",
+            "terminal_connect_foundation",
+            "terminal_disconnect_foundation",
+            "scale_read_foundation"
+          ],
+          "type": "string"
+        },
+        "display": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "amountDueMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "changeMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "discountMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "items": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "modifiers": {
+                        "items": {
+                          "maxLength": 120,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "maxItems": 40,
+                        "type": "array"
+                      },
+                      "name": {
+                        "maxLength": 160,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "quantity": {
+                        "exclusiveMinimum": 0,
+                        "type": "integer"
+                      },
+                      "totalMinorUnits": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "quantity",
+                      "totalMinorUnits",
+                      "modifiers"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 100,
+                  "type": "array"
+                },
+                "messageCode": {
+                  "anyOf": [
+                    {
+                      "maxLength": 80,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "receiptQr": {
+                  "anyOf": [
+                    {
+                      "maxLength": 512,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "receivedMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "state": {
+                  "enum": [
+                    "idle",
+                    "sale_active",
+                    "payment",
+                    "completed",
+                    "error_safe"
+                  ],
+                  "type": "string"
+                },
+                "subtotalMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "taxMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "tipMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "totalMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "state",
+                "items",
+                "subtotalMinorUnits",
+                "discountMinorUnits",
+                "taxMinorUnits",
+                "tipMinorUnits",
+                "totalMinorUnits",
+                "amountDueMinorUnits",
+                "receivedMinorUnits",
+                "changeMinorUnits",
+                "currency",
+                "receiptQr",
+                "messageCode"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "drawer": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "approvalId": {
+                  "anyOf": [
+                    {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "cashReference": {
+                  "anyOf": [
+                    {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reason": {
+                  "enum": [
+                    "cash_sale",
+                    "cash_refund",
+                    "paid_in",
+                    "paid_out",
+                    "safe_drop",
+                    "register_open",
+                    "register_close_foundation",
+                    "no_sale",
+                    "manager_test"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason",
+                "cashReference",
+                "approvalId"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "expectedConfigurationVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "maxLength": 128,
+          "minLength": 8,
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "payloadFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "printPayload": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "businessDate": {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                "changeMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "customerValueSummary": {
+                  "anyOf": [
+                    {
+                      "maxLength": 240,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "discountMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "exceptionMarker": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "refund",
+                        "void"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "footer": {
+                  "anyOf": [
+                    {
+                      "maxLength": 500,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "items": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "modifiers": {
+                        "items": {
+                          "maxLength": 120,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "maxItems": 40,
+                        "type": "array"
+                      },
+                      "name": {
+                        "maxLength": 160,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "quantity": {
+                        "exclusiveMinimum": 0,
+                        "type": "integer"
+                      },
+                      "totalMinorUnits": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "quantity",
+                      "totalMinorUnits",
+                      "modifiers"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 500,
+                  "type": "array"
+                },
+                "locationName": {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "loyaltySummary": {
+                  "anyOf": [
+                    {
+                      "maxLength": 240,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "merchantName": {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "qrValue": {
+                  "anyOf": [
+                    {
+                      "maxLength": 512,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "receiptId": {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "receiptNumber": {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "registerName": {
+                  "anyOf": [
+                    {
+                      "maxLength": 160,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "subtotalMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "taxMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "tenders": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "amountMinorUnits": {
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "maskedReference": {
+                        "anyOf": [
+                          {
+                            "maxLength": 80,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "type": {
+                        "enum": [
+                          "cash",
+                          "manual_terminal",
+                          "wallet",
+                          "gift_card",
+                          "other"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "amountMinorUnits",
+                      "maskedReference"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 16,
+                  "type": "array"
+                },
+                "tipMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "totalMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "receiptId",
+                "merchantName",
+                "locationName",
+                "registerName",
+                "receiptNumber",
+                "businessDate",
+                "currency",
+                "items",
+                "subtotalMinorUnits",
+                "discountMinorUnits",
+                "taxMinorUnits",
+                "tipMinorUnits",
+                "totalMinorUnits",
+                "tenders",
+                "changeMinorUnits",
+                "loyaltySummary",
+                "customerValueSummary",
+                "exceptionMarker",
+                "qrValue",
+                "footer"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "registerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceAggregateId": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "sourceAggregateType": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "targetHardwareId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "registerId",
+        "operatorSessionId",
+        "commandId",
+        "idempotencyKey",
+        "targetHardwareId",
+        "commandType",
+        "sourceAggregateType",
+        "sourceAggregateId",
+        "expectedConfigurationVersion",
+        "payloadFingerprint"
+      ],
+      "type": "object"
+    },
+    "HardwareCommandResult": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "additionalProperties": false,
+          "properties": {
+            "commandId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "commandType": {
+              "enum": [
+                "print_receipt",
+                "print_kitchen_ticket_foundation",
+                "print_test_page",
+                "controlled_reprint",
+                "cancel_pending_print",
+                "query_printer_status",
+                "open_drawer",
+                "query_drawer_status",
+                "test_drawer",
+                "begin_scanner_session",
+                "end_scanner_session",
+                "update_customer_display",
+                "clear_customer_display",
+                "run_diagnostic",
+                "terminal_connect_foundation",
+                "terminal_disconnect_foundation",
+                "scale_read_foundation"
+              ],
+              "type": "string"
+            },
+            "completedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "correlationId": {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            },
+            "createdAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "failureCode": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "hardware_not_found",
+                    "hardware_disabled",
+                    "hardware_not_assigned",
+                    "capability_unsupported",
+                    "disconnected",
+                    "busy",
+                    "paper_out",
+                    "cover_open_foundation",
+                    "transport_unavailable",
+                    "command_timeout",
+                    "unknown_outcome",
+                    "permission_denied",
+                    "location_mismatch",
+                    "register_mismatch",
+                    "configuration_stale",
+                    "retryable_transport_failure",
+                    "terminal_hardware_failure"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "idempotencyKey": {
+              "maxLength": 128,
+              "minLength": 8,
+              "type": "string"
+            },
+            "locationId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "merchantId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "operatorId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "originatingPosDeviceId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "payloadFingerprint": {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            "registerId": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "safeResultMetadata": {
+              "additionalProperties": false,
+              "properties": {
+                "acknowledged": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "artifactReference": {
+                  "anyOf": [
+                    {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "latencyMs": {
+                  "anyOf": [
+                    {
+                      "maximum": 120000,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "statusMessage": {
+                  "anyOf": [
+                    {
+                      "maxLength": 240,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "type": "object"
+            },
+            "sourceAggregateId": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            "sourceAggregateType": {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            "startedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "status": {
+              "enum": [
+                "pending",
+                "dispatching",
+                "succeeded",
+                "failed",
+                "retryable",
+                "cancelled",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "targetHardwareId": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "commandId",
+            "commandType",
+            "targetHardwareId",
+            "merchantId",
+            "locationId",
+            "registerId",
+            "originatingPosDeviceId",
+            "operatorId",
+            "sourceAggregateType",
+            "sourceAggregateId",
+            "payloadFingerprint",
+            "idempotencyKey",
+            "correlationId",
+            "status",
+            "createdAt",
+            "startedAt",
+            "completedAt",
+            "failureCode",
+            "safeResultMetadata"
+          ],
+          "type": "object"
+        },
+        "dispatchPayload": {
+          "additionalProperties": false,
+          "properties": {
+            "display": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "amountDueMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "changeMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "discountMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "items": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "modifiers": {
+                            "items": {
+                              "maxLength": 120,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "maxItems": 40,
+                            "type": "array"
+                          },
+                          "name": {
+                            "maxLength": 160,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "exclusiveMinimum": 0,
+                            "type": "integer"
+                          },
+                          "totalMinorUnits": {
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "quantity",
+                          "totalMinorUnits",
+                          "modifiers"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 100,
+                      "type": "array"
+                    },
+                    "messageCode": {
+                      "anyOf": [
+                        {
+                          "maxLength": 80,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "receiptQr": {
+                      "anyOf": [
+                        {
+                          "maxLength": 512,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "receivedMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "state": {
+                      "enum": [
+                        "idle",
+                        "sale_active",
+                        "payment",
+                        "completed",
+                        "error_safe"
+                      ],
+                      "type": "string"
+                    },
+                    "subtotalMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "taxMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "tipMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "totalMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "state",
+                    "items",
+                    "subtotalMinorUnits",
+                    "discountMinorUnits",
+                    "taxMinorUnits",
+                    "tipMinorUnits",
+                    "totalMinorUnits",
+                    "amountDueMinorUnits",
+                    "receivedMinorUnits",
+                    "changeMinorUnits",
+                    "currency",
+                    "receiptQr",
+                    "messageCode"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "drawer": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "approvalId": {
+                      "anyOf": [
+                        {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "cashReference": {
+                      "anyOf": [
+                        {
+                          "maxLength": 160,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "reason": {
+                      "enum": [
+                        "cash_sale",
+                        "cash_refund",
+                        "paid_in",
+                        "paid_out",
+                        "safe_drop",
+                        "register_open",
+                        "register_close_foundation",
+                        "no_sale",
+                        "manager_test"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reason",
+                    "cashReference",
+                    "approvalId"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "printPayload": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "businessDate": {
+                      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                      "type": "string"
+                    },
+                    "changeMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "customerValueSummary": {
+                      "anyOf": [
+                        {
+                          "maxLength": 240,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "discountMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "exceptionMarker": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "refund",
+                            "void"
+                          ],
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "footer": {
+                      "anyOf": [
+                        {
+                          "maxLength": 500,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "items": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "modifiers": {
+                            "items": {
+                              "maxLength": 120,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "maxItems": 40,
+                            "type": "array"
+                          },
+                          "name": {
+                            "maxLength": 160,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "exclusiveMinimum": 0,
+                            "type": "integer"
+                          },
+                          "totalMinorUnits": {
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "quantity",
+                          "totalMinorUnits",
+                          "modifiers"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 500,
+                      "type": "array"
+                    },
+                    "locationName": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "loyaltySummary": {
+                      "anyOf": [
+                        {
+                          "maxLength": 240,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "merchantName": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "qrValue": {
+                      "anyOf": [
+                        {
+                          "maxLength": 512,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "receiptId": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "receiptNumber": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "registerName": {
+                      "anyOf": [
+                        {
+                          "maxLength": 160,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "subtotalMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "taxMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "tenders": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "amountMinorUnits": {
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "maskedReference": {
+                            "anyOf": [
+                              {
+                                "maxLength": 80,
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "type": {
+                            "enum": [
+                              "cash",
+                              "manual_terminal",
+                              "wallet",
+                              "gift_card",
+                              "other"
+                            ],
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "amountMinorUnits",
+                          "maskedReference"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 16,
+                      "type": "array"
+                    },
+                    "tipMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "totalMinorUnits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "receiptId",
+                    "merchantName",
+                    "locationName",
+                    "registerName",
+                    "receiptNumber",
+                    "businessDate",
+                    "currency",
+                    "items",
+                    "subtotalMinorUnits",
+                    "discountMinorUnits",
+                    "taxMinorUnits",
+                    "tipMinorUnits",
+                    "totalMinorUnits",
+                    "tenders",
+                    "changeMinorUnits",
+                    "loyaltySummary",
+                    "customerValueSummary",
+                    "exceptionMarker",
+                    "qrValue",
+                    "footer"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "type": "object"
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "code": {
+                  "enum": [
+                    "hardware_not_found",
+                    "hardware_disabled",
+                    "hardware_not_assigned",
+                    "capability_unsupported",
+                    "disconnected",
+                    "busy",
+                    "paper_out",
+                    "cover_open_foundation",
+                    "transport_unavailable",
+                    "command_timeout",
+                    "unknown_outcome",
+                    "permission_denied",
+                    "location_mismatch",
+                    "register_mismatch",
+                    "configuration_stale",
+                    "retryable_transport_failure",
+                    "terminal_hardware_failure"
+                  ],
+                  "type": "string"
+                },
+                "correlationId": {
+                  "anyOf": [
+                    {
+                      "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                },
+                "operatorGuidance": {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "retryable": {
+                  "type": "boolean"
+                },
+                "safeDetail": {
+                  "anyOf": [
+                    {
+                      "maxLength": 240,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                }
+              },
+              "required": [
+                "code",
+                "retryable",
+                "operatorGuidance"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recovered": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "command",
+        "recovered",
+        "failure",
+        "dispatchPayload"
+      ],
+      "type": "object"
+    },
+    "HardwareCommandStatus": {
+      "enum": [
+        "pending",
+        "dispatching",
+        "succeeded",
+        "failed",
+        "retryable",
+        "cancelled",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "HardwareCommandTransitionRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "failureCode": {
+          "anyOf": [
+            {
+              "enum": [
+                "hardware_not_found",
+                "hardware_disabled",
+                "hardware_not_assigned",
+                "capability_unsupported",
+                "disconnected",
+                "busy",
+                "paper_out",
+                "cover_open_foundation",
+                "transport_unavailable",
+                "command_timeout",
+                "unknown_outcome",
+                "permission_denied",
+                "location_mismatch",
+                "register_mismatch",
+                "configuration_stale",
+                "retryable_transport_failure",
+                "terminal_hardware_failure"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "safeResultMetadata": {
+          "additionalProperties": false,
+          "default": {},
+          "properties": {
+            "acknowledged": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "artifactReference": {
+              "anyOf": [
+                {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "latencyMs": {
+              "anyOf": [
+                {
+                  "maximum": 120000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "statusMessage": {
+              "anyOf": [
+                {
+                  "maxLength": 240,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "status": {
+          "enum": [
+            "dispatching",
+            "succeeded",
+            "failed",
+            "retryable",
+            "cancelled",
+            "unknown"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "operatorSessionId",
+        "status"
+      ],
+      "type": "object"
+    },
+    "HardwareCommandType": {
+      "enum": [
+        "print_receipt",
+        "print_kitchen_ticket_foundation",
+        "print_test_page",
+        "controlled_reprint",
+        "cancel_pending_print",
+        "query_printer_status",
+        "open_drawer",
+        "query_drawer_status",
+        "test_drawer",
+        "begin_scanner_session",
+        "end_scanner_session",
+        "update_customer_display",
+        "clear_customer_display",
+        "run_diagnostic",
+        "terminal_connect_foundation",
+        "terminal_disconnect_foundation",
+        "scale_read_foundation"
+      ],
+      "type": "string"
+    },
+    "HardwareConnectionState": {
+      "enum": [
+        "connected",
+        "disconnected",
+        "connecting",
+        "busy",
+        "error",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "HardwareDevice": {
+      "additionalProperties": false,
+      "properties": {
+        "archivedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assignedPosDeviceId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "capabilities": {
+          "items": {
+            "enum": [
+              "printer.receipt",
+              "printer.image",
+              "printer.qr",
+              "printer.cut",
+              "printer.test_page",
+              "printer.kitchen_ticket_foundation",
+              "drawer.open",
+              "drawer.status",
+              "scanner.barcode",
+              "scanner.qr",
+              "scanner.continuous",
+              "scanner.single",
+              "customer_display.text",
+              "customer_display.totals",
+              "customer_display.qr",
+              "terminal.connect_foundation",
+              "terminal.payment_foundation",
+              "terminal.refund_foundation",
+              "scale.read_weight_foundation",
+              "scale.tare_foundation"
+            ],
+            "type": "string"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "configurationVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "connectionState": {
+          "enum": [
+            "connected",
+            "disconnected",
+            "connecting",
+            "busy",
+            "error",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "firmwareVersion": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "lastDiagnosticAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastHeartbeatAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "manufacturer": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "model": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "optimisticVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "primary": {
+          "default": false,
+          "type": "boolean"
+        },
+        "publicReference": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "registerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transport": {
+          "enum": [
+            "simulator",
+            "usb_foundation",
+            "bluetooth_foundation",
+            "network_foundation",
+            "serial_foundation",
+            "platform_channel_foundation"
+          ],
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "printer",
+            "cash_drawer",
+            "barcode_scanner",
+            "customer_display",
+            "payment_terminal_foundation",
+            "scale_foundation"
+          ],
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "merchantId",
+        "locationId",
+        "registerId",
+        "assignedPosDeviceId",
+        "type",
+        "manufacturer",
+        "model",
+        "publicReference",
+        "transport",
+        "capabilities",
+        "enabled",
+        "configurationVersion",
+        "connectionState",
+        "firmwareVersion",
+        "lastHeartbeatAt",
+        "lastDiagnosticAt",
+        "createdAt",
+        "updatedAt",
+        "archivedAt",
+        "optimisticVersion"
+      ],
+      "type": "object"
+    },
+    "HardwareDeviceType": {
+      "enum": [
+        "printer",
+        "cash_drawer",
+        "barcode_scanner",
+        "customer_display",
+        "payment_terminal_foundation",
+        "scale_foundation"
+      ],
+      "type": "string"
+    },
+    "HardwareDiagnostic": {
+      "enum": [
+        "query_status",
+        "connection_test",
+        "capability_report",
+        "printer_test_page",
+        "drawer_test",
+        "scanner_test_session",
+        "customer_display_test",
+        "runtime_snapshot"
+      ],
+      "type": "string"
+    },
+    "HardwareDiagnosticRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "connectionState": {
+          "enum": [
+            "connected",
+            "disconnected",
+            "connecting",
+            "busy",
+            "error",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "diagnostic": {
+          "enum": [
+            "query_status",
+            "connection_test",
+            "capability_report",
+            "printer_test_page",
+            "drawer_test",
+            "scanner_test_session",
+            "customer_display_test",
+            "runtime_snapshot"
+          ],
+          "type": "string"
+        },
+        "failureCode": {
+          "anyOf": [
+            {
+              "enum": [
+                "hardware_not_found",
+                "hardware_disabled",
+                "hardware_not_assigned",
+                "capability_unsupported",
+                "disconnected",
+                "busy",
+                "paper_out",
+                "cover_open_foundation",
+                "transport_unavailable",
+                "command_timeout",
+                "unknown_outcome",
+                "permission_denied",
+                "location_mismatch",
+                "register_mismatch",
+                "configuration_stale",
+                "retryable_transport_failure",
+                "terminal_hardware_failure"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "hardwareId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "health": {
+          "enum": [
+            "healthy",
+            "degraded",
+            "unavailable",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "maxLength": 128,
+          "minLength": 8,
+          "type": "string"
+        },
+        "latencyMs": {
+          "anyOf": [
+            {
+              "maximum": 120000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "safeResult": {
+          "additionalProperties": false,
+          "default": {},
+          "properties": {
+            "acknowledged": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "artifactReference": {
+              "anyOf": [
+                {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "latencyMs": {
+              "anyOf": [
+                {
+                  "maximum": 120000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "statusMessage": {
+              "anyOf": [
+                {
+                  "maxLength": 240,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "locationId",
+        "operatorSessionId",
+        "commandId",
+        "idempotencyKey",
+        "hardwareId",
+        "diagnostic",
+        "health",
+        "connectionState"
+      ],
+      "type": "object"
+    },
+    "HardwareDiagnosticResult": {
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "items": {
+            "enum": [
+              "printer.receipt",
+              "printer.image",
+              "printer.qr",
+              "printer.cut",
+              "printer.test_page",
+              "printer.kitchen_ticket_foundation",
+              "drawer.open",
+              "drawer.status",
+              "scanner.barcode",
+              "scanner.qr",
+              "scanner.continuous",
+              "scanner.single",
+              "customer_display.text",
+              "customer_display.totals",
+              "customer_display.qr",
+              "terminal.connect_foundation",
+              "terminal.payment_foundation",
+              "terminal.refund_foundation",
+              "scale.read_weight_foundation",
+              "scale.tare_foundation"
+            ],
+            "type": "string"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "connectionState": {
+          "enum": [
+            "connected",
+            "disconnected",
+            "connecting",
+            "busy",
+            "error",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "correlationId": {
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+          "type": "string"
+        },
+        "diagnostic": {
+          "enum": [
+            "query_status",
+            "connection_test",
+            "capability_report",
+            "printer_test_page",
+            "drawer_test",
+            "scanner_test_session",
+            "customer_display_test",
+            "runtime_snapshot"
+          ],
+          "type": "string"
+        },
+        "diagnosticId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "code": {
+                  "enum": [
+                    "hardware_not_found",
+                    "hardware_disabled",
+                    "hardware_not_assigned",
+                    "capability_unsupported",
+                    "disconnected",
+                    "busy",
+                    "paper_out",
+                    "cover_open_foundation",
+                    "transport_unavailable",
+                    "command_timeout",
+                    "unknown_outcome",
+                    "permission_denied",
+                    "location_mismatch",
+                    "register_mismatch",
+                    "configuration_stale",
+                    "retryable_transport_failure",
+                    "terminal_hardware_failure"
+                  ],
+                  "type": "string"
+                },
+                "correlationId": {
+                  "anyOf": [
+                    {
+                      "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                },
+                "operatorGuidance": {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "retryable": {
+                  "type": "boolean"
+                },
+                "safeDetail": {
+                  "anyOf": [
+                    {
+                      "maxLength": 240,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                }
+              },
+              "required": [
+                "code",
+                "retryable",
+                "operatorGuidance"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hardwareId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "health": {
+          "enum": [
+            "healthy",
+            "degraded",
+            "unavailable",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "latencyMs": {
+          "anyOf": [
+            {
+              "maximum": 120000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "occurredAt": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "diagnosticId",
+        "hardwareId",
+        "diagnostic",
+        "health",
+        "connectionState",
+        "capabilities",
+        "latencyMs",
+        "failure",
+        "occurredAt",
+        "correlationId"
+      ],
+      "type": "object"
+    },
+    "HardwareDispatchPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "display": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "amountDueMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "changeMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "discountMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "items": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "modifiers": {
+                        "items": {
+                          "maxLength": 120,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "maxItems": 40,
+                        "type": "array"
+                      },
+                      "name": {
+                        "maxLength": 160,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "quantity": {
+                        "exclusiveMinimum": 0,
+                        "type": "integer"
+                      },
+                      "totalMinorUnits": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "quantity",
+                      "totalMinorUnits",
+                      "modifiers"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 100,
+                  "type": "array"
+                },
+                "messageCode": {
+                  "anyOf": [
+                    {
+                      "maxLength": 80,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "receiptQr": {
+                  "anyOf": [
+                    {
+                      "maxLength": 512,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "receivedMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "state": {
+                  "enum": [
+                    "idle",
+                    "sale_active",
+                    "payment",
+                    "completed",
+                    "error_safe"
+                  ],
+                  "type": "string"
+                },
+                "subtotalMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "taxMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "tipMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "totalMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "state",
+                "items",
+                "subtotalMinorUnits",
+                "discountMinorUnits",
+                "taxMinorUnits",
+                "tipMinorUnits",
+                "totalMinorUnits",
+                "amountDueMinorUnits",
+                "receivedMinorUnits",
+                "changeMinorUnits",
+                "currency",
+                "receiptQr",
+                "messageCode"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "drawer": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "approvalId": {
+                  "anyOf": [
+                    {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "cashReference": {
+                  "anyOf": [
+                    {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reason": {
+                  "enum": [
+                    "cash_sale",
+                    "cash_refund",
+                    "paid_in",
+                    "paid_out",
+                    "safe_drop",
+                    "register_open",
+                    "register_close_foundation",
+                    "no_sale",
+                    "manager_test"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason",
+                "cashReference",
+                "approvalId"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "printPayload": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "businessDate": {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                "changeMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "customerValueSummary": {
+                  "anyOf": [
+                    {
+                      "maxLength": 240,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "discountMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "exceptionMarker": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "refund",
+                        "void"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "footer": {
+                  "anyOf": [
+                    {
+                      "maxLength": 500,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "items": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "modifiers": {
+                        "items": {
+                          "maxLength": 120,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "maxItems": 40,
+                        "type": "array"
+                      },
+                      "name": {
+                        "maxLength": 160,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "quantity": {
+                        "exclusiveMinimum": 0,
+                        "type": "integer"
+                      },
+                      "totalMinorUnits": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "quantity",
+                      "totalMinorUnits",
+                      "modifiers"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 500,
+                  "type": "array"
+                },
+                "locationName": {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "loyaltySummary": {
+                  "anyOf": [
+                    {
+                      "maxLength": 240,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "merchantName": {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "qrValue": {
+                  "anyOf": [
+                    {
+                      "maxLength": 512,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "receiptId": {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "receiptNumber": {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "registerName": {
+                  "anyOf": [
+                    {
+                      "maxLength": 160,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "subtotalMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "taxMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "tenders": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "amountMinorUnits": {
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "maskedReference": {
+                        "anyOf": [
+                          {
+                            "maxLength": 80,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "type": {
+                        "enum": [
+                          "cash",
+                          "manual_terminal",
+                          "wallet",
+                          "gift_card",
+                          "other"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "amountMinorUnits",
+                      "maskedReference"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 16,
+                  "type": "array"
+                },
+                "tipMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "totalMinorUnits": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "receiptId",
+                "merchantName",
+                "locationName",
+                "registerName",
+                "receiptNumber",
+                "businessDate",
+                "currency",
+                "items",
+                "subtotalMinorUnits",
+                "discountMinorUnits",
+                "taxMinorUnits",
+                "tipMinorUnits",
+                "totalMinorUnits",
+                "tenders",
+                "changeMinorUnits",
+                "loyaltySummary",
+                "customerValueSummary",
+                "exceptionMarker",
+                "qrValue",
+                "footer"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "type": "object"
+    },
+    "HardwareFailure": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "hardware_not_found",
+            "hardware_disabled",
+            "hardware_not_assigned",
+            "capability_unsupported",
+            "disconnected",
+            "busy",
+            "paper_out",
+            "cover_open_foundation",
+            "transport_unavailable",
+            "command_timeout",
+            "unknown_outcome",
+            "permission_denied",
+            "location_mismatch",
+            "register_mismatch",
+            "configuration_stale",
+            "retryable_transport_failure",
+            "terminal_hardware_failure"
+          ],
+          "type": "string"
+        },
+        "correlationId": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "operatorGuidance": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "safeDetail": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "code",
+        "retryable",
+        "operatorGuidance"
+      ],
+      "type": "object"
+    },
+    "HardwareFailureCode": {
+      "enum": [
+        "hardware_not_found",
+        "hardware_disabled",
+        "hardware_not_assigned",
+        "capability_unsupported",
+        "disconnected",
+        "busy",
+        "paper_out",
+        "cover_open_foundation",
+        "transport_unavailable",
+        "command_timeout",
+        "unknown_outcome",
+        "permission_denied",
+        "location_mismatch",
+        "register_mismatch",
+        "configuration_stale",
+        "retryable_transport_failure",
+        "terminal_hardware_failure"
+      ],
+      "type": "string"
+    },
+    "HardwareHealth": {
+      "enum": [
+        "healthy",
+        "degraded",
+        "unavailable",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "HardwareRecoveryQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "operatorSessionId"
+      ],
+      "type": "object"
+    },
+    "HardwareRecoveryState": {
+      "enum": [
+        "none",
+        "pending_print",
+        "failed_print",
+        "unknown_print",
+        "drawer_unknown",
+        "disconnected",
+        "stale_assignment",
+        "stale_configuration",
+        "recovered"
+      ],
+      "type": "string"
+    },
+    "HardwareRegistryQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "includeDisabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "registerId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "operatorSessionId"
+      ],
+      "type": "object"
+    },
+    "HardwareRuntimeSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "capturedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "devices": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "archivedAt": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "assignedPosDeviceId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "capabilities": {
+                "items": {
+                  "enum": [
+                    "printer.receipt",
+                    "printer.image",
+                    "printer.qr",
+                    "printer.cut",
+                    "printer.test_page",
+                    "printer.kitchen_ticket_foundation",
+                    "drawer.open",
+                    "drawer.status",
+                    "scanner.barcode",
+                    "scanner.qr",
+                    "scanner.continuous",
+                    "scanner.single",
+                    "customer_display.text",
+                    "customer_display.totals",
+                    "customer_display.qr",
+                    "terminal.connect_foundation",
+                    "terminal.payment_foundation",
+                    "terminal.refund_foundation",
+                    "scale.read_weight_foundation",
+                    "scale.tare_foundation"
+                  ],
+                  "type": "string"
+                },
+                "maxItems": 32,
+                "type": "array"
+              },
+              "configurationVersion": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "connectionState": {
+                "enum": [
+                  "connected",
+                  "disconnected",
+                  "connecting",
+                  "busy",
+                  "error",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              "createdAt": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "firmwareVersion": {
+                "anyOf": [
+                  {
+                    "maxLength": 120,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "lastDiagnosticAt": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lastHeartbeatAt": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "locationId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "manufacturer": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "merchantId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "model": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "optimisticVersion": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "primary": {
+                "default": false,
+                "type": "boolean"
+              },
+              "publicReference": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "registerId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "transport": {
+                "enum": [
+                  "simulator",
+                  "usb_foundation",
+                  "bluetooth_foundation",
+                  "network_foundation",
+                  "serial_foundation",
+                  "platform_channel_foundation"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "printer",
+                  "cash_drawer",
+                  "barcode_scanner",
+                  "customer_display",
+                  "payment_terminal_foundation",
+                  "scale_foundation"
+                ],
+                "type": "string"
+              },
+              "updatedAt": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "merchantId",
+              "locationId",
+              "registerId",
+              "assignedPosDeviceId",
+              "type",
+              "manufacturer",
+              "model",
+              "publicReference",
+              "transport",
+              "capabilities",
+              "enabled",
+              "configurationVersion",
+              "connectionState",
+              "firmwareVersion",
+              "lastHeartbeatAt",
+              "lastDiagnosticAt",
+              "createdAt",
+              "updatedAt",
+              "archivedAt",
+              "optimisticVersion"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "pendingJobs": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "printJobs": {
+          "default": [],
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "attempts": {
+                "maximum": 10,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "completedAt": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "copies": {
+                "maximum": 10,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "correlationId": {
+                "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+                "type": "string"
+              },
+              "createdAt": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "failure": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "code": {
+                        "enum": [
+                          "hardware_not_found",
+                          "hardware_disabled",
+                          "hardware_not_assigned",
+                          "capability_unsupported",
+                          "disconnected",
+                          "busy",
+                          "paper_out",
+                          "cover_open_foundation",
+                          "transport_unavailable",
+                          "command_timeout",
+                          "unknown_outcome",
+                          "permission_denied",
+                          "location_mismatch",
+                          "register_mismatch",
+                          "configuration_stale",
+                          "retryable_transport_failure",
+                          "terminal_hardware_failure"
+                        ],
+                        "type": "string"
+                      },
+                      "correlationId": {
+                        "anyOf": [
+                          {
+                            "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null
+                      },
+                      "operatorGuidance": {
+                        "maxLength": 160,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      },
+                      "safeDetail": {
+                        "anyOf": [
+                          {
+                            "maxLength": 240,
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "retryable",
+                      "operatorGuidance"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "idempotencyKey": {
+                "maxLength": 128,
+                "minLength": 8,
+                "type": "string"
+              },
+              "jobId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "originalJobId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "payloadFingerprint": {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string"
+              },
+              "sourceAggregateId": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "sourceAggregateType": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "startedAt": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "enum": [
+                  "queued",
+                  "printing",
+                  "printed",
+                  "retryable_failure",
+                  "terminal_failure",
+                  "cancelled",
+                  "unknown_outcome"
+                ],
+                "type": "string"
+              },
+              "targetPrinterId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "official_receipt",
+                  "receipt_copy",
+                  "test_page",
+                  "kitchen_ticket_foundation",
+                  "diagnostic_page_foundation"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "jobId",
+              "targetPrinterId",
+              "type",
+              "sourceAggregateType",
+              "sourceAggregateId",
+              "correlationId",
+              "idempotencyKey",
+              "payloadFingerprint",
+              "copies",
+              "status",
+              "attempts",
+              "createdAt",
+              "startedAt",
+              "completedAt",
+              "failure",
+              "originalJobId"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "recoveryStates": {
+          "default": [],
+          "items": {
+            "enum": [
+              "none",
+              "pending_print",
+              "failed_print",
+              "unknown_print",
+              "drawer_unknown",
+              "disconnected",
+              "stale_assignment",
+              "stale_configuration",
+              "recovered"
+            ],
+            "type": "string"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "registerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retryableJobs": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unknownCommands": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "merchantId",
+        "locationId",
+        "registerId",
+        "devices",
+        "pendingJobs",
+        "retryableJobs",
+        "unknownCommands",
+        "capturedAt"
+      ],
+      "type": "object"
+    },
+    "HardwareTransport": {
+      "enum": [
+        "simulator",
+        "usb_foundation",
+        "bluetooth_foundation",
+        "network_foundation",
+        "serial_foundation",
+        "platform_channel_foundation"
+      ],
+      "type": "string"
+    },
     "IdempotencyMetadata": {
       "additionalProperties": false,
       "properties": {
@@ -33592,6 +38786,64 @@
       ],
       "type": "object"
     },
+    "KitchenTicketPrintPayloadFoundation": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "modifiers": {
+                "items": {
+                  "maxLength": 120,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 40,
+                "type": "array"
+              },
+              "name": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "quantity": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "totalMinorUnits": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "name",
+              "quantity",
+              "totalMinorUnits",
+              "modifiers"
+            ],
+            "type": "object"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        "operationalOnly": {
+          "const": true,
+          "type": "boolean"
+        },
+        "orderReference": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "orderReference",
+        "items",
+        "operationalOnly"
+      ],
+      "type": "object"
+    },
     "LocationAccess": {
       "additionalProperties": false,
       "properties": {
@@ -34708,16 +39960,13 @@
     "NoSaleDrawerRequest": {
       "additionalProperties": false,
       "properties": {
+        "approvalFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
         "approvalId": {
-          "anyOf": [
-            {
-              "format": "uuid",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "format": "uuid",
+          "type": "string"
         },
         "commandId": {
           "format": "uuid",
@@ -34752,7 +40001,8 @@
         "idempotencyKey",
         "shiftId",
         "reasonCode",
-        "approvalId"
+        "approvalId",
+        "approvalFingerprint"
       ],
       "type": "object"
     },
@@ -40786,6 +46036,211 @@
       ],
       "type": "object"
     },
+    "PaymentTerminalDeviceFoundation": {
+      "additionalProperties": false,
+      "properties": {
+        "archivedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assignedPosDeviceId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "capabilities": {
+          "items": {
+            "enum": [
+              "printer.receipt",
+              "printer.image",
+              "printer.qr",
+              "printer.cut",
+              "printer.test_page",
+              "printer.kitchen_ticket_foundation",
+              "drawer.open",
+              "drawer.status",
+              "scanner.barcode",
+              "scanner.qr",
+              "scanner.continuous",
+              "scanner.single",
+              "customer_display.text",
+              "customer_display.totals",
+              "customer_display.qr",
+              "terminal.connect_foundation",
+              "terminal.payment_foundation",
+              "terminal.refund_foundation",
+              "scale.read_weight_foundation",
+              "scale.tare_foundation"
+            ],
+            "type": "string"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "configurationVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "connectionState": {
+          "enum": [
+            "connected",
+            "disconnected",
+            "connecting",
+            "busy",
+            "error",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "executionEnabled": {
+          "const": false,
+          "type": "boolean"
+        },
+        "firmwareVersion": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "lastDiagnosticAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastHeartbeatAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "manufacturer": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "model": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "optimisticVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "primary": {
+          "default": false,
+          "type": "boolean"
+        },
+        "publicReference": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "registerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transport": {
+          "enum": [
+            "simulator",
+            "usb_foundation",
+            "bluetooth_foundation",
+            "network_foundation",
+            "serial_foundation",
+            "platform_channel_foundation"
+          ],
+          "type": "string"
+        },
+        "type": {
+          "const": "payment_terminal_foundation",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "merchantId",
+        "locationId",
+        "registerId",
+        "assignedPosDeviceId",
+        "type",
+        "manufacturer",
+        "model",
+        "publicReference",
+        "transport",
+        "capabilities",
+        "enabled",
+        "configurationVersion",
+        "connectionState",
+        "firmwareVersion",
+        "lastHeartbeatAt",
+        "lastDiagnosticAt",
+        "createdAt",
+        "updatedAt",
+        "archivedAt",
+        "optimisticVersion",
+        "executionEnabled"
+      ],
+      "type": "object"
+    },
     "PhysicalRegister": {
       "additionalProperties": false,
       "properties": {
@@ -42186,6 +47641,539 @@
         "taxRateBasisPoints"
       ],
       "type": "object"
+    },
+    "PrintDocument": {
+      "additionalProperties": false,
+      "properties": {
+        "contentFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "documentType": {
+          "enum": [
+            "official_receipt",
+            "receipt_copy",
+            "test_page",
+            "kitchen_ticket_foundation",
+            "diagnostic_page_foundation"
+          ],
+          "type": "string"
+        },
+        "widthColumns": {
+          "maximum": 120,
+          "minimum": 20,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "documentType",
+        "widthColumns",
+        "contentFingerprint"
+      ],
+      "type": "object"
+    },
+    "PrinterCapabilities": {
+      "additionalProperties": false,
+      "properties": {
+        "cut": {
+          "type": "boolean"
+        },
+        "image": {
+          "type": "boolean"
+        },
+        "kitchenTicketFoundation": {
+          "type": "boolean"
+        },
+        "qr": {
+          "type": "boolean"
+        },
+        "receipt": {
+          "type": "boolean"
+        },
+        "supportedWidths": {
+          "items": {
+            "maximum": 120,
+            "minimum": 20,
+            "type": "integer"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
+        "testPage": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "receipt",
+        "image",
+        "qr",
+        "cut",
+        "testPage",
+        "kitchenTicketFoundation",
+        "supportedWidths"
+      ],
+      "type": "object"
+    },
+    "PrinterDevice": {
+      "additionalProperties": false,
+      "properties": {
+        "archivedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assignedPosDeviceId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "capabilities": {
+          "items": {
+            "enum": [
+              "printer.receipt",
+              "printer.image",
+              "printer.qr",
+              "printer.cut",
+              "printer.test_page",
+              "printer.kitchen_ticket_foundation",
+              "drawer.open",
+              "drawer.status",
+              "scanner.barcode",
+              "scanner.qr",
+              "scanner.continuous",
+              "scanner.single",
+              "customer_display.text",
+              "customer_display.totals",
+              "customer_display.qr",
+              "terminal.connect_foundation",
+              "terminal.payment_foundation",
+              "terminal.refund_foundation",
+              "scale.read_weight_foundation",
+              "scale.tare_foundation"
+            ],
+            "type": "string"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "configurationVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "connectionState": {
+          "enum": [
+            "connected",
+            "disconnected",
+            "connecting",
+            "busy",
+            "error",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "firmwareVersion": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "lastDiagnosticAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastHeartbeatAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "manufacturer": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "model": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "optimisticVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "primary": {
+          "default": false,
+          "type": "boolean"
+        },
+        "printerCapabilities": {
+          "additionalProperties": false,
+          "properties": {
+            "cut": {
+              "type": "boolean"
+            },
+            "image": {
+              "type": "boolean"
+            },
+            "kitchenTicketFoundation": {
+              "type": "boolean"
+            },
+            "qr": {
+              "type": "boolean"
+            },
+            "receipt": {
+              "type": "boolean"
+            },
+            "supportedWidths": {
+              "items": {
+                "maximum": 120,
+                "minimum": 20,
+                "type": "integer"
+              },
+              "maxItems": 8,
+              "type": "array"
+            },
+            "testPage": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "receipt",
+            "image",
+            "qr",
+            "cut",
+            "testPage",
+            "kitchenTicketFoundation",
+            "supportedWidths"
+          ],
+          "type": "object"
+        },
+        "publicReference": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "registerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transport": {
+          "enum": [
+            "simulator",
+            "usb_foundation",
+            "bluetooth_foundation",
+            "network_foundation",
+            "serial_foundation",
+            "platform_channel_foundation"
+          ],
+          "type": "string"
+        },
+        "type": {
+          "const": "printer",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "merchantId",
+        "locationId",
+        "registerId",
+        "assignedPosDeviceId",
+        "type",
+        "manufacturer",
+        "model",
+        "publicReference",
+        "transport",
+        "capabilities",
+        "enabled",
+        "configurationVersion",
+        "connectionState",
+        "firmwareVersion",
+        "lastHeartbeatAt",
+        "lastDiagnosticAt",
+        "createdAt",
+        "updatedAt",
+        "archivedAt",
+        "optimisticVersion",
+        "printerCapabilities"
+      ],
+      "type": "object"
+    },
+    "PrintJob": {
+      "additionalProperties": false,
+      "properties": {
+        "attempts": {
+          "maximum": 10,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "completedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "copies": {
+          "maximum": 10,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "correlationId": {
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+          "type": "string"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "code": {
+                  "enum": [
+                    "hardware_not_found",
+                    "hardware_disabled",
+                    "hardware_not_assigned",
+                    "capability_unsupported",
+                    "disconnected",
+                    "busy",
+                    "paper_out",
+                    "cover_open_foundation",
+                    "transport_unavailable",
+                    "command_timeout",
+                    "unknown_outcome",
+                    "permission_denied",
+                    "location_mismatch",
+                    "register_mismatch",
+                    "configuration_stale",
+                    "retryable_transport_failure",
+                    "terminal_hardware_failure"
+                  ],
+                  "type": "string"
+                },
+                "correlationId": {
+                  "anyOf": [
+                    {
+                      "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                },
+                "operatorGuidance": {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "retryable": {
+                  "type": "boolean"
+                },
+                "safeDetail": {
+                  "anyOf": [
+                    {
+                      "maxLength": 240,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                }
+              },
+              "required": [
+                "code",
+                "retryable",
+                "operatorGuidance"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "idempotencyKey": {
+          "maxLength": 128,
+          "minLength": 8,
+          "type": "string"
+        },
+        "jobId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "originalJobId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payloadFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "sourceAggregateId": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "sourceAggregateType": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "startedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "printing",
+            "printed",
+            "retryable_failure",
+            "terminal_failure",
+            "cancelled",
+            "unknown_outcome"
+          ],
+          "type": "string"
+        },
+        "targetPrinterId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "official_receipt",
+            "receipt_copy",
+            "test_page",
+            "kitchen_ticket_foundation",
+            "diagnostic_page_foundation"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "jobId",
+        "targetPrinterId",
+        "type",
+        "sourceAggregateType",
+        "sourceAggregateId",
+        "correlationId",
+        "idempotencyKey",
+        "payloadFingerprint",
+        "copies",
+        "status",
+        "attempts",
+        "createdAt",
+        "startedAt",
+        "completedAt",
+        "failure",
+        "originalJobId"
+      ],
+      "type": "object"
+    },
+    "PrintJobStatus": {
+      "enum": [
+        "queued",
+        "printing",
+        "printed",
+        "retryable_failure",
+        "terminal_failure",
+        "cancelled",
+        "unknown_outcome"
+      ],
+      "type": "string"
+    },
+    "PrintJobType": {
+      "enum": [
+        "official_receipt",
+        "receipt_copy",
+        "test_page",
+        "kitchen_ticket_foundation",
+        "diagnostic_page_foundation"
+      ],
+      "type": "string"
     },
     "ProductMedia": {
       "additionalProperties": false,
@@ -44129,6 +50117,233 @@
         "quantity",
         "unitPrice",
         "lineTotal"
+      ],
+      "type": "object"
+    },
+    "ReceiptPrintPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "businessDate": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "changeMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "customerValueSummary": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "discountMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "exceptionMarker": {
+          "anyOf": [
+            {
+              "enum": [
+                "refund",
+                "void"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "footer": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "modifiers": {
+                "items": {
+                  "maxLength": 120,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 40,
+                "type": "array"
+              },
+              "name": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "quantity": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "totalMinorUnits": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "name",
+              "quantity",
+              "totalMinorUnits",
+              "modifiers"
+            ],
+            "type": "object"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        "locationName": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "loyaltySummary": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "merchantName": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "qrValue": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "receiptId": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "receiptNumber": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "registerName": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subtotalMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "taxMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tenders": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "amountMinorUnits": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maskedReference": {
+                "anyOf": [
+                  {
+                    "maxLength": 80,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "enum": [
+                  "cash",
+                  "manual_terminal",
+                  "wallet",
+                  "gift_card",
+                  "other"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "amountMinorUnits",
+              "maskedReference"
+            ],
+            "type": "object"
+          },
+          "maxItems": 16,
+          "type": "array"
+        },
+        "tipMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "totalMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "receiptId",
+        "merchantName",
+        "locationName",
+        "registerName",
+        "receiptNumber",
+        "businessDate",
+        "currency",
+        "items",
+        "subtotalMinorUnits",
+        "discountMinorUnits",
+        "taxMinorUnits",
+        "tipMinorUnits",
+        "totalMinorUnits",
+        "tenders",
+        "changeMinorUnits",
+        "loyaltySummary",
+        "customerValueSummary",
+        "exceptionMarker",
+        "qrValue",
+        "footer"
       ],
       "type": "object"
     },
@@ -48169,6 +54384,132 @@
         "deviceId",
         "allowedDeviceClasses",
         "assignedAt"
+      ],
+      "type": "object"
+    },
+    "RegisterHardwareRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "assignedPosDeviceId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "capabilities": {
+          "items": {
+            "enum": [
+              "printer.receipt",
+              "printer.image",
+              "printer.qr",
+              "printer.cut",
+              "printer.test_page",
+              "printer.kitchen_ticket_foundation",
+              "drawer.open",
+              "drawer.status",
+              "scanner.barcode",
+              "scanner.qr",
+              "scanner.continuous",
+              "scanner.single",
+              "customer_display.text",
+              "customer_display.totals",
+              "customer_display.qr",
+              "terminal.connect_foundation",
+              "terminal.payment_foundation",
+              "terminal.refund_foundation",
+              "scale.read_weight_foundation",
+              "scale.tare_foundation"
+            ],
+            "type": "string"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "type": "array"
+        },
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "maxLength": 128,
+          "minLength": 8,
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "manufacturer": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "model": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "publicReference": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "registerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "transport": {
+          "enum": [
+            "simulator",
+            "usb_foundation",
+            "bluetooth_foundation",
+            "network_foundation",
+            "serial_foundation",
+            "platform_channel_foundation"
+          ],
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "printer",
+            "cash_drawer",
+            "barcode_scanner",
+            "customer_display",
+            "payment_terminal_foundation",
+            "scale_foundation"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "operatorSessionId",
+        "type",
+        "manufacturer",
+        "model",
+        "publicReference",
+        "transport",
+        "capabilities",
+        "commandId",
+        "idempotencyKey"
       ],
       "type": "object"
     },
@@ -55129,6 +61470,211 @@
       ],
       "type": "object"
     },
+    "ScaleDeviceFoundation": {
+      "additionalProperties": false,
+      "properties": {
+        "archivedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assignedPosDeviceId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "capabilities": {
+          "items": {
+            "enum": [
+              "printer.receipt",
+              "printer.image",
+              "printer.qr",
+              "printer.cut",
+              "printer.test_page",
+              "printer.kitchen_ticket_foundation",
+              "drawer.open",
+              "drawer.status",
+              "scanner.barcode",
+              "scanner.qr",
+              "scanner.continuous",
+              "scanner.single",
+              "customer_display.text",
+              "customer_display.totals",
+              "customer_display.qr",
+              "terminal.connect_foundation",
+              "terminal.payment_foundation",
+              "terminal.refund_foundation",
+              "scale.read_weight_foundation",
+              "scale.tare_foundation"
+            ],
+            "type": "string"
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "configurationVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "connectionState": {
+          "enum": [
+            "connected",
+            "disconnected",
+            "connecting",
+            "busy",
+            "error",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "firmwareVersion": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "lastDiagnosticAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastHeartbeatAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "manufacturer": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "model": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "optimisticVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "pricingIntegrationEnabled": {
+          "const": false,
+          "type": "boolean"
+        },
+        "primary": {
+          "default": false,
+          "type": "boolean"
+        },
+        "publicReference": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "registerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transport": {
+          "enum": [
+            "simulator",
+            "usb_foundation",
+            "bluetooth_foundation",
+            "network_foundation",
+            "serial_foundation",
+            "platform_channel_foundation"
+          ],
+          "type": "string"
+        },
+        "type": {
+          "const": "scale_foundation",
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "merchantId",
+        "locationId",
+        "registerId",
+        "assignedPosDeviceId",
+        "type",
+        "manufacturer",
+        "model",
+        "publicReference",
+        "transport",
+        "capabilities",
+        "enabled",
+        "configurationVersion",
+        "connectionState",
+        "firmwareVersion",
+        "lastHeartbeatAt",
+        "lastDiagnosticAt",
+        "createdAt",
+        "updatedAt",
+        "archivedAt",
+        "optimisticVersion",
+        "pricingIntegrationEnabled"
+      ],
+      "type": "object"
+    },
     "ScaledQuantity": {
       "additionalProperties": false,
       "properties": {
@@ -61347,6 +67893,44 @@
       ],
       "type": "string"
     },
+    "UpdateHardwareRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "expectedVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "maxLength": 128,
+          "minLength": 8,
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "operatorSessionId",
+        "commandId",
+        "idempotencyKey",
+        "enabled",
+        "expectedVersion"
+      ],
+      "type": "object"
+    },
     "UpdateStaffRequest": {
       "additionalProperties": false,
       "properties": {
@@ -62076,6 +68660,46 @@
       "public": true,
       "retryable": false
     },
+    "HARDWARE_BUSY": {
+      "public": true,
+      "retryable": false
+    },
+    "HARDWARE_CAPABILITY_UNSUPPORTED": {
+      "public": true,
+      "retryable": false
+    },
+    "HARDWARE_COMMAND_TIMEOUT": {
+      "public": true,
+      "retryable": false
+    },
+    "HARDWARE_CONFIGURATION_STALE": {
+      "public": true,
+      "retryable": false
+    },
+    "HARDWARE_DISABLED": {
+      "public": true,
+      "retryable": false
+    },
+    "HARDWARE_DISCONNECTED": {
+      "public": true,
+      "retryable": false
+    },
+    "HARDWARE_NOT_ASSIGNED": {
+      "public": true,
+      "retryable": false
+    },
+    "HARDWARE_NOT_FOUND": {
+      "public": true,
+      "retryable": false
+    },
+    "HARDWARE_OUTCOME_UNKNOWN": {
+      "public": true,
+      "retryable": false
+    },
+    "HARDWARE_PAPER_OUT": {
+      "public": true,
+      "retryable": false
+    },
     "IDEMPOTENCY_CONFLICT": {
       "public": true,
       "retryable": false
@@ -62275,6 +68899,7 @@
   },
   "invariants": {
     "CustomerPrivacy": "Customer identity is merchant scoped. Receipt delivery never grants marketing consent.",
+    "HardwareSideEffect": "A hardware command has stable identity. An unknown physical outcome is never retried blindly.",
     "IdempotencyRetention": "A command result replays for 72 hours, then returns IDEMPOTENCY_EXPIRED.",
     "InventoryAtomicity": "A stock-tracked sale and its inventory effects commit in one database transaction.",
     "InventoryLedger": "Every stock effect is an immutable ledger fact. A projection is never the sole authority.",
@@ -62595,6 +69220,54 @@
       "request": "ExceptionCommandRecoveryQuery",
       "response": "ExceptionCommandRecoveryResult"
     },
+    "GET /api/v1/pos/merchants/:merchantId/hardware": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "LOCATION_SCOPE_VIOLATION"
+      ],
+      "idempotent": false,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "hardware.read",
+      "pin": false,
+      "request": "HardwareRegistryQuery",
+      "response": "HardwareRuntimeSnapshot"
+    },
+    "GET /api/v1/pos/merchants/:merchantId/hardware/recovery": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "LOCATION_SCOPE_VIOLATION"
+      ],
+      "idempotent": false,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "hardware.read",
+      "pin": false,
+      "request": "HardwareRecoveryQuery",
+      "response": "HardwareRuntimeSnapshot"
+    },
+    "GET /api/v1/pos/merchants/:merchantId/hardware/runtime": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "LOCATION_SCOPE_VIOLATION"
+      ],
+      "idempotent": false,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "hardware.read",
+      "pin": false,
+      "request": "HardwareRegistryQuery",
+      "response": "HardwareRuntimeSnapshot"
+    },
     "GET /api/v1/pos/merchants/:merchantId/inventory": {
       "approval": false,
       "auth": "operator-session",
@@ -62881,6 +69554,23 @@
       "pin": false,
       "request": "CartLineInput",
       "response": "Cart"
+    },
+    "PATCH /api/v1/pos/merchants/:merchantId/hardware/:hardwareId": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "OPTIMISTIC_VERSION_CONFLICT",
+        "LOCATION_SCOPE_VIOLATION"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "hardware.manage",
+      "pin": false,
+      "request": "UpdateHardwareRequest",
+      "response": "HardwareDevice"
     },
     "POST /api/:merchantRef/admin/gift-cards": {
       "approval": false,
@@ -63800,6 +70490,111 @@
       "pin": false,
       "request": "CustomerMergeRequest",
       "response": "CustomerMergeResult"
+    },
+    "POST /api/v1/pos/merchants/:merchantId/hardware": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "IDEMPOTENCY_CONFLICT",
+        "LOCATION_SCOPE_VIOLATION"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "hardware.manage",
+      "pin": false,
+      "request": "RegisterHardwareRequest",
+      "response": "HardwareDevice"
+    },
+    "POST /api/v1/pos/merchants/:merchantId/hardware/:hardwareId/assignment": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "OPTIMISTIC_VERSION_CONFLICT",
+        "LOCATION_SCOPE_VIOLATION"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "hardware.assign",
+      "pin": false,
+      "request": "AssignHardwareRequest",
+      "response": "HardwareDevice"
+    },
+    "POST /api/v1/pos/merchants/:merchantId/hardware/commands": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "IDEMPOTENCY_CONFLICT",
+        "HARDWARE_NOT_FOUND",
+        "HARDWARE_DISABLED",
+        "HARDWARE_CAPABILITY_UNSUPPORTED",
+        "HARDWARE_OUTCOME_UNKNOWN"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "hardware.command.execute",
+      "pin": false,
+      "request": "HardwareCommandRequest",
+      "response": "HardwareCommandResult"
+    },
+    "POST /api/v1/pos/merchants/:merchantId/hardware/commands/:commandId/transition": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "HARDWARE_NOT_FOUND",
+        "HARDWARE_OUTCOME_UNKNOWN"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "hardware.command.execute",
+      "pin": false,
+      "request": "HardwareCommandTransitionRequest",
+      "response": "HardwareCommandResult"
+    },
+    "POST /api/v1/pos/merchants/:merchantId/hardware/diagnostics": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "HARDWARE_NOT_FOUND",
+        "HARDWARE_DISCONNECTED"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "hardware.diagnostics",
+      "pin": false,
+      "request": "HardwareDiagnosticRequest",
+      "response": "HardwareDiagnosticResult"
+    },
+    "POST /api/v1/pos/merchants/:merchantId/hardware/print-jobs/:jobId/reprint": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "IDEMPOTENCY_CONFLICT",
+        "HARDWARE_OUTCOME_UNKNOWN"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "hardware.printer.reprint",
+      "pin": false,
+      "request": "ControlledReprintRequest",
+      "response": "ControlledReprintResult"
     },
     "POST /api/v1/pos/merchants/:merchantId/inventory/adjustments": {
       "approval": true,

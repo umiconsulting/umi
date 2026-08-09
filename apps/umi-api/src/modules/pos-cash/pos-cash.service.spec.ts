@@ -305,7 +305,8 @@ describe('Gate 3C cash application boundary', () => {
       shiftId: id(9),
       operatorSessionId: id(4),
       reasonCode: 'operator_request',
-      approvalId: null,
+      approvalId: id(11),
+      approvalFingerprint: 'a'.repeat(64),
       commandId: id(7),
       idempotencyKey: id(10),
     });
