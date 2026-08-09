@@ -76,10 +76,12 @@ Prefer existing artifacts and owners over inventing parallel structures.
 
 ### Issue tracker
 
-Work items and PRDs live as Trello cards (official Trello MCP, `https://mcp.trello.com/v1`);
-GitHub PRs are the review surface, linked to a card optionally. The `to-tickets` / `to-spec` /
-`triage` skills publish there; `code-review` checks a PR against its linked card when one is
-present. See [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
+Work items and PRDs live in self-hosted Plane (`https://plane.umiconsulting.co`, workspace
+`umi`, project `UMI`) through the Plane MCP; GitHub PRs are the review surface, linked to an
+item optionally. The `to-tickets` / `to-spec` / `triage` skills publish there; `code-review`
+checks a PR against its linked item when one is present. Agents raise work items as issues
+surface, rather than waiting for a person to file them.
+See [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
 
 ## Current stance
 
