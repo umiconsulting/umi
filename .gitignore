@@ -43,3 +43,8 @@ build/
 
 # Turborepo cache
 .turbo/
+
+# Claude Code per-developer settings. Contains machine-specific permission
+# allowlists that have historically included credentials in command strings.
+# The repo-shared config is .mcp.json (secrets via ${VAR} expansion only).
+.claude/settings.local.json
