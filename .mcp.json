@@ -8,6 +8,7 @@
       "type": "stdio",
       "command": "npx",
       "args": [
+        "-y",
         "@playwright/mcp@latest"
       ],
       "env": {}
@@ -46,6 +47,7 @@
       "type": "stdio",
       "command": "npx",
       "args": [
+        "-y",
         "nano-banana-mcp"
       ],
       "env": {
@@ -75,6 +77,18 @@
       "env": {
         "CLIENT_ID": "${XAPI_CLIENT_ID}",
         "CLIENT_SECRET": "${XAPI_CLIENT_SECRET}"
+      }
+    },
+    "plane": {
+      "command": "uvx",
+      "args": [
+        "plane-mcp-server",
+        "stdio"
+      ],
+      "env": {
+        "PLANE_API_KEY": "${PLANE_API_KEY}",
+        "PLANE_WORKSPACE_SLUG": "umi",
+        "PLANE_BASE_URL": "https://plane.umiconsulting.co"
       }
     }
   }
