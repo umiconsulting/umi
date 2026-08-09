@@ -190,13 +190,17 @@ Recommended Mac review sequence:
 - Implemented: historical policy binding, one earn engine, reward scope, usage limits, and automatic expiry.
 - Implemented: reward replacement requires confirmation and releases the prior authorization once.
 - Implemented: manual points adjustment and protected gift-card issuance with one-time code delivery.
-- Blocked safely: sale-funded activation needs an explicit funded-line allocation.
-- Blocked safely: gift-card payment needs a one-use lookup proof bound to the operator and device.
-- Implemented: distributed lookup limits, composite history, signed cursors, and focused database races.
-- Review: explain pending points, reward incompatibility, expiry, approval, lookup lockout, and recovery.
+- Implemented: one canonical allocation and fingerprint bind wallet, gift-card, cash, and terminal tenders.
+- Implemented: wallet payment, gift-card payment, mixed tender, and funded gift-card activation commit atomically.
+- Implemented: a reward approval binds the manager, exact preview, tender fingerprint, expiry, and one-use state.
+- Implemented: distributed lookup limits, permission-bound global history, signed cursors, and 26 real database races.
+- Review: explain pending points, reward incompatibility, stale authorization, approval expiry, lockout, and recovery.
 - Review on pilot hardware: search speed, duplicate warnings, masked contacts, and checkout value density.
+- Review: confirm wallet and gift-card amount selection and tender redistribution before payment.
+- Review: confirm the one-time gift-card code, unavailable-result state, and response-loss guidance.
+- Review: confirm global history visibility, mixed-tender clarity, refund reversal, and operator confidence.
+- Review: approve the English and Spanish customer-value text.
 - Owner decision: define the earn rate, reward limits, wallet issuance, and gift-card limits.
-- Engineering blocker: define one stable checkout fingerprint before wallet or gift-card debit becomes operational.
 - Owner decision: define the partial-refund policy for rewards.
 - Legal review: approve consent text, retention, anonymization, and gift-card expiry rules.
-- Gate 3F remains incomplete. Executable concurrency, consent reconciliation, reward approval, and sale-funded activation remain open.
+- Engineering validation is complete. Owner approval and final UX certification remain pending.

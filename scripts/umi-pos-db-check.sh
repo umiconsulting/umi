@@ -28,7 +28,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DDL="$ROOT/docs/migration/build-v3"
-DB="umi_pos_check_$$"
+DB="${UMI_POS_DB_NAME:-umi_pos_check_$$}"
 
 if ! command -v psql >/dev/null 2>&1; then
   command -v docker >/dev/null 2>&1 || {
@@ -56,7 +56,11 @@ fail=0
 pass() { printf '  \033[32mPASS\033[0m  %s\n' "$1"; }
 bad()  { printf '  \033[31mFAIL\033[0m  %s\n' "$1"; fail=1; }
 
-cleanup() { psql -q -c "drop database if exists $DB;" >/dev/null 2>&1 || true; }
+cleanup() {
+  if [ "${UMI_POS_DB_KEEP:-0}" != "1" ]; then
+    psql -q -c "drop database if exists $DB;" >/dev/null 2>&1 || true
+  fi
+}
 trap cleanup EXIT
 
 q() { psql -X -q -t -A -d "$DB" "$@" 2>&1; }
@@ -69,7 +73,8 @@ as_api() {
     -c "set role api;" \
     -c "select set_config('app.current_merchant','$merchant',false),
                set_config('app.current_location','$location',false),
-               set_config('app.current_device','$device',false);" \
+               set_config('app.current_device','$device',false),
+               set_config('app.user_id','$U1',false);" \
     -c "$sql" 2>&1 | tail -1
 }
 
@@ -81,7 +86,8 @@ as_api_raw() {
     -c "set role api;" \
     -c "select set_config('app.current_merchant','$merchant',false),
                set_config('app.current_location','$location',false),
-               set_config('app.current_device','$device',false);" \
+               set_config('app.current_device','$device',false),
+               set_config('app.user_id','$U1',false);" \
     -c "$sql" 2>&1
 }
 
@@ -94,7 +100,7 @@ expect_error() {  # expect_error <label> <output>
 
 echo "== building a disposable build-v3 in $DB =="
 psql -q -c "create database $DB;" >/dev/null
-for f in 00_foundation 10_umi 20_merchant 30_runtime 30_device_pairing 31_pos_sale 32_pos_checkout 33_pos_cash 34_pos_exception 35_pos_pilot_rbac 36_pos_inventory 37_pos_customer_value 38_pos_customer_value_closeout 50_cross_schema_fk 60_triggers 90_rls 99_verify; do
+for f in 00_foundation 10_umi 20_merchant 30_runtime 30_device_pairing 31_pos_sale 32_pos_checkout 33_pos_cash 34_pos_exception 35_pos_pilot_rbac 36_pos_inventory 37_pos_customer_value 38_pos_customer_value_closeout 39_pos_customer_value_final_closeout 50_cross_schema_fk 60_triggers 90_rls 99_verify; do
   if ! ddl_output=$(psql -X -q -v ON_ERROR_STOP=1 -d "$DB" -f "$DDL/$f.sql" 2>&1); then
     echo "  DDL FAILED at $f:"
     printf '%s\n' "$ddl_output" | grep -E 'ERROR|LINE' | head -5
@@ -662,7 +668,7 @@ expect "Cashier receives the exact reviewed grant count" "41" \
 expect "Supervisor receives the exact reviewed grant count" "65" \
   "$(q -c "select count(*) from umi.role_permission rp join umi.role r on r.id=rp.role_id
     where r.key='supervisor';")"
-expect "Manager receives the exact reviewed grant count" "95" \
+expect "Manager receives the exact reviewed grant count" "97" \
   "$(q -c "select count(*) from umi.role_permission rp join umi.role r on r.id=rp.role_id
     where r.key='manager';")"
 expect "Viewer receives no mutation permission" "0" \
@@ -1263,7 +1269,7 @@ insert into merchant.loyalty_stored_value_ledger(
 values('$A','$WALLET',0,400,'authorized','f3000000-0000-4000-8000-000000000042',
   'authorized','MXN','hold','f3000000-0000-4000-8000-000000000040',
   'f3000000-0000-4000-8000-000000000042',repeat('6',64),current_date,
-  'stored_value_authorization','f3000000-0000-4000-8000-000000000040');"
+  'stored_value_authorization','f3000000-0000-4000-8000-000000000040');" >/dev/null
 expect "sale, historical policy, points and wallet facts commit atomically" "points_earn_committed|10|pilot-v1|1|committed|600|0|1" \
   "$(q -c "create temporary table gate3f_commit_result(result jsonb);
     insert into gate3f_commit_result select merchant.commit_customer_value_closeout(
@@ -1285,11 +1291,18 @@ expect "sale, historical policy, points and wallet facts commit atomically" "poi
         where authorization_id='f3000000-0000-4000-8000-000000000040' and entry_type='redeemed')
     from gate3f_commit_result;")"
 
-q -c "insert into merchant.pos_cart(
+if ! gift_checkout_setup=$(q -c "insert into merchant.pos_cart(
   id,merchant_id,location_id,operator_session_id,status,lifecycle_state,version,business_date,
   original_operator_session_id,original_operator_user_id,operator_user_id)
 values('f3000000-0000-4000-8000-000000000100','$A','$A1','$OS','committed','committed',1,
   current_date,'$OS','$U1','$U1');
+update merchant.product set sale_action='gift_card'
+where id='d3000000-0000-4000-8000-000000000001' and merchant_id='$A';
+insert into merchant.pos_cart_line(
+  id,merchant_id,cart_id,product_id,identity_key,product_name,quantity,base_price,tax_rate_basis_points)
+values('f3000000-0000-4000-8000-000000000117','$A',
+  'f3000000-0000-4000-8000-000000000100','d3000000-0000-4000-8000-000000000001',
+  repeat('7',64),'Gift card',1,100,0);
 insert into merchant.customer_order(
   id,merchant_id,location_id,source,fulfillment_type,status,business_date,external_ref)
 values('f3000000-0000-4000-8000-000000000101','$A','$A1','pos','dine_in','completed',
@@ -1309,51 +1322,78 @@ insert into merchant.pos_committed_sale(
 values('f3000000-0000-4000-8000-000000000104','$A','$A1',
   'f3000000-0000-4000-8000-000000000100','f3000000-0000-4000-8000-000000000101',
   'f3000000-0000-4000-8000-000000000102','f3000000-0000-4000-8000-000000000103',repeat('4',64));
+insert into merchant.loyalty_gift_card(
+  id,merchant_id,location_id,code,status,public_reference,code_hash,masked_code,currency,
+  amount_cents,issuance_command_id,issuance_fingerprint,issuance_policy_version,
+  issuer_operator_id,issuer_device_id,issuance_source,pending_funding_cart_id,
+  pending_funding_minor_units,pending_funding_assignment_id,pending_funding_line_id,
+  pending_funding_fingerprint)
+values('f3000000-0000-4000-8000-000000000115','$A','$A1','FUNDED-CARD-SECRET',
+  'inactive','GFT-FUNDED',extensions.digest('FUNDED-CARD-SECRET','sha256'),'••••-FUNDED','MXN',100,
+  'f3000000-0000-4000-8000-000000000118',repeat('8',64),'pilot-v1','$U1','$D1','sale',
+  'f3000000-0000-4000-8000-000000000100',100,
+  'f3000000-0000-4000-8000-000000000116','f3000000-0000-4000-8000-000000000117',repeat('9',64));
 insert into merchant.customer_value_authorization(
   id,merchant_id,location_id,account_type,account_id,customer_id,sale_id,checkout_version,
   amount_minor_units,currency,checkout_fingerprint,policy_version,command_id,idempotency_key,
-  command_fingerprint,status,expires_at,correlation_id)
+  command_fingerprint,status,expires_at,correlation_id,allocation_id,allocation_order,
+  remaining_balance_minor_units,optimistic_version)
 values('f3000000-0000-4000-8000-000000000105','$A','$A1','gift_card','$GIFT',null,
   'f3000000-0000-4000-8000-000000000100',1,100,'MXN',repeat('4',64),'pilot-v1',
   'f3000000-0000-4000-8000-000000000106','f3000000-0000-4000-8000-000000000106',
-  repeat('6',64),'authorized',clock_timestamp()+interval '5 minutes','gift-anonymous');
+  repeat('6',64),'authorized',clock_timestamp()+interval '5 minutes','gift-anonymous',
+  'f3000000-0000-4000-8000-000000000110',0,900,1);
 select merchant.append_gift_card_fact('$A','$GIFT',jsonb_build_object(
   'delta',0,'amountMinorUnits',100,'reason','authorized','entryType','authorized','currency','MXN',
   'direction','hold','authorizationId','f3000000-0000-4000-8000-000000000105',
   'commandId','f3000000-0000-4000-8000-000000000106','idempotencyKey',
   'f3000000-0000-4000-8000-000000000106','fingerprint',repeat('6',64),'operatorId','$U1',
   'deviceId','$D1','businessDate',current_date,'sourceType','stored_value_authorization',
-  'sourceId','f3000000-0000-4000-8000-000000000105'));" >/dev/null
-expect "gift-card commit fails closed without a lookup proof" "blocked|authorized|900|100|0" \
-  "$(q -c "do \$\$ begin
-      perform merchant.commit_customer_value_closeout(
+  'sourceId','f3000000-0000-4000-8000-000000000105'));
+insert into merchant.pos_checkout_draft(
+  id,merchant_id,location_id,cart_id,operator_session_id,device_id,state,receipt_delivery)
+values('f3000000-0000-4000-8000-000000000109','$A','$A1',
+  'f3000000-0000-4000-8000-000000000100','$OS','$D1','payment_accepted','{}');
+insert into merchant.pos_tender_fact(
+  id,merchant_id,location_id,checkout_id,cart_id,position,tender_type,status,
+  amount_minor_units,currency,correlation_id)
+values('f3000000-0000-4000-8000-000000000110','$A','$A1',
+  'f3000000-0000-4000-8000-000000000109','f3000000-0000-4000-8000-000000000100',
+  0,'gift_card','confirmed_success',100,'MXN','gift-anonymous');"); then
+  printf '%s\n' "$gift_checkout_setup" >&2
+  exit 1
+fi
+expect "gift-card payment and funded activation commit atomically" "committed|900|0|1|1|active|100|1" \
+  "$(q -c "do \$\$ begin perform merchant.commit_customer_value_closeout(
         '$A','$A1','f3000000-0000-4000-8000-000000000100',
         'f3000000-0000-4000-8000-000000000104','f3000000-0000-4000-8000-000000000101',
         null,'f3000000-0000-4000-8000-000000000107',
         'f3000000-0000-4000-8000-000000000107',repeat('4',64),1,repeat('4',64),
-        current_date,'$U1','$D1',jsonb_build_object('storedValueAuthorizationIds',
-          jsonb_build_array('f3000000-0000-4000-8000-000000000105')));
-      raise exception 'unexpected gift-card commit';
-    exception when others then
-      if sqlerrm<>'GIFT_CARD_CODE_INVALID' then raise; end if;
-    end \$\$;
-    select 'blocked',status,
+        current_date,'$U1','$D1',repeat('a',64),jsonb_build_object(
+          'storedValueFingerprint',repeat('a',64),'storedValueAuthorizationIds',
+          jsonb_build_array('f3000000-0000-4000-8000-000000000105'),'fundedGiftCards',
+          jsonb_build_array(jsonb_build_object(
+            'assignmentId','f3000000-0000-4000-8000-000000000116',
+            'giftCardId','f3000000-0000-4000-8000-000000000115',
+            'saleLineId','f3000000-0000-4000-8000-000000000117',
+            'purchasedValue',jsonb_build_object('minorUnits',100,'currency','MXN'),
+            'policyId','gift-card-sale-funding','policyVersion','pilot-v1',
+            'fingerprint',repeat('9',64))))); end \$\$;
+    select status,
       (select available from merchant.loyalty_gift_card_balance where gift_card_id='$GIFT'),
       (select authorized from merchant.loyalty_gift_card_balance where gift_card_id='$GIFT'),
       (select count(*) from merchant.loyalty_gift_card_ledger
-        where authorization_id='f3000000-0000-4000-8000-000000000105' and entry_type='redeemed')
+        where authorization_id='f3000000-0000-4000-8000-000000000105' and entry_type='redeemed'),
+      (select count(*) from merchant.customer_value_tender_allocation
+        where authorization_id='f3000000-0000-4000-8000-000000000105'),
+      (select status from merchant.loyalty_gift_card
+        where id='f3000000-0000-4000-8000-000000000115'),
+      (select available from merchant.loyalty_gift_card_balance
+        where gift_card_id='f3000000-0000-4000-8000-000000000115'),
+      (select count(*) from merchant.gift_card_funding_assignment
+        where gift_card_id='f3000000-0000-4000-8000-000000000115')
     from merchant.customer_value_authorization
     where id='f3000000-0000-4000-8000-000000000105';")"
-q -c "select merchant.append_gift_card_fact('$A','$GIFT',jsonb_build_object(
-  'delta',0,'amountMinorUnits',100,'reason','authorization_released',
-  'entryType','authorization_released','currency','MXN','direction','release',
-  'authorizationId','f3000000-0000-4000-8000-000000000105',
-  'commandId','f3000000-0000-4000-8000-000000000108','idempotencyKey',
-  'f3000000-0000-4000-8000-000000000108','fingerprint',repeat('5',64),
-  'operatorId','$U1','deviceId','$D1','businessDate',current_date,
-  'sourceType','test_cleanup','sourceId','f3000000-0000-4000-8000-000000000105'));
-update merchant.customer_value_authorization set status='released',released_at=clock_timestamp()
-where id='f3000000-0000-4000-8000-000000000105';" >/dev/null
 
 VALUE_CONCURRENT_ONE="/tmp/umi-pos-value-one-$$"
 VALUE_CONCURRENT_TWO="/tmp/umi-pos-value-two-$$"
@@ -1452,7 +1492,7 @@ select merchant.append_gift_card_fact('$A','$GIFT',jsonb_build_object(
   'sourceId','f3000000-0000-4000-8000-000000000095'));" >/dev/null
 expect "automatic expiry claims every authorization type" "3" \
   "$(q -c "select merchant.expire_customer_value_authorizations('$A',100);")"
-expect "automatic expiry releases points and stored value exactly once" "0|100|500|116|0|1000|0|1|1|1" \
+expect "automatic expiry releases points and stored value exactly once" "0|100|500|116|0|900|0|1|1|1" \
   "$(q -c "select merchant.expire_customer_value_authorizations('$A',100),
       (select available from merchant.loyalty_stored_value_balance where card_id='$WALLET'),
       (select authorized from merchant.loyalty_stored_value_balance where card_id='$WALLET'),
@@ -1481,6 +1521,21 @@ expect "composite customer history includes sale, receipt, points, wallet and gi
       when event_type like 'wallet_%' then 'wallet'
       when event_type like 'gift_card_%' then 'gift' end)
     from merchant.customer_history_event where merchant_id='$A' and customer_id='$CUST';")"
+q -c "update runtime.operator_session set
+  permissions=array['offline.replay','customer.history.read','customer.history.global',
+    'customer.history.admin','customer.consent.read'],
+  entitlements='[{\"featureKey\":\"pos\",\"enabled\":true}]',
+  state='active',ended_at=null,expires_at=clock_timestamp()+interval '5 minutes'
+  where id='$OS';" >/dev/null
+expect "scoped history function serves the API without direct view access" "1|1" \
+  "$(as_api "$A" "$A1" "$D1" "select
+    (count(*)>0)::int,
+    count(*) filter(where event_type='wallet_loaded' and location_id is null
+      and visibility='restricted_administrative')
+    from merchant.read_customer_history_event_scoped(
+      '$A','$CUST','$OS');")"
+expect_error "api cannot read the unscoped customer history view" \
+  "$(as_api_raw "$A" "$A1" "$D1" "select * from merchant.customer_history_event limit 1;")"
 expect_error "a history cursor cannot cross customers" \
   "$(q -c "select merchant.validate_customer_history_cursor('$A','$CUST','$A',gen_random_uuid());")"
 expect "receipt consent does not imply marketing consent" "0" \

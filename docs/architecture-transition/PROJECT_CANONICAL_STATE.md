@@ -194,15 +194,17 @@ Future clients use `packages/contract` and controlled UMI APIs.
   location, permission, policy, and approval checks remain server-authoritative.
 - Gate 3E: complete. The ledger, projection, reservations, atomic sale synchronization, refund
   outcomes, inventory operations, blind counts, and reconciliation use server authority.
-- Gate 3F: incomplete. Historical policy snapshots bind one integer-safe earn engine to checkout and refunds.
-- Gate 3F includes reward scope, usage limits, exact expiry, manual points adjustments, protected gift-card issuance, distributed lookup limits, and composite history.
-- Gate 3F uses signed cursor version `2`. The 26-case executable concurrency matrix remains open.
-- Gate 3F contract: version `2.5.0`, content hash
-  `582f9d608ec5f551befc1f2c06e763338175f309c444b603ec0e34234fc4ce4c`.
+- Gate 3F: complete. Historical policy snapshots bind one integer-safe earn engine to checkout and refunds.
+- Gate 3F uses one canonical allocation and fingerprint for wallet, gift-card, cash, and terminal tenders.
+- Gate 3F supports exact reward approval, wallet and gift-card payment, and funded gift-card activation.
+- Gate 3F history uses explicit global visibility and a permission-bound signed cursor version `2`.
+- Gate 3F passed all 26 races through two independent PostgreSQL sessions.
+- Gate 3F contract: version `2.6.0`, content hash
+  `cfe933a00f07b8972d28fad536001d1260cc259c2d3bed56efec5a2c9a0278c9`.
 - Gate 3F keeps rewards and stored value online-only. Cash replay can keep a bounded customer reference.
 - `stash@{0}: pre-gate-3d1-unpublished-pos-runtime-fixes` remains preserved and excluded.
-- Gate 3F keeps reward approval, gift-card payment, and sale-funded activation fail-closed. Consent reconciliation remains open.
-- Gate 3G is not authorized. Gate 3G has not started.
+- Gate 3F passed focused privacy, security, contract, API, Flutter, PostgreSQL, RLS, Linux, and Web checks.
+- Gate 3G is authorized. Gate 3G has not started.
 
 ## Gate 3C decision basis
 

@@ -1,8 +1,8 @@
 # UmiPOS: clientes, lealtad y valor almacenado
 
-Actualizado: 2026-08-06
+Actualizado: 2026-08-08
 
-Estado: `INCOMPLETE`.
+Estado: `COMPLETE`.
 
 ## 1. Autoridad
 
@@ -85,7 +85,11 @@ La wallet pertenece a un cliente, un merchant y una moneda. El ledger usa unidad
 
 La autorización separa el saldo disponible del saldo autorizado. La liberación restaura el valor una vez.
 
-El commit de wallet por la ruta de checkout permanece bloqueado. La redistribución de tenders no tiene una huella base estable. La API falla antes del débito.
+El checkout usa una asignación canónica. La asignación vincula la cuenta, la autorización, el importe, el orden y la política.
+
+La API calcula la huella de valor. La vista previa y el commit usan la misma serialización canónica. Los cambios invalidan la confirmación.
+
+El commit crea el débito y el tender en la transacción de la venta. También admite tenders mixtos.
 
 La wallet no permite saldo negativo, retiro, transferencia ni crédito. La emisión general permanece desactivada.
 
@@ -99,9 +103,13 @@ La entrega usa un token protegido. El código se cifra con AES-GCM y tiene una d
 
 La lectura del código usa una ruta separada. Esta ruta no guarda el código en `business_command`. Flutter muestra el código en un diálogo local y no lo conserva en el estado normal.
 
-La emisión promocional autorizada está operativa. La emisión financiada por venta permanece bloqueada. Falta una asignación explícita que vincule el valor con una línea financiada. El sistema no crea valor desde una venta ordinaria.
+La emisión financiada crea una tarjeta inactiva. La asignación vincula la tarjeta, la línea, el valor, la política y la huella.
 
-La autorización de pago con gift card permanece bloqueada. Falta una prueba de consulta de un solo uso que vincule el código con el operador y el dispositivo.
+El checkout activa la tarjeta después del pago completo. La venta, el pago, la emisión y la activación usan una transacción.
+
+La línea debe usar un producto con `sale_action='gift_card'`. La API rechaza una línea comercial normal.
+
+El pago usa una consulta protegida y una autorización temporal. El recibo conserva solo la referencia oculta.
 
 ## 9. Consulta de gift card
 
@@ -129,9 +137,17 @@ La API ordena por fecha, tipo e identidad de evento. El cursor es opaco y usa HM
 
 El cursor vincula merchant, cliente, permisos y filtros. Un cursor de otro ámbito falla. La API limita cada página a 50 eventos.
 
+Cada hecho usa una visibilidad explícita. Una location nula no concede acceso.
+
+La clasificación usa una lista permitida. Un tipo global desconocido requiere el permiso administrativo.
+
+Los permisos globales y administrativos son separados. Un cambio de permiso invalida un cursor incompatible.
+
 ## 11. Checkout, refund y recuperación
 
 El checkout confirma venta, tenders, caja, inventario, recibo, puntos y valor en una transacción. Un error revierte todos los efectos.
+
+La venta financiada activa una gift card en esa transacción. Un fallo o un pago parcial conserva la tarjeta inactiva.
 
 El refund agrega hechos de compensación. No elimina el earn, el canje ni el débito original. Una reversión acumulada no supera el valor original.
 
@@ -151,13 +167,19 @@ Los ajustes usan `loyalty.adjust`. La emisión usa `gift_card.issue`. Las accion
 
 Cada aprobación vincula la location, la cuenta, el importe, el comando y la huella. La autoaprobación está bloqueada.
 
+Un reward protegido usa `loyalty.reward.approve`. La aprobación vincula la vista del reward y la huella completa de tenders.
+
+Un cambio comercial invalida la aprobación. La aprobación dura 300 segundos y permite un uso.
+
 ## 14. Concurrencia y seguridad
 
 Las cuentas usan locks por fila. Los ledgers usan una secuencia única y hechos append-only.
 
-Las restricciones bloquean doble gasto, doble liberación, saldo negativo y una segunda emisión. Las pruebas ejecutan carreras de wallet y expiración.
+Las restricciones bloquean doble gasto, doble liberación, saldo negativo y una segunda emisión.
 
-La matriz completa de 26 carreras permanece pendiente. Las pruebas estructurales no sustituyen las sesiones simultáneas.
+Una venta acepta una sola autorización activa por cuenta. Así, dos allocations no pueden recuperar el mismo débito.
+
+`pnpm umi-pos:customer-value-concurrency-check` ejecuta 26 carreras con dos sesiones PostgreSQL. La matriz produce 52 resultados terminales.
 
 La API no registra contactos, PIN, códigos de gift card ni secretos de recuperación. Flutter usa el SDK generado y no usa Supabase directo.
 
@@ -167,4 +189,4 @@ Este Gate no incluye campañas, banca, transferencia, suscripciones ni redes ext
 
 El Owner debe definir la tasa de earn, los límites de rewards y los límites de emisión. El área legal debe revisar retención, anonimización, texto de consentimiento y expiración.
 
-Gate 3F permanece incompleto. Faltan la matriz completa, la conciliación de consentimiento, la aprobación de rewards y los flujos de gift card bloqueados.
+Gate 3F está completo. Gate 3G queda autorizado y no ha empezado.

@@ -30,7 +30,7 @@ import type { ZodTypeAny } from 'zod';
  * breaking change to the described paths, so the artifact major moves, even though
  * no client is pinned in the field yet and the URL major is unchanged at 1.
  */
-export const CONTRACT_VERSION = '2.5.0';
+export const CONTRACT_VERSION = '2.6.0';
 
 /** The major in the URL. A v1 client never silently receives v2 behaviour. */
 export const API_MAJOR_VERSION = 1;

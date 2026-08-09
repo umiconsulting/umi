@@ -264,7 +264,8 @@ final class _CartRepository implements CartRepository {
     updatedAt: '2026-07-28T19:00:00.000Z',
   );
   @override
-  Future<Cart> create(String merchantId, CreateCartRequest request) async => cart;
+  Future<Cart> create(String merchantId, CreateCartRequest request) async =>
+      cart;
   @override
   Future<Cart> read(String merchantId, CartQuery query) async => cart;
   @override
@@ -282,7 +283,8 @@ final class _CartRepository implements CartRepository {
     RemoveCartLineRequest input,
   ) async => cart;
   @override
-  Future<Cart> prepare(String merchantId, PrepareSaleRequest input) async => cart;
+  Future<Cart> prepare(String merchantId, PrepareSaleRequest input) async =>
+      cart;
   @override
   Future<Cart> clear(String merchantId, ClearCartRequest input) async => cart;
 }
@@ -326,6 +328,39 @@ void main() {
       isNot(repository.commands[1].idempotencyKey),
     );
   });
+
+  test(
+    'keeps value fingerprint command identity until checkout reset',
+    () async {
+      final repository = _CheckoutRepository();
+      final controller = _controller(repository);
+
+      Future<void> preview() => controller.preview(
+        merchantId: '00000000-0000-4000-8000-000000000001',
+        locationId: '00000000-0000-4000-8000-000000000002',
+        operatorSessionId: '00000000-0000-4000-8000-000000000003',
+        cartId: '00000000-0000-4000-8000-000000000004',
+        cartVersion: 3,
+        paymentMethod: 'cash',
+      );
+
+      await preview();
+      final firstCommandId =
+          repository.commands.last.customerValueFingerprintCommandId;
+      await preview();
+      expect(
+        repository.commands.last.customerValueFingerprintCommandId,
+        firstCommandId,
+      );
+
+      controller.reset();
+      await preview();
+      expect(
+        repository.commands.last.customerValueFingerprintCommandId,
+        isNot(firstCommandId),
+      );
+    },
+  );
 
   test('unknown external-terminal payment remains query-only', () async {
     final repository = _CheckoutRepository(unknown: true);

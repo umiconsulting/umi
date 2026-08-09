@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/features/customer_value/customer_value_controller.dart';
@@ -173,6 +176,20 @@ final class FakeCustomerValueRepository implements CustomerValueRepository {
       deliveryToken: 'delivery-token',
       deliveryExpiresAt: '2026-08-05T18:10:00.000Z',
       recovered: false,
+      fundingAssignment: command.source == 'sale'
+          ? {
+              'assignmentId': '10000000-0000-4000-8000-000000000041',
+              'giftCardId': '10000000-0000-4000-8000-000000000040',
+              'saleLineId': command.saleLineId,
+              'purchasedValue': {
+                'minorUnits': command.initialValueMinorUnits,
+                'currency': command.currency,
+              },
+              'policyId': 'gift-card-sale-funding',
+              'policyVersion': 'pilot-v1',
+              'fingerprint': List.filled(64, '9').join(),
+            }
+          : null,
     );
   }
 
@@ -238,6 +255,9 @@ final class FakeCustomerValueRepository implements CustomerValueRepository {
       fingerprint: List.filled(64, 'd').join(),
       status: 'authorized',
       remainingBalanceMinorUnits: 4000,
+      allocationId: command.allocationId,
+      allocationOrder: command.allocationOrder,
+      allocationFingerprint: List.filled(64, 'e').join(),
       createdAt: '2026-08-05T18:00:00.000Z',
       expiresAt: '2026-08-05T18:05:00.000Z',
       correlationId: 'customer-value-test',
@@ -256,6 +276,21 @@ final class FakeCustomerValueRepository implements CustomerValueRepository {
 }
 
 void main() {
+  test('generated Dart contract reads the canonical fingerprint vector', () {
+    final vector =
+        jsonDecode(
+              File(
+                '../../packages/contract/test-vectors/customer-value-fingerprint-v1.json',
+              ).readAsStringSync(),
+            )
+            as Map<String, Object?>;
+    final input = StoredValueFingerprintInput.fromJson(
+      vector['input']! as Map<String, Object?>,
+    );
+    expect(input.allocations, hasLength(2));
+    expect(vector['expectedFingerprint'], hasLength(64));
+  });
+
   test('search keeps the merchant-scoped masked customer projection', () async {
     final controller = CustomerValueController(FakeCustomerValueRepository());
     await controller.search(scope, 'Ana');
@@ -304,6 +339,10 @@ void main() {
         customerId: customer().id,
         checkoutFingerprint: List.filled(64, 'b').join(),
       );
+      expect(
+        controller.selection()?.previewFingerprint,
+        List.filled(64, 'a').join(),
+      );
       await controller.authorizeReward(
         scope,
         saleId: saleId,
@@ -320,6 +359,7 @@ void main() {
         saleVersion: 1,
         amountMinorUnits: 1000,
         currency: 'MXN',
+        accountPublicReference: 'WAL-TEST',
       );
       expect(controller.selection()?.rewardAuthorizationId, isNotNull);
       expect(controller.selection()?.storedValueAuthorizationIds, hasLength(1));
@@ -392,6 +432,37 @@ void main() {
       );
       expect(secret?.code, 'TEST-ONLY-CODE');
       expect(controller.state.toString(), isNot(contains('TEST-ONLY-CODE')));
+    },
+  );
+
+  test(
+    'sale-funded issuance remains inactive until checkout selection',
+    () async {
+      final repository = FakeCustomerValueRepository();
+      final controller = CustomerValueController(repository);
+      await controller.loadPreview(
+        scope,
+        saleId: '10000000-0000-4000-8000-000000000006',
+        saleVersion: 1,
+        customerId: null,
+        checkoutFingerprint: List.filled(64, 'b').join(),
+      );
+      final preview = await controller.previewGiftCardIssuance(
+        scope,
+        valueMinorUnits: 50000,
+        currency: 'MXN',
+        source: 'sale',
+        saleId: '10000000-0000-4000-8000-000000000006',
+        saleLineId: '10000000-0000-4000-8000-000000000042',
+      );
+      final issued = await controller.issueGiftCard(
+        scope,
+        approvalId: '10000000-0000-4000-8000-000000000032',
+        approvalFingerprint: preview!.fingerprint,
+      );
+      expect(issued?.card['status'], 'inactive');
+      expect(controller.selection()?.fundedGiftCards, hasLength(1));
+      expect(repository.issuanceCommand?.saleLineId, isNotNull);
     },
   );
 }

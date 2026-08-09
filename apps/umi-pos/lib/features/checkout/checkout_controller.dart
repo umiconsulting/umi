@@ -84,6 +84,7 @@ final class CheckoutController extends ChangeNotifier {
   Map<String, Object?>? _recoveredPaymentOutcome;
   String? _commitCommandId;
   String? _commitIdempotencyKey;
+  String? _customerValueFingerprintCommandId;
   final Map<String, CheckoutResult> _confirmationCache = {};
 
   Future<void> preview({
@@ -128,6 +129,7 @@ final class CheckoutController extends ChangeNotifier {
     _receiptDelivery = Map.unmodifiable(receiptDelivery);
     _commitCommandId = _uuid();
     _commitIdempotencyKey = _uuid();
+    _customerValueFingerprintCommandId ??= _uuid();
     _set(const CheckoutState(phase: CheckoutPhase.repricing));
     _event('checkout_opened');
     if ((_connectivity?.state ?? PosConnectivity.online) !=
@@ -350,6 +352,7 @@ final class CheckoutController extends ChangeNotifier {
     _recoveredPaymentOutcome = null;
     _commitCommandId = null;
     _commitIdempotencyKey = null;
+    _customerValueFingerprintCommandId = null;
     _set(const CheckoutState());
   }
 
@@ -398,6 +401,7 @@ final class CheckoutController extends ChangeNotifier {
         _merchantId!,
         CheckoutCommand(
           commandId: fingerprint == null ? _uuid() : _commitCommandId,
+          customerValueFingerprintCommandId: _customerValueFingerprintCommandId,
           cartId: _cartId!,
           locationId: _locationId!,
           operatorSessionId: _operatorSessionId!,
@@ -416,6 +420,20 @@ final class CheckoutController extends ChangeNotifier {
           customerValue: _customerValueSelection?.toJson(),
         ),
       );
+      final storedValueFingerprint =
+          result.confirmation['storedValueFingerprint'] as String?;
+      final selectedValue = _customerValueSelection;
+      if (selectedValue != null && storedValueFingerprint != null) {
+        _customerValueSelection = CustomerValueSelection(
+          previewFingerprint: selectedValue.previewFingerprint,
+          storedValueFingerprint: storedValueFingerprint,
+          rewardAuthorizationId: selectedValue.rewardAuthorizationId,
+          rewardApprovalId: selectedValue.rewardApprovalId,
+          storedValueAuthorizationIds:
+              selectedValue.storedValueAuthorizationIds,
+          fundedGiftCards: selectedValue.fundedGiftCards,
+        );
+      }
       final phase = switch (result.status) {
         'confirmation_required' => CheckoutPhase.confirmationRequired,
         'payment_unknown' => CheckoutPhase.paymentUnknown,

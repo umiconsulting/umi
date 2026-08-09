@@ -224,6 +224,8 @@ begin
     where d.merchant_id=p_merchant_id and d.location_id=p_location_id
       and d.token_hash=p_token_hash and d.operator_id=p_operator_id and d.device_id=p_device_id
       and d.gift_card_id=g.id and g.merchant_id=d.merchant_id
+      and g.status='active'
+      and (g.issuance_source<>'sale' or g.activated_by_sale_id is not null)
       and d.acknowledged_at is null and d.expires_at>clock_timestamp() and d.reveal_attempts<3
     returning g.public_reference,d.ciphertext,d.nonce,d.auth_tag,d.expires_at;
 end $$;

@@ -18,12 +18,14 @@ import type {
   PaymentSummary,
   PaymentStatusQuery,
   ReceiptSnapshot,
+  StoredValueFingerprintInput,
   TaxBreakdown,
   TotalsConfirmation,
 } from '@umi/contract';
 import type { AuthUser } from '../auth/auth.types';
 import { IntegrityService } from '../integrity/integrity.service';
 import { inventoryConflictCode } from '../pos-inventory/inventory-errors';
+import { canonicalStoredValueFingerprint } from '../pos-customer-value/customer-value-domain';
 import { PosCartRepository, type PricedSelection } from '../pos-cart/pos-cart.repository';
 import { PosCheckoutRepository, type CheckoutCart } from './pos-checkout.repository';
 import { calculateCheckout } from './checkout-calculator';
@@ -115,7 +117,102 @@ export class PosCheckoutService {
             lineAmounts,
             null,
           ).confirmation.fingerprint;
-          const confirmation = calculation.confirmation;
+          const cashMinorUnits = dto.tenderDrafts
+            .filter((tender) => tender.type === 'cash')
+            .reduce((total, tender) => total + tender.amount.minorUnits, 0);
+          const manualTerminalMinorUnits = dto.tenderDrafts
+            .filter((tender) => tender.type === 'manual_terminal')
+            .reduce((total, tender) => total + tender.amount.minorUnits, 0);
+          const walletAllocationIds = customerValueAllocation.storedValue
+            .filter((allocation) => allocation.accountType === 'wallet')
+            .map((allocation) => allocation.allocationId)
+            .sort();
+          const giftCardAllocationIds = customerValueAllocation.storedValue
+            .filter((allocation) => allocation.accountType === 'gift_card')
+            .map((allocation) => allocation.allocationId)
+            .sort();
+          const fingerprintInput: StoredValueFingerprintInput = {
+            merchantId,
+            locationId: dto.locationId,
+            customerId: cart.customerId,
+            saleId: cart.id,
+            saleVersion: cart.version,
+            checkoutId: cart.id,
+            checkoutVersion: cart.version,
+            cartFingerprint: repriced.public.fingerprint,
+            totalsFingerprint: calculation.confirmation.fingerprint,
+            currency: calculation.confirmation.totals.grandTotal.currency,
+            loyaltyPolicyVersion: dto.customerValue?.previewFingerprint ?? 'none',
+            rewardPolicyVersion: customerValueAllocation.rewardDiscount?.policyVersion ?? 'none',
+            selectedRewardId: customerValueAllocation.rewardDiscount?.rewardId ?? null,
+            rewardAuthorizationId: customerValueAllocation.rewardDiscount?.authorizationId ?? null,
+            receiptDestination: dto.receiptDelivery.destination,
+            businessDate: cart.businessDate,
+            deviceId: authorization.deviceId,
+            credentialVersion: authorization.credentialVersion,
+            operatorSessionId: cart.operatorSessionId,
+            commandId: dto.customerValueFingerprintCommandId ?? context.commandId,
+            allocations: customerValueAllocation.storedValue.map((allocation) => ({
+              allocationId: allocation.allocationId,
+              tenderType: allocation.accountType,
+              accountId: allocation.accountId,
+              accountPublicReference: allocation.accountPublicReference,
+              authorizationId: allocation.authorizationId,
+              merchantId,
+              locationId: dto.locationId,
+              customerId: allocation.customerId,
+              saleId: cart.id,
+              checkoutId: cart.id,
+              checkoutVersion: cart.version,
+              currency: allocation.currency,
+              requestedAmountMinorUnits: allocation.amountMinorUnits,
+              authorizedAmountMinorUnits: allocation.amountMinorUnits,
+              committedAmountMinorUnits: 0,
+              remainingAccountBalanceMinorUnits: allocation.remainingBalanceMinorUnits,
+              allocationOrder: allocation.allocationOrder,
+              cashAllocationMinorUnits: cashMinorUnits,
+              manualTerminalAllocationMinorUnits: manualTerminalMinorUnits,
+              walletAllocationIds,
+              giftCardAllocationIds,
+              policyId: `${allocation.accountType}-pilot`,
+              policyVersion: allocation.policyVersion,
+              authorizationExpiresAt: allocation.expiresAt,
+              commandId: allocation.commandId,
+              idempotencyKey: allocation.idempotencyKey,
+              optimisticVersion: allocation.optimisticVersion,
+            })),
+            cashMinorUnits,
+            manualTerminalMinorUnits,
+          };
+          const finalStoredValueFingerprint = canonicalStoredValueFingerprint(fingerprintInput);
+          const approvalTenderFingerprint = canonicalStoredValueFingerprint({
+            ...fingerprintInput,
+            totalsFingerprint: customerValueBasisFingerprint,
+            rewardPolicyVersion: 'none',
+            selectedRewardId: null,
+            rewardAuthorizationId: null,
+          });
+          const storedValueFingerprint = customerValueAllocation.rewardDiscount
+            ? finalStoredValueFingerprint
+            : approvalTenderFingerprint;
+          if (
+            customerValueAllocation.rewardDiscount?.approvalTenderFingerprint &&
+            customerValueAllocation.rewardDiscount.approvalTenderFingerprint !==
+              approvalTenderFingerprint
+          ) {
+            throw new ConflictException({ code: 'APPROVAL_INVALID' });
+          }
+          if (customerValueAllocation.rewardDiscount) {
+            await this.repo.bindRewardStoredValueFingerprint(
+              context.client,
+              customerValueAllocation.rewardDiscount.authorizationId,
+              storedValueFingerprint,
+            );
+          }
+          const confirmation: TotalsConfirmation = {
+            ...calculation.confirmation,
+            storedValueFingerprint,
+          };
           const previewRecoveryState = this.recoveryState(calculation.ok ? null : calculation.code);
           const previewState =
             previewRecoveryState === 'terminal_outcome_unknown'
@@ -241,9 +338,10 @@ export class PosCheckoutService {
               );
             });
           const storedValueSelectionInvalid =
-            selectedAuthorizationIds.length > 0 ||
             JSON.stringify(tenderAuthorizationIds) !== JSON.stringify(selectedAuthorizationIds) ||
-            storedValueTenderMismatch;
+            storedValueTenderMismatch ||
+            (dto.customerValue != null &&
+              dto.customerValue?.storedValueFingerprint !== storedValueFingerprint);
           const calculationCode = calculation.ok ? null : calculation.code;
           const recoveryState = this.recoveryState(calculationCode);
           const draftState =
@@ -615,6 +713,7 @@ export class PosCheckoutService {
         id: line.id,
         productId: priced.productId,
         productName: priced.productName,
+        saleAction: priced.saleAction,
         quantity: line.quantity,
         variant: priced.variantId
           ? {

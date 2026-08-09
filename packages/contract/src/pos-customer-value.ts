@@ -112,6 +112,13 @@ export const CustomerAttachment = z
     version: z.number().int().positive(),
   })
   .strict();
+export const CustomerHistoryVisibility = z.enum([
+  'merchant_global',
+  'location_attributed',
+  'origin_location',
+  'restricted_administrative',
+  'customer_visible_foundation',
+]);
 export const CustomerHistoryEntry = z
   .object({
     id: Uuid,
@@ -129,6 +136,9 @@ export const CustomerHistoryEntry = z
     ]),
     publicReference: PublicReference,
     locationId: Uuid.nullable(),
+    originLocationId: Uuid.nullable().default(null),
+    visibility: CustomerHistoryVisibility,
+    permissionClass: z.string().min(1).max(100),
     businessDate: MerchantDate,
     total: Money.nullable(),
     points: z.number().int().nullable().default(null),
@@ -418,6 +428,9 @@ export const RewardAuthorizationRequest = CustomerCommandContext.extend({
   customerId: Uuid,
   rewardId: Uuid,
   previewFingerprint: Fingerprint,
+  storedValueFingerprint: Fingerprint.optional(),
+  approvalId: Uuid.nullable().optional(),
+  approvalFingerprint: Fingerprint.nullable().optional(),
 }).strict();
 export const ValueReleaseRequest = CustomerCommandContext.extend({
   authorizationId: Uuid,
@@ -522,6 +535,73 @@ export const StoredValueAuthorizationStatus = z.enum([
   'reversed',
 ]);
 export const StoredValueAccountType = z.enum(['wallet', 'gift_card']);
+export const StoredValueTenderAllocation = z
+  .object({
+    allocationId: Uuid,
+    tenderType: StoredValueAccountType,
+    accountId: Uuid,
+    accountPublicReference: PublicReference,
+    authorizationId: Uuid,
+    merchantId: Uuid,
+    locationId: Uuid,
+    customerId: Uuid.nullable(),
+    saleId: Uuid,
+    checkoutId: Uuid,
+    checkoutVersion: z.number().int().positive(),
+    currency: CurrencyCode,
+    requestedAmountMinorUnits: z.number().int().positive(),
+    authorizedAmountMinorUnits: z.number().int().positive(),
+    committedAmountMinorUnits: z.number().int().nonnegative(),
+    remainingAccountBalanceMinorUnits: z.number().int().nonnegative(),
+    allocationOrder: z.number().int().min(0).max(7),
+    cashAllocationMinorUnits: z.number().int().nonnegative(),
+    manualTerminalAllocationMinorUnits: z.number().int().nonnegative(),
+    walletAllocationIds: z.array(Uuid).max(8),
+    giftCardAllocationIds: z.array(Uuid).max(8),
+    policyId: z.string().min(1).max(80),
+    policyVersion: z.string().min(1).max(80),
+    authorizationExpiresAt: IsoTimestamp,
+    commandId: Uuid,
+    idempotencyKey: Uuid,
+    optimisticVersion: z.number().int().positive(),
+  })
+  .strict();
+export const StoredValueFingerprintInput = z
+  .object({
+    merchantId: Uuid,
+    locationId: Uuid,
+    customerId: Uuid.nullable(),
+    saleId: Uuid,
+    saleVersion: z.number().int().positive(),
+    checkoutId: Uuid,
+    checkoutVersion: z.number().int().positive(),
+    cartFingerprint: Fingerprint,
+    totalsFingerprint: Fingerprint,
+    currency: CurrencyCode,
+    loyaltyPolicyVersion: z.string().min(1).max(80),
+    rewardPolicyVersion: z.string().min(1).max(80),
+    selectedRewardId: Uuid.nullable(),
+    rewardAuthorizationId: Uuid.nullable(),
+    receiptDestination: z.enum(['display', 'print_later', 'digital', 'none']),
+    businessDate: MerchantDate,
+    deviceId: Uuid,
+    credentialVersion: z.number().int().positive(),
+    operatorSessionId: Uuid,
+    commandId: Uuid,
+    allocations: z.array(StoredValueTenderAllocation).max(8),
+    cashMinorUnits: z.number().int().nonnegative(),
+    manualTerminalMinorUnits: z.number().int().nonnegative(),
+  })
+  .strict();
+export const StoredValueFingerprintResult = z
+  .object({
+    version: z.literal(1),
+    fingerprint: Fingerprint,
+    allocations: z.array(StoredValueTenderAllocation).max(8),
+    remainingBalance: Money,
+    requiresConfirmation: z.literal(true),
+  })
+  .strict();
 export const StoredValueAuthorization = z
   .object({
     id: Uuid,
@@ -535,6 +615,9 @@ export const StoredValueAuthorization = z
     fingerprint: Fingerprint,
     status: StoredValueAuthorizationStatus,
     remainingBalanceMinorUnits: z.number().int().nonnegative(),
+    allocationId: Uuid,
+    allocationOrder: z.number().int().min(0).max(7),
+    allocationFingerprint: Fingerprint,
     createdAt: IsoTimestamp,
     expiresAt: IsoTimestamp,
     correlationId: CorrelationId,
@@ -548,6 +631,9 @@ export const StoredValueAuthorizationRequest = CustomerCommandContext.extend({
   checkoutVersion: z.number().int().positive(),
   amount: Money.refine((value) => value.minorUnits > 0),
   checkoutFingerprint: Fingerprint,
+  allocationId: Uuid,
+  allocationOrder: z.number().int().min(0).max(7),
+  accountPublicReference: PublicReference,
 }).strict();
 export const StoredValueCommit = z
   .object({
@@ -605,11 +691,23 @@ export const GiftCardLookupResult = z
     reasonCode: z.enum(['available', 'unavailable', 'temporarily_locked']),
   })
   .strict();
+export const SaleFundedGiftCardAssignment = z
+  .object({
+    assignmentId: Uuid,
+    giftCardId: Uuid,
+    saleLineId: Uuid,
+    purchasedValue: Money.refine((value) => value.minorUnits > 0),
+    policyId: z.string().min(1).max(80),
+    policyVersion: z.string().min(1).max(80),
+    fingerprint: Fingerprint,
+  })
+  .strict();
 export const GiftCardIssuanceRequest = CustomerCommandContext.extend({
   currency: CurrencyCode,
   initialValueMinorUnits: z.number().int().positive().max(10_000_000),
   source: z.enum(['sale', 'promotion', 'development']),
   saleId: Uuid.nullable().default(null),
+  saleLineId: Uuid.nullable().default(null),
   customerId: Uuid.nullable().default(null),
   approvalId: Uuid.nullable().default(null),
   approvalFingerprint: Fingerprint.nullable().default(null),
@@ -620,6 +718,7 @@ export const GiftCardIssuanceResult = z
     deliveryToken: z.string().min(32).max(256),
     deliveryExpiresAt: IsoTimestamp,
     recovered: z.boolean(),
+    fundingAssignment: SaleFundedGiftCardAssignment.nullable(),
   })
   .strict();
 export const GiftCardIssuancePreview = z
@@ -685,8 +784,11 @@ export const CustomerValuePreview = z
 export const CustomerValueSelection = z
   .object({
     previewFingerprint: Fingerprint,
+    storedValueFingerprint: Fingerprint.nullable().optional(),
     rewardAuthorizationId: Uuid.nullable().default(null),
+    rewardApprovalId: Uuid.nullable().optional(),
     storedValueAuthorizationIds: z.array(Uuid).max(8).default([]),
+    fundedGiftCards: z.array(SaleFundedGiftCardAssignment).max(8).optional(),
   })
   .strict();
 export const CustomerValueCommitResult = z
@@ -695,6 +797,7 @@ export const CustomerValueCommitResult = z
     earn: PointsEarnCommit.nullable(),
     reward: RewardRedemption.nullable(),
     storedValue: z.array(StoredValueCommit).max(8),
+    fundedGiftCards: z.array(GiftCard).max(8).optional(),
     recovered: z.boolean(),
   })
   .strict();
@@ -800,6 +903,7 @@ export type CustomerSearchRequest = z.infer<typeof CustomerSearchRequest>;
 export type CustomerSearchResult = z.infer<typeof CustomerSearchResult>;
 export type CustomerHistoryPage = z.infer<typeof CustomerHistoryPage>;
 export type CustomerHistoryQuery = z.infer<typeof CustomerHistoryQuery>;
+export type CustomerHistoryVisibility = z.infer<typeof CustomerHistoryVisibility>;
 export type CreateCustomerRequest = z.infer<typeof CreateCustomerRequest>;
 export type CustomerMergeRequest = z.infer<typeof CustomerMergeRequest>;
 export type CustomerValuePreviewRequest = z.infer<typeof CustomerValuePreviewRequest>;
@@ -808,6 +912,9 @@ export type CustomerValueSelection = z.infer<typeof CustomerValueSelection>;
 export type CustomerValueCommitResult = z.infer<typeof CustomerValueCommitResult>;
 export type RewardAuthorization = z.infer<typeof RewardAuthorization>;
 export type StoredValueAuthorization = z.infer<typeof StoredValueAuthorization>;
+export type StoredValueTenderAllocation = z.infer<typeof StoredValueTenderAllocation>;
+export type StoredValueFingerprintInput = z.infer<typeof StoredValueFingerprintInput>;
+export type StoredValueFingerprintResult = z.infer<typeof StoredValueFingerprintResult>;
 export type GiftCard = z.infer<typeof GiftCard>;
 export type RewardAuthorizationRequest = z.infer<typeof RewardAuthorizationRequest>;
 export type StoredValueAuthorizationRequest = z.infer<typeof StoredValueAuthorizationRequest>;
@@ -823,6 +930,7 @@ export type PointsAdjustmentRequest = z.infer<typeof PointsAdjustmentRequest>;
 export type PointsAdjustmentPreview = z.infer<typeof PointsAdjustmentPreview>;
 export type PointsAdjustmentResult = z.infer<typeof PointsAdjustmentResult>;
 export type GiftCardActivation = z.infer<typeof GiftCardActivation>;
+export type SaleFundedGiftCardAssignment = z.infer<typeof SaleFundedGiftCardAssignment>;
 export type CustomerValueRecoveryQuery = z.infer<typeof CustomerValueRecoveryQuery>;
 export type CustomerValueRecoveryResult = z.infer<typeof CustomerValueRecoveryResult>;
 
@@ -842,6 +950,7 @@ export const posCustomerValueModels = {
   CustomerSearchResult,
   CustomerMatchCandidate,
   CustomerAttachment,
+  CustomerHistoryVisibility,
   CustomerHistoryEntry,
   CustomerHistoryPage,
   CustomerHistoryQuery,
@@ -875,6 +984,9 @@ export const posCustomerValueModels = {
   WalletBalance,
   StoredValueAuthorizationStatus,
   StoredValueAccountType,
+  StoredValueTenderAllocation,
+  StoredValueFingerprintInput,
+  StoredValueFingerprintResult,
   StoredValueAuthorization,
   StoredValueAuthorizationRequest,
   StoredValueCommit,
@@ -890,6 +1002,7 @@ export const posCustomerValueModels = {
   GiftCardSecretRevealRequest,
   GiftCardSecretRevealResult,
   GiftCardActivation,
+  SaleFundedGiftCardAssignment,
   GiftCardAuthorization,
   GiftCardRedemption,
   GiftCardReversal,

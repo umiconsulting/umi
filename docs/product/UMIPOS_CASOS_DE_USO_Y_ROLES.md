@@ -27,7 +27,7 @@
 
 Este documento explica el comportamiento operativo que existe en UmiPOS hasta Gate 3F. Sirve para operación, soporte, desarrollo, QA y capacitación.
 
-La referencia es el commit funcional de Gate 3F, del 6 de agosto de 2026. El contrato canónico es la versión `2.5.0`. Su hash de contenido es `582f9d608ec5f551befc1f2c06e763338175f309c444b603ec0e34234fc4ce4c`.
+La referencia es el cierre final de Gate 3F, del 8 de agosto de 2026. El contrato canónico es la versión `2.6.0`. Su hash es `cfe933a00f07b8972d28fad536001d1260cc259c2d3bed56efec5a2c9a0278c9`.
 
 El producto conserva Gates 3A a 3E. Gate 3F añade clientes, lealtad y valor almacenado. La certificación final de UX sigue pendiente.
 
@@ -3203,6 +3203,42 @@ Antes de empezar, prepare un merchant de prueba, una location, un registro, prod
 **Resultado esperado:** Los hechos originales no cambian. Las compensaciones no exceden lo original.
 
 **Evidencia:** Guarde preview fingerprint, approval ref segura, exception ref y receipt ref.
+
+## Casos operativos finales de Gate 3F
+
+### Pago con wallet
+
+El operador adjunta el cliente. La API autoriza el importe y devuelve una asignación canónica.
+
+El operador confirma la nueva vista. El checkout valida la huella y crea el débito con la venta.
+
+### Pago con gift card
+
+El operador consulta el código por la ruta protegida. La API devuelve una referencia oculta.
+
+La API autoriza el importe. El checkout confirma el débito y admite tenders mixtos.
+
+### Venta de una gift card
+
+El operador selecciona una línea del carrito. La API crea una tarjeta inactiva y una asignación financiada.
+
+El checkout activa la tarjeta después del pago completo. La UI muestra el código una vez después del commit.
+
+### Reward con aprobación
+
+La elegibilidad devuelve `APPROVAL_REQUIRED`. El manager usa su PIN para la vista exacta.
+
+El cambio del cliente, carrito, reward, política o tender invalida la aprobación.
+
+### Historial global del cliente
+
+La API clasifica cada hecho por visibilidad. Una location nula no funciona como acceso global.
+
+El cursor vincula el merchant, el cliente, la location, los filtros y los permisos efectivos.
+
+### Recuperación de concurrencia
+
+La API devuelve un resultado terminal o un conflicto estable. El operador no repite una mutación ambigua.
 
 ### Sesión 6 — Offline y recovery
 

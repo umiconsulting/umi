@@ -947,6 +947,10 @@ declare r record; v_prior bigint; v_target bigint; v_delta bigint;
   v_result jsonb:='{"points":0,"storedValue":0}'::jsonb;
 begin
   perform merchant.assert_customer_value_write_scope(p_merchant_id,p_device_id);
+  perform 1 from merchant.pos_committed_sale
+    where id=p_sale_id and merchant_id=p_merchant_id and location_id=p_location_id
+    for update;
+  if not found then raise exception 'VALUE_REVERSAL_EXCEEDS_ORIGINAL'; end if;
   select receipt.grand_total,coalesce(sum(exception.total_minor_units),0)
     into v_sale_total,v_refunded_total
     from merchant.pos_committed_sale sale

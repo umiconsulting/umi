@@ -32,6 +32,9 @@ final class CustomerValueState {
     this.giftCardIssuancePreview,
     this.pendingGiftCardIssuance,
     this.rewardAuthorization,
+    this.rewardApprovalId,
+    this.pendingRewardApprovalPermission,
+    this.pendingRewardApprovalFingerprint,
     this.storedValueAuthorizations = const [],
     this.ambiguous = false,
     this.errorCode,
@@ -49,6 +52,9 @@ final class CustomerValueState {
   final GiftCardIssuancePreview? giftCardIssuancePreview;
   final GiftCardIssuanceRequest? pendingGiftCardIssuance;
   final RewardAuthorization? rewardAuthorization;
+  final String? rewardApprovalId;
+  final String? pendingRewardApprovalPermission;
+  final String? pendingRewardApprovalFingerprint;
   final List<StoredValueAuthorization> storedValueAuthorizations;
   final bool ambiguous;
   final String? errorCode;
@@ -232,7 +238,7 @@ final class CustomerValueController extends ChangeNotifier {
     CustomerValueScope scope, {
     required String saleId,
     required int saleVersion,
-    required String customerId,
+    required String? customerId,
     required String checkoutFingerprint,
   }) async {
     try {
@@ -273,6 +279,9 @@ final class CustomerValueController extends ChangeNotifier {
     required int saleVersion,
     required String customerId,
     required String rewardId,
+    String? storedValueFingerprint,
+    String? approvalId,
+    String? approvalFingerprint,
   }) async {
     final preview = _state.preview;
     if (preview == null) return null;
@@ -290,12 +299,30 @@ final class CustomerValueController extends ChangeNotifier {
           customerId: customerId,
           rewardId: rewardId,
           previewFingerprint: preview.fingerprint,
+          storedValueFingerprint: storedValueFingerprint,
+          approvalId: approvalId,
+          approvalFingerprint: approvalFingerprint,
         ),
       );
-      _set(_copyState(rewardAuthorization: value, errorCode: null));
+      _set(
+        _copyState(
+          rewardAuthorization: value,
+          rewardApprovalId: approvalId,
+          clearPendingRewardApproval: true,
+          errorCode: null,
+        ),
+      );
       return value;
     } on AppException catch (error) {
-      _set(_copyState(errorCode: error.code));
+      final permission = _firstField(error.fieldErrors, 'approvalPermission');
+      final fingerprint = _firstField(error.fieldErrors, 'approvalFingerprint');
+      _set(
+        _copyState(
+          pendingRewardApprovalPermission: permission,
+          pendingRewardApprovalFingerprint: fingerprint,
+          errorCode: error.code,
+        ),
+      );
       return null;
     }
   }
@@ -309,10 +336,12 @@ final class CustomerValueController extends ChangeNotifier {
     required int saleVersion,
     required int amountMinorUnits,
     required String currency,
+    required String accountPublicReference,
   }) async {
     final preview = _state.preview;
     if (preview == null || amountMinorUnits <= 0) return null;
     final commandId = _uuid();
+    final allocationId = _uuid();
     try {
       final value = await _repository.authorizeStoredValue(
         scope.merchantId,
@@ -328,6 +357,9 @@ final class CustomerValueController extends ChangeNotifier {
           checkoutVersion: saleVersion,
           amount: {'minorUnits': amountMinorUnits, 'currency': currency},
           checkoutFingerprint: preview.fingerprint,
+          allocationId: allocationId,
+          allocationOrder: _state.storedValueAuthorizations.length,
+          accountPublicReference: accountPublicReference,
         ),
       );
       _set(
@@ -495,6 +527,9 @@ final class CustomerValueController extends ChangeNotifier {
     CustomerValueScope scope, {
     required int valueMinorUnits,
     required String currency,
+    String source = 'promotion',
+    String? saleId,
+    String? saleLineId,
   }) async {
     if (valueMinorUnits <= 0) return null;
     final commandId = _uuid();
@@ -506,7 +541,9 @@ final class CustomerValueController extends ChangeNotifier {
         idempotencyKey: commandId,
         currency: currency,
         initialValueMinorUnits: valueMinorUnits,
-        source: 'promotion',
+        source: source,
+        saleId: saleId,
+        saleLineId: saleLineId,
         customerId: _state.selected?.id,
       );
       final value = await _repository.previewGiftCardIssuance(
@@ -543,6 +580,7 @@ final class CustomerValueController extends ChangeNotifier {
       initialValueMinorUnits: pending.initialValueMinorUnits,
       source: pending.source,
       saleId: pending.saleId,
+      saleLineId: pending.saleLineId,
       customerId: pending.customerId,
       approvalId: approvalId,
       approvalFingerprint: approvalFingerprint,
@@ -583,17 +621,16 @@ final class CustomerValueController extends ChangeNotifier {
 
   CustomerValueSelection? selection() {
     final preview = _state.preview;
-    if (preview == null ||
-        (_state.rewardAuthorization == null &&
-            _state.storedValueAuthorizations.isEmpty)) {
-      return null;
-    }
+    final fundingAssignment = _state.giftCardIssuance?.fundingAssignment;
+    if (preview == null) return null;
     return CustomerValueSelection(
       previewFingerprint: preview.fingerprint,
       rewardAuthorizationId: _state.rewardAuthorization?.id,
+      rewardApprovalId: _state.rewardApprovalId,
       storedValueAuthorizationIds: _state.storedValueAuthorizations
           .map((item) => item.id)
           .toList(),
+      fundedGiftCards: fundingAssignment == null ? null : [fundingAssignment],
     );
   }
 
@@ -617,6 +654,10 @@ final class CustomerValueController extends ChangeNotifier {
     GiftCardIssuancePreview? giftCardIssuancePreview,
     GiftCardIssuanceRequest? pendingGiftCardIssuance,
     RewardAuthorization? rewardAuthorization,
+    String? rewardApprovalId,
+    String? pendingRewardApprovalPermission,
+    String? pendingRewardApprovalFingerprint,
+    bool clearPendingRewardApproval = false,
     bool clearRewardAuthorization = false,
     List<StoredValueAuthorization>? storedValueAuthorizations,
     String? errorCode,
@@ -641,11 +682,28 @@ final class CustomerValueController extends ChangeNotifier {
     rewardAuthorization: clearRewardAuthorization
         ? null
         : rewardAuthorization ?? _state.rewardAuthorization,
+    rewardApprovalId: clearRewardAuthorization
+        ? null
+        : rewardApprovalId ?? _state.rewardApprovalId,
+    pendingRewardApprovalPermission: clearPendingRewardApproval
+        ? null
+        : pendingRewardApprovalPermission ??
+              _state.pendingRewardApprovalPermission,
+    pendingRewardApprovalFingerprint: clearPendingRewardApproval
+        ? null
+        : pendingRewardApprovalFingerprint ??
+              _state.pendingRewardApprovalFingerprint,
     storedValueAuthorizations:
         storedValueAuthorizations ?? _state.storedValueAuthorizations,
     ambiguous: _state.ambiguous,
     errorCode: errorCode,
   );
+
+  String? _firstField(Map<String, Object?>? fields, String key) {
+    final value = fields?[key];
+    if (value is List && value.isNotEmpty) return value.first.toString();
+    return value?.toString();
+  }
 
   String _uuid() {
     final random = Random.secure();

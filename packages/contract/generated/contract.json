@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "dc10191052518f5e7a5cfc60186d9c54ad41f665676896decb77ab7251c6b254",
-  "contractVersion": "2.5.0",
+  "contentHash": "cfe933a00f07b8972d28fad536001d1260cc259c2d3bed56efec5a2c9a0278c9",
+  "contractVersion": "2.6.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -1671,6 +1671,13 @@
                 "minimum": 1,
                 "type": "integer"
               },
+              "saleAction": {
+                "enum": [
+                  "merchandise",
+                  "gift_card"
+                ],
+                "type": "string"
+              },
               "variant": {
                 "anyOf": [
                   {
@@ -1710,6 +1717,7 @@
               "id",
               "productId",
               "productName",
+              "saleAction",
               "quantity",
               "variant",
               "modifiers",
@@ -2093,6 +2101,13 @@
           "minimum": 1,
           "type": "integer"
         },
+        "saleAction": {
+          "enum": [
+            "merchandise",
+            "gift_card"
+          ],
+          "type": "string"
+        },
         "variant": {
           "anyOf": [
             {
@@ -2132,6 +2147,7 @@
         "id",
         "productId",
         "productName",
+        "saleAction",
         "quantity",
         "variant",
         "modifiers",
@@ -7698,6 +7714,13 @@
                   }
                 ]
               },
+              "saleAction": {
+                "enum": [
+                  "merchandise",
+                  "gift_card"
+                ],
+                "type": "string"
+              },
               "sku": {
                 "anyOf": [
                   {
@@ -7728,6 +7751,7 @@
               "category",
               "price",
               "taxRateBasisPoints",
+              "saleAction",
               "availability",
               "availableFrom",
               "primaryMedia",
@@ -8095,6 +8119,13 @@
             }
           ]
         },
+        "saleAction": {
+          "enum": [
+            "merchandise",
+            "gift_card"
+          ],
+          "type": "string"
+        },
         "sku": {
           "anyOf": [
             {
@@ -8186,6 +8217,7 @@
         "category",
         "price",
         "taxRateBasisPoints",
+        "saleAction",
         "availability",
         "availableFrom",
         "primaryMedia",
@@ -8367,6 +8399,13 @@
             }
           ]
         },
+        "saleAction": {
+          "enum": [
+            "merchandise",
+            "gift_card"
+          ],
+          "type": "string"
+        },
         "sku": {
           "anyOf": [
             {
@@ -8397,6 +8436,7 @@
         "category",
         "price",
         "taxRateBasisPoints",
+        "saleAction",
         "availability",
         "availableFrom",
         "primaryMedia",
@@ -8451,6 +8491,13 @@
         "locationId"
       ],
       "type": "object"
+    },
+    "CatalogSaleAction": {
+      "enum": [
+        "merchandise",
+        "gift_card"
+      ],
+      "type": "string"
     },
     "CatalogVariant": {
       "additionalProperties": false,
@@ -8630,9 +8677,84 @@
             {
               "additionalProperties": false,
               "properties": {
+                "fundedGiftCards": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "assignmentId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "fingerprint": {
+                        "pattern": "^[a-f0-9]{64}$",
+                        "type": "string"
+                      },
+                      "giftCardId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "policyId": {
+                        "maxLength": 80,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "policyVersion": {
+                        "maxLength": 80,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "purchasedValue": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "currency": {
+                            "pattern": "^[A-Z]{3}$",
+                            "type": "string"
+                          },
+                          "minorUnits": {
+                            "maximum": 9007199254740991,
+                            "minimum": -9007199254740991,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "minorUnits",
+                          "currency"
+                        ],
+                        "type": "object"
+                      },
+                      "saleLineId": {
+                        "format": "uuid",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "assignmentId",
+                      "giftCardId",
+                      "saleLineId",
+                      "purchasedValue",
+                      "policyId",
+                      "policyVersion",
+                      "fingerprint"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 8,
+                  "type": "array"
+                },
                 "previewFingerprint": {
                   "pattern": "^[a-f0-9]{64}$",
                   "type": "string"
+                },
+                "rewardApprovalId": {
+                  "anyOf": [
+                    {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "rewardAuthorizationId": {
                   "anyOf": [
@@ -8654,6 +8776,17 @@
                   },
                   "maxItems": 8,
                   "type": "array"
+                },
+                "storedValueFingerprint": {
+                  "anyOf": [
+                    {
+                      "pattern": "^[a-f0-9]{64}$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": [
@@ -8665,6 +8798,10 @@
               "type": "null"
             }
           ]
+        },
+        "customerValueFingerprintCommandId": {
+          "format": "uuid",
+          "type": "string"
         },
         "discountDrafts": {
           "default": [],
@@ -10232,6 +10369,17 @@
                       "format": "date-time",
                       "type": "string"
                     },
+                    "storedValueFingerprint": {
+                      "anyOf": [
+                        {
+                          "pattern": "^[a-f0-9]{64}$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "taxes": {
                       "additionalProperties": false,
                       "properties": {
@@ -10727,6 +10875,188 @@
                             }
                           ]
                         },
+                        "fundedGiftCards": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "activatedAt": {
+                                "anyOf": [
+                                  {
+                                    "format": "date-time",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "balance": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "accountId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "adjusted": {
+                                    "type": "integer"
+                                  },
+                                  "authorized": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  },
+                                  "available": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  },
+                                  "calculatedAt": {
+                                    "format": "date-time",
+                                    "type": "string"
+                                  },
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "issued": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  },
+                                  "ledgerSequence": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  },
+                                  "loaded": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  },
+                                  "projectionVersion": {
+                                    "exclusiveMinimum": 0,
+                                    "type": "integer"
+                                  },
+                                  "redeemed": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  },
+                                  "refunded": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  },
+                                  "reversed": {
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "accountId",
+                                  "currency",
+                                  "issued",
+                                  "loaded",
+                                  "available",
+                                  "authorized",
+                                  "redeemed",
+                                  "refunded",
+                                  "reversed",
+                                  "adjusted",
+                                  "ledgerSequence",
+                                  "projectionVersion",
+                                  "calculatedAt"
+                                ],
+                                "type": "object"
+                              },
+                              "currency": {
+                                "pattern": "^[A-Z]{3}$",
+                                "type": "string"
+                              },
+                              "customerId": {
+                                "anyOf": [
+                                  {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "expiresAt": {
+                                "anyOf": [
+                                  {
+                                    "format": "date-time",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "id": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "initialValue": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "maximum": 9007199254740991,
+                                    "minimum": -9007199254740991,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              },
+                              "maskedCode": {
+                                "maxLength": 32,
+                                "minLength": 4,
+                                "type": "string"
+                              },
+                              "publicReference": {
+                                "maxLength": 80,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "status": {
+                                "enum": [
+                                  "created",
+                                  "inactive",
+                                  "active",
+                                  "suspended",
+                                  "depleted",
+                                  "expired",
+                                  "closed",
+                                  "restricted"
+                                ],
+                                "type": "string"
+                              },
+                              "version": {
+                                "exclusiveMinimum": 0,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "publicReference",
+                              "maskedCode",
+                              "status",
+                              "currency",
+                              "initialValue",
+                              "balance",
+                              "activatedAt",
+                              "expiresAt",
+                              "customerId",
+                              "version"
+                            ],
+                            "type": "object"
+                          },
+                          "maxItems": 8,
+                          "type": "array"
+                        },
                         "recovered": {
                           "type": "boolean"
                         },
@@ -10802,6 +11132,19 @@
                                       "gift_card"
                                     ],
                                     "type": "string"
+                                  },
+                                  "allocationFingerprint": {
+                                    "pattern": "^[a-f0-9]{64}$",
+                                    "type": "string"
+                                  },
+                                  "allocationId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "allocationOrder": {
+                                    "maximum": 7,
+                                    "minimum": 0,
+                                    "type": "integer"
                                   },
                                   "amountMinorUnits": {
                                     "exclusiveMinimum": 0,
@@ -10880,6 +11223,9 @@
                                   "fingerprint",
                                   "status",
                                   "remainingBalanceMinorUnits",
+                                  "allocationId",
+                                  "allocationOrder",
+                                  "allocationFingerprint",
                                   "createdAt",
                                   "expiresAt",
                                   "correlationId"
@@ -13098,6 +13444,17 @@
               "format": "date-time",
               "type": "string"
             },
+            "storedValueFingerprint": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-f0-9]{64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "taxes": {
               "additionalProperties": false,
               "properties": {
@@ -13593,6 +13950,188 @@
                     }
                   ]
                 },
+                "fundedGiftCards": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "activatedAt": {
+                        "anyOf": [
+                          {
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "balance": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "accountId": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "adjusted": {
+                            "type": "integer"
+                          },
+                          "authorized": {
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "available": {
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "calculatedAt": {
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "currency": {
+                            "pattern": "^[A-Z]{3}$",
+                            "type": "string"
+                          },
+                          "issued": {
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "ledgerSequence": {
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "loaded": {
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "projectionVersion": {
+                            "exclusiveMinimum": 0,
+                            "type": "integer"
+                          },
+                          "redeemed": {
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "refunded": {
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "reversed": {
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "accountId",
+                          "currency",
+                          "issued",
+                          "loaded",
+                          "available",
+                          "authorized",
+                          "redeemed",
+                          "refunded",
+                          "reversed",
+                          "adjusted",
+                          "ledgerSequence",
+                          "projectionVersion",
+                          "calculatedAt"
+                        ],
+                        "type": "object"
+                      },
+                      "currency": {
+                        "pattern": "^[A-Z]{3}$",
+                        "type": "string"
+                      },
+                      "customerId": {
+                        "anyOf": [
+                          {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "expiresAt": {
+                        "anyOf": [
+                          {
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "initialValue": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "currency": {
+                            "pattern": "^[A-Z]{3}$",
+                            "type": "string"
+                          },
+                          "minorUnits": {
+                            "maximum": 9007199254740991,
+                            "minimum": -9007199254740991,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "minorUnits",
+                          "currency"
+                        ],
+                        "type": "object"
+                      },
+                      "maskedCode": {
+                        "maxLength": 32,
+                        "minLength": 4,
+                        "type": "string"
+                      },
+                      "publicReference": {
+                        "maxLength": 80,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "status": {
+                        "enum": [
+                          "created",
+                          "inactive",
+                          "active",
+                          "suspended",
+                          "depleted",
+                          "expired",
+                          "closed",
+                          "restricted"
+                        ],
+                        "type": "string"
+                      },
+                      "version": {
+                        "exclusiveMinimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "publicReference",
+                      "maskedCode",
+                      "status",
+                      "currency",
+                      "initialValue",
+                      "balance",
+                      "activatedAt",
+                      "expiresAt",
+                      "customerId",
+                      "version"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 8,
+                  "type": "array"
+                },
                 "recovered": {
                   "type": "boolean"
                 },
@@ -13668,6 +14207,19 @@
                               "gift_card"
                             ],
                             "type": "string"
+                          },
+                          "allocationFingerprint": {
+                            "pattern": "^[a-f0-9]{64}$",
+                            "type": "string"
+                          },
+                          "allocationId": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "allocationOrder": {
+                            "maximum": 7,
+                            "minimum": 0,
+                            "type": "integer"
                           },
                           "amountMinorUnits": {
                             "exclusiveMinimum": 0,
@@ -13746,6 +14298,9 @@
                           "fingerprint",
                           "status",
                           "remainingBalanceMinorUnits",
+                          "allocationId",
+                          "allocationOrder",
+                          "allocationFingerprint",
                           "createdAt",
                           "expiresAt",
                           "correlationId"
@@ -16790,6 +17345,17 @@
                             "format": "date-time",
                             "type": "string"
                           },
+                          "storedValueFingerprint": {
+                            "anyOf": [
+                              {
+                                "pattern": "^[a-f0-9]{64}$",
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "taxes": {
                             "additionalProperties": false,
                             "properties": {
@@ -18717,6 +19283,23 @@
           "format": "date-time",
           "type": "string"
         },
+        "originLocationId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "permissionClass": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
         "points": {
           "anyOf": [
             {
@@ -18802,6 +19385,16 @@
             "merge"
           ],
           "type": "string"
+        },
+        "visibility": {
+          "enum": [
+            "merchant_global",
+            "location_attributed",
+            "origin_location",
+            "restricted_administrative",
+            "customer_visible_foundation"
+          ],
+          "type": "string"
         }
       },
       "required": [
@@ -18809,6 +19402,8 @@
         "type",
         "publicReference",
         "locationId",
+        "visibility",
+        "permissionClass",
         "businessDate",
         "total",
         "status",
@@ -18856,6 +19451,23 @@
               },
               "occurredAt": {
                 "format": "date-time",
+                "type": "string"
+              },
+              "originLocationId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
+              "permissionClass": {
+                "maxLength": 100,
+                "minLength": 1,
                 "type": "string"
               },
               "points": {
@@ -18943,6 +19555,16 @@
                   "merge"
                 ],
                 "type": "string"
+              },
+              "visibility": {
+                "enum": [
+                  "merchant_global",
+                  "location_attributed",
+                  "origin_location",
+                  "restricted_administrative",
+                  "customer_visible_foundation"
+                ],
+                "type": "string"
               }
             },
             "required": [
@@ -18950,6 +19572,8 @@
               "type",
               "publicReference",
               "locationId",
+              "visibility",
+              "permissionClass",
               "businessDate",
               "total",
               "status",
@@ -19170,6 +19794,16 @@
         "operatorSessionId"
       ],
       "type": "object"
+    },
+    "CustomerHistoryVisibility": {
+      "enum": [
+        "merchant_global",
+        "location_attributed",
+        "origin_location",
+        "restricted_administrative",
+        "customer_visible_foundation"
+      ],
+      "type": "string"
     },
     "CustomerMatchCandidate": {
       "additionalProperties": false,
@@ -20904,6 +21538,188 @@
             }
           ]
         },
+        "fundedGiftCards": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "activatedAt": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "balance": {
+                "additionalProperties": false,
+                "properties": {
+                  "accountId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "adjusted": {
+                    "type": "integer"
+                  },
+                  "authorized": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "available": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "calculatedAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "currency": {
+                    "pattern": "^[A-Z]{3}$",
+                    "type": "string"
+                  },
+                  "issued": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "ledgerSequence": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "loaded": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "projectionVersion": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  "redeemed": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "refunded": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "reversed": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "accountId",
+                  "currency",
+                  "issued",
+                  "loaded",
+                  "available",
+                  "authorized",
+                  "redeemed",
+                  "refunded",
+                  "reversed",
+                  "adjusted",
+                  "ledgerSequence",
+                  "projectionVersion",
+                  "calculatedAt"
+                ],
+                "type": "object"
+              },
+              "currency": {
+                "pattern": "^[A-Z]{3}$",
+                "type": "string"
+              },
+              "customerId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "expiresAt": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "initialValue": {
+                "additionalProperties": false,
+                "properties": {
+                  "currency": {
+                    "pattern": "^[A-Z]{3}$",
+                    "type": "string"
+                  },
+                  "minorUnits": {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "minorUnits",
+                  "currency"
+                ],
+                "type": "object"
+              },
+              "maskedCode": {
+                "maxLength": 32,
+                "minLength": 4,
+                "type": "string"
+              },
+              "publicReference": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "created",
+                  "inactive",
+                  "active",
+                  "suspended",
+                  "depleted",
+                  "expired",
+                  "closed",
+                  "restricted"
+                ],
+                "type": "string"
+              },
+              "version": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "publicReference",
+              "maskedCode",
+              "status",
+              "currency",
+              "initialValue",
+              "balance",
+              "activatedAt",
+              "expiresAt",
+              "customerId",
+              "version"
+            ],
+            "type": "object"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
         "recovered": {
           "type": "boolean"
         },
@@ -20979,6 +21795,19 @@
                       "gift_card"
                     ],
                     "type": "string"
+                  },
+                  "allocationFingerprint": {
+                    "pattern": "^[a-f0-9]{64}$",
+                    "type": "string"
+                  },
+                  "allocationId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "allocationOrder": {
+                    "maximum": 7,
+                    "minimum": 0,
+                    "type": "integer"
                   },
                   "amountMinorUnits": {
                     "exclusiveMinimum": 0,
@@ -21057,6 +21886,9 @@
                   "fingerprint",
                   "status",
                   "remainingBalanceMinorUnits",
+                  "allocationId",
+                  "allocationOrder",
+                  "allocationFingerprint",
                   "createdAt",
                   "expiresAt",
                   "correlationId"
@@ -21582,6 +22414,19 @@
                 ],
                 "type": "string"
               },
+              "allocationFingerprint": {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string"
+              },
+              "allocationId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "allocationOrder": {
+                "maximum": 7,
+                "minimum": 0,
+                "type": "integer"
+              },
               "amountMinorUnits": {
                 "exclusiveMinimum": 0,
                 "type": "integer"
@@ -21659,6 +22504,9 @@
               "fingerprint",
               "status",
               "remainingBalanceMinorUnits",
+              "allocationId",
+              "allocationOrder",
+              "allocationFingerprint",
               "createdAt",
               "expiresAt",
               "correlationId"
@@ -22521,9 +23369,84 @@
     "CustomerValueSelection": {
       "additionalProperties": false,
       "properties": {
+        "fundedGiftCards": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "assignmentId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "fingerprint": {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string"
+              },
+              "giftCardId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "policyId": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "policyVersion": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "purchasedValue": {
+                "additionalProperties": false,
+                "properties": {
+                  "currency": {
+                    "pattern": "^[A-Z]{3}$",
+                    "type": "string"
+                  },
+                  "minorUnits": {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "minorUnits",
+                  "currency"
+                ],
+                "type": "object"
+              },
+              "saleLineId": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "assignmentId",
+              "giftCardId",
+              "saleLineId",
+              "purchasedValue",
+              "policyId",
+              "policyVersion",
+              "fingerprint"
+            ],
+            "type": "object"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
         "previewFingerprint": {
           "pattern": "^[a-f0-9]{64}$",
           "type": "string"
+        },
+        "rewardApprovalId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "rewardAuthorizationId": {
           "anyOf": [
@@ -22545,6 +23468,17 @@
           },
           "maxItems": 8,
           "type": "array"
+        },
+        "storedValueFingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -26503,6 +27437,19 @@
           ],
           "type": "string"
         },
+        "allocationFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "allocationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "allocationOrder": {
+          "maximum": 7,
+          "minimum": 0,
+          "type": "integer"
+        },
         "amountMinorUnits": {
           "exclusiveMinimum": 0,
           "type": "integer"
@@ -26580,6 +27527,9 @@
         "fingerprint",
         "status",
         "remainingBalanceMinorUnits",
+        "allocationId",
+        "allocationOrder",
+        "allocationFingerprint",
         "createdAt",
         "expiresAt",
         "correlationId"
@@ -26734,6 +27684,18 @@
           "type": "string"
         },
         "saleId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "saleLineId": {
           "anyOf": [
             {
               "format": "uuid",
@@ -26955,6 +27917,73 @@
           "minLength": 32,
           "type": "string"
         },
+        "fundingAssignment": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "assignmentId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "fingerprint": {
+                  "pattern": "^[a-f0-9]{64}$",
+                  "type": "string"
+                },
+                "giftCardId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "policyId": {
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "policyVersion": {
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "purchasedValue": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "saleLineId": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "assignmentId",
+                "giftCardId",
+                "saleLineId",
+                "purchasedValue",
+                "policyId",
+                "policyVersion",
+                "fingerprint"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "recovered": {
           "type": "boolean"
         }
@@ -26963,7 +27992,8 @@
         "card",
         "deliveryToken",
         "deliveryExpiresAt",
-        "recovered"
+        "recovered",
+        "fundingAssignment"
       ],
       "type": "object"
     },
@@ -27220,6 +28250,19 @@
               ],
               "type": "string"
             },
+            "allocationFingerprint": {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            "allocationId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "allocationOrder": {
+              "maximum": 7,
+              "minimum": 0,
+              "type": "integer"
+            },
             "amountMinorUnits": {
               "exclusiveMinimum": 0,
               "type": "integer"
@@ -27297,6 +28340,9 @@
             "fingerprint",
             "status",
             "remainingBalanceMinorUnits",
+            "allocationId",
+            "allocationOrder",
+            "allocationFingerprint",
             "createdAt",
             "expiresAt",
             "correlationId"
@@ -33838,6 +34884,17 @@
               "format": "date-time",
               "type": "string"
             },
+            "storedValueFingerprint": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-f0-9]{64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "taxes": {
               "additionalProperties": false,
               "properties": {
@@ -34412,9 +35469,84 @@
                     {
                       "additionalProperties": false,
                       "properties": {
+                        "fundedGiftCards": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "assignmentId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "fingerprint": {
+                                "pattern": "^[a-f0-9]{64}$",
+                                "type": "string"
+                              },
+                              "giftCardId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "policyId": {
+                                "maxLength": 80,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "policyVersion": {
+                                "maxLength": 80,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "purchasedValue": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "maximum": 9007199254740991,
+                                    "minimum": -9007199254740991,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              },
+                              "saleLineId": {
+                                "format": "uuid",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "assignmentId",
+                              "giftCardId",
+                              "saleLineId",
+                              "purchasedValue",
+                              "policyId",
+                              "policyVersion",
+                              "fingerprint"
+                            ],
+                            "type": "object"
+                          },
+                          "maxItems": 8,
+                          "type": "array"
+                        },
                         "previewFingerprint": {
                           "pattern": "^[a-f0-9]{64}$",
                           "type": "string"
+                        },
+                        "rewardApprovalId": {
+                          "anyOf": [
+                            {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         "rewardAuthorizationId": {
                           "anyOf": [
@@ -34436,6 +35568,17 @@
                           },
                           "maxItems": 8,
                           "type": "array"
+                        },
+                        "storedValueFingerprint": {
+                          "anyOf": [
+                            {
+                              "pattern": "^[a-f0-9]{64}$",
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -34447,6 +35590,10 @@
                       "type": "null"
                     }
                   ]
+                },
+                "customerValueFingerprintCommandId": {
+                  "format": "uuid",
+                  "type": "string"
                 },
                 "discountDrafts": {
                   "default": [],
@@ -34948,6 +36095,17 @@
                   "format": "date-time",
                   "type": "string"
                 },
+                "storedValueFingerprint": {
+                  "anyOf": [
+                    {
+                      "pattern": "^[a-f0-9]{64}$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "taxes": {
                   "additionalProperties": false,
                   "properties": {
@@ -35404,9 +36562,84 @@
                 {
                   "additionalProperties": false,
                   "properties": {
+                    "fundedGiftCards": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "assignmentId": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "fingerprint": {
+                            "pattern": "^[a-f0-9]{64}$",
+                            "type": "string"
+                          },
+                          "giftCardId": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "policyId": {
+                            "maxLength": 80,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "policyVersion": {
+                            "maxLength": 80,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "purchasedValue": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "currency": {
+                                "pattern": "^[A-Z]{3}$",
+                                "type": "string"
+                              },
+                              "minorUnits": {
+                                "maximum": 9007199254740991,
+                                "minimum": -9007199254740991,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "minorUnits",
+                              "currency"
+                            ],
+                            "type": "object"
+                          },
+                          "saleLineId": {
+                            "format": "uuid",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "assignmentId",
+                          "giftCardId",
+                          "saleLineId",
+                          "purchasedValue",
+                          "policyId",
+                          "policyVersion",
+                          "fingerprint"
+                        ],
+                        "type": "object"
+                      },
+                      "maxItems": 8,
+                      "type": "array"
+                    },
                     "previewFingerprint": {
                       "pattern": "^[a-f0-9]{64}$",
                       "type": "string"
+                    },
+                    "rewardApprovalId": {
+                      "anyOf": [
+                        {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "rewardAuthorizationId": {
                       "anyOf": [
@@ -35428,6 +36661,17 @@
                       },
                       "maxItems": 8,
                       "type": "array"
+                    },
+                    "storedValueFingerprint": {
+                      "anyOf": [
+                        {
+                          "pattern": "^[a-f0-9]{64}$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -35439,6 +36683,10 @@
                   "type": "null"
                 }
               ]
+            },
+            "customerValueFingerprintCommandId": {
+              "format": "uuid",
+              "type": "string"
             },
             "discountDrafts": {
               "default": [],
@@ -35939,6 +37187,17 @@
             "snapshotAt": {
               "format": "date-time",
               "type": "string"
+            },
+            "storedValueFingerprint": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-f0-9]{64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "taxes": {
               "additionalProperties": false,
@@ -41564,9 +42823,84 @@
                     {
                       "additionalProperties": false,
                       "properties": {
+                        "fundedGiftCards": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "assignmentId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "fingerprint": {
+                                "pattern": "^[a-f0-9]{64}$",
+                                "type": "string"
+                              },
+                              "giftCardId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "policyId": {
+                                "maxLength": 80,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "policyVersion": {
+                                "maxLength": 80,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "purchasedValue": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "currency": {
+                                    "pattern": "^[A-Z]{3}$",
+                                    "type": "string"
+                                  },
+                                  "minorUnits": {
+                                    "maximum": 9007199254740991,
+                                    "minimum": -9007199254740991,
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "minorUnits",
+                                  "currency"
+                                ],
+                                "type": "object"
+                              },
+                              "saleLineId": {
+                                "format": "uuid",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "assignmentId",
+                              "giftCardId",
+                              "saleLineId",
+                              "purchasedValue",
+                              "policyId",
+                              "policyVersion",
+                              "fingerprint"
+                            ],
+                            "type": "object"
+                          },
+                          "maxItems": 8,
+                          "type": "array"
+                        },
                         "previewFingerprint": {
                           "pattern": "^[a-f0-9]{64}$",
                           "type": "string"
+                        },
+                        "rewardApprovalId": {
+                          "anyOf": [
+                            {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         "rewardAuthorizationId": {
                           "anyOf": [
@@ -41588,6 +42922,17 @@
                           },
                           "maxItems": 8,
                           "type": "array"
+                        },
+                        "storedValueFingerprint": {
+                          "anyOf": [
+                            {
+                              "pattern": "^[a-f0-9]{64}$",
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -41599,6 +42944,10 @@
                       "type": "null"
                     }
                   ]
+                },
+                "customerValueFingerprintCommandId": {
+                  "format": "uuid",
+                  "type": "string"
                 },
                 "discountDrafts": {
                   "default": [],
@@ -42099,6 +43448,17 @@
                 "snapshotAt": {
                   "format": "date-time",
                   "type": "string"
+                },
+                "storedValueFingerprint": {
+                  "anyOf": [
+                    {
+                      "pattern": "^[a-f0-9]{64}$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "taxes": {
                   "additionalProperties": false,
@@ -43936,6 +45296,17 @@
                           "snapshotAt": {
                             "format": "date-time",
                             "type": "string"
+                          },
+                          "storedValueFingerprint": {
+                            "anyOf": [
+                              {
+                                "pattern": "^[a-f0-9]{64}$",
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "taxes": {
                             "additionalProperties": false,
@@ -47393,6 +48764,17 @@
                             "format": "date-time",
                             "type": "string"
                           },
+                          "storedValueFingerprint": {
+                            "anyOf": [
+                              {
+                                "pattern": "^[a-f0-9]{64}$",
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "taxes": {
                             "additionalProperties": false,
                             "properties": {
@@ -48250,6 +49632,17 @@
                     "snapshotAt": {
                       "format": "date-time",
                       "type": "string"
+                    },
+                    "storedValueFingerprint": {
+                      "anyOf": [
+                        {
+                          "pattern": "^[a-f0-9]{64}$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "taxes": {
                       "additionalProperties": false,
@@ -49398,6 +50791,28 @@
     "RewardAuthorizationRequest": {
       "additionalProperties": false,
       "properties": {
+        "approvalFingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "approvalId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "checkoutVersion": {
           "exclusiveMinimum": 0,
           "type": "integer"
@@ -49444,6 +50859,10 @@
         },
         "saleId": {
           "format": "uuid",
+          "type": "string"
+        },
+        "storedValueFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
           "type": "string"
         }
       },
@@ -51789,6 +53208,66 @@
       ],
       "type": "string"
     },
+    "SaleFundedGiftCardAssignment": {
+      "additionalProperties": false,
+      "properties": {
+        "assignmentId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "fingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "giftCardId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "policyId": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "policyVersion": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "purchasedValue": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "saleLineId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "assignmentId",
+        "giftCardId",
+        "saleLineId",
+        "purchasedValue",
+        "policyId",
+        "policyVersion",
+        "fingerprint"
+      ],
+      "type": "object"
+    },
     "SaleHistoryPage": {
       "additionalProperties": false,
       "properties": {
@@ -52009,6 +53488,13 @@
                           "minimum": 1,
                           "type": "integer"
                         },
+                        "saleAction": {
+                          "enum": [
+                            "merchandise",
+                            "gift_card"
+                          ],
+                          "type": "string"
+                        },
                         "variant": {
                           "anyOf": [
                             {
@@ -52048,6 +53534,7 @@
                         "id",
                         "productId",
                         "productName",
+                        "saleAction",
                         "quantity",
                         "variant",
                         "modifiers",
@@ -53241,6 +54728,13 @@
                     "minimum": 1,
                     "type": "integer"
                   },
+                  "saleAction": {
+                    "enum": [
+                      "merchandise",
+                      "gift_card"
+                    ],
+                    "type": "string"
+                  },
                   "variant": {
                     "anyOf": [
                       {
@@ -53280,6 +54774,7 @@
                   "id",
                   "productId",
                   "productName",
+                  "saleAction",
                   "quantity",
                   "variant",
                   "modifiers",
@@ -57076,6 +58571,19 @@
           ],
           "type": "string"
         },
+        "allocationFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "allocationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "allocationOrder": {
+          "maximum": 7,
+          "minimum": 0,
+          "type": "integer"
+        },
         "amountMinorUnits": {
           "exclusiveMinimum": 0,
           "type": "integer"
@@ -57153,6 +58661,9 @@
         "fingerprint",
         "status",
         "remainingBalanceMinorUnits",
+        "allocationId",
+        "allocationOrder",
+        "allocationFingerprint",
         "createdAt",
         "expiresAt",
         "correlationId"
@@ -57166,12 +58677,26 @@
           "format": "uuid",
           "type": "string"
         },
+        "accountPublicReference": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
         "accountType": {
           "enum": [
             "wallet",
             "gift_card"
           ],
           "type": "string"
+        },
+        "allocationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "allocationOrder": {
+          "maximum": 7,
+          "minimum": 0,
+          "type": "integer"
         },
         "amount": {
           "additionalProperties": false,
@@ -57255,7 +58780,10 @@
         "saleId",
         "checkoutVersion",
         "amount",
-        "checkoutFingerprint"
+        "checkoutFingerprint",
+        "allocationId",
+        "allocationOrder",
+        "accountPublicReference"
       ],
       "type": "object"
     },
@@ -57288,6 +58816,19 @@
                 "gift_card"
               ],
               "type": "string"
+            },
+            "allocationFingerprint": {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            "allocationId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "allocationOrder": {
+              "maximum": 7,
+              "minimum": 0,
+              "type": "integer"
             },
             "amountMinorUnits": {
               "exclusiveMinimum": 0,
@@ -57366,6 +58907,9 @@
             "fingerprint",
             "status",
             "remainingBalanceMinorUnits",
+            "allocationId",
+            "allocationOrder",
+            "allocationFingerprint",
             "createdAt",
             "expiresAt",
             "correlationId"
@@ -57385,6 +58929,535 @@
         "authorization",
         "ledgerEntryId",
         "committedAt"
+      ],
+      "type": "object"
+    },
+    "StoredValueFingerprintInput": {
+      "additionalProperties": false,
+      "properties": {
+        "allocations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "accountId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "accountPublicReference": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "allocationId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "allocationOrder": {
+                "maximum": 7,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "authorizationExpiresAt": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "authorizationId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "authorizedAmountMinorUnits": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "cashAllocationMinorUnits": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "checkoutId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "checkoutVersion": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "commandId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "committedAmountMinorUnits": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "currency": {
+                "pattern": "^[A-Z]{3}$",
+                "type": "string"
+              },
+              "customerId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "giftCardAllocationIds": {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 8,
+                "type": "array"
+              },
+              "idempotencyKey": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "locationId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "manualTerminalAllocationMinorUnits": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "merchantId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "optimisticVersion": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "policyId": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "policyVersion": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "remainingAccountBalanceMinorUnits": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "requestedAmountMinorUnits": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "saleId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "tenderType": {
+                "enum": [
+                  "wallet",
+                  "gift_card"
+                ],
+                "type": "string"
+              },
+              "walletAllocationIds": {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 8,
+                "type": "array"
+              }
+            },
+            "required": [
+              "allocationId",
+              "tenderType",
+              "accountId",
+              "accountPublicReference",
+              "authorizationId",
+              "merchantId",
+              "locationId",
+              "customerId",
+              "saleId",
+              "checkoutId",
+              "checkoutVersion",
+              "currency",
+              "requestedAmountMinorUnits",
+              "authorizedAmountMinorUnits",
+              "committedAmountMinorUnits",
+              "remainingAccountBalanceMinorUnits",
+              "allocationOrder",
+              "cashAllocationMinorUnits",
+              "manualTerminalAllocationMinorUnits",
+              "walletAllocationIds",
+              "giftCardAllocationIds",
+              "policyId",
+              "policyVersion",
+              "authorizationExpiresAt",
+              "commandId",
+              "idempotencyKey",
+              "optimisticVersion"
+            ],
+            "type": "object"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
+        "businessDate": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "cartFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "cashMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "checkoutId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "checkoutVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "credentialVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "customerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deviceId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "loyaltyPolicyVersion": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "manualTerminalMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "receiptDestination": {
+          "enum": [
+            "display",
+            "print_later",
+            "digital",
+            "none"
+          ],
+          "type": "string"
+        },
+        "rewardAuthorizationId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rewardPolicyVersion": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "saleId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "saleVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "selectedRewardId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "totalsFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "merchantId",
+        "locationId",
+        "customerId",
+        "saleId",
+        "saleVersion",
+        "checkoutId",
+        "checkoutVersion",
+        "cartFingerprint",
+        "totalsFingerprint",
+        "currency",
+        "loyaltyPolicyVersion",
+        "rewardPolicyVersion",
+        "selectedRewardId",
+        "rewardAuthorizationId",
+        "receiptDestination",
+        "businessDate",
+        "deviceId",
+        "credentialVersion",
+        "operatorSessionId",
+        "commandId",
+        "allocations",
+        "cashMinorUnits",
+        "manualTerminalMinorUnits"
+      ],
+      "type": "object"
+    },
+    "StoredValueFingerprintResult": {
+      "additionalProperties": false,
+      "properties": {
+        "allocations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "accountId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "accountPublicReference": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "allocationId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "allocationOrder": {
+                "maximum": 7,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "authorizationExpiresAt": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "authorizationId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "authorizedAmountMinorUnits": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "cashAllocationMinorUnits": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "checkoutId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "checkoutVersion": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "commandId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "committedAmountMinorUnits": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "currency": {
+                "pattern": "^[A-Z]{3}$",
+                "type": "string"
+              },
+              "customerId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "giftCardAllocationIds": {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 8,
+                "type": "array"
+              },
+              "idempotencyKey": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "locationId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "manualTerminalAllocationMinorUnits": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "merchantId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "optimisticVersion": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "policyId": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "policyVersion": {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              "remainingAccountBalanceMinorUnits": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "requestedAmountMinorUnits": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "saleId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "tenderType": {
+                "enum": [
+                  "wallet",
+                  "gift_card"
+                ],
+                "type": "string"
+              },
+              "walletAllocationIds": {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 8,
+                "type": "array"
+              }
+            },
+            "required": [
+              "allocationId",
+              "tenderType",
+              "accountId",
+              "accountPublicReference",
+              "authorizationId",
+              "merchantId",
+              "locationId",
+              "customerId",
+              "saleId",
+              "checkoutId",
+              "checkoutVersion",
+              "currency",
+              "requestedAmountMinorUnits",
+              "authorizedAmountMinorUnits",
+              "committedAmountMinorUnits",
+              "remainingAccountBalanceMinorUnits",
+              "allocationOrder",
+              "cashAllocationMinorUnits",
+              "manualTerminalAllocationMinorUnits",
+              "walletAllocationIds",
+              "giftCardAllocationIds",
+              "policyId",
+              "policyVersion",
+              "authorizationExpiresAt",
+              "commandId",
+              "idempotencyKey",
+              "optimisticVersion"
+            ],
+            "type": "object"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
+        "fingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "remainingBalance": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "requiresConfirmation": {
+          "const": true,
+          "type": "boolean"
+        },
+        "version": {
+          "const": 1,
+          "type": "number"
+        }
+      },
+      "required": [
+        "version",
+        "fingerprint",
+        "allocations",
+        "remainingBalance",
+        "requiresConfirmation"
       ],
       "type": "object"
     },
@@ -57456,6 +59529,171 @@
         "refundId",
         "amount",
         "reversedAt"
+      ],
+      "type": "object"
+    },
+    "StoredValueTenderAllocation": {
+      "additionalProperties": false,
+      "properties": {
+        "accountId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "accountPublicReference": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "allocationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "allocationOrder": {
+          "maximum": 7,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "authorizationExpiresAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "authorizationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "authorizedAmountMinorUnits": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "cashAllocationMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "checkoutId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "checkoutVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "committedAmountMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "customerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "giftCardAllocationIds": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "manualTerminalAllocationMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "optimisticVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "policyId": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "policyVersion": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "remainingAccountBalanceMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "requestedAmountMinorUnits": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "saleId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "tenderType": {
+          "enum": [
+            "wallet",
+            "gift_card"
+          ],
+          "type": "string"
+        },
+        "walletAllocationIds": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 8,
+          "type": "array"
+        }
+      },
+      "required": [
+        "allocationId",
+        "tenderType",
+        "accountId",
+        "accountPublicReference",
+        "authorizationId",
+        "merchantId",
+        "locationId",
+        "customerId",
+        "saleId",
+        "checkoutId",
+        "checkoutVersion",
+        "currency",
+        "requestedAmountMinorUnits",
+        "authorizedAmountMinorUnits",
+        "committedAmountMinorUnits",
+        "remainingAccountBalanceMinorUnits",
+        "allocationOrder",
+        "cashAllocationMinorUnits",
+        "manualTerminalAllocationMinorUnits",
+        "walletAllocationIds",
+        "giftCardAllocationIds",
+        "policyId",
+        "policyVersion",
+        "authorizationExpiresAt",
+        "commandId",
+        "idempotencyKey",
+        "optimisticVersion"
       ],
       "type": "object"
     },
@@ -58602,6 +60840,17 @@
         "snapshotAt": {
           "format": "date-time",
           "type": "string"
+        },
+        "storedValueFingerprint": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "taxes": {
           "additionalProperties": false,

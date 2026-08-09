@@ -142,7 +142,7 @@
     {
       "commit": "HEAD (Gate 3F closeout commit)",
       "id": "3F",
-      "status": "incomplete",
+      "status": "complete",
       "subject": "Merchant customers, consent, loyalty, rewards, wallet, gift cards, checkout, and refund synchronization"
     }
   ]

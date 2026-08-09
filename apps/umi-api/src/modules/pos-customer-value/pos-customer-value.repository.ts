@@ -332,6 +332,12 @@ export class PosCustomerValueRepository {
           contactAccess:
             authorization.permissions.includes('*') ||
             authorization.permissions.includes('customer.consent.read'),
+          globalAccess:
+            authorization.permissions.includes('*') ||
+            authorization.permissions.includes('customer.history.global'),
+          administrativeAccess:
+            authorization.permissions.includes('*') ||
+            authorization.permissions.includes('customer.history.admin'),
         };
         const cursor = query.cursor ? this.decodeHistoryCursor(query.cursor, scope) : null;
         const { rows } = await client.query<Row>(
@@ -347,6 +353,7 @@ export class PosCustomerValueRepository {
                when event_type like 'consent_%' then 'consent'
                else 'merge' end AS type,
              public_reference AS "publicReference",location_id::text AS "locationId",
+             origin_location_id::text AS "originLocationId",visibility,permission_class AS "permissionClass",
              business_date::text AS "businessDate",
              case when safe_data ? 'amountMinorUnits' then jsonb_build_object(
                'minorUnits',(safe_data->>'amountMinorUnits')::bigint,
@@ -356,8 +363,9 @@ export class PosCustomerValueRepository {
              nullif(safe_data->>'refundId','')::text AS "relatedExceptionId",
              null::text AS "correlationReference",coalesce(safe_data->>'status','committed') AS status,
              occurred_at::text AS "occurredAt"
-           FROM merchant.customer_history_event
-          WHERE merchant_id=$1::uuid AND customer_id=$2::uuid
+           FROM merchant.read_customer_history_event_scoped(
+             $1::uuid,$2::uuid,$14::uuid)
+          WHERE true
             AND ($3='all' OR
               ($3='sale' AND event_type='sale') OR ($3='receipt' AND event_type='receipt') OR
               ($3='exception' AND event_type IN ('refund','void')) OR
@@ -366,7 +374,12 @@ export class PosCustomerValueRepository {
               ($3='wallet' AND event_type LIKE 'wallet_%') OR
               ($3='gift_card' AND event_type LIKE 'gift_card_%') OR
               ($3='consent' AND event_type LIKE 'consent_%'))
-            AND location_id=$4::uuid
+            AND (
+              (visibility IN ('location_attributed','origin_location') AND location_id=$4::uuid)
+              OR visibility='customer_visible_foundation'
+              OR ($12 AND visibility='merchant_global')
+              OR ($13 AND visibility='restricted_administrative')
+            )
             AND ($5::date IS NULL OR business_date>=$5::date)
             AND ($6::date IS NULL OR business_date<=$6::date)
             AND ($7::timestamptz IS NULL OR
@@ -385,6 +398,9 @@ export class PosCustomerValueRepository {
             cursor?.eventId ?? null,
             scope.contactAccess,
             query.limit + 1,
+            scope.globalAccess,
+            scope.administrativeAccess,
+            query.operatorSessionId,
           ],
         );
         const pageRows = rows.slice(0, query.limit);
@@ -971,11 +987,48 @@ export class PosCustomerValueRepository {
     if (!row || !eligibility.eligible || Number(row.saleUsageCount) >= Number(row.usagePerSale)) {
       throw new ConflictException({ code: 'REWARD_INELIGIBLE' });
     }
+    const approvalFingerprint = commandFingerprint('pos.reward.approval.v1', {
+      merchantId,
+      locationId: dto.locationId,
+      customerId: dto.customerId,
+      loyaltyAccountId: row.accountId,
+      rewardId: dto.rewardId,
+      rewardVersion: Number(row.version),
+      pointsCost: Number(row.pointsCost),
+      financialBenefitMinorUnits: Math.min(
+        Number(row.benefit),
+        Number(row.maximumBenefitMinorUnits ?? row.benefit),
+        Number(row.cartTotal),
+      ),
+      checkoutVersion: dto.checkoutVersion,
+      rewardPreviewFingerprint: dto.previewFingerprint,
+      storedValueFingerprint: dto.storedValueFingerprint ?? null,
+    });
     if (row.approvalPermission) {
-      throw new ConflictException({
-        code: 'APPROVAL_REQUIRED',
-        fieldErrors: { approvalPermission: [row.approvalPermission] },
-      });
+      if (!dto.storedValueFingerprint) {
+        throw new ConflictException({ code: 'STORED_VALUE_PREVIEW_REQUIRED' });
+      }
+      if (!dto.approvalId || dto.approvalFingerprint !== approvalFingerprint) {
+        throw new ConflictException({
+          code: 'APPROVAL_REQUIRED',
+          fieldErrors: {
+            approvalPermission: [row.approvalPermission],
+            approvalFingerprint: [approvalFingerprint],
+          },
+        });
+      }
+      await this.consumeApproval(
+        client,
+        merchantId,
+        {
+          ...dto,
+          approvalId: dto.approvalId,
+          approvalFingerprint: dto.approvalFingerprint,
+        },
+        authorization,
+        row.approvalPermission,
+        approvalFingerprint,
+      );
     }
     const id = randomUUID();
     const fingerprint = commandFingerprint('pos.reward.authorize', dto);
@@ -984,10 +1037,12 @@ export class PosCustomerValueRepository {
         id,merchant_id,location_id,account_type,account_id,customer_id,reward_id,sale_id,
         checkout_version,points,benefit_minor_units,checkout_fingerprint,policy_version,reward_version,command_id,
         idempotency_key,command_fingerprint,status,expires_at,correlation_id,policy_fingerprint,
-        reward_policy_snapshot,operator_id,device_id,credential_version)
+        reward_policy_snapshot,operator_id,device_id,credential_version,approval_id,
+        approval_fingerprint,stored_value_fingerprint,approval_tender_fingerprint)
        VALUES($1::uuid,$2::uuid,$3::uuid,'loyalty_reward',$4::uuid,$5::uuid,$6::uuid,$7::uuid,
         $8,$9,$10,$11,$12,$13,$14::uuid,$15::uuid,$16,'authorized',clock_timestamp()+interval '5 minutes',$17,
-        $18,jsonb_build_object('rewardVersion',$13,'policyVersion',$12),$19::uuid,$20::uuid,$21)
+        $18,jsonb_build_object('rewardVersion',$13,'policyVersion',$12),$19::uuid,$20::uuid,$21,
+        $22::uuid,$23,$24,$25)
        RETURNING created_at::text AS "createdAt",expires_at::text AS "expiresAt"`,
       [
         id,
@@ -1015,6 +1070,10 @@ export class PosCustomerValueRepository {
         authorization.operatorId,
         authorization.deviceId,
         authorization.credentialVersion,
+        dto.approvalId ?? null,
+        row.approvalPermission ? approvalFingerprint : null,
+        null,
+        row.approvalPermission ? dto.storedValueFingerprint : null,
       ],
     );
     await client.query(
@@ -1067,15 +1126,13 @@ export class PosCustomerValueRepository {
     authorization: CustomerValueAuthorization,
     correlationId: string,
   ): Promise<StoredValueAuthorization> {
-    if (dto.accountType === 'gift_card') {
-      throw new ConflictException({ code: 'GIFT_CARD_CODE_INVALID' });
-    }
     const table = dto.accountType === 'wallet' ? 'loyalty_card' : 'loyalty_gift_card';
     const key = dto.accountType === 'wallet' ? 'card_id' : 'gift_card_id';
     const ledger =
       dto.accountType === 'wallet' ? 'loyalty_stored_value_ledger' : 'loyalty_gift_card_ledger';
     const account = await client.query<Row>(
-      `SELECT a.id::text,a.currency,a.status,${dto.accountType === 'wallet' ? 'a.customer_id::text AS "customerId"' : 'a.customer_id::text AS "customerId"'},
+      `SELECT a.id::text,a.currency,a.status,a.version,
+         a.customer_id::text AS "customerId",
          coalesce((select sum(l.delta) from merchant.${ledger} l where l.${key}=a.id),0)::bigint
          -coalesce((select sum(v.amount_minor_units) from merchant.customer_value_authorization v
            where v.account_type=$2 and v.account_id=a.id and v.status='authorized' and v.expires_at>clock_timestamp()),0)::bigint AS available
@@ -1099,10 +1156,11 @@ export class PosCustomerValueRepository {
         id,merchant_id,location_id,account_type,account_id,customer_id,sale_id,checkout_version,
         amount_minor_units,currency,checkout_fingerprint,policy_version,command_id,idempotency_key,
         command_fingerprint,status,expires_at,correlation_id,policy_fingerprint,operator_id,device_id,
-        credential_version)
+        credential_version,allocation_id,allocation_order,allocation_fingerprint,
+        remaining_balance_minor_units,optimistic_version)
        VALUES($1::uuid,$2::uuid,$3::uuid,$4,$5::uuid,$6::uuid,$7::uuid,$8,$9,$10,$11,
         'pilot-deny-v1',$12::uuid,$13::uuid,$14,'authorized',clock_timestamp()+interval '5 minutes',$15,
-        $16,$17::uuid,$18::uuid,$19)
+        $16,$17::uuid,$18::uuid,$19,$20::uuid,$21,$14,$22,$23)
        RETURNING created_at::text AS "createdAt",expires_at::text AS "expiresAt"`,
       [
         id,
@@ -1124,6 +1182,10 @@ export class PosCustomerValueRepository {
         authorization.operatorId,
         authorization.deviceId,
         authorization.credentialVersion,
+        dto.allocationId,
+        dto.allocationOrder,
+        Number(row.available) - dto.amount.minorUnits,
+        Number(row.version),
       ],
     );
     if (dto.accountType === 'wallet') {
@@ -1179,6 +1241,9 @@ export class PosCustomerValueRepository {
       fingerprint,
       status: 'authorized',
       remainingBalanceMinorUnits: Number(row.available) - dto.amount.minorUnits,
+      allocationId: dto.allocationId,
+      allocationOrder: dto.allocationOrder,
+      allocationFingerprint: fingerprint,
       createdAt: inserted.rows[0].createdAt,
       expiresAt: inserted.rows[0].expiresAt,
       correlationId,
@@ -1472,24 +1537,54 @@ export class PosCustomerValueRepository {
     } else if (this.config.get('NODE_ENV', { infer: true }) === 'production') {
       throw new ConflictException({ code: 'GIFT_CARD_DEVELOPMENT_ISSUANCE_DISABLED' });
     }
-    if (dto.source === 'sale' && !dto.saleId) {
+    if (dto.source === 'sale' && (!dto.saleId || !dto.saleLineId)) {
       throw new ConflictException({ code: 'GIFT_CARD_FUNDING_REQUIRED' });
     }
     if (dto.source === 'sale') {
-      throw new ConflictException({ code: 'GIFT_CARD_SALE_ISSUANCE_NOT_AVAILABLE' });
+      const product = await client.query(
+        `SELECT 1 FROM merchant.pos_cart_line line
+          JOIN merchant.product product ON product.id=line.product_id
+            AND product.merchant_id=$1::uuid AND product.active
+            AND product.sale_action='gift_card'
+         WHERE line.cart_id=$2::uuid AND line.id=$3::uuid`,
+        [merchantId, dto.saleId, dto.saleLineId],
+      );
+      if (product.rowCount !== 1) {
+        throw new ConflictException({ code: 'GIFT_CARD_PRODUCT_REQUIRED' });
+      }
     }
+    const id = randomUUID();
+    const fundingAssignmentId = dto.source === 'sale' ? randomUUID() : null;
+    const fundingFingerprint =
+      dto.source === 'sale'
+        ? commandFingerprint('pos.gift-card.sale-funding.v1', {
+            assignmentId: fundingAssignmentId,
+            giftCardId: id,
+            merchantId,
+            locationId: dto.locationId,
+            cartId: dto.saleId,
+            saleLineId: dto.saleLineId,
+            purchasedValue: {
+              minorUnits: dto.initialValueMinorUnits,
+              currency: dto.currency,
+            },
+            policyId: 'gift-card-sale-funding',
+            policyVersion: 'pilot-v1',
+          })
+        : null;
     const code = `UMI-${randomBytes(18).toString('base64url')}`;
     const deliveryToken = this.giftCardDeliveryToken(dto.commandId);
-    const id = randomUUID();
     const active = dto.source === 'promotion' || dto.source === 'development';
     const card = await client.query<Row>(
       `INSERT INTO merchant.loyalty_gift_card(
         id,merchant_id,code,public_reference,status,currency,amount_cents,customer_id,location_id,
         issuance_command_id,issuance_fingerprint,issuance_policy_version,issuer_operator_id,
-        issuer_device_id,issuance_source,activated_at)
+        issuer_device_id,issuance_source,activated_at,pending_funding_cart_id,
+        pending_funding_minor_units,pending_funding_assignment_id,pending_funding_line_id,
+        pending_funding_fingerprint)
        VALUES($1::uuid,$2::uuid,$3,'GFT-'||$1::text,$4,$5,$6,$7::uuid,$8::uuid,$9::uuid,$10,
         'pilot-v1',$11::uuid,$12::uuid,$13,
-        case when $4='active' then clock_timestamp() end)
+        case when $4='active' then clock_timestamp() end,$14::uuid,$15,$16::uuid,$17::uuid,$18)
        RETURNING id::text,public_reference AS "publicReference",masked_code AS "maskedCode",status,
         currency,amount_cents::int AS "initialValue",activated_at::text AS "activatedAt",
         expires_at::text AS "expiresAt",customer_id::text AS "customerId",version`,
@@ -1507,6 +1602,11 @@ export class PosCustomerValueRepository {
         authorization.operatorId,
         authorization.deviceId,
         dto.source,
+        dto.source === 'sale' ? dto.saleId : null,
+        dto.source === 'sale' ? dto.initialValueMinorUnits : null,
+        fundingAssignmentId,
+        dto.source === 'sale' ? dto.saleLineId : null,
+        fundingFingerprint,
       ],
     );
     if (active) {
@@ -1561,6 +1661,21 @@ export class PosCustomerValueRepository {
       }),
       deliveryExpiresAt,
       recovered: false,
+      fundingAssignment:
+        dto.source === 'sale'
+          ? {
+              assignmentId: fundingAssignmentId!,
+              giftCardId: id,
+              saleLineId: dto.saleLineId!,
+              purchasedValue: {
+                minorUnits: dto.initialValueMinorUnits,
+                currency: dto.currency,
+              },
+              policyId: 'gift-card-sale-funding',
+              policyVersion: 'pilot-v1',
+              fingerprint: fundingFingerprint!,
+            }
+          : null,
     };
   }
 

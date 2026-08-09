@@ -199,6 +199,7 @@ describe('Gate 3F customer and value application boundary', () => {
         initialValueMinorUnits: 1000,
         source: 'promotion',
         saleId: null,
+        saleLineId: null,
         customerId: null,
         approvalId: id(21),
         approvalFingerprint: 'a'.repeat(64),

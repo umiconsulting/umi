@@ -155,7 +155,14 @@ export function calculateCheckout(
         JSON.stringify({
           source: source.fingerprint,
           discounts: command.discountDrafts,
-          customerValue: command.customerValue ?? null,
+          customerValue: command.customerValue
+            ? {
+                previewFingerprint: command.customerValue.previewFingerprint,
+                rewardAuthorizationId: command.customerValue.rewardAuthorizationId,
+                storedValueAuthorizationIds: command.customerValue.storedValueAuthorizationIds,
+                fundedGiftCards: command.customerValue.fundedGiftCards,
+              }
+            : null,
           rewardDiscount,
           tip: command.tipDraft,
           tenders: command.tenderDrafts,

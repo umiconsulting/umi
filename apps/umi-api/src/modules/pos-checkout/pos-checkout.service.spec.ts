@@ -94,6 +94,7 @@ function harness() {
       rewardDiscount: null,
       storedValue: [],
     }),
+    bindRewardStoredValueFingerprint: vi.fn().mockResolvedValue(undefined),
     saveDraft: vi.fn().mockResolvedValue({ id: id(19), version: 1 }),
     consumeApprovals: vi.fn().mockResolvedValue({
       approved: true,
@@ -177,6 +178,7 @@ function harness() {
     price: vi.fn().mockResolvedValue({
       productId: id(9),
       productName: 'Café',
+      saleAction: 'merchandise',
       variantId: null,
       variantName: null,
       variantAttributes: {},
@@ -240,21 +242,115 @@ describe('PosCheckoutService', () => {
 
   it('binds customer value to the stable checkout basis fingerprint', async () => {
     const { service, repo } = harness();
-    const initial = await service.checkout(user, id(1), base);
+    const fingerprintCommandId = id(41);
+    const initial = await service.checkout(user, id(1), {
+      ...base,
+      customerValueFingerprintCommandId: fingerprintCommandId,
+    });
     const customerValue = {
       previewFingerprint: 'b'.repeat(64),
       rewardAuthorizationId: id(40),
       storedValueAuthorizationIds: [],
     };
-    const selected = await service.checkout(user, id(1), { ...base, customerValue });
+    const selected = await service.checkout(user, id(1), {
+      ...base,
+      customerValueFingerprintCommandId: fingerprintCommandId,
+      customerValue,
+    });
     expect(selected.confirmation.fingerprint).not.toBe(initial.confirmation.fingerprint);
     const result = await service.checkout(user, id(1), {
       ...base,
-      customerValue,
+      customerValueFingerprintCommandId: fingerprintCommandId,
+      customerValue: {
+        ...customerValue,
+        storedValueFingerprint: selected.confirmation.storedValueFingerprint!,
+      },
       totalsFingerprint: selected.confirmation.fingerprint,
     });
     expect(result.status).toBe('completed');
     expect(repo.commit.mock.calls[0]?.[13]).toBe(initial.confirmation.fingerprint);
+  });
+
+  it('keeps reward approval bound to the pre-reward tender fingerprint', async () => {
+    const { service, repo } = harness();
+    const commandId = id(41);
+    const previewSelection = {
+      previewFingerprint: 'b'.repeat(64),
+      rewardAuthorizationId: null,
+      storedValueAuthorizationIds: [],
+    };
+    const preview = await service.checkout(user, id(1), {
+      ...base,
+      customerValueFingerprintCommandId: commandId,
+      customerValue: previewSelection,
+    });
+    repo.customerValueAllocation.mockResolvedValue({
+      rewardDiscount: {
+        authorizationId: id(42),
+        rewardId: id(43),
+        amountMinorUnits: 1000,
+        policyVersion: 'reward-v1',
+        approvalTenderFingerprint: preview.confirmation.storedValueFingerprint,
+      },
+      storedValue: [],
+    });
+    const approved = await service.checkout(user, id(1), {
+      ...base,
+      customerValueFingerprintCommandId: commandId,
+      customerValue: {
+        ...previewSelection,
+        rewardAuthorizationId: id(42),
+      },
+    });
+    expect(approved.confirmation.totals.grandTotal.minorUnits).toBe(22200);
+    expect(repo.bindRewardStoredValueFingerprint).toHaveBeenCalledOnce();
+  });
+
+  it('rejects a tender change after reward approval', async () => {
+    const { service, repo } = harness();
+    const commandId = id(41);
+    const previewSelection = {
+      previewFingerprint: 'b'.repeat(64),
+      rewardAuthorizationId: null,
+      storedValueAuthorizationIds: [],
+    };
+    const preview = await service.checkout(user, id(1), {
+      ...base,
+      customerValueFingerprintCommandId: commandId,
+      customerValue: previewSelection,
+    });
+    repo.customerValueAllocation.mockResolvedValue({
+      rewardDiscount: {
+        authorizationId: id(42),
+        rewardId: id(43),
+        amountMinorUnits: 1000,
+        policyVersion: 'reward-v1',
+        approvalTenderFingerprint: preview.confirmation.storedValueFingerprint,
+      },
+      storedValue: [],
+    });
+    await expect(
+      service.checkout(user, id(1), {
+        ...base,
+        paymentMethod: 'external_terminal',
+        customerValueFingerprintCommandId: commandId,
+        customerValue: {
+          ...previewSelection,
+          rewardAuthorizationId: id(42),
+        },
+        tenderDrafts: [
+          {
+            id: id(18),
+            type: 'manual_terminal',
+            amount: { minorUnits: 22200, currency: 'MXN' },
+            amountReceived: null,
+            status: 'confirmed_success',
+            correlationId: 'changed-tender',
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({ response: { code: 'APPROVAL_INVALID' } });
+    expect(repo.bindRewardStoredValueFingerprint).not.toHaveBeenCalled();
   });
 
   it('fails closed when stored-value redistribution cannot bind to the earn preview', async () => {
@@ -272,10 +368,21 @@ describe('PosCheckoutService', () => {
       rewardDiscount: null,
       storedValue: [
         {
+          allocationId: id(41),
           authorizationId: id(40),
           accountType: 'wallet',
+          accountId: id(42),
+          accountPublicReference: 'WAL-42',
+          customerId: id(20),
           amountMinorUnits: 1000,
           currency: 'MXN',
+          allocationOrder: 0,
+          remainingBalanceMinorUnits: 4000,
+          policyVersion: 'pilot-deny-v1',
+          expiresAt: '2026-08-08T22:00:00.000Z',
+          commandId: id(43),
+          idempotencyKey: id(44),
+          optimisticVersion: 1,
         },
       ],
     });

@@ -625,3 +625,28 @@ grant  update (acknowledged_at) on merchant.offline_reconciliation to api;
 revoke update on merchant.offline_replay_conflict from api;
 grant  update (last_observed_at, resolution_state, resolution_acknowledged_at)
   on merchant.offline_replay_conflict to api;
+
+-- Gate 3F customer history is available only through the scoped function.
+revoke all on merchant.customer_history_event,merchant.customer_history_event_scoped
+  from api,worker,readonly;
+do $$ begin
+  if to_regprocedure('merchant.read_customer_history_event_scoped(uuid,uuid)') is not null then
+    execute 'revoke all on function merchant.read_customer_history_event_scoped(uuid,uuid) '
+      'from public,api,worker,readonly';
+  end if;
+end $$;
+grant execute on function merchant.read_customer_history_event_scoped(
+  uuid,uuid,uuid
+) to api;
+do $$ begin
+  if to_regprocedure('merchant.read_customer_history_event_scoped(uuid,uuid,uuid,boolean,boolean,boolean)') is not null then
+    execute 'revoke all on function merchant.read_customer_history_event_scoped(uuid,uuid,uuid,boolean,boolean,boolean) '
+      'from public,api,worker,readonly';
+  end if;
+end $$;
+revoke all on function merchant.commit_customer_value_closeout(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,integer,text,date,uuid,uuid,jsonb
+) from public,api,worker,readonly;
+revoke all on function merchant.activate_sale_funded_gift_card(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,date,jsonb
+) from public,api,worker,readonly;

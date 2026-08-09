@@ -6,7 +6,15 @@ const root = resolve(process.cwd(), '../..');
 const migration = [
   readFileSync(resolve(root, 'docs/migration/build-v3/37_pos_customer_value.sql'), 'utf8'),
   readFileSync(resolve(root, 'docs/migration/build-v3/38_pos_customer_value_closeout.sql'), 'utf8'),
+  readFileSync(
+    resolve(root, 'docs/migration/build-v3/39_pos_customer_value_final_closeout.sql'),
+    'utf8',
+  ),
 ].join('\n');
+const realHarness = readFileSync(
+  resolve(root, 'scripts/umi-pos-customer-value-concurrency-check.sh'),
+  'utf8',
+);
 const repository = readFileSync(
   resolve(root, 'apps/umi-api/src/modules/pos-customer-value/pos-customer-value.repository.ts'),
   'utf8',
@@ -111,5 +119,14 @@ describe('Gate 3F bounded concurrency matrix', () => {
       /customer[\s\S]*loyalty_points_account[\s\S]*customer_value_authorization/i,
     );
     expect(migration).toMatch(/order by a\.account_type,a\.account_id for update/i);
+  });
+
+  it('executes all 26 races through independent PostgreSQL sessions', () => {
+    expect(realHarness).toContain('for scenario in $(seq 1 26)');
+    expect(realHarness).toContain('pg_advisory_lock');
+    expect(realHarness).toContain('pid_1');
+    expect(realHarness).toContain('pid_2');
+    expect(realHarness).toContain('count(distinct scenario)');
+    expect(realHarness).not.toContain('Promise.resolve');
   });
 });

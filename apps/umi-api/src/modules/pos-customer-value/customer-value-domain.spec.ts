@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import type { StoredValueFingerprintInput } from '@umi/contract';
+import fingerprintVector from '../../../../../packages/contract/test-vectors/customer-value-fingerprint-v1.json';
 import {
   applyPointsFacts,
   applyStoredValueFacts,
+  canonicalStoredValueFingerprint,
   calculatePointsEarn,
   calculateEarnedPoints,
   calculateRewardReversal,
@@ -10,6 +13,24 @@ import {
 } from './customer-value-domain';
 
 describe('Gate 3F customer and value domain', () => {
+  it('creates one deterministic stored-value tender fingerprint without secrets', () => {
+    const input = structuredClone(fingerprintVector.input) as StoredValueFingerprintInput;
+    const first = canonicalStoredValueFingerprint(input);
+    const reorderedKeys = canonicalStoredValueFingerprint({
+      ...input,
+      allocations: input.allocations.map((allocation) => ({ ...allocation })),
+    });
+    expect(first).toBe(reorderedKeys);
+    expect(first).toMatch(/^[a-f0-9]{64}$/);
+    expect(canonicalStoredValueFingerprint({ ...input, cashMinorUnits: 501 })).not.toBe(first);
+    expect(JSON.stringify(input)).not.toContain('secret');
+  });
+
+  it('matches the language-neutral stored-value fingerprint vector', () => {
+    expect(canonicalStoredValueFingerprint(fingerprintVector.input as never)).toBe(
+      fingerprintVector.expectedFingerprint,
+    );
+  });
   it('normalizes supported contacts without changing display data', () => {
     expect(normalizeCustomerContact('email', '  Café@Example.COM ')).toEqual({
       displayValue: 'Café@Example.COM',

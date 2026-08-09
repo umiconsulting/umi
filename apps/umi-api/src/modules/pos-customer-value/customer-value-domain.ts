@@ -1,3 +1,6 @@
+import type { StoredValueFingerprintInput } from '@umi/contract';
+import { commandFingerprint } from '../integrity/canonical-json';
+
 export type ContactType = 'email' | 'phone';
 export type PointsFactType =
   | 'earn_pending'
@@ -24,6 +27,45 @@ export type StoredValueFactType =
 const safe = (value: number, code: string): number => {
   if (!Number.isSafeInteger(value) || value < 0) throw new RangeError(code);
   return value;
+};
+
+export const canonicalStoredValueFingerprint = (input: StoredValueFingerprintInput): string => {
+  for (const amount of [input.cashMinorUnits, input.manualTerminalMinorUnits]) {
+    safe(amount, 'STORED_VALUE_ALLOCATION_INVALID');
+  }
+  const allocations = input.allocations.map((allocation) => {
+    safe(allocation.requestedAmountMinorUnits, 'STORED_VALUE_ALLOCATION_INVALID');
+    safe(allocation.authorizedAmountMinorUnits, 'STORED_VALUE_ALLOCATION_INVALID');
+    safe(allocation.committedAmountMinorUnits, 'STORED_VALUE_ALLOCATION_INVALID');
+    safe(allocation.remainingAccountBalanceMinorUnits, 'STORED_VALUE_ALLOCATION_INVALID');
+    safe(allocation.allocationOrder, 'STORED_VALUE_ALLOCATION_INVALID');
+    if (
+      allocation.requestedAmountMinorUnits === 0 ||
+      allocation.authorizedAmountMinorUnits !== allocation.requestedAmountMinorUnits ||
+      allocation.committedAmountMinorUnits > allocation.authorizedAmountMinorUnits
+    ) {
+      throw new RangeError('STORED_VALUE_ALLOCATION_INVALID');
+    }
+    return allocation;
+  });
+  if (
+    new Set(allocations.map((allocation) => allocation.allocationId)).size !== allocations.length
+  ) {
+    throw new RangeError('STORED_VALUE_ALLOCATION_DUPLICATE');
+  }
+  if (
+    new Set(allocations.map((allocation) => allocation.allocationOrder)).size !== allocations.length
+  ) {
+    throw new RangeError('STORED_VALUE_ALLOCATION_ORDER_DUPLICATE');
+  }
+  return commandFingerprint('umi.pos.customer-value.allocation.v1', {
+    ...input,
+    allocations: [...allocations].sort(
+      (left, right) =>
+        left.allocationOrder - right.allocationOrder ||
+        left.allocationId.localeCompare(right.allocationId),
+    ),
+  });
 };
 
 export const normalizeCustomerContact = (type: ContactType, input: string) => {

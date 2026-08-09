@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CatalogMoney } from './pos-catalog';
+import { CatalogMoney, CatalogSaleAction } from './pos-catalog';
 
 const Uuid = z.string().uuid();
 const Timestamp = z.string().datetime({ offset: true });
@@ -40,6 +40,7 @@ export const CartItem = z
     id: Uuid,
     productId: Uuid,
     productName: z.string().min(1).max(240),
+    saleAction: CatalogSaleAction,
     quantity: z.number().int().min(1).max(999),
     variant: VariantSelection.nullable(),
     modifiers: z.array(ModifierSelection).max(100),

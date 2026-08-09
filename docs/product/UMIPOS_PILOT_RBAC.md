@@ -265,7 +265,7 @@ La excepción de existencia negativa es la frontera más restrictiva. Esta aprob
 
 Estos valores prueban el límite más conservador. El Owner debe definir los valores de producción.
 
-El flujo documentado de seed y API es la autoridad del piloto. Gate 3E no inicia Gate 3F.
+El flujo documentado de seed y API es la autoridad del piloto. Gate 3F está completo.
 
 ## 14. Permisos de clientes y valor de Gate 3F
 
@@ -273,8 +273,8 @@ El flujo documentado de seed y API es la autoridad del piloto. Gate 3E no inicia
 | --------------- | ---------------------------------------------------------------------------------------------------------- |
 | Cashier y Staff | Buscan una vista limitada, crean un cliente mínimo, adjuntan, consultan puntos y usan un valor autorizado. |
 | Supervisor      | Añade historial de la location y refunds de wallet o gift card.                                            |
-| Manager         | Ejecuta ajustes aprobados, emite gift cards y resuelve conflictos autorizados.                             |
-| Admin y Owner   | Administran políticas y usan las rutas operativas con el control normal.                                   |
+| Manager         | Aprueba rewards exactos, emite gift cards y lee hechos globales aprobados.                                 |
+| Admin y Owner   | Leen el historial global. Admin y Owner aprueban rewards con separación de actores.                        |
 | Viewer          | Lee proyecciones explícitas. No ve contactos completos y no cambia datos.                                  |
 | super_admin     | Permanece fuera del viaje operativo del café.                                                              |
 
@@ -289,5 +289,10 @@ La matriz separa estas acciones:
 - activación de gift card sobre el umbral;
 - emisión de gift card o ajuste de wallet;
 - resolución de un conflicto de valor.
+- uso de un reward protegido.
 
 La activación, la emisión, el ajuste de puntos y el merge consumen una aprobación vinculada cuando aplica el umbral.
+
+`loyalty.reward.approve` vincula la vista del reward y la huella de tenders. `customer.history.global` permite hechos globales aprobados.
+
+`customer.history.admin` limita los hechos administrativos a Admin y Owner. Una location nula no concede acceso.

@@ -6,6 +6,7 @@ import { PgService } from '../../shared/database/pg.service';
 export interface PricedSelection {
   productId: string;
   productName: string;
+  saleAction: 'merchandise' | 'gift_card';
   variantId: string | null;
   variantName: string | null;
   variantAttributes: Record<string, string>;
@@ -116,6 +117,7 @@ export class PosCartRepository {
     const product = await client.query<{
       productId: string;
       productName: string;
+      saleAction: 'merchandise' | 'gift_card';
       basePrice: string;
       taxRateBasisPoints: number;
       currency: string;
@@ -124,7 +126,8 @@ export class PosCartRepository {
       variantAttributes: Record<string, string> | null;
       variantDelta: string | null;
     }>(
-      `SELECT p.id::text AS "productId",p.name AS "productName",p.price::text AS "basePrice",
+      `SELECT p.id::text AS "productId",p.name AS "productName",p.sale_action AS "saleAction",
+              p.price::text AS "basePrice",
               p.tax_rate_basis_points AS "taxRateBasisPoints",business.currency,
               v.id::text AS "variantId",v.name AS "variantName",
               v.attributes AS "variantAttributes",v.price_delta::text AS "variantDelta"
@@ -405,6 +408,7 @@ export class PosCartRepository {
       id: string;
       productId: string;
       productName: string;
+      saleAction: 'merchandise' | 'gift_card';
       quantity: number;
       variantId: string | null;
       variantName: string | null;
@@ -417,6 +421,7 @@ export class PosCartRepository {
       modifiers: Array<Record<string, unknown>>;
     }>(
       `SELECT l.id::text,l.product_id::text AS "productId",l.product_name AS "productName",
+              p.sale_action AS "saleAction",
               l.quantity,l.variant_id::text AS "variantId",l.variant_name AS "variantName",
               l.variant_attributes AS "variantAttributes",l.note,l.base_price::text AS "basePrice",
               l.variant_delta::text AS "variantDelta",l.modifier_total::text AS "modifierTotal",
@@ -425,9 +430,10 @@ export class PosCartRepository {
                 'groupId',m.group_id::text,'name',m.name,'quantity',m.quantity,
                 'priceDelta',jsonb_build_object('minorUnits',m.price_delta,'currency',$3::text))
                 ORDER BY m.name) FILTER(WHERE m.id IS NOT NULL),'[]') modifiers
-       FROM merchant.pos_cart_line l LEFT JOIN merchant.pos_cart_line_modifier m ON m.line_id=l.id
+       FROM merchant.pos_cart_line l JOIN merchant.product p ON p.id=l.product_id
+       LEFT JOIN merchant.pos_cart_line_modifier m ON m.line_id=l.id
        WHERE l.merchant_id=$1::uuid AND l.cart_id=$2::uuid
-       GROUP BY l.id ORDER BY l.created_at,l.id`,
+       GROUP BY l.id,p.sale_action ORDER BY l.created_at,l.id`,
       [merchantId, cartId, cart.rows[0].currency],
     );
     const currency = cart.rows[0].currency;
@@ -445,6 +451,7 @@ export class PosCartRepository {
         id: line.id,
         productId: line.productId,
         productName: line.productName,
+        saleAction: line.saleAction,
         quantity: line.quantity,
         variant: line.variantId
           ? {

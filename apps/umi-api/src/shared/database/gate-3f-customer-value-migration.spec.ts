@@ -10,6 +10,10 @@ const closeout = readFileSync(
   resolve(process.cwd(), '../../docs/migration/build-v3/38_pos_customer_value_closeout.sql'),
   'utf8',
 );
+const finalCloseout = readFileSync(
+  resolve(process.cwd(), '../../docs/migration/build-v3/39_pos_customer_value_final_closeout.sql'),
+  'utf8',
+);
 const checkout = readFileSync(
   resolve(process.cwd(), 'src/modules/pos-checkout/pos-checkout.repository.ts'),
   'utf8',
@@ -131,16 +135,44 @@ describe('Gate 3F customer and value authority', () => {
     expect(closeout).toContain('CUSTOMER_HISTORY_CURSOR_INVALID');
     expect(closeout).toContain('store_gift_card_secret_delivery');
     expect(closeout).toContain('reveal_gift_card_secret_delivery');
+    expect(closeout).toContain("g.status='active'");
+    expect(closeout).toContain("g.issuance_source<>'sale' or g.activated_by_sale_id is not null");
     expect(closeout).not.toContain('grant select,insert,update on merchant.loyalty_earn_preview');
   });
 
-  it('binds the final checkout and still commits anonymous gift-card tenders', () => {
+  it('binds the final checkout and commits anonymous gift-card tenders', () => {
     expect(closeout).toContain('merchant.assert_loyalty_earn_preview');
     expect(closeout).toContain('p_checkout_version');
     expect(closeout).toContain('p_checkout_fingerprint');
     expect(closeout).toContain("v_auth.account_type='wallet'");
     expect(closeout).toContain('WALLET_CUSTOMER_REQUIRED');
-    expect(customerValueRepository).toContain("code: 'GIFT_CARD_CODE_INVALID'");
+    expect(finalCloseout).toContain("a.account_type='gift_card'");
+    expect(finalCloseout).toContain('merchant.append_gift_card_fact');
+    expect(finalCloseout).toContain('STORED_VALUE_FINGERPRINT_CONFLICT');
+    expect(customerValueRepository).not.toContain('GIFT_CARD_SALE_ISSUANCE_NOT_AVAILABLE');
+  });
+
+  it('stores immutable tender allocation, funded activation, and explicit history scope', () => {
+    expect(finalCloseout).toContain('customer_value_tender_allocation');
+    expect(finalCloseout).toContain('gift_card_funding_assignment');
+    expect(finalCloseout).toContain('customer_history_event_scoped');
+    expect(finalCloseout).toContain('restricted_administrative');
+    expect(finalCloseout).toContain('read_customer_history_event_scoped');
+    expect(finalCloseout).toContain('p_operator_session_id uuid');
+    expect(finalCloseout).toContain("'customer.history.admin'=any(os.permissions)");
+    expect(finalCloseout).toContain(
+      "os.user_id=nullif(current_setting('app.user_id',true),'')::uuid",
+    );
+    expect(finalCloseout).toContain('activate_sale_funded_gift_card');
+    expect(finalCloseout).toContain("then 'wallet_'||e.event_type");
+    expect(finalCloseout).toContain('customer_value_one_live_account_allocation_uidx');
+    expect(finalCloseout).toContain("product.sale_action='gift_card'");
+    expect(finalCloseout).toContain("'gift-card-sale-funding','pilot-v1'");
+    expect(finalCloseout).toContain('A null location never acts as a location wildcard');
+    expect(finalCloseout).toContain(
+      'uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,integer,text,date,uuid,uuid,jsonb',
+    );
+    expect(finalCloseout).toContain('from public,api,worker,readonly');
   });
 
   it('binds every closeout relation to the same merchant', () => {
@@ -153,6 +185,8 @@ describe('Gate 3F customer and value authority', () => {
   it('fails closed for consent merge conflicts and location history', () => {
     expect(customerValueRepository).toContain('customer_consent_current');
     expect(customerValueRepository).toContain('is distinct from');
-    expect(customerValueRepository).toContain('AND location_id=$4::uuid');
+    expect(customerValueRepository).toContain(
+      "visibility IN ('location_attributed','origin_location')",
+    );
   });
 });

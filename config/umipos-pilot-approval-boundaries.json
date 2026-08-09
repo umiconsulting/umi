@@ -355,6 +355,19 @@
       "policy": "cash.recountLimit"
     },
     {
+      "action": "reward_approval",
+      "actingPermission": "loyalty.reward.authorize",
+      "approvalPermission": "loyalty.reward.approve",
+      "selfApproval": false,
+      "actorSeparation": true,
+      "scope": "location",
+      "lifetimeSeconds": 300,
+      "oneUse": true,
+      "fingerprintBound": true,
+      "auditRequired": true,
+      "policy": "loyalty.rewardApproval"
+    },
+    {
       "action": "safe_drop_above_threshold",
       "actingPermission": "cash.movement.safe_drop",
       "approvalPermission": "cash.movement.safe_drop.approve",

@@ -83,6 +83,7 @@ export class PosCatalogRepository {
                 'enabled', true) END AS category,
               p.price::text AS "priceMinorUnits", business.currency,
               p.tax_rate_basis_points AS "taxRateBasisPoints",
+              p.sale_action AS "saleAction",
               CASE
                 WHEN a.status NOT IN ('enabled','future_availability') THEN a.status
                 WHEN a.status = 'future_availability' AND a.available_from > now()

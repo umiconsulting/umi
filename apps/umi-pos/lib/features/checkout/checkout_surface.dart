@@ -72,6 +72,8 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   final discountPercent = TextEditingController();
   final discountReason = TextEditingController();
   bool committed = false;
+  bool fundedGiftCardRevealed = false;
+  bool fundedGiftCardRevealInFlight = false;
   String? customerValuePreviewKey;
   List<Map<String, Object?>> storedValueTenders = const [];
 
@@ -123,6 +125,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     if (widget.checkout.state.phase == CheckoutPhase.completed && !committed) {
       committed = true;
       unawaited(widget.sales.checkoutCommitted());
+      unawaited(_revealFundedGiftCardAfterCommit());
     }
   }
 
@@ -136,7 +139,6 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     if (controller == null ||
         fingerprint == null ||
         cart == null ||
-        customerId == null ||
         operator == null) {
       return;
     }
@@ -292,9 +294,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                   ),
                 ],
                 Text('${l.businessDateLabel}: ${totals.businessDate}'),
-                if (widget.customerValue != null &&
-                    widget.sales.state.sale?.customer != null)
-                  _customerValueSection(totals),
+                if (widget.customerValue != null) _customerValueSection(totals),
                 const SizedBox(height: UmiSpacing.lg),
                 Text(
                   l.tenderSelectionTitle,
@@ -675,6 +675,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                     : TextButton(
                         onPressed:
                             (reward['eligible'] == true ||
+                                    reward['state'] == 'approval_required' ||
                                     reward['state'] ==
                                         'replacement_confirmation_required') &&
                                 permissions.contains('loyalty.reward.authorize')
@@ -723,6 +724,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       accountType: 'gift_card',
                       account: {
                         'accountId': card['id'],
+                        'publicReference': card['publicReference'],
                         'customerId': card['customerId'],
                         'available':
                             (card['balance']!
@@ -738,6 +740,14 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                 onPressed: () => _lookupGiftCard(totals),
                 icon: const Icon(Icons.qr_code_scanner_outlined),
                 label: Text(es ? 'Buscar tarjeta regalo' : 'Look up gift card'),
+              ),
+            if (permissions.contains('gift_card.issue'))
+              TextButton.icon(
+                onPressed: () => _issueSaleFundedGiftCard(totals),
+                icon: const Icon(Icons.add_card_outlined),
+                label: Text(
+                  es ? 'Vender tarjeta de regalo' : 'Sell a gift card',
+                ),
               ),
             if (state.storedValueAuthorizations.isNotEmpty ||
                 state.rewardAuthorization != null)
@@ -820,13 +830,43 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         checkoutFingerprint: checkoutFingerprint,
       );
     }
-    final authorization = await widget.customerValue!.authorizeReward(
+    _applyCustomerValue(totals);
+    await _review(totals);
+    final storedValueFingerprint =
+        widget.checkout.state.result?.confirmation['storedValueFingerprint']
+            as String?;
+    var authorization = await widget.customerValue!.authorizeReward(
       scope,
       saleId: cart.id,
       saleVersion: cart.version,
       customerId: customerId,
       rewardId: reward['id']! as String,
+      storedValueFingerprint: storedValueFingerprint,
     );
+    final approvalPermission =
+        widget.customerValue!.state.pendingRewardApprovalPermission;
+    final approvalFingerprint =
+        widget.customerValue!.state.pendingRewardApprovalFingerprint;
+    if (authorization == null &&
+        approvalPermission != null &&
+        approvalFingerprint != null &&
+        mounted) {
+      final approvalId = await _requestRewardApproval(
+        approvalPermission,
+        approvalFingerprint,
+      );
+      if (approvalId == null) return;
+      authorization = await widget.customerValue!.authorizeReward(
+        scope,
+        saleId: cart.id,
+        saleVersion: cart.version,
+        customerId: customerId,
+        rewardId: reward['id']! as String,
+        storedValueFingerprint: storedValueFingerprint,
+        approvalId: approvalId,
+        approvalFingerprint: approvalFingerprint,
+      );
+    }
     if (authorization == null) return;
     _applyCustomerValue(totals);
   }
@@ -851,6 +891,9 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       ),
       accountType: accountType,
       accountId: account['accountId']! as String,
+      accountPublicReference:
+          account['publicReference'] as String? ??
+          '${accountType == 'wallet' ? 'WAL' : 'GFT'}-${account['accountId']}',
       customerId:
           account['customerId'] as String? ??
           widget.sales.state.sale?.customer?['id'] as String?,
@@ -908,6 +951,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       accountType: 'gift_card',
       account: {
         'accountId': card.id,
+        'publicReference': card.publicReference,
         'customerId': card.customerId,
         'available': card.balance['available'],
         'currency': card.currency,
@@ -948,6 +992,153 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     return accepted == true && value > 0 && value <= available ? value : null;
   }
 
+  Future<void> _issueSaleFundedGiftCard(TotalsPreview totals) async {
+    final cart = widget.cart.state.cart;
+    final operator = widget.entry.state.operator;
+    final controller = widget.customerValue;
+    if (cart == null ||
+        operator == null ||
+        controller == null ||
+        cart.items.isEmpty) {
+      return;
+    }
+    final es = Localizations.localeOf(context).languageCode == 'es';
+    String? selectedLineId;
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(
+            es ? 'Tarjeta financiada por venta' : 'Sale-funded gift card',
+          ),
+          content: DropdownButtonFormField<String>(
+            initialValue: selectedLineId,
+            decoration: InputDecoration(
+              labelText: es ? 'Línea de tarjeta' : 'Gift-card line',
+            ),
+            items: cart.items
+                .where((item) => item['saleAction'] == 'gift_card')
+                .map(
+                  (item) => DropdownMenuItem<String>(
+                    value: item['id']! as String,
+                    child: Text(item['productName']! as String),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) => setDialogState(() {
+              selectedLineId = value;
+            }),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(es ? 'Cancelar' : 'Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, selectedLineId != null);
+              },
+              child: Text(es ? 'Revisar' : 'Review'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (accepted != true || selectedLineId == null || !mounted) return;
+    final line = cart.items.singleWhere((item) => item['id'] == selectedLineId);
+    final linePrice = line['price']! as Map<String, Object?>;
+    final value = linePrice['lineTotal']! as Map<String, Object?>;
+    final scope = CustomerValueScope(
+      merchantId: cart.merchantId,
+      locationId: cart.locationId,
+      operatorSessionId: operator.id,
+    );
+    final preview = await controller.previewGiftCardIssuance(
+      scope,
+      valueMinorUnits: (value['minorUnits']! as num).toInt(),
+      currency: value['currency']! as String,
+      source: 'sale',
+      saleId: cart.id,
+      saleLineId: selectedLineId,
+    );
+    if (preview == null || !mounted) return;
+    String? approvalId;
+    if (preview.approvalPermission != null) {
+      approvalId = await _requestRewardApproval(
+        preview.approvalPermission!,
+        preview.fingerprint,
+        title: es ? 'Aprobar tarjeta' : 'Approve gift card',
+      );
+      if (approvalId == null) return;
+    }
+    final issued = await controller.issueGiftCard(
+      scope,
+      approvalId: approvalId,
+      approvalFingerprint: approvalId == null ? null : preview.fingerprint,
+    );
+    if (issued?.fundingAssignment == null || !mounted) return;
+    _applyCustomerValue(totals);
+  }
+
+  Future<void> _revealFundedGiftCardAfterCommit() async {
+    if (fundedGiftCardRevealed || fundedGiftCardRevealInFlight) return;
+    final controller = widget.customerValue;
+    final result = controller?.state.giftCardIssuance;
+    final cart = widget.cart.state.cart;
+    final operator = widget.entry.state.operator;
+    if (controller == null ||
+        result?.fundingAssignment == null ||
+        cart == null ||
+        operator == null) {
+      return;
+    }
+    fundedGiftCardRevealInFlight = true;
+    final secret = await controller.revealGiftCardSecret(
+      CustomerValueScope(
+        merchantId: cart.merchantId,
+        locationId: cart.locationId,
+        operatorSessionId: operator.id,
+      ),
+      result!.deliveryToken,
+    );
+    fundedGiftCardRevealInFlight = false;
+    if (secret == null) {
+      if (!mounted) return;
+      final es = Localizations.localeOf(context).languageCode == 'es';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            es
+                ? 'No se recibió el código. Recupera el resultado original.'
+                : 'The code response was lost. Recover the original result.',
+          ),
+          action: SnackBarAction(
+            label: es ? 'Reintentar' : 'Retry',
+            onPressed: () => unawaited(_revealFundedGiftCardAfterCommit()),
+          ),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+    fundedGiftCardRevealed = true;
+    final es = Localizations.localeOf(context).languageCode == 'es';
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text(es ? 'Código de entrega única' : 'One-time delivery code'),
+        content: SelectableText('${secret.maskedReference}\n${secret.code}'),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(es ? 'Código entregado' : 'Code delivered'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _applyCustomerValue(TotalsPreview totals) {
     final controller = widget.customerValue!;
     final selection = controller.selection();
@@ -955,7 +1146,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     storedValueTenders = authorizations
         .map(
           (authorization) => <String, Object?>{
-            'id': authorization.id,
+            'id': authorization.allocationId,
             'type': authorization.accountType,
             'amount': {
               'minorUnits': authorization.amountMinorUnits,
@@ -968,33 +1159,6 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
           },
         )
         .toList();
-    final rewardAlreadyApplied =
-        totals.discounts['entries'] is List &&
-        (totals.discounts['entries']! as List<Object?>).any(
-          (entry) =>
-              ((entry! as Map<String, Object?>)['label'] as String?)
-                  ?.startsWith('loyalty_reward:') ??
-              false,
-        );
-    final rewardAmount = rewardAlreadyApplied
-        ? 0
-        : (controller.state.rewardAuthorization?.benefit['minorUnits'] as num?)
-                  ?.toInt() ??
-              0;
-    final storedAmount = authorizations.fold<int>(
-      0,
-      (sum, item) => sum + item.amountMinorUnits,
-    );
-    final total = (totals.grandTotal['minorUnits']! as num).toInt();
-    final remainder = (total - rewardAmount - storedAmount).clamp(0, total);
-    if (cashEnabled) {
-      cashApplied.text = (remainder / 100).toStringAsFixed(2);
-      cashReceived.text = cashApplied.text;
-      if (remainder == 0) cashEnabled = false;
-    } else if (terminalEnabled) {
-      terminalAmount.text = (remainder / 100).toStringAsFixed(2);
-      if (remainder == 0) terminalEnabled = false;
-    }
     method = authorizations.any((item) => item.accountType == 'gift_card')
         ? 'gift_card'
         : authorizations.isNotEmpty
@@ -1002,6 +1166,48 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         : method;
     widget.checkout.applyCustomerValue(selection);
     setState(() => dirty = true);
+  }
+
+  Future<String?> _requestRewardApproval(
+    String permission,
+    String fingerprint, {
+    String? title,
+  }) async {
+    final pin = TextEditingController();
+    final es = Localizations.localeOf(context).languageCode == 'es';
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title ?? (es ? 'Aprobar reward' : 'Approve reward')),
+        content: TextField(
+          controller: pin,
+          obscureText: true,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: es ? 'PIN del responsable' : 'Manager PIN',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(es ? 'Cancelar' : 'Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(es ? 'Aprobar' : 'Approve'),
+          ),
+        ],
+      ),
+    );
+    final value = pin.text;
+    pin.dispose();
+    if (accepted != true || value.isEmpty) return null;
+    return widget.entry.requestCheckoutApproval(
+      managerPin: value,
+      permission: permission,
+      commandFingerprint: fingerprint,
+    );
   }
 
   int _minorUnits(String raw) {
@@ -1183,7 +1389,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     return '00000000-0000-4000-8000-$suffix';
   }
 
-  void _review(TotalsPreview totals) {
+  Future<void> _review(TotalsPreview totals) async {
     final cart = widget.cart.state.cart!;
     final entry = widget.entry.state;
     final tenant = entry.selectedTenant;
@@ -1209,7 +1415,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
           );
     dirty = false;
     widget.sales.checkoutStarted();
-    widget.checkout.preview(
+    await widget.checkout.preview(
       merchantId: cart.merchantId,
       locationId: cart.locationId,
       operatorSessionId: cart.operatorSessionId,

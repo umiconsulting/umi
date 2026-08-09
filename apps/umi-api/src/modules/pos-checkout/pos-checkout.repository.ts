@@ -48,12 +48,30 @@ export interface CheckoutAuthorization {
 }
 
 export interface CheckoutCustomerValueAllocation {
-  rewardDiscount: { authorizationId: string; amountMinorUnits: number } | null;
+  rewardDiscount: {
+    authorizationId: string;
+    rewardId: string;
+    amountMinorUnits: number;
+    rewardVersion: number;
+    policyVersion: string;
+    approvalTenderFingerprint: string | null;
+  } | null;
   storedValue: Array<{
+    allocationId: string;
     authorizationId: string;
     accountType: 'wallet' | 'gift_card';
+    accountId: string;
+    accountPublicReference: string;
+    customerId: string | null;
     amountMinorUnits: number;
     currency: string;
+    allocationOrder: number;
+    remainingBalanceMinorUnits: number;
+    policyVersion: string;
+    expiresAt: string;
+    commandId: string;
+    idempotencyKey: string;
+    optimisticVersion: number;
   }>;
 }
 
@@ -207,8 +225,18 @@ export class PosCheckoutRepository {
     if (!selection) return { rewardDiscount: null, storedValue: [] };
     let rewardDiscount: CheckoutCustomerValueAllocation['rewardDiscount'] = null;
     if (selection.rewardAuthorizationId) {
-      const reward = await client.query<{ authorizationId: string; amountMinorUnits: string }>(
-        `SELECT a.id::text AS "authorizationId",a.benefit_minor_units::text AS "amountMinorUnits"
+      const reward = await client.query<{
+        authorizationId: string;
+        rewardId: string;
+        amountMinorUnits: string;
+        rewardVersion: number;
+        policyVersion: string;
+        approvalTenderFingerprint: string | null;
+      }>(
+        `SELECT a.id::text AS "authorizationId",a.reward_id::text AS "rewardId",
+                a.benefit_minor_units::text AS "amountMinorUnits",
+                a.reward_version AS "rewardVersion",a.policy_version AS "policyVersion",
+                a.approval_tender_fingerprint AS "approvalTenderFingerprint"
            FROM merchant.customer_value_authorization a
           WHERE a.id=$1::uuid AND a.merchant_id=$2::uuid AND a.location_id=$3::uuid
             AND a.sale_id=$4::uuid AND a.checkout_version=$5 AND a.customer_id=$6::uuid
@@ -228,7 +256,11 @@ export class PosCheckoutRepository {
       if (!reward.rows[0]) throw new ConflictException({ code: 'REWARD_AUTHORIZATION_EXPIRED' });
       rewardDiscount = {
         authorizationId: reward.rows[0].authorizationId,
+        rewardId: reward.rows[0].rewardId,
         amountMinorUnits: Number(reward.rows[0].amountMinorUnits),
+        rewardVersion: Number(reward.rows[0].rewardVersion),
+        policyVersion: reward.rows[0].policyVersion,
+        approvalTenderFingerprint: reward.rows[0].approvalTenderFingerprint,
       };
     }
     const requested = [...new Set(selection.storedValueAuthorizationIds)].sort();
@@ -237,20 +269,40 @@ export class PosCheckoutRepository {
     }
     if (requested.length === 0) return { rewardDiscount, storedValue: [] };
     const stored = await client.query<{
+      allocationId: string;
       authorizationId: string;
       accountType: 'wallet' | 'gift_card';
+      accountId: string;
+      accountPublicReference: string;
+      customerId: string | null;
       amountMinorUnits: string;
       currency: string;
+      allocationOrder: number;
+      remainingBalanceMinorUnits: string;
+      policyVersion: string;
+      expiresAt: string;
+      commandId: string;
+      idempotencyKey: string;
+      optimisticVersion: number;
     }>(
-      `SELECT id::text AS "authorizationId",account_type AS "accountType",
-              amount_minor_units::text AS "amountMinorUnits",currency
-         FROM merchant.customer_value_authorization
-        WHERE id=ANY($1::uuid[]) AND merchant_id=$2::uuid AND location_id=$3::uuid
-          AND sale_id=$4::uuid AND checkout_version=$5
-          AND customer_id IS NOT DISTINCT FROM $6::uuid
-          AND account_type IN ('wallet','gift_card') AND status='authorized'
-          AND expires_at>clock_timestamp() AND checkout_fingerprint=$7
-        ORDER BY account_type,account_id FOR UPDATE`,
+      `SELECT a.allocation_id::text AS "allocationId",a.id::text AS "authorizationId",
+              a.account_type AS "accountType",a.account_id::text AS "accountId",
+              coalesce(w.public_reference,g.public_reference) AS "accountPublicReference",
+              a.customer_id::text AS "customerId",a.amount_minor_units::text AS "amountMinorUnits",
+              a.currency,a.allocation_order AS "allocationOrder",
+              a.remaining_balance_minor_units::text AS "remainingBalanceMinorUnits",
+              a.policy_version AS "policyVersion",a.expires_at::text AS "expiresAt",
+              a.command_id::text AS "commandId",a.idempotency_key::text AS "idempotencyKey",
+              a.optimistic_version AS "optimisticVersion"
+         FROM merchant.customer_value_authorization a
+         LEFT JOIN merchant.loyalty_card w ON a.account_type='wallet' AND w.id=a.account_id
+         LEFT JOIN merchant.loyalty_gift_card g ON a.account_type='gift_card' AND g.id=a.account_id
+        WHERE a.id=ANY($1::uuid[]) AND a.merchant_id=$2::uuid AND a.location_id=$3::uuid
+          AND a.sale_id=$4::uuid AND a.checkout_version=$5
+          AND (a.account_type='gift_card' OR a.customer_id IS NOT DISTINCT FROM $6::uuid)
+          AND a.account_type IN ('wallet','gift_card') AND a.status='authorized'
+          AND a.expires_at>clock_timestamp() AND a.checkout_fingerprint=$7
+        ORDER BY a.allocation_order,a.id FOR UPDATE OF a`,
       [
         requested,
         cart.merchantId,
@@ -264,15 +316,50 @@ export class PosCheckoutRepository {
     if (stored.rowCount !== requested.length) {
       throw new ConflictException({ code: 'STORED_VALUE_AUTHORIZATION_EXPIRED' });
     }
+    if (
+      new Set(stored.rows.map((row) => `${row.accountType}:${row.accountId}`)).size !==
+      stored.rows.length
+    ) {
+      throw new ConflictException({ code: 'STORED_VALUE_ALLOCATION_DUPLICATE' });
+    }
     return {
       rewardDiscount,
       storedValue: stored.rows.map((row) => ({
+        allocationId: row.allocationId,
         authorizationId: row.authorizationId,
         accountType: row.accountType,
+        accountId: row.accountId,
+        accountPublicReference: row.accountPublicReference,
+        customerId: row.customerId,
         amountMinorUnits: Number(row.amountMinorUnits),
         currency: row.currency,
+        allocationOrder: Number(row.allocationOrder),
+        remainingBalanceMinorUnits: Number(row.remainingBalanceMinorUnits),
+        policyVersion: row.policyVersion,
+        expiresAt: row.expiresAt,
+        commandId: row.commandId,
+        idempotencyKey: row.idempotencyKey,
+        optimisticVersion: Number(row.optimisticVersion),
       })),
     };
+  }
+
+  async bindRewardStoredValueFingerprint(
+    client: PoolClient,
+    authorizationId: string,
+    fingerprint: string,
+  ): Promise<void> {
+    const bound = await client.query(
+      `UPDATE merchant.customer_value_authorization
+          SET stored_value_fingerprint=$2
+        WHERE id=$1::uuid AND account_type='loyalty_reward' AND status='authorized'
+          AND (stored_value_fingerprint IS NULL OR stored_value_fingerprint=$2)
+        RETURNING id`,
+      [authorizationId, fingerprint],
+    );
+    if (bound.rowCount !== 1) {
+      throw new ConflictException({ code: 'FINGERPRINT_CONFLICT' });
+    }
   }
 
   async saveDraft(
@@ -1126,7 +1213,7 @@ export class PosCheckoutRepository {
     const value = await client.query<{ result: Record<string, unknown> }>(
       `SELECT merchant.commit_customer_value_closeout(
         $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::uuid,$9,$10,$11,
-        $12::date,$13::uuid,$14::uuid,$15::jsonb) AS result`,
+        $12::date,$13::uuid,$14::uuid,$15,$16::jsonb) AS result`,
       [
         cart.merchantId,
         cart.locationId,
@@ -1142,6 +1229,7 @@ export class PosCheckoutRepository {
         cart.businessDate,
         authorization.operatorId,
         authorization.deviceId,
+        customerValue?.storedValueFingerprint ?? null,
         JSON.stringify(customerValue ?? {}),
       ],
     );

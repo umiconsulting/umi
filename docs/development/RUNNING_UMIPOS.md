@@ -507,9 +507,20 @@ Prueba wallet y gift card:
 4. Confirma el importe y la aprobación vinculada.
 5. Entrega el código de una sola lectura. No copies el código a un log.
 6. Para una promoción, confirma que la tarjeta se activa en el comando de emisión.
-7. Confirma que una emisión financiada por venta devuelve `GIFT_CARD_SALE_ISSUANCE_NOT_AVAILABLE`.
-8. Confirma que la autorización devuelve un error genérico hasta que exista una prueba de consulta.
-9. No presentes un débito ni un pago mixto como operativo.
+7. Añade una línea de gift card a una venta online.
+8. Crea la tarjeta inactiva con la asignación de esa línea.
+9. Confirma un pago completo y verifica la activación atómica.
+10. Autoriza un importe de wallet y otro de gift card.
+11. Confirma la vista con cash o terminal cuando quede un saldo.
+12. Verifica los débitos, la asignación y la referencia oculta del recibo.
+
+Prueba un reward con aprobación:
+
+1. Selecciona un reward que requiera `loyalty.reward.approve`.
+2. Usa un manager distinto del operador solicitante.
+3. Introduce el PIN por la ruta de aprobación actual.
+4. Confirma la misma vista y la misma huella de tenders.
+5. Cambia un tender y verifica que la aprobación falle.
 
 Prueba el límite de consulta:
 
@@ -525,15 +536,16 @@ Prueba el historial compuesto:
 3. Selecciona **Cargar más**.
 4. Confirma que el cursor no repite eventos.
 5. Confirma que otro customer o merchant no puede usar el cursor.
+6. Confirma que una location nula no funciona como wildcard.
+7. Quita un permiso global y confirma que el cursor anterior falla.
 
-Ejecuta las pruebas estructurales de la matriz de concurrencia:
+Ejecuta la matriz real de concurrencia:
 
 ```sh
-pnpm --filter @umi/api exec vitest run \
-  src/shared/database/gate-3f-customer-value-concurrency.spec.ts
+pnpm umi-pos:customer-value-concurrency-check
 ```
 
-Estas pruebas no certifican las 26 carreras con sesiones simultáneas. Gate 3F permanece incompleto hasta esa certificación.
+El comando crea una base desechable. Ejecuta 26 carreras con dos sesiones PostgreSQL y elimina la base.
 
 Una pérdida de respuesta requiere consultar el comando original. No repitas un débito sin esa consulta.
 

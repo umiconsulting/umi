@@ -367,6 +367,11 @@ export const TotalsConfirmation = z
   .object({
     cartVersion: z.number().int().positive(),
     fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+    storedValueFingerprint: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .nullable()
+      .optional(),
     totals: TotalsPreview,
     taxes: TaxBreakdown,
     discounts: DiscountBreakdown,
@@ -380,6 +385,7 @@ export const TotalsConfirmation = z
 export const CheckoutCommand = z
   .object({
     commandId: Uuid.optional(),
+    customerValueFingerprintCommandId: Uuid.optional(),
     cartId: Uuid,
     locationId: Uuid,
     operatorSessionId: Uuid,
