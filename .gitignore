@@ -48,3 +48,10 @@ build/
 # allowlists that have historically included credentials in command strings.
 # The repo-shared config is .mcp.json (secrets via ${VAR} expansion only).
 .claude/settings.local.json
+
+# Python bytecode and test caches. Generated on import, version-stamped
+# (cpython-314), and useless on a machine with a different interpreter — the
+# .agents/skills/design/* skills ship Python scripts, so these appear locally.
+__pycache__/
+*.py[cod]
+.pytest_cache/
