@@ -10,6 +10,29 @@ import 'offline_journal.dart';
 import 'recovery_actions.dart';
 import 'replay_engine.dart';
 
+final class OfflineHardwareRecoveryItem {
+  const OfflineHardwareRecoveryItem({
+    required this.commandId,
+    required this.commandType,
+    required this.status,
+    this.verifyPrint,
+    this.controlledReprint,
+    this.repeatDrawerOpen,
+  });
+
+  final String commandId;
+  final String commandType;
+  final String status;
+  final Future<void> Function()? verifyPrint;
+  final Future<void> Function()? controlledReprint;
+  final Future<void> Function()? repeatDrawerOpen;
+}
+
+final class OfflineHardwareRecoveryResult {
+  const OfflineHardwareRecoveryResult(this.items);
+  final List<OfflineHardwareRecoveryItem> items;
+}
+
 Future<void> showRecoveryCenter(
   BuildContext context, {
   required EncryptedOfflineJournal journal,
@@ -20,6 +43,8 @@ Future<void> showRecoveryCenter(
   required Future<void> Function() refreshSnapshots,
   required Future<void> Function() queryAmbiguousPayment,
   Future<bool> Function()? beforeContextExit,
+  Future<OfflineHardwareRecoveryResult> Function(JournalEntry entry)?
+  retryOfflineHardware,
 }) => showModalBottomSheet<void>(
   context: context,
   isScrollControlled: true,
@@ -27,6 +52,7 @@ Future<void> showRecoveryCenter(
     journal: journal,
     recovery: recovery,
     scope: scope,
+    retryOfflineHardware: retryOfflineHardware,
     executor: AppRecoveryActionExecutor(
       recovery: recovery,
       scope: scope,
@@ -46,12 +72,15 @@ final class RecoveryCenter extends StatefulWidget {
     required this.recovery,
     required this.scope,
     required this.executor,
+    this.retryOfflineHardware,
     super.key,
   });
   final EncryptedOfflineJournal journal;
   final OfflineRecoveryController recovery;
   final ReplayScope scope;
   final RecoveryActionExecutor executor;
+  final Future<OfflineHardwareRecoveryResult> Function(JournalEntry entry)?
+  retryOfflineHardware;
 
   @override
   State<RecoveryCenter> createState() => _RecoveryCenterState();
@@ -59,6 +88,7 @@ final class RecoveryCenter extends StatefulWidget {
 
 final class _RecoveryCenterState extends State<RecoveryCenter> {
   OfflineJournalSnapshot? snapshot;
+  final Set<String> _hardwareRetries = {};
 
   @override
   void initState() {
@@ -119,6 +149,11 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
                         itemBuilder: (context, index) {
                           final entry = entries[index];
                           final conflict = entry.failure;
+                          final provisionalId = entry.command.provisionalId;
+                          final canRetryHardware =
+                              widget.retryOfflineHardware != null &&
+                              provisionalId != null &&
+                              entry.command.commandType == 'pos.checkout.cash';
                           return ListTile(
                             leading: Icon(
                               conflict == null
@@ -136,7 +171,44 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
                                   ? l.conflictNeedsAttention
                                   : l.pendingSalesSecure,
                             ),
-                            trailing: Text('#${entry.command.deviceSequence}'),
+                            trailing: canRetryHardware
+                                ? Semantics(
+                                    button: true,
+                                    label:
+                                        Localizations.localeOf(
+                                              context,
+                                            ).languageCode ==
+                                            'es'
+                                        ? 'Reintentar el hardware de forma segura'
+                                        : 'Retry hardware safely',
+                                    child: IconButton(
+                                      tooltip:
+                                          Localizations.localeOf(
+                                                context,
+                                              ).languageCode ==
+                                              'es'
+                                          ? 'Reintentar el hardware'
+                                          : 'Retry hardware',
+                                      onPressed:
+                                          _hardwareRetries.contains(
+                                            provisionalId,
+                                          )
+                                          ? null
+                                          : () => _retryHardware(entry),
+                                      icon:
+                                          _hardwareRetries.contains(
+                                            provisionalId,
+                                          )
+                                          ? const SizedBox.square(
+                                              dimension: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : const Icon(Icons.print_outlined),
+                                    ),
+                                  )
+                                : Text('#${entry.command.deviceSequence}'),
                           );
                         },
                       ),
@@ -197,6 +269,139 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
       await _showReceiptStatus();
     }
     await _load();
+  }
+
+  Future<void> _retryHardware(JournalEntry entry) async {
+    final id = entry.command.provisionalId;
+    final retry = widget.retryOfflineHardware;
+    if (id == null || retry == null || _hardwareRetries.contains(id)) return;
+    setState(() => _hardwareRetries.add(id));
+    try {
+      final result = await retry(entry);
+      if (!mounted) return;
+      final unknown = result.items
+          .where((item) => item.status == 'unknown')
+          .toList();
+      if (unknown.isNotEmpty) {
+        await _showUnknownHardware(unknown);
+        return;
+      }
+      if (result.items.any((item) => item.status != 'succeeded')) {
+        final spanish = Localizations.localeOf(context).languageCode == 'es';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              spanish
+                  ? 'El hardware requiere atención.'
+                  : 'The hardware needs attention.',
+            ),
+          ),
+        );
+        return;
+      }
+      final spanish = Localizations.localeOf(context).languageCode == 'es';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            spanish
+                ? 'La recuperación del hardware terminó.'
+                : 'Hardware recovery completed.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      final spanish = Localizations.localeOf(context).languageCode == 'es';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            spanish
+                ? 'El hardware requiere atención.'
+                : 'The hardware needs attention.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _hardwareRetries.remove(id));
+    }
+  }
+
+  Future<void> _showUnknownHardware(
+    List<OfflineHardwareRecoveryItem> items,
+  ) async {
+    final spanish = Localizations.localeOf(context).languageCode == 'es';
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          spanish ? 'Resultado físico desconocido' : 'Unknown physical result',
+        ),
+        content: Text(
+          spanish
+              ? 'Verifica el dispositivo antes de iniciar otra acción.'
+              : 'Verify the device before you start another action.',
+        ),
+        actions: [
+          for (final item in items) ...[
+            if (item.verifyPrint != null)
+              TextButton(
+                onPressed: () =>
+                    _runHardwareAction(dialogContext, item.verifyPrint!),
+                child: Text(spanish ? 'Confirmar impresión' : 'Verify print'),
+              ),
+            if (item.controlledReprint != null)
+              FilledButton.tonal(
+                onPressed: () =>
+                    _runHardwareAction(dialogContext, item.controlledReprint!),
+                child: Text(spanish ? 'Imprimir una COPIA' : 'Print a COPY'),
+              ),
+            if (item.repeatDrawerOpen != null)
+              FilledButton.tonal(
+                onPressed: () =>
+                    _runHardwareAction(dialogContext, item.repeatDrawerOpen!),
+                child: Text(spanish ? 'Abrir otra vez' : 'Open again'),
+              ),
+          ],
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(spanish ? 'Cerrar' : 'Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _runHardwareAction(
+    BuildContext dialogContext,
+    Future<void> Function() action,
+  ) async {
+    Navigator.pop(dialogContext);
+    final spanish = Localizations.localeOf(context).languageCode == 'es';
+    try {
+      await action();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            spanish
+                ? 'El resultado físico sigue desconocido.'
+                : 'The physical result is still unknown.',
+          ),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          spanish
+              ? 'La acción del hardware terminó.'
+              : 'The hardware action completed.',
+        ),
+      ),
+    );
   }
 
   List<RecoveryAction> _availableActions(

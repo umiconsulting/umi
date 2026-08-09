@@ -107,6 +107,37 @@ final class CatalogController extends ChangeNotifier {
     );
   }
 
+  Future<List<CatalogProductSummary>> lookupBarcode(String value) async {
+    final partition = _partition;
+    if (partition == null) return const [];
+    _searchTimer?.cancel();
+    _request?.cancel();
+    _request = CancellationToken();
+    _event('barcode_lookup_started');
+    try {
+      final page = await _repository.products(
+        partition,
+        barcode: value,
+        cancellation: _request,
+      );
+      final products = page.items.map(CatalogProductSummary.fromJson).toList();
+      _set(
+        CatalogState(
+          phase: products.isEmpty ? CatalogPhase.noResults : CatalogPhase.ready,
+          categories: _state.categories,
+          products: products,
+          search: value,
+          nextCursor: null,
+        ),
+      );
+      _event(products.isEmpty ? 'barcode_unknown' : 'barcode_lookup_succeeded');
+      return products;
+    } on AppException catch (error) {
+      _failure(error);
+      return const [];
+    }
+  }
+
   Future<void> selectCategory(String? id) async {
     _event('category_selected');
     await _loadFilter(categoryId: id, search: _state.search);

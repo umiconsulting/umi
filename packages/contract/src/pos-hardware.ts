@@ -11,6 +11,9 @@ export const HardwareDeviceType = z.enum([
 ]);
 export const HardwareTransport = z.enum([
   'simulator',
+  'network_tcp',
+  'printer_attached',
+  'keyboard_wedge',
   'usb_foundation',
   'bluetooth_foundation',
   'network_foundation',
@@ -44,10 +47,49 @@ export const HardwareConnectionState = z.enum([
   'disconnected',
   'connecting',
   'busy',
+  'recovering',
+  'failed',
+  'disabled',
   'error',
   'unknown',
 ]);
 export const HardwareHealth = z.enum(['healthy', 'degraded', 'unavailable', 'unknown']);
+
+export const HardwareConnectionConfiguration = z
+  .object({
+    networkHost: z
+      .string()
+      .trim()
+      .min(1)
+      .max(253)
+      .regex(/^[A-Za-z0-9.-]+$/)
+      .nullable()
+      .default(null),
+    networkPort: z.number().int().min(1).max(65535).nullable().default(null),
+    connectTimeoutMs: z.number().int().min(250).max(10_000).default(2_000),
+    commandTimeoutMs: z.number().int().min(500).max(30_000).default(5_000),
+    characterEncoding: z.enum(['cp850', 'utf8']).default('cp850'),
+    receiptWidthColumns: z.number().int().min(20).max(120).default(42),
+    drawerPulsePin: z.number().int().min(0).max(1).default(0),
+    drawerPulseOnMs: z.number().int().min(10).max(500).default(50),
+    scannerTerminator: z.enum(['enter', 'tab']).default('enter'),
+    scannerBurstWindowMs: z.number().int().min(20).max(500).default(80),
+  })
+  .strict();
+
+export const HardwarePilotPolicy = z
+  .object({
+    autoPrintReceipt: z.boolean().default(true),
+    openDrawerOnCashSale: z.boolean().default(true),
+    openDrawerOnCashRefund: z.boolean().default(true),
+    allowNoSale: z.boolean().default(false),
+    receiptCopiesDefault: z.number().int().min(1).max(3).default(1),
+    hardwareRetryLimit: z.number().int().min(1).max(3).default(2),
+    hardwareHealthIntervalSeconds: z.number().int().min(15).max(300).default(30),
+    scannerEnabled: z.boolean().default(true),
+    customerDisplayEnabled: z.boolean().default(false),
+  })
+  .strict();
 export const HardwareCommandType = z.enum([
   'print_receipt',
   'print_kitchen_ticket_foundation',
@@ -105,6 +147,11 @@ const SafeMetadata = z
     latencyMs: z.number().int().min(0).max(120_000).nullable().optional(),
     artifactReference: PublicReference.nullable().optional(),
     acknowledged: z.boolean().nullable().optional(),
+    commandId: Uuid.optional(),
+    commandStatus: HardwareCommandStatus.optional(),
+    recovered: z.boolean().optional(),
+    connectionState: HardwareConnectionState.optional(),
+    attemptLimitReached: z.boolean().optional(),
   })
   .strict();
 
@@ -131,6 +178,7 @@ export const HardwareDevice = z
     model: z.string().trim().min(1).max(120),
     publicReference: PublicReference,
     transport: HardwareTransport,
+    connectionConfiguration: HardwareConnectionConfiguration.default({}),
     capabilities: z.array(HardwareCapability).max(32),
     enabled: z.boolean(),
     configurationVersion: z.number().int().positive(),
@@ -198,6 +246,7 @@ export const HardwareCommand = z
     sourceAggregateId: PublicReference,
     payloadFingerprint: Fingerprint,
     idempotencyKey: IdempotencyKey,
+    expectedConfigurationVersion: z.number().int().positive(),
     correlationId: CorrelationId,
     status: HardwareCommandStatus,
     createdAt: IsoTimestamp,
@@ -298,7 +347,7 @@ export const ReceiptPrintPayload = z
     changeMinorUnits: z.number().int().nonnegative(),
     loyaltySummary: z.string().trim().max(240).nullable(),
     customerValueSummary: z.string().trim().max(240).nullable(),
-    exceptionMarker: z.enum(['refund', 'void']).nullable(),
+    exceptionMarker: z.enum(['refund', 'void', 'provisional']).nullable(),
     qrValue: z.string().trim().max(512).nullable(),
     footer: z.string().trim().max(500).nullable(),
   })
@@ -408,6 +457,8 @@ export const HardwareRuntimeSnapshot = z
     merchantId: Uuid,
     locationId: Uuid,
     registerId: Uuid.nullable(),
+    policy: HardwarePilotPolicy.default({}),
+    policyVersion: z.number().int().positive().default(1),
     devices: z.array(HardwareDevice).max(100),
     printJobs: z.array(PrintJob).max(100).default([]),
     recoveryStates: z.array(HardwareRecoveryState).max(100).default([]),
@@ -437,11 +488,40 @@ export const RegisterHardwareRequest = z
     model: z.string().trim().min(1).max(120),
     publicReference: PublicReference,
     transport: HardwareTransport,
+    connectionConfiguration: HardwareConnectionConfiguration.default({}),
     capabilities: z.array(HardwareCapability).min(1).max(32),
     commandId: Uuid,
     idempotencyKey: IdempotencyKey,
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    const expectedType =
+      value.transport === 'network_tcp'
+        ? 'printer'
+        : value.transport === 'printer_attached'
+          ? 'cash_drawer'
+          : value.transport === 'keyboard_wedge'
+            ? 'barcode_scanner'
+            : null;
+    if (expectedType !== null && value.type !== expectedType) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'HARDWARE_TRANSPORT_TYPE_MISMATCH',
+        path: ['transport'],
+      });
+    }
+    if (
+      ['network_tcp', 'printer_attached'].includes(value.transport) &&
+      (value.connectionConfiguration.networkHost === null ||
+        value.connectionConfiguration.networkPort === null)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'HARDWARE_NETWORK_ENDPOINT_REQUIRED',
+        path: ['connectionConfiguration'],
+      });
+    }
+  });
 export const AssignHardwareRequest = z
   .object({
     locationId: Uuid,
@@ -461,7 +541,29 @@ export const UpdateHardwareRequest = z
     commandId: Uuid,
     idempotencyKey: IdempotencyKey,
     enabled: z.boolean(),
+    connectionConfiguration: HardwareConnectionConfiguration.nullable().default(null),
     expectedVersion: z.number().int().positive(),
+  })
+  .strict();
+export const UpdateHardwarePolicyRequest = z
+  .object({
+    locationId: Uuid,
+    registerId: Uuid.nullable().default(null),
+    operatorSessionId: Uuid,
+    commandId: Uuid,
+    idempotencyKey: IdempotencyKey,
+    expectedVersion: z.number().int().positive(),
+    policy: HardwarePilotPolicy,
+  })
+  .strict();
+export const HardwarePilotPolicyResult = z
+  .object({
+    merchantId: Uuid,
+    locationId: Uuid,
+    registerId: Uuid.nullable(),
+    policy: HardwarePilotPolicy,
+    version: z.number().int().positive(),
+    updatedAt: IsoTimestamp,
   })
   .strict();
 export const HardwareCommandRequest = z
@@ -526,6 +628,9 @@ export const HardwareRecoveryQuery = z
   .strict();
 
 export type HardwareDevice = z.infer<typeof HardwareDevice>;
+export type HardwareConnectionConfiguration = z.infer<typeof HardwareConnectionConfiguration>;
+export type HardwarePilotPolicy = z.infer<typeof HardwarePilotPolicy>;
+export type HardwarePilotPolicyResult = z.infer<typeof HardwarePilotPolicyResult>;
 export type HardwareAssignment = z.infer<typeof HardwareAssignment>;
 export type HardwareCommand = z.infer<typeof HardwareCommand>;
 export type HardwareCommandResult = z.infer<typeof HardwareCommandResult>;
@@ -538,6 +643,7 @@ export type HardwareRuntimeSnapshot = z.infer<typeof HardwareRuntimeSnapshot>;
 export type RegisterHardwareRequest = z.infer<typeof RegisterHardwareRequest>;
 export type AssignHardwareRequest = z.infer<typeof AssignHardwareRequest>;
 export type UpdateHardwareRequest = z.infer<typeof UpdateHardwareRequest>;
+export type UpdateHardwarePolicyRequest = z.infer<typeof UpdateHardwarePolicyRequest>;
 export type HardwareCommandRequest = z.infer<typeof HardwareCommandRequest>;
 export type HardwareCommandTransitionRequest = z.infer<typeof HardwareCommandTransitionRequest>;
 export type ControlledReprintRequest = z.infer<typeof ControlledReprintRequest>;
@@ -551,6 +657,9 @@ export const posHardwareModels = {
   HardwareTransport,
   HardwareCapability,
   HardwareConnectionState,
+  HardwareConnectionConfiguration,
+  HardwarePilotPolicy,
+  HardwarePilotPolicyResult,
   HardwareHealth,
   HardwareAssignment,
   HardwareDevice,
@@ -587,6 +696,7 @@ export const posHardwareModels = {
   RegisterHardwareRequest,
   AssignHardwareRequest,
   UpdateHardwareRequest,
+  UpdateHardwarePolicyRequest,
   HardwareCommandRequest,
   HardwareCommandTransitionRequest,
   ControlledReprintRequest,

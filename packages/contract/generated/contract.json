@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "7223f72894a444d32735ba8e1a325a160bc09a394bca222d12a8bb2545da6323",
-  "contractVersion": "2.7.0",
+  "contentHash": "acacbd59b0691a0a351691e2b161cf0ac7ee433280ad363cf2a86238bdb85abe",
+  "contractVersion": "2.8.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -1094,12 +1094,101 @@
           "exclusiveMinimum": 0,
           "type": "integer"
         },
+        "connectionConfiguration": {
+          "additionalProperties": false,
+          "default": {},
+          "properties": {
+            "characterEncoding": {
+              "default": "cp850",
+              "enum": [
+                "cp850",
+                "utf8"
+              ],
+              "type": "string"
+            },
+            "commandTimeoutMs": {
+              "default": 5000,
+              "maximum": 30000,
+              "minimum": 500,
+              "type": "integer"
+            },
+            "connectTimeoutMs": {
+              "default": 2000,
+              "maximum": 10000,
+              "minimum": 250,
+              "type": "integer"
+            },
+            "drawerPulseOnMs": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 10,
+              "type": "integer"
+            },
+            "drawerPulsePin": {
+              "default": 0,
+              "maximum": 1,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "networkHost": {
+              "anyOf": [
+                {
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9.-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "networkPort": {
+              "anyOf": [
+                {
+                  "maximum": 65535,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "receiptWidthColumns": {
+              "default": 42,
+              "maximum": 120,
+              "minimum": 20,
+              "type": "integer"
+            },
+            "scannerBurstWindowMs": {
+              "default": 80,
+              "maximum": 500,
+              "minimum": 20,
+              "type": "integer"
+            },
+            "scannerTerminator": {
+              "default": "enter",
+              "enum": [
+                "enter",
+                "tab"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
         "connectionState": {
           "enum": [
             "connected",
             "disconnected",
             "connecting",
             "busy",
+            "recovering",
+            "failed",
+            "disabled",
             "error",
             "unknown"
           ],
@@ -1194,6 +1283,9 @@
         "transport": {
           "enum": [
             "simulator",
+            "network_tcp",
+            "printer_attached",
+            "keyboard_wedge",
             "usb_foundation",
             "bluetooth_foundation",
             "network_foundation",
@@ -5757,12 +5849,101 @@
           "exclusiveMinimum": 0,
           "type": "integer"
         },
+        "connectionConfiguration": {
+          "additionalProperties": false,
+          "default": {},
+          "properties": {
+            "characterEncoding": {
+              "default": "cp850",
+              "enum": [
+                "cp850",
+                "utf8"
+              ],
+              "type": "string"
+            },
+            "commandTimeoutMs": {
+              "default": 5000,
+              "maximum": 30000,
+              "minimum": 500,
+              "type": "integer"
+            },
+            "connectTimeoutMs": {
+              "default": 2000,
+              "maximum": 10000,
+              "minimum": 250,
+              "type": "integer"
+            },
+            "drawerPulseOnMs": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 10,
+              "type": "integer"
+            },
+            "drawerPulsePin": {
+              "default": 0,
+              "maximum": 1,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "networkHost": {
+              "anyOf": [
+                {
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9.-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "networkPort": {
+              "anyOf": [
+                {
+                  "maximum": 65535,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "receiptWidthColumns": {
+              "default": 42,
+              "maximum": 120,
+              "minimum": 20,
+              "type": "integer"
+            },
+            "scannerBurstWindowMs": {
+              "default": 80,
+              "maximum": 500,
+              "minimum": 20,
+              "type": "integer"
+            },
+            "scannerTerminator": {
+              "default": "enter",
+              "enum": [
+                "enter",
+                "tab"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
         "connectionState": {
           "enum": [
             "connected",
             "disconnected",
             "connecting",
             "busy",
+            "recovering",
+            "failed",
+            "disabled",
             "error",
             "unknown"
           ],
@@ -5857,6 +6038,9 @@
         "transport": {
           "enum": [
             "simulator",
+            "network_tcp",
+            "printer_attached",
+            "keyboard_wedge",
             "usb_foundation",
             "bluetooth_foundation",
             "network_foundation",
@@ -18711,7 +18895,8 @@
                         {
                           "enum": [
                             "refund",
-                            "void"
+                            "void",
+                            "provisional"
                           ],
                           "type": "string"
                         },
@@ -20817,12 +21002,101 @@
           "exclusiveMinimum": 0,
           "type": "integer"
         },
+        "connectionConfiguration": {
+          "additionalProperties": false,
+          "default": {},
+          "properties": {
+            "characterEncoding": {
+              "default": "cp850",
+              "enum": [
+                "cp850",
+                "utf8"
+              ],
+              "type": "string"
+            },
+            "commandTimeoutMs": {
+              "default": 5000,
+              "maximum": 30000,
+              "minimum": 500,
+              "type": "integer"
+            },
+            "connectTimeoutMs": {
+              "default": 2000,
+              "maximum": 10000,
+              "minimum": 250,
+              "type": "integer"
+            },
+            "drawerPulseOnMs": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 10,
+              "type": "integer"
+            },
+            "drawerPulsePin": {
+              "default": 0,
+              "maximum": 1,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "networkHost": {
+              "anyOf": [
+                {
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9.-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "networkPort": {
+              "anyOf": [
+                {
+                  "maximum": 65535,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "receiptWidthColumns": {
+              "default": 42,
+              "maximum": 120,
+              "minimum": 20,
+              "type": "integer"
+            },
+            "scannerBurstWindowMs": {
+              "default": 80,
+              "maximum": 500,
+              "minimum": 20,
+              "type": "integer"
+            },
+            "scannerTerminator": {
+              "default": "enter",
+              "enum": [
+                "enter",
+                "tab"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
         "connectionState": {
           "enum": [
             "connected",
             "disconnected",
             "connecting",
             "busy",
+            "recovering",
+            "failed",
+            "disabled",
             "error",
             "unknown"
           ],
@@ -20917,6 +21191,9 @@
         "transport": {
           "enum": [
             "simulator",
+            "network_tcp",
+            "printer_attached",
+            "keyboard_wedge",
             "usb_foundation",
             "bluetooth_foundation",
             "network_foundation",
@@ -30479,6 +30756,10 @@
           "format": "date-time",
           "type": "string"
         },
+        "expectedConfigurationVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
         "failureCode": {
           "anyOf": [
             {
@@ -30565,6 +30846,39 @@
                 }
               ]
             },
+            "attemptLimitReached": {
+              "type": "boolean"
+            },
+            "commandId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "commandStatus": {
+              "enum": [
+                "pending",
+                "dispatching",
+                "succeeded",
+                "failed",
+                "retryable",
+                "cancelled",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "connectionState": {
+              "enum": [
+                "connected",
+                "disconnected",
+                "connecting",
+                "busy",
+                "recovering",
+                "failed",
+                "disabled",
+                "error",
+                "unknown"
+              ],
+              "type": "string"
+            },
             "latencyMs": {
               "anyOf": [
                 {
@@ -30576,6 +30890,9 @@
                   "type": "null"
                 }
               ]
+            },
+            "recovered": {
+              "type": "boolean"
             },
             "statusMessage": {
               "anyOf": [
@@ -30642,6 +30959,7 @@
         "sourceAggregateId",
         "payloadFingerprint",
         "idempotencyKey",
+        "expectedConfigurationVersion",
         "correlationId",
         "status",
         "createdAt",
@@ -30930,7 +31248,8 @@
                     {
                       "enum": [
                         "refund",
-                        "void"
+                        "void",
+                        "provisional"
                       ],
                       "type": "string"
                     },
@@ -31220,6 +31539,10 @@
               "format": "date-time",
               "type": "string"
             },
+            "expectedConfigurationVersion": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
             "failureCode": {
               "anyOf": [
                 {
@@ -31306,6 +31629,39 @@
                     }
                   ]
                 },
+                "attemptLimitReached": {
+                  "type": "boolean"
+                },
+                "commandId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "commandStatus": {
+                  "enum": [
+                    "pending",
+                    "dispatching",
+                    "succeeded",
+                    "failed",
+                    "retryable",
+                    "cancelled",
+                    "unknown"
+                  ],
+                  "type": "string"
+                },
+                "connectionState": {
+                  "enum": [
+                    "connected",
+                    "disconnected",
+                    "connecting",
+                    "busy",
+                    "recovering",
+                    "failed",
+                    "disabled",
+                    "error",
+                    "unknown"
+                  ],
+                  "type": "string"
+                },
                 "latencyMs": {
                   "anyOf": [
                     {
@@ -31317,6 +31673,9 @@
                       "type": "null"
                     }
                   ]
+                },
+                "recovered": {
+                  "type": "boolean"
                 },
                 "statusMessage": {
                   "anyOf": [
@@ -31383,6 +31742,7 @@
             "sourceAggregateId",
             "payloadFingerprint",
             "idempotencyKey",
+            "expectedConfigurationVersion",
             "correlationId",
             "status",
             "createdAt",
@@ -31624,7 +31984,8 @@
                         {
                           "enum": [
                             "refund",
-                            "void"
+                            "void",
+                            "provisional"
                           ],
                           "type": "string"
                         },
@@ -31984,6 +32345,39 @@
                 }
               ]
             },
+            "attemptLimitReached": {
+              "type": "boolean"
+            },
+            "commandId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "commandStatus": {
+              "enum": [
+                "pending",
+                "dispatching",
+                "succeeded",
+                "failed",
+                "retryable",
+                "cancelled",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "connectionState": {
+              "enum": [
+                "connected",
+                "disconnected",
+                "connecting",
+                "busy",
+                "recovering",
+                "failed",
+                "disabled",
+                "error",
+                "unknown"
+              ],
+              "type": "string"
+            },
             "latencyMs": {
               "anyOf": [
                 {
@@ -31995,6 +32389,9 @@
                   "type": "null"
                 }
               ]
+            },
+            "recovered": {
+              "type": "boolean"
             },
             "statusMessage": {
               "anyOf": [
@@ -32051,12 +32448,100 @@
       ],
       "type": "string"
     },
+    "HardwareConnectionConfiguration": {
+      "additionalProperties": false,
+      "properties": {
+        "characterEncoding": {
+          "default": "cp850",
+          "enum": [
+            "cp850",
+            "utf8"
+          ],
+          "type": "string"
+        },
+        "commandTimeoutMs": {
+          "default": 5000,
+          "maximum": 30000,
+          "minimum": 500,
+          "type": "integer"
+        },
+        "connectTimeoutMs": {
+          "default": 2000,
+          "maximum": 10000,
+          "minimum": 250,
+          "type": "integer"
+        },
+        "drawerPulseOnMs": {
+          "default": 50,
+          "maximum": 500,
+          "minimum": 10,
+          "type": "integer"
+        },
+        "drawerPulsePin": {
+          "default": 0,
+          "maximum": 1,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "networkHost": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9.-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "networkPort": {
+          "anyOf": [
+            {
+              "maximum": 65535,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "receiptWidthColumns": {
+          "default": 42,
+          "maximum": 120,
+          "minimum": 20,
+          "type": "integer"
+        },
+        "scannerBurstWindowMs": {
+          "default": 80,
+          "maximum": 500,
+          "minimum": 20,
+          "type": "integer"
+        },
+        "scannerTerminator": {
+          "default": "enter",
+          "enum": [
+            "enter",
+            "tab"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "HardwareConnectionState": {
       "enum": [
         "connected",
         "disconnected",
         "connecting",
         "busy",
+        "recovering",
+        "failed",
+        "disabled",
         "error",
         "unknown"
       ],
@@ -32120,12 +32605,101 @@
           "exclusiveMinimum": 0,
           "type": "integer"
         },
+        "connectionConfiguration": {
+          "additionalProperties": false,
+          "default": {},
+          "properties": {
+            "characterEncoding": {
+              "default": "cp850",
+              "enum": [
+                "cp850",
+                "utf8"
+              ],
+              "type": "string"
+            },
+            "commandTimeoutMs": {
+              "default": 5000,
+              "maximum": 30000,
+              "minimum": 500,
+              "type": "integer"
+            },
+            "connectTimeoutMs": {
+              "default": 2000,
+              "maximum": 10000,
+              "minimum": 250,
+              "type": "integer"
+            },
+            "drawerPulseOnMs": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 10,
+              "type": "integer"
+            },
+            "drawerPulsePin": {
+              "default": 0,
+              "maximum": 1,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "networkHost": {
+              "anyOf": [
+                {
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9.-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "networkPort": {
+              "anyOf": [
+                {
+                  "maximum": 65535,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "receiptWidthColumns": {
+              "default": 42,
+              "maximum": 120,
+              "minimum": 20,
+              "type": "integer"
+            },
+            "scannerBurstWindowMs": {
+              "default": 80,
+              "maximum": 500,
+              "minimum": 20,
+              "type": "integer"
+            },
+            "scannerTerminator": {
+              "default": "enter",
+              "enum": [
+                "enter",
+                "tab"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
         "connectionState": {
           "enum": [
             "connected",
             "disconnected",
             "connecting",
             "busy",
+            "recovering",
+            "failed",
+            "disabled",
             "error",
             "unknown"
           ],
@@ -32220,6 +32794,9 @@
         "transport": {
           "enum": [
             "simulator",
+            "network_tcp",
+            "printer_attached",
+            "keyboard_wedge",
             "usb_foundation",
             "bluetooth_foundation",
             "network_foundation",
@@ -32306,6 +32883,9 @@
             "disconnected",
             "connecting",
             "busy",
+            "recovering",
+            "failed",
+            "disabled",
             "error",
             "unknown"
           ],
@@ -32415,6 +32995,39 @@
                 }
               ]
             },
+            "attemptLimitReached": {
+              "type": "boolean"
+            },
+            "commandId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "commandStatus": {
+              "enum": [
+                "pending",
+                "dispatching",
+                "succeeded",
+                "failed",
+                "retryable",
+                "cancelled",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            "connectionState": {
+              "enum": [
+                "connected",
+                "disconnected",
+                "connecting",
+                "busy",
+                "recovering",
+                "failed",
+                "disabled",
+                "error",
+                "unknown"
+              ],
+              "type": "string"
+            },
             "latencyMs": {
               "anyOf": [
                 {
@@ -32426,6 +33039,9 @@
                   "type": "null"
                 }
               ]
+            },
+            "recovered": {
+              "type": "boolean"
             },
             "statusMessage": {
               "anyOf": [
@@ -32492,6 +33108,9 @@
             "disconnected",
             "connecting",
             "busy",
+            "recovering",
+            "failed",
+            "disabled",
             "error",
             "unknown"
           ],
@@ -32865,7 +33484,8 @@
                     {
                       "enum": [
                         "refund",
-                        "void"
+                        "void",
+                        "provisional"
                       ],
                       "type": "string"
                     },
@@ -33162,6 +33782,143 @@
       ],
       "type": "string"
     },
+    "HardwarePilotPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "allowNoSale": {
+          "default": false,
+          "type": "boolean"
+        },
+        "autoPrintReceipt": {
+          "default": true,
+          "type": "boolean"
+        },
+        "customerDisplayEnabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "hardwareHealthIntervalSeconds": {
+          "default": 30,
+          "maximum": 300,
+          "minimum": 15,
+          "type": "integer"
+        },
+        "hardwareRetryLimit": {
+          "default": 2,
+          "maximum": 3,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "openDrawerOnCashRefund": {
+          "default": true,
+          "type": "boolean"
+        },
+        "openDrawerOnCashSale": {
+          "default": true,
+          "type": "boolean"
+        },
+        "receiptCopiesDefault": {
+          "default": 1,
+          "maximum": 3,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "scannerEnabled": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "HardwarePilotPolicyResult": {
+      "additionalProperties": false,
+      "properties": {
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "policy": {
+          "additionalProperties": false,
+          "properties": {
+            "allowNoSale": {
+              "default": false,
+              "type": "boolean"
+            },
+            "autoPrintReceipt": {
+              "default": true,
+              "type": "boolean"
+            },
+            "customerDisplayEnabled": {
+              "default": false,
+              "type": "boolean"
+            },
+            "hardwareHealthIntervalSeconds": {
+              "default": 30,
+              "maximum": 300,
+              "minimum": 15,
+              "type": "integer"
+            },
+            "hardwareRetryLimit": {
+              "default": 2,
+              "maximum": 3,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "openDrawerOnCashRefund": {
+              "default": true,
+              "type": "boolean"
+            },
+            "openDrawerOnCashSale": {
+              "default": true,
+              "type": "boolean"
+            },
+            "receiptCopiesDefault": {
+              "default": 1,
+              "maximum": 3,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "scannerEnabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        },
+        "registerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "version": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "merchantId",
+        "locationId",
+        "registerId",
+        "policy",
+        "version",
+        "updatedAt"
+      ],
+      "type": "object"
+    },
     "HardwareRecoveryQuery": {
       "additionalProperties": false,
       "properties": {
@@ -33286,12 +34043,101 @@
                 "exclusiveMinimum": 0,
                 "type": "integer"
               },
+              "connectionConfiguration": {
+                "additionalProperties": false,
+                "default": {},
+                "properties": {
+                  "characterEncoding": {
+                    "default": "cp850",
+                    "enum": [
+                      "cp850",
+                      "utf8"
+                    ],
+                    "type": "string"
+                  },
+                  "commandTimeoutMs": {
+                    "default": 5000,
+                    "maximum": 30000,
+                    "minimum": 500,
+                    "type": "integer"
+                  },
+                  "connectTimeoutMs": {
+                    "default": 2000,
+                    "maximum": 10000,
+                    "minimum": 250,
+                    "type": "integer"
+                  },
+                  "drawerPulseOnMs": {
+                    "default": 50,
+                    "maximum": 500,
+                    "minimum": 10,
+                    "type": "integer"
+                  },
+                  "drawerPulsePin": {
+                    "default": 0,
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "networkHost": {
+                    "anyOf": [
+                      {
+                        "maxLength": 253,
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9.-]+$",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null
+                  },
+                  "networkPort": {
+                    "anyOf": [
+                      {
+                        "maximum": 65535,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null
+                  },
+                  "receiptWidthColumns": {
+                    "default": 42,
+                    "maximum": 120,
+                    "minimum": 20,
+                    "type": "integer"
+                  },
+                  "scannerBurstWindowMs": {
+                    "default": 80,
+                    "maximum": 500,
+                    "minimum": 20,
+                    "type": "integer"
+                  },
+                  "scannerTerminator": {
+                    "default": "enter",
+                    "enum": [
+                      "enter",
+                      "tab"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
               "connectionState": {
                 "enum": [
                   "connected",
                   "disconnected",
                   "connecting",
                   "busy",
+                  "recovering",
+                  "failed",
+                  "disabled",
                   "error",
                   "unknown"
                 ],
@@ -33386,6 +34232,9 @@
               "transport": {
                 "enum": [
                   "simulator",
+                  "network_tcp",
+                  "printer_attached",
+                  "keyboard_wedge",
                   "usb_foundation",
                   "bluetooth_foundation",
                   "network_foundation",
@@ -33448,6 +34297,60 @@
         },
         "pendingJobs": {
           "minimum": 0,
+          "type": "integer"
+        },
+        "policy": {
+          "additionalProperties": false,
+          "default": {},
+          "properties": {
+            "allowNoSale": {
+              "default": false,
+              "type": "boolean"
+            },
+            "autoPrintReceipt": {
+              "default": true,
+              "type": "boolean"
+            },
+            "customerDisplayEnabled": {
+              "default": false,
+              "type": "boolean"
+            },
+            "hardwareHealthIntervalSeconds": {
+              "default": 30,
+              "maximum": 300,
+              "minimum": 15,
+              "type": "integer"
+            },
+            "hardwareRetryLimit": {
+              "default": 2,
+              "maximum": 3,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "openDrawerOnCashRefund": {
+              "default": true,
+              "type": "boolean"
+            },
+            "openDrawerOnCashSale": {
+              "default": true,
+              "type": "boolean"
+            },
+            "receiptCopiesDefault": {
+              "default": 1,
+              "maximum": 3,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "scannerEnabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        },
+        "policyVersion": {
+          "default": 1,
+          "exclusiveMinimum": 0,
           "type": "integer"
         },
         "printJobs": {
@@ -33705,6 +34608,9 @@
     "HardwareTransport": {
       "enum": [
         "simulator",
+        "network_tcp",
+        "printer_attached",
+        "keyboard_wedge",
         "usb_foundation",
         "bluetooth_foundation",
         "network_foundation",
@@ -46094,12 +47000,101 @@
           "exclusiveMinimum": 0,
           "type": "integer"
         },
+        "connectionConfiguration": {
+          "additionalProperties": false,
+          "default": {},
+          "properties": {
+            "characterEncoding": {
+              "default": "cp850",
+              "enum": [
+                "cp850",
+                "utf8"
+              ],
+              "type": "string"
+            },
+            "commandTimeoutMs": {
+              "default": 5000,
+              "maximum": 30000,
+              "minimum": 500,
+              "type": "integer"
+            },
+            "connectTimeoutMs": {
+              "default": 2000,
+              "maximum": 10000,
+              "minimum": 250,
+              "type": "integer"
+            },
+            "drawerPulseOnMs": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 10,
+              "type": "integer"
+            },
+            "drawerPulsePin": {
+              "default": 0,
+              "maximum": 1,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "networkHost": {
+              "anyOf": [
+                {
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9.-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "networkPort": {
+              "anyOf": [
+                {
+                  "maximum": 65535,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "receiptWidthColumns": {
+              "default": 42,
+              "maximum": 120,
+              "minimum": 20,
+              "type": "integer"
+            },
+            "scannerBurstWindowMs": {
+              "default": 80,
+              "maximum": 500,
+              "minimum": 20,
+              "type": "integer"
+            },
+            "scannerTerminator": {
+              "default": "enter",
+              "enum": [
+                "enter",
+                "tab"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
         "connectionState": {
           "enum": [
             "connected",
             "disconnected",
             "connecting",
             "busy",
+            "recovering",
+            "failed",
+            "disabled",
             "error",
             "unknown"
           ],
@@ -46198,6 +47193,9 @@
         "transport": {
           "enum": [
             "simulator",
+            "network_tcp",
+            "printer_attached",
+            "keyboard_wedge",
             "usb_foundation",
             "bluetooth_foundation",
             "network_foundation",
@@ -47772,12 +48770,101 @@
           "exclusiveMinimum": 0,
           "type": "integer"
         },
+        "connectionConfiguration": {
+          "additionalProperties": false,
+          "default": {},
+          "properties": {
+            "characterEncoding": {
+              "default": "cp850",
+              "enum": [
+                "cp850",
+                "utf8"
+              ],
+              "type": "string"
+            },
+            "commandTimeoutMs": {
+              "default": 5000,
+              "maximum": 30000,
+              "minimum": 500,
+              "type": "integer"
+            },
+            "connectTimeoutMs": {
+              "default": 2000,
+              "maximum": 10000,
+              "minimum": 250,
+              "type": "integer"
+            },
+            "drawerPulseOnMs": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 10,
+              "type": "integer"
+            },
+            "drawerPulsePin": {
+              "default": 0,
+              "maximum": 1,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "networkHost": {
+              "anyOf": [
+                {
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9.-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "networkPort": {
+              "anyOf": [
+                {
+                  "maximum": 65535,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "receiptWidthColumns": {
+              "default": 42,
+              "maximum": 120,
+              "minimum": 20,
+              "type": "integer"
+            },
+            "scannerBurstWindowMs": {
+              "default": 80,
+              "maximum": 500,
+              "minimum": 20,
+              "type": "integer"
+            },
+            "scannerTerminator": {
+              "default": "enter",
+              "enum": [
+                "enter",
+                "tab"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
         "connectionState": {
           "enum": [
             "connected",
             "disconnected",
             "connecting",
             "busy",
+            "recovering",
+            "failed",
+            "disabled",
             "error",
             "unknown"
           ],
@@ -47914,6 +49001,9 @@
         "transport": {
           "enum": [
             "simulator",
+            "network_tcp",
+            "printer_attached",
+            "keyboard_wedge",
             "usb_foundation",
             "bluetooth_foundation",
             "network_foundation",
@@ -50155,7 +51245,8 @@
             {
               "enum": [
                 "refund",
-                "void"
+                "void",
+                "provisional"
               ],
               "type": "string"
             },
@@ -54436,6 +55527,92 @@
           "format": "uuid",
           "type": "string"
         },
+        "connectionConfiguration": {
+          "additionalProperties": false,
+          "default": {},
+          "properties": {
+            "characterEncoding": {
+              "default": "cp850",
+              "enum": [
+                "cp850",
+                "utf8"
+              ],
+              "type": "string"
+            },
+            "commandTimeoutMs": {
+              "default": 5000,
+              "maximum": 30000,
+              "minimum": 500,
+              "type": "integer"
+            },
+            "connectTimeoutMs": {
+              "default": 2000,
+              "maximum": 10000,
+              "minimum": 250,
+              "type": "integer"
+            },
+            "drawerPulseOnMs": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 10,
+              "type": "integer"
+            },
+            "drawerPulsePin": {
+              "default": 0,
+              "maximum": 1,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "networkHost": {
+              "anyOf": [
+                {
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9.-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "networkPort": {
+              "anyOf": [
+                {
+                  "maximum": 65535,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "receiptWidthColumns": {
+              "default": 42,
+              "maximum": 120,
+              "minimum": 20,
+              "type": "integer"
+            },
+            "scannerBurstWindowMs": {
+              "default": 80,
+              "maximum": 500,
+              "minimum": 20,
+              "type": "integer"
+            },
+            "scannerTerminator": {
+              "default": "enter",
+              "enum": [
+                "enter",
+                "tab"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
         "idempotencyKey": {
           "maxLength": 128,
           "minLength": 8,
@@ -54479,6 +55656,9 @@
         "transport": {
           "enum": [
             "simulator",
+            "network_tcp",
+            "printer_attached",
+            "keyboard_wedge",
             "usb_foundation",
             "bluetooth_foundation",
             "network_foundation",
@@ -61528,12 +62708,101 @@
           "exclusiveMinimum": 0,
           "type": "integer"
         },
+        "connectionConfiguration": {
+          "additionalProperties": false,
+          "default": {},
+          "properties": {
+            "characterEncoding": {
+              "default": "cp850",
+              "enum": [
+                "cp850",
+                "utf8"
+              ],
+              "type": "string"
+            },
+            "commandTimeoutMs": {
+              "default": 5000,
+              "maximum": 30000,
+              "minimum": 500,
+              "type": "integer"
+            },
+            "connectTimeoutMs": {
+              "default": 2000,
+              "maximum": 10000,
+              "minimum": 250,
+              "type": "integer"
+            },
+            "drawerPulseOnMs": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 10,
+              "type": "integer"
+            },
+            "drawerPulsePin": {
+              "default": 0,
+              "maximum": 1,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "networkHost": {
+              "anyOf": [
+                {
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9.-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "networkPort": {
+              "anyOf": [
+                {
+                  "maximum": 65535,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "receiptWidthColumns": {
+              "default": 42,
+              "maximum": 120,
+              "minimum": 20,
+              "type": "integer"
+            },
+            "scannerBurstWindowMs": {
+              "default": 80,
+              "maximum": 500,
+              "minimum": 20,
+              "type": "integer"
+            },
+            "scannerTerminator": {
+              "default": "enter",
+              "enum": [
+                "enter",
+                "tab"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
         "connectionState": {
           "enum": [
             "connected",
             "disconnected",
             "connecting",
             "busy",
+            "recovering",
+            "failed",
+            "disabled",
             "error",
             "unknown"
           ],
@@ -61632,6 +62901,9 @@
         "transport": {
           "enum": [
             "simulator",
+            "network_tcp",
+            "printer_attached",
+            "keyboard_wedge",
             "usb_foundation",
             "bluetooth_foundation",
             "network_foundation",
@@ -67893,12 +69165,200 @@
       ],
       "type": "string"
     },
+    "UpdateHardwarePolicyRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "expectedVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "maxLength": 128,
+          "minLength": 8,
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "policy": {
+          "additionalProperties": false,
+          "properties": {
+            "allowNoSale": {
+              "default": false,
+              "type": "boolean"
+            },
+            "autoPrintReceipt": {
+              "default": true,
+              "type": "boolean"
+            },
+            "customerDisplayEnabled": {
+              "default": false,
+              "type": "boolean"
+            },
+            "hardwareHealthIntervalSeconds": {
+              "default": 30,
+              "maximum": 300,
+              "minimum": 15,
+              "type": "integer"
+            },
+            "hardwareRetryLimit": {
+              "default": 2,
+              "maximum": 3,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "openDrawerOnCashRefund": {
+              "default": true,
+              "type": "boolean"
+            },
+            "openDrawerOnCashSale": {
+              "default": true,
+              "type": "boolean"
+            },
+            "receiptCopiesDefault": {
+              "default": 1,
+              "maximum": 3,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "scannerEnabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        },
+        "registerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "locationId",
+        "operatorSessionId",
+        "commandId",
+        "idempotencyKey",
+        "expectedVersion",
+        "policy"
+      ],
+      "type": "object"
+    },
     "UpdateHardwareRequest": {
       "additionalProperties": false,
       "properties": {
         "commandId": {
           "format": "uuid",
           "type": "string"
+        },
+        "connectionConfiguration": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "characterEncoding": {
+                  "default": "cp850",
+                  "enum": [
+                    "cp850",
+                    "utf8"
+                  ],
+                  "type": "string"
+                },
+                "commandTimeoutMs": {
+                  "default": 5000,
+                  "maximum": 30000,
+                  "minimum": 500,
+                  "type": "integer"
+                },
+                "connectTimeoutMs": {
+                  "default": 2000,
+                  "maximum": 10000,
+                  "minimum": 250,
+                  "type": "integer"
+                },
+                "drawerPulseOnMs": {
+                  "default": 50,
+                  "maximum": 500,
+                  "minimum": 10,
+                  "type": "integer"
+                },
+                "drawerPulsePin": {
+                  "default": 0,
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "networkHost": {
+                  "anyOf": [
+                    {
+                      "maxLength": 253,
+                      "minLength": 1,
+                      "pattern": "^[A-Za-z0-9.-]+$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                },
+                "networkPort": {
+                  "anyOf": [
+                    {
+                      "maximum": 65535,
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                },
+                "receiptWidthColumns": {
+                  "default": 42,
+                  "maximum": 120,
+                  "minimum": 20,
+                  "type": "integer"
+                },
+                "scannerBurstWindowMs": {
+                  "default": 80,
+                  "maximum": 500,
+                  "minimum": 20,
+                  "type": "integer"
+                },
+                "scannerTerminator": {
+                  "default": "enter",
+                  "enum": [
+                    "enter",
+                    "tab"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "enabled": {
           "type": "boolean"
@@ -69236,6 +70696,22 @@
       "request": "HardwareRegistryQuery",
       "response": "HardwareRuntimeSnapshot"
     },
+    "GET /api/v1/pos/merchants/:merchantId/hardware/print-jobs/:jobId/command": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "HARDWARE_NOT_FOUND"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "hardware.printer.print",
+      "pin": false,
+      "request": "HardwareRecoveryQuery",
+      "response": "HardwareCommandResult"
+    },
     "GET /api/v1/pos/merchants/:merchantId/hardware/recovery": {
       "approval": false,
       "auth": "operator-session",
@@ -69571,6 +71047,23 @@
       "pin": false,
       "request": "UpdateHardwareRequest",
       "response": "HardwareDevice"
+    },
+    "PATCH /api/v1/pos/merchants/:merchantId/hardware/policy": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "OPTIMISTIC_VERSION_CONFLICT",
+        "LOCATION_SCOPE_VIOLATION"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "hardware.manage",
+      "pin": false,
+      "request": "UpdateHardwarePolicyRequest",
+      "response": "HardwarePilotPolicyResult"
     },
     "POST /api/:merchantRef/admin/gift-cards": {
       "approval": false,

@@ -45,17 +45,20 @@ final class CheckoutController extends ChangeNotifier {
     ConnectivityController? connectivity,
     required Telemetry telemetry,
     Future<void> Function(CheckoutResult result)? afterCommit,
+    Future<void> Function(ProvisionalReceipt receipt)? afterOfflineCommit,
   }) : _repository = repository,
        _offlineCheckout = offlineCheckout,
        _connectivity = connectivity,
        _telemetry = telemetry,
-       _afterCommit = afterCommit;
+       _afterCommit = afterCommit,
+       _afterOfflineCommit = afterOfflineCommit;
 
   final CheckoutRepository _repository;
   final OfflineCheckoutService? _offlineCheckout;
   final ConnectivityController? _connectivity;
   final Telemetry _telemetry;
   final Future<void> Function(CheckoutResult result)? _afterCommit;
+  final Future<void> Function(ProvisionalReceipt receipt)? _afterOfflineCommit;
   CheckoutState _state = const CheckoutState();
   CheckoutState get state => _state;
   List<Map<String, Object?>> get tenderDrafts => _tenderDrafts;
@@ -575,6 +578,14 @@ final class CheckoutController extends ChangeNotifier {
         ),
       );
       _event('offline_checkout_journaled');
+      final callback = _afterOfflineCommit;
+      if (callback != null) {
+        unawaited(
+          callback(receipt).catchError((Object _) {
+            _event('offline_hardware_recovery_required');
+          }),
+        );
+      }
     } on OfflineJournalException catch (error) {
       _set(
         CheckoutState(

@@ -100,7 +100,7 @@ expect_error() {  # expect_error <label> <output>
 
 echo "== building a disposable build-v3 in $DB =="
 psql -q -c "create database $DB;" >/dev/null
-for f in 00_foundation 10_umi 20_merchant 30_runtime 30_device_pairing 31_pos_sale 32_pos_checkout 33_pos_cash 34_pos_exception 35_pos_pilot_rbac 36_pos_inventory 37_pos_customer_value 38_pos_customer_value_closeout 39_pos_customer_value_final_closeout 40_pos_hardware_runtime 50_cross_schema_fk 60_triggers 90_rls 99_verify; do
+for f in 00_foundation 10_umi 20_merchant 30_runtime 30_device_pairing 31_pos_sale 32_pos_checkout 33_pos_cash 34_pos_exception 35_pos_pilot_rbac 36_pos_inventory 37_pos_customer_value 38_pos_customer_value_closeout 39_pos_customer_value_final_closeout 40_pos_hardware_runtime 41_pos_hardware_pilot 50_cross_schema_fk 60_triggers 90_rls 99_verify; do
   if ! ddl_output=$(psql -X -q -v ON_ERROR_STOP=1 -d "$DB" -f "$DDL/$f.sql" 2>&1); then
     echo "  DDL FAILED at $f:"
     printf '%s\n' "$ddl_output" | grep -E 'ERROR|LINE' | head -5
@@ -1570,6 +1570,56 @@ HARDWARE_ID="$(as_api "$A" "$A1" "$D1" "select merchant.register_hardware_device
 expect "hardware registration creates one scoped device" "1" \
   "$(q -c "select count(*) from merchant.hardware_device where id='$HARDWARE_ID'
     and merchant_id='$A' and location_id='$A1' and device_type='printer';")"
+NETWORK_PRINTER_ID="$(as_api "$A" "$A1" "$D1" "select merchant.register_hardware_device(
+  jsonb_build_object('merchantId','$A','locationId','$A1','operatorSessionId','$OS',
+    'registerId',null,'assignedPosDeviceId','$D1','deviceType','printer',
+    'manufacturer','Generic','model','thermal-network','publicReference','NET-PRINTER-1',
+    'transport','network_tcp','capabilities',jsonb_build_array(
+      'printer.receipt','printer.qr','printer.cut','printer.test_page'),
+    'connectionConfiguration',jsonb_build_object(
+      'networkHost','printer.local','networkPort',9100,'connectTimeoutMs',1000,
+      'commandTimeoutMs',3000,'characterEncoding','cp850','receiptWidthColumns',42,
+      'drawerPulsePin',0,'drawerPulseOnMs',50,'scannerTerminator','enter',
+      'scannerBurstWindowMs',80)));" )"
+expect "generic network printer stores bounded safe configuration" "network_tcp|printer.local|9100" \
+  "$(q -c "select transport,connection_configuration->>'networkHost',
+    connection_configuration->>'networkPort' from merchant.hardware_device
+    where id='$NETWORK_PRINTER_ID';")"
+expect_error "a network printer rejects an invalid endpoint" \
+  "$(as_api_raw "$A" "$A1" "$D1" "select merchant.register_hardware_device(
+    jsonb_build_object('merchantId','$A','locationId','$A1','operatorSessionId','$OS',
+      'deviceType','printer','manufacturer','Generic','model','invalid',
+      'publicReference','NET-PRINTER-BAD','transport','network_tcp',
+      'capabilities',jsonb_build_array('printer.receipt'),
+      'connectionConfiguration',jsonb_build_object(
+        'networkHost','http://unsafe','networkPort',70000,'connectTimeoutMs',1000,
+        'commandTimeoutMs',3000,'characterEncoding','cp850','receiptWidthColumns',42,
+        'drawerPulsePin',0,'drawerPulseOnMs',50,'scannerTerminator','enter',
+        'scannerBurstWindowMs',80)));" )"
+expect "pilot policy starts without a permissive stored override" "0" \
+  "$(q -c "select count(*) from merchant.hardware_pilot_policy
+    where merchant_id='$A' and location_id='$A1';")"
+POLICY_VERSION="$(as_api "$A" "$A1" "$D1" "select merchant.update_hardware_pilot_policy(
+  jsonb_build_object('merchantId','$A','locationId','$A1','operatorSessionId','$OS',
+    'registerId',null,'expectedVersion',1,'policy',jsonb_build_object(
+      'autoPrintReceipt',true,'openDrawerOnCashSale',true,
+      'openDrawerOnCashRefund',true,'allowNoSale',false,
+      'receiptCopiesDefault',1,'hardwareRetryLimit',3,
+      'hardwareHealthIntervalSeconds',60,'scannerEnabled',true,
+      'customerDisplayEnabled',false)));" )"
+expect "pilot policy update is scoped and versioned" "2|3|1" \
+  "$POLICY_VERSION|$(as_api "$A" "$A1" "$D1" "select
+    (policy->>'hardwareRetryLimit')::int,count(*) over()
+    from merchant.hardware_pilot_policy where merchant_id='$A' and location_id='$A1';")"
+expect_error "another location cannot update the pilot policy" \
+  "$(as_api_raw "$A" "$A2" "$D2" "select merchant.update_hardware_pilot_policy(
+    jsonb_build_object('merchantId','$A','locationId','$A2','operatorSessionId','$OS',
+      'registerId',null,'expectedVersion',1,'policy',jsonb_build_object(
+        'autoPrintReceipt',true,'openDrawerOnCashSale',true,
+        'openDrawerOnCashRefund',true,'allowNoSale',false,
+        'receiptCopiesDefault',1,'hardwareRetryLimit',2,
+        'hardwareHealthIntervalSeconds',30,'scannerEnabled',true,
+        'customerDisplayEnabled',false)));" )"
 as_api "$A" "$A1" "$D1" "select merchant.assign_hardware_device(jsonb_build_object(
   'merchantId','$A','locationId','$A1','operatorSessionId','$OS','hardwareId','$HARDWARE_ID',
   'registerId',null,'assignedPosDeviceId','$D1','primary',true,'expectedVersion',1));" >/dev/null
@@ -1698,11 +1748,23 @@ expect_error "a committed cash fact cannot emit a second drawer pulse" \
 expect_error "api cannot mutate hardware command history" \
   "$(as_api_raw "$A" "$A1" "$D1" "update merchant.hardware_command_event
     set status='failed' where command_id='$HARDWARE_COMMAND';")"
-expect "all hardware authority tables force RLS" "7" \
+as_api "$A" "$A1" "$D1" "select merchant.assign_hardware_device(jsonb_build_object(
+  'merchantId','$A','locationId','$A1','operatorSessionId','$OS',
+  'hardwareId','$NETWORK_PRINTER_ID','registerId',null,'assignedPosDeviceId','$D1',
+  'primary',true,'expectedVersion',1));" >/dev/null
+expect "primary printer change keeps one active primary and the prior assignment" "1|1|0" \
+  "$(q -c "select
+    count(*) filter(where primary_device),count(*) filter(where not primary_device),
+    count(*) filter(where primary_device and hardware_id='$HARDWARE_ID')
+    from merchant.hardware_assignment where merchant_id='$A' and location_id='$A1'
+      and register_id is null and released_at is null and hardware_id in (
+        '$HARDWARE_ID','$NETWORK_PRINTER_ID');")"
+expect "all hardware authority tables force RLS" "8" \
   "$(q -c "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
     where n.nspname='merchant' and c.relname in (
       'hardware_device','hardware_assignment','hardware_command','hardware_command_event',
-      'hardware_print_job','hardware_print_job_event','hardware_diagnostic')
+      'hardware_print_job','hardware_print_job_event','hardware_diagnostic',
+      'hardware_pilot_policy')
       and c.relrowsecurity and c.relforcerowsecurity;")"
 
 echo

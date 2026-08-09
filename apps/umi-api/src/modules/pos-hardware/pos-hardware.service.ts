@@ -16,6 +16,7 @@ import type {
   HardwareRegistryQuery,
   RegisterHardwareRequest,
   UpdateHardwareRequest,
+  UpdateHardwarePolicyRequest,
 } from '@umi/contract';
 import type { AuthUser } from '../auth/auth.types';
 import { IntegrityService } from '../integrity/integrity.service';
@@ -66,6 +67,22 @@ export class PosHardwareService {
           eventType: dto.enabled ? 'hardware_enabled' : 'hardware_disabled',
           entityType: 'hardware_device',
           entityId: result.id,
+        },
+      };
+    });
+  }
+
+  async updatePolicy(user: AuthUser, merchantId: string, dto: UpdateHardwarePolicyRequest) {
+    await this.authorize(user, merchantId, dto, 'hardware.manage');
+    return this.mutation(merchantId, dto, 'pos.hardware.policy.update', async (client) => {
+      const result = await this.repo.updatePolicy(client, merchantId, dto);
+      return {
+        result,
+        audit: {
+          eventType: 'hardware_policy_updated',
+          entityType: 'hardware_pilot_policy',
+          entityId: dto.commandId,
+          publicData: { registerId: dto.registerId, version: result.version },
         },
       };
     });
@@ -168,6 +185,16 @@ export class PosHardwareService {
         };
       },
     );
+  }
+
+  async printJobCommand(
+    user: AuthUser,
+    merchantId: string,
+    jobId: string,
+    query: HardwareRecoveryQuery,
+  ) {
+    await this.authorize(user, merchantId, query, 'hardware.printer.print');
+    return this.repo.printJobCommand(user.id, merchantId, query.locationId, jobId);
   }
 
   async diagnostic(user: AuthUser, merchantId: string, dto: HardwareDiagnosticRequest) {

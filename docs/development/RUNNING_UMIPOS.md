@@ -553,7 +553,7 @@ Las operaciones de customers, rewards, wallet y gift card son online-only. El re
 
 El script crea y elimina su base desechable. No lo apuntes a una base compartida. No borres datos de producción.
 
-## Runtime de hardware de Gate 3G-A
+## Hardware piloto de Gate 3G-B
 
 Genera y verifica los contratos de hardware:
 
@@ -580,6 +580,15 @@ El comando crea y elimina una base desechable. No uses una base compartida.
 Usa el laboratorio de simuladores para el desarrollo local. Registra el simulador con la API de hardware.
 Asígnalo a la ubicación y al dispositivo POS inscritos. El Centro de hardware resuelve el adaptador.
 
+Registra una impresora TCP genérica con el transporte `network_tcp`. Configura el host y el puerto `9100`.
+Usa `cp850` para los caracteres en español. Usa `utf8` solamente cuando la impresora lo admite.
+
+Registra un cajón conectado a la impresora con el transporte `printer_attached`.
+Usa el mismo host de la impresora. Configura el pin y la duración del pulso.
+
+Registra un escáner de teclado con el transporte `keyboard_wedge`.
+Configura `enter` o `tab` como terminador. Configura una ventana entre 20 y 500 milisegundos.
+
 Prueba la recuperación de la impresora con estos estados deterministas:
 
 - `success` guarda un artefacto de impresión seguro.
@@ -603,7 +612,10 @@ flutter build linux --debug
 flutter build web --debug
 ```
 
-Gate 3G-A no requiere hardware físico, un SDK de fabricante o un proveedor de pagos.
+La prueba `simulated cashier journey keeps financial and physical facts separate` ejecuta el recorrido completo.
+
+El runner actual no tiene hardware piloto. No afirmes una certificación física con este resultado.
+Gate 3G-B no requiere un SDK de fabricante o un proveedor de pagos.
 
 ## Canonical PR check
 

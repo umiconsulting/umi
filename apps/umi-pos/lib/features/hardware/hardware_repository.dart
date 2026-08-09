@@ -17,6 +17,10 @@ abstract interface class HardwareRepository {
     String hardwareId,
     AssignHardwareRequest request,
   );
+  Future<HardwarePilotPolicyResult> updatePolicy(
+    String merchantId,
+    UpdateHardwarePolicyRequest request,
+  );
   Future<HardwareRuntimeSnapshot> snapshot(
     String merchantId,
     HardwareRegistryQuery query,
@@ -38,6 +42,11 @@ abstract interface class HardwareRepository {
     String merchantId,
     String jobId,
     ControlledReprintRequest request,
+  );
+  Future<HardwareCommandResult> printJobCommand(
+    String merchantId,
+    String jobId,
+    HardwareRecoveryQuery query,
   );
 }
 
@@ -119,6 +128,24 @@ final class ApiHardwareRepository implements HardwareRepository {
   );
 
   @override
+  Future<HardwareCommandResult> printJobCommand(
+    String merchantId,
+    String jobId,
+    HardwareRecoveryQuery query,
+  ) async => HardwareCommandResult.fromJson(
+    await _api.request(
+      method: ApiMethod.get,
+      path: Uri(
+        path: UmiRoutes.posHardwarePrintJobCommand(merchantId, jobId),
+        queryParameters: {
+          'locationId': query.locationId,
+          'operatorSessionId': query.operatorSessionId,
+        },
+      ).toString(),
+    ),
+  );
+
+  @override
   Future<HardwareDevice> register(
     String merchantId,
     RegisterHardwareRequest request,
@@ -154,6 +181,19 @@ final class ApiHardwareRepository implements HardwareRepository {
     await _api.request(
       method: ApiMethod.post,
       path: UmiRoutes.posHardwareAssign(merchantId, hardwareId),
+      body: request.toJson(),
+      idempotent: true,
+    ),
+  );
+
+  @override
+  Future<HardwarePilotPolicyResult> updatePolicy(
+    String merchantId,
+    UpdateHardwarePolicyRequest request,
+  ) async => HardwarePilotPolicyResult.fromJson(
+    await _api.request(
+      method: ApiMethod.patch,
+      path: UmiRoutes.posHardwarePolicyUpdate(merchantId),
       body: request.toJson(),
       idempotent: true,
     ),

@@ -67,10 +67,13 @@ final class _UmiPosAppState extends State<UmiPosApp> {
     final editable = own is EditableText
         ? own
         : context?.findAncestorWidgetOfExactType<EditableText>();
+    final textField = context?.findAncestorWidgetOfExactType<TextField>();
     return _keyboardRouter.route(
       acceptCodeUnit: widget.root.hardware?.acceptKeyboardCodeUnit,
       event: event,
-      textInputFocused: editable != null,
+      textInputFocused:
+          editable != null &&
+          textField?.key != const ValueKey('hardware-barcode-search'),
     );
   }
 

@@ -11,6 +11,7 @@ final class RuntimeDevice {
     required this.transport,
     required this.capabilities,
     required this.enabled,
+    this.connectionConfiguration = const {},
   });
 
   final String id;
@@ -18,6 +19,7 @@ final class RuntimeDevice {
   final String transport;
   final Set<String> capabilities;
   final bool enabled;
+  final Map<String, Object?> connectionConfiguration;
 }
 
 RuntimeDevice simulatedDevice({required String id, required String type}) {
@@ -364,6 +366,16 @@ final class HardwareCoordinator {
     _adapters[device.id] = adapter;
   }
 
+  void disable(RuntimeDevice device) {
+    _devices[device.id] = device;
+    _adapters.remove(device.id);
+  }
+
+  void retainDevices(Set<String> hardwareIds) {
+    _devices.removeWhere((id, _) => !hardwareIds.contains(id));
+    _adapters.removeWhere((id, _) => !hardwareIds.contains(id));
+  }
+
   Future<RuntimeCommandResult> dispatch(RuntimeCommand command) async {
     final previous = _results[command.id];
     if (previous != null) {
@@ -451,19 +463,51 @@ abstract interface class DeviceAdapterResolver {
   DeviceAdapter? resolve(RuntimeDevice device);
 }
 
-final class SimulatorHardwareLab implements DeviceAdapterResolver {
+abstract interface class HardwareScanEventSource {
+  Stream<CanonicalScanEvent> get scanEvents;
+}
+
+abstract interface class DisposableDeviceAdapterResolver {
+  Future<void> dispose();
+}
+
+abstract interface class HardwarePolicyAwareResolver {
+  Future<void> configurePolicy(Map<String, Object?> policy);
+}
+
+abstract interface class HardwareScanObserver {
+  void recordScan(CanonicalScanEvent event);
+}
+
+abstract interface class HardwareConnectionStateResolver {
+  Future<void> refreshHealth();
+  String? connectionStateFor(String hardwareId);
+}
+
+abstract interface class HardwareRegistryAwareResolver {
+  Future<void> retainDevices(Set<String> hardwareIds);
+}
+
+final class SimulatorHardwareLab
+    implements
+        DeviceAdapterResolver,
+        HardwareScanEventSource,
+        DisposableDeviceAdapterResolver {
   SimulatorHardwareLab({this.failures = const {}});
   final Map<String, Map<String, SimulatorFailure>> failures;
   final Map<String, DeviceAdapter> _adapters = {};
   final StreamController<CanonicalScanEvent> _scanEvents =
       StreamController.broadcast();
   final Set<String> _scannerSubscriptions = {};
+  final Set<String> _activeDevices = {};
 
+  @override
   Stream<CanonicalScanEvent> get scanEvents => _scanEvents.stream;
 
   @override
   DeviceAdapter? resolve(RuntimeDevice device) {
     if (device.transport != 'simulator') return null;
+    _activeDevices.add(device.id);
     final adapter = _adapters.putIfAbsent(device.id, () {
       final injected = failures[device.id] ?? const {};
       return switch (device.type) {
@@ -478,7 +522,9 @@ final class SimulatorHardwareLab implements DeviceAdapterResolver {
     });
     if (adapter is ScannerSimulatorAdapter &&
         _scannerSubscriptions.add(device.id)) {
-      adapter.events.listen(_scanEvents.add);
+      adapter.events.listen((event) {
+        if (_activeDevices.contains(device.id)) _scanEvents.add(event);
+      });
     }
     return adapter;
   }
@@ -486,6 +532,11 @@ final class SimulatorHardwareLab implements DeviceAdapterResolver {
   T? adapter<T extends DeviceAdapter>(String hardwareId) =>
       _adapters[hardwareId] is T ? _adapters[hardwareId] as T : null;
 
+  void retainDevices(Set<String> hardwareIds) {
+    _activeDevices.retainAll(hardwareIds);
+  }
+
+  @override
   Future<void> dispose() async {
     for (final adapter
         in _adapters.values.whereType<ScannerSimulatorAdapter>()) {
@@ -502,18 +553,25 @@ final class KeyboardWedgeInputAdapter {
     this.maximumLength = 256,
   });
 
-  final String terminator;
-  final Duration timeout;
+  String terminator;
+  Duration timeout;
   final int maximumLength;
   final List<CanonicalScanEvent> events = [];
   final StreamController<CanonicalScanEvent> _eventStream =
       StreamController.broadcast();
   final StringBuffer _buffer = StringBuffer();
+  final Map<String, DateTime> _recent = {};
   DateTime? _first;
   DateTime? _last;
   bool sensitiveInputActive = false;
 
   Stream<CanonicalScanEvent> get scanEvents => _eventStream.stream;
+
+  void configure({required String terminator, required Duration timeout}) {
+    this.terminator = terminator;
+    this.timeout = timeout;
+    _reset();
+  }
 
   bool accept(int codeUnit, DateTime at) {
     if (sensitiveInputActive) {
@@ -528,9 +586,16 @@ final class KeyboardWedgeInputAdapter {
       final value = _buffer.toString();
       final burst = _first != null && at.difference(_first!) <= timeout;
       if (burst && value.length >= 3) {
+        final previous = _recent[value];
+        if (previous != null &&
+            at.difference(previous) < const Duration(milliseconds: 120)) {
+          _reset();
+          return true;
+        }
+        _recent[value] = at;
         final event = CanonicalScanEvent(
           value: value,
-          symbology: 'unknown_symbology',
+          symbology: _symbology(value),
           sequence: events.length + 1,
         );
         events.add(event);
@@ -547,6 +612,14 @@ final class KeyboardWedgeInputAdapter {
     }
     if (codeUnit >= 32 && codeUnit <= 126) _buffer.write(character);
     return false;
+  }
+
+  String _symbology(String value) {
+    final digits = RegExp(r'^\d+$').hasMatch(value);
+    if (digits && (value.length == 8 || value.length == 13)) return 'ean';
+    if (digits && value.length == 12) return 'upc';
+    if (RegExp(r'^[\x20-\x7e]+$').hasMatch(value)) return 'code128';
+    return 'unknown_symbology';
   }
 
   void _reset() {

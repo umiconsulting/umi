@@ -97,6 +97,7 @@ Future<void> showSaleCenter(
   SaleLifecycleController lifecycle,
   OperatorPermissions permissions, [
   SaleExceptionController? exceptions,
+  Future<void> Function(String receiptId, SaleReceiptResult result)? onPrint,
 ]) => showModalBottomSheet<void>(
   context: context,
   isScrollControlled: true,
@@ -105,6 +106,7 @@ Future<void> showSaleCenter(
     lifecycle: lifecycle,
     permissions: permissions,
     exceptions: exceptions,
+    onPrint: onPrint,
   ),
 );
 
@@ -212,10 +214,13 @@ final class _SaleCenter extends StatefulWidget {
     required this.lifecycle,
     required this.permissions,
     this.exceptions,
+    this.onPrint,
   });
   final SaleLifecycleController lifecycle;
   final OperatorPermissions permissions;
   final SaleExceptionController? exceptions;
+  final Future<void> Function(String receiptId, SaleReceiptResult result)?
+  onPrint;
 
   @override
   State<_SaleCenter> createState() => _SaleCenterState();
@@ -421,6 +426,11 @@ final class _SaleCenterState extends State<_SaleCenter> {
                                         await _showReceipt(
                                           context,
                                           widget.lifecycle.state.receipt,
+                                          receiptId: sale.receiptId,
+                                          onPrint: widget.onPrint,
+                                          canPrint: widget.permissions.allows(
+                                            'hardware.printer.print',
+                                          ),
                                         );
                                       }
                                     },
@@ -494,8 +504,11 @@ final class _Filter extends StatelessWidget {
 
 Future<void> _showReceipt(
   BuildContext context,
-  SaleReceiptResult? result,
-) async {
+  SaleReceiptResult? result, {
+  String? receiptId,
+  Future<void> Function(String receiptId, SaleReceiptResult result)? onPrint,
+  bool canPrint = false,
+}) async {
   final l = AppLocalizations.of(context);
   final raw = result?.receipt;
   if (raw == null) return;
@@ -525,6 +538,15 @@ Future<void> _showReceipt(
         ),
       ),
       actions: [
+        if (canPrint && receiptId != null && onPrint != null)
+          FilledButton.tonalIcon(
+            onPressed: () async {
+              await onPrint(receiptId, result!);
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+            },
+            icon: const Icon(Icons.print_outlined),
+            label: Text(l.reprintReceiptAction),
+          ),
         TextButton(
           onPressed: () => Navigator.pop(dialogContext),
           child: Text(l.closeAction),

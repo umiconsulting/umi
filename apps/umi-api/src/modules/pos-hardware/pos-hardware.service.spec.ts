@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PosHardwareService } from './pos-hardware.service';
 import { hardwareCommandFingerprint } from './hardware-fingerprint';
 
@@ -57,11 +57,59 @@ const integrity = {
 };
 
 describe('Gate 3G-A hardware application boundary', () => {
+  beforeEach(() => vi.clearAllMocks());
+
   it('rejects direct command use without a trusted POS device', async () => {
     const service = new PosHardwareService({} as never, integrity as never);
     await expect(
       service.command({ ...user, deviceId: null }, id(6), command()),
     ).rejects.toMatchObject({ response: { code: 'DEVICE_NOT_ENROLLED' } });
+  });
+
+  it('updates pilot policy through exact hardware management permission', async () => {
+    const result = {
+      merchantId: id(6),
+      locationId: scope.locationId,
+      registerId: null,
+      policy: {
+        autoPrintReceipt: true,
+        openDrawerOnCashSale: true,
+        openDrawerOnCashRefund: true,
+        allowNoSale: false,
+        receiptCopiesDefault: 1,
+        hardwareRetryLimit: 2,
+        hardwareHealthIntervalSeconds: 30,
+        scannerEnabled: true,
+        customerDisplayEnabled: false,
+      },
+      version: 2,
+      updatedAt: '2026-08-09T00:00:00.000Z',
+    };
+    const repo = {
+      authorize: vi.fn().mockResolvedValue({ operatorId: user.id, deviceId: user.deviceId }),
+      updatePolicy: vi.fn().mockResolvedValue(result),
+    };
+    const service = new PosHardwareService(repo as never, integrity as never);
+
+    await expect(
+      service.updatePolicy(user, id(6), {
+        ...scope,
+        registerId: null,
+        commandId: id(9),
+        idempotencyKey: 'hardware-policy-1',
+        expectedVersion: 1,
+        policy: result.policy,
+      }),
+    ).resolves.toEqual(result);
+    expect(repo.authorize).toHaveBeenCalledWith(
+      user.id,
+      user.sessionId,
+      id(6),
+      scope.locationId,
+      scope.operatorSessionId,
+      user.deviceId,
+      'hardware.manage',
+    );
   });
 
   it('uses command-specific permission and command integrity for receipt print', async () => {

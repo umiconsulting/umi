@@ -75,6 +75,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   bool _cashPromptShown = false;
   String? _lastSaleErrorCode;
   StreamSubscription<CanonicalScanEvent>? _scanSubscription;
+  Future<void> _scanQueue = Future<void>.value();
 
   @override
   void initState() {
@@ -167,14 +168,42 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         merchantId: entry.selectedTenant!.id,
         locationId: entry.selectedBranch!.id,
         operatorSessionId: entry.operator!.id,
+        deviceId: entry.device!.id,
+        credentialVersion: entry.device!.credentialVersion,
+        permissions: entry.operator!.permissions.toSet(),
         registerId: widget.cash.activeRegisterId,
       ),
     );
     _scanSubscription = hardware.scanEvents.listen((event) {
-      if (!mounted) return;
-      _search.text = event.value;
-      widget.catalog.search(event.value);
+      if (mounted) _scanQueue = _scanQueue.then((_) => _handleScan(event));
     });
+  }
+
+  Future<void> _handleScan(CanonicalScanEvent event) async {
+    _search.text = event.value;
+    final matches = await widget.catalog.lookupBarcode(event.value);
+    if (!mounted) return;
+    final spanish = Localizations.localeOf(context).languageCode == 'es';
+    if (matches.length == 1) {
+      final product = matches.single;
+      if (!product.hasVariants && !product.hasModifiers) {
+        await widget.cart.add(productId: product.id);
+      } else {
+        await _showDetail(product.id);
+      }
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          matches.isEmpty
+              ? (spanish ? 'Código de barras desconocido.' : 'Unknown barcode.')
+              : (spanish
+                    ? 'Hay varios productos para este código.'
+                    : 'Multiple products match this barcode.'),
+        ),
+      ),
+    );
   }
 
   void _changed() {
@@ -329,6 +358,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 entry: widget.entry,
                 service: widget.hardware!,
                 permissions: permissions,
+                registerId: widget.cash.activeRegisterId,
               ),
               icon: const Icon(Icons.devices_other_outlined),
             ),
@@ -340,6 +370,24 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 widget.sales,
                 permissions,
                 widget.exceptions,
+                widget.hardware == null
+                    ? null
+                    : (receiptId, result) async {
+                        final entry = widget.entry.state;
+                        await widget.hardware!.printAuthoritativeReceipt(
+                          scope: HardwareScope(
+                            merchantId: entry.selectedTenant!.id,
+                            locationId: entry.selectedBranch!.id,
+                            operatorSessionId: entry.operator!.id,
+                            deviceId: entry.device!.id,
+                            credentialVersion: entry.device!.credentialVersion,
+                            permissions: entry.operator!.permissions.toSet(),
+                            registerId: widget.cash.activeRegisterId,
+                          ),
+                          receiptId: receiptId,
+                          receiptSnapshot: result.receipt!,
+                        );
+                      },
               ),
               icon: const Icon(Icons.receipt_long_outlined),
             ),
@@ -414,6 +462,12 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                     ),
                     queryAmbiguousPayment: widget.checkout.queryUnknownPayment,
                     beforeContextExit: widget.sales.prepareForOperatorExit,
+                    retryOfflineHardware:
+                        widget.hardware == null ||
+                            (!permissions.allows('hardware.printer.print') &&
+                                !permissions.allows('hardware.drawer.open'))
+                        ? null
+                        : _retryOfflineHardware,
                   );
                 }
               },
@@ -449,6 +503,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 child: Column(
                   children: [
                     TextField(
+                      key: const ValueKey('hardware-barcode-search'),
                       controller: _search,
                       focusNode: _searchFocus,
                       onChanged: (value) {
@@ -599,6 +654,101 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       operatorSessionId: operator.id,
       credentialVersion: device.credentialVersion,
     );
+  }
+
+  Future<OfflineHardwareRecoveryResult> _retryOfflineHardware(
+    JournalEntry entry,
+  ) async {
+    final hardware = widget.hardware;
+    final state = widget.entry.state;
+    final tenant = state.selectedTenant;
+    final branch = state.selectedBranch;
+    final operator = state.operator;
+    final posDevice = state.device;
+    final provisionalId = entry.command.provisionalId;
+    final permissions = OperatorPermissions(operator?.permissions ?? const []);
+    if (hardware == null ||
+        tenant == null ||
+        branch == null ||
+        operator == null ||
+        posDevice == null ||
+        provisionalId == null ||
+        (!permissions.allows('hardware.printer.print') &&
+            !permissions.allows('hardware.drawer.open'))) {
+      throw StateError('HARDWARE_OFFLINE_RECOVERY_CONTEXT_REQUIRED');
+    }
+    final command = OfflineCheckoutCommand.fromJson(entry.command.payload);
+    final hardwareScope = HardwareScope(
+      merchantId: tenant.id,
+      locationId: branch.id,
+      operatorSessionId: operator.id,
+      deviceId: posDevice.id,
+      credentialVersion: posDevice.credentialVersion,
+      permissions: operator.permissions.toSet(),
+      registerId: widget.cash.activeRegisterId,
+    );
+    final results = await hardware.retryOfflineCheckoutHardware(
+      hardwareScope,
+      ProvisionalReceipt(
+        provisionalSaleId: provisionalId,
+        status: 'pending_sync',
+        locationName: branch.name,
+        operatorName: operator.staffId,
+        snapshot: command.snapshot,
+        createdAt: entry.command.createdAt,
+        lastSynchronizationAt: null,
+        officialReceipt: entry.officialCommit,
+      ),
+    );
+    return OfflineHardwareRecoveryResult([
+      for (final result in results.whereType<RuntimeCommandResult>())
+        OfflineHardwareRecoveryItem(
+          commandId: result.safeMetadata['commandId']! as String,
+          commandType: result.safeMetadata['commandType']! as String,
+          status: result.status.name,
+          verifyPrint:
+              result.status == RuntimeCommandStatus.unknown &&
+                  (result.safeMetadata['commandType'] == 'print_receipt' ||
+                      result.safeMetadata['commandType'] ==
+                          'controlled_reprint') &&
+                  permissions.allows('hardware.printer.print')
+              ? () => hardware.verifyOfflinePrint(
+                  scope: hardwareScope,
+                  commandId: result.safeMetadata['commandId']! as String,
+                )
+              : null,
+          controlledReprint:
+              result.status == RuntimeCommandStatus.unknown &&
+                  (result.safeMetadata['commandType'] == 'print_receipt' ||
+                      result.safeMetadata['commandType'] ==
+                          'controlled_reprint') &&
+                  permissions.allows('hardware.printer.reprint')
+              ? () async {
+                  final recovered = await hardware.controlledOfflineReprint(
+                    scope: hardwareScope,
+                    commandId: result.safeMetadata['commandId']! as String,
+                  );
+                  if (recovered.status != RuntimeCommandStatus.succeeded) {
+                    throw StateError('HARDWARE_RECOVERY_NEEDS_ATTENTION');
+                  }
+                }
+              : null,
+          repeatDrawerOpen:
+              result.status == RuntimeCommandStatus.unknown &&
+                  result.safeMetadata['commandType'] == 'open_drawer' &&
+                  permissions.allows('hardware.drawer.open')
+              ? () async {
+                  final recovered = await hardware.repeatOfflineDrawerOpen(
+                    scope: hardwareScope,
+                    commandId: result.safeMetadata['commandId']! as String,
+                  );
+                  if (recovered.status != RuntimeCommandStatus.succeeded) {
+                    throw StateError('HARDWARE_RECOVERY_NEEDS_ATTENTION');
+                  }
+                }
+              : null,
+        ),
+    ]);
   }
 
   Future<void> _recover() async {

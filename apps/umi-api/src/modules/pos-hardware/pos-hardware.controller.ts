@@ -9,6 +9,7 @@ import {
   HardwareRegistryQuery,
   RegisterHardwareRequest,
   UpdateHardwareRequest,
+  UpdateHardwarePolicyRequest,
 } from '@umi/contract';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { AuthGuard } from '../auth/auth.guard';
@@ -41,6 +42,15 @@ export class PosHardwareController {
     @Body(new ZodValidationPipe(RegisterHardwareRequest)) dto: RegisterHardwareRequest,
   ) {
     return this.hardware.register(user, merchantId, dto);
+  }
+
+  @Patch('policy')
+  updatePolicy(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Body(new ZodValidationPipe(UpdateHardwarePolicyRequest)) dto: UpdateHardwarePolicyRequest,
+  ) {
+    return this.hardware.updatePolicy(user, merchantId, dto);
   }
 
   @Patch(':hardwareId')
@@ -91,6 +101,16 @@ export class PosHardwareController {
     @Body(new ZodValidationPipe(ControlledReprintRequest)) dto: ControlledReprintRequest,
   ) {
     return this.hardware.reprint(user, merchantId, jobId, dto);
+  }
+
+  @Get('print-jobs/:jobId/command')
+  printJobCommand(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Param('jobId') jobId: string,
+    @Query(new ZodValidationPipe(HardwareRecoveryQuery)) query: HardwareRecoveryQuery,
+  ) {
+    return this.hardware.printJobCommand(user, merchantId, jobId, query);
   }
 
   @Post('diagnostics')

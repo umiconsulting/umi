@@ -33,6 +33,7 @@ CatalogProductSummary product(String id) => CatalogProductSummary(
 
 final class FakeCatalogRepository implements CatalogRepository {
   var calls = 0;
+  String? lastBarcode;
   @override
   Future<CatalogCategoriesResponse> categories(
     CatalogPartition partition,
@@ -51,6 +52,7 @@ final class FakeCatalogRepository implements CatalogRepository {
     CancellationToken? cancellation,
   }) async {
     calls += 1;
+    lastBarcode = barcode;
     final items = search == 'missing'
         ? <Map<String, Object?>>[]
         : [product('$calls').toJson()];
@@ -142,6 +144,16 @@ void main() {
     expect(value.state.phase, CatalogPhase.ready);
     await value.loadMore();
     expect(value.state.products.map((item) => item.id), ['1', '2']);
+    value.dispose();
+  });
+
+  test('scanner lookup uses the exact barcode query', () async {
+    final repository = FakeCatalogRepository();
+    final value = controller(repository);
+    await value.open(partition);
+    final matches = await value.lookupBarcode('7501000000002');
+    expect(repository.lastBarcode, '7501000000002');
+    expect(matches, hasLength(1));
     value.dispose();
   });
 

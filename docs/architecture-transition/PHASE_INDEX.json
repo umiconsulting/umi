@@ -151,6 +151,13 @@
       "status": "complete",
       "stateMachineVersion": 1,
       "subject": "Hardware registry, command runtime, printer queue, device simulators, diagnostics, and recovery"
+    },
+    {
+      "commit": "HEAD (Gate 3G-B commit)",
+      "id": "3G-B",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "Generic pilot printing, printer-attached drawer, keyboard-wedge scanner, configuration, and recovery"
     }
   ]
 }

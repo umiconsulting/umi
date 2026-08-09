@@ -9,14 +9,18 @@ import type {
   HardwareCommandResult,
   HardwareCommandTransitionRequest,
   HardwareDevice,
+  HardwareConnectionConfiguration,
   HardwareDiagnosticRequest,
   HardwareDiagnosticResult,
   HardwareRegistryQuery,
   HardwareRuntimeSnapshot,
+  HardwarePilotPolicy,
+  HardwarePilotPolicyResult,
   PrintJob,
   ReceiptPrintPayload,
   RegisterHardwareRequest,
   UpdateHardwareRequest,
+  UpdateHardwarePolicyRequest,
 } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
 import { hardwareCommandFingerprint } from './hardware-fingerprint';
@@ -40,6 +44,7 @@ interface DeviceRow {
   model: string;
   publicReference: string;
   transport: HardwareDevice['transport'];
+  connectionConfiguration: HardwareConnectionConfiguration;
   capabilities: HardwareDevice['capabilities'];
   enabled: boolean;
   configurationVersion: string;
@@ -66,6 +71,7 @@ interface CommandRow {
   sourceAggregateId: string;
   payloadFingerprint: string;
   idempotencyKey: string;
+  expectedConfigurationVersion: number;
   correlationId: string;
   status: HardwareCommandResult['command']['status'];
   createdAt: Date | string;
@@ -149,6 +155,12 @@ export class PosHardwareRepository {
         );
         const devices = await this.devices(client, merchantId, query.locationId, query.registerId);
         const printJobs = await this.printJobs(client, merchantId, query.locationId);
+        const policy = await this.policy(
+          client,
+          merchantId,
+          query.locationId,
+          query.registerId ?? null,
+        );
         const unknown = await client.query<{ commandType: string }>(
           `SELECT c.command_type AS "commandType"
              FROM merchant.hardware_command c
@@ -163,6 +175,8 @@ export class PosHardwareRepository {
           merchantId,
           locationId: query.locationId,
           registerId: query.registerId ?? null,
+          policy: policy.policy,
+          policyVersion: policy.version,
           devices: query.includeDisabled ? devices : devices.filter((device) => device.enabled),
           printJobs,
           recoveryStates: [
@@ -211,6 +225,7 @@ export class PosHardwareRepository {
           publicReference: dto.publicReference,
           transport: dto.transport,
           capabilities: dto.capabilities,
+          connectionConfiguration: dto.connectionConfiguration,
         },
       ],
     );
@@ -231,9 +246,28 @@ export class PosHardwareRepository {
         operatorSessionId: dto.operatorSessionId,
         expectedVersion: dto.expectedVersion,
         enabled: dto.enabled,
+        connectionConfiguration: dto.connectionConfiguration,
       },
     ]);
     return this.device(client, merchantId, hardwareId);
+  }
+
+  async updatePolicy(
+    client: PoolClient,
+    merchantId: string,
+    dto: UpdateHardwarePolicyRequest,
+  ): Promise<HardwarePilotPolicyResult> {
+    await client.query(`SELECT merchant.update_hardware_pilot_policy($1::jsonb)`, [
+      {
+        merchantId,
+        locationId: dto.locationId,
+        registerId: dto.registerId,
+        operatorSessionId: dto.operatorSessionId,
+        expectedVersion: dto.expectedVersion,
+        policy: dto.policy,
+      },
+    ]);
+    return this.policy(client, merchantId, dto.locationId, dto.registerId);
   }
 
   async assign(
@@ -346,6 +380,28 @@ export class PosHardwareRepository {
     );
   }
 
+  printJobCommand(
+    userId: string,
+    merchantId: string,
+    locationId: string,
+    jobId: string,
+  ): Promise<HardwareCommandResult> {
+    return this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      async (client) => {
+        const { rows } = await client.query<{ commandId: string }>(
+          `SELECT command_id::text AS "commandId" FROM merchant.hardware_print_job
+            WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND id=$3::uuid`,
+          [merchantId, locationId, jobId],
+        );
+        if (!rows[0]) throw new Error('HARDWARE_PRINT_JOB_NOT_FOUND');
+        return this.commandResult(client, merchantId, rows[0].commandId, true);
+      },
+      locationId,
+    );
+  }
+
   async reprint(
     client: PoolClient,
     merchantId: string,
@@ -445,7 +501,26 @@ export class PosHardwareRepository {
       connectionState: row.connectionState,
       capabilities: row.capabilities,
       latencyMs: row.latencyMs,
-      failure: null,
+      failure:
+        row.failureCode === null
+          ? null
+          : {
+              code: row.failureCode as HardwareDiagnosticResult['failure'] extends infer F
+                ? F extends { code: infer C }
+                  ? C
+                  : never
+                : never,
+              retryable: [
+                'disconnected',
+                'busy',
+                'transport_unavailable',
+                'command_timeout',
+                'retryable_transport_failure',
+              ].includes(row.failureCode),
+              operatorGuidance: 'review_hardware_status',
+              safeDetail: null,
+              correlationId: row.correlationId,
+            },
       occurredAt: iso(row.occurredAt)!,
       correlationId: row.correlationId,
     };
@@ -479,7 +554,8 @@ export class PosHardwareRepository {
       d.register_id::text AS "registerId",d.assigned_pos_device_id::text AS "assignedPosDeviceId",
       coalesce(a.primary_device,false) AS primary,
       d.device_type AS "deviceType",d.manufacturer,d.model,d.public_reference AS "publicReference",
-      d.transport,d.capabilities,d.enabled,d.configuration_version::text AS "configurationVersion",
+      d.transport,d.connection_configuration AS "connectionConfiguration",
+      d.capabilities,d.enabled,d.configuration_version::text AS "configurationVersion",
       d.connection_state AS "connectionState",d.firmware_version AS "firmwareVersion",
       d.last_heartbeat_at AS "lastHeartbeatAt",d.last_diagnostic_at AS "lastDiagnosticAt",
       d.created_at AS "createdAt",d.updated_at AS "updatedAt",d.archived_at AS "archivedAt",
@@ -501,6 +577,7 @@ export class PosHardwareRepository {
       model: row.model,
       publicReference: row.publicReference,
       transport: row.transport,
+      connectionConfiguration: row.connectionConfiguration,
       capabilities: row.capabilities,
       enabled: row.enabled,
       configurationVersion: Number(row.configurationVersion),
@@ -512,6 +589,45 @@ export class PosHardwareRepository {
       updatedAt: iso(row.updatedAt)!,
       archivedAt: iso(row.archivedAt),
       optimisticVersion: Number(row.optimisticVersion),
+    };
+  }
+
+  private async policy(
+    client: PoolClient,
+    merchantId: string,
+    locationId: string,
+    registerId: string | null,
+  ): Promise<HardwarePilotPolicyResult> {
+    const { rows } = await client.query<{
+      policy: HardwarePilotPolicy;
+      version: string;
+      updatedAt: Date | string;
+    }>(
+      `SELECT policy,version::text,updated_at AS "updatedAt"
+         FROM merchant.hardware_pilot_policy
+        WHERE merchant_id=$1::uuid AND location_id=$2::uuid
+          AND register_id IS NOT DISTINCT FROM $3::uuid
+        LIMIT 1`,
+      [merchantId, locationId, registerId],
+    );
+    const row = rows[0];
+    return {
+      merchantId,
+      locationId,
+      registerId,
+      policy: row?.policy ?? {
+        autoPrintReceipt: true,
+        openDrawerOnCashSale: true,
+        openDrawerOnCashRefund: true,
+        allowNoSale: false,
+        receiptCopiesDefault: 1,
+        hardwareRetryLimit: 2,
+        hardwareHealthIntervalSeconds: 30,
+        scannerEnabled: true,
+        customerDisplayEnabled: false,
+      },
+      version: Number(row?.version ?? 1),
+      updatedAt: iso(row?.updatedAt ?? new Date(0))!,
     };
   }
 
@@ -528,7 +644,9 @@ export class PosHardwareRepository {
               c.originating_pos_device_id::text AS "originatingPosDeviceId",
               c.operator_id::text AS "operatorId",c.source_aggregate_type AS "sourceAggregateType",
               c.source_aggregate_id AS "sourceAggregateId",c.payload_fingerprint AS "payloadFingerprint",
-              c.idempotency_key AS "idempotencyKey",c.correlation_id AS "correlationId",
+              c.idempotency_key AS "idempotencyKey",
+              c.expected_configuration_version::int AS "expectedConfigurationVersion",
+              c.correlation_id AS "correlationId",
               e.status,c.created_at AS "createdAt",
               CASE WHEN e.status='dispatching' THEN e.occurred_at END AS "startedAt",
               CASE WHEN e.status IN ('succeeded','failed','cancelled','unknown') THEN e.occurred_at END AS "completedAt",

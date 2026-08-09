@@ -28,6 +28,7 @@ import '../features/hardware/hardware_recovery_store.dart';
 import '../features/hardware/hardware_repository.dart';
 import '../features/hardware/hardware_runtime.dart';
 import '../features/hardware/hardware_service.dart';
+import '../features/hardware/pilot_hardware_adapters.dart';
 import '../features/inventory/inventory_controller.dart';
 import '../features/inventory/inventory_repository.dart';
 import '../features/offline/connectivity_controller.dart';
@@ -85,7 +86,7 @@ final class AppCompositionRoot {
       deviceCredentialProvider: credentials,
     );
     final connectivity = ConnectivityController();
-    final hardwareLab = SimulatorHardwareLab();
+    final hardwareLab = PilotHardwareLab();
     final hardware = HardwareService(
       repository: ApiHardwareRepository(apiClient),
       coordinator: HardwareCoordinator(adapters: const {}, devices: const []),
@@ -125,12 +126,21 @@ final class AppCompositionRoot {
         final merchant = state.selectedTenant;
         final location = state.selectedBranch;
         final operator = state.operator;
-        if (merchant == null || location == null || operator == null) return;
+        final posDevice = state.device;
+        if (merchant == null ||
+            location == null ||
+            operator == null ||
+            posDevice == null) {
+          return;
+        }
         await hardware.afterCashAction(
           HardwareScope(
             merchantId: merchant.id,
             locationId: location.id,
             operatorSessionId: operator.id,
+            deviceId: posDevice.id,
+            credentialVersion: posDevice.credentialVersion,
+            permissions: operator.permissions.toSet(),
             registerId: action.registerId,
           ),
           reason: action.reason,
@@ -162,12 +172,21 @@ final class AppCompositionRoot {
           final merchant = state.selectedTenant;
           final location = state.selectedBranch;
           final operator = state.operator;
-          if (merchant == null || location == null || operator == null) return;
+          final posDevice = state.device;
+          if (merchant == null ||
+              location == null ||
+              operator == null ||
+              posDevice == null) {
+            return;
+          }
           await hardware.afterRefundCompleted(
             HardwareScope(
               merchantId: merchant.id,
               locationId: location.id,
               operatorSessionId: operator.id,
+              deviceId: posDevice.id,
+              credentialVersion: posDevice.credentialVersion,
+              permissions: operator.permissions.toSet(),
               registerId: cash.activeRegisterId,
             ),
             result,
@@ -199,15 +218,49 @@ final class AppCompositionRoot {
           final merchant = state.selectedTenant;
           final location = state.selectedBranch;
           final operator = state.operator;
-          if (merchant == null || location == null || operator == null) return;
+          final posDevice = state.device;
+          if (merchant == null ||
+              location == null ||
+              operator == null ||
+              posDevice == null) {
+            return;
+          }
           await hardware.afterCheckoutCompleted(
             HardwareScope(
               merchantId: merchant.id,
               locationId: location.id,
               operatorSessionId: operator.id,
+              deviceId: posDevice.id,
+              credentialVersion: posDevice.credentialVersion,
+              permissions: operator.permissions.toSet(),
               registerId: cash.activeRegisterId,
             ),
             result,
+          );
+        },
+        afterOfflineCommit: (receipt) async {
+          final state = entry.state;
+          final merchant = state.selectedTenant;
+          final location = state.selectedBranch;
+          final operator = state.operator;
+          final posDevice = state.device;
+          if (merchant == null ||
+              location == null ||
+              operator == null ||
+              posDevice == null) {
+            return;
+          }
+          await hardware.afterOfflineCheckoutCompleted(
+            HardwareScope(
+              merchantId: merchant.id,
+              locationId: location.id,
+              operatorSessionId: operator.id,
+              deviceId: posDevice.id,
+              credentialVersion: posDevice.credentialVersion,
+              permissions: operator.permissions.toSet(),
+              registerId: cash.activeRegisterId,
+            ),
+            receipt,
           );
         },
       ),

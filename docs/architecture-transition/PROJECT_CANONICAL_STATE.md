@@ -211,7 +211,14 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Gate 3G-A contract: version `2.7.0`, content hash
   `7223f72894a444d32735ba8e1a325a160bc09a394bca222d12a8bb2545da6323`.
 - Gate 3G-A passed focused contract, API, Flutter, simulator, recovery, PostgreSQL, and RLS checks.
-- Gate 3G-B is authorized. Gate 3G-B has not started.
+- Gate 3G-B: complete with observations. Generic TCP printing, printer-attached drawers, and keyboard-wedge scanning are code-controlled ready.
+- Gate 3G-B uses deterministic thermal rendering, bounded reconnect, exact replay identity, and server-owned pilot configuration.
+- Gate 3G-B keeps the customer display simulator ready. Physical secondary-display support remains device-dependent.
+- Gate 3G-B contract: version `2.8.0`, content hash
+  `acacbd59b0691a0a351691e2b161cf0ac7ee433280ad363cf2a86238bdb85abe`.
+- Gate 3G-B passed focused contract, API, Flutter, simulator, PostgreSQL, RLS, Linux, Web, and PR checks.
+- Physical validation was unavailable in the current runner. This result is not hardware certification.
+- Gate 4A is authorized. Gate 4A has not started.
 
 ## Gate 3C decision basis
 
@@ -246,3 +253,10 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Umi-specific inference: an unknown physical result cannot authorize an automatic second side effect.
 - Umi-specific inference: a hardware failure cannot change a committed financial fact.
 - Umi-specific inference: future vendor adapters must implement the canonical adapter interfaces.
+
+## Gate 3G-B decision basis
+
+- Documented fact: the existing Hardware Runtime is the only hardware access path.
+- Umi-specific inference: generic protocol adapters enable a pilot without vendor business logic.
+- Umi-specific inference: only a known pre-write failure permits automatic reconnect.
+- Umi-specific inference: physical certification requires actual supported hardware.

@@ -3,9 +3,12 @@ import assert from 'node:assert/strict';
 
 import {
   HardwareCommand,
+  HardwareConnectionConfiguration,
   HardwareDevice,
+  HardwarePilotPolicy,
   HardwareRuntimeSnapshot,
   PrintJob,
+  RegisterHardwareRequest,
   ReceiptPrintPayload,
   routeCatalog,
 } from '../dist/index.js';
@@ -61,6 +64,7 @@ test('Gate 3G-A device and command contracts reject vendor authority and unsafe 
     sourceAggregateId: 'receipt-public-1',
     payloadFingerprint: 'a'.repeat(64),
     idempotencyKey: 'hardware-command-1',
+    expectedConfigurationVersion: 1,
     correlationId: 'hardware-correlation-1',
     status: 'pending',
     createdAt: '2026-08-09T00:00:00.000Z',
@@ -156,5 +160,72 @@ test('Gate 3G-A hardware routes are typed and permission scoped', () => {
   assert.equal(
     routeCatalog['GET /api/v1/pos/merchants/:merchantId/hardware/runtime'].permission,
     'hardware.read',
+  );
+});
+
+test('Gate 3G-B network configuration and pilot policy are bounded and secret-free', () => {
+  const configuration = HardwareConnectionConfiguration.parse({
+    networkHost: '192.0.2.20',
+    networkPort: 9100,
+    connectTimeoutMs: 2000,
+    commandTimeoutMs: 5000,
+    characterEncoding: 'cp850',
+    receiptWidthColumns: 42,
+    drawerPulsePin: 0,
+    drawerPulseOnMs: 50,
+    scannerTerminator: 'enter',
+    scannerBurstWindowMs: 80,
+  });
+  assert.equal(configuration.networkPort, 9100);
+  assert.equal(
+    HardwareConnectionConfiguration.safeParse({ ...configuration, password: 'secret' }).success,
+    false,
+  );
+
+  const policy = HardwarePilotPolicy.parse({
+    autoPrintReceipt: true,
+    openDrawerOnCashSale: true,
+    openDrawerOnCashRefund: true,
+    allowNoSale: false,
+    receiptCopiesDefault: 1,
+    hardwareRetryLimit: 2,
+    hardwareHealthIntervalSeconds: 30,
+    scannerEnabled: true,
+    customerDisplayEnabled: false,
+  });
+  assert.equal(policy.hardwareRetryLimit, 2);
+});
+
+test('Gate 3G-B operational transports require a safe endpoint and device type', () => {
+  const request = {
+    locationId: ids.location,
+    operatorSessionId: ids.operator,
+    registerId: ids.register,
+    assignedPosDeviceId: ids.pos,
+    type: 'cash_drawer',
+    manufacturer: 'Generic',
+    model: 'Drawer',
+    publicReference: 'DRAWER-1',
+    transport: 'printer_attached',
+    connectionConfiguration: {},
+    capabilities: ['drawer.open'],
+    commandId: ids.command,
+    idempotencyKey: 'register-drawer-1',
+  };
+  assert.equal(RegisterHardwareRequest.safeParse(request).success, false);
+  assert.equal(
+    RegisterHardwareRequest.safeParse({
+      ...request,
+      connectionConfiguration: { networkHost: 'printer.local', networkPort: 9100 },
+    }).success,
+    true,
+  );
+  assert.equal(
+    RegisterHardwareRequest.safeParse({
+      ...request,
+      type: 'printer',
+      connectionConfiguration: { networkHost: 'printer.local', networkPort: 9100 },
+    }).success,
+    false,
   );
 });

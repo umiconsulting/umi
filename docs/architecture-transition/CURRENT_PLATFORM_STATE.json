@@ -26,7 +26,8 @@
     "3D.1",
     "3E",
     "3F",
-    "3G-A"
+    "3G-A",
+    "3G-B"
   ],
   "authorities": {
     "api": "apps/umi-api",
@@ -83,8 +84,8 @@
     "gate2AStatus": "complete",
     "flutterVersion": "3.44.6",
     "dartVersion": "3.12.2",
-    "contractVersion": "2.7.0",
-    "contractContentHash": "7223f72894a444d32735ba8e1a325a160bc09a394bca222d12a8bb2545da6323",
+    "contractVersion": "2.8.0",
+    "contractContentHash": "acacbd59b0691a0a351691e2b161cf0ac7ee433280ad363cf2a86238bdb85abe",
     "stateManagement": "ChangeNotifier with one explicit composition root",
     "navigation": "central typed route guard",
     "secureStorage": "flutter_secure_storage with no plaintext fallback",
@@ -111,6 +112,7 @@
     "gate3EStatus": "complete",
     "gate3FStatus": "complete",
     "gate3GAStatus": "complete",
+    "gate3GBStatus": "complete_with_observations",
     "pilotRoleGrantMatrix": "config/umipos-pilot-role-grants.json",
     "pilotApprovalMatrix": "config/umipos-pilot-approval-boundaries.json",
     "pilotPermissionInventory": "config/umipos-permission-inventory.json",
@@ -171,6 +173,11 @@
     "customerDisplayRuntime": "customer-safe sale, payment, and completion projections",
     "hardwareSimulators": "deterministic printer, drawer, scanner, and customer display adapters",
     "hardwareFoundations": "payment terminal and scale remain disabled adapter foundations",
+    "pilotPrinterAdapter": "generic network TCP thermal adapter with bounded ESC/POS-compatible rendering, CP850 or UTF-8, capability degradation, and unknown-outcome protection",
+    "pilotDrawerAdapter": "generic printer-attached pulse with committed-fact binding and no ambiguous automatic retry",
+    "pilotScannerAdapter": "keyboard-wedge EAN, UPC, Code128, and QR input with bounded timing, duplicate suppression, and PIN exclusion",
+    "pilotHardwarePolicy": "server-owned register scope controls auto-print, cash drawer, retry, health, scanner, and customer display behavior",
+    "pilotPhysicalValidation": "not available in the current runner; no physical certification claimed",
     "hardwareOfflineBoundary": "native command journal foundation only; Web has no secure native hardware parity",
     "compensatingReceipt": "immutable exception receipt preserves the original sale and receipt",
     "saleExceptionRecovery": "secure command identity queries the authoritative idempotent result after restart or response loss",
@@ -210,7 +217,7 @@
     "offlineCash": "default-deny server-issued branch policy; eligible native cash checkout is encrypted and provisional",
     "offlineRecovery": "generated-SDK gateway, serialized journal mutations, restart deduplication, ordered replay, typed recovery actions, response-loss query, reconciliation, immutable mapping, Recovery Center",
     "offlineDatabaseValidation": "clean migration chain plus merchant, location, device, credential, immutability, revocation and rotation negative matrix passed in disposable PostgreSQL",
-    "nativeBuild": "Linux debug build passed for Gate 3G-A",
+    "nativeBuild": "Linux debug build passed for Gate 3G-B",
     "webOfflineCapability": "sensitive journaling unsupported; online operation only",
     "checkoutAuthority": "apps/umi-api/src/modules/pos-checkout",
     "checkoutMode": "online, immediately repriced, explicitly confirmed, idempotent",
@@ -234,9 +241,9 @@
     "pinFoundation": "merchant-unique personal PIN, keyed lookup, server-side scrypt verification, bounded attempts, and no client role selection",
     "managerApprovalFoundation": "single-action scoped five-minute elevation",
     "readyShell": true,
-    "latestLocalCommit": "HEAD (Gate 3G-A commit in PR #72)",
-    "pushStatus": "Gate 3G-A publication uses PR #72",
+    "latestLocalCommit": "HEAD (Gate 3G-B commit in PR #72)",
+    "pushStatus": "Gate 3G-B publication uses PR #72",
     "pullRequestStatus": "PR #72 targets build-v3"
   },
-  "nextGate": "Gate 3G-B pilot hardware integration is authorized. Gate 3G-B has not started."
+  "nextGate": "Gate 4A KDS operational integration is authorized. Gate 4A has not started."
 }

@@ -6,6 +6,10 @@ const sql = readFileSync(
   resolve(process.cwd(), '../../docs/migration/build-v3/40_pos_hardware_runtime.sql'),
   'utf8',
 );
+const pilotSql = readFileSync(
+  resolve(process.cwd(), '../../docs/migration/build-v3/41_pos_hardware_pilot.sql'),
+  'utf8',
+);
 const hardwareRepository = readFileSync(
   resolve(process.cwd(), 'src/modules/pos-hardware/pos-hardware.repository.ts'),
   'utf8',
@@ -60,5 +64,17 @@ describe('Gate 3G-A hardware persistence', () => {
     expect(sql).toContain("'payment_terminal_foundation'");
     expect(sql).toContain("'scale_foundation'");
     expect(sql).toContain('hardware_foundation_execution_block');
+  });
+
+  it('adds scoped pilot transports, configuration, and policy', () => {
+    expect(pilotSql).toContain("'network_tcp','printer_attached','keyboard_wedge'");
+    expect(pilotSql).toContain('connection_configuration jsonb not null');
+    expect(pilotSql).toContain('merchant.validate_hardware_connection');
+    expect(pilotSql).toContain('create table merchant.hardware_pilot_policy');
+    expect(pilotSql).toContain('hardware_transport_device_compatibility');
+    expect(pilotSql).toContain('primary_receipt_printer_uidx');
+    expect(pilotSql).toContain('primary_replaced');
+    expect(pilotSql).toContain('hardware_pilot_policy_location_scope');
+    expect(pilotSql).toContain('force row level security');
   });
 });

@@ -13,6 +13,13 @@ const scope = HardwareScope(
   merchantId: '10000000-0000-4000-8000-000000000001',
   locationId: '10000000-0000-4000-8000-000000000002',
   operatorSessionId: '10000000-0000-4000-8000-000000000003',
+  deviceId: '10000000-0000-4000-8000-000000000099',
+  credentialVersion: 1,
+  permissions: {
+    'hardware.printer.print',
+    'hardware.printer.reprint',
+    'hardware.drawer.open',
+  },
   registerId: null,
 );
 
@@ -315,6 +322,35 @@ void main() {
     ]);
   });
 
+  test(
+    'print queue retry recovers and preserves the command identity',
+    () async {
+      final repository = _HardwareRepository();
+      const commandId = '10000000-0000-4000-8000-000000000025';
+      final printer = PrinterSimulatorAdapter(
+        failures: {commandId: SimulatorFailure.busy},
+      );
+      final service = HardwareService(
+        repository: repository,
+        coordinator: HardwareCoordinator(
+          adapters: {'printer-1': printer},
+          devices: [simulatedDevice(id: 'printer-1', type: 'printer')],
+        ),
+        recovery: MemoryHardwareRecoveryStore(),
+      );
+      await service.execute(scope.merchantId, _printCommand(commandId));
+      printer.clearFailure(commandId);
+      final result = await service.retryKnownSafePrint(
+        scope: scope,
+        jobId: commandId,
+      );
+      expect(result.command['commandId'], commandId);
+      expect(result.command['status'], 'succeeded');
+      expect(printer.artifacts, hasLength(1));
+      await service.dispose();
+    },
+  );
+
   test('server terminal retry limit clears local recovery state', () async {
     const commandId = '10000000-0000-4000-8000-000000000018';
     final repository = _HardwareRepository()..terminalizeRetryable = true;
@@ -384,6 +420,365 @@ void main() {
       await service.dispose();
     },
   );
+
+  test(
+    'server pilot policy disables scanner input without disabling manual lookup',
+    () async {
+      final repository = _HardwareRepository()
+        ..snapshotResult = HardwareRuntimeSnapshot(
+          merchantId: scope.merchantId,
+          locationId: scope.locationId,
+          registerId: null,
+          policy: const {
+            'autoPrintReceipt': true,
+            'openDrawerOnCashSale': true,
+            'openDrawerOnCashRefund': true,
+            'allowNoSale': false,
+            'receiptCopiesDefault': 1,
+            'hardwareRetryLimit': 2,
+            'hardwareHealthIntervalSeconds': 30,
+            'scannerEnabled': false,
+            'customerDisplayEnabled': false,
+          },
+          devices: const [],
+          printJobs: const [],
+          recoveryStates: const [],
+          pendingJobs: 0,
+          retryableJobs: 0,
+          unknownCommands: 0,
+          capturedAt: '2026-08-09T00:00:00.000Z',
+        );
+      final service = HardwareService(
+        repository: repository,
+        coordinator: HardwareCoordinator(adapters: const {}, devices: const []),
+        recovery: MemoryHardwareRecoveryStore(),
+      );
+      final events = <CanonicalScanEvent>[];
+      final subscription = service.scanEvents.listen(events.add);
+
+      await service.snapshot(scope);
+      var now = DateTime.utc(2026, 8, 9);
+      for (final unit in '7501234567890\n'.codeUnits) {
+        service.acceptKeyboardCodeUnit(unit, now);
+        now = now.add(const Duration(milliseconds: 4));
+      }
+      await Future<void>.delayed(Duration.zero);
+
+      expect(events, isEmpty);
+      await subscription.cancel();
+      await service.dispose();
+    },
+  );
+
+  test(
+    'offline recovery restores runtime and controls an unknown print',
+    () async {
+      final recovery = MemoryHardwareRecoveryStore();
+      final repository = _HardwareRepository()
+        ..snapshotResult = HardwareRuntimeSnapshot(
+          merchantId: scope.merchantId,
+          locationId: scope.locationId,
+          registerId: null,
+          policy: const {
+            'autoPrintReceipt': true,
+            'openDrawerOnCashSale': false,
+            'receiptCopiesDefault': 1,
+            'hardwareRetryLimit': 2,
+            'hardwareHealthIntervalSeconds': 30,
+            'scannerEnabled': true,
+            'customerDisplayEnabled': false,
+          },
+          devices: [_simulatorPrinter.toJson()],
+          printJobs: const [],
+          recoveryStates: const [],
+          pendingJobs: 0,
+          retryableJobs: 0,
+          unknownCommands: 0,
+          capturedAt: '2026-08-09T00:00:00.000Z',
+        );
+      final firstLab = SimulatorHardwareLab();
+      final first = HardwareService(
+        repository: repository,
+        coordinator: HardwareCoordinator(adapters: const {}, devices: const []),
+        recovery: recovery,
+        adapterResolver: firstLab,
+      );
+      await first.snapshot(scope);
+      await first.dispose();
+
+      const provisionalId = '10000000-0000-4000-8000-000000000041';
+      final unknownCommandId = _deterministicTestId(
+        'offline-print-1:$provisionalId:${_simulatorPrinter.id}',
+      );
+      final secondLab = SimulatorHardwareLab(
+        failures: {
+          _simulatorPrinter.id: {
+            unknownCommandId: SimulatorFailure.unknownOutcome,
+          },
+        },
+      );
+      final second = HardwareService(
+        repository: repository,
+        coordinator: HardwareCoordinator(adapters: const {}, devices: const []),
+        recovery: recovery,
+        adapterResolver: secondLab,
+        identifiers: const _FixedIdentifierFactory(
+          '10000000-0000-4000-8000-000000000042',
+        ),
+      );
+      const totals = {
+        'subtotal': {'minorUnits': 100, 'currency': 'MXN'},
+        'tax': {'minorUnits': 0, 'currency': 'MXN'},
+        'discounts': {
+          'total': {'minorUnits': 0, 'currency': 'MXN'},
+          'entries': <Object?>[],
+        },
+        'grandTotal': {'minorUnits': 100, 'currency': 'MXN'},
+        'businessDate': '2026-08-09',
+      };
+      const cart = Cart(
+        id: '10000000-0000-4000-8000-000000000040',
+        merchantId: '10000000-0000-4000-8000-000000000001',
+        locationId: '10000000-0000-4000-8000-000000000002',
+        operatorSessionId: '10000000-0000-4000-8000-000000000003',
+        status: 'prepared',
+        version: 1,
+        items: [],
+        totals: totals,
+        checkoutEnabled: true,
+        checkoutMessageCode: 'ready',
+        updatedAt: '2026-08-09T00:00:00.000Z',
+      );
+      const confirmation = TotalsConfirmation(
+        cartVersion: 1,
+        fingerprint:
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        totals: totals,
+        taxes: {'groups': <Object?>[]},
+        discounts: {
+          'total': {'minorUnits': 0, 'currency': 'MXN'},
+        },
+        catalogVersion: 'catalog-1',
+        pricingVersion: 'pricing-1',
+        taxVersion: 'tax-1',
+        snapshotAt: '2026-08-09T00:00:00.000Z',
+        confirmedAt: '2026-08-09T00:00:00.000Z',
+      );
+      final offline = OfflineCheckoutSnapshot(
+        checkoutCommand: {},
+        cartSnapshot: cart.toJson(),
+        totals: confirmation.toJson(),
+        catalogVersion: 'catalog-1',
+        pricingVersion: 'pricing-1',
+        taxVersion: 'tax-1',
+        catalogSnapshotAt: '2026-08-09T00:00:00.000Z',
+        pricingSnapshotAt: '2026-08-09T00:00:00.000Z',
+        taxSnapshotAt: '2026-08-09T00:00:00.000Z',
+        currency: 'MXN',
+        amountDueMinorUnits: 100,
+        amountReceivedMinorUnits: 100,
+        changeDueMinorUnits: 0,
+        businessDate: '2026-08-09',
+      );
+      final provisional = ProvisionalReceipt(
+        provisionalSaleId: provisionalId,
+        status: 'pending_sync',
+        locationName: 'Pilot',
+        operatorName: 'Cashier',
+        snapshot: offline.toJson(),
+        createdAt: '2026-08-09T00:00:00.000Z',
+        lastSynchronizationAt: null,
+        officialReceipt: null,
+      );
+
+      final results = await second.afterOfflineCheckoutCompleted(
+        scope,
+        provisional,
+      );
+
+      expect(results, hasLength(1));
+      final unknown = results.single as RuntimeCommandResult;
+      expect(unknown.status, RuntimeCommandStatus.unknown);
+      expect(unknown.safeMetadata['commandId'], unknownCommandId);
+      final copy = await second.controlledOfflineReprint(
+        scope: scope,
+        commandId: unknownCommandId,
+      );
+      expect(copy.status, RuntimeCommandStatus.succeeded);
+      await second.verifyOfflinePrint(
+        scope: scope,
+        commandId: unknownCommandId,
+      );
+      final verified = await second.retryOfflineCheckoutHardware(
+        scope,
+        provisional,
+      );
+      expect(
+        (verified.single as RuntimeCommandResult).status,
+        RuntimeCommandStatus.succeeded,
+      );
+      expect(
+        secondLab
+            .adapter<PrinterSimulatorAdapter>(_simulatorPrinter.id)!
+            .artifacts,
+        hasLength(1),
+      );
+      await second.dispose();
+    },
+  );
+
+  test(
+    'simulated cashier journey keeps financial and physical facts separate',
+    () async {
+      final repository = _HardwareRepository()
+        ..snapshotResult = HardwareRuntimeSnapshot(
+          merchantId: scope.merchantId,
+          locationId: scope.locationId,
+          registerId: null,
+          policy: const {
+            'autoPrintReceipt': true,
+            'openDrawerOnCashSale': true,
+            'openDrawerOnCashRefund': true,
+            'allowNoSale': false,
+            'receiptCopiesDefault': 2,
+            'hardwareRetryLimit': 2,
+            'hardwareHealthIntervalSeconds': 30,
+            'scannerEnabled': true,
+            'customerDisplayEnabled': true,
+          },
+          devices: [
+            _pilotDevice('printer-journey', 'printer', const [
+              'printer.receipt',
+              'printer.test_page',
+            ], primary: true).toJson(),
+            _pilotDevice('drawer-journey', 'cash_drawer', const [
+              'drawer.open',
+              'drawer.status',
+            ]).toJson(),
+            _pilotDevice('scanner-journey', 'barcode_scanner', const [
+              'scanner.barcode',
+              'scanner.qr',
+            ]).toJson(),
+            _pilotDevice('display-journey', 'customer_display', const [
+              'customer_display.text',
+              'customer_display.totals',
+            ]).toJson(),
+          ],
+          printJobs: const [],
+          recoveryStates: const [],
+          pendingJobs: 0,
+          retryableJobs: 0,
+          unknownCommands: 0,
+          capturedAt: '2026-08-09T00:00:00.000Z',
+        );
+      final lab = SimulatorHardwareLab();
+      final service = HardwareService(
+        repository: repository,
+        coordinator: HardwareCoordinator(adapters: const {}, devices: const []),
+        recovery: MemoryHardwareRecoveryStore(),
+        adapterResolver: lab,
+      );
+      const completedSale = CheckoutResult(
+        status: 'completed',
+        confirmation: {},
+        payment: null,
+        payments: [
+          {
+            'type': 'cash',
+            'amount': {'minorUnits': 1500, 'currency': 'MXN'},
+          },
+        ],
+        reservation: null,
+        sale: {'id': '10000000-0000-4000-8000-000000000030'},
+        receipt: {
+          'id': '10000000-0000-4000-8000-000000000031',
+          'receiptRef': 'PILOT-1',
+          'businessDate': '2026-08-09',
+          'currency': 'MXN',
+          'lines': [
+            {
+              'description': 'Café',
+              'quantity': 1,
+              'lineTotal': {'minorUnits': 1200, 'currency': 'MXN'},
+            },
+          ],
+          'subtotal': {'minorUnits': 1200, 'currency': 'MXN'},
+          'taxTotal': {'minorUnits': 0, 'currency': 'MXN'},
+          'grandTotal': {'minorUnits': 1200, 'currency': 'MXN'},
+          'change': {'minorUnits': 300, 'currency': 'MXN'},
+        },
+        failure: null,
+      );
+      const completedRefund = SaleExceptionResult(
+        exceptionId: '10000000-0000-4000-8000-000000000032',
+        saleId: '10000000-0000-4000-8000-000000000030',
+        status: 'committed',
+        exceptionType: 'full_refund',
+        allocation: {
+          'tenders': [
+            {'type': 'cash', 'minorUnits': 1200},
+          ],
+        },
+        receipt: {
+          'id': '10000000-0000-4000-8000-000000000033',
+          'publicReference': 'REFUND-1',
+          'businessDate': '2026-08-09',
+          'currency': 'MXN',
+          'lines': [],
+          'subtotal': {'minorUnits': -1200, 'currency': 'MXN'},
+          'taxTotal': {'minorUnits': 0, 'currency': 'MXN'},
+          'grandTotal': {'minorUnits': -1200, 'currency': 'MXN'},
+        },
+        remainingRefundable: {'minorUnits': 0, 'currency': 'MXN'},
+        correlationReference: 'refund-pilot-1',
+        committedAt: '2026-08-09T12:00:00.000Z',
+        retryAllowed: false,
+      );
+
+      await service.snapshot(scope);
+      final scans = <CanonicalScanEvent>[];
+      final subscription = service.scanEvents.listen(scans.add);
+      lab
+          .adapter<ScannerSimulatorAdapter>('scanner-journey')!
+          .emit('7501234567890', symbology: 'ean');
+      await Future<void>.delayed(Duration.zero);
+      final saleResults = await service.afterCheckoutCompleted(
+        scope,
+        completedSale,
+      );
+      final replayResults = await service.afterCheckoutCompleted(
+        scope,
+        completedSale,
+      );
+      final refundResults = await service.afterRefundCompleted(
+        scope,
+        completedRefund,
+      );
+
+      expect(scans.single.value, '7501234567890');
+      expect(saleResults, hasLength(3));
+      expect(replayResults, hasLength(3));
+      expect(refundResults, hasLength(2));
+      expect(
+        lab.adapter<PrinterSimulatorAdapter>('printer-journey')!.artifacts,
+        hasLength(4),
+      );
+      expect(
+        lab.adapter<DrawerSimulatorAdapter>('drawer-journey')!.openCommands,
+        hasLength(2),
+      );
+      expect(
+        lab
+            .adapter<CustomerDisplaySimulatorAdapter>('display-journey')!
+            .lastProjection!
+            .state['state'],
+        'completed',
+      );
+      expect(repository.statuses, hasLength(7));
+      await subscription.cancel();
+      await service.dispose();
+    },
+  );
 }
 
 const _simulatorPrinter = HardwareDevice(
@@ -399,6 +794,36 @@ const _simulatorPrinter = HardwareDevice(
   publicReference: 'SIM-PRINTER-1',
   transport: 'simulator',
   capabilities: ['printer.receipt', 'printer.test_page'],
+  enabled: true,
+  configurationVersion: 1,
+  connectionState: 'connected',
+  firmwareVersion: null,
+  lastHeartbeatAt: null,
+  lastDiagnosticAt: null,
+  createdAt: '2026-08-09T00:00:00.000Z',
+  updatedAt: '2026-08-09T00:00:00.000Z',
+  archivedAt: null,
+  optimisticVersion: 1,
+);
+
+HardwareDevice _pilotDevice(
+  String id,
+  String type,
+  List<String> capabilities, {
+  bool primary = false,
+}) => HardwareDevice(
+  id: id,
+  merchantId: scope.merchantId,
+  locationId: scope.locationId,
+  registerId: null,
+  assignedPosDeviceId: '10000000-0000-4000-8000-000000000021',
+  primary: primary,
+  type: type,
+  manufacturer: 'Simulator',
+  model: '$type-v1',
+  publicReference: id,
+  transport: 'simulator',
+  capabilities: capabilities,
   enabled: true,
   configurationVersion: 1,
   connectionState: 'connected',
@@ -458,6 +883,13 @@ HardwareCommandRequest _printCommand(String commandId) {
   );
 }
 
+String _deterministicTestId(String source) {
+  final hex = hardwarePayloadFingerprint({'source': source}).substring(0, 32);
+  return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+      '5${hex.substring(13, 16)}-8${hex.substring(17, 20)}-'
+      '${hex.substring(20)}';
+}
+
 final class _HardwareRepository implements HardwareRepository {
   final Map<String, String> statuses = {};
   final List<String> transitions = [];
@@ -493,9 +925,12 @@ final class _HardwareRepository implements HardwareRepository {
   HardwareCommandResult _result(String commandId, String status) =>
       HardwareCommandResult(
         command: {
+          ...?lastCommand?.toJson(),
           'commandId': commandId,
-          'commandType': lastCommand?.commandType,
-          'payloadFingerprint': lastCommand?.payloadFingerprint,
+          'merchantId': scope.merchantId,
+          'originatingPosDeviceId': '10000000-0000-4000-8000-000000000099',
+          'operatorId': '10000000-0000-4000-8000-000000000098',
+          'correlationId': 'hardware-test',
           'status': status,
         },
         recovered: status != 'pending',
@@ -542,13 +977,49 @@ final class _HardwareRepository implements HardwareRepository {
     String jobId,
     ControlledReprintRequest request,
   ) async {
-    final command = _printCommand(request.commandId);
+    final original = lastCommand ?? _printCommand(jobId);
+    final input = {
+      'locationId': original.locationId,
+      'registerId': original.registerId,
+      'targetHardwareId': original.targetHardwareId,
+      'commandType': 'controlled_reprint',
+      'sourceAggregateType': original.sourceAggregateType,
+      'sourceAggregateId': original.sourceAggregateId,
+      'expectedConfigurationVersion': original.expectedConfigurationVersion,
+      'requiredCapability': 'printer.receipt',
+      'drawer': null,
+      'display': null,
+      'printPayload': original.printPayload,
+    };
+    final command = HardwareCommandRequest(
+      locationId: original.locationId,
+      registerId: original.registerId,
+      operatorSessionId: original.operatorSessionId,
+      commandId: request.commandId,
+      idempotencyKey: 'hardware-reprint-${request.commandId}',
+      targetHardwareId: original.targetHardwareId,
+      commandType: 'controlled_reprint',
+      sourceAggregateType: original.sourceAggregateType,
+      sourceAggregateId: original.sourceAggregateId,
+      expectedConfigurationVersion: original.expectedConfigurationVersion,
+      payloadFingerprint: hardwarePayloadFingerprint(input),
+      drawer: null,
+      display: null,
+      printPayload: original.printPayload,
+    );
     lastCommand = command;
     return ControlledReprintResult(
       job: {'jobId': request.commandId, 'originalJobId': jobId},
       command: command.toJson(),
     );
   }
+
+  @override
+  Future<HardwareCommandResult> printJobCommand(
+    String merchantId,
+    String jobId,
+    HardwareRecoveryQuery query,
+  ) async => _result(lastCommand!.commandId, statuses[lastCommand!.commandId]!);
 
   @override
   Future<HardwareDevice> register(
@@ -566,5 +1037,10 @@ final class _HardwareRepository implements HardwareRepository {
     String merchantId,
     String hardwareId,
     AssignHardwareRequest request,
+  ) => throw UnimplementedError();
+  @override
+  Future<HardwarePilotPolicyResult> updatePolicy(
+    String merchantId,
+    UpdateHardwarePolicyRequest request,
   ) => throw UnimplementedError();
 }
