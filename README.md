@@ -44,16 +44,23 @@ Filter by the **package name** (`@umi/dashboard`), not the directory — see
 > Nothing in this section changes that.
 
 Self-hosted Plane runs at **https://plane.umiconsulting.co** (workspace `umi`) as
-a **time-boxed evaluation**, deliberately scoped so it cannot become a second
-source of truth by drift:
+a **time-boxed evaluation**. The split is by layer, not by ticket type:
 
-- **In Plane:** bugs only.
-- **In Trello:** everything else — PRDs, specs, client work. Unchanged.
-- **The decision, on a date, not "eventually":** if devs file bugs in Plane
+- **Trello — the spec layer.** PRDs and specs: what to build and why, agreed with
+  stakeholders. The agent skills read from here, so this half is not negotiable
+  while they exist.
+- **Plane — the execution layer.** Bugs, ops tasks, tech debt. Work that does not
+  need a PRD behind it.
+- **The decision, on a date, not "eventually":** if devs file work in Plane
   without being reminded and cycles get real use, Plane replaces Trello outright
   and `AGENTS.md` plus the skills get rewritten to match. If it needs pushing,
-  Plane gets switched off. Two trackers is the one outcome to avoid — it is worse
-  than either alone, because things get lost at the boundary.
+  Plane gets switched off.
+
+The endgame is **one** tracker. Two is worse than either alone, because work gets
+lost at the boundary — so the split above is a measurement period with an end,
+not a target state. If a ticket makes you hesitate about where it goes, that
+hesitation is the signal the trial is meant to produce; record it and raise it at
+the decision point.
 
 `.mcp.json` wires Plane into Claude Code so an agent can read and update work
 items. The token is **per-person**, so each dev supplies their own:
