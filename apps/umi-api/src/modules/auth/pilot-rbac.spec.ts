@@ -162,6 +162,8 @@ describe('Gate 3D.1 pilot RBAC matrix', () => {
       'insights.read',
       'inventory.history.read',
       'inventory.read',
+      'kitchen.read',
+      'kitchen.station.read',
       'loyalty.read',
       'wallet.read',
     ]);
