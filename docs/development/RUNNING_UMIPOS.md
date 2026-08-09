@@ -617,6 +617,60 @@ La prueba `simulated cashier journey keeps financial and physical facts separate
 El runner actual no tiene hardware piloto. No afirmes una certificación física con este resultado.
 Gate 3G-B no requiere un SDK de fabricante o un proveedor de pagos.
 
+## KDS operativo de Gate 4A
+
+Ejecuta la API y el KDS existente:
+
+```sh
+pnpm --filter @umi/api dev
+open apps/umi-kds/375.xcodeproj
+```
+
+Configura `KDSBackendURL` con la URL HTTPS de la UMI API.
+Usa `KDSLocalBaseURL` solamente para el desarrollo local.
+
+Crea una estación y una ruta con los endpoints protegidos del Dashboard:
+
+```text
+POST /api/merchants/{merchantId}/kds/stations?locationId={locationId}
+POST /api/merchants/{merchantId}/kds/routes?locationId={locationId}
+```
+
+La ruta acepta un `productId`, un `categoryId` o un default de location.
+No envíes un `productId` y un `categoryId` juntos.
+
+Ejecuta las pruebas enfocadas de la API:
+
+```sh
+pnpm --filter @umi/api exec vitest run \
+  src/modules/kds \
+  src/shared/database/gate-4a-kds-migration.spec.ts \
+  src/shared/orders/order-writer.spec.ts
+```
+
+Ejecuta las 10 carreras reales de PostgreSQL:
+
+```sh
+pnpm umi-pos:kds-concurrency-check
+```
+
+El comando usa dos sesiones independientes.
+El comando crea y elimina una base desechable.
+
+Ejecuta la prueba de estado en UmiPOS:
+
+```sh
+cd apps/umi-pos
+flutter test test/kitchen_status_test.dart
+```
+
+Simula una desconexión al detener la API durante el polling.
+Confirma que el KDS conserva la vista y bloquea las mutaciones.
+Inicia la API y confirma que el KDS obtiene un snapshot antes de otra mutación.
+
+No uses una base compartida para la matriz de concurrencia.
+No ejecutes una mutación KDS durante el estado desconectado.
+
 ## Canonical PR check
 
 Use Node 22 and pnpm 10.29.3. Run this command before each commit and push:

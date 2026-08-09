@@ -98,6 +98,7 @@ Future<void> showSaleCenter(
   OperatorPermissions permissions, [
   SaleExceptionController? exceptions,
   Future<void> Function(String receiptId, SaleReceiptResult result)? onPrint,
+  Future<PosKitchenStatusResult> Function(SaleSnapshot sale)? onKitchenStatus,
 ]) => showModalBottomSheet<void>(
   context: context,
   isScrollControlled: true,
@@ -107,6 +108,7 @@ Future<void> showSaleCenter(
     permissions: permissions,
     exceptions: exceptions,
     onPrint: onPrint,
+    onKitchenStatus: onKitchenStatus,
   ),
 );
 
@@ -215,12 +217,15 @@ final class _SaleCenter extends StatefulWidget {
     required this.permissions,
     this.exceptions,
     this.onPrint,
+    this.onKitchenStatus,
   });
   final SaleLifecycleController lifecycle;
   final OperatorPermissions permissions;
   final SaleExceptionController? exceptions;
   final Future<void> Function(String receiptId, SaleReceiptResult result)?
   onPrint;
+  final Future<PosKitchenStatusResult> Function(SaleSnapshot sale)?
+  onKitchenStatus;
 
   @override
   State<_SaleCenter> createState() => _SaleCenterState();
@@ -402,6 +407,23 @@ final class _SaleCenterState extends State<_SaleCenter> {
                                     child: Text(l.resumeSaleAction),
                                   ),
                                 if (sale.state == 'committed' &&
+                                    sale.sourceOrderId != null &&
+                                    widget.onKitchenStatus != null)
+                                  IconButton(
+                                    tooltip:
+                                        Localizations.localeOf(
+                                              context,
+                                            ).languageCode ==
+                                            'es'
+                                        ? 'Estado de cocina'
+                                        : 'Kitchen status',
+                                    onPressed: () =>
+                                        _showKitchenStatus(context, sale),
+                                    icon: const Icon(
+                                      Icons.soup_kitchen_outlined,
+                                    ),
+                                  ),
+                                if (sale.state == 'committed' &&
                                     widget.exceptions != null &&
                                     widget.permissions.allows(
                                       'sale.exception.read',
@@ -482,7 +504,53 @@ final class _SaleCenterState extends State<_SaleCenter> {
     }
     label.dispose();
   }
+
+  Future<void> _showKitchenStatus(
+    BuildContext context,
+    SaleSnapshot sale,
+  ) async {
+    final spanish = Localizations.localeOf(context).languageCode == 'es';
+    try {
+      final result = await widget.onKitchenStatus!(sale);
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(spanish ? 'Estado de cocina' : 'Kitchen status'),
+          content: Text(_kitchenStatusLabel(result.status, spanish)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(spanish ? 'Cerrar' : 'Close'),
+            ),
+          ],
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            spanish
+                ? 'No se pudo obtener el estado de cocina.'
+                : 'Kitchen status is not available.',
+          ),
+        ),
+      );
+    }
+  }
 }
+
+String _kitchenStatusLabel(String status, bool spanish) => switch (status) {
+  'queued' => spanish ? 'En cola' : 'Queued',
+  'in_preparation' => spanish ? 'En preparación' : 'Preparing',
+  'partially_ready' => spanish ? 'Parcialmente lista' : 'Partially ready',
+  'ready' => spanish ? 'Lista' : 'Ready',
+  'completed' => spanish ? 'Completada' : 'Completed',
+  'cancelled' => spanish ? 'Cancelada' : 'Cancelled',
+  'exception' => spanish ? 'Requiere atención' : 'Needs attention',
+  _ => spanish ? 'Estado no disponible' : 'Status unavailable',
+};
 
 final class _Filter extends StatelessWidget {
   const _Filter({

@@ -34,14 +34,11 @@ struct KDSCard: View {
                 // Row 3: Items
                 itemsSection
 
-                if order.status == .partialCancelled {
-                    partialCancelBadge
+                if order.status == .partiallyReady {
+                    partialReadyBadge
                 }
 
-                // Row 4: Footer (station + note) — only when either is present
-                if order.customerNote != nil || order.station != nil {
-                    footer
-                }
+                footer
             }
             .padding(.leading, 14)
             .padding(.trailing, KDSTheme.Spacing.cardPadding)
@@ -117,23 +114,16 @@ struct KDSCard: View {
 
     private var footer: some View {
         HStack {
-            if let station = order.station?.name {
-                Label(station, systemImage: "fork.knife")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.quaternary)
-                    .lineLimit(1)
-            }
+            Label(order.station.name, systemImage: "fork.knife")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.quaternary)
+                .lineLimit(1)
             Spacer()
-            if order.customerNote != nil {
-                Image(systemName: "text.bubble.fill")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(KDSTheme.Brand.blue.opacity(0.55))
-            }
         }
     }
 
-    private var partialCancelBadge: some View {
-        Text("Partial cancel - awaiting reply")
+    private var partialReadyBadge: some View {
+        Text("Some items are ready")
             .font(.caption.weight(.semibold))
             .foregroundStyle(.orange)
             .padding(.horizontal, 10)

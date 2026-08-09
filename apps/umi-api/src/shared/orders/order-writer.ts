@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg';
+import { projectKitchenOrder } from '../../modules/kds/kitchen-projector';
 
 /**
  * THE way an order is written. Every producer — the WhatsApp checkout today, the POS
@@ -235,6 +236,10 @@ export async function writeOrder(client: PoolClient, order: NewOrder): Promise<W
      VALUES ($1::uuid, 'status_changed', 'placed')`,
     [orderId],
   );
+
+  // Project only preparation lines. This call uses the caller transaction, so a
+  // failed checkout cannot leave kitchen work and a committed sale cannot lose it.
+  await projectKitchenOrder(client, order.merchantId, orderId);
 
   return { orderId, lineIds, created: true };
 }

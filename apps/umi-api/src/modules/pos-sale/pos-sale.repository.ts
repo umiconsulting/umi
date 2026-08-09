@@ -448,6 +448,7 @@ export class PosSaleRepository {
       cancelledAt: string | null;
       cancellationReason: string | null;
       committedSaleId: string | null;
+      sourceOrderId: string | null;
       receiptId: string | null;
       receiptRef: string | null;
       updatedAt: string;
@@ -467,6 +468,7 @@ export class PosSaleRepository {
               cart.cancelled_at::text AS "cancelledAt",
               cart.cancellation_reason AS "cancellationReason",
               committed.id::text AS "committedSaleId",
+              committed.order_id::text AS "sourceOrderId",
               receipt.id::text AS "receiptId",
               receipt.receipt_number AS "receiptRef",
               cart.updated_at::text AS "updatedAt"
@@ -507,6 +509,7 @@ export class PosSaleRepository {
       cancelledAt: row.cancelledAt,
       cancellationReason: row.cancellationReason,
       committedSaleId: row.committedSaleId,
+      sourceOrderId: row.sourceOrderId,
       receiptId: row.receiptId,
       receiptRef: row.receiptRef,
       updatedAt: row.updatedAt,

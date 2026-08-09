@@ -158,6 +158,13 @@
       "status": "complete_with_observations",
       "stateMachineVersion": 1,
       "subject": "Generic pilot printing, printer-attached drawer, keyboard-wedge scanner, configuration, and recovery"
+    },
+    {
+      "commit": "HEAD (Gate 4A commit)",
+      "id": "4A",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "Authoritative kitchen projection, station routing, existing KDS integration, reconnect, recovery, and POS visibility"
     }
   ]
 }

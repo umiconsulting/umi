@@ -23,12 +23,13 @@
 19. [Checklist manual para probar UmiPOS](#19-checklist-manual-para-probar-umipos)
 20. [Mapa de cobertura](#20-mapa-de-cobertura)
 21. [Hardware Runtime](#21-hardware-runtime)
+22. [Operación KDS](#22-operación-kds)
 
 ## 1. Propósito del documento
 
-Este documento explica el comportamiento operativo que existe en UmiPOS hasta Gate 3G-A. Sirve para operación, soporte, desarrollo, QA y capacitación.
+Este documento explica el comportamiento operativo que existe en UmiPOS hasta Gate 4A. Sirve para operación, soporte, desarrollo, QA y capacitación.
 
-La referencia es Gate 3G-A, del 9 de agosto de 2026. El contrato canónico es la versión `2.7.0`. Su hash es `7223f72894a444d32735ba8e1a325a160bc09a394bca222d12a8bb2545da6323`.
+La referencia es Gate 4A, del 9 de agosto de 2026. El contrato canónico es la versión `2.9.0`. Su hash es `ac23d09d92f252f8e770e84fef90ab4c42c30afb85d8e08a0c0a15df2376ff6f`.
 
 El producto conserva Gates 3A a 3E. Gate 3F añade clientes, lealtad y valor almacenado. La certificación final de UX sigue pendiente.
 
@@ -3429,3 +3430,53 @@ La terminal integrada y la scale son foundations. Gate 3G-A no ejecuta pagos ni 
 | Registrar o asignar hardware    | ❌      | ❌         | ❌      | ✅          | ❌     |
 
 La tabla explica el perfil del piloto. El permiso efectivo sigue como la única autoridad.
+
+## 22. Operación KDS
+
+### Venta con preparación
+
+1. Cashier compromete una venta elegible.
+2. La API crea una orden de cocina en la misma transacción.
+3. La API asigna cada línea a una estación.
+4. El KDS recibe una sola tarjeta por orden y estación.
+5. El operador inicia la preparación.
+6. El operador marca los artículos o la orden como lista.
+7. UmiPOS consulta el estado seguro de cocina.
+8. El operador completa la orden.
+
+La orden de cocina no contiene datos de pago ni contacto del cliente.
+
+### Orden con varias estaciones
+
+La API aplica la prioridad de ruta `product → category → default`.
+Cada estación ve solamente sus líneas.
+La orden pasa a `PartiallyReady` cuando solo una parte está lista.
+La orden pasa a `Ready` cuando todas las líneas activas están listas.
+
+### Cancelación y void
+
+Un void comprometido cancela el trabajo que aún no está listo.
+La API conserva el trabajo listo como una excepción física.
+Un refund financiero conserva el historial de cocina y no crea preparación nueva.
+
+### Recall y recuperación
+
+Supervisor, Manager, Admin u Owner ejecutan un recall con `kitchen.recall`.
+El comando requiere una razón, una versión y una identidad estable.
+
+Después de una desconexión, el KDS conserva una vista de solo lectura.
+El KDS bloquea las mutaciones hasta que obtiene un snapshot autoritativo.
+Los eventos duplicados o antiguos no cambian la vista.
+
+### Matriz operativa
+
+| Operación                      | Cashier | Staff | Supervisor | Manager | Owner/Admin | Viewer |
+| ------------------------------ | ------- | ----- | ---------- | ------- | ----------- | ------ |
+| Ver estado seguro en POS       | ✅      | ✅    | ✅         | ✅      | ✅          | ✅     |
+| Preparar y marcar listo en KDS | ❌      | ❌    | ✅         | ✅      | ✅          | ❌     |
+| Completar trabajo asignado     | ❌      | ❌    | ✅         | ✅      | ✅          | ❌     |
+| Recall o prioridad             | ❌      | ❌    | ✅         | ✅      | ✅          | ❌     |
+| Configurar estaciones y rutas  | ❌      | ❌    | ❌         | ✅      | ✅          | ❌     |
+| Leer todas las locations       | ❌      | ❌    | ❌         | ❌      | ✅          | ❌     |
+
+El permiso efectivo y el scope asignado siguen como la autoridad.

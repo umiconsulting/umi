@@ -34,13 +34,13 @@ Una denegación explícita prevalece sobre un grant. Un permiso de otro merchant
 
 | Perfil      | Scope principal | Grants POS | Aprobación | Uso principal                                      |
 | ----------- | --------------- | ---------: | ---------- | -------------------------------------------------- |
-| Owner       | Merchant        |         47 | Sí         | Autoridad de negocio para un merchant.             |
-| Admin       | Merchant        |         46 | Sí         | Administración del negocio y operación autorizada. |
-| Manager     | Location        |         42 | Sí         | Gestión de caja, recovery y excepciones.           |
-| Supervisor  | Location        |         35 | Sí         | Supervisión de checkout en una location.           |
-| Cashier     | Location        |         22 | No         | Jornada normal de venta y caja propia.             |
-| Staff       | Location        |         22 | No         | Perfil compatible con Cashier.                     |
-| Viewer      | Location        |          2 | No         | Lectura explícita sin mutaciones.                  |
+| Owner       | Merchant        |        130 | Sí         | Autoridad de negocio para un merchant.             |
+| Admin       | Merchant        |        129 | Sí         | Administración del negocio y operación autorizada. |
+| Manager     | Location        |        120 | Sí         | Gestión de caja, recovery y excepciones.           |
+| Supervisor  | Location        |         85 | Sí         | Supervisión de checkout en una location.           |
+| Cashier     | Location        |         48 | No         | Jornada normal de venta y caja propia.             |
+| Staff       | Location        |         48 | No         | Perfil compatible con Cashier.                     |
+| Viewer      | Location        |          9 | No         | Lectura explícita sin mutaciones.                  |
 | super_admin | Platform        |          0 | N/A        | Administración de plataforma fuera del café.       |
 
 No existe un rol de negocio `Auditor`. Owner y Admin pueden leer auditoría. El perfil técnico `developer` conserva lectura limitada.
@@ -325,3 +325,33 @@ Los permisos canónicos son:
 Cada comando valida el entitlement POS, el dispositivo, la credencial, la sesión, el merchant y la location.
 El permiso `hardware.drawer.open` no permite una apertura arbitraria. La política de efectivo valida la razón.
 Un comando `NoSale` requiere `cash.drawer.no_sale.approve` de otro operador. La autoaprobación permanece bloqueada.
+
+## 17. Permisos KDS de Gate 4A
+
+Gate 4A añade permisos para la operación de cocina.
+La API no usa el nombre del rol para autorizar un comando.
+
+| Perfil          | Autoridad KDS                                                         |
+| --------------- | --------------------------------------------------------------------- |
+| Cashier y Staff | Lee el estado seguro de cocina.                                       |
+| Supervisor      | Prepara, marca listo, completa, ejecuta recall y cambia la prioridad. |
+| Manager         | Añade configuración de estaciones y diagnósticos en su location.      |
+| Admin y Owner   | Administra las locations del merchant con `kitchen.merchant.read`.    |
+| Viewer          | Lee una proyección segura cuando existe un grant explícito.           |
+
+Los permisos canónicos son:
+
+- `kitchen.read`;
+- `kitchen.prepare`;
+- `kitchen.ready`;
+- `kitchen.complete`;
+- `kitchen.recall`;
+- `kitchen.cancel_ack`;
+- `kitchen.priority`;
+- `kitchen.station.read` y `kitchen.station.manage`;
+- `kitchen.diagnostics`;
+- `kitchen.merchant.read`.
+
+Un usuario con scope de location debe enviar su location asignada.
+Solo `kitchen.merchant.read` permite omitir el scope de location.
+El dispositivo KDS también debe tener una asignación activa a la estación.

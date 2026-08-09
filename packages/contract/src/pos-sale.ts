@@ -48,6 +48,7 @@ export const SaleSnapshot = z
     cancelledAt: Timestamp.nullable(),
     cancellationReason: z.string().max(160).nullable(),
     committedSaleId: Uuid.nullable(),
+    sourceOrderId: Uuid.nullable(),
     receiptId: Uuid.nullable(),
     receiptRef: z.string().max(100).nullable(),
     updatedAt: Timestamp,

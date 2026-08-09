@@ -6,7 +6,9 @@ struct BoardView: View {
     @Binding var selectedOrderID: KitchenOrder.ID?
     var onSettings: (() -> Void)? = nil
 
-    private let visibleStatuses: [KitchenStatus] = [.new, .accepted, .preparing, .partialCancelled, .ready]
+    private let visibleStatuses: [KitchenStatus] = [
+        .queued, .inPreparation, .partiallyReady, .ready, .exception
+    ]
 
     var body: some View {
         VStack(spacing: 0) {

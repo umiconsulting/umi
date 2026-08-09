@@ -57,6 +57,7 @@ SaleSnapshot sale({
   cancelledAt: null,
   cancellationReason: null,
   committedSaleId: null,
+  sourceOrderId: null,
   receiptId: null,
   receiptRef: null,
   updatedAt: '2026-07-29T12:00:00.000Z',

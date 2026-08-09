@@ -854,6 +854,16 @@ export class PosExceptionRepository {
         preview.totalMinorUnits,
       ],
     );
+    if (preview.exceptionType === 'void') {
+      await this.applyVoidKitchenConsequence(
+        client,
+        merchantId,
+        dto.locationId,
+        saleId,
+        exceptionId,
+        correlationId,
+      );
+    }
     return {
       exceptionId,
       saleId,
@@ -866,6 +876,61 @@ export class PosExceptionRepository {
       committedAt: receipt.createdAt,
       retryAllowed: false,
     };
+  }
+
+  private async applyVoidKitchenConsequence(
+    client: PoolClient,
+    merchantId: string,
+    locationId: string,
+    saleId: string,
+    exceptionId: string,
+    correlationId: string,
+  ): Promise<void> {
+    const order = await client.query<{ id: string; version: string }>(
+      `SELECT ko.id::text,ko.version::text
+         FROM merchant.pos_committed_sale s
+         JOIN merchant.kitchen_order ko
+           ON ko.merchant_id=s.merchant_id AND ko.source_order_id=s.order_id
+        WHERE s.id=$1::uuid AND s.merchant_id=$2::uuid AND s.location_id=$3::uuid
+        FOR UPDATE OF ko`,
+      [saleId, merchantId, locationId],
+    );
+    const row = order.rows[0];
+    if (!row) return;
+    await client.query(
+      `UPDATE merchant.kitchen_order_item
+          SET status='cancelled',version=version+1,cancelled_at=clock_timestamp(),
+              updated_at=clock_timestamp()
+        WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid
+          AND status IN ('queued','preparing','exception')`,
+      [merchantId, row.id],
+    );
+    const status = await client.query<{ status: string }>(
+      `SELECT CASE
+          WHEN bool_or(status='ready') THEN 'exception'
+          WHEN bool_and(status='cancelled') THEN 'cancelled'
+          ELSE 'exception' END AS status
+         FROM merchant.kitchen_order_item
+        WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid`,
+      [merchantId, row.id],
+    );
+    const nextStatus = status.rows[0]?.status ?? 'exception';
+    const version = Number(row.version) + 1;
+    await client.query(
+      `UPDATE merchant.kitchen_order
+          SET status=$3,version=$4,cancelled_at=clock_timestamp(),updated_at=clock_timestamp(),
+              cancellation_code='sale_voided'
+        WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+      [merchantId, row.id, nextStatus, version],
+    );
+    await client.query(
+      `INSERT INTO merchant.kitchen_event
+         (event_id,merchant_id,location_id,kitchen_order_id,station_id,kind,
+          aggregate_version,status,safe_payload,correlation_id)
+       VALUES (gen_random_uuid(),$1::uuid,$2::uuid,$3::uuid,NULL,'order_cancelled',$4,$5,
+               jsonb_build_object('exceptionId',$6::text,'consequence','sale_voided'),$7)`,
+      [merchantId, locationId, row.id, version, nextStatus, exceptionId, correlationId],
+    );
   }
 
   async terminalOutcome(

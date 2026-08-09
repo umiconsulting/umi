@@ -196,6 +196,14 @@ export const routes = {
       diagnostics: (merchantId: string): string =>
         buildPath('pos.offlineDiagnostics', { merchantId }),
     },
+    kitchen: {
+      order: (merchantId: string, sourceOrderId: string): string =>
+        buildPath('pos.kitchenOrder', { merchantId, sourceOrderId }),
+    },
+  },
+  kds: {
+    board: routePath('kds.board'),
+    command: routePath('kds.command'),
   },
 } as const;
 

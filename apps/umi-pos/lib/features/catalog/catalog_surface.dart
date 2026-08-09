@@ -22,6 +22,7 @@ import '../hardware/hardware_service.dart';
 import '../hardware/hardware_surface.dart';
 import '../inventory/inventory_controller.dart';
 import '../inventory/inventory_surface.dart';
+import '../kitchen/kitchen_status_repository.dart';
 import '../offline/connectivity_controller.dart';
 import '../offline/offline_journal.dart';
 import '../offline/recovery_center.dart';
@@ -39,6 +40,7 @@ final class CatalogSurface extends StatefulWidget {
     required this.cash,
     required this.checkout,
     required this.sales,
+    this.kitchenStatus,
     this.customerValue,
     required this.exceptions,
     required this.connectivity,
@@ -55,6 +57,7 @@ final class CatalogSurface extends StatefulWidget {
   final CashController cash;
   final CheckoutController checkout;
   final SaleLifecycleController sales;
+  final KitchenStatusRepository? kitchenStatus;
   final CustomerValueController? customerValue;
   final SaleExceptionController exceptions;
   final ConnectivityController connectivity;
@@ -386,6 +389,19 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                           ),
                           receiptId: receiptId,
                           receiptSnapshot: result.receipt!,
+                        );
+                      },
+                widget.kitchenStatus == null
+                    ? null
+                    : (sale) {
+                        final state = widget.entry.state;
+                        return widget.kitchenStatus!.status(
+                          state.selectedTenant!.id,
+                          sale.sourceOrderId!,
+                          PosKitchenOrderQuery(
+                            locationId: state.selectedBranch!.id,
+                            operatorSessionId: state.operator!.id,
+                          ),
                         );
                       },
               ),

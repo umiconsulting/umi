@@ -95,7 +95,7 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - UmiPOS uses a personal merchant-unique PIN after device trust. The API resolves the staff identity
   and current role without an email or client role selector.
 - `runtime.operator_session` separates operator presence from PIN authentication.
-- UmiPOS consumes contract version `2.7.0`. The generated checksum is the content-hash authority.
+- UmiPOS consumes contract version `2.9.0`. The generated checksum is the content-hash authority.
 - Original sale, payment, receipt, and cash facts remain immutable after an exception.
 - `merchant.pos_sale_exception` and related tables own append-only compensation history.
 - Refund amounts use original receipt, discount, tax, tip, and tender snapshots.
@@ -218,7 +218,17 @@ Future clients use `packages/contract` and controlled UMI APIs.
   `acacbd59b0691a0a351691e2b161cf0ac7ee433280ad363cf2a86238bdb85abe`.
 - Gate 3G-B passed focused contract, API, Flutter, simulator, PostgreSQL, RLS, Linux, Web, and PR checks.
 - Physical validation was unavailable in the current runner. This result is not hardware certification.
-- Gate 4A is authorized. Gate 4A has not started.
+- Gate 4A: complete with observations. The UMI API owns one kitchen projection for each committed sale.
+- Gate 4A uses deterministic station routes, historical route snapshots, ordered events, stable commands, and exact device scope.
+- Gate 4A adapts the existing SwiftUI KDS. It does not create a replacement Flutter KDS.
+- Gate 4A reconnects through an authoritative station snapshot and ignores duplicate or stale events.
+- Gate 4A keeps disconnected mutations fail closed and exposes a safe read-only kitchen status to UmiPOS.
+- Gate 4A passed all 10 focused races through two independent PostgreSQL sessions.
+- Gate 4A contract: version `2.9.0`, content hash
+  `ac23d09d92f252f8e770e84fef90ab4c42c30afb85d8e08a0c0a15df2376ff6f`.
+- Gate 4A passed focused contract, API, Flutter, PostgreSQL, RLS, security, and PR checks.
+- The Linux runner had no Xcode toolchain. Static KDS reviews passed, but the iPad build remains an observation.
+- Gate 5A is authorized with observations. Gate 5A has not started.
 
 ## Gate 3C decision basis
 
@@ -260,3 +270,10 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Umi-specific inference: generic protocol adapters enable a pilot without vendor business logic.
 - Umi-specific inference: only a known pre-write failure permits automatic reconnect.
 - Umi-specific inference: physical certification requires actual supported hardware.
+
+## Gate 4A decision basis
+
+- Documented fact: the UMI API owns the commercial order and the kitchen write model.
+- Source-backed tradeoff: an ordered event feed needs an authoritative snapshot for gap recovery.
+- Umi-specific inference: a KDS disconnect must preserve visibility and block state changes.
+- Umi-specific inference: a prepared item cannot be reversed by a financial void or refund.

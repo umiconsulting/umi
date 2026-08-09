@@ -100,7 +100,7 @@ expect_error() {  # expect_error <label> <output>
 
 echo "== building a disposable build-v3 in $DB =="
 psql -q -c "create database $DB;" >/dev/null
-for f in 00_foundation 10_umi 20_merchant 30_runtime 30_device_pairing 31_pos_sale 32_pos_checkout 33_pos_cash 34_pos_exception 35_pos_pilot_rbac 36_pos_inventory 37_pos_customer_value 38_pos_customer_value_closeout 39_pos_customer_value_final_closeout 40_pos_hardware_runtime 41_pos_hardware_pilot 50_cross_schema_fk 60_triggers 90_rls 99_verify; do
+for f in 00_foundation 10_umi 20_merchant 30_runtime 30_device_pairing 31_pos_sale 32_pos_checkout 33_pos_cash 34_pos_exception 35_pos_pilot_rbac 36_pos_inventory 37_pos_customer_value 38_pos_customer_value_closeout 39_pos_customer_value_final_closeout 40_pos_hardware_runtime 41_pos_hardware_pilot 42_pos_kitchen 50_cross_schema_fk 60_triggers 90_rls 99_verify; do
   if ! ddl_output=$(psql -X -q -v ON_ERROR_STOP=1 -d "$DB" -f "$DDL/$f.sql" 2>&1); then
     echo "  DDL FAILED at $f:"
     printf '%s\n' "$ddl_output" | grep -E 'ERROR|LINE' | head -5
@@ -662,13 +662,13 @@ expect "all pilot business roles exist" "7" \
     ('owner','admin','manager','supervisor','cashier','staff','viewer') and not is_platform;")"
 expect "super_admin remains platform-only" "t" \
   "$(q -c "select is_platform from umi.role where key='super_admin';")"
-expect "Cashier receives the exact reviewed grant count" "47" \
+expect "Cashier receives the exact reviewed grant count" "48" \
   "$(q -c "select count(*) from umi.role_permission rp join umi.role r on r.id=rp.role_id
     where r.key='cashier';")"
-expect "Supervisor receives the exact reviewed grant count" "76" \
+expect "Supervisor receives the exact reviewed grant count" "85" \
   "$(q -c "select count(*) from umi.role_permission rp join umi.role r on r.id=rp.role_id
     where r.key='supervisor';")"
-expect "Manager receives the exact reviewed grant count" "110" \
+expect "Manager receives the exact reviewed grant count" "120" \
   "$(q -c "select count(*) from umi.role_permission rp join umi.role r on r.id=rp.role_id
     where r.key='manager';")"
 expect "Viewer receives no mutation permission" "0" \
@@ -1765,6 +1765,54 @@ expect "all hardware authority tables force RLS" "8" \
       'hardware_device','hardware_assignment','hardware_command','hardware_command_event',
       'hardware_print_job','hardware_print_job_event','hardware_diagnostic',
       'hardware_pilot_policy')
+      and c.relrowsecurity and c.relforcerowsecurity;")"
+
+echo
+echo "== 13. Gate 4A kitchen authority =="
+psql -X -q -v ON_ERROR_STOP=1 -d "$DB" >/dev/null <<SQL
+insert into merchant.station(id,merchant_id,location_id,key,name) values
+  ('a2000000-0000-4000-8000-000000000091','$A','$A1','gate4a-hot','Gate 4A Hot'),
+  ('a2000000-0000-4000-8000-000000000092','$A','$A2','gate4a-other','Gate 4A Other');
+insert into merchant.product(id,merchant_id,name,price,requires_preparation)
+values('a3000000-0000-4000-8000-000000000091','$A','Gate 4A item',100,true);
+insert into merchant.customer_order(id,merchant_id,location_id,source,fulfillment_type,status,business_date,external_ref)
+values('a4000000-0000-4000-8000-000000000091','$A','$A1','pos','dine_in','completed',current_date,'gate4a-db-order');
+insert into merchant.order_item(id,order_id,product_id,name,quantity,unit_price,display_order)
+values('a4100000-0000-4000-8000-000000000091','a4000000-0000-4000-8000-000000000091',
+  'a3000000-0000-4000-8000-000000000091','Gate 4A item',1,100,1);
+insert into merchant.kitchen_order(id,merchant_id,location_id,source_order_id,public_reference,
+  source,fulfillment_type,business_date,status,queued_at)
+values('a4200000-0000-4000-8000-000000000091','$A','$A1',
+  'a4000000-0000-4000-8000-000000000091','K-DB-1','pos','dine_in',current_date,'queued',clock_timestamp());
+insert into merchant.kitchen_order_item(id,merchant_id,location_id,kitchen_order_id,source_order_id,
+  source_order_item_id,station_id,status,product_id,product_name,quantity,display_order,route_reason)
+values('a4300000-0000-4000-8000-000000000091','$A','$A1',
+  'a4200000-0000-4000-8000-000000000091','a4000000-0000-4000-8000-000000000091',
+  'a4100000-0000-4000-8000-000000000091','a2000000-0000-4000-8000-000000000091',
+  'queued','a3000000-0000-4000-8000-000000000091','Gate 4A item',1,1,'product');
+insert into merchant.kitchen_event(event_id,merchant_id,location_id,kitchen_order_id,station_id,
+  kind,aggregate_version,status,correlation_id)
+values('a4400000-0000-4000-8000-000000000091','$A','$A1',
+  'a4200000-0000-4000-8000-000000000091','a2000000-0000-4000-8000-000000000091',
+  'order_created',1,'queued','gate4a-db-check');
+SQL
+expect "assigned location reads its kitchen order" "1" \
+  "$(as_api "$A" "$A1" "$D1" "select count(*) from merchant.kitchen_order where id='a4200000-0000-4000-8000-000000000091';")"
+expect "another location cannot read kitchen work" "0" \
+  "$(as_api "$A" "$A2" "$D2" "select count(*) from merchant.kitchen_order where id='a4200000-0000-4000-8000-000000000091';")"
+expect "another merchant cannot read kitchen work" "0" \
+  "$(as_api "$B" "" "" "select count(*) from merchant.kitchen_order where id='a4200000-0000-4000-8000-000000000091';")"
+expect_error "api cannot insert a kitchen event directly" \
+  "$(as_api_raw "$A" "$A1" "$D1" "insert into merchant.kitchen_event(event_id,merchant_id,location_id,kitchen_order_id,kind,aggregate_version,correlation_id) values(gen_random_uuid(),'$A','$A1','a4200000-0000-4000-8000-000000000091','order_updated',2,'forged');")"
+expect_error "api cannot read an unscoped KDS view" \
+  "$(as_api_raw "$A" "$A1" "$D1" "select count(*) from kds.station_order;")"
+expect_error "a kitchen route cannot cross locations" \
+  "$(q -c "insert into merchant.kitchen_route(merchant_id,location_id,product_id,station_id) values('$A','$A1','a3000000-0000-4000-8000-000000000091','a2000000-0000-4000-8000-000000000092');")"
+expect "all kitchen authority tables force RLS" "6" \
+  "$(q -c "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='merchant' and c.relname in (
+      'kitchen_route','kitchen_order','kitchen_order_item','kitchen_command',
+      'kitchen_event','kitchen_device_station')
       and c.relrowsecurity and c.relforcerowsecurity;")"
 
 echo

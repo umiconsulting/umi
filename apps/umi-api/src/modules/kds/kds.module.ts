@@ -5,22 +5,16 @@ import { KdsController } from './kds.controller';
 import { KdsAdminController, KdsDashboardController } from './kds-dashboard.controller';
 import { KdsService } from './kds.service';
 import { KdsRepository } from './kds.repository';
+import { KdsPosController } from './kds-pos.controller';
+import { KdsLocationGuard } from './kds-location.guard';
 
 /**
- * KDS domain (spec §8.1, Phase 4). Two faces over the canonical `ops.*`/
- * `device.*`/`kitchen.*` model:
- *   - the FROZEN iPad contract (`KdsController`: pairing/board/command +
- *     `/functions/v1/*` aliases + heartbeat), and
- *   - the owner dashboard surface (`KdsDashboardController` +
- *     `KdsAdminController`: device management, board orders, transitions).
- *
- * Web-process only — transitions run on the request path and write
- * `runtime.outbox_event`, which the existing OutboxRelay/OutboundProcessor (worker)
- * already deliver as `twilio.status_notification` / `twilio.cancel_notification`.
+ * The UMI API owns kitchen projections and transitions.
+ * The existing iPad KDS, the POS, and the Dashboard use this module as clients.
  */
 @Module({
   imports: [AuthModule, MerchantsModule],
-  controllers: [KdsController, KdsDashboardController, KdsAdminController],
-  providers: [KdsService, KdsRepository],
+  controllers: [KdsController, KdsDashboardController, KdsAdminController, KdsPosController],
+  providers: [KdsService, KdsRepository, KdsLocationGuard],
 })
 export class KdsModule {}

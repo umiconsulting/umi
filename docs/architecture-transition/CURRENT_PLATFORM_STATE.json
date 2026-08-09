@@ -27,7 +27,8 @@
     "3E",
     "3F",
     "3G-A",
-    "3G-B"
+    "3G-B",
+    "4A"
   ],
   "authorities": {
     "api": "apps/umi-api",
@@ -50,6 +51,8 @@
     "hardwareRegistry": "merchant.hardware_device and merchant.hardware_assignment",
     "hardwareCommands": "merchant.hardware_command and append-only merchant.hardware_command_event",
     "printerQueue": "merchant.hardware_print_job and append-only merchant.hardware_print_job_event",
+    "kitchenOrders": "merchant.kitchen_order and merchant.kitchen_order_item",
+    "kitchenEvents": "merchant.kitchen_event and safe kds read projections",
     "operationalTelemetry": "apps/umi-api/src/shared/operations",
     "health": "apps/umi-api/src/modules/health"
   },
@@ -63,6 +66,7 @@
     "appendOnlyAudit": true,
     "appendOnlyFinancialEvents": true,
     "appendOnlyInventoryLedger": true,
+    "appendOnlyKitchenEvents": true,
     "commandFingerprinting": true,
     "idempotentBusinessCommands": true,
     "internalAuditMetadataPubliclyReadable": false,
@@ -84,8 +88,8 @@
     "gate2AStatus": "complete",
     "flutterVersion": "3.44.6",
     "dartVersion": "3.12.2",
-    "contractVersion": "2.8.0",
-    "contractContentHash": "acacbd59b0691a0a351691e2b161cf0ac7ee433280ad363cf2a86238bdb85abe",
+    "contractVersion": "2.9.0",
+    "contractContentHash": "ac23d09d92f252f8e770e84fef90ab4c42c30afb85d8e08a0c0a15df2376ff6f",
     "stateManagement": "ChangeNotifier with one explicit composition root",
     "navigation": "central typed route guard",
     "secureStorage": "flutter_secure_storage with no plaintext fallback",
@@ -113,6 +117,7 @@
     "gate3FStatus": "complete",
     "gate3GAStatus": "complete",
     "gate3GBStatus": "complete_with_observations",
+    "gate4AStatus": "complete_with_observations",
     "pilotRoleGrantMatrix": "config/umipos-pilot-role-grants.json",
     "pilotApprovalMatrix": "config/umipos-pilot-approval-boundaries.json",
     "pilotPermissionInventory": "config/umipos-permission-inventory.json",
@@ -179,6 +184,14 @@
     "pilotHardwarePolicy": "server-owned register scope controls auto-print, cash drawer, retry, health, scanner, and customer display behavior",
     "pilotPhysicalValidation": "not available in the current runner; no physical certification claimed",
     "hardwareOfflineBoundary": "native command journal foundation only; Web has no secure native hardware parity",
+    "kitchenAuthority": "UMI API kitchen orders reference committed commercial orders without financial mutation authority",
+    "kitchenRouting": "deterministic product, category, and location-default routes with historical snapshots and explicit exceptions",
+    "kitchenStations": "exact merchant, location, station, and KDS device assignments",
+    "kitchenLifecycle": "versioned queued, preparation, partial-ready, ready, completed, cancelled, exception, and explicit recall states",
+    "kitchenFeed": "ordered version-aware events plus authoritative station snapshot recovery",
+    "kitchenOfflineBoundary": "read cached and fail closed for mutations until authoritative reconciliation",
+    "kitchenConcurrency": "all 10 focused races passed through two independent PostgreSQL sessions",
+    "kitchenPrivacy": "preparation-safe projection excludes customer contact, payment, wallet, and gift-card data",
     "compensatingReceipt": "immutable exception receipt preserves the original sale and receipt",
     "saleExceptionRecovery": "secure command identity queries the authoritative idempotent result after restart or response loss",
     "gate3DOfflineBoundary": "all post-sale exception mutations are online-only",
@@ -217,7 +230,7 @@
     "offlineCash": "default-deny server-issued branch policy; eligible native cash checkout is encrypted and provisional",
     "offlineRecovery": "generated-SDK gateway, serialized journal mutations, restart deduplication, ordered replay, typed recovery actions, response-loss query, reconciliation, immutable mapping, Recovery Center",
     "offlineDatabaseValidation": "clean migration chain plus merchant, location, device, credential, immutability, revocation and rotation negative matrix passed in disposable PostgreSQL",
-    "nativeBuild": "Linux debug build passed for Gate 3G-B",
+    "nativeBuild": "Linux debug build passed for Gate 4A UmiPOS status visibility",
     "webOfflineCapability": "sensitive journaling unsupported; online operation only",
     "checkoutAuthority": "apps/umi-api/src/modules/pos-checkout",
     "checkoutMode": "online, immediately repriced, explicitly confirmed, idempotent",
@@ -241,9 +254,9 @@
     "pinFoundation": "merchant-unique personal PIN, keyed lookup, server-side scrypt verification, bounded attempts, and no client role selection",
     "managerApprovalFoundation": "single-action scoped five-minute elevation",
     "readyShell": true,
-    "latestLocalCommit": "HEAD (Gate 3G-B commit in PR #72)",
-    "pushStatus": "Gate 3G-B publication uses PR #72",
+    "latestLocalCommit": "HEAD (Gate 4A commit in PR #72)",
+    "pushStatus": "Gate 4A publication uses PR #72",
     "pullRequestStatus": "PR #72 targets build-v3"
   },
-  "nextGate": "Gate 4A KDS operational integration is authorized. Gate 4A has not started."
+  "nextGate": "Gate 5A Dashboard operational completion is authorized with observations. Gate 5A has not started."
 }

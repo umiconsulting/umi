@@ -31,6 +31,7 @@ import '../features/hardware/hardware_service.dart';
 import '../features/hardware/pilot_hardware_adapters.dart';
 import '../features/inventory/inventory_controller.dart';
 import '../features/inventory/inventory_repository.dart';
+import '../features/kitchen/kitchen_status_repository.dart';
 import '../features/offline/connectivity_controller.dart';
 import '../features/offline/offline_checkout_service.dart';
 import '../features/offline/offline_journal.dart';
@@ -59,6 +60,7 @@ final class AppCompositionRoot {
     required this.cash,
     required this.checkout,
     required this.sales,
+    this.kitchenStatus,
     this.customerValue,
     required this.connectivity,
     required this.offlineJournal,
@@ -205,6 +207,7 @@ final class AppCompositionRoot {
         cart: cart,
         telemetry: telemetry,
       ),
+      kitchenStatus: ApiKitchenStatusRepository(apiClient),
       customerValue: CustomerValueController(
         ApiCustomerValueRepository(apiClient),
       ),
@@ -289,6 +292,7 @@ final class AppCompositionRoot {
   final CashController cash;
   final CheckoutController checkout;
   final SaleLifecycleController sales;
+  final KitchenStatusRepository? kitchenStatus;
   final CustomerValueController? customerValue;
   final ConnectivityController connectivity;
   final EncryptedOfflineJournal offlineJournal;

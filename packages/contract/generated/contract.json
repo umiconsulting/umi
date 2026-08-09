@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "acacbd59b0691a0a351691e2b161cf0ac7ee433280ad363cf2a86238bdb85abe",
-  "contractVersion": "2.8.0",
+  "contentHash": "ac23d09d92f252f8e770e84fef90ab4c42c30afb85d8e08a0c0a15df2376ff6f",
+  "contractVersion": "2.9.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -39692,6 +39692,1019 @@
       ],
       "type": "object"
     },
+    "KitchenBoardRequest": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "const": "snapshot",
+              "type": "string"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "const": "events",
+              "type": "string"
+            },
+            "afterSequence": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "limit": {
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "action",
+            "afterSequence",
+            "limit"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "KitchenBoardResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "businessDate": {
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "type": "string"
+                  },
+                  "id": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "items": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "displayOrder": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "id": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "modifiers": {
+                          "items": {
+                            "maxLength": 300,
+                            "type": "string"
+                          },
+                          "maxItems": 100,
+                          "type": "array"
+                        },
+                        "preparationNote": {
+                          "anyOf": [
+                            {
+                              "maxLength": 500,
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "productName": {
+                          "maxLength": 300,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "quantity": {
+                          "exclusiveMinimum": 0,
+                          "type": "integer"
+                        },
+                        "status": {
+                          "enum": [
+                            "queued",
+                            "preparing",
+                            "ready",
+                            "cancelled",
+                            "exception"
+                          ],
+                          "type": "string"
+                        },
+                        "targetSeconds": {
+                          "anyOf": [
+                            {
+                              "maximum": 86400,
+                              "minimum": 30,
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "variantName": {
+                          "anyOf": [
+                            {
+                              "maxLength": 300,
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "version": {
+                          "exclusiveMinimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "status",
+                        "productName",
+                        "variantName",
+                        "modifiers",
+                        "quantity",
+                        "preparationNote",
+                        "displayOrder",
+                        "targetSeconds",
+                        "version"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 500,
+                    "type": "array"
+                  },
+                  "lastEventSequence": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "locationId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "merchantId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "preparationStartedAt": {
+                    "anyOf": [
+                      {
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "priority": {
+                    "enum": [
+                      "normal",
+                      "high",
+                      "urgent"
+                    ],
+                    "type": "string"
+                  },
+                  "publicReference": {
+                    "maxLength": 160,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "queuedAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "source": {
+                    "enum": [
+                      "whatsapp",
+                      "pos",
+                      "web",
+                      "dashboard"
+                    ],
+                    "type": "string"
+                  },
+                  "sourceOrderId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "stationId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "status": {
+                    "enum": [
+                      "queued",
+                      "in_preparation",
+                      "partially_ready",
+                      "ready",
+                      "completed",
+                      "cancelled",
+                      "exception"
+                    ],
+                    "type": "string"
+                  },
+                  "updatedAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "version": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "id",
+                  "sourceOrderId",
+                  "publicReference",
+                  "merchantId",
+                  "locationId",
+                  "stationId",
+                  "source",
+                  "status",
+                  "priority",
+                  "businessDate",
+                  "queuedAt",
+                  "preparationStartedAt",
+                  "updatedAt",
+                  "version",
+                  "lastEventSequence",
+                  "items"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "aggregateVersion": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  "correlationId": {
+                    "maxLength": 200,
+                    "minLength": 8,
+                    "type": "string"
+                  },
+                  "kind": {
+                    "enum": [
+                      "order_created",
+                      "order_updated",
+                      "item_updated",
+                      "order_cancelled",
+                      "priority_changed",
+                      "order_recalled",
+                      "recovery_required"
+                    ],
+                    "type": "string"
+                  },
+                  "kitchenOrderId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "locationId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "merchantId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "occurredAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "payload": {
+                    "additionalProperties": {},
+                    "type": "object"
+                  },
+                  "sequence": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  "source": {
+                    "const": "umi_api",
+                    "type": "string"
+                  },
+                  "sourceOrderId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "stationId": {
+                    "anyOf": [
+                      {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "status": {
+                    "anyOf": [
+                      {
+                        "enum": [
+                          "queued",
+                          "in_preparation",
+                          "partially_ready",
+                          "ready",
+                          "completed",
+                          "cancelled",
+                          "exception"
+                        ],
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "sequence",
+                  "kitchenOrderId",
+                  "sourceOrderId",
+                  "merchantId",
+                  "locationId",
+                  "stationId",
+                  "kind",
+                  "aggregateVersion",
+                  "status",
+                  "occurredAt",
+                  "correlationId",
+                  "source",
+                  "payload"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          ]
+        },
+        "ok": {
+          "const": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok",
+        "data"
+      ],
+      "type": "object"
+    },
+    "KitchenCommandRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "const": "command",
+          "type": "string"
+        },
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "commandType": {
+          "enum": [
+            "start_preparation",
+            "mark_item_ready",
+            "mark_order_ready",
+            "complete",
+            "recall",
+            "cancel_ack",
+            "change_priority"
+          ],
+          "type": "string"
+        },
+        "correlationId": {
+          "maxLength": 200,
+          "minLength": 8,
+          "type": "string"
+        },
+        "expectedVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "maxLength": 200,
+          "minLength": 8,
+          "type": "string"
+        },
+        "itemIds": {
+          "default": [],
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        "kitchenOrderId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "priority": {
+          "anyOf": [
+            {
+              "enum": [
+                "normal",
+                "high",
+                "urgent"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "reasonCode": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "reasonNote": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "action",
+        "commandId",
+        "idempotencyKey",
+        "correlationId",
+        "expectedVersion",
+        "kitchenOrderId",
+        "commandType"
+      ],
+      "type": "object"
+    },
+    "KitchenCommandResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": false,
+          "properties": {
+            "kitchenOrderId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "sequence": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "status": {
+              "enum": [
+                "queued",
+                "in_preparation",
+                "partially_ready",
+                "ready",
+                "completed",
+                "cancelled",
+                "exception"
+              ],
+              "type": "string"
+            },
+            "updatedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "version": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "kitchenOrderId",
+            "status",
+            "version",
+            "sequence",
+            "updatedAt"
+          ],
+          "type": "object"
+        },
+        "ok": {
+          "const": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok",
+        "data"
+      ],
+      "type": "object"
+    },
+    "KitchenCommandResult": {
+      "additionalProperties": false,
+      "properties": {
+        "kitchenOrderId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "sequence": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "in_preparation",
+            "partially_ready",
+            "ready",
+            "completed",
+            "cancelled",
+            "exception"
+          ],
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "version": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kitchenOrderId",
+        "status",
+        "version",
+        "sequence",
+        "updatedAt"
+      ],
+      "type": "object"
+    },
+    "KitchenCommandType": {
+      "enum": [
+        "start_preparation",
+        "mark_item_ready",
+        "mark_order_ready",
+        "complete",
+        "recall",
+        "cancel_ack",
+        "change_priority"
+      ],
+      "type": "string"
+    },
+    "KitchenEventProjection": {
+      "additionalProperties": false,
+      "properties": {
+        "aggregateVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "correlationId": {
+          "maxLength": 200,
+          "minLength": 8,
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "order_created",
+            "order_updated",
+            "item_updated",
+            "order_cancelled",
+            "priority_changed",
+            "order_recalled",
+            "recovery_required"
+          ],
+          "type": "string"
+        },
+        "kitchenOrderId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "occurredAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "payload": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "sequence": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "source": {
+          "const": "umi_api",
+          "type": "string"
+        },
+        "sourceOrderId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "stationId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "anyOf": [
+            {
+              "enum": [
+                "queued",
+                "in_preparation",
+                "partially_ready",
+                "ready",
+                "completed",
+                "cancelled",
+                "exception"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "sequence",
+        "kitchenOrderId",
+        "sourceOrderId",
+        "merchantId",
+        "locationId",
+        "stationId",
+        "kind",
+        "aggregateVersion",
+        "status",
+        "occurredAt",
+        "correlationId",
+        "source",
+        "payload"
+      ],
+      "type": "object"
+    },
+    "KitchenItemStatus": {
+      "enum": [
+        "queued",
+        "preparing",
+        "ready",
+        "cancelled",
+        "exception"
+      ],
+      "type": "string"
+    },
+    "KitchenOrderItem": {
+      "additionalProperties": false,
+      "properties": {
+        "displayOrder": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "modifiers": {
+          "items": {
+            "maxLength": 300,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "preparationNote": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "productName": {
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        },
+        "quantity": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "preparing",
+            "ready",
+            "cancelled",
+            "exception"
+          ],
+          "type": "string"
+        },
+        "targetSeconds": {
+          "anyOf": [
+            {
+              "maximum": 86400,
+              "minimum": 30,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "variantName": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "productName",
+        "variantName",
+        "modifiers",
+        "quantity",
+        "preparationNote",
+        "displayOrder",
+        "targetSeconds",
+        "version"
+      ],
+      "type": "object"
+    },
+    "KitchenOrderProjection": {
+      "additionalProperties": false,
+      "properties": {
+        "businessDate": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "displayOrder": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "modifiers": {
+                "items": {
+                  "maxLength": 300,
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "type": "array"
+              },
+              "preparationNote": {
+                "anyOf": [
+                  {
+                    "maxLength": 500,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "productName": {
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string"
+              },
+              "quantity": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "status": {
+                "enum": [
+                  "queued",
+                  "preparing",
+                  "ready",
+                  "cancelled",
+                  "exception"
+                ],
+                "type": "string"
+              },
+              "targetSeconds": {
+                "anyOf": [
+                  {
+                    "maximum": 86400,
+                    "minimum": 30,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "variantName": {
+                "anyOf": [
+                  {
+                    "maxLength": 300,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "version": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "productName",
+              "variantName",
+              "modifiers",
+              "quantity",
+              "preparationNote",
+              "displayOrder",
+              "targetSeconds",
+              "version"
+            ],
+            "type": "object"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        "lastEventSequence": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "preparationStartedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "priority": {
+          "enum": [
+            "normal",
+            "high",
+            "urgent"
+          ],
+          "type": "string"
+        },
+        "publicReference": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "queuedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "whatsapp",
+            "pos",
+            "web",
+            "dashboard"
+          ],
+          "type": "string"
+        },
+        "sourceOrderId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "stationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "in_preparation",
+            "partially_ready",
+            "ready",
+            "completed",
+            "cancelled",
+            "exception"
+          ],
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "version": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "sourceOrderId",
+        "publicReference",
+        "merchantId",
+        "locationId",
+        "stationId",
+        "source",
+        "status",
+        "priority",
+        "businessDate",
+        "queuedAt",
+        "preparationStartedAt",
+        "updatedAt",
+        "version",
+        "lastEventSequence",
+        "items"
+      ],
+      "type": "object"
+    },
+    "KitchenOrderStatus": {
+      "enum": [
+        "queued",
+        "in_preparation",
+        "partially_ready",
+        "ready",
+        "completed",
+        "cancelled",
+        "exception"
+      ],
+      "type": "string"
+    },
+    "KitchenPriority": {
+      "enum": [
+        "normal",
+        "high",
+        "urgent"
+      ],
+      "type": "string"
+    },
     "KitchenTicketPrintPayloadFoundation": {
       "additionalProperties": false,
       "properties": {
@@ -48207,6 +49220,89 @@
       },
       "required": [
         "items"
+      ],
+      "type": "object"
+    },
+    "PosKitchenOrderQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "operatorSessionId"
+      ],
+      "type": "object"
+    },
+    "PosKitchenStatusResult": {
+      "additionalProperties": false,
+      "properties": {
+        "kitchenOrderId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "priority": {
+          "enum": [
+            "normal",
+            "high",
+            "urgent"
+          ],
+          "type": "string"
+        },
+        "publicReference": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "sourceOrderId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "stationIds": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "in_preparation",
+            "partially_ready",
+            "ready",
+            "completed",
+            "cancelled",
+            "exception"
+          ],
+          "type": "string"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "version": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kitchenOrderId",
+        "sourceOrderId",
+        "publicReference",
+        "status",
+        "priority",
+        "version",
+        "stationIds",
+        "updatedAt"
       ],
       "type": "object"
     },
@@ -61365,6 +62461,17 @@
                   }
                 ]
               },
+              "sourceOrderId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "state": {
                 "enum": [
                   "building_cart",
@@ -61404,6 +62511,7 @@
               "cancelledAt",
               "cancellationReason",
               "committedSaleId",
+              "sourceOrderId",
               "receiptId",
               "receiptRef",
               "updatedAt"
@@ -62605,6 +63713,17 @@
             }
           ]
         },
+        "sourceOrderId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "state": {
           "enum": [
             "building_cart",
@@ -62644,6 +63763,7 @@
         "cancelledAt",
         "cancellationReason",
         "committedSaleId",
+        "sourceOrderId",
         "receiptId",
         "receiptRef",
         "updatedAt"
@@ -70364,6 +71484,8 @@
     "InventoryAtomicity": "A stock-tracked sale and its inventory effects commit in one database transaction.",
     "InventoryLedger": "Every stock effect is an immutable ledger fact. A projection is never the sole authority.",
     "InventoryRestockLimit": "A restock cannot exceed the refunded quantity or the original stock consumption.",
+    "KitchenAuthority": "A kitchen projection references one committed sale. A KDS command cannot change a financial fact.",
+    "KitchenEventOrder": "A client applies only a newer aggregate version. It recovers a gap from the authoritative snapshot.",
     "LoyaltyLedger": "Every points effect is an immutable ledger fact. A projection is never the sole authority.",
     "Money": "minorUnits is an integer and currency is an uppercase ISO 4217 code.",
     "OfflineCommandEnvelope": "sequence is positive and fingerprint is a SHA-256 hexadecimal value.",
@@ -70807,6 +71929,22 @@
       "pin": false,
       "request": "InventoryQuery",
       "response": "InventoryHistoryResult"
+    },
+    "GET /api/v1/pos/merchants/:merchantId/kitchen/orders/:sourceOrderId": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "RESOURCE_NOT_FOUND"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "kitchen.read",
+      "pin": false,
+      "request": "PosKitchenOrderQuery",
+      "response": "PosKitchenStatusResult"
     },
     "GET /api/v1/pos/merchants/:merchantId/offline/conflicts": {
       "approval": false,
@@ -71274,6 +72412,40 @@
       "pin": false,
       "request": "ResetPasswordRequest",
       "response": "OkResponse"
+    },
+    "POST /api/kds/board": {
+      "approval": false,
+      "auth": "device",
+      "errors": [
+        "AUTHENTICATION_REQUIRED",
+        "PERMISSION_DENIED",
+        "RESOURCE_NOT_FOUND"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "kitchen.read",
+      "pin": false,
+      "request": "KitchenBoardRequest",
+      "response": "KitchenBoardResponse"
+    },
+    "POST /api/kds/command": {
+      "approval": false,
+      "auth": "device",
+      "errors": [
+        "PERMISSION_DENIED",
+        "RESOURCE_NOT_FOUND",
+        "OPTIMISTIC_VERSION_CONFLICT"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "kitchen.prepare",
+      "pin": false,
+      "request": "KitchenCommandRequest",
+      "response": "KitchenCommandResponse"
     },
     "POST /api/v1/auth/pos/global-logout": {
       "approval": false,

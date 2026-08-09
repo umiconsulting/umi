@@ -45,8 +45,11 @@ comment on function umi.current_device() is
 
 -- ---- No ambient authority: lock schema public (CVE-2018-1058) and our schemas ----
 revoke create on schema public from public;
-revoke all on all tables in schema umi, merchant, runtime from public;
+revoke all on all tables in schema umi, merchant, runtime, kds from public;
+revoke all on schema kds from public, api;
 grant usage on schema umi, merchant, runtime to api, worker, readonly;
+grant usage on schema kds to worker, readonly;
+grant select on all tables in schema kds to worker, readonly;
 
 -- ===========================================================================
 -- GRANTS — least privilege per role
@@ -64,6 +67,24 @@ revoke select on runtime.session, runtime.otp, runtime.password_reset_token,
 -- api (the café REQUEST-PATH role): full DML on merchant (RLS-bound); umi limited to
 -- global catalogs + per-café tables (RLS-scoped); minimal, scoped runtime.
 grant select, insert, update, delete on all tables in schema merchant to api;
+
+-- Gate 4A writes kitchen authority only through the scoped UMI API repositories.
+revoke insert, update, delete on
+  merchant.kitchen_route,
+  merchant.kitchen_order,
+  merchant.kitchen_order_item,
+  merchant.kitchen_command,
+  merchant.kitchen_event,
+  merchant.kitchen_device_station
+from api;
+grant select on
+  merchant.kitchen_route,
+  merchant.kitchen_order,
+  merchant.kitchen_order_item,
+  merchant.kitchen_command,
+  merchant.kitchen_event,
+  merchant.kitchen_device_station
+to api;
 
 -- Gate 3F permits points and stored-value facts only through command boundaries.
 revoke insert, update, delete on
@@ -506,7 +527,11 @@ declare
     'stock_ledger_entry',
     'loyalty_points_ledger',
     'loyalty_stored_value_ledger',
-    'loyalty_gift_card_ledger'
+    'loyalty_gift_card_ledger',
+    -- These rows record a target device or command actor. The column is provenance.
+    -- Merchant, location, permission, and station checks control access.
+    'kitchen_command',
+    'kitchen_device_station'
   ]::text[];
 begin
   select array_agg(c.relname order by c.relname) into undecided

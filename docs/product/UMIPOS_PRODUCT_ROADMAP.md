@@ -20,9 +20,10 @@ Updated: 2026-08-09
 | 3F Customers, loyalty, and stored value | Complete                   | 3E                     | Authorize Gate 3G hardware foundations    | Owner production limits and legal review remain      | Contract, API, Flutter, 26 real races, PostgreSQL, RLS, Linux, Web, and deterministic PR checks passed                   |
 | 3G-A Pilot hardware runtime foundation  | Complete                   | 3F                     | Authorize Gate 3G-B pilot hardware        | Physical hardware and vendor adapters remain         | Contract, API, Flutter, simulator, recovery, PostgreSQL, RLS, Linux, Web, and PR checks passed                           |
 | 3G-B Pilot hardware integration         | Complete with observations | 3G-A                   | Authorize Gate 4A KDS integration         | Physical hardware validation remains                 | Generic printer, drawer, scanner, simulator, API, PostgreSQL, RLS, Flutter, Linux, Web, and PR checks passed             |
+| 4A KDS operational integration          | Complete with observations | 3G-B                   | Authorize Gate 5A Dashboard completion    | Xcode validation was unavailable in the Linux runner | Existing KDS static review, API, contracts, POS status, 10 real races, PostgreSQL, RLS, reconnect, and PR checks passed  |
 
-The latest relevant revision is the Gate 3G-B commit in PR #72.
-PR #72 keeps Gates 3A through 3G-B complete. Gate 4A is authorized and has not started.
+The latest relevant revision is the Gate 4A commit in PR #72.
+PR #72 keeps Gates 3A through 4A complete. Gate 5A is authorized with observations and has not started.
 Native encrypted offline support covers the explicit allowlist and server-policy-authorized cash;
 Web sensitive journaling remains disabled. UMI remains the
 sole business authority; Flutter owns presentation, hardware integration, encrypted local state,
@@ -64,4 +65,7 @@ It adds deterministic printer, drawer, scanner, and customer display simulators.
 Gate 3G-B adds generic TCP printing, a printer-attached drawer, and keyboard-wedge scanning.
 It adds server-owned pilot configuration, bounded reconnect, deterministic rendering, and a simulated cashier walkthrough.
 Physical validation was unavailable. This status does not certify a device or vendor.
-Gate 4A is authorized and has not started.
+Gate 4A adds one authoritative kitchen projection and deterministic station routing.
+It adapts the existing SwiftUI KDS to safe snapshots, ordered events, stable commands, and fail-closed reconnect.
+It adds safe POS kitchen status and runs all 10 focused races with independent PostgreSQL sessions.
+Gate 5A is authorized and has not started.
