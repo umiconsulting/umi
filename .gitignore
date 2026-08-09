@@ -55,3 +55,8 @@ apps/*/supabase/.temp/
 # are unreviewable binaries and version-specific (cpython-314 here).
 __pycache__/
 *.pyc
+
+# Claude Code per-developer settings. Contains machine-specific permission
+# allowlists that have historically included credentials in command strings.
+# The repo-shared config is .mcp.json (secrets via ${VAR} expansion only).
+.claude/settings.local.json
