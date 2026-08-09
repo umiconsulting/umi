@@ -61,7 +61,7 @@ items. The token is **per-person**, so each dev supplies their own:
 1. In Plane: avatar → **Settings → Personal Access Tokens → Add**. Copy it once;
    it is not shown again. Name it something you can revoke in isolation.
 2. Export it where your shell will pick it up (`~/.zshrc`, direnv, 1Password CLI —
-   whatever you already use for `SLACK_BOT_TOKEN` and friends):
+   wherever the other `.mcp.json` secrets already come from):
 
    ```bash
    export PLANE_API_KEY=plane_api_...
