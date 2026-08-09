@@ -42,31 +42,6 @@
         "GEMINI_API_KEY": "${GEMINI_API_KEY}"
       }
     },
-    "magic": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@21st-dev/magic@latest"
-      ],
-      "env": {
-        "API_KEY": "${MAGIC_API_KEY}"
-      }
-    },
-    "xapi": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@xdevplatform/xurl",
-        "mcp",
-        "https://api.x.com/mcp"
-      ],
-      "env": {
-        "CLIENT_ID": "${XAPI_CLIENT_ID}",
-        "CLIENT_SECRET": "${XAPI_CLIENT_SECRET}"
-      }
-    },
     "plane": {
       "command": "uvx",
       "args": [
