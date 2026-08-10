@@ -228,7 +228,14 @@ Future clients use `packages/contract` and controlled UMI APIs.
   `ac23d09d92f252f8e770e84fef90ab4c42c30afb85d8e08a0c0a15df2376ff6f`.
 - Gate 4A passed focused contract, API, Flutter, PostgreSQL, RLS, security, and PR checks.
 - The Linux runner had no Xcode toolchain. Static KDS reviews passed, but the iPad build remains an observation.
-- Gate 5A is authorized with observations. Gate 5A has not started.
+- Gate 5A: incomplete. The Dashboard has permission-scoped read coverage for 21 operational domains.
+- Gate 5A uses contract version `2.10.0`, with content hash
+  `d377d5da5aa02b6af82fe071806f4c59ff78dcb71227f962e502befa995c24cb`.
+- Gate 5A limits each location membership to its assigned location.
+- Gate 5A uses effective permissions for navigation and direct API access.
+- Device-bound financial, inventory, hardware, and recovery commands remain unavailable to a normal Dashboard session.
+- Gate 5A does not create a false POS device or operator session.
+- Gate 6A is not authorized.
 
 ## Gate 3C decision basis
 

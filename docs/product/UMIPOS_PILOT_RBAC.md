@@ -355,3 +355,16 @@ Los permisos canónicos son:
 Un usuario con scope de location debe enviar su location asignada.
 Solo `kitchen.merchant.read` permite omitir el scope de location.
 El dispositivo KDS también debe tener una asignación activa a la estación.
+
+## Gate 5A — Navegación del Dashboard
+
+El Dashboard crea la navegación con los permisos efectivos de la membresía.
+El Dashboard no usa el nombre del rol como autoridad.
+La API también comprueba el permiso de cada enlace directo.
+
+Una membresía con una location asignada solo recibe datos de esa location.
+Los productos y las políticas de rewards conservan su scope de merchant.
+Los hechos de customer value no usan un `location_id` nulo como acceso global.
+
+El Dashboard no omite las pruebas de dispositivo, credencial y sesión del operador.
+Una mutación que exige estas pruebas debe usar un contexto POS inscrito.

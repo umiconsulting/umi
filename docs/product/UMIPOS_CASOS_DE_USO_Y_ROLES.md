@@ -3480,3 +3480,19 @@ Los eventos duplicados o antiguos no cambian la vista.
 | Leer todas las locations       | ❌      | ❌    | ❌         | ❌      | ✅          | ❌     |
 
 El permiso efectivo y el scope asignado siguen como la autoridad.
+
+## Gate 5A — Consulta operativa del Dashboard
+
+1. El operador selecciona un merchant y una location permitida.
+2. El Dashboard solicita un dominio con un cursor y un límite.
+3. La API comprueba el permiso efectivo del dominio.
+4. La API aplica el scope de la membresía y de la location.
+5. La API devuelve una proyección segura y paginada.
+6. El Dashboard muestra una referencia pública o una correlation ID.
+
+El Dashboard niega un enlace directo cuando falta el permiso.
+El Dashboard invalida los datos cuando cambia el contexto de location.
+El Dashboard no ofrece una acción genérica para repetir todas las operaciones.
+
+Las mutaciones financieras conservan el requisito de un dispositivo POS inscrito.
+Gate 5A no crea una ruta administrativa que omita este límite.

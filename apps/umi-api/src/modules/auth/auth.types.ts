@@ -19,6 +19,8 @@ export interface MerchantAccess {
   role: string | null;
   roles: string[];
   permissions: string[];
+  /** Null grants merchant scope. A value limits this employment to one location. */
+  locationId: string | null;
 }
 
 /**

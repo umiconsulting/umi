@@ -693,3 +693,24 @@ canonical JSON, the contract checksum, the UmiPOS use-case document, and the ful
 Run affected tests and builds separately.
 
 See `docs/development/LINT_AND_PR_CHECKS.md` for the failure diagnosis and troubleshooting steps.
+
+## Centro operativo del Dashboard
+
+El Dashboard obtiene el resumen operativo con `GET /api/merchants/:merchantId/operations`.
+La consulta exige un permiso efectivo para cada dominio.
+La consulta aplica el scope de la location de la membresía.
+El Dashboard usa páginas con un límite máximo de 50 registros.
+
+Ejecuta las pruebas enfocadas:
+
+```bash
+pnpm --filter @umi/api exec vitest run \
+  src/modules/dashboard-operations/dashboard-operations.service.spec.ts \
+  src/modules/merchants/merchants.service.spec.ts \
+  src/modules/auth/auth.guards.spec.ts
+pnpm --filter @umi/dashboard test
+pnpm --filter @umi/dashboard build
+```
+
+El Dashboard no crea un contexto falso de dispositivo POS.
+Las mutaciones que exigen un dispositivo inscrito permanecen fuera del centro operativo.

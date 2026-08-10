@@ -165,6 +165,13 @@
       "status": "complete_with_observations",
       "stateMachineVersion": 1,
       "subject": "Authoritative kitchen projection, station routing, existing KDS integration, reconnect, recovery, and POS visibility"
+    },
+    {
+      "commit": "HEAD (Gate 5A incomplete closeout commit)",
+      "id": "5A",
+      "status": "incomplete",
+      "stateMachineVersion": 1,
+      "subject": "Permission-scoped Dashboard read coverage for 21 domains; device-bound administrative commands remain open"
     }
   ]
 }

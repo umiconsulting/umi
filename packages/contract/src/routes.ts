@@ -43,6 +43,7 @@ export const routes = {
     settings: (merchantId: string): string => buildPath('merchants.settings', { merchantId }),
     locations: (merchantId: string): string => buildPath('merchants.locations', { merchantId }),
     audit: (merchantId: string): string => buildPath('merchants.audit', { merchantId }),
+    operations: (merchantId: string): string => buildPath('merchants.operations', { merchantId }),
   },
   cash: {
     // Merchant-scoped surface (dashboard, cookie auth).

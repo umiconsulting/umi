@@ -88,8 +88,8 @@
     "gate2AStatus": "complete",
     "flutterVersion": "3.44.6",
     "dartVersion": "3.12.2",
-    "contractVersion": "2.9.0",
-    "contractContentHash": "ac23d09d92f252f8e770e84fef90ab4c42c30afb85d8e08a0c0a15df2376ff6f",
+    "contractVersion": "2.10.0",
+    "contractContentHash": "d377d5da5aa02b6af82fe071806f4c59ff78dcb71227f962e502befa995c24cb",
     "stateManagement": "ChangeNotifier with one explicit composition root",
     "navigation": "central typed route guard",
     "secureStorage": "flutter_secure_storage with no plaintext fallback",
@@ -254,9 +254,12 @@
     "pinFoundation": "merchant-unique personal PIN, keyed lookup, server-side scrypt verification, bounded attempts, and no client role selection",
     "managerApprovalFoundation": "single-action scoped five-minute elevation",
     "readyShell": true,
-    "latestLocalCommit": "HEAD (Gate 4A commit in PR #72)",
-    "pushStatus": "Gate 4A publication uses PR #72",
+    "gate5AStatus": "incomplete",
+    "dashboardOperations": "permission-scoped read projections for 21 operational domains",
+    "dashboardMutationBoundary": "device-bound financial, inventory, hardware, and recovery commands remain unavailable to a normal Dashboard session",
+    "latestLocalCommit": "HEAD (Gate 5A incomplete closeout commit in PR #72)",
+    "pushStatus": "Gate 5A incomplete closeout publication uses PR #72",
     "pullRequestStatus": "PR #72 targets build-v3"
   },
-  "nextGate": "Gate 5A Dashboard operational completion is authorized with observations. Gate 5A has not started."
+  "nextGate": "Gate 5A remains incomplete. Gate 6A is not authorized."
 }

@@ -47,6 +47,7 @@ export interface MembershipAccess {
   timezone: string | null;
   roles: string[];
   permissions: string[];
+  locationId: string | null;
 }
 
 export interface ResetTokenRecord {
@@ -514,6 +515,8 @@ export class AuthRepository {
          t.handle    AS "handle",
          t.name      AS "name",
          t.timezone  AS "timezone",
+         (SELECT s.location_id::text FROM merchant.staff s
+           WHERE s.id=(SELECT id FROM grants ORDER BY id LIMIT 1)) AS "locationId",
          COALESCE((SELECT array_agg(role_key) FROM grants),
                   ARRAY[(SELECT platform_role FROM sa)]) AS "roles",
          COALESCE(

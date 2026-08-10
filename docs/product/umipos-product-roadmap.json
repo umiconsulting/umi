@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-08-09",
-  "latestRelevantCommit": "HEAD (Gate 4A commit)",
-  "integrationState": "Gates 3A through 4A are complete. Gate 5A is authorized with observations and has not started.",
+  "latestRelevantCommit": "HEAD (Gate 5A incomplete closeout commit)",
+  "integrationState": "Gates 3A through 4A are complete. Gate 5A remains incomplete. Gate 6A is not authorized.",
   "items": [
     {
       "id": "platform-certification",
@@ -143,6 +143,17 @@
         "The Linux runner had no Xcode toolchain for the iPad build and focused Swift tests"
       ],
       "validationState": "Existing KDS static review, API, contract, POS status, all 10 real PostgreSQL races, reconnect, PostgreSQL, RLS, and deterministic PR checks passed"
+    },
+    {
+      "id": "5A",
+      "status": "incomplete",
+      "dependencies": ["4A"],
+      "nextObjective": "Complete safe Dashboard commands before Gate 6A",
+      "blockers": [
+        "A normal Dashboard session has no enrolled POS device or operator session for device-bound commands",
+        "Refund, inventory, cash, hardware, customer-value, and recovery mutations have no complete Dashboard flow"
+      ],
+      "validationState": "Permission-scoped 21-domain read model, location isolation, API tests, Dashboard tests, and production build passed"
     }
   ]
 }

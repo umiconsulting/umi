@@ -33,6 +33,11 @@ const EMPTY_HOURS = {
 const EMPTY_VOICE = { voice: null, presets: [], businessName: '', defaults: null };
 const EMPTY_GIFT_CARDS = { giftCards: [], total: 0, page: 1, totalPages: 1 };
 const EMPTY_CONVERSATIONS = { conversations: [], total: 0, page: 1, totalPages: 1 };
+const EMPTY_OPERATIONS = {
+  domains: [],
+  items: [],
+  page: { limit: 20, hasMore: false, nextCursor: null },
+};
 const DEVICE_LIVE_MS = 10_000;
 const DEVICE_OFFLINE_MS = 20_000;
 
@@ -113,23 +118,28 @@ function _merchantPath(ctx, suffix) {
 }
 
 function _useAsync(asyncFn, deps, seed) {
-  const [state, setState] = useStateD({ data: seed, loading: true, error: null });
+  const [state, setState] = useStateD({ data: seed, loading: true, error: null, errorCode: null });
   useEffectD(function () {
     var active = true;
     setState(function (s) {
-      return Object.assign({}, s, { loading: true, error: null });
+      return Object.assign({}, s, { loading: true, error: null, errorCode: null });
     });
     Promise.resolve()
       .then(function () {
         return asyncFn();
       })
       .then(function (data) {
-        if (active) setState({ data: data, loading: false, error: null });
+        if (active) setState({ data: data, loading: false, error: null, errorCode: null });
       })
       .catch(function (err) {
         if (active)
           setState(function (s) {
-            return Object.assign({}, s, { data: seed, loading: false, error: err.message });
+            return Object.assign({}, s, {
+              data: seed,
+              loading: false,
+              error: err.message,
+              errorCode: err.code || null,
+            });
           });
       });
     return function () {
@@ -417,6 +427,16 @@ async function _loadConversations(ctx, opts) {
   opts = opts || {};
   const q = new URLSearchParams({ page: String(opts.page || 1), limit: String(opts.limit || 20) });
   return _apiFetch(_merchantPath(ctx, '/conversaflow/conversations?' + q));
+}
+
+async function _loadOperations(ctx, domain, cursor, merchantWide) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId) return EMPTY_OPERATIONS;
+  const query = new URLSearchParams({ domain: domain || 'organization', limit: '20' });
+  const locationId = merchantWide ? '' : _locationId(ctx);
+  if (locationId) query.set('locationId', locationId);
+  if (cursor) query.set('cursor', String(cursor));
+  return _apiFetch(`${routes.merchants.operations(merchantId)}?${query}`);
 }
 
 async function _loadBusinessHours(ctx) {
@@ -804,6 +824,17 @@ function useConversationsData(opts) {
   );
 }
 
+function useOperationsData(domain, cursor, refresh, merchantWide) {
+  const ctx = useMerchant();
+  return _useAsync(
+    function () {
+      return _loadOperations(ctx, domain, cursor, merchantWide);
+    },
+    _deps(ctx, [domain || 'organization', cursor || 0, refresh || 0, merchantWide ? 1 : 0]),
+    EMPTY_OPERATIONS,
+  );
+}
+
 // Polls /api/health and tracks connectivity to the dashboard backend.
 // status: 'connecting' | 'online' | 'offline'
 // Retries every 5 s while offline, every 20 s while online.
@@ -904,6 +935,9 @@ export {
   useVoiceConfig,
   useGiftCardsData,
   useConversationsData,
+  // This hook follows the existing data module boundary. Do not increase the warning baseline.
+  // eslint-disable-next-line react-refresh/only-export-components
+  useOperationsData,
   saveMerchantSettings,
   saveRewardConfig,
   saveBusinessHours,

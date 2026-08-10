@@ -450,6 +450,26 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
       errors: ['PERMISSION_DENIED'],
     },
   },
+  {
+    id: 'merchants.operations',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/operations',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'DashboardOperationsQuery',
+      response: 'DashboardOperationsSnapshot',
+      auth: 'session',
+      permission: null,
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'LOCATION_SCOPE_VIOLATION'],
+    },
+  },
 
   // ── Cash / loyalty, merchant-scoped (dashboard) ──────────────────────────────
   {

@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "ac23d09d92f252f8e770e84fef90ab4c42c30afb85d8e08a0c0a15df2376ff6f",
-  "contractVersion": "2.9.0",
+  "contentHash": "d377d5da5aa02b6af82fe071806f4c59ff78dcb71227f962e502befa995c24cb",
+  "contractVersion": "2.10.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -25749,6 +25749,581 @@
         "quantity",
         "reason",
         "disposition"
+      ],
+      "type": "object"
+    },
+    "DashboardDomainCoverage": {
+      "additionalProperties": false,
+      "properties": {
+        "administrative": {
+          "type": "boolean"
+        },
+        "allowedActions": {
+          "items": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 24,
+          "type": "array"
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "boundary": {
+          "enum": [
+            "dashboard",
+            "pos",
+            "kds"
+          ],
+          "type": "string"
+        },
+        "domain": {
+          "enum": [
+            "organization",
+            "locations",
+            "memberships",
+            "devices",
+            "registers",
+            "hardware",
+            "catalog",
+            "inventory",
+            "sales",
+            "receipts",
+            "refunds_voids",
+            "cash_shifts",
+            "customers",
+            "loyalty",
+            "rewards",
+            "wallet",
+            "gift_cards",
+            "kitchen",
+            "recovery",
+            "audit",
+            "diagnostics"
+          ],
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "priority": {
+          "enum": [
+            "P0",
+            "P1",
+            "P2"
+          ],
+          "type": "string"
+        },
+        "recovery": {
+          "type": "boolean"
+        },
+        "requiredPermissions": {
+          "items": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 12,
+          "type": "array"
+        }
+      },
+      "required": [
+        "domain",
+        "label",
+        "priority",
+        "available",
+        "administrative",
+        "boundary",
+        "requiredPermissions",
+        "allowedActions",
+        "recovery"
+      ],
+      "type": "object"
+    },
+    "DashboardOperationItem": {
+      "additionalProperties": false,
+      "properties": {
+        "amountMinorUnits": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "correlationId": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "locationId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "occurredAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "publicReference": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        "status": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 240,
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "publicReference",
+        "title",
+        "detail",
+        "status",
+        "locationId",
+        "occurredAt",
+        "amountMinorUnits",
+        "currency",
+        "version",
+        "correlationId"
+      ],
+      "type": "object"
+    },
+    "DashboardOperationsQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "default": 0,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "domain": {
+          "default": "organization",
+          "enum": [
+            "organization",
+            "locations",
+            "memberships",
+            "devices",
+            "registers",
+            "hardware",
+            "catalog",
+            "inventory",
+            "sales",
+            "receipts",
+            "refunds_voids",
+            "cash_shifts",
+            "customers",
+            "loyalty",
+            "rewards",
+            "wallet",
+            "gift_cards",
+            "kitchen",
+            "recovery",
+            "audit",
+            "diagnostics"
+          ],
+          "type": "string"
+        },
+        "limit": {
+          "default": 20,
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardOperationsSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "capturedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "domains": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "administrative": {
+                "type": "boolean"
+              },
+              "allowedActions": {
+                "items": {
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 24,
+                "type": "array"
+              },
+              "available": {
+                "type": "boolean"
+              },
+              "boundary": {
+                "enum": [
+                  "dashboard",
+                  "pos",
+                  "kds"
+                ],
+                "type": "string"
+              },
+              "domain": {
+                "enum": [
+                  "organization",
+                  "locations",
+                  "memberships",
+                  "devices",
+                  "registers",
+                  "hardware",
+                  "catalog",
+                  "inventory",
+                  "sales",
+                  "receipts",
+                  "refunds_voids",
+                  "cash_shifts",
+                  "customers",
+                  "loyalty",
+                  "rewards",
+                  "wallet",
+                  "gift_cards",
+                  "kitchen",
+                  "recovery",
+                  "audit",
+                  "diagnostics"
+                ],
+                "type": "string"
+              },
+              "label": {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              "priority": {
+                "enum": [
+                  "P0",
+                  "P1",
+                  "P2"
+                ],
+                "type": "string"
+              },
+              "recovery": {
+                "type": "boolean"
+              },
+              "requiredPermissions": {
+                "items": {
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 12,
+                "type": "array"
+              }
+            },
+            "required": [
+              "domain",
+              "label",
+              "priority",
+              "available",
+              "administrative",
+              "boundary",
+              "requiredPermissions",
+              "allowedActions",
+              "recovery"
+            ],
+            "type": "object"
+          },
+          "maxItems": 21,
+          "minItems": 21,
+          "type": "array"
+        },
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "amountMinorUnits": {
+                "anyOf": [
+                  {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "correlationId": {
+                "anyOf": [
+                  {
+                    "maxLength": 160,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "currency": {
+                "anyOf": [
+                  {
+                    "pattern": "^[A-Z]{3}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "detail": {
+                "anyOf": [
+                  {
+                    "maxLength": 500,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "id": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "locationId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "publicReference": {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              "status": {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              "title": {
+                "maxLength": 240,
+                "minLength": 1,
+                "type": "string"
+              },
+              "version": {
+                "anyOf": [
+                  {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "publicReference",
+              "title",
+              "detail",
+              "status",
+              "locationId",
+              "occurredAt",
+              "amountMinorUnits",
+              "currency",
+              "version",
+              "correlationId"
+            ],
+            "type": "object"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "locationId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "page": {
+          "additionalProperties": false,
+          "properties": {
+            "hasMore": {
+              "type": "boolean"
+            },
+            "limit": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "nextCursor": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "limit",
+            "hasMore",
+            "nextCursor"
+          ],
+          "type": "object"
+        },
+        "scope": {
+          "enum": [
+            "merchant",
+            "assigned_location",
+            "selected_location"
+          ],
+          "type": "string"
+        },
+        "selectedDomain": {
+          "enum": [
+            "organization",
+            "locations",
+            "memberships",
+            "devices",
+            "registers",
+            "hardware",
+            "catalog",
+            "inventory",
+            "sales",
+            "receipts",
+            "refunds_voids",
+            "cash_shifts",
+            "customers",
+            "loyalty",
+            "rewards",
+            "wallet",
+            "gift_cards",
+            "kitchen",
+            "recovery",
+            "audit",
+            "diagnostics"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "merchantId",
+        "locationId",
+        "scope",
+        "domains",
+        "selectedDomain",
+        "items",
+        "page",
+        "capturedAt"
       ],
       "type": "object"
     },
@@ -71574,6 +72149,22 @@
       "pin": false,
       "request": "AuditSearchRequest",
       "response": "AuditSearchResponse"
+    },
+    "GET /api/merchants/:merchantId/operations": {
+      "approval": false,
+      "auth": "session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "LOCATION_SCOPE_VIOLATION"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "DashboardOperationsQuery",
+      "response": "DashboardOperationsSnapshot"
     },
     "GET /api/v1/devices/status": {
       "approval": false,

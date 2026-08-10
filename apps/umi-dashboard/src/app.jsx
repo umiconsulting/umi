@@ -26,6 +26,7 @@ import CustomersScreen from '@/screens/customers.jsx';
 import HoursScreen from '@/screens/hours.jsx';
 import SettingsScreen from '@/screens/settings.jsx';
 import ProductsBillingScreen from '@/screens/products-billing.jsx';
+import OperationsScreen from '@/screens/operations.jsx';
 
 const TWEAK_DEFAULTS = { merchantHue: '#1A5632', density: 'comfy', lang: 'es' };
 
@@ -148,6 +149,18 @@ function DashboardLayout() {
                   ordersPaused={ordersPaused}
                   setOrdersPaused={setOrdersPaused}
                 />
+              }
+            />
+            <Route
+              path="operations"
+              element={
+                <GuardedScreen
+                  moduleKey="operations"
+                  moduleName="Centro operativo"
+                  product="Dashboard"
+                >
+                  <OperationsScreen />
+                </GuardedScreen>
               }
             />
             <Route

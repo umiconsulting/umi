@@ -48,6 +48,7 @@ export class MerchantAccessGuard implements CanActivate {
       role,
       roles: access.roles,
       permissions: effectivePermissions(role, access.permissions),
+      locationId: access.locationId,
     };
     req.merchantAccess = merchantAccess;
 
