@@ -88,8 +88,8 @@
     "gate2AStatus": "complete",
     "flutterVersion": "3.44.6",
     "dartVersion": "3.12.2",
-    "contractVersion": "2.10.0",
-    "contractContentHash": "d377d5da5aa02b6af82fe071806f4c59ff78dcb71227f962e502befa995c24cb",
+    "contractVersion": "2.11.0",
+    "contractContentHash": "5cccb2974addbf9833a7c3b2ecf31733161120ed9449a6e5f7b2aeb4d115c66f",
     "stateManagement": "ChangeNotifier with one explicit composition root",
     "navigation": "central typed route guard",
     "secureStorage": "flutter_secure_storage with no plaintext fallback",
@@ -241,7 +241,7 @@
     "cartPartition": "merchant/location/operator",
     "totalsPreview": "server-authoritative inclusive-tax snapshot",
     "catalogAuthority": "apps/umi-api/src/modules/pos-catalog",
-    "catalogMode": "branch-aware read-only cursor pagination",
+    "catalogMode": "branch-aware cursor pagination plus trusted Dashboard create, update, and archive commands",
     "catalogSearch": "server-side name, description, SKU, and barcode",
     "catalogCache": "bounded merchant/location/language/version partitions",
     "deviceAuthority": "merchant.device",
@@ -255,12 +255,12 @@
     "managerApprovalFoundation": "single-action scoped five-minute elevation",
     "readyShell": true,
     "gate5AStatus": "incomplete",
-    "dashboardOperations": "permission-scoped read projections for 21 operational domains",
-    "dashboardCommandContext": "server-validated dashboard_administrative foundation with revocable web sessions, CSRF, deterministic fingerprints, and an explicit operation allowlist",
-    "dashboardMutationBoundary": "the context exists, but device-bound refund, inventory, hardware, customer-value, and recovery commands still need domain integration",
-    "latestLocalCommit": "HEAD (Gate 5A incomplete closeout commit in PR #72)",
-    "pushStatus": "Gate 5A incomplete closeout publication uses PR #72",
+    "dashboardOperations": "permission-scoped read projections and operational pilot commands",
+    "dashboardCommandContext": "server-validated dashboard_administrative commands with current authority, CSRF, deterministic fingerprints, approvals, and recovery",
+    "dashboardMutationBoundary": "checkout, physical cash movement, and KDS preparation remain in their assigned operational clients",
+    "latestLocalCommit": "HEAD (Gate 5A operational wiring commit in PR #72)",
+    "pushStatus": "Gate 5A operational wiring publication uses PR #72",
     "pullRequestStatus": "PR #72 targets build-v3"
   },
-  "nextGate": "Gate 5A remains incomplete. Gate 6A is not authorized."
+  "nextGate": "Gate 6A — Pilot Deployment & Release Runtime is not authorized and has not started. Gate 5A requires an authenticated end-to-end authority matrix and P0 mutation walkthrough."
 }

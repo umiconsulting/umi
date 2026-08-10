@@ -97,4 +97,70 @@ describe('PosEntryService', () => {
       }),
     );
   });
+
+  it('binds Dashboard manager approval to its session and exact fingerprint', async () => {
+    const repo = {
+      administrativeManagerPinRecord: vi.fn().mockResolvedValue({
+        staffId: '00000000-0000-4000-8000-000000000010',
+        userId: '00000000-0000-4000-8000-000000000011',
+        salt: 'salt',
+        hash: 'hash',
+        lockedUntil: null,
+      }),
+      grantAdministrativeManagerElevation: vi.fn().mockResolvedValue({
+        id: '00000000-0000-4000-8000-000000000012',
+        expiresAt: new Date('2026-08-10T20:05:00.000Z'),
+      }),
+    };
+    const service = new PosEntryService(
+      repo as never,
+      { verify: vi.fn().mockReturnValue(true) } as never,
+      { get: vi.fn().mockReturnValue('test-jwt-secret-with-enough-length') } as never,
+    );
+    const fingerprint = 'a'.repeat(64);
+    const grant = await service.approveAdministrativeByManager(
+      { ...user, deviceId: null },
+      { merchantId: '00000000-0000-4000-8000-000000000014' } as never,
+      {
+        dashboardSessionId: user.sessionId,
+        managerPin: '3333',
+        permission: 'loyalty.adjust.approve',
+        locationId: '00000000-0000-4000-8000-000000000015',
+        commandFingerprint: fingerprint,
+      },
+    );
+    expect(grant.commandFingerprint).toBe(fingerprint);
+    expect(repo.grantAdministrativeManagerElevation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dashboardSessionId: user.sessionId,
+        commandFingerprint: fingerprint,
+      }),
+    );
+  });
+
+  it('rate-limits invalid Dashboard approval PIN attempts', async () => {
+    const repo = {
+      administrativeManagerPinRecord: vi.fn().mockResolvedValue(null),
+      recordAdministrativePinFailure: vi.fn(),
+    };
+    const service = new PosEntryService(
+      repo as never,
+      { verify: vi.fn() } as never,
+      { get: vi.fn().mockReturnValue('test-jwt-secret-with-enough-length') } as never,
+    );
+    await expect(
+      service.approveAdministrativeByManager(
+        { ...user, deviceId: null },
+        { merchantId: '00000000-0000-4000-8000-000000000014' } as never,
+        {
+          dashboardSessionId: user.sessionId,
+          managerPin: '0000',
+          permission: 'inventory.adjust.approve',
+          locationId: '00000000-0000-4000-8000-000000000015',
+          commandFingerprint: 'b'.repeat(64),
+        },
+      ),
+    ).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+    expect(repo.recordAdministrativePinFailure).toHaveBeenCalledOnce();
+  });
 });

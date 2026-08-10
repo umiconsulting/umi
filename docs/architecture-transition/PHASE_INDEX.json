@@ -167,11 +167,11 @@
       "subject": "Authoritative kitchen projection, station routing, existing KDS integration, reconnect, recovery, and POS visibility"
     },
     {
-      "commit": "HEAD (Gate 5A incomplete closeout commit)",
+      "commit": "HEAD (Gate 5A operational wiring commit)",
       "id": "5A",
       "status": "incomplete",
       "stateMachineVersion": 1,
-      "subject": "Dashboard read coverage plus a trusted web command foundation; device-bound domain integration remains open"
+      "subject": "Dashboard command wiring requires authenticated end-to-end execution evidence"
     }
   ]
 }

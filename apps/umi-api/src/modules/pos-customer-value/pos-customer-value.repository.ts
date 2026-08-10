@@ -50,10 +50,12 @@ import {
 } from './customer-value-domain';
 
 export interface CustomerValueAuthorization {
+  commandContextType: 'pos_device' | 'dashboard_administrative';
   operatorId: string;
-  deviceId: string;
-  durableSessionId: string;
-  credentialVersion: number;
+  deviceId: string | null;
+  durableSessionId: string | null;
+  dashboardSessionId: string | null;
+  credentialVersion: number | null;
   permissions: string[];
 }
 
@@ -87,8 +89,10 @@ export class PosCustomerValueRepository {
       userId,
       async (client) => {
         const { rows } = await client.query<CustomerValueAuthorization>(
-          `SELECT os.user_id::text AS "operatorId",os.device_id::text AS "deviceId",
+          `SELECT 'pos_device'::text AS "commandContextType",
+                  os.user_id::text AS "operatorId",os.device_id::text AS "deviceId",
                   os.durable_session_id::text AS "durableSessionId",
+                  NULL::text AS "dashboardSessionId",
                   d.credential_version AS "credentialVersion",os.permissions
              FROM runtime.operator_session os
              JOIN merchant.device d ON d.id=os.device_id AND d.merchant_id=os.merchant_id
@@ -114,6 +118,22 @@ export class PosCustomerValueRepository {
       },
       locationId,
     );
+  }
+
+  administrativeAuthorization(input: {
+    actorUserId: string;
+    dashboardSessionId: string;
+    permissions: string[];
+  }): CustomerValueAuthorization {
+    return {
+      commandContextType: 'dashboard_administrative',
+      operatorId: input.actorUserId,
+      deviceId: null,
+      durableSessionId: null,
+      dashboardSessionId: input.dashboardSessionId,
+      credentialVersion: null,
+      permissions: input.permissions,
+    };
   }
 
   async expireAllAuthorizations(batchSize = 100): Promise<number> {
@@ -1435,6 +1455,29 @@ export class PosCustomerValueRepository {
     );
   }
 
+  async pointsAccountCustomer(
+    userId: string,
+    merchantId: string,
+    locationId: string,
+    accountId: string,
+  ): Promise<string> {
+    return this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      async (client) => {
+        const result = await client.query<{ customerId: string }>(
+          `SELECT customer_id::text AS "customerId"
+             FROM merchant.loyalty_points_account
+            WHERE merchant_id=$1::uuid AND id=$2::uuid AND status='active'`,
+          [merchantId, accountId],
+        );
+        if (!result.rows[0]) throw new ConflictException({ code: 'LOYALTY_ACCOUNT_NOT_FOUND' });
+        return result.rows[0].customerId;
+      },
+      locationId,
+    );
+  }
+
   async commitPointsAdjustment(
     client: PoolClient,
     merchantId: string,
@@ -1979,7 +2022,12 @@ export class PosCustomerValueRepository {
     const consumed = await client.query(
       `UPDATE runtime.elevation_grant
           SET consumed_at=clock_timestamp(),consumed_by_command_id=$6::uuid
-        WHERE id=$1::uuid AND session_id=$2::uuid AND merchant_id=$3::uuid
+        WHERE id=$1::uuid
+          AND (
+            ($2::uuid IS NOT NULL AND session_id=$2::uuid AND dashboard_session_id IS NULL)
+            OR ($9::uuid IS NOT NULL AND dashboard_session_id=$9::uuid AND session_id IS NULL)
+          )
+          AND merchant_id=$3::uuid
           AND location_id=$4::uuid AND permission_key=$5
           AND command_fingerprint=$7 AND method='manager_approval'
           AND approved_by<>$8::uuid AND expires_at>clock_timestamp()
@@ -1993,6 +2041,7 @@ export class PosCustomerValueRepository {
         dto.commandId,
         expectedFingerprint,
         authorization.operatorId,
+        authorization.dashboardSessionId,
       ],
     );
     if (consumed.rowCount !== 1) {

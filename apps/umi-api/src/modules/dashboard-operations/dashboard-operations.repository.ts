@@ -70,8 +70,10 @@ const QUERIES: Record<DashboardOperationDomain, ReturnType<typeof row>> = {
     `SELECT p.id::text,coalesce(p.sku,p.barcode,p.id::text) AS "publicReference",p.name AS title,
     coalesce(c.name,'Sin categoría') AS detail,CASE WHEN p.active THEN 'active' ELSE 'archived' END AS status,
     NULL::text AS "locationId",p.updated_at::text AS "occurredAt",p.price AS "amountMinorUnits",m.currency,
-    NULL::bigint AS version,NULL::text AS "correlationId" FROM merchant.product p
-    JOIN merchant.merchant m ON m.id=p.merchant_id LEFT JOIN merchant.product_category c ON c.id=p.category_id`,
+    coalesce(v.version,1)::bigint AS version,NULL::text AS "correlationId" FROM merchant.product p
+    JOIN merchant.merchant m ON m.id=p.merchant_id LEFT JOIN merchant.product_category c ON c.id=p.category_id
+    LEFT JOIN merchant.aggregate_version v ON v.merchant_id=p.merchant_id
+      AND v.aggregate_type='catalog_product' AND v.aggregate_id=p.id`,
     'p.merchant_id=$1::uuid',
     'p.updated_at DESC,p.id',
   ),
@@ -95,10 +97,23 @@ const QUERIES: Record<DashboardOperationDomain, ReturnType<typeof row>> = {
     's.committed_at DESC,s.id',
   ),
   receipts: row(
-    `SELECT r.id::text,r.receipt_number AS "publicReference",concat('Recibo ',r.receipt_number) AS title,
-    concat('Fecha comercial ',r.business_date::text) AS detail,'issued' AS status,r.location_id::text AS "locationId",
+    `SELECT coalesce(j.id,r.id)::text AS id,r.receipt_number AS "publicReference",concat('Recibo ',r.receipt_number) AS title,
+    concat('Fecha comercial ',r.business_date::text) AS detail,coalesce(j.status,'not_printed') AS status,r.location_id::text AS "locationId",
     r.issued_at::text AS "occurredAt",r.grand_total AS "amountMinorUnits",r.currency,
-    NULL::bigint AS version,NULL::text AS "correlationId" FROM merchant.receipt_snapshot r`,
+    NULL::bigint AS version,j.correlation_id AS "correlationId" FROM merchant.receipt_snapshot r
+    LEFT JOIN LATERAL (
+      SELECT p.id,p.correlation_id,coalesce(e.status,'queued') AS status
+      FROM merchant.hardware_print_job p
+      LEFT JOIN LATERAL (
+        SELECT pe.status FROM merchant.hardware_print_job_event pe
+        WHERE pe.merchant_id=p.merchant_id AND pe.print_job_id=p.id
+        ORDER BY pe.sequence DESC LIMIT 1
+      ) e ON true
+      WHERE p.merchant_id=r.merchant_id AND p.location_id=r.location_id
+        AND p.job_type='official_receipt' AND p.source_aggregate_type='receipt'
+        AND p.source_aggregate_id=r.id::text
+      ORDER BY p.created_at DESC LIMIT 1
+    ) j ON true`,
     'r.merchant_id=$1::uuid',
     'r.issued_at DESC,r.id',
   ),

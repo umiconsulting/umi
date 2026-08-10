@@ -20,7 +20,8 @@ import type {
   StoredValueAuthorizationRequest,
   ValueReleaseRequest,
 } from '@umi/contract';
-import type { AuthUser } from '../auth/auth.types';
+import type { PersistedDashboardAdministrativeCommandContext } from '../administrative-commands/administrative-command-context.service';
+import type { AuthUser, MerchantAccess } from '../auth/auth.types';
 import { IntegrityService } from '../integrity/integrity.service';
 import type { CommandResult, TransactionContext } from '../integrity/integrity.types';
 import { customerValueConflictCode } from './customer-value-errors';
@@ -143,10 +144,44 @@ export class PosCustomerValueService {
     return this.repo.previewPointsAdjustment(user.id, merchantId, dto);
   }
 
+  async previewPointsAdjustmentAdministrative(
+    user: AuthUser,
+    access: MerchantAccess,
+    _context: PersistedDashboardAdministrativeCommandContext,
+    dto: PointsAdjustmentRequest,
+  ) {
+    return this.repo.previewPointsAdjustment(user.id, access.merchantId, dto);
+  }
+
+  pointsAccountCustomer(
+    user: AuthUser,
+    access: MerchantAccess,
+    locationId: string,
+    accountId: string,
+  ) {
+    return this.repo.pointsAccountCustomer(user.id, access.merchantId, locationId, accountId);
+  }
+
   async commitPointsAdjustment(user: AuthUser, merchantId: string, dto: PointsAdjustmentRequest) {
     const authorization = await this.authorize(user, merchantId, dto, 'loyalty.adjust');
     return this.mutation(user, merchantId, dto, 'pos.points.adjust', (context) =>
       this.repo.commitPointsAdjustment(context.client, merchantId, dto, authorization),
+    );
+  }
+
+  async commitPointsAdjustmentAdministrative(
+    user: AuthUser,
+    access: MerchantAccess,
+    context: PersistedDashboardAdministrativeCommandContext,
+    dto: PointsAdjustmentRequest,
+  ) {
+    const authorization = this.repo.administrativeAuthorization({
+      actorUserId: user.id,
+      dashboardSessionId: user.sessionId,
+      permissions: access.permissions,
+    });
+    return this.mutation(user, access.merchantId, dto, 'pos.points.adjust', (transaction) =>
+      this.repo.commitPointsAdjustment(transaction.client, access.merchantId, dto, authorization),
     );
   }
 
@@ -195,6 +230,98 @@ export class PosCustomerValueService {
   async previewGiftCardIssuance(user: AuthUser, merchantId: string, dto: GiftCardIssuanceRequest) {
     await this.authorize(user, merchantId, dto, 'gift_card.issue');
     return this.repo.previewGiftCardIssuance(dto);
+  }
+
+  async previewGiftCardIssuanceAdministrative(
+    _user: AuthUser,
+    _access: MerchantAccess,
+    _context: PersistedDashboardAdministrativeCommandContext,
+    dto: GiftCardIssuanceRequest,
+  ) {
+    return this.repo.previewGiftCardIssuance(dto);
+  }
+
+  async issueGiftCardAdministrative(
+    user: AuthUser,
+    access: MerchantAccess,
+    _context: PersistedDashboardAdministrativeCommandContext,
+    dto: GiftCardIssuanceRequest,
+  ) {
+    if (dto.source !== 'promotion') {
+      throw new ConflictException({ code: 'GIFT_CARD_ISSUANCE_SOURCE_INVALID' });
+    }
+    const authorization = this.repo.administrativeAuthorization({
+      actorUserId: user.id,
+      dashboardSessionId: user.sessionId,
+      permissions: access.permissions,
+    });
+    const result = await this.commandResult(
+      this.integrity.execute(
+        {
+          merchantId: access.merchantId,
+          locationId: dto.locationId,
+          commandId: dto.commandId,
+          idempotencyKey: dto.idempotencyKey,
+          commandType: 'pos.gift-card.issue',
+          payload: dto,
+        },
+        async (transaction) => {
+          const value = await this.repo.issueGiftCard(
+            transaction.client,
+            access.merchantId,
+            dto,
+            authorization,
+          );
+          await transaction.appendAudit({
+            eventType: 'dashboard.gift-card.issue.committed',
+            entityType: 'customer_value',
+            entityId: dto.commandId,
+            outcome: 'success',
+          });
+          return { ok: true, value };
+        },
+      ),
+    );
+    if (result.status !== 'succeeded' || result.result === null) {
+      throw new ConflictException({
+        code: result.failureCode ?? 'CUSTOMER_VALUE_COMMAND_FAILED',
+        correlationId: result.correlationId,
+      });
+    }
+    return {
+      ...result.result,
+      deliveryToken: this.repo.giftCardDeliveryToken(dto.commandId),
+      recovered: result.duplicate,
+    };
+  }
+
+  revealGiftCardSecretAdministrative(
+    user: AuthUser,
+    access: MerchantAccess,
+    _context: PersistedDashboardAdministrativeCommandContext,
+    dto: GiftCardSecretRevealRequest,
+  ) {
+    const authorization = this.repo.administrativeAuthorization({
+      actorUserId: user.id,
+      dashboardSessionId: user.sessionId,
+      permissions: access.permissions,
+    });
+    return this.repo.revealGiftCardSecret(user.id, access.merchantId, dto, authorization);
+  }
+
+  commandAdministrative(
+    user: AuthUser,
+    access: MerchantAccess,
+    _context: PersistedDashboardAdministrativeCommandContext,
+    commandId: string,
+    query: CustomerValueRecoveryQuery,
+  ) {
+    const authorization = this.repo.administrativeAuthorization({
+      actorUserId: user.id,
+      dashboardSessionId: user.sessionId,
+      permissions: access.permissions,
+    });
+    return this.repo.command(user.id, access.merchantId, commandId, query, authorization);
   }
 
   async revealGiftCardSecret(user: AuthUser, merchantId: string, dto: GiftCardSecretRevealRequest) {

@@ -500,7 +500,9 @@ end $$;
 -- any future device-related table it legitimately reads. Opt-in, plus the assertion
 -- below so that forgetting is LOUD instead of silent.
 do $$
-declare t text;
+declare
+  t text;
+  predicate text;
 begin
   foreach t in array array[
     'device_replay_cursor', 'offline_replay_command', 'offline_reconciliation',
@@ -509,9 +511,27 @@ begin
     'pos_exception_preview', 'pos_sale_exception',
     'inventory_count'
   ] loop
+    predicate := case
+      when t in ('pos_exception_preview', 'pos_sale_exception', 'inventory_count') then
+        format($p$(
+          (umi.current_device() is not null and %1$I.device_id = umi.current_device())
+          or
+          (%1$I.administrative_command_id is not null and exists (
+            select 1
+              from merchant.administrative_command ac
+             where ac.id = %1$I.administrative_command_id
+               and ac.merchant_id = umi.current_merchant()
+               and ac.actor_user_id = nullif(current_setting('app.user_id', true), '')::uuid
+               and (ac.location_id is null or umi.current_location() is null
+                    or ac.location_id = umi.current_location())
+          ))
+        )$p$, t)
+      else
+        '(umi.current_device() is not null and device_id = umi.current_device())'
+    end;
     execute format($f$create policy device_scoping on merchant.%I as restrictive
-      using      (umi.current_device() is not null and device_id = umi.current_device())
-      with check (umi.current_device() is not null and device_id = umi.current_device())$f$, t);
+      using      (%s)
+      with check (%s)$f$, t, predicate, predicate);
   end loop;
 end $$;
 

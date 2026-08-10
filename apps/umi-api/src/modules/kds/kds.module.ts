@@ -16,5 +16,6 @@ import { KdsLocationGuard } from './kds-location.guard';
   imports: [AuthModule, MerchantsModule],
   controllers: [KdsController, KdsDashboardController, KdsAdminController, KdsPosController],
   providers: [KdsService, KdsRepository, KdsLocationGuard],
+  exports: [KdsService],
 })
 export class KdsModule {}

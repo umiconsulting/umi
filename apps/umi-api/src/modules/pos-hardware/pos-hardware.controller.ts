@@ -82,6 +82,17 @@ export class PosHardwareController {
     return this.hardware.command(user, merchantId, dto);
   }
 
+  @Get('commands/remote/claim')
+  claimRemoteCommand(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Query(new ZodValidationPipe(HardwareRecoveryQuery)) query: HardwareRecoveryQuery,
+  ) {
+    return this.hardware
+      .claimAdministrativeCommand(user, merchantId, query)
+      .then((command) => ({ command }));
+  }
+
   @Post('commands/:commandId/transition')
   transition(
     @CurrentUser() user: AuthUser,

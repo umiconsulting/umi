@@ -23,7 +23,7 @@ export function hardwareCommandFingerprint(command: HardwareCommandRequest): str
     sourceAggregateType: command.sourceAggregateType,
     sourceAggregateId: command.sourceAggregateId,
     expectedConfigurationVersion: command.expectedConfigurationVersion,
-    requiredCapability: requiredCapability(command.commandType),
+    requiredCapability: requiredHardwareCapability(command.commandType) ?? 'hardware.diagnostics',
     drawer: command.drawer,
     display: command.display,
     printPayload: command.printPayload,
@@ -41,7 +41,9 @@ function omitSecrets(value: unknown): unknown {
   );
 }
 
-function requiredCapability(commandType: HardwareCommandRequest['commandType']): string {
+export function requiredHardwareCapability(
+  commandType: HardwareCommandRequest['commandType'],
+): string | null {
   switch (commandType) {
     case 'print_receipt':
     case 'controlled_reprint':
@@ -52,10 +54,12 @@ function requiredCapability(commandType: HardwareCommandRequest['commandType']):
     case 'test_drawer':
       return 'drawer.open';
     case 'begin_scanner_session':
+    case 'end_scanner_session':
       return 'scanner.barcode';
     case 'update_customer_display':
+    case 'clear_customer_display':
       return 'customer_display.totals';
     default:
-      return 'hardware.diagnostics';
+      return null;
   }
 }

@@ -44,6 +44,8 @@ export const routes = {
     locations: (merchantId: string): string => buildPath('merchants.locations', { merchantId }),
     audit: (merchantId: string): string => buildPath('merchants.audit', { merchantId }),
     operations: (merchantId: string): string => buildPath('merchants.operations', { merchantId }),
+    administrativeCommands: (merchantId: string): string =>
+      buildPath('merchants.administrativeCommands', { merchantId }),
   },
   cash: {
     // Merchant-scoped surface (dashboard, cookie auth).

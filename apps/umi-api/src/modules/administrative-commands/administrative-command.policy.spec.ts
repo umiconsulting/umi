@@ -22,6 +22,12 @@ describe('administrative command policy', () => {
       expect(typeof policy.stepUp).toBe('boolean');
       expect(typeof policy.approval).toBe('boolean');
       expect(typeof policy.remotePhysicalExecution).toBe('boolean');
+      expect(typeof policy.domainConditionalApproval).toBe('boolean');
     }
+    expect(administrativeCommandPolicy('refund.commit')).toMatchObject({
+      stepUp: false,
+      domainConditionalApproval: true,
+    });
+    expect(administrativeCommandPolicy('refund.approval')).toMatchObject({ stepUp: true });
   });
 });

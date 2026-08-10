@@ -8,6 +8,6 @@ import { PosCustomerValueService } from './pos-customer-value.service';
   imports: [IntegrityModule],
   controllers: [PosCustomerValueController],
   providers: [PosCustomerValueRepository, PosCustomerValueService],
-  exports: [PosCustomerValueRepository],
+  exports: [PosCustomerValueRepository, PosCustomerValueService],
 })
 export class PosCustomerValueModule {}

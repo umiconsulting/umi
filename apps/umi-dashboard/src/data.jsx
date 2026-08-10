@@ -113,6 +113,7 @@ async function _apiFetch(path, opts, _retried) {
             ? payload.error
             : null;
     err.path = path;
+    err.details = payload;
     throw err;
   }
   return payload;
@@ -446,6 +447,29 @@ async function _loadOperations(ctx, domain, cursor, merchantWide) {
   return _apiFetch(`${routes.merchants.operations(merchantId)}?${query}`);
 }
 
+async function executeAdministrativeCommand(operation, targetAggregateId, options) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  const locationId = window.localStorage.getItem('umi-dashboard-selected-location');
+  if (!merchantId) throw new Error('No active merchant selected');
+  const input = options || {};
+  const commandId = input.commandId || crypto.randomUUID();
+  const idempotencyKey = input.idempotencyKey || crypto.randomUUID();
+  const result = await _apiFetch(routes.merchants.administrativeCommands(merchantId), {
+    method: 'POST',
+    body: JSON.stringify({
+      operation,
+      locationId: input.locationId === undefined ? locationId || null : input.locationId,
+      targetAggregateId,
+      targetVersion: input.targetVersion ?? null,
+      commandId,
+      idempotencyKey,
+      parameters: input.parameters || {},
+      approvalId: input.approvalId || null,
+    }),
+  });
+  return { result, commandId, idempotencyKey };
+}
+
 async function _loadBusinessHours(ctx) {
   if (!_active(ctx, 'conversaflow')) return EMPTY_HOURS;
   return _apiFetch(_withLocation(ctx, _merchantPath(ctx, '/conversaflow/hours')));
@@ -598,23 +622,24 @@ async function denyPosEnrollmentRequest(requestId) {
 }
 
 async function createKdsStation(station) {
-  return _apiFetch(merchantScopedPath('/kds/stations'), {
-    method: 'POST',
-    body: JSON.stringify(station),
+  const result = await executeAdministrativeCommand('kitchen.station.create', crypto.randomUUID(), {
+    parameters: station,
   });
+  return result.result;
 }
 
 async function updateKdsStation(stationId, patch) {
-  return _apiFetch(merchantScopedPath(`/kds/stations/${encodeURIComponent(stationId)}`), {
-    method: 'PATCH',
-    body: JSON.stringify(patch),
+  const result = await executeAdministrativeCommand('kitchen.station.update', stationId, {
+    parameters: patch,
   });
+  return result.result;
 }
 
 async function deleteKdsStation(stationId) {
-  return _apiFetch(merchantScopedPath(`/kds/stations/${encodeURIComponent(stationId)}`), {
-    method: 'DELETE',
+  const result = await executeAdministrativeCommand('kitchen.station.update', stationId, {
+    parameters: { archive: true },
   });
+  return result.result;
 }
 
 async function approveDevicePairing(pairingId) {
@@ -634,10 +659,10 @@ async function denyDevicePairing(pairingId) {
 }
 
 async function updateDevice(deviceId, patch) {
-  return _apiFetch(merchantScopedPath(`/kds/devices/${encodeURIComponent(deviceId)}`), {
-    method: 'PATCH',
-    body: JSON.stringify(patch),
+  const result = await executeAdministrativeCommand('kitchen.device.assign', deviceId, {
+    parameters: patch,
   });
+  return result.result;
 }
 
 async function revokeDevice(deviceId, reason) {
@@ -945,6 +970,8 @@ export {
   // This hook follows the existing data module boundary. Do not increase the warning baseline.
   // eslint-disable-next-line react-refresh/only-export-components
   useOperationsData,
+  // eslint-disable-next-line react-refresh/only-export-components
+  executeAdministrativeCommand,
   saveMerchantSettings,
   saveRewardConfig,
   saveBusinessHours,

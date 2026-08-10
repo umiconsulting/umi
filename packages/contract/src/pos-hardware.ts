@@ -626,6 +626,9 @@ export const HardwareDiagnosticRequest = z
 export const HardwareRecoveryQuery = z
   .object({ locationId: Uuid, operatorSessionId: Uuid })
   .strict();
+export const HardwareRemoteClaimResult = z
+  .object({ command: HardwareCommandResult.nullable() })
+  .strict();
 
 export type HardwareDevice = z.infer<typeof HardwareDevice>;
 export type HardwareConnectionConfiguration = z.infer<typeof HardwareConnectionConfiguration>;
@@ -640,6 +643,7 @@ export type ReceiptPrintPayload = z.infer<typeof ReceiptPrintPayload>;
 export type BarcodeScanEvent = z.infer<typeof BarcodeScanEvent>;
 export type CustomerDisplayState = z.infer<typeof CustomerDisplayState>;
 export type HardwareRuntimeSnapshot = z.infer<typeof HardwareRuntimeSnapshot>;
+export type HardwareRemoteClaimResult = z.infer<typeof HardwareRemoteClaimResult>;
 export type RegisterHardwareRequest = z.infer<typeof RegisterHardwareRequest>;
 export type AssignHardwareRequest = z.infer<typeof AssignHardwareRequest>;
 export type UpdateHardwareRequest = z.infer<typeof UpdateHardwareRequest>;
@@ -703,4 +707,5 @@ export const posHardwareModels = {
   ControlledReprintResult,
   HardwareDiagnosticRequest,
   HardwareRecoveryQuery,
+  HardwareRemoteClaimResult,
 };

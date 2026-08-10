@@ -18,7 +18,9 @@ import type {
   UpdateHardwareRequest,
   UpdateHardwarePolicyRequest,
 } from '@umi/contract';
-import type { AuthUser } from '../auth/auth.types';
+import type { PersistedDashboardAdministrativeCommandContext } from '../administrative-commands/administrative-command-context.service';
+import type { AuthUser, MerchantAccess } from '../auth/auth.types';
+import { commandFingerprint } from '../integrity/canonical-json';
 import { IntegrityService } from '../integrity/integrity.service';
 import type { CommandResult } from '../integrity/integrity.types';
 import { hardwareCommandFingerprint } from './hardware-fingerprint';
@@ -218,6 +220,223 @@ export class PosHardwareService {
     );
   }
 
+  async executeAdministrative(
+    user: AuthUser,
+    access: MerchantAccess,
+    context: PersistedDashboardAdministrativeCommandContext,
+    operation: string,
+    parameters: Record<string, unknown>,
+  ) {
+    if (!context.locationId) throw new ForbiddenException({ code: 'LOCATION_REQUIRED' });
+    const locationId = context.locationId;
+    const commandType = this.administrativeCommandType(operation);
+    let targetHardwareId = optionalString(parameters.hardwareId);
+    if (!targetHardwareId && operation !== 'hardware.printer.reprint') {
+      throw new BadRequestException({ code: 'VALIDATION_FAILED', field: 'hardwareId' });
+    }
+    const registerId = optionalString(parameters.registerId);
+    let expectedConfigurationVersion = Number(parameters.expectedConfigurationVersion || 0);
+    if (operation !== 'hardware.printer.reprint') {
+      expectedConfigurationVersion = requiredPositiveInteger(
+        parameters.expectedConfigurationVersion,
+        'expectedConfigurationVersion',
+      );
+    }
+    try {
+      return await this.unwrap(
+        this.integrity.execute(
+          {
+            merchantId: access.merchantId,
+            locationId: context.locationId,
+            commandId: context.commandId,
+            idempotencyKey: context.idempotencyKey,
+            commandType: `dashboard.${operation}`,
+            payload: { operation, targetHardwareId, registerId, parameters },
+          },
+          async (transaction) => {
+            let sourceAggregateType = String(
+              parameters.sourceAggregateType || 'hardware_diagnostic',
+            );
+            let sourceAggregateId = String(
+              parameters.sourceAggregateId || context.targetAggregateId,
+            );
+            let safePayload: Record<string, unknown> = {
+              diagnostic: parameters.diagnostic ?? null,
+              drawer: parameters.drawer ?? null,
+              display: parameters.display ?? null,
+            };
+            let printJobType: 'test_page' | 'receipt_copy' | undefined;
+            let originalPrintJobId: string | null = null;
+            if (operation === 'hardware.printer.test') {
+              printJobType = 'test_page';
+              safePayload = { printPayload: parameters.printPayload ?? { testPage: true } };
+            }
+            if (operation === 'hardware.printer.reprint') {
+              const originalJobId = requiredString(parameters.originalJobId, 'originalJobId');
+              const original = await this.repo.controlledReprintSource(
+                transaction.client,
+                access.merchantId,
+                locationId,
+                originalJobId,
+              );
+              if (targetHardwareId && original.targetPrinterId !== targetHardwareId) {
+                throw new ConflictException({ code: 'HARDWARE_NOT_ASSIGNED' });
+              }
+              targetHardwareId = original.targetPrinterId;
+              expectedConfigurationVersion = original.configurationVersion;
+              sourceAggregateType = original.sourceAggregateType;
+              sourceAggregateId = original.sourceAggregateId;
+              originalPrintJobId = original.jobId;
+              printJobType = 'receipt_copy';
+              safePayload = {
+                copy: true,
+                reason: parameters.reason ?? 'customer_copy',
+                printPayload: original.printPayload,
+              };
+            }
+            const payloadFingerprint = commandFingerprint('hardware.remote', {
+              commandType,
+              expectedConfigurationVersion,
+              registerId,
+              safePayload,
+              sourceAggregateId,
+              sourceAggregateType,
+              targetHardwareId,
+            });
+            if (!targetHardwareId) {
+              throw new BadRequestException({ code: 'VALIDATION_FAILED', field: 'hardwareId' });
+            }
+            const result = await this.repo.createAdministrativeCommand(
+              transaction.client,
+              access.merchantId,
+              context.commandRecordId,
+              user.id,
+              {
+                locationId,
+                registerId,
+                commandId: context.commandId,
+                idempotencyKey: context.idempotencyKey,
+                targetHardwareId,
+                commandType,
+                sourceAggregateType,
+                sourceAggregateId,
+                expectedConfigurationVersion,
+                payloadFingerprint,
+                safePayload,
+                printJobType,
+                originalPrintJobId,
+              },
+              context.correlationId,
+            );
+            await transaction.appendAudit({
+              eventType: 'dashboard.hardware.command.created',
+              entityType: 'hardware_command',
+              entityId: context.commandId,
+              outcome: 'success',
+              publicData: { operation, targetHardwareId },
+            });
+            return { ok: true, value: result };
+          },
+        ),
+      );
+    } catch (error) {
+      throw this.hardwareError(error);
+    }
+  }
+
+  async configureAdministrative(
+    user: AuthUser,
+    access: MerchantAccess,
+    context: PersistedDashboardAdministrativeCommandContext,
+    operation: 'hardware.assign' | 'hardware.update',
+    parameters: Record<string, unknown>,
+  ) {
+    if (!context.locationId) throw new ForbiddenException({ code: 'LOCATION_REQUIRED' });
+    const locationId = context.locationId;
+    const hardwareId = context.targetAggregateId;
+    try {
+      return await this.unwrap(
+        this.integrity.execute(
+          {
+            merchantId: access.merchantId,
+            locationId,
+            commandId: context.commandId,
+            idempotencyKey: context.idempotencyKey,
+            commandType: `dashboard.${operation}`,
+            payload: { hardwareId, parameters },
+            expectedVersion: context.targetVersion ?? undefined,
+          },
+          async (transaction) => {
+            const expectedVersion = requiredPositiveInteger(
+              parameters.expectedVersion ?? context.targetVersion,
+              'expectedVersion',
+            );
+            const result =
+              operation === 'hardware.assign'
+                ? await this.repo.assignAdministrative(
+                    transaction.client,
+                    user.id,
+                    access.merchantId,
+                    locationId,
+                    hardwareId,
+                    {
+                      registerId: optionalString(parameters.registerId),
+                      assignedPosDeviceId: optionalString(parameters.assignedPosDeviceId),
+                      primary: parameters.primary === true,
+                      expectedVersion,
+                    },
+                  )
+                : await this.repo.updateAdministrative(
+                    transaction.client,
+                    access.merchantId,
+                    locationId,
+                    hardwareId,
+                    { enabled: parameters.enabled === true, expectedVersion },
+                  );
+            await transaction.appendAudit({
+              eventType:
+                operation === 'hardware.assign' ? 'hardware_reassigned' : 'hardware_updated',
+              entityType: 'hardware_device',
+              entityId: hardwareId,
+              outcome: 'success',
+            });
+            return { ok: true, value: result };
+          },
+        ),
+      );
+    } catch (error) {
+      throw this.hardwareError(error);
+    }
+  }
+
+  administrativeCommandStatus(
+    user: AuthUser,
+    access: MerchantAccess,
+    context: PersistedDashboardAdministrativeCommandContext,
+  ) {
+    if (!context.locationId) throw new ForbiddenException({ code: 'LOCATION_REQUIRED' });
+    return this.repo.administrativeCommandResult(
+      user.id,
+      access.merchantId,
+      context.locationId,
+      context.targetAggregateId,
+    );
+  }
+
+  async claimAdministrativeCommand(
+    user: AuthUser,
+    merchantId: string,
+    query: HardwareRecoveryQuery,
+  ) {
+    const authorization = await this.authorize(user, merchantId, query, 'hardware.command.execute');
+    return this.repo.claimAdministrativeCommandForExecutor(
+      user.id,
+      merchantId,
+      query.locationId,
+      authorization.deviceId,
+    );
+  }
+
   recovery(user: AuthUser, merchantId: string, query: HardwareRecoveryQuery) {
     return this.registry(user, merchantId, {
       ...query,
@@ -306,6 +525,21 @@ export class PosHardwareService {
     }
   }
 
+  private administrativeCommandType(operation: string): HardwareCommandRequest['commandType'] {
+    switch (operation) {
+      case 'hardware.printer.test':
+        return 'print_test_page';
+      case 'hardware.printer.reprint':
+        return 'controlled_reprint';
+      case 'hardware.drawer.test':
+        return 'test_drawer';
+      case 'hardware.diagnostic':
+        return 'run_diagnostic';
+      default:
+        throw new BadRequestException({ code: 'HARDWARE_COMMAND_TYPE_INVALID' });
+    }
+  }
+
   private async mutation<T>(
     merchantId: string,
     dto: { locationId: string; commandId: string; idempotencyKey: string },
@@ -366,9 +600,30 @@ export class PosHardwareService {
       HARDWARE_CONFIGURATION_STALE: 'HARDWARE_CONFIGURATION_STALE',
       HARDWARE_IDEMPOTENCY_CONFLICT: 'IDEMPOTENCY_CONFLICT',
       HARDWARE_LOCATION_SCOPE: 'LOCATION_SCOPE_VIOLATION',
+      HARDWARE_REGISTER_SCOPE: 'REGISTER_SCOPE_VIOLATION',
+      HARDWARE_POS_DEVICE_SCOPE: 'POS_DEVICE_SCOPE_VIOLATION',
+      EXECUTION_DEVICE_UNAVAILABLE: 'EXECUTION_DEVICE_UNAVAILABLE',
       HARDWARE_FOUNDATION_ONLY: 'HARDWARE_CAPABILITY_UNSUPPORTED',
     };
     const code = Object.entries(mapping).find(([source]) => message.includes(source))?.[1];
     return new ConflictException({ code: code ?? 'HARDWARE_COMMAND_FAILED' });
   }
+}
+
+function requiredString(value: unknown, field: string): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new BadRequestException({ code: 'VALIDATION_FAILED', field });
+  }
+  return value;
+}
+
+function optionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function requiredPositiveInteger(value: unknown, field: string): number {
+  if (!Number.isInteger(value) || Number(value) < 1) {
+    throw new BadRequestException({ code: 'VALIDATION_FAILED', field });
+  }
+  return Number(value);
 }

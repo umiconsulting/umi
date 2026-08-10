@@ -14,7 +14,8 @@ import type {
   SaleExceptionCommand,
   SaleExceptionEligibilityQuery,
 } from '@umi/contract';
-import type { AuthUser } from '../auth/auth.types';
+import type { AuthUser, MerchantAccess } from '../auth/auth.types';
+import type { DashboardAdministrativeCommandContext } from '../administrative-commands/administrative-command-context.service';
 import { IntegrityService } from '../integrity/integrity.service';
 import { PosEntryService } from '../pos-entry/pos-entry.service';
 import { PosExceptionRepository, type ExceptionAuthorization } from './pos-exception.repository';
@@ -72,6 +73,65 @@ export class PosExceptionService {
     return this.repo.preview(user.id, merchantId, saleId, authorization, dto);
   }
 
+  async previewAdministrative(
+    user: AuthUser,
+    access: MerchantAccess,
+    context: DashboardAdministrativeCommandContext & { commandRecordId?: string },
+    saleId: string,
+    input: Omit<RefundPreviewRequest, 'locationId' | 'operatorSessionId'>,
+  ) {
+    const locationId = context.locationId;
+    if (!locationId || !context.commandRecordId) {
+      throw new ForbiddenException({ code: 'ADMINISTRATIVE_COMMAND_CONTEXT_REQUIRED' });
+    }
+    const permission =
+      input.exceptionType === 'void'
+        ? 'sale.void.create'
+        : input.exceptionType === 'full_refund'
+          ? 'sale.refund.full'
+          : 'sale.refund.partial';
+    if (!access.permissions.includes('*') && !access.permissions.includes(permission)) {
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+    }
+    const authorization = await this.repo.authorizeAdministrative({
+      userId: user.id,
+      sessionId: user.sessionId,
+      merchantId: access.merchantId,
+      locationId,
+      administrativeCommandId: context.commandRecordId,
+      permissions: access.permissions,
+    });
+    if (!authorization) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+    return this.repo.preview(user.id, access.merchantId, saleId, authorization, {
+      ...input,
+      locationId,
+      operatorSessionId: user.sessionId,
+    });
+  }
+
+  async eligibilityAdministrative(
+    user: AuthUser,
+    access: MerchantAccess,
+    context: DashboardAdministrativeCommandContext & { commandRecordId?: string },
+    saleId: string,
+  ) {
+    if (!context.locationId || !context.commandRecordId) {
+      throw new ForbiddenException({ code: 'ADMINISTRATIVE_COMMAND_CONTEXT_REQUIRED' });
+    }
+    const authorization = await this.repo.authorizeAdministrative({
+      userId: user.id,
+      sessionId: user.sessionId,
+      merchantId: access.merchantId,
+      locationId: context.locationId,
+      administrativeCommandId: context.commandRecordId,
+      permissions: access.permissions,
+    });
+    if (!authorization) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+    const result = await this.repo.eligibility(user.id, access.merchantId, saleId, authorization);
+    if (!result) throw new NotFoundException({ code: 'SALE_NOT_FOUND' });
+    return result;
+  }
+
   async approval(user: AuthUser, merchantId: string, saleId: string, dto: RefundApprovalRequest) {
     if (saleId !== dto.saleId) {
       throw new ForbiddenException({ code: 'SALE_EXCEPTION_SCOPE_VIOLATION' });
@@ -123,6 +183,59 @@ export class PosExceptionService {
     };
   }
 
+  async approvalAdministrative(
+    user: AuthUser,
+    access: MerchantAccess,
+    context: DashboardAdministrativeCommandContext & { commandRecordId?: string },
+    saleId: string,
+    input: Omit<RefundApprovalRequest, 'locationId' | 'operatorSessionId' | 'saleId'>,
+  ) {
+    const locationId = context.locationId;
+    if (!locationId || !context.commandRecordId) {
+      throw new ForbiddenException({ code: 'ADMINISTRATIVE_COMMAND_CONTEXT_REQUIRED' });
+    }
+    if (saleId !== context.targetAggregateId) {
+      throw new ForbiddenException({ code: 'SALE_EXCEPTION_SCOPE_VIOLATION' });
+    }
+    const expected = exceptionCommandFingerprint(
+      saleId,
+      input.previewId,
+      input.previewFingerprint,
+      input.commandId,
+    );
+    if (input.commandFingerprint !== expected) {
+      throw new ConflictException({ code: 'APPROVAL_FINGERPRINT_MISMATCH' });
+    }
+    await this.repo.assertPreview(
+      user.id,
+      access.merchantId,
+      locationId,
+      saleId,
+      input.previewId,
+      input.previewFingerprint,
+    );
+    const grant = await this.entry.approveAdministrativeByManager(user, access, {
+      dashboardSessionId: user.sessionId,
+      managerPin: input.managerPin,
+      permission: 'sale.refund.approve',
+      locationId,
+      commandFingerprint: input.commandFingerprint,
+    });
+    const actor = await this.repo.approvalActor(
+      user.id,
+      access.merchantId,
+      locationId,
+      grant.elevationId,
+    );
+    return {
+      approvalId: grant.elevationId,
+      approvingOperatorReference: actor ?? 'manager',
+      previewFingerprint: input.previewFingerprint,
+      expiresAt: grant.expiresAt,
+      oneUse: true as const,
+    };
+  }
+
   async commit(user: AuthUser, merchantId: string, saleId: string, dto: SaleExceptionCommand) {
     const authorization = await this.authorize(
       user,
@@ -168,6 +281,83 @@ export class PosExceptionService {
       throw new ConflictException({ code: result.failureCode ?? 'SALE_EXCEPTION_CONFLICT' });
     }
     return result.result;
+  }
+
+  async commitAdministrative(
+    user: AuthUser,
+    access: MerchantAccess,
+    context: DashboardAdministrativeCommandContext & { commandRecordId?: string },
+    saleId: string,
+    input: Omit<SaleExceptionCommand, 'locationId' | 'operatorSessionId'>,
+  ) {
+    const locationId = context.locationId;
+    if (!locationId || !context.commandRecordId) {
+      throw new ForbiddenException({ code: 'ADMINISTRATIVE_COMMAND_CONTEXT_REQUIRED' });
+    }
+    const authorization = await this.repo.authorizeAdministrative({
+      userId: user.id,
+      sessionId: user.sessionId,
+      merchantId: access.merchantId,
+      locationId,
+      administrativeCommandId: context.commandRecordId,
+      permissions: access.permissions,
+    });
+    if (!authorization) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+    const dto: SaleExceptionCommand = {
+      ...input,
+      locationId,
+      operatorSessionId: user.sessionId,
+    };
+    const result = await this.integrity.execute(
+      {
+        merchantId: access.merchantId,
+        locationId,
+        commandId: dto.commandId,
+        idempotencyKey: dto.idempotencyKey,
+        commandType: 'pos.exception.commit',
+        payload: { saleId, ...dto, operatorSessionId: null, commandContext: context.type },
+      },
+      async (integrityContext) => ({
+        ok: true as const,
+        value: await this.repo.commit(
+          integrityContext.client,
+          access.merchantId,
+          saleId,
+          authorization,
+          dto,
+          exceptionCommandFingerprint(saleId, dto.previewId, dto.previewFingerprint, dto.commandId),
+          integrityContext.correlationId,
+        ),
+      }),
+    );
+    if (result.status !== 'succeeded' || !result.result) {
+      throw new ConflictException({ code: result.failureCode ?? 'SALE_EXCEPTION_CONFLICT' });
+    }
+    return result.result;
+  }
+
+  async recoverAdministrative(
+    user: AuthUser,
+    access: MerchantAccess,
+    context: DashboardAdministrativeCommandContext & { commandRecordId?: string },
+    input: Omit<ExceptionCommandRecoveryQuery, 'locationId' | 'operatorSessionId'>,
+  ) {
+    if (!context.locationId || !context.commandRecordId) {
+      throw new ForbiddenException({ code: 'ADMINISTRATIVE_COMMAND_CONTEXT_REQUIRED' });
+    }
+    await this.repo.authorizeAdministrative({
+      userId: user.id,
+      sessionId: user.sessionId,
+      merchantId: access.merchantId,
+      locationId: context.locationId,
+      administrativeCommandId: context.commandRecordId,
+      permissions: access.permissions,
+    });
+    return this.repo.command(user.id, access.merchantId, {
+      ...input,
+      locationId: context.locationId,
+      operatorSessionId: user.sessionId,
+    });
   }
 
   async history(

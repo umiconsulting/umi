@@ -586,6 +586,89 @@ final class HardwareService {
     return result;
   }
 
+  Future<HardwareCommandResult?> executeNextRemoteCommand(
+    HardwareScope scope,
+  ) async {
+    final claimed = await _repository.claimRemoteCommand(
+      scope.merchantId,
+      HardwareRecoveryQuery(
+        locationId: scope.locationId,
+        operatorSessionId: scope.operatorSessionId,
+      ),
+    );
+    if (claimed == null) return null;
+    final server = claimed.command;
+    final command = HardwareCommandRequest(
+      locationId: server['locationId']! as String,
+      registerId: server['registerId'] as String?,
+      operatorSessionId: scope.operatorSessionId,
+      commandId: server['commandId']! as String,
+      idempotencyKey: server['idempotencyKey']! as String,
+      targetHardwareId: server['targetHardwareId']! as String,
+      commandType: server['commandType']! as String,
+      sourceAggregateType: server['sourceAggregateType']! as String,
+      sourceAggregateId: server['sourceAggregateId']! as String,
+      expectedConfigurationVersion:
+          server['expectedConfigurationVersion']! as int,
+      payloadFingerprint: server['payloadFingerprint']! as String,
+      drawer: claimed.dispatchPayload['drawer'] as Map<String, Object?>?,
+      display: claimed.dispatchPayload['display'] as Map<String, Object?>?,
+      printPayload:
+          claimed.dispatchPayload['printPayload'] as Map<String, Object?>?,
+    );
+    await _recovery.save(
+      PendingHardwareDispatch(
+        merchantId: scope.merchantId,
+        locationId: scope.locationId,
+        commandId: command.commandId,
+        payloadFingerprint: command.payloadFingerprint,
+        state: HardwareDispatchState.dispatching,
+      ),
+    );
+    final local = await _coordinator.dispatch(
+      RuntimeCommand(
+        id: command.commandId,
+        hardwareId: command.targetHardwareId,
+        type: command.commandType,
+        requiredCapability: _requiredCapability(command.commandType),
+        payloadFingerprint: command.payloadFingerprint,
+        safePayload:
+            claimed.dispatchPayload['display'] as Map<String, Object?>? ??
+            claimed.dispatchPayload['printPayload'] as Map<String, Object?>? ??
+            claimed.dispatchPayload['drawer'] as Map<String, Object?>? ??
+            const {},
+      ),
+    );
+    final state = switch (local.status) {
+      RuntimeCommandStatus.succeeded => HardwareDispatchState.succeeded,
+      RuntimeCommandStatus.retryable => HardwareDispatchState.retryable,
+      RuntimeCommandStatus.unknown => HardwareDispatchState.unknown,
+      _ => HardwareDispatchState.failed,
+    };
+    await _recovery.save(
+      PendingHardwareDispatch(
+        merchantId: scope.merchantId,
+        locationId: scope.locationId,
+        commandId: command.commandId,
+        payloadFingerprint: command.payloadFingerprint,
+        state: state,
+        failureCode: local.failureCode,
+        safeMetadata: local.safeMetadata,
+      ),
+    );
+    final result = await _transition(
+      scope.merchantId,
+      command,
+      status: _status(local),
+      failureCode: local.failureCode,
+      safeMetadata: local.safeMetadata,
+    );
+    if (const {'succeeded', 'failed', 'cancelled'}.contains(result.command['status'])) {
+      await _recovery.clear(command.commandId);
+    }
+    return result;
+  }
+
   Future<HardwareCommandResult> printReceipt({
     required HardwareScope scope,
     required String printerId,

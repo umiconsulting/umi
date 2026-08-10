@@ -183,6 +183,30 @@ void main() {
     },
   );
 
+  test('assigned POS executes one Dashboard remote command', () async {
+    final repository = _HardwareRepository();
+    final remote = _printCommand(
+      '10000000-0000-4000-8000-000000000015',
+    );
+    repository.lastCommand = remote;
+    repository.remoteClaim = repository._result(remote.commandId, 'dispatching');
+    final printer = PrinterSimulatorAdapter();
+    final service = HardwareService(
+      repository: repository,
+      coordinator: HardwareCoordinator(
+        adapters: {'printer-1': printer},
+        devices: [simulatedDevice(id: 'printer-1', type: 'printer')],
+      ),
+      recovery: MemoryHardwareRecoveryStore(),
+    );
+
+    final result = await service.executeNextRemoteCommand(scope);
+
+    expect(result?.command['status'], 'succeeded');
+    expect(printer.artifacts, hasLength(1));
+    expect(repository.transitions, ['succeeded']);
+  });
+
   test('hardware service suppresses keyboard scans during PIN entry', () async {
     final service = HardwareService(
       repository: _HardwareRepository(),
@@ -891,6 +915,17 @@ String _deterministicTestId(String source) {
 }
 
 final class _HardwareRepository implements HardwareRepository {
+  HardwareCommandResult? remoteClaim;
+
+  @override
+  Future<HardwareCommandResult?> claimRemoteCommand(
+    String merchantId,
+    HardwareRecoveryQuery query,
+  ) async {
+    final result = remoteClaim;
+    remoteClaim = null;
+    return result;
+  }
   final Map<String, String> statuses = {};
   final List<String> transitions = [];
   HardwareCommandRequest? lastCommand;

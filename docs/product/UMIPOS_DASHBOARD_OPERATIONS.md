@@ -20,29 +20,29 @@ Una membresía asignada a una location no recibe otras locations. Un cambio de c
 
 ## Matriz de cobertura P0
 
-| Dominio                 | Superficie                    | Estado             | Operación disponible                           |
-| ----------------------- | ----------------------------- | ------------------ | ---------------------------------------------- |
-| Organización / Merchant | Settings y Centro operativo   | Operativo          | Consulta y edición de settings                 |
-| Locations               | Settings y Centro operativo   | Operativo          | Consulta y edición de perfiles                 |
-| Usuarios / Membresías   | Staff & Access                | Operativo          | Alta, cambio y revocación                      |
-| Dispositivos            | Devices                       | Operativo          | Enrollment, aprobación, rechazo y revocación   |
-| Registros               | Centro operativo              | Consulta operativa | Estado y referencia segura                     |
-| Hardware                | Centro operativo              | Consulta operativa | Registro, cola y fallos seguros                |
-| Catálogo                | Centro operativo              | Consulta operativa | Productos, estado, precio y preparación        |
-| Inventario              | Centro operativo              | Consulta operativa | Items y estado de autoridad                    |
-| Ventas                  | Centro operativo              | Consulta operativa | Venta comprometida y recibo                    |
-| Recibos                 | Centro operativo              | Consulta operativa | Recibo autoritativo e importe histórico        |
-| Refunds / Voids         | Centro operativo              | Consulta operativa | Excepciones y referencias de recuperación      |
-| Cash Shifts             | Centro operativo              | Consulta operativa | Turno, register, estado y fecha comercial      |
-| Customers               | Customers                     | Operativo          | Búsqueda, perfil, historial e identidad        |
-| Loyalty                 | Loyalty y Customers           | Operativo          | Cuenta, saldo e historial                      |
-| Rewards                 | Loyalty                       | Operativo          | Política y estado                              |
-| Wallet                  | Centro operativo y Customers  | Consulta operativa | Referencia, estado y saldo proyectado          |
-| Gift Cards              | Gift Cards y Centro operativo | Operativo          | Consulta segura y emisión autorizada existente |
-| Kitchen / KDS           | Orders y Centro operativo     | Operativo          | Orden, station, routing y diagnóstico          |
-| Recovery                | Centro operativo              | Consulta operativa | Comandos no terminales y referencias seguras   |
-| Audit                   | Centro operativo              | Operativo          | Eventos seguros, scope y correlación           |
-| Diagnostics             | Centro operativo              | Consulta operativa | Estado de hardware y correlación               |
+| Dominio                 | Superficie                    | Estado             | Operación disponible                               |
+| ----------------------- | ----------------------------- | ------------------ | -------------------------------------------------- |
+| Organización / Merchant | Settings y Centro operativo   | Operativo          | Consulta y edición de settings                     |
+| Locations               | Settings y Centro operativo   | Operativo          | Consulta y edición de perfiles                     |
+| Usuarios / Membresías   | Staff & Access                | Operativo          | Alta, cambio y revocación                          |
+| Dispositivos            | Devices                       | Operativo          | Enrollment, aprobación, rechazo y revocación       |
+| Registros               | Centro operativo              | Operativo          | Configuración, estado y asignación POS             |
+| Hardware                | Centro operativo              | Operativo          | Asignación, diagnóstico, prueba y reprint          |
+| Catálogo                | Centro operativo              | Operativo          | Alta, edición, barcode, inventario y preparación   |
+| Inventario              | Centro operativo              | Operativo          | Ajuste, merma, daño, cuarentena y conteo           |
+| Ventas                  | Centro operativo              | Consulta operativa | Venta comprometida y recibo                        |
+| Recibos                 | Centro operativo              | Operativo          | Recibo autoritativo y reprint `COPY`               |
+| Refunds / Voids         | Centro operativo              | Operativo          | Preview, aprobación, commit y recuperación         |
+| Cash Shifts             | Centro operativo              | POS por política   | Consulta; el movimiento físico se completa en POS  |
+| Customers               | Customers                     | Operativo          | Búsqueda, perfil, historial e identidad            |
+| Loyalty                 | Loyalty y Customers           | Operativo          | Cuenta, historial y ajuste aprobado                |
+| Rewards                 | Loyalty                       | Operativo          | Política y estado                                  |
+| Wallet                  | Centro operativo y Customers  | Solo consulta      | La política no permite financiación administrativa |
+| Gift Cards              | Gift Cards y Centro operativo | Operativo          | Consulta, emisión promocional y entrega única      |
+| Kitchen / KDS           | Orders y Centro operativo     | Operativo          | Orden, station, routing y diagnóstico              |
+| Recovery                | Centro operativo              | Operativo          | Consulta, inventario, refund y valor del cliente   |
+| Audit                   | Centro operativo              | Operativo          | Eventos seguros, scope y correlación               |
+| Diagnostics             | Centro operativo              | Consulta operativa | Estado de hardware y correlación                   |
 
 ## Autoridad y permisos
 
@@ -79,7 +79,7 @@ El Centro operativo muestra comandos fallidos o reintentables. El operador copia
 
 No existe una acción genérica de reintento. El dominio decide si una acción es segura.
 
-## Límites actuales
+## Contexto de comando
 
 La API separa `dashboard_administrative` de `pos_device`.
 La sesión administrativa vive en `runtime.dashboard_session`.
@@ -91,24 +91,51 @@ El registro `merchant.administrative_command` guarda la identidad estable, el fi
 La política permite solo operaciones administrativas explícitas.
 La política rechaza checkout y preparación de cocina desde el Dashboard.
 
-Esta base todavía no conecta los comandos que exigen procedencia POS.
-La API no crea un dispositivo falso para cerrar esta diferencia.
+Los comandos de refund, inventario, loyalty y gift card usan la misma autoridad que UmiPOS.
+La API conserva los permisos, las aprobaciones, el fingerprint y la idempotencia del dominio.
 
-Estas acciones todavía no tienen un flujo administrativo completo en el Dashboard:
+Los comandos físicos usan un relay tipado. La API guarda el comando y lo entrega al POS asignado.
+El navegador y el servidor del Dashboard no abren un socket del dispositivo.
 
-- comandos de inventario;
-- preview y commit de refund o void;
-- comandos de cash shift;
-- comandos físicos de hardware;
-- acciones de wallet y gift card que requieren una sesión POS;
-- acciones de recuperación específicas del dominio.
+La aprobación usa el PIN personal de otro actor autorizado. El grant dura cinco minutos y usa un fingerprint exacto.
+La sesión bloquea los intentos de aprobación después de cinco fallos durante 15 minutos.
+La política marca una aprobación condicional cuando el dominio decide el umbral.
+El endpoint de aprobación ejecuta el step-up. El comando de dominio consume el grant cuando lo exige.
 
-Este límite mantiene Gate 5A en estado `INCOMPLETE`.
+El cliente conserva el `commandId` y el `idempotencyKey` después de una pérdida de respuesta.
+Un resultado físico desconocido exige verificación. El sistema no repite una impresión de forma automática.
+La prueba de recorrido ejecuta el catálogo, el registro, el hardware, el inventario, el refund y el valor del cliente.
+La misma prueba ejecuta la administración de cocina y la consulta de recuperación.
+
+### Base de la decisión
+
+- Hecho documentado: `administrative-command.policy.ts` define cada contexto y permiso permitido.
+- Hecho documentado: `csrf.guard.ts` valida el token CSRF para una mutación con cookies.
+- Fuente oficial: [OWASP CSRF Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html) recomienda un token junto con `SameSite`.
+- Fuente oficial: [NIST SP 800-207](https://csrc.nist.gov/pubs/sp/800/207/final) define la validación de acceso en un punto de política.
+- Tradeoff: el relay agrega latencia, pero mantiene el acceso físico dentro del POS inscrito.
+- Inferencia de Umi: un solo comando de dominio reduce las diferencias entre el Dashboard y UmiPOS.
+
+Gate 5A está `INCOMPLETE` por una falta de prueba de extremo a extremo.
+Las pruebas unitarias validan el cableado y los 24 rechazos de autoridad.
+Estas pruebas sustituyen los servicios de dominio con dobles de prueba.
+El recorrido P0 también usa dobles de prueba para los servicios de dominio.
+Falta una prueba con Dashboard autenticado, API, servicios canónicos y PostgreSQL.
 Gate 6A no está autorizado.
+
+## Límites de producto
+
+- Checkout y venta en efectivo son operaciones de UmiPOS.
+- Preparar, ready y complete son operaciones del KDS.
+- Un movimiento físico de efectivo se completa en el POS asignado.
+- `VerifyPrint` y `HardwareReconnect` se completan en el POS asignado.
+- `KitchenReconcile` se completa en el KDS con un snapshot de la API.
+- Wallet no tiene una operación administrativa de financiación.
+- El Dashboard no sustituye UmiPOS o el KDS.
 
 ## Límite entre clientes
 
-- El Dashboard administra y consulta.
+- El Dashboard administra y consulta con comandos permitidos.
 - UmiPOS ejecuta una venta y una acción que exige un dispositivo POS.
 - El KDS ejecuta una transición de cocina.
 - La UMI API valida y compromete cada mutación.

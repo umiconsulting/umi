@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -7,11 +8,17 @@ import {
 } from '@nestjs/common';
 import { CatalogQuery, type CatalogQuery as CatalogQueryType } from '@umi/contract';
 import type { AuthUser } from '../auth/auth.types';
+import type { MerchantAccess } from '../auth/auth.types';
+import type { PersistedDashboardAdministrativeCommandContext } from '../administrative-commands/administrative-command-context.service';
+import { IntegrityService } from '../integrity/integrity.service';
 import { PosCatalogRepository } from './pos-catalog.repository';
 
 @Injectable()
 export class PosCatalogService {
-  constructor(private readonly repo: PosCatalogRepository) {}
+  constructor(
+    private readonly repo: PosCatalogRepository,
+    private readonly integrity: IntegrityService,
+  ) {}
 
   parseQuery(raw: Record<string, string | undefined>): CatalogQueryType {
     const parsed = CatalogQuery.safeParse(raw);
@@ -60,6 +67,72 @@ export class PosCatalogService {
     return item;
   }
 
+  async executeAdministrative(
+    user: AuthUser,
+    access: MerchantAccess,
+    context: PersistedDashboardAdministrativeCommandContext,
+    operation: 'catalog.create' | 'catalog.update' | 'catalog.archive',
+    parameters: Record<string, unknown>,
+  ) {
+    const command = await this.integrity.execute(
+      {
+        merchantId: access.merchantId,
+        locationId: context.locationId,
+        commandId: context.commandId,
+        idempotencyKey: context.idempotencyKey,
+        commandType: `dashboard.${operation}`,
+        payload: { productId: context.targetAggregateId, parameters },
+        expectedVersion: context.targetVersion ?? undefined,
+      },
+      async (transaction) => {
+        const value =
+          operation === 'catalog.create'
+            ? await this.repo.createAdministrative(
+                transaction.client,
+                access.merchantId,
+                context.targetAggregateId,
+                parameters,
+              )
+            : operation === 'catalog.update'
+              ? await this.repo.updateAdministrative(
+                  transaction.client,
+                  access.merchantId,
+                  context.targetAggregateId,
+                  requiredVersion(context.targetVersion),
+                  parameters,
+                )
+              : await this.repo.archiveAdministrative(
+                  transaction.client,
+                  access.merchantId,
+                  context.targetAggregateId,
+                  requiredVersion(context.targetVersion),
+                );
+        await transaction.appendAudit({
+          eventType: `catalog_${operation.split('.')[1]}`,
+          entityType: 'product',
+          entityId: context.targetAggregateId,
+          outcome: 'success',
+          publicData: { actorUserId: user.id },
+        });
+        return { ok: true, value };
+      },
+    );
+    if (command.status === 'succeeded' && command.result) return command.result;
+    throw new ConflictException({
+      code: command.failureCode ?? 'CATALOG_COMMAND_FAILED',
+      correlationId: command.correlationId,
+    });
+  }
+
+  async detailAdministrative(
+    access: MerchantAccess,
+    context: PersistedDashboardAdministrativeCommandContext,
+  ) {
+    const item = await this.repo.administrativeDetail(access.merchantId, context.targetAggregateId);
+    if (!item) throw new NotFoundException({ code: 'RESOURCE_NOT_FOUND' });
+    return item;
+  }
+
   private async authorize(user: AuthUser, merchantId: string, locationId: string) {
     if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
     if (
@@ -92,4 +165,11 @@ export class PosCatalogService {
       throw new BadRequestException({ code: 'VALIDATION_FAILED' });
     }
   }
+}
+
+function requiredVersion(value: number | null): number {
+  if (!Number.isInteger(value) || Number(value) < 1) {
+    throw new BadRequestException({ code: 'CATALOG_VERSION_REQUIRED' });
+  }
+  return Number(value);
 }

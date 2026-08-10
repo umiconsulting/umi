@@ -220,4 +220,67 @@ describe('Gate 3G-A hardware application boundary', () => {
       ).rejects.toMatchObject({ response: { code: 'HARDWARE_CAPABILITY_UNSUPPORTED' } });
     }
   });
+
+  it('creates a typed remote printer command for the assigned POS executor', async () => {
+    const repo = {
+      createAdministrativeCommand: vi.fn().mockResolvedValue({
+        command: { commandId: id(7), status: 'pending' },
+        printJob: { jobId: id(9), status: 'queued' },
+      }),
+    };
+    const service = new PosHardwareService(repo as never, integrity as never);
+    const result = await service.executeAdministrative(
+      { ...user, deviceId: null },
+      { merchantId: id(6) } as never,
+      {
+        commandId: id(7),
+        idempotencyKey: id(10),
+        commandRecordId: id(11),
+        correlationId: 'dashboard-hardware-test',
+        targetAggregateId: id(8),
+        locationId: scope.locationId,
+      } as never,
+      'hardware.printer.test',
+      {
+        hardwareId: id(8),
+        expectedConfigurationVersion: 1,
+        sourceAggregateType: 'dashboard_hardware_test',
+        sourceAggregateId: id(8),
+      },
+    );
+    expect(result.command.status).toBe('pending');
+    expect(repo.createAdministrativeCommand).toHaveBeenCalledWith(
+      {},
+      id(6),
+      id(11),
+      user.id,
+      expect.objectContaining({ commandType: 'print_test_page', targetHardwareId: id(8) }),
+      'dashboard-hardware-test',
+    );
+  });
+
+  it('returns a typed unavailable result when no assigned executor is online', async () => {
+    const repo = {
+      createAdministrativeCommand: vi
+        .fn()
+        .mockRejectedValue(new Error('EXECUTION_DEVICE_UNAVAILABLE')),
+    };
+    const service = new PosHardwareService(repo as never, integrity as never);
+    await expect(
+      service.executeAdministrative(
+        { ...user, deviceId: null },
+        { merchantId: id(6) } as never,
+        {
+          commandId: id(7),
+          idempotencyKey: id(10),
+          commandRecordId: id(11),
+          correlationId: 'dashboard-hardware-test',
+          targetAggregateId: id(8),
+          locationId: scope.locationId,
+        } as never,
+        'hardware.diagnostic',
+        { hardwareId: id(8), expectedConfigurationVersion: 1 },
+      ),
+    ).rejects.toMatchObject({ response: { code: 'EXECUTION_DEVICE_UNAVAILABLE' } });
+  });
 });

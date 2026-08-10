@@ -371,5 +371,16 @@ La API deriva el usuario, la membresía y el scope de la sesión activa.
 La API rechaza una membresía sintetizada para una mutación administrativa.
 La API comprueba el permiso actual en cada comando.
 
-Una mutación que todavía exige procedencia POS permanece fuera del Dashboard.
+El Dashboard ejecuta solamente las operaciones de la lista administrativa.
+La API usa el mismo comando de refund, inventario, loyalty, gift card, hardware, cocina o catálogo.
 El Dashboard no fabrica un dispositivo o una sesión de operador.
+
+`catalog.manage` permite la administración de productos.
+`register.manage` permite la configuración segura de un register.
+Owner, Admin y Manager reciben estos permisos en el perfil piloto.
+
+Una aprobación exige un actor diferente con el permiso exacto.
+La API enlaza la aprobación con el fingerprint del comando.
+Cinco PIN incorrectos bloquean la aprobación web durante 15 minutos.
+
+Checkout, movimiento físico de efectivo y preparación de cocina permanecen fuera del Dashboard.

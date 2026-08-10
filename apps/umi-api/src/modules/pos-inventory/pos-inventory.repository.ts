@@ -21,9 +21,12 @@ import { commandFingerprint } from '../integrity/canonical-json';
 import { inventoryOperationFingerprint } from './inventory-errors';
 
 export interface InventoryAuthorization {
+  commandContextType: 'pos_device' | 'dashboard_administrative';
+  administrativeCommandId: string | null;
+  operatorSessionId: string | null;
   operatorId: string;
-  deviceId: string;
-  credentialVersion: number;
+  deviceId: string | null;
+  credentialVersion: number | null;
   permissions: string[];
 }
 
@@ -53,8 +56,8 @@ interface LedgerRow {
   refundId: string | null;
   countId: string | null;
   operatorId: string;
-  deviceId: string;
-  credentialVersion: number;
+  deviceId: string | null;
+  credentialVersion: number | null;
   businessDate: string;
   correlationId: string;
   occurredAt: string;
@@ -81,7 +84,8 @@ export class PosInventoryRepository {
       userId,
       async (client) => {
         const { rows } = await client.query<InventoryAuthorization>(
-          `SELECT os.user_id::text AS "operatorId",os.device_id::text AS "deviceId",
+          `SELECT 'pos_device'::text AS "commandContextType",null::text AS "administrativeCommandId",
+                  os.id::text AS "operatorSessionId",os.user_id::text AS "operatorId",os.device_id::text AS "deviceId",
                   d.credential_version AS "credentialVersion",os.permissions
              FROM runtime.operator_session os
              JOIN merchant.device d ON d.id=os.device_id AND d.merchant_id=os.merchant_id
@@ -106,6 +110,45 @@ export class PosInventoryRepository {
         return rows[0] ?? null;
       },
       locationId,
+    );
+  }
+
+  authorizeAdministrative(input: {
+    userId: string;
+    merchantId: string;
+    locationId: string;
+    dashboardSessionId: string;
+    administrativeCommandId: string;
+    permissions: string[];
+    permission: string;
+  }): Promise<InventoryAuthorization | null> {
+    if (!input.permissions.includes('*') && !input.permissions.includes(input.permission)) {
+      return Promise.resolve(null);
+    }
+    return this.pg.runWithMerchant(
+      input.merchantId,
+      input.userId,
+      async (client) => {
+        const { rows } = await client.query<{ active: boolean }>(
+          `SELECT EXISTS (
+             SELECT 1 FROM runtime.dashboard_session
+              WHERE id=$1::uuid AND user_id=$2::uuid AND is_active
+                AND expires_at>clock_timestamp()
+           ) AS active`,
+          [input.dashboardSessionId, input.userId],
+        );
+        if (rows[0]?.active !== true) return null;
+        return {
+          commandContextType: 'dashboard_administrative',
+          administrativeCommandId: input.administrativeCommandId,
+          operatorSessionId: null,
+          operatorId: input.userId,
+          deviceId: null,
+          credentialVersion: null,
+          permissions: input.permissions,
+        };
+      },
+      input.locationId,
     );
   }
 
@@ -374,11 +417,25 @@ export class PosInventoryRepository {
         const activeCountRow = await client.query<{ id: string }>(
           `SELECT id::text FROM merchant.inventory_count
             WHERE merchant_id=$1::uuid AND location_id=$2::uuid
-              AND inventory_location_id=$3::uuid AND operator_session_id=$4::uuid
+              AND inventory_location_id=$3::uuid
+              AND (
+                operator_session_id=$4::uuid
+                OR (administrative_command_id IS NOT NULL AND EXISTS (
+                  SELECT 1 FROM merchant.administrative_command ac
+                   WHERE ac.id=inventory_count.administrative_command_id
+                     AND ac.actor_user_id=$5::uuid
+                ))
+              )
               AND status IN ('draft','counting','submitted','variance_calculated',
                 'reconciliation_required','approved')
             ORDER BY created_at DESC,id DESC LIMIT 1`,
-          [merchantId, query.locationId, policy.inventoryLocationId, query.operatorSessionId],
+          [
+            merchantId,
+            query.locationId,
+            policy.inventoryLocationId,
+            query.operatorSessionId,
+            userId,
+          ],
         );
         const activeCount = activeCountRow.rows[0]
           ? await this.countResult(
@@ -983,7 +1040,7 @@ export class PosInventoryRepository {
       `INSERT INTO merchant.inventory_count(
         merchant_id,location_id,inventory_location_id,public_reference,count_scope,status,blind,
         snapshot_ledger_sequence,snapshot_item_sequences,item_scope,operator_id,
-        operator_session_id,device_id,command_id,command_fingerprint)
+        operator_session_id,device_id,administrative_command_id,command_id,command_fingerprint)
        WITH snapshot AS (
          SELECT coalesce(max(coalesce(b.ledger_sequence,0)),0) AS maximum,
                 jsonb_object_agg(scope_item.id::text,coalesce(b.ledger_sequence,0)) AS item_sequences
@@ -993,7 +1050,7 @@ export class PosInventoryRepository {
        )
        SELECT $1::uuid,$2::uuid,$3::uuid,'IC-'||upper(substr(replace($4::text,'-',''),1,12)),
               $5,'counting',p.blind_count,s.maximum,s.item_sequences,$10::uuid[],$6::uuid,
-              $7::uuid,$8::uuid,$4::uuid,$9
+              $7::uuid,$8::uuid,$11::uuid,$4::uuid,$9
          FROM merchant.inventory_policy p CROSS JOIN snapshot s
         WHERE p.merchant_id=$1::uuid AND p.location_id=$2::uuid AND p.inventory_location_id=$3::uuid
        RETURNING id::text,created_at::text AS "createdAt",snapshot_ledger_sequence::text AS snapshot`,
@@ -1004,10 +1061,11 @@ export class PosInventoryRepository {
         dto.commandId,
         dto.scope,
         authorization.operatorId,
-        dto.operatorSessionId,
+        authorization.operatorSessionId,
         authorization.deviceId,
         fingerprint,
         itemIds,
+        authorization.administrativeCommandId,
       ],
     );
     if (!rows[0]) throw new ConflictException({ code: 'INVENTORY_POLICY_REQUIRED' });

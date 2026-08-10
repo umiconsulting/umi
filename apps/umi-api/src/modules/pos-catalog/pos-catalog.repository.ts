@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { PoolClient } from 'pg';
 import type { CatalogCategory, CatalogProductDetail, CatalogProductSummary } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
 
@@ -169,6 +170,28 @@ export class PosCatalogRepository {
     return summary ? this.withDetails(merchantId, locationId, summary) : null;
   }
 
+  async administrativeDetail(merchantId: string, productId: string) {
+    const { rows } = await this.pg.tquery(
+      merchantId,
+      `SELECT p.id::text,p.name,p.sku,p.barcode,p.price::int AS "priceMinorUnits",
+              p.tax_rate_basis_points AS "taxRateBasisPoints",
+              p.requires_preparation AS "requiresPreparation",
+              p.category_id::text AS "categoryId",m.inventory_item_id::text AS "inventoryItemId",
+              coalesce(v.version,1)::int AS version
+         FROM merchant.product p
+         LEFT JOIN merchant.aggregate_version v ON v.merchant_id=p.merchant_id
+          AND v.aggregate_type='catalog_product' AND v.aggregate_id=p.id
+         LEFT JOIN LATERAL (
+           SELECT mapping.inventory_item_id FROM merchant.inventory_catalog_mapping mapping
+           WHERE mapping.merchant_id=p.merchant_id AND mapping.product_id=p.id AND mapping.active
+           ORDER BY mapping.created_at DESC LIMIT 1
+         ) m ON true
+        WHERE p.merchant_id=$1::uuid AND p.id=$2::uuid`,
+      [merchantId, productId],
+    );
+    return rows[0] ?? null;
+  }
+
   private async withDetails(
     merchantId: string,
     locationId: string,
@@ -260,4 +283,240 @@ export class PosCatalogRepository {
     );
     return rows[0];
   }
+
+  async createAdministrative(
+    client: PoolClient,
+    merchantId: string,
+    productId: string,
+    input: Record<string, unknown>,
+  ) {
+    const categoryId = nullableUuid(input.categoryId);
+    await this.assertCategory(client, merchantId, categoryId);
+    const result = await client.query(
+      `INSERT INTO merchant.product(
+         id,merchant_id,category_id,name,description,price,active,sku,barcode,
+         tax_rate_basis_points,requires_preparation,preparation_target_seconds
+       ) VALUES($1::uuid,$2::uuid,$3::uuid,$4,$5,$6,true,$7,$8,$9,$10,$11)
+       RETURNING id::text,name,price,active,updated_at::text AS "updatedAt"`,
+      [
+        productId,
+        merchantId,
+        categoryId,
+        requiredText(input.name, 'name', 240),
+        optionalText(input.description, 1000),
+        nonnegativeInteger(input.priceMinorUnits, 'priceMinorUnits'),
+        optionalText(input.sku, 120),
+        optionalText(input.barcode, 160),
+        boundedInteger(input.taxRateBasisPoints ?? 0, 'taxRateBasisPoints', 0, 10_000),
+        input.requiresPreparation === true,
+        nullableBoundedInteger(input.preparationTargetSeconds, 30, 86_400),
+      ],
+    );
+    await client.query(
+      `INSERT INTO merchant.aggregate_version(merchant_id,aggregate_type,aggregate_id,version)
+       VALUES($1::uuid,'catalog_product',$2::uuid,1)`,
+      [merchantId, productId],
+    );
+    if ('inventoryItemId' in input) {
+      await this.updateInventoryMapping(client, merchantId, productId, input.inventoryItemId);
+    }
+    return { ...result.rows[0], version: 1 };
+  }
+
+  async updateAdministrative(
+    client: PoolClient,
+    merchantId: string,
+    productId: string,
+    expectedVersion: number,
+    input: Record<string, unknown>,
+  ) {
+    await client.query(
+      `INSERT INTO merchant.aggregate_version(merchant_id,aggregate_type,aggregate_id,version)
+       SELECT $1::uuid,'catalog_product',$2::uuid,1
+        WHERE EXISTS (SELECT 1 FROM merchant.product WHERE merchant_id=$1::uuid AND id=$2::uuid)
+       ON CONFLICT DO NOTHING`,
+      [merchantId, productId],
+    );
+    const version = await client.query<{ version: string }>(
+      `SELECT version::text FROM merchant.aggregate_version
+        WHERE merchant_id=$1::uuid AND aggregate_type='catalog_product' AND aggregate_id=$2::uuid
+        FOR UPDATE`,
+      [merchantId, productId],
+    );
+    if (!version.rows[0]) throw new Error('CATALOG_PRODUCT_NOT_FOUND');
+    if (Number(version.rows[0].version) !== expectedVersion) {
+      throw new Error('CATALOG_VERSION_STALE');
+    }
+    const current = await client.query<{
+      name: string;
+      description: string | null;
+      price: string;
+      categoryId: string | null;
+      sku: string | null;
+      barcode: string | null;
+      taxRateBasisPoints: number;
+      requiresPreparation: boolean;
+      preparationTargetSeconds: number | null;
+    }>(
+      `SELECT name,description,price::text,category_id::text AS "categoryId",sku,barcode,
+              tax_rate_basis_points AS "taxRateBasisPoints",
+              requires_preparation AS "requiresPreparation",
+              preparation_target_seconds AS "preparationTargetSeconds"
+         FROM merchant.product WHERE merchant_id=$1::uuid AND id=$2::uuid FOR UPDATE`,
+      [merchantId, productId],
+    );
+    const row = current.rows[0];
+    if (!row) throw new Error('CATALOG_PRODUCT_NOT_FOUND');
+    const categoryId = 'categoryId' in input ? nullableUuid(input.categoryId) : row.categoryId;
+    await this.assertCategory(client, merchantId, categoryId);
+    const result = await client.query(
+      `UPDATE merchant.product SET category_id=$3::uuid,name=$4,description=$5,price=$6,
+          sku=$7,barcode=$8,tax_rate_basis_points=$9,requires_preparation=$10,
+          preparation_target_seconds=$11,updated_at=clock_timestamp()
+        WHERE merchant_id=$1::uuid AND id=$2::uuid
+        RETURNING id::text,name,price,active,updated_at::text AS "updatedAt"`,
+      [
+        merchantId,
+        productId,
+        categoryId,
+        'name' in input ? requiredText(input.name, 'name', 240) : row.name,
+        'description' in input ? optionalText(input.description, 1000) : row.description,
+        'priceMinorUnits' in input
+          ? nonnegativeInteger(input.priceMinorUnits, 'priceMinorUnits')
+          : Number(row.price),
+        'sku' in input ? optionalText(input.sku, 120) : row.sku,
+        'barcode' in input ? optionalText(input.barcode, 160) : row.barcode,
+        'taxRateBasisPoints' in input
+          ? boundedInteger(input.taxRateBasisPoints, 'taxRateBasisPoints', 0, 10_000)
+          : row.taxRateBasisPoints,
+        'requiresPreparation' in input
+          ? input.requiresPreparation === true
+          : row.requiresPreparation,
+        'preparationTargetSeconds' in input
+          ? nullableBoundedInteger(input.preparationTargetSeconds, 30, 86_400)
+          : row.preparationTargetSeconds,
+      ],
+    );
+    if ('inventoryItemId' in input) {
+      await this.updateInventoryMapping(client, merchantId, productId, input.inventoryItemId);
+    }
+    const next = await client.query<{ version: string }>(
+      `UPDATE merchant.aggregate_version SET version=version+1,updated_at=clock_timestamp()
+        WHERE merchant_id=$1::uuid AND aggregate_type='catalog_product' AND aggregate_id=$2::uuid
+        RETURNING version::text`,
+      [merchantId, productId],
+    );
+    return { ...result.rows[0], version: Number(next.rows[0].version) };
+  }
+
+  async archiveAdministrative(
+    client: PoolClient,
+    merchantId: string,
+    productId: string,
+    expectedVersion: number,
+  ) {
+    const updated = await this.updateAdministrative(
+      client,
+      merchantId,
+      productId,
+      expectedVersion,
+      {},
+    );
+    const result = await client.query(
+      `UPDATE merchant.product SET active=false,updated_at=clock_timestamp()
+        WHERE merchant_id=$1::uuid AND id=$2::uuid RETURNING id::text,active`,
+      [merchantId, productId],
+    );
+    return { ...updated, ...result.rows[0] };
+  }
+
+  private async assertCategory(client: PoolClient, merchantId: string, categoryId: string | null) {
+    if (!categoryId) return;
+    const result = await client.query(
+      `SELECT 1 FROM merchant.product_category WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+      [merchantId, categoryId],
+    );
+    if (!result.rows[0]) throw new Error('CATALOG_CATEGORY_SCOPE');
+  }
+
+  private async updateInventoryMapping(
+    client: PoolClient,
+    merchantId: string,
+    productId: string,
+    rawInventoryItemId: unknown,
+  ) {
+    const inventoryItemId = nullableUuid(rawInventoryItemId);
+    if (inventoryItemId) {
+      const item = await client.query(
+        `SELECT 1 FROM merchant.inventory_item
+          WHERE merchant_id=$1::uuid AND id=$2::uuid AND active`,
+        [merchantId, inventoryItemId],
+      );
+      if (!item.rows[0]) throw new Error('CATALOG_INVENTORY_ITEM_SCOPE');
+    }
+    const version = await client.query<{ version: string }>(
+      `SELECT coalesce(max(version),0)::text AS version
+         FROM merchant.inventory_catalog_mapping
+        WHERE merchant_id=$1::uuid AND product_id=$2::uuid AND variant_id IS NULL`,
+      [merchantId, productId],
+    );
+    await client.query(
+      `UPDATE merchant.inventory_catalog_mapping
+          SET active=false,retired_at=clock_timestamp()
+        WHERE merchant_id=$1::uuid AND product_id=$2::uuid
+          AND variant_id IS NULL AND active`,
+      [merchantId, productId],
+    );
+    await client.query(
+      `INSERT INTO merchant.inventory_catalog_mapping(
+         merchant_id,product_id,variant_id,mapping_type,inventory_item_id,
+         conversion_numerator,conversion_denominator,version)
+       VALUES($1::uuid,$2::uuid,NULL,$3,$4::uuid,1,1,$5)`,
+      [
+        merchantId,
+        productId,
+        inventoryItemId ? 'direct' : 'non_stock',
+        inventoryItemId,
+        Number(version.rows[0].version) + 1,
+      ],
+    );
+  }
+}
+
+function requiredText(value: unknown, field: string, maximum: number): string {
+  if (typeof value !== 'string' || !value.trim() || value.trim().length > maximum) {
+    throw new Error(`CATALOG_${field.toUpperCase()}_INVALID`);
+  }
+  return value.trim();
+}
+
+function optionalText(value: unknown, maximum: number): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'string' || value.trim().length > maximum)
+    throw new Error('CATALOG_TEXT_INVALID');
+  return value.trim();
+}
+
+function nullableUuid(value: unknown): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'string' || !/^[0-9a-f-]{36}$/i.test(value))
+    throw new Error('CATALOG_UUID_INVALID');
+  return value;
+}
+
+function nonnegativeInteger(value: unknown, field: string): number {
+  return boundedInteger(value, field, 0, Number.MAX_SAFE_INTEGER);
+}
+
+function boundedInteger(value: unknown, field: string, minimum: number, maximum: number): number {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < minimum || parsed > maximum) {
+    throw new Error(`CATALOG_${field.toUpperCase()}_INVALID`);
+  }
+  return parsed;
+}
+
+function nullableBoundedInteger(value: unknown, minimum: number, maximum: number): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  return boundedInteger(value, 'VALUE', minimum, maximum);
 }

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import '../core/config/app_config.dart';
 import '../core/contracts/contract_gateway.dart';
 import '../core/feature_flags/feature_flags.dart';
@@ -67,7 +69,16 @@ final class AppCompositionRoot {
     this.inventory,
     this.hardware,
     this.offlineRecovery,
-  });
+  }) {
+    if (!kIsWeb && hardware != null) {
+      entry.addListener(_scheduleHardwareRelay);
+      _hardwareRelayTimer = Timer.periodic(
+        const Duration(seconds: 10),
+        (_) => _scheduleHardwareRelay(),
+      );
+      _scheduleHardwareRelay();
+    }
+  }
 
   factory AppCompositionRoot.production() {
     final config = AppConfig.fromEnvironment();
@@ -299,8 +310,47 @@ final class AppCompositionRoot {
   final InventoryController? inventory;
   final HardwareService? hardware;
   final OfflineRecoveryController? offlineRecovery;
+  Timer? _hardwareRelayTimer;
+  bool _hardwareRelayBusy = false;
+
+  void _scheduleHardwareRelay() {
+    if (_hardwareRelayBusy) return;
+    _hardwareRelayBusy = true;
+    unawaited(_drainHardwareRelay().whenComplete(() => _hardwareRelayBusy = false));
+  }
+
+  Future<void> _drainHardwareRelay() async {
+    final service = hardware;
+    final state = entry.state;
+    final merchant = state.selectedTenant;
+    final location = state.selectedBranch;
+    final operator = state.operator;
+    final device = state.device;
+    if (service == null || merchant == null || location == null || operator == null || device == null) {
+      return;
+    }
+    final scope = HardwareScope(
+      merchantId: merchant.id,
+      locationId: location.id,
+      operatorSessionId: operator.id,
+      deviceId: device.id,
+      credentialVersion: device.credentialVersion,
+      permissions: operator.permissions.toSet(),
+      registerId: cash.activeRegisterId,
+    );
+    try {
+      await service.snapshot(scope);
+      for (var index = 0; index < 4; index++) {
+        if (await service.executeNextRemoteCommand(scope) == null) break;
+      }
+    } catch (_) {
+      // The next bounded poll recovers the relay. Financial state is unchanged.
+    }
+  }
 
   void dispose() {
+    _hardwareRelayTimer?.cancel();
+    entry.removeListener(_scheduleHardwareRelay);
     controller.dispose();
     entry.dispose();
     exceptions.dispose();

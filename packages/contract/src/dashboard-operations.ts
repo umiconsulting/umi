@@ -83,9 +83,81 @@ export const DashboardOperationsSnapshot = z
   .strict();
 export type DashboardOperationsSnapshot = z.infer<typeof DashboardOperationsSnapshot>;
 
+export const DashboardAdministrativeOperation = z.enum([
+  'register.configure',
+  'hardware.update',
+  'hardware.assign',
+  'hardware.diagnostic',
+  'hardware.command.status',
+  'hardware.printer.test',
+  'hardware.printer.reprint',
+  'inventory.adjustment',
+  'inventory.overview',
+  'inventory.preview',
+  'inventory.waste',
+  'inventory.damage',
+  'inventory.quarantine',
+  'inventory.count.create',
+  'inventory.count.submit',
+  'inventory.count.reconcile',
+  'inventory.recovery',
+  'inventory.adjustment.approval',
+  'inventory.waste.approval',
+  'inventory.damage.approval',
+  'inventory.quarantine.approval',
+  'inventory.count.approval',
+  'refund.preview',
+  'refund.eligibility',
+  'refund.approval',
+  'refund.commit',
+  'refund.recovery',
+  'loyalty.adjustment',
+  'loyalty.adjustment.preview',
+  'loyalty.adjustment.approval',
+  'gift_card.promotional_issue',
+  'gift_card.promotional_issue.preview',
+  'gift_card.promotional_issue.approval',
+  'gift_card.reveal',
+  'gift_card.recovery',
+  'kitchen.station.create',
+  'kitchen.station.update',
+  'kitchen.route.update',
+  'kitchen.device.assign',
+  'catalog.create',
+  'catalog.detail',
+  'catalog.update',
+  'catalog.archive',
+  'recovery.query_original',
+]);
+
+export const DashboardAdministrativeCommandRequest = z
+  .object({
+    operation: DashboardAdministrativeOperation,
+    locationId: Uuid.nullable(),
+    targetAggregateId: Uuid,
+    targetVersion: z.number().int().nonnegative().nullable(),
+    commandId: Uuid,
+    idempotencyKey: Uuid,
+    parameters: z.record(z.unknown()),
+    approvalId: Uuid.nullable(),
+  })
+  .strict();
+
+export const DashboardAdministrativeCommandResult = z.record(z.unknown());
+
+export type DashboardAdministrativeCommandRequest = z.infer<
+  typeof DashboardAdministrativeCommandRequest
+>;
+export type DashboardAdministrativeCommandResult = z.infer<
+  typeof DashboardAdministrativeCommandResult
+>;
+
 export const dashboardOperationsModels = {
   DashboardOperationsQuery,
   DashboardOperationItem,
   DashboardDomainCoverage,
   DashboardOperationsSnapshot,
+  DashboardAdministrativeOperation,
+  DashboardAdministrativeCommandRequest,
+  DashboardAdministrativeCommandResult,
 } as const;

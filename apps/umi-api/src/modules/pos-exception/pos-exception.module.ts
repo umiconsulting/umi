@@ -9,5 +9,6 @@ import { PosExceptionService } from './pos-exception.service';
   imports: [IntegrityModule, PosEntryModule],
   controllers: [PosExceptionController],
   providers: [PosExceptionRepository, PosExceptionService],
+  exports: [PosExceptionService],
 })
 export class PosExceptionModule {}

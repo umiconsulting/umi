@@ -36,7 +36,7 @@ const make = (authorized = true) => {
       .mockResolvedValue({ ...product, barcode: null, media: [], variants: [], optionGroups: [] }),
     version: vi.fn().mockResolvedValue({ version: '42', updatedAt: product.updatedAt }),
   };
-  return { service: new PosCatalogService(repo as never), repo };
+  return { service: new PosCatalogService(repo as never, {} as never), repo };
 };
 
 describe('PosCatalogService', () => {
@@ -70,5 +70,41 @@ describe('PosCatalogService', () => {
         service.parseQuery({ locationId, cursor: 'not-a-cursor' }),
       ),
     ).rejects.toMatchObject({ response: { code: 'VALIDATION_FAILED' } });
+  });
+
+  it('executes product administration through the canonical command transaction', async () => {
+    const repo = {
+      createAdministrative: vi.fn().mockResolvedValue({ id: product.id, version: 1 }),
+    };
+    const integrity = {
+      execute: vi.fn(async (_input, operation) => {
+        const value = await operation({ client: {}, appendAudit: vi.fn() });
+        return { status: 'succeeded', result: value.value, failureCode: null };
+      }),
+    };
+    const service = new PosCatalogService(repo as never, integrity as never);
+    const context = {
+      commandId: user.id,
+      idempotencyKey: user.sessionId,
+      targetAggregateId: product.id,
+      targetVersion: null,
+      locationId,
+      correlationId: 'catalog-test',
+    };
+    await expect(
+      service.executeAdministrative(
+        user as never,
+        { merchantId } as never,
+        context as never,
+        'catalog.create',
+        { name: product.name, priceMinorUnits: product.price.minorUnits },
+      ),
+    ).resolves.toEqual({ id: product.id, version: 1 });
+    expect(repo.createAdministrative).toHaveBeenCalledWith(
+      {},
+      merchantId,
+      product.id,
+      expect.objectContaining({ name: product.name }),
+    );
   });
 });

@@ -227,4 +227,110 @@ describe('Gate 3F customer and value application boundary', () => {
     ).resolves.toEqual(secret);
     expect(integrity.execute).not.toHaveBeenCalled();
   });
+
+  it('commits a Dashboard points adjustment through the same ledger command', async () => {
+    const result = { recovered: false, ledgerEntry: { id: id(20) } };
+    const repo = {
+      administrativeAuthorization: vi.fn().mockReturnValue({
+        operatorId: user.id,
+        deviceId: null,
+        dashboardSessionId: user.sessionId,
+      }),
+      commitPointsAdjustment: vi.fn().mockResolvedValue(result),
+    };
+    const integrity = {
+      execute: vi.fn(async (_input, operation) => {
+        const outcome = await operation({
+          client: {},
+          appendAudit: vi.fn(),
+          correlationId: 'test',
+        });
+        return { status: 'succeeded', result: outcome.value, failureCode: null };
+      }),
+    };
+    const service = new PosCustomerValueService(repo as never, integrity as never);
+    await expect(
+      service.commitPointsAdjustmentAdministrative(
+        { ...user, deviceId: null },
+        { merchantId: id(6), permissions: ['loyalty.adjust'] } as never,
+        { commandRecordId: id(22) } as never,
+        {
+          ...context,
+          commandId: id(8),
+          idempotencyKey: id(9),
+          expectedVersion: 1,
+          customerId: id(10),
+          accountId: id(11),
+          direction: 'increase',
+          points: 50,
+          reason: 'customer_service_correction',
+          note: null,
+          approvalId: null,
+          approvalFingerprint: null,
+        },
+      ),
+    ).resolves.toEqual(result);
+    expect(repo.commitPointsAdjustment).toHaveBeenCalledWith(
+      {},
+      id(6),
+      expect.any(Object),
+      expect.objectContaining({ deviceId: null, dashboardSessionId: user.sessionId }),
+    );
+  });
+
+  it('issues a promotional gift card from Dashboard without POS impersonation', async () => {
+    const stored = { card: { id: id(20) }, deliveryExpiresAt: 'soon', recovered: false };
+    const repo = {
+      administrativeAuthorization: vi.fn().mockReturnValue({
+        operatorId: user.id,
+        deviceId: null,
+        dashboardSessionId: user.sessionId,
+      }),
+      issueGiftCard: vi.fn().mockResolvedValue(stored),
+      giftCardDeliveryToken: vi.fn().mockReturnValue('protected-token'),
+    };
+    const integrity = {
+      execute: vi.fn(async (_input, operation) => {
+        const outcome = await operation({
+          client: {},
+          appendAudit: vi.fn(),
+          correlationId: 'test',
+        });
+        return {
+          status: 'succeeded',
+          result: outcome.value,
+          failureCode: null,
+          duplicate: false,
+        };
+      }),
+    };
+    const service = new PosCustomerValueService(repo as never, integrity as never);
+    await expect(
+      service.issueGiftCardAdministrative(
+        { ...user, deviceId: null },
+        { merchantId: id(6), permissions: ['gift_card.issue'] } as never,
+        { commandRecordId: id(22) } as never,
+        {
+          ...context,
+          commandId: id(8),
+          idempotencyKey: id(9),
+          expectedVersion: null,
+          currency: 'MXN',
+          initialValueMinorUnits: 1000,
+          source: 'promotion',
+          saleId: null,
+          saleLineId: null,
+          customerId: null,
+          approvalId: id(21),
+          approvalFingerprint: 'a'.repeat(64),
+        },
+      ),
+    ).resolves.toMatchObject({ card: { id: id(20) }, deliveryToken: 'protected-token' });
+    expect(repo.issueGiftCard).toHaveBeenCalledWith(
+      {},
+      id(6),
+      expect.any(Object),
+      expect.objectContaining({ deviceId: null, dashboardSessionId: user.sessionId }),
+    );
+  });
 });

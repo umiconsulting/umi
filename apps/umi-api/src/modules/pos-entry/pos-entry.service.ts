@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PasswordService } from '../../shared/auth/password.service';
 import { posPinLookupHash } from '../../shared/auth/pos-pin';
 import type { AppConfig } from '../../shared/config/config.schema';
-import type { AuthUser } from '../auth/auth.types';
+import type { AuthUser, MerchantAccess } from '../auth/auth.types';
 import { PosEntryRepository } from './pos-entry.repository';
 
 @Injectable()
@@ -133,6 +133,64 @@ export class PosEntryService {
       elevationId: grant.id,
       permission: dto.permission,
       merchantId: dto.merchantId,
+      locationId: dto.locationId,
+      method: 'manager_approval' as const,
+      expiresAt: grant.expiresAt.toISOString(),
+      commandFingerprint: dto.commandFingerprint,
+    };
+  }
+
+  async approveAdministrativeByManager(
+    user: AuthUser,
+    access: MerchantAccess,
+    dto: {
+      dashboardSessionId: string;
+      managerPin: string;
+      permission: string;
+      locationId: string;
+      commandFingerprint: string | null;
+    },
+  ) {
+    const secret = this.config.get('JWT_SECRET', { infer: true });
+    if (!secret) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+    const record = await this.repo.administrativeManagerPinRecord({
+      lookupHash: posPinLookupHash(secret, access.merchantId, dto.managerPin),
+      merchantId: access.merchantId,
+      locationId: dto.locationId,
+      permission: dto.permission,
+      actingUserId: user.id,
+      dashboardSessionId: dto.dashboardSessionId,
+    });
+    if ((record?.lockedUntil?.getTime() ?? 0) > Date.now()) {
+      throw new ForbiddenException({ code: 'PIN_LOCKED' });
+    }
+    if (
+      !record?.salt ||
+      !record.hash ||
+      !this.passwords.verify(dto.managerPin, record.salt, record.hash)
+    ) {
+      await this.repo.recordAdministrativePinFailure(
+        access.merchantId,
+        dto.locationId,
+        dto.dashboardSessionId,
+      );
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+    }
+    const grant = await this.repo.grantAdministrativeManagerElevation({
+      managerUserId: record.userId,
+      managerStaffId: record.staffId,
+      actingUserId: user.id,
+      dashboardSessionId: dto.dashboardSessionId,
+      merchantId: access.merchantId,
+      locationId: dto.locationId,
+      permission: dto.permission,
+      commandFingerprint: dto.commandFingerprint,
+    });
+    if (!grant) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+    return {
+      elevationId: grant.id,
+      permission: dto.permission,
+      merchantId: access.merchantId,
       locationId: dto.locationId,
       method: 'manager_approval' as const,
       expiresAt: grant.expiresAt.toISOString(),

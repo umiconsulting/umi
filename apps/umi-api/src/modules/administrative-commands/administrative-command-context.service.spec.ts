@@ -81,4 +81,30 @@ describe('AdministrativeCommandContextService', () => {
     expect(same.fingerprint).toBe(one.fingerprint);
     expect(changed.fingerprint).not.toBe(one.fingerprint);
   });
+
+  it('requires step-up evidence and excludes a manager PIN from the fingerprint', async () => {
+    const service = new AdministrativeCommandContextService(repository as never);
+    const approval = {
+      ...command,
+      operation: 'loyalty.adjustment.approval',
+      parameters: {
+        managerPin: '1234',
+        commandFingerprint: 'b'.repeat(64),
+        approvalPermission: 'loyalty.adjust.approve',
+      },
+    };
+    const approvalAccess = { ...access, permissions: ['loyalty.adjust'] };
+    const one = await service.create(user, approvalAccess, approval);
+    const otherPin = await service.create(user, approvalAccess, {
+      ...approval,
+      parameters: { ...approval.parameters, managerPin: '9876' },
+    });
+    expect(otherPin.fingerprint).toBe(one.fingerprint);
+    await expect(
+      service.create(user, approvalAccess, {
+        ...approval,
+        parameters: { commandFingerprint: 'b'.repeat(64) },
+      }),
+    ).rejects.toMatchObject({ response: { code: 'STEP_UP_REQUIRED' } });
+  });
 });

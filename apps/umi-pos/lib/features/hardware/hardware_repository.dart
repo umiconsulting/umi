@@ -48,6 +48,10 @@ abstract interface class HardwareRepository {
     String jobId,
     HardwareRecoveryQuery query,
   );
+  Future<HardwareCommandResult?> claimRemoteCommand(
+    String merchantId,
+    HardwareRecoveryQuery query,
+  );
 }
 
 final class ApiHardwareRepository implements HardwareRepository {
@@ -144,6 +148,27 @@ final class ApiHardwareRepository implements HardwareRepository {
       ).toString(),
     ),
   );
+
+  @override
+  Future<HardwareCommandResult?> claimRemoteCommand(
+    String merchantId,
+    HardwareRecoveryQuery query,
+  ) async {
+    final result = HardwareRemoteClaimResult.fromJson(
+      await _api.request(
+        method: ApiMethod.get,
+        path: Uri(
+          path: UmiRoutes.posHardwareRemoteClaim(merchantId),
+          queryParameters: {
+            'locationId': query.locationId,
+            'operatorSessionId': query.operatorSessionId,
+          },
+        ).toString(),
+      ),
+    );
+    final command = result.command;
+    return command == null ? null : HardwareCommandResult.fromJson(command);
+  }
 
   @override
   Future<HardwareDevice> register(

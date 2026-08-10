@@ -701,22 +701,31 @@ La consulta exige un permiso efectivo para cada dominio.
 La consulta aplica el scope de la location de la membresía.
 El Dashboard usa páginas con un límite máximo de 50 registros.
 
-Ejecuta las pruebas enfocadas:
+Ejecuta las pruebas enfocadas de Gate 5A:
 
 ```bash
 pnpm --filter @umi/api exec vitest run \
   src/modules/dashboard-operations/dashboard-operations.service.spec.ts \
   src/modules/administrative-commands/administrative-command.policy.spec.ts \
   src/modules/administrative-commands/administrative-command-context.service.spec.ts \
+  src/modules/administrative-commands/administrative-command-authority-matrix.spec.ts \
+  src/modules/administrative-commands/administrative-command-execution.service.spec.ts \
+  src/modules/pos-exception/pos-exception.service.spec.ts \
+  src/modules/pos-inventory/pos-inventory.service.spec.ts \
+  src/modules/pos-hardware/pos-hardware.service.spec.ts \
+  src/modules/pos-customer-value/pos-customer-value.service.spec.ts \
   src/modules/auth/csrf.guard.spec.ts \
   src/shared/database/gate-5a-administrative-command-migration.spec.ts \
   src/modules/merchants/merchants.service.spec.ts \
   src/modules/auth/guards.spec.ts
 pnpm --filter @umi/dashboard test
 pnpm --filter @umi/dashboard build
+cd apps/umi-pos && flutter test test/hardware_service_test.dart
 ```
 
 El Dashboard no crea un contexto falso de dispositivo POS.
 La API valida `runtime.dashboard_session` en cada solicitud web autenticada.
 El Dashboard envía `X-UMI-CSRF` en cada mutación con cookies.
-Las mutaciones que exigen procedencia POS permanecen fuera del centro operativo.
+El Dashboard usa `POST /api/merchants/:merchantId/administrative-commands` para cada comando permitido.
+UmiPOS consulta el relay tipado con `GET /api/merchants/:merchantId/pos/hardware/remote-commands/claim`.
+Checkout, preparación KDS y movimiento físico de efectivo permanecen en su cliente operativo.

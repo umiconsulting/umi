@@ -8,6 +8,6 @@ import { PosInventoryService } from './pos-inventory.service';
   imports: [IntegrityModule],
   controllers: [PosInventoryController],
   providers: [PosInventoryRepository, PosInventoryService],
-  exports: [PosInventoryRepository],
+  exports: [PosInventoryRepository, PosInventoryService],
 })
 export class PosInventoryModule {}

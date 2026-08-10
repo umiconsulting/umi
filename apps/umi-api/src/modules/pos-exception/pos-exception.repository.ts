@@ -22,13 +22,15 @@ import {
 } from './refund-calculator';
 
 export interface ExceptionAuthorization {
-  operatorSessionId: string;
+  commandContextType: 'pos_device' | 'dashboard_administrative';
+  administrativeCommandId: string | null;
+  operatorSessionId: string | null;
   durableSessionId: string;
   operatorId: string;
   operatorReference: string;
   locationId: string;
-  deviceId: string;
-  credentialVersion: number;
+  deviceId: string | null;
+  credentialVersion: number | null;
   permissions: string[];
 }
 
@@ -128,8 +130,9 @@ interface PreviewRow {
   id: string;
   saleId: string;
   originalReceiptId: string;
-  operatorSessionId: string;
-  deviceId: string;
+  operatorSessionId: string | null;
+  deviceId: string | null;
+  administrativeCommandId: string | null;
   exceptionType: 'void' | 'full_refund' | 'partial_refund';
   reasonCode: RefundPreviewRequest['reason'];
   note: string | null;
@@ -199,7 +202,8 @@ export class PosExceptionRepository {
       userId,
       async (client) => {
         const { rows } = await client.query<ExceptionAuthorization>(
-          `SELECT os.id::text AS "operatorSessionId",
+          `SELECT 'pos_device'::text AS "commandContextType",
+                  null::text AS "administrativeCommandId",os.id::text AS "operatorSessionId",
                   os.durable_session_id::text AS "durableSessionId",
                   os.user_id::text AS "operatorId",u.full_name AS "operatorReference",
                   os.location_id::text AS "locationId",
@@ -218,6 +222,40 @@ export class PosExceptionRepository {
         return rows[0] ?? null;
       },
       locationId,
+    );
+  }
+
+  authorizeAdministrative(input: {
+    userId: string;
+    sessionId: string;
+    merchantId: string;
+    locationId: string;
+    administrativeCommandId: string;
+    permissions: string[];
+  }): Promise<ExceptionAuthorization | null> {
+    return this.pg.runWithMerchant(
+      input.merchantId,
+      input.userId,
+      async (client) => {
+        const { rows } = await client.query<{ operatorReference: string }>(
+          `SELECT full_name AS "operatorReference" FROM umi.user WHERE id=$1::uuid`,
+          [input.userId],
+        );
+        if (!rows[0]) return null;
+        return {
+          commandContextType: 'dashboard_administrative',
+          administrativeCommandId: input.administrativeCommandId,
+          operatorSessionId: null,
+          durableSessionId: input.sessionId,
+          operatorId: input.userId,
+          operatorReference: rows[0].operatorReference,
+          locationId: input.locationId,
+          deviceId: null,
+          credentialVersion: null,
+          permissions: input.permissions,
+        };
+      },
+      input.locationId,
     );
   }
 
@@ -379,14 +417,14 @@ export class PosExceptionRepository {
         await client.query(
           `INSERT INTO merchant.pos_exception_preview
                (id,merchant_id,location_id,sale_id,original_receipt_id,
-                operator_session_id,device_id,exception_type,reason_code,note,
+                operator_session_id,device_id,administrative_command_id,exception_type,reason_code,note,
                 selection,line_allocations,tender_allocations,restock_intents,
                 terminal_refund_status,allocation_policy,merchandise_minor_units,tax_minor_units,
                 discount_minor_units,tip_minor_units,total_minor_units,
                 remaining_after_minor_units,currency,approval_required,sale_version,
                 exception_version,preview_fingerprint,correlation_id,expires_at)
-             VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,
-               $8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)`,
+             VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::uuid,
+               $9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)`,
           [
             previewId,
             merchantId,
@@ -395,6 +433,7 @@ export class PosExceptionRepository {
             source.receiptId,
             authorization.operatorSessionId,
             authorization.deviceId,
+            authorization.administrativeCommandId,
             dto.exceptionType,
             dto.reason,
             dto.note,
@@ -551,11 +590,17 @@ export class PosExceptionRepository {
     if (!preview || new Date(preview.expiresAt).getTime() <= Date.now()) {
       throw new ConflictException({ code: 'STALE_PREVIEW' });
     }
-    if (
-      preview.operatorSessionId !== authorization.operatorSessionId ||
-      preview.deviceId !== authorization.deviceId ||
-      Number(preview.saleVersion) !== dto.expectedSaleVersion
-    ) {
+    const contextMatches =
+      authorization.commandContextType === 'pos_device'
+        ? preview.operatorSessionId === authorization.operatorSessionId &&
+          preview.deviceId === authorization.deviceId &&
+          preview.administrativeCommandId === null
+        : await this.administrativeContextsMatch(
+            client,
+            preview.administrativeCommandId,
+            authorization.administrativeCommandId,
+          );
+    if (!contextMatches || Number(preview.saleVersion) !== dto.expectedSaleVersion) {
       throw new ConflictException({ code: 'SALE_EXCEPTION_CONTEXT_CHANGED' });
     }
     const permission =
@@ -602,9 +647,12 @@ export class PosExceptionRepository {
       const grant = await client.query<{ actor: string }>(
         `SELECT u.full_name AS actor
          FROM runtime.elevation_grant e JOIN umi.user u ON u.id=e.approved_by
-         WHERE e.id=$1::uuid AND e.session_id=$2::uuid AND e.merchant_id=$3::uuid
+         WHERE e.id=$1::uuid AND e.merchant_id=$3::uuid
            AND e.location_id=$4::uuid AND e.permission_key='sale.refund.approve'
            AND e.method='manager_approval' AND e.command_fingerprint=$5
+           AND (($6='pos_device' AND e.session_id=$2::uuid AND e.dashboard_session_id IS NULL)
+             OR ($6='dashboard_administrative' AND e.dashboard_session_id=$2::uuid
+                 AND e.session_id IS NULL))
            AND e.expires_at>now() AND e.consumed_at IS NULL
          FOR UPDATE OF e`,
         [
@@ -613,6 +661,7 @@ export class PosExceptionRepository {
           merchantId,
           dto.locationId,
           commandFingerprint,
+          authorization.commandContextType,
         ],
       );
       if (!grant.rows[0]) throw new ConflictException({ code: 'APPROVAL_EXPIRED' });
@@ -646,13 +695,13 @@ export class PosExceptionRepository {
       `INSERT INTO merchant.pos_sale_exception
          (id,merchant_id,location_id,sale_id,original_receipt_id,preview_id,
           exception_type,status,reason_code,note,operator_id,operator_session_id,
-          device_id,device_credential_version,approval_id,command_id,idempotency_key,
+          device_id,device_credential_version,administrative_command_id,approval_id,command_id,idempotency_key,
           command_fingerprint,preview_fingerprint,merchandise_minor_units,tax_minor_units,
           discount_minor_units,tip_minor_units,total_minor_units,currency,business_date,
           correlation_id)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7,$8,$9,$10,
-         $11::uuid,$12::uuid,$13::uuid,$14,$15::uuid,$16::uuid,$17::uuid,$18,$19,
-         $20,$21,$22,$23,$24,$25,current_date,$26)`,
+         $11::uuid,$12::uuid,$13::uuid,$14,$15::uuid,$16::uuid,$17::uuid,$18::uuid,$19,$20,
+         $21,$22,$23,$24,$25,$26,current_date,$27)`,
       [
         exceptionId,
         merchantId,
@@ -668,6 +717,7 @@ export class PosExceptionRepository {
         authorization.operatorSessionId,
         authorization.deviceId,
         authorization.credentialVersion,
+        authorization.administrativeCommandId,
         dto.approvalId,
         dto.commandId,
         dto.idempotencyKey,
@@ -1670,8 +1720,11 @@ export class PosExceptionRepository {
               s.ledger_sequence::text AS "ledgerSequence"
        FROM merchant.cash_shift s
        WHERE s.merchant_id=$1::uuid AND s.location_id=$2::uuid
-         AND s.operator_session_id=$3::uuid AND s.device_id=$4::uuid
+         AND (($6='pos_device' AND s.operator_session_id=$3::uuid AND s.device_id=$4::uuid)
+           OR ($6='dashboard_administrative'))
          AND s.status='open' AND s.currency=$5
+       ORDER BY s.opened_at DESC
+       LIMIT 2
        ${lock ? 'FOR UPDATE OF s' : ''}`,
       [
         merchantId,
@@ -1679,8 +1732,15 @@ export class PosExceptionRepository {
         authorization.operatorSessionId,
         authorization.deviceId,
         currency,
+        authorization.commandContextType,
       ],
     );
+    if (
+      authorization.commandContextType === 'dashboard_administrative' &&
+      shift.rows.length !== 1
+    ) {
+      return null;
+    }
     const row = shift.rows[0];
     if (!row) return null;
     const balance = await client.query<{ expectedCash: string }>(
@@ -1712,6 +1772,7 @@ export class PosExceptionRepository {
       .query<PreviewRow>(
         `SELECT id::text,"sale_id"::text AS "saleId",original_receipt_id::text AS "originalReceiptId",
                 operator_session_id::text AS "operatorSessionId",device_id::text AS "deviceId",
+                administrative_command_id::text AS "administrativeCommandId",
                 exception_type AS "exceptionType",reason_code AS "reasonCode",note,
                 line_allocations AS "lineAllocations",tender_allocations AS "tenderAllocations",
                 terminal_refund_status AS "terminalRefundStatus",allocation_policy AS "allocationPolicy",
@@ -1728,6 +1789,30 @@ export class PosExceptionRepository {
         [merchantId, locationId, saleId, previewId, fingerprint],
       )
       .then((result) => result.rows[0] ?? null);
+  }
+
+  private async administrativeContextsMatch(
+    client: PoolClient,
+    previewCommandId: string | null,
+    commitCommandId: string | null,
+  ): Promise<boolean> {
+    if (!previewCommandId || !commitCommandId) return false;
+    const { rows } = await client.query<{ matches: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1
+           FROM merchant.administrative_command preview
+           JOIN merchant.administrative_command commit
+             ON commit.id=$2::uuid
+            AND commit.merchant_id=preview.merchant_id
+            AND commit.location_id IS NOT DISTINCT FROM preview.location_id
+            AND commit.actor_user_id=preview.actor_user_id
+            AND commit.membership_id=preview.membership_id
+            AND commit.dashboard_session_id=preview.dashboard_session_id
+          WHERE preview.id=$1::uuid
+       ) AS matches`,
+      [previewCommandId, commitCommandId],
+    );
+    return rows[0]?.matches === true;
   }
 
   private async postCashRefund(

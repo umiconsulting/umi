@@ -3494,8 +3494,8 @@ El Dashboard niega un enlace directo cuando falta el permiso.
 El Dashboard invalida los datos cuando cambia el contexto de location.
 El Dashboard no ofrece una acción genérica para repetir todas las operaciones.
 
-Las mutaciones financieras conservan el requisito de un dispositivo POS inscrito.
-Gate 5A no crea una ruta administrativa que omita este límite.
+Las ventas y el movimiento físico de efectivo conservan el requisito de un dispositivo POS inscrito.
+Refund y ajuste de customer value aceptan el contexto administrativo cuando la política lo permite.
 
 ## Gate 5A — Contexto administrativo de confianza
 
@@ -3508,4 +3508,7 @@ Gate 5A no crea una ruta administrativa que omita este límite.
 7. La API rechaza una operación POS o KDS.
 
 La base no suplanta un dispositivo POS.
-Los comandos de inventario, refund y hardware todavía necesitan la adaptación del dominio.
+Los comandos permitidos usan el contexto `dashboard_administrative` y la autoridad del dominio.
+El relay de hardware entrega un comando tipado al POS asignado.
+El Dashboard puede ejecutar refund, inventario, reprint, loyalty, gift card, catálogo y administración de cocina.
+El Dashboard no puede ejecutar checkout ni preparación de cocina.

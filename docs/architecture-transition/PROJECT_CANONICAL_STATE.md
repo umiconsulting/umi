@@ -228,18 +228,23 @@ Future clients use `packages/contract` and controlled UMI APIs.
   `ac23d09d92f252f8e770e84fef90ab4c42c30afb85d8e08a0c0a15df2376ff6f`.
 - Gate 4A passed focused contract, API, Flutter, PostgreSQL, RLS, security, and PR checks.
 - The Linux runner had no Xcode toolchain. Static KDS reviews passed, but the iPad build remains an observation.
-- Gate 5A: incomplete. The Dashboard has permission-scoped read coverage for 21 operational domains.
-- Gate 5A uses contract version `2.10.0`, with content hash
-  `d377d5da5aa02b6af82fe071806f4c59ff78dcb71227f962e502befa995c24cb`.
+- Gate 5A: incomplete. The Dashboard has permission-scoped read and command wiring for pilot operations.
+- Gate 5A uses contract version `2.11.0`, with content hash
+  `5cccb2974addbf9833a7c3b2ecf31733161120ed9449a6e5f7b2aeb4d115c66f`.
 - Gate 5A limits each location membership to its assigned location.
 - Gate 5A uses effective permissions for navigation and direct API access.
-- Gate 5A has a distinct `dashboard_administrative` context foundation.
+- Gate 5A uses a distinct `dashboard_administrative` context for operational commands.
 - Dashboard sessions are server-side, revocable, and separate from device sessions.
 - Cookie mutations use a double-submit CSRF check.
 - The operation policy is an explicit allowlist. POS checkout and KDS preparation remain excluded.
-- Device-bound financial, inventory, hardware, and recovery commands remain unavailable to a normal Dashboard session.
+- Refund, inventory, loyalty, gift-card, catalog, register, kitchen, and recovery commands use existing domain authority.
+- Physical commands use a persistent relay to the assigned enrolled POS runtime.
+- Cash movement remains POS-only. Wallet funding remains unavailable by product policy.
 - Gate 5A does not create a false POS device or operator session.
-- Gate 6A is not authorized.
+- The 24-case authority matrix and the P0 command walkthrough passed with mocked domain services.
+- The focused API, Dashboard, Flutter, PostgreSQL, and RLS checks passed.
+- An authenticated end-to-end run through the Dashboard, API, domain services, and PostgreSQL remains required.
+- Gate 6A is not authorized. Gate 6A has not started.
 
 ## Gate 3C decision basis
 

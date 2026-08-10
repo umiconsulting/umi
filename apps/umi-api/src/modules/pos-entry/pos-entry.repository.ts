@@ -272,6 +272,66 @@ export class PosEntryRepository {
     return rows[0] ?? null;
   }
 
+  async administrativeManagerPinRecord(input: {
+    lookupHash: string;
+    merchantId: string;
+    locationId: string;
+    permission: string;
+    actingUserId: string;
+    dashboardSessionId: string;
+  }) {
+    const { rows } = await this.scopedQuery<{
+      staffId: string;
+      userId: string;
+      salt: string | null;
+      hash: string | null;
+      lockedUntil: Date | null;
+    }>(
+      input.merchantId,
+      input.locationId,
+      `SELECT s.id::text AS "staffId",s.user_id::text AS "userId",
+              s.operator_pin_salt AS salt,s.operator_pin_hash AS hash,
+              ds.approval_locked_until AS "lockedUntil"
+         FROM merchant.staff s
+         JOIN runtime.dashboard_session ds ON ds.id=$6::uuid
+          AND ds.user_id=$5::uuid AND ds.is_active AND ds.expires_at>clock_timestamp()
+        WHERE s.merchant_id=$2::uuid AND (s.location_id IS NULL OR s.location_id=$3::uuid)
+          AND s.operator_pin_lookup=$1 AND s.status='active' AND s.user_id<>$5::uuid
+          AND $4=ANY(umi.resolve_staff_permissions(s.id))
+          AND EXISTS (
+            SELECT 1 FROM umi.effective_entitlement ee
+             WHERE ee.merchant_id=s.merchant_id AND ee.feature_key='pos' AND ee.enabled
+          )
+        LIMIT 1`,
+      [
+        input.lookupHash,
+        input.merchantId,
+        input.locationId,
+        input.permission,
+        input.actingUserId,
+        input.dashboardSessionId,
+      ],
+    );
+    return rows[0] ?? null;
+  }
+
+  async recordAdministrativePinFailure(
+    merchantId: string,
+    locationId: string,
+    dashboardSessionId: string,
+  ): Promise<void> {
+    await this.scopedQuery(
+      merchantId,
+      locationId,
+      `UPDATE runtime.dashboard_session
+          SET approval_failed_attempts=least(approval_failed_attempts+1,10),
+              approval_locked_until=CASE WHEN approval_failed_attempts+1>=5
+                THEN clock_timestamp()+interval '15 minutes' ELSE approval_locked_until END
+        WHERE id=$1::uuid`,
+      [dashboardSessionId],
+    );
+  }
+
   async recordPinFailure(merchantId: string, locationId: string, deviceId: string): Promise<void> {
     await this.scopedQuery(
       merchantId,
@@ -403,6 +463,56 @@ export class PosEntryRepository {
         [input.managerUserId, input.merchantId, input.locationId, rows[0].id, input.permission],
       );
     }
+    return rows[0] ?? null;
+  }
+
+  async grantAdministrativeManagerElevation(input: {
+    managerUserId: string;
+    managerStaffId: string;
+    actingUserId: string;
+    dashboardSessionId: string;
+    merchantId: string;
+    locationId: string;
+    permission: string;
+    commandFingerprint: string | null;
+  }) {
+    const { rows } = await this.scopedQuery<{ id: string; expiresAt: Date }>(
+      input.merchantId,
+      input.locationId,
+      `WITH manager_allowed AS (
+         SELECT 1 FROM merchant.staff ms
+          WHERE ms.user_id=$1::uuid AND ms.id=$2::uuid AND ms.merchant_id=$5::uuid
+            AND (ms.location_id IS NULL OR ms.location_id=$6::uuid)
+            AND ms.status='active' AND $7=ANY(umi.resolve_staff_permissions(ms.id))
+       ), acting AS (
+         SELECT 1 FROM runtime.dashboard_session ds
+          WHERE ds.id=$4::uuid AND ds.user_id=$3::uuid
+            AND ds.is_active AND ds.expires_at>clock_timestamp()
+       ), reset AS (
+         UPDATE runtime.dashboard_session
+            SET approval_failed_attempts=0,approval_locked_until=null
+          WHERE id=$4::uuid AND EXISTS (SELECT 1 FROM acting)
+         RETURNING 1
+       )
+       INSERT INTO runtime.elevation_grant
+         (session_id,dashboard_session_id,merchant_id,location_id,permission_key,method,
+          approved_by,expires_at,command_fingerprint)
+       SELECT null,$4::uuid,$5::uuid,$6::uuid,$7,'manager_approval',$1::uuid,
+              clock_timestamp()+interval '5 minutes',$8
+         FROM manager_allowed,acting,reset
+        WHERE $1::uuid<>$3::uuid
+       RETURNING id::text,expires_at AS "expiresAt"`,
+      [
+        input.managerUserId,
+        input.managerStaffId,
+        input.actingUserId,
+        input.dashboardSessionId,
+        input.merchantId,
+        input.locationId,
+        input.permission,
+        input.commandFingerprint,
+      ],
+    );
     return rows[0] ?? null;
   }
 }

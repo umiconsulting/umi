@@ -470,6 +470,31 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
       errors: ['PERMISSION_DENIED', 'LOCATION_SCOPE_VIOLATION'],
     },
   },
+  {
+    id: 'merchants.administrativeCommands',
+    method: 'POST',
+    path: '/api/merchants/:merchantId/administrative-commands',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'DashboardAdministrativeCommandRequest',
+      response: 'DashboardAdministrativeCommandResult',
+      auth: 'session',
+      permission: null,
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: true,
+      errors: [
+        'PERMISSION_DENIED',
+        'LOCATION_SCOPE_VIOLATION',
+        'ADMINISTRATIVE_COMMAND_FINGERPRINT_CONFLICT',
+        'ADMINISTRATIVE_COMMAND_RECOVERY_REQUIRED',
+      ],
+    },
+  },
 
   // ── Cash / loyalty, merchant-scoped (dashboard) ──────────────────────────────
   {
@@ -2006,6 +2031,17 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
       'HARDWARE_CAPABILITY_UNSUPPORTED',
       'HARDWARE_OUTCOME_UNKNOWN',
     ],
+  }),
+  posMerchantRoute({
+    id: 'pos.hardwareRemoteClaim',
+    method: 'GET',
+    suffix: '/hardware/commands/remote/claim',
+    dart: 'posHardwareRemoteClaim',
+    request: 'HardwareRecoveryQuery',
+    response: 'HardwareRemoteClaimResult',
+    permission: 'hardware.command.execute',
+    idempotent: false,
+    errors: ['PERMISSION_DENIED', 'LOCATION_SCOPE_VIOLATION'],
   }),
   posMerchantRoute({
     id: 'pos.hardwareReprint',

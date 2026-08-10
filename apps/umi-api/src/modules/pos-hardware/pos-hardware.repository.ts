@@ -23,7 +23,7 @@ import type {
   UpdateHardwarePolicyRequest,
 } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
-import { hardwareCommandFingerprint } from './hardware-fingerprint';
+import { hardwareCommandFingerprint, requiredHardwareCapability } from './hardware-fingerprint';
 
 export interface HardwareAuthorization {
   operatorId: string;
@@ -82,6 +82,22 @@ interface CommandRow {
   safePayload: HardwareCommandResult['dispatchPayload'];
 }
 
+export interface AdministrativeHardwareCommandInput {
+  locationId: string;
+  registerId: string | null;
+  commandId: string;
+  idempotencyKey: string;
+  targetHardwareId: string;
+  commandType: HardwareCommandRequest['commandType'];
+  sourceAggregateType: string;
+  sourceAggregateId: string;
+  expectedConfigurationVersion: number;
+  payloadFingerprint: string;
+  safePayload: Record<string, unknown>;
+  printJobType?: 'test_page' | 'receipt_copy';
+  originalPrintJobId?: string | null;
+}
+
 const iso = (value: Date | string | null): string | null =>
   value === null
     ? null
@@ -138,6 +154,348 @@ export class PosHardwareRepository {
       },
       locationId,
     );
+  }
+
+  async createAdministrativeCommand(
+    client: PoolClient,
+    merchantId: string,
+    administrativeCommandId: string,
+    actorUserId: string,
+    input: AdministrativeHardwareCommandInput,
+    correlationId: string,
+  ): Promise<HardwareCommandResult> {
+    const existing = await client.query<{ id: string; payloadFingerprint: string }>(
+      `SELECT id::text,payload_fingerprint AS "payloadFingerprint"
+         FROM merchant.hardware_command
+        WHERE merchant_id=$1::uuid AND idempotency_key=$2`,
+      [merchantId, input.idempotencyKey],
+    );
+    if (existing.rows[0]) {
+      if (
+        existing.rows[0].id !== input.commandId ||
+        existing.rows[0].payloadFingerprint !== input.payloadFingerprint
+      ) {
+        throw new Error('HARDWARE_IDEMPOTENCY_CONFLICT');
+      }
+      return this.commandResult(client, merchantId, input.commandId, true);
+    }
+    const device = await client.query<{
+      id: string;
+      assignedPosDeviceId: string | null;
+      registerId: string | null;
+      deviceType: HardwareDevice['type'];
+      transport: HardwareDevice['transport'];
+      capabilities: string[];
+      configurationVersion: string;
+    }>(
+      `SELECT id::text,assigned_pos_device_id::text AS "assignedPosDeviceId",
+              register_id::text AS "registerId",
+              device_type AS "deviceType",transport,capabilities,
+              configuration_version::text AS "configurationVersion"
+         FROM merchant.hardware_device
+        WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND id=$3::uuid
+          AND enabled AND archived_at IS NULL
+        FOR UPDATE`,
+      [merchantId, input.locationId, input.targetHardwareId],
+    );
+    const target = device.rows[0];
+    if (!target) throw new Error('HARDWARE_NOT_FOUND');
+    if (!target.assignedPosDeviceId) throw new Error('HARDWARE_NOT_ASSIGNED');
+    if (input.registerId && input.registerId !== target.registerId) {
+      throw new Error('HARDWARE_REGISTER_SCOPE');
+    }
+    if (Number(target.configurationVersion) !== input.expectedConfigurationVersion) {
+      throw new Error('HARDWARE_CONFIGURATION_STALE');
+    }
+    const required = requiredHardwareCapability(input.commandType);
+    if (required && !target.capabilities.includes(required)) {
+      throw new Error('HARDWARE_CAPABILITY_UNSUPPORTED');
+    }
+    const executor = await client.query(
+      `SELECT 1 FROM merchant.device d
+        WHERE d.id=$1::uuid AND d.merchant_id=$2::uuid AND d.location_id=$3::uuid
+          AND d.status='active'
+          AND EXISTS (
+            SELECT 1 FROM runtime.operator_session os
+             WHERE os.device_id=d.id AND os.merchant_id=d.merchant_id
+               AND os.location_id=d.location_id AND os.state='active'
+               AND os.expires_at>clock_timestamp()
+          )`,
+      [target.assignedPosDeviceId, merchantId, input.locationId],
+    );
+    if (!executor.rows[0]) throw new Error('EXECUTION_DEVICE_UNAVAILABLE');
+    await client.query(
+      `INSERT INTO merchant.hardware_command(
+         id,merchant_id,location_id,register_id,hardware_id,originating_pos_device_id,
+         operator_id,operator_session_id,administrative_command_id,command_type,
+         source_aggregate_type,source_aggregate_id,payload_fingerprint,idempotency_key,
+         correlation_id,expected_configuration_version,safe_payload
+       ) VALUES(
+         $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,NULL,$8::uuid,$9,
+         $10,$11,$12,$13,$14,$15,$16::jsonb
+       )`,
+      [
+        input.commandId,
+        merchantId,
+        input.locationId,
+        target.registerId,
+        input.targetHardwareId,
+        target.assignedPosDeviceId,
+        actorUserId,
+        administrativeCommandId,
+        input.commandType,
+        input.sourceAggregateType,
+        input.sourceAggregateId,
+        input.payloadFingerprint,
+        input.idempotencyKey,
+        correlationId,
+        input.expectedConfigurationVersion,
+        input.safePayload,
+      ],
+    );
+    await client.query(
+      `INSERT INTO merchant.hardware_command_event(merchant_id,command_id,sequence,status)
+       VALUES($1::uuid,$2::uuid,1,'pending')`,
+      [merchantId, input.commandId],
+    );
+    if (input.printJobType) {
+      await client.query(
+        `INSERT INTO merchant.hardware_print_job(
+           id,merchant_id,location_id,register_id,printer_id,command_id,job_type,
+           source_aggregate_type,source_aggregate_id,original_job_id,correlation_id,
+           idempotency_key,payload_fingerprint,safe_document
+         ) VALUES(
+           $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$1::uuid,$6,$7,$8,$9::uuid,$10,$11,$12,$13::jsonb
+         )`,
+        [
+          input.commandId,
+          merchantId,
+          input.locationId,
+          target.registerId,
+          input.targetHardwareId,
+          input.printJobType,
+          input.sourceAggregateType,
+          input.sourceAggregateId,
+          input.originalPrintJobId ?? null,
+          correlationId,
+          input.idempotencyKey,
+          input.payloadFingerprint,
+          input.safePayload,
+        ],
+      );
+    }
+    return this.commandResult(client, merchantId, input.commandId, false);
+  }
+
+  async claimAdministrativeCommand(
+    client: PoolClient,
+    merchantId: string,
+    locationId: string,
+    deviceId: string,
+  ): Promise<HardwareCommandResult | null> {
+    await client.query(
+      `INSERT INTO merchant.hardware_command_event(
+         merchant_id,command_id,sequence,status,failure_code,safe_result_metadata
+       )
+       SELECT c.merchant_id,c.id,coalesce(max(e.sequence),0)+1,'unknown','unknown_outcome',
+              '{"statusMessage":"verify_physical_result"}'::jsonb
+         FROM merchant.hardware_command c
+         JOIN merchant.hardware_command_event e
+           ON e.merchant_id=c.merchant_id AND e.command_id=c.id
+        WHERE c.merchant_id=$1::uuid AND c.location_id=$2::uuid
+          AND c.originating_pos_device_id=$3::uuid AND c.administrative_command_id IS NOT NULL
+          AND e.status='dispatching' AND e.occurred_at<clock_timestamp()-interval '2 minutes'
+          AND NOT EXISTS (
+            SELECT 1 FROM merchant.hardware_command_event newer
+             WHERE newer.merchant_id=e.merchant_id AND newer.command_id=e.command_id
+               AND newer.sequence>e.sequence
+          )
+        GROUP BY c.merchant_id,c.id`,
+      [merchantId, locationId, deviceId],
+    );
+    const claimed = await client.query<{ commandId: string }>(
+      `WITH candidate AS (
+         SELECT c.id
+           FROM merchant.hardware_command c
+           JOIN LATERAL (
+             SELECT status FROM merchant.hardware_command_event e
+              WHERE e.merchant_id=c.merchant_id AND e.command_id=c.id
+              ORDER BY sequence DESC LIMIT 1
+           ) latest ON true
+          WHERE c.merchant_id=$1::uuid AND c.location_id=$2::uuid
+            AND c.originating_pos_device_id=$3::uuid
+            AND c.administrative_command_id IS NOT NULL AND latest.status='pending'
+          ORDER BY c.created_at,c.id
+          FOR UPDATE OF c SKIP LOCKED LIMIT 1
+       ), inserted AS (
+         INSERT INTO merchant.hardware_command_event(merchant_id,command_id,sequence,status)
+         SELECT $1::uuid,candidate.id,
+                coalesce((SELECT max(sequence) FROM merchant.hardware_command_event
+                           WHERE merchant_id=$1::uuid AND command_id=candidate.id),0)+1,
+                'dispatching'
+           FROM candidate
+         RETURNING command_id
+       ) SELECT command_id::text AS "commandId" FROM inserted`,
+      [merchantId, locationId, deviceId],
+    );
+    if (!claimed.rows[0]) return null;
+    return this.commandResult(client, merchantId, claimed.rows[0].commandId, false);
+  }
+
+  claimAdministrativeCommandForExecutor(
+    userId: string,
+    merchantId: string,
+    locationId: string,
+    deviceId: string,
+  ): Promise<HardwareCommandResult | null> {
+    return this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      (client) => this.claimAdministrativeCommand(client, merchantId, locationId, deviceId),
+      locationId,
+    );
+  }
+
+  async controlledReprintSource(
+    client: PoolClient,
+    merchantId: string,
+    locationId: string,
+    jobId: string,
+  ) {
+    return this.printJobSource(client, merchantId, jobId, locationId);
+  }
+
+  async assignAdministrative(
+    client: PoolClient,
+    actorUserId: string,
+    merchantId: string,
+    locationId: string,
+    hardwareId: string,
+    input: {
+      registerId: string | null;
+      assignedPosDeviceId: string | null;
+      primary: boolean;
+      expectedVersion: number;
+    },
+  ): Promise<HardwareDevice> {
+    const target = await client.query<{
+      type: HardwareDevice['type'];
+      version: string;
+    }>(
+      `SELECT device_type AS type,optimistic_version::text AS version
+         FROM merchant.hardware_device
+        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+        FOR UPDATE`,
+      [hardwareId, merchantId, locationId],
+    );
+    if (!target.rows[0]) throw new Error('HARDWARE_NOT_FOUND');
+    if (Number(target.rows[0].version) !== input.expectedVersion) {
+      throw new Error('HARDWARE_CONFIGURATION_STALE');
+    }
+    if (input.primary && target.rows[0].type !== 'printer') {
+      throw new Error('HARDWARE_CAPABILITY_UNSUPPORTED');
+    }
+    if (input.registerId) {
+      const register = await client.query(
+        `SELECT 1 FROM merchant.physical_register
+          WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+            AND active AND archived_at IS NULL AND status<>'archived'`,
+        [input.registerId, merchantId, locationId],
+      );
+      if (!register.rows[0]) throw new Error('HARDWARE_REGISTER_SCOPE');
+    }
+    if (input.assignedPosDeviceId) {
+      const device = await client.query(
+        `SELECT 1 FROM merchant.device
+          WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+            AND kind='pos_terminal' AND status='active'`,
+        [input.assignedPosDeviceId, merchantId, locationId],
+      );
+      if (!device.rows[0]) throw new Error('HARDWARE_POS_DEVICE_SCOPE');
+    }
+    if (input.primary) {
+      await client.query(
+        `WITH released AS (
+           UPDATE merchant.hardware_assignment
+              SET released_at=clock_timestamp(),release_reason='primary_replaced'
+            WHERE merchant_id=$1::uuid AND location_id=$2::uuid
+              AND register_id IS NOT DISTINCT FROM $3::uuid
+              AND primary_device AND released_at IS NULL AND hardware_id<>$4::uuid
+            RETURNING hardware_id,register_id,assigned_pos_device_id
+         ), bumped AS (
+           UPDATE merchant.hardware_device d
+              SET configuration_version=d.configuration_version+1,
+                  optimistic_version=d.optimistic_version+1,updated_at=clock_timestamp()
+             FROM released r WHERE d.id=r.hardware_id AND d.merchant_id=$1::uuid
+             RETURNING d.id,d.configuration_version
+         )
+         INSERT INTO merchant.hardware_assignment(
+           merchant_id,hardware_id,location_id,register_id,assigned_pos_device_id,
+           primary_device,configuration_version,assigned_by
+         )
+         SELECT $1::uuid,r.hardware_id,$2::uuid,r.register_id,r.assigned_pos_device_id,
+                false,b.configuration_version,$5::uuid
+           FROM released r JOIN bumped b ON b.id=r.hardware_id`,
+        [merchantId, locationId, input.registerId, hardwareId, actorUserId],
+      );
+    }
+    await client.query(
+      `UPDATE merchant.hardware_assignment
+          SET released_at=clock_timestamp(),release_reason='reassigned'
+        WHERE merchant_id=$1::uuid AND hardware_id=$2::uuid AND released_at IS NULL`,
+      [merchantId, hardwareId],
+    );
+    const updated = await client.query<{ configurationVersion: string }>(
+      `UPDATE merchant.hardware_device
+          SET register_id=$4::uuid,assigned_pos_device_id=$5::uuid,
+              configuration_version=configuration_version+1,
+              optimistic_version=optimistic_version+1,updated_at=clock_timestamp()
+        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+        RETURNING configuration_version::text AS "configurationVersion"`,
+      [hardwareId, merchantId, locationId, input.registerId, input.assignedPosDeviceId],
+    );
+    await client.query(
+      `INSERT INTO merchant.hardware_assignment(
+         merchant_id,hardware_id,location_id,register_id,assigned_pos_device_id,
+         primary_device,configuration_version,assigned_by
+       ) VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7,$8::uuid)`,
+      [
+        merchantId,
+        hardwareId,
+        locationId,
+        input.registerId,
+        input.assignedPosDeviceId,
+        input.primary,
+        Number(updated.rows[0].configurationVersion),
+        actorUserId,
+      ],
+    );
+    return this.device(client, merchantId, hardwareId);
+  }
+
+  async updateAdministrative(
+    client: PoolClient,
+    merchantId: string,
+    locationId: string,
+    hardwareId: string,
+    input: { enabled: boolean; expectedVersion: number },
+  ): Promise<HardwareDevice> {
+    const updated = await client.query(
+      `UPDATE merchant.hardware_device
+          SET enabled=$5,
+              connection_state=CASE WHEN $5 THEN
+                CASE WHEN connection_state='disabled' THEN 'disconnected' ELSE connection_state END
+                ELSE 'disabled' END,
+              configuration_version=configuration_version+1,
+              optimistic_version=optimistic_version+1,updated_at=clock_timestamp()
+        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+          AND optimistic_version=$4 AND archived_at IS NULL
+          AND (device_type NOT IN ('payment_terminal_foundation','scale_foundation') OR NOT $5)
+        RETURNING id`,
+      [hardwareId, merchantId, locationId, input.expectedVersion, input.enabled],
+    );
+    if (!updated.rows[0]) throw new Error('HARDWARE_CONFIGURATION_STALE');
+    return this.device(client, merchantId, hardwareId);
   }
 
   async snapshot(
@@ -788,6 +1146,7 @@ export class PosHardwareRepository {
     locationId: string,
   ) {
     const { rows } = await client.query<{
+      jobId: string;
       registerId: string | null;
       targetPrinterId: string;
       sourceAggregateType: string;
@@ -795,14 +1154,17 @@ export class PosHardwareRepository {
       configurationVersion: number;
       printPayload: ReceiptPrintPayload;
     }>(
-      `SELECT j.register_id::text AS "registerId",j.printer_id::text AS "targetPrinterId",
+      `SELECT j.id::text AS "jobId",j.register_id::text AS "registerId",
+              j.printer_id::text AS "targetPrinterId",
               j.source_aggregate_type AS "sourceAggregateType",
               j.source_aggregate_id AS "sourceAggregateId",
               d.configuration_version::int AS "configurationVersion",
               j.safe_document->'printPayload' AS "printPayload"
          FROM merchant.hardware_print_job j
          JOIN merchant.hardware_device d ON d.id=j.printer_id AND d.merchant_id=j.merchant_id
-        WHERE j.id=$1::uuid AND j.merchant_id=$2::uuid AND j.location_id=$3::uuid`,
+        WHERE (j.id=$1::uuid OR j.source_aggregate_id=$1)
+          AND j.merchant_id=$2::uuid AND j.location_id=$3::uuid
+        ORDER BY CASE WHEN j.id=$1::uuid THEN 0 ELSE 1 END,j.created_at DESC LIMIT 1`,
       [jobId, merchantId, locationId],
     );
     if (!rows[0]) throw new Error('HARDWARE_PRINT_JOB_NOT_FOUND');
@@ -871,5 +1233,19 @@ export class PosHardwareRepository {
           }
         : null,
     };
+  }
+
+  administrativeCommandResult(
+    userId: string,
+    merchantId: string,
+    locationId: string,
+    commandId: string,
+  ) {
+    return this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      (client) => this.commandResult(client, merchantId, commandId, true),
+      locationId,
+    );
   }
 }
