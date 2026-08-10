@@ -156,7 +156,20 @@ export class AuthController {
 
   @Public()
   @Post('local/logout')
-  logout(@Res({ passthrough: true }) reply: FastifyReply): { ok: true } {
+  async logout(
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<{ ok: true }> {
+    const refreshToken = req.cookies?.[REFRESH_COOKIE];
+    if (refreshToken) {
+      try {
+        await this.auth.dashboardLogout(refreshToken);
+      } catch (error) {
+        // An expired or already-revoked token makes logout idempotent.
+        // A database failure must remain visible because server revocation did not complete.
+        if (!(error instanceof UnauthorizedException)) throw error;
+      }
+    }
     for (const name of [ACCESS_COOKIE, REFRESH_COOKIE, CSRF_COOKIE, REMEMBER_COOKIE]) {
       reply.clearCookie(name, { path: '/' });
     }
@@ -232,8 +245,7 @@ export class AuthController {
       result.refreshToken,
       buildCookieOptions(this.config, 'refresh', remember),
     );
-    // Double-submit CSRF token: readable cookie, echoed by the SPA in a header
-    // on mutations (CsrfGuard wiring is a follow-up; the token is issued now).
+    // Double-submit CSRF token. CsrfGuard validates the matching request header.
     reply.setCookie(
       CSRF_COOKIE,
       randomBytes(18).toString('hex'),

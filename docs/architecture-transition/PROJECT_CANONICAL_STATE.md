@@ -233,6 +233,10 @@ Future clients use `packages/contract` and controlled UMI APIs.
   `d377d5da5aa02b6af82fe071806f4c59ff78dcb71227f962e502befa995c24cb`.
 - Gate 5A limits each location membership to its assigned location.
 - Gate 5A uses effective permissions for navigation and direct API access.
+- Gate 5A has a distinct `dashboard_administrative` context foundation.
+- Dashboard sessions are server-side, revocable, and separate from device sessions.
+- Cookie mutations use a double-submit CSRF check.
+- The operation policy is an explicit allowlist. POS checkout and KDS preparation remain excluded.
 - Device-bound financial, inventory, hardware, and recovery commands remain unavailable to a normal Dashboard session.
 - Gate 5A does not create a false POS device or operator session.
 - Gate 6A is not authorized.

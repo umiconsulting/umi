@@ -1,6 +1,7 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
+import { randomUUID } from 'node:crypto';
 import type { AppConfig } from '../config/config.schema';
 
 /**
@@ -73,7 +74,14 @@ export class JwtService {
   }
 
   async signRefresh(userId: string, sessionId: string): Promise<string> {
-    return this.sign({ sub: userId, sid: sessionId, typ: 'refresh' }, this.refreshTtl);
+    return new SignJWT({ sub: userId, sid: sessionId, typ: 'refresh' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setJti(randomUUID())
+      .setIssuer(ISSUER)
+      .setAudience(AUDIENCE)
+      .setExpirationTime(this.refreshTtl)
+      .sign(this.key());
   }
 
   /**

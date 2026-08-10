@@ -15,6 +15,11 @@ function make() {
     rotatePosSessionToken: vi.fn().mockResolvedValue(true),
     revokePosSession: vi.fn().mockResolvedValue(undefined),
     revokePosSessionsForOperator: vi.fn().mockResolvedValue(undefined),
+    createDashboardSession: vi.fn().mockResolvedValue(undefined),
+    validateDashboardSession: vi.fn().mockResolvedValue(true),
+    rotateDashboardSession: vi.fn().mockResolvedValue(true),
+    revokeDashboardSession: vi.fn().mockResolvedValue(undefined),
+    revokeDashboardSessionsForUser: vi.fn().mockResolvedValue(undefined),
   };
   const passwords = { verify: vi.fn(), hash: vi.fn() };
   const jwt = {
@@ -79,6 +84,9 @@ describe('AuthService.login', () => {
       email: 'owner@kala.co',
       displayName: 'Owner',
     });
+    expect(h.repo.createDashboardSession).toHaveBeenCalledWith(
+      expect.objectContaining({ id: expect.any(String), userId: 'u1' }),
+    );
   });
 
   it('401s on wrong password', async () => {

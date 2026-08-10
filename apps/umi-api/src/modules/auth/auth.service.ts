@@ -16,6 +16,7 @@ import type { AppConfig } from '../../shared/config/config.schema';
 import { AuthRepository, type MerchantMembershipSummary } from './auth.repository';
 import { MfaService } from './mfa.service';
 import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
+import { parseDurationSeconds } from './cookies';
 
 export interface SessionUser {
   id: string;
@@ -116,7 +117,7 @@ export class AuthService {
 
     const [merchants, tokens] = await Promise.all([
       this.repo.findMerchantsForUser(user.id),
-      this.issueTokens(user),
+      this.issueDashboardSession(user),
     ]);
     return { user, merchants, ...tokens };
   }
@@ -142,7 +143,7 @@ export class AuthService {
     };
     const [merchants, tokens] = await Promise.all([
       this.repo.findMerchantsForUser(user.id),
-      this.issueTokens(user),
+      this.issueDashboardSession(user),
     ]);
     return { user, merchants, ...tokens };
   }
@@ -150,6 +151,9 @@ export class AuthService {
   /** Rotate the access token from a valid refresh token. */
   async refresh(refreshToken: string): Promise<LoginResult> {
     const claims = await this.jwt.verifyRefresh(refreshToken);
+    if (!(await this.repo.validateDashboardSession(claims.sub, claims.sessionId))) {
+      throw new UnauthorizedException('invalid_token');
+    }
     const summary = await this.repo.findUserById(claims.sub);
     if (!summary) throw new UnauthorizedException('invalid_token');
     const user: SessionUser = {
@@ -161,7 +165,27 @@ export class AuthService {
       this.repo.findMerchantsForUser(user.id),
       this.issueTokens(user, claims.sessionId),
     ]);
+    if (
+      !(await this.repo.rotateDashboardSession(
+        claims.sessionId,
+        claims.sub,
+        sha256(refreshToken),
+        sha256(tokens.refreshToken),
+      ))
+    ) {
+      throw new UnauthorizedException('invalid_token');
+    }
     return { user, merchants, ...tokens };
+  }
+
+  async dashboardLogout(refreshToken: string): Promise<void> {
+    const claims = await this.jwt.verifyRefresh(refreshToken);
+    await this.repo.revokeDashboardSession(
+      claims.sessionId,
+      claims.sub,
+      sha256(refreshToken),
+      'dashboard_logout',
+    );
   }
 
   async pinLogin(input: {
@@ -303,6 +327,22 @@ export class AuthService {
     return { accessToken, refreshToken, sessionId, deviceId };
   }
 
+  private async issueDashboardSession(user: SessionUser): Promise<TokenPair> {
+    const sessionId = randomUUID();
+    const tokens = await this.issueTokens(user, sessionId);
+    const configured = parseDurationSeconds(
+      this.config.get('JWT_REFRESH_TTL', { infer: true }) ?? '30d',
+    );
+    const ttlSeconds = configured > 0 ? configured : 30 * 24 * 60 * 60;
+    await this.repo.createDashboardSession({
+      id: sessionId,
+      userId: user.id,
+      tokenHash: sha256(tokens.refreshToken),
+      expiresAt: new Date(Date.now() + ttlSeconds * 1_000),
+    });
+    return tokens;
+  }
+
   private enforcePinRateLimit(key: string, max: number, windowMs: number): void {
     const result = this.rateLimit.hit(key, max, windowMs);
     if (!result.allowed) {
@@ -376,6 +416,7 @@ export class AuthService {
     const { salt, hash } = this.passwords.hash(password);
     await this.repo.updatePassword(record.userId, salt, hash);
     await this.repo.markResetTokenUsed(record.id);
+    await this.repo.revokeDashboardSessionsForUser(record.userId, 'credential_changed');
   }
 }
 

@@ -8,6 +8,7 @@ import { PublicMerchantGuard } from './public-merchant.guard';
 import { EntitlementGuard } from './entitlement.guard';
 import { RolesGuard } from './roles.guard';
 import { MfaService } from './mfa.service';
+import { CsrfGuard } from './csrf.guard';
 
 /**
  * Auth domain (D9). Owns login/refresh/logout/reset + the four guards that the
@@ -26,6 +27,7 @@ import { MfaService } from './mfa.service';
     PublicMerchantGuard,
     EntitlementGuard,
     RolesGuard,
+    CsrfGuard,
   ],
   exports: [
     AuthRepository,
@@ -34,6 +36,7 @@ import { MfaService } from './mfa.service';
     PublicMerchantGuard,
     EntitlementGuard,
     RolesGuard,
+    CsrfGuard,
   ],
 })
 export class AuthModule {}

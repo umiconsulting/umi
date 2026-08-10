@@ -150,10 +150,10 @@
       "dependencies": ["4A"],
       "nextObjective": "Complete safe Dashboard commands before Gate 6A",
       "blockers": [
-        "A normal Dashboard session has no enrolled POS device or operator session for device-bound commands",
-        "Refund, inventory, cash, hardware, customer-value, and recovery mutations have no complete Dashboard flow"
+        "Refund, inventory, hardware, customer-value, and recovery handlers still require POS provenance",
+        "Required P0 mutations have no complete Dashboard flow through the new administrative context"
       ],
-      "validationState": "Permission-scoped 21-domain read model, location isolation, API tests, Dashboard tests, and production build passed"
+      "validationState": "Trusted Dashboard session, CSRF, deterministic fingerprint, explicit operation allowlist, and focused tests passed"
     }
   ]
 }

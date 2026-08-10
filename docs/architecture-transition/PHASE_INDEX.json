@@ -171,7 +171,7 @@
       "id": "5A",
       "status": "incomplete",
       "stateMachineVersion": 1,
-      "subject": "Permission-scoped Dashboard read coverage for 21 domains; device-bound administrative commands remain open"
+      "subject": "Dashboard read coverage plus a trusted web command foundation; device-bound domain integration remains open"
     }
   ]
 }

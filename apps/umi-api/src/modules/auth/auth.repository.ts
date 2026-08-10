@@ -113,6 +113,69 @@ export class AuthRepository {
 
   constructor(private readonly pg: PgService) {}
 
+  async createDashboardSession(input: {
+    id: string;
+    userId: string;
+    tokenHash: string;
+    expiresAt: Date;
+  }): Promise<void> {
+    await this.pg.query(
+      `INSERT INTO runtime.dashboard_session(id,user_id,token_hash,expires_at)
+       VALUES($1::uuid,$2::uuid,$3,$4)`,
+      [input.id, input.userId, input.tokenHash, input.expiresAt],
+    );
+  }
+
+  async validateDashboardSession(userId: string, sessionId: string): Promise<boolean> {
+    const { rows } = await this.pg.query<{ active: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM runtime.dashboard_session
+          WHERE id=$1::uuid AND user_id=$2::uuid AND is_active AND expires_at>clock_timestamp()
+       ) AS active`,
+      [sessionId, userId],
+    );
+    return rows[0]?.active === true;
+  }
+
+  async rotateDashboardSession(
+    sessionId: string,
+    userId: string,
+    priorTokenHash: string,
+    nextTokenHash: string,
+  ): Promise<boolean> {
+    const { rowCount } = await this.pg.query(
+      `UPDATE runtime.dashboard_session
+          SET token_hash=$4,last_used_at=clock_timestamp()
+        WHERE id=$1::uuid AND user_id=$2::uuid AND token_hash=$3
+          AND is_active AND expires_at>clock_timestamp()`,
+      [sessionId, userId, priorTokenHash, nextTokenHash],
+    );
+    return rowCount === 1;
+  }
+
+  async revokeDashboardSession(
+    sessionId: string,
+    userId: string,
+    tokenHash: string,
+    reason: string,
+  ): Promise<void> {
+    await this.pg.query(
+      `UPDATE runtime.dashboard_session
+          SET is_active=false,revoked_at=clock_timestamp(),revoked_reason=$4
+        WHERE id=$1::uuid AND user_id=$2::uuid AND token_hash=$3 AND is_active`,
+      [sessionId, userId, tokenHash, reason],
+    );
+  }
+
+  async revokeDashboardSessionsForUser(userId: string, reason: string): Promise<void> {
+    await this.pg.query(
+      `UPDATE runtime.dashboard_session
+          SET is_active=false,revoked_at=clock_timestamp(),revoked_reason=$2
+        WHERE user_id=$1::uuid AND is_active`,
+      [userId, reason],
+    );
+  }
+
   async effectiveEntitlement(
     merchantId: string,
     productKey: string,

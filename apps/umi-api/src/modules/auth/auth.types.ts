@@ -4,6 +4,7 @@ export interface AuthUser {
   email: string;
   sessionId: string;
   deviceId: string | null;
+  commandContextType?: 'pos_device' | 'dashboard_administrative';
 }
 
 /** Resolved merchant membership attached by MerchantAccessGuard. */

@@ -40,6 +40,13 @@ describe('JwtService', () => {
     expect(await svc.verifyRefresh(token)).toEqual({ sub: 'u9', sessionId: 's9' });
   });
 
+  it('gives each refresh token a distinct identity', async () => {
+    const svc = jwtWith(FULL);
+    const first = await svc.signRefresh('u9', 's9');
+    const second = await svc.signRefresh('u9', 's9');
+    expect(second).not.toBe(first);
+  });
+
   it('rejects an access token presented as a refresh token (kind mismatch)', async () => {
     const svc = jwtWith(FULL);
     const access = await svc.signAccess({

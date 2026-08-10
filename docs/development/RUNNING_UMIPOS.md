@@ -706,11 +706,17 @@ Ejecuta las pruebas enfocadas:
 ```bash
 pnpm --filter @umi/api exec vitest run \
   src/modules/dashboard-operations/dashboard-operations.service.spec.ts \
+  src/modules/administrative-commands/administrative-command.policy.spec.ts \
+  src/modules/administrative-commands/administrative-command-context.service.spec.ts \
+  src/modules/auth/csrf.guard.spec.ts \
+  src/shared/database/gate-5a-administrative-command-migration.spec.ts \
   src/modules/merchants/merchants.service.spec.ts \
-  src/modules/auth/auth.guards.spec.ts
+  src/modules/auth/guards.spec.ts
 pnpm --filter @umi/dashboard test
 pnpm --filter @umi/dashboard build
 ```
 
 El Dashboard no crea un contexto falso de dispositivo POS.
-Las mutaciones que exigen un dispositivo inscrito permanecen fuera del centro operativo.
+La API valida `runtime.dashboard_session` en cada solicitud web autenticada.
+El Dashboard envía `X-UMI-CSRF` en cada mutación con cookies.
+Las mutaciones que exigen procedencia POS permanecen fuera del centro operativo.

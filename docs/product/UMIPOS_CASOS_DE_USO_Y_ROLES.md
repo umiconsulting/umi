@@ -3496,3 +3496,16 @@ El Dashboard no ofrece una acción genérica para repetir todas las operaciones.
 
 Las mutaciones financieras conservan el requisito de un dispositivo POS inscrito.
 Gate 5A no crea una ruta administrativa que omita este límite.
+
+## Gate 5A — Contexto administrativo de confianza
+
+1. El usuario inicia una sesión web con su identidad personal.
+2. La API registra una sesión administrativa revocable.
+3. El Dashboard envía el token CSRF en una mutación.
+4. La API obtiene la membresía y el permiso actuales.
+5. La API selecciona una operación de la lista explícita.
+6. La API calcula un fingerprint sin secretos.
+7. La API rechaza una operación POS o KDS.
+
+La base no suplanta un dispositivo POS.
+Los comandos de inventario, refund y hardware todavía necesitan la adaptación del dominio.

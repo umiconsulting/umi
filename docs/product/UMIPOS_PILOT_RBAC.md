@@ -366,5 +366,10 @@ Una membresía con una location asignada solo recibe datos de esa location.
 Los productos y las políticas de rewards conservan su scope de merchant.
 Los hechos de customer value no usan un `location_id` nulo como acceso global.
 
-El Dashboard no omite las pruebas de dispositivo, credencial y sesión del operador.
-Una mutación que exige estas pruebas debe usar un contexto POS inscrito.
+La API separa el contexto `dashboard_administrative` del contexto `pos_device`.
+La API deriva el usuario, la membresía y el scope de la sesión activa.
+La API rechaza una membresía sintetizada para una mutación administrativa.
+La API comprueba el permiso actual en cada comando.
+
+Una mutación que todavía exige procedencia POS permanece fuera del Dashboard.
+El Dashboard no fabrica un dispositivo o una sesión de operador.

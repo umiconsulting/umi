@@ -31,13 +31,17 @@ describe('AuthGuard', () => {
     (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation(
       (k: string) => k === IS_PUBLIC,
     );
-    const guard = new AuthGuard({ verifyAccess: vi.fn() } as never, reflector);
+    const guard = new AuthGuard({ verifyAccess: vi.fn() } as never, reflector, {
+      validateDashboardSession: vi.fn(),
+    } as never);
     expect(await guard.canActivate(ctxFor({}))).toBe(true);
   });
 
   it('401s when no access cookie is present', async () => {
     (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
-    const guard = new AuthGuard({ verifyAccess: vi.fn() } as never, reflector);
+    const guard = new AuthGuard({ verifyAccess: vi.fn() } as never, reflector, {
+      validateDashboardSession: vi.fn(),
+    } as never);
     await expect(guard.canActivate(ctxFor({ cookies: {} }))).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
@@ -46,12 +50,44 @@ describe('AuthGuard', () => {
   it('attaches the principal from a valid cookie', async () => {
     (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     const jwt = {
-      verifyAccess: vi.fn().mockResolvedValue({ sub: 'u1', email: 'a@b.co' }),
+      verifyAccess: vi.fn().mockResolvedValue({
+        sub: 'u1',
+        email: 'a@b.co',
+        sessionId: 'session-1',
+        deviceId: null,
+      }),
     };
-    const guard = new AuthGuard(jwt as never, reflector);
+    const guard = new AuthGuard(jwt as never, reflector, {
+      validateDashboardSession: vi.fn().mockResolvedValue(true),
+    } as never);
     const req: Record<string, unknown> = { cookies: { umi_access: 'tok' } };
     expect(await guard.canActivate(ctxFor(req))).toBe(true);
-    expect(req.authUser).toEqual({ id: 'u1', email: 'a@b.co' });
+    expect(req.authUser).toEqual({
+      id: 'u1',
+      email: 'a@b.co',
+      sessionId: 'session-1',
+      deviceId: null,
+      commandContextType: 'dashboard_administrative',
+    });
+  });
+
+  it('rejects a revoked Dashboard session', async () => {
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+    const guard = new AuthGuard(
+      {
+        verifyAccess: vi.fn().mockResolvedValue({
+          sub: 'u1',
+          email: 'a@b.co',
+          sessionId: 'session-1',
+          deviceId: null,
+        }),
+      } as never,
+      reflector,
+      { validateDashboardSession: vi.fn().mockResolvedValue(false) } as never,
+    );
+    await expect(
+      guard.canActivate(ctxFor({ cookies: { umi_access: 'tok' } })),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });
 

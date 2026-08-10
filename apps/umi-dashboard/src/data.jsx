@@ -67,6 +67,13 @@ async function _apiFetch(path, opts, _retried) {
   // empty body when Content-Type is application/json, so bodyless mutations
   // (pairing approve/deny, deletes) must NOT carry the header.
   const headers = Object.assign({}, authHeaders);
+  if (COOKIE_AUTH && opts.method && !['GET', 'HEAD', 'OPTIONS'].includes(opts.method)) {
+    const csrf = document.cookie
+      .split(';')
+      .map((part) => part.trim())
+      .find((part) => part.startsWith('umi_csrf='));
+    if (csrf) headers['X-UMI-CSRF'] = decodeURIComponent(csrf.slice('umi_csrf='.length));
+  }
   if (opts.body != null) headers['Content-Type'] = 'application/json';
   const res = await fetch(
     apiUrl(path),

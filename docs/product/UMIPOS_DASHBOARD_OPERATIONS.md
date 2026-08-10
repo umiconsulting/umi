@@ -81,7 +81,18 @@ No existe una acción genérica de reintento. El dominio decide si una acción e
 
 ## Límites actuales
 
-Las mutaciones con una sesión de operador y un dispositivo POS mantienen ese requisito. El Dashboard no omite esta prueba.
+La API separa `dashboard_administrative` de `pos_device`.
+La sesión administrativa vive en `runtime.dashboard_session`.
+La API valida la sesión en cada solicitud.
+La API también valida el token CSRF de cada mutación con cookies.
+Cada refresh token tiene una identidad única para impedir una repetición durante la rotación.
+
+El registro `merchant.administrative_command` guarda la identidad estable, el fingerprint y el estado de recuperación.
+La política permite solo operaciones administrativas explícitas.
+La política rechaza checkout y preparación de cocina desde el Dashboard.
+
+Esta base todavía no conecta los comandos que exigen procedencia POS.
+La API no crea un dispositivo falso para cerrar esta diferencia.
 
 Estas acciones todavía no tienen un flujo administrativo completo en el Dashboard:
 
@@ -92,7 +103,8 @@ Estas acciones todavía no tienen un flujo administrativo completo en el Dashboa
 - acciones de wallet y gift card que requieren una sesión POS;
 - acciones de recuperación específicas del dominio.
 
-Este límite mantiene Gate 5A en estado `INCOMPLETE`. Gate 6A no está autorizado.
+Este límite mantiene Gate 5A en estado `INCOMPLETE`.
+Gate 6A no está autorizado.
 
 ## Límite entre clientes
 

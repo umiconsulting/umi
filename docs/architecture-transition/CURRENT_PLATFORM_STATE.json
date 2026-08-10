@@ -256,7 +256,8 @@
     "readyShell": true,
     "gate5AStatus": "incomplete",
     "dashboardOperations": "permission-scoped read projections for 21 operational domains",
-    "dashboardMutationBoundary": "device-bound financial, inventory, hardware, and recovery commands remain unavailable to a normal Dashboard session",
+    "dashboardCommandContext": "server-validated dashboard_administrative foundation with revocable web sessions, CSRF, deterministic fingerprints, and an explicit operation allowlist",
+    "dashboardMutationBoundary": "the context exists, but device-bound refund, inventory, hardware, customer-value, and recovery commands still need domain integration",
     "latestLocalCommit": "HEAD (Gate 5A incomplete closeout commit in PR #72)",
     "pushStatus": "Gate 5A incomplete closeout publication uses PR #72",
     "pullRequestStatus": "PR #72 targets build-v3"
