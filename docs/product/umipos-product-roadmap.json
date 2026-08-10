@@ -150,7 +150,7 @@
       "dependencies": ["4A"],
       "nextObjective": "Authorize Gate 6A Pilot Deployment and Release Runtime",
       "blockers": [],
-      "validationState": "Live Dashboard, session, CSRF, API, domain, PostgreSQL, RLS, 24-case authority matrix, P0 walkthrough, and no-mock guard passed"
+      "validationState": "Live Dashboard, session, CSRF, API, domain, PostgreSQL, RLS, inventory waste, 24-case authority matrix, P0 walkthrough, and no-mock guard passed"
     }
   ]
 }

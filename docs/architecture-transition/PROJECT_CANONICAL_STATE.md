@@ -243,7 +243,7 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Gate 5A does not create a false POS device or operator session.
 - The continuous P0 walkthrough passed through the real Dashboard, API, domain services, and PostgreSQL.
 - The 24-case authority matrix passed through real sessions, CSRF, authorization, services, and persistence.
-- Exact refund, inventory, loyalty, and hardware retries returned the original result without a new fact.
+- Exact refund, inventory adjustment, inventory waste, loyalty, and hardware retries returned the original result without a new fact.
 - The disposable database reported 137 tables with forced RLS and no duplicate domain fact.
 - The hardware relay used the canonical simulator. No other P0 domain used a test double.
 - Gate 6A is authorized. Gate 6A has not started.

@@ -328,6 +328,22 @@ def run_positive_walkthrough(page: Page) -> None:
         pin.fill(MANAGER_PIN)
     dialog.get_by_role("button", name="Confirmar operación").click()
     dialog.wait_for(state="detached")
+
+    page.get_by_role("button", name="Actualizar").click()
+    page.wait_for_timeout(350)
+    inventory_row = page.get_by_role("row").filter(has_text="Café en grano")
+    inventory_row.get_by_role("button", name="Operar").click()
+    dialog = page.get_by_role("dialog", name="Inventario")
+    dialog.get_by_role("button", name="Cargar autoridad").click()
+    dialog.get_by_label("Operación").select_option("inventory.waste")
+    dialog.get_by_role("button", name="Revisar operación").click()
+    page.wait_for_timeout(500)
+    pin = dialog.get_by_label("PIN del aprobador")
+    if pin.count():
+        pin.fill(MANAGER_PIN)
+    dialog.get_by_role("button", name="Confirmar operación").click()
+    dialog.wait_for(state="detached")
+
     page.get_by_role("button", name="Actualizar").click()
     page.wait_for_timeout(350)
     inventory_row = page.get_by_role("row").filter(has_text="Café en grano")
@@ -415,6 +431,7 @@ def certify_response_loss_retries(page: Page, observed: dict[str, dict]) -> list
     fact_queries = {
         "refund.commit": f"select count(*) from merchant.pos_sale_exception where merchant_id='{MERCHANT}'",
         "inventory.adjustment": f"select count(*) from merchant.stock_ledger_entry where merchant_id='{MERCHANT}'",
+        "inventory.waste": f"select count(*) from merchant.stock_ledger_entry where merchant_id='{MERCHANT}' and entry_type='waste_recorded'",
         "loyalty.adjustment": f"select count(*) from merchant.loyalty_points_ledger where merchant_id='{MERCHANT}'",
         "hardware.printer.test": f"select count(*) from merchant.hardware_command where merchant_id='{MERCHANT}'",
     }
@@ -758,6 +775,12 @@ def database_evidence() -> dict:
         ),
         "refunds": int(psql(f"select count(*) from merchant.pos_sale_exception where merchant_id='{MERCHANT}'")),
         "inventory_facts": int(psql(f"select count(*) from merchant.stock_ledger_entry where merchant_id='{MERCHANT}'")),
+        "inventory_waste_facts": int(
+            psql(
+                f"select count(*) from merchant.stock_ledger_entry where merchant_id='{MERCHANT}' "
+                "and entry_type='waste_recorded'"
+            )
+        ),
         "inventory_counts": int(psql(f"select count(*) from merchant.inventory_count where merchant_id='{MERCHANT}'")),
         "hardware_commands": int(psql(f"select count(*) from merchant.hardware_command where merchant_id='{MERCHANT}'")),
         "copy_jobs": int(psql(f"select count(*) from merchant.hardware_print_job where merchant_id='{MERCHANT}' and job_type='receipt_copy'")),
@@ -829,6 +852,7 @@ def main() -> None:
     check(evidence["duplicate_command_ids"] == 0, "A command identity has duplicate rows.")
     check(evidence["consumed_approvals"] >= 2, "Consumed approval evidence is absent.")
     check(evidence["refunds"] == 1, f"Refund fact count is {evidence['refunds']}.")
+    check(evidence["inventory_waste_facts"] >= 1, "Inventory waste evidence is absent.")
     check(evidence["inventory_counts"] >= 1, "Inventory count evidence is absent.")
     check(evidence["hardware_commands"] >= 4, "Hardware relay evidence is absent.")
     check(evidence["copy_jobs"] >= 1, "Controlled COPY evidence is absent.")

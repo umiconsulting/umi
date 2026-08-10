@@ -771,3 +771,5 @@ python3 scripts/umi-pos-gate5a-live-certification.py
 La prueba exige una cookie de sesión, CSRF, la API real y PostgreSQL real.
 La prueba falla si el host de la API o el nombre de PostgreSQL no cumplen el perfil.
 La prueba no usa `page.route` ni sustituye un servicio de dominio.
+El recorrido registra un ajuste, una merma y un conteo de inventario.
+La prueba repite cada comando de merma y exige un solo hecho `waste_recorded`.

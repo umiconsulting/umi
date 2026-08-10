@@ -21,7 +21,7 @@ Updated: 2026-08-10
 | 3G-A Pilot hardware runtime foundation  | Complete                   | 3F                     | Authorize Gate 3G-B pilot hardware        | Physical hardware and vendor adapters remain         | Contract, API, Flutter, simulator, recovery, PostgreSQL, RLS, Linux, Web, and PR checks passed                           |
 | 3G-B Pilot hardware integration         | Complete with observations | 3G-A                   | Authorize Gate 4A KDS integration         | Physical hardware validation remains                 | Generic printer, drawer, scanner, simulator, API, PostgreSQL, RLS, Flutter, Linux, Web, and PR checks passed             |
 | 4A KDS operational integration          | Complete with observations | 3G-B                   | Authorize Gate 5A Dashboard completion    | Xcode validation was unavailable in the Linux runner | Existing KDS static review, API, contracts, POS status, 10 real races, PostgreSQL, RLS, reconnect, and PR checks passed  |
-| 5A Dashboard operational completion     | Complete                   | 4A                     | Authorize Gate 6A pilot deployment        | None                                                 | Live Dashboard, session, CSRF, API, domains, PostgreSQL, RLS, 24-case matrix, and P0 walkthrough passed                  |
+| 5A Dashboard operational completion     | Complete                   | 4A                     | Authorize Gate 6A pilot deployment        | None                                                 | Live Dashboard, CSRF, API, PostgreSQL, RLS, inventory waste, 24-case matrix, and P0 walkthrough passed                   |
 
 The latest relevant revision is the Gate 5A live certification commit in PR #72.
 PR #72 keeps Gates 3A through 5A complete.

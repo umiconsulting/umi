@@ -128,7 +128,7 @@ El recorrido continuo certificó estas operaciones:
 - edición de catálogo;
 - configuración de registro y hardware;
 - diagnóstico, prueba de impresora y reprint `COPY` con el simulador canónico;
-- ajuste y conteo de inventario;
+- ajuste, merma y conteo de inventario;
 - refund parcial y recibo compensatorio;
 - ajuste de loyalty;
 - emisión promocional de gift card con entrega única;
@@ -140,8 +140,8 @@ La matriz rechazó una sesión, un permiso y una location revocados.
 La matriz también rechazó la repetición de una aprobación y un fingerprint diferente.
 La matriz rechazó una sesión revocada mientras el navegador permaneció abierto.
 
-La prueba repitió los comandos exactos de refund, inventario, loyalty e impresora.
-Los cuatro reintentos devolvieron el resultado original y no agregaron un hecho.
+La prueba repitió los comandos exactos de refund, ajuste, merma, loyalty e impresora.
+Los cinco reintentos devolvieron el resultado original y no agregaron un hecho.
 
 La base desechable registró 137 tablas con RLS forzada.
 El rol de la API no fue propietario ni superusuario.
