@@ -6,42 +6,49 @@ import {
   removeAdministrativeIdentity,
   writeAdministrativeIdentity,
 } from './administrative-command-identity.js';
+import { useMerchant } from './merchant-context.jsx';
 
 export function useAdministrativeCommand() {
+  const merchant = useMerchant();
   const [state, setState] = useState({ pending: false, error: null, result: null });
   const ambiguous = useRef(new Map());
+  const activeLocationId = merchant?.selectedLocationId || merchant?.selectedLocation?.id || null;
 
-  const execute = useCallback(async (operation, targetAggregateId, options) => {
-    setState({ pending: true, error: null, result: null });
-    const input = options || {};
-    const recoveryKey = administrativeRecoveryKey(operation, targetAggregateId, input);
-    const prior =
-      ambiguous.current.get(recoveryKey) ||
-      readAdministrativeIdentity(window.sessionStorage, recoveryKey);
-    const identity = {
-      commandId: input.commandId || prior?.commandId || crypto.randomUUID(),
-      idempotencyKey: input.idempotencyKey || prior?.idempotencyKey || crypto.randomUUID(),
-    };
-    ambiguous.current.set(recoveryKey, identity);
-    writeAdministrativeIdentity(window.sessionStorage, recoveryKey, identity);
-    try {
-      const response = await executeAdministrativeCommand(operation, targetAggregateId, {
-        ...input,
-        ...identity,
-      });
-      ambiguous.current.delete(recoveryKey);
-      removeAdministrativeIdentity(window.sessionStorage, recoveryKey);
-      setState({ pending: false, error: null, result: response.result });
-      return response;
-    } catch (error) {
-      if (error?.status && error.status < 500) {
+  const execute = useCallback(
+    async (operation, targetAggregateId, options) => {
+      setState({ pending: true, error: null, result: null });
+      const input = options || {};
+      const recoveryKey = administrativeRecoveryKey(operation, targetAggregateId, input);
+      const prior =
+        ambiguous.current.get(recoveryKey) ||
+        readAdministrativeIdentity(window.sessionStorage, recoveryKey);
+      const identity = {
+        commandId: input.commandId || prior?.commandId || crypto.randomUUID(),
+        idempotencyKey: input.idempotencyKey || prior?.idempotencyKey || crypto.randomUUID(),
+      };
+      ambiguous.current.set(recoveryKey, identity);
+      writeAdministrativeIdentity(window.sessionStorage, recoveryKey, identity);
+      try {
+        const response = await executeAdministrativeCommand(operation, targetAggregateId, {
+          ...input,
+          locationId: input.locationId === undefined ? activeLocationId : input.locationId,
+          ...identity,
+        });
         ambiguous.current.delete(recoveryKey);
         removeAdministrativeIdentity(window.sessionStorage, recoveryKey);
+        setState({ pending: false, error: null, result: response.result });
+        return response;
+      } catch (error) {
+        if (error?.status && error.status < 500) {
+          ambiguous.current.delete(recoveryKey);
+          removeAdministrativeIdentity(window.sessionStorage, recoveryKey);
+        }
+        setState({ pending: false, error, result: null });
+        throw error;
       }
-      setState({ pending: false, error, result: null });
-      throw error;
-    }
-  }, []);
+    },
+    [activeLocationId],
+  );
 
   const requestApproval = useCallback(
     (operation, targetAggregateId, options) => execute(operation, targetAggregateId, options),

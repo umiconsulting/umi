@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-08-10",
-  "latestRelevantCommit": "HEAD (Gate 5A operational wiring commit)",
-  "integrationState": "Gates 3A through 4A are complete. Gate 5A remains incomplete. Gate 6A is not authorized.",
+  "latestRelevantCommit": "HEAD (Gate 5A live certification commit)",
+  "integrationState": "Gates 3A through 5A are complete. Gate 6A is authorized and has not started.",
   "items": [
     {
       "id": "platform-certification",
@@ -146,11 +146,11 @@
     },
     {
       "id": "5A",
-      "status": "incomplete",
+      "status": "complete",
       "dependencies": ["4A"],
-      "nextObjective": "Run authenticated end-to-end authority and P0 mutation validation",
-      "blockers": ["The 24-case authority matrix and P0 walkthrough use mocked domain services"],
-      "validationState": "Command wiring, typed hardware relay, focused API and Flutter tests, Dashboard build, and disposable PostgreSQL checks passed"
+      "nextObjective": "Authorize Gate 6A Pilot Deployment and Release Runtime",
+      "blockers": [],
+      "validationState": "Live Dashboard, session, CSRF, API, domain, PostgreSQL, RLS, 24-case authority matrix, P0 walkthrough, and no-mock guard passed"
     }
   ]
 }

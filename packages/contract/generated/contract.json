@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "5cccb2974addbf9833a7c3b2ecf31733161120ed9449a6e5f7b2aeb4d115c66f",
-  "contractVersion": "2.11.0",
+  "contentHash": "5aafd2d554267c27c523686d95b44474d9783971223b63e95f25696d13fb67ba",
+  "contractVersion": "2.12.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -126,6 +126,7 @@
             "HARDWARE_COMMAND_TIMEOUT",
             "HARDWARE_OUTCOME_UNKNOWN",
             "HARDWARE_CONFIGURATION_STALE",
+            "EXECUTION_DEVICE_UNAVAILABLE",
             "INTERNAL_ERROR"
           ],
           "type": "string"
@@ -250,6 +251,7 @@
                 "HARDWARE_COMMAND_TIMEOUT",
                 "HARDWARE_OUTCOME_UNKNOWN",
                 "HARDWARE_CONFIGURATION_STALE",
+                "EXECUTION_DEVICE_UNAVAILABLE",
                 "INTERNAL_ERROR"
               ],
               "type": "string"
@@ -72889,6 +72891,10 @@
       "retryable": false
     },
     "ENTITLEMENT_DISABLED": {
+      "public": true,
+      "retryable": false
+    },
+    "EXECUTION_DEVICE_UNAVAILABLE": {
       "public": true,
       "retryable": false
     },

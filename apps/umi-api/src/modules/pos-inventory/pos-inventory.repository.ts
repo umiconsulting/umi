@@ -113,7 +113,7 @@ export class PosInventoryRepository {
     );
   }
 
-  authorizeAdministrative(input: {
+  async authorizeAdministrative(input: {
     userId: string;
     merchantId: string;
     locationId: string;
@@ -125,31 +125,24 @@ export class PosInventoryRepository {
     if (!input.permissions.includes('*') && !input.permissions.includes(input.permission)) {
       return Promise.resolve(null);
     }
-    return this.pg.runWithMerchant(
-      input.merchantId,
-      input.userId,
-      async (client) => {
-        const { rows } = await client.query<{ active: boolean }>(
-          `SELECT EXISTS (
-             SELECT 1 FROM runtime.dashboard_session
-              WHERE id=$1::uuid AND user_id=$2::uuid AND is_active
-                AND expires_at>clock_timestamp()
-           ) AS active`,
-          [input.dashboardSessionId, input.userId],
-        );
-        if (rows[0]?.active !== true) return null;
-        return {
-          commandContextType: 'dashboard_administrative',
-          administrativeCommandId: input.administrativeCommandId,
-          operatorSessionId: null,
-          operatorId: input.userId,
-          deviceId: null,
-          credentialVersion: null,
-          permissions: input.permissions,
-        };
-      },
-      input.locationId,
+    const { rows } = await this.pg.query<{ active: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM runtime.dashboard_session
+          WHERE id=$1::uuid AND user_id=$2::uuid AND is_active
+            AND expires_at>clock_timestamp()
+       ) AS active`,
+      [input.dashboardSessionId, input.userId],
     );
+    if (rows[0]?.active !== true) return null;
+    return {
+      commandContextType: 'dashboard_administrative',
+      administrativeCommandId: input.administrativeCommandId,
+      operatorSessionId: null,
+      operatorId: input.userId,
+      deviceId: null,
+      credentialVersion: null,
+      permissions: input.permissions,
+    };
   }
 
   mutationApprovalRequirement(
@@ -1213,7 +1206,7 @@ export class PosInventoryRepository {
       signed: string;
       negativeOverride: boolean;
     }>(
-      `SELECT id::text,inventory_item_id::text AS "inventoryItemId",
+      `SELECT l.id::text,l.inventory_item_id::text AS "inventoryItemId",
               l.absolute_variance::text AS absolute,l.signed_variance::text AS signed,
               (i.negative_stock_policy='manager_override'
                 AND coalesce(b.available,0)+l.signed_variance<0) AS "negativeOverride"
@@ -1645,10 +1638,16 @@ export class PosInventoryRepository {
         WHERE id=$1::uuid AND merchant_id=$2::uuid AND active FOR UPDATE`,
       [dto.inventoryItemId, merchantId],
     );
+    await client.query(
+      `SELECT pg_advisory_xact_lock(hashtextextended(
+         concat_ws(':',$1::text,$2::text,$3::text,$4::text),0
+       ))`,
+      [merchantId, dto.locationId, dto.inventoryLocationId, dto.inventoryItemId],
+    );
     const balance = await client.query<{ version: string }>(
       `SELECT version::text FROM merchant.stock_balance
         WHERE merchant_id=$1::uuid AND location_id=$2::uuid
-          AND inventory_location_id=$3::uuid AND inventory_item_id=$4::uuid FOR UPDATE`,
+          AND inventory_location_id=$3::uuid AND inventory_item_id=$4::uuid`,
       [merchantId, dto.locationId, dto.inventoryLocationId, dto.inventoryItemId],
     );
     const currentVersion = Number(balance.rows[0]?.version ?? 1);

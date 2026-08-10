@@ -272,7 +272,16 @@ function InventoryDialog({ row, onClose, onComplete }) {
       parameters: { inventoryLocationId, itemId: inventoryItemId, limit: 100 },
     });
     setOverview(response.result);
-    if (response.result.activeCount?.count) setCount(response.result.activeCount.count);
+    if (response.result.activeCount?.count) {
+      setCount(response.result.activeCount.count);
+      if (
+        ['submitted', 'variance_calculated', 'reconciliation_required', 'approved'].includes(
+          response.result.activeCount.count.status,
+        )
+      ) {
+        setSubmitted(response.result.activeCount);
+      }
+    }
     const initial = {};
     for (const balance of response.result.balances || []) {
       initial[balance.inventoryItemId] = balance.onHand;
@@ -282,10 +291,14 @@ function InventoryDialog({ row, onClose, onComplete }) {
 
   function commandBody(selectedOperation) {
     const item = overview.items.find((value) => value.id === inventoryItemId);
-    const location = overview.locations.find((value) => value.id === inventoryLocationId);
+    const balance = overview.balances.find(
+      (value) =>
+        value.inventoryLocationId === inventoryLocationId &&
+        value.inventoryItemId === inventoryItemId,
+    );
     const common = {
       inventoryLocationId,
-      expectedVersion: location.version,
+      expectedVersion: balance?.version ?? 1,
       policyFingerprint: overview.policy.fingerprint,
       approvalFingerprint: null,
       businessDate: new Date().toISOString().slice(0, 10),
@@ -355,8 +368,8 @@ function InventoryDialog({ row, onClose, onComplete }) {
         policyFingerprint: overview.policy.fingerprint,
         approvalFingerprint: null,
         businessDate: new Date().toISOString().slice(0, 10),
-        scope: 'full_location',
-        itemIds: [],
+        scope: 'selected_items',
+        itemIds: [inventoryItemId],
       },
     });
     setCount(response.result.count);
@@ -520,7 +533,7 @@ function InventoryDialog({ row, onClose, onComplete }) {
             <hr />
             {!count ? (
               <button className="btn" type="button" onClick={createCount}>
-                Crear conteo completo
+                Crear conteo del artículo
               </button>
             ) : !submitted ? (
               <>

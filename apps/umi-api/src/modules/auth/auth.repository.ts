@@ -548,12 +548,10 @@ export class AuthRepository {
    * Membership + role + permissions for one (user, merchant). Drives
    * MerchantAccessGuard. Null ⇒ no active access (404 merchant_not_found).
    *
-   * Permissions come from the sealed `umi.role_permission` catalog, and NOW THAT IS THE
-   * ONLY SOURCE. `effectivePermissions` used to convert super_admin into `['*']`, which
-   * meant a platform operator held every permission key in the catalog — including keys
-   * added long after the grant. Eight POS keys arrived that way in July 2026 with no
-   * review. So the permission subquery reads BOTH the café role and the platform role,
-   * and `seed_rbac.sql` names super_admin's permissions one by one.
+   * The sealed catalog defines role permissions.
+   * `umi.resolve_staff_permissions` applies the current staff overrides.
+   * The platform role remains a separate explicit grant.
+   * The query does not convert `super_admin` into `['*']`.
    *
    * A platform operator with no employment here still gets access (never 404 Umi's own
    * operator) and is tagged with their platform role.
@@ -583,14 +581,22 @@ export class AuthRepository {
          COALESCE((SELECT array_agg(role_key) FROM grants),
                   ARRAY[(SELECT platform_role FROM sa)]) AS "roles",
          COALESCE(
-           (SELECT array_agg(DISTINCT p.key)
-              FROM umi.role_permission AS rp
-              JOIN umi.role AS r        ON r.id = rp.role_id
-              JOIN umi.permission AS p  ON p.id = rp.permission_id
-             -- The union is deliberate. Someone who is 'staff' at this café AND holds a
-             -- platform grant gets both sets, not the lesser of the two.
-             WHERE r.key IN (SELECT role_key FROM grants)
-                OR r.key = (SELECT platform_role FROM sa)),
+           (SELECT array_agg(DISTINCT effective.key)
+              FROM (
+                -- Resolve the current employment grants on every request. This includes
+                -- active allow and deny overrides, so a browser session cannot retain a
+                -- permission after an administrator removes it.
+                SELECT unnest(umi.resolve_staff_permissions(
+                  (SELECT id FROM grants ORDER BY id LIMIT 1)
+                )) AS key
+                UNION
+                -- A platform grant remains separate from the café employment.
+                SELECT p.key
+                  FROM umi.role_permission AS rp
+                  JOIN umi.role AS r       ON r.id = rp.role_id
+                  JOIN umi.permission AS p ON p.id = rp.permission_id
+                 WHERE r.key = (SELECT platform_role FROM sa)
+              ) effective),
            '{}'
          ) AS "permissions"
        FROM merchant.merchant AS t

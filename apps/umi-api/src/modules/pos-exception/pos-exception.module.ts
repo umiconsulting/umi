@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
 import { IntegrityModule } from '../integrity/integrity.module';
 import { PosEntryModule } from '../pos-entry/pos-entry.module';
 import { PosExceptionController } from './pos-exception.controller';
@@ -6,7 +7,7 @@ import { PosExceptionRepository } from './pos-exception.repository';
 import { PosExceptionService } from './pos-exception.service';
 
 @Module({
-  imports: [IntegrityModule, PosEntryModule],
+  imports: [AuthModule, IntegrityModule, PosEntryModule],
   controllers: [PosExceptionController],
   providers: [PosExceptionRepository, PosExceptionService],
   exports: [PosExceptionService],

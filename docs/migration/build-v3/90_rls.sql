@@ -526,6 +526,24 @@ begin
                     or ac.location_id = umi.current_location())
           ))
         )$p$, t)
+      when t = 'cash_shift' then
+        $p$(
+          (umi.current_device() is not null and cash_shift.device_id = umi.current_device())
+          or
+          (nullif(current_setting('app.administrative_command_id', true), '') is not null
+            and exists (
+              select 1
+                from merchant.administrative_command ac
+               where ac.id = nullif(
+                       current_setting('app.administrative_command_id', true), ''
+                     )::uuid
+                 and ac.merchant_id = umi.current_merchant()
+                 and ac.actor_user_id = nullif(current_setting('app.user_id', true), '')::uuid
+                 and ac.location_id = umi.current_location()
+                 and ac.operation in ('refund.preview', 'refund.commit')
+                 and ac.status = 'pending'
+            ))
+        )$p$
       else
         '(umi.current_device() is not null and device_id = umi.current_device())'
     end;

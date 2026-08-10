@@ -59,5 +59,8 @@ describe('Gate 5A administrative command migration', () => {
     );
     expect(rlsSql).toContain('ac.actor_user_id');
     expect(rlsSql).toContain("current_setting('app.user_id', true)");
+    expect(rlsSql).toContain("t = 'cash_shift'");
+    expect(rlsSql).toContain("ac.operation in ('refund.preview', 'refund.commit')");
+    expect(rlsSql).toContain("current_setting('app.administrative_command_id', true)");
   });
 });

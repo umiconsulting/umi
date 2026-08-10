@@ -116,12 +116,39 @@ La misma prueba ejecuta la administración de cocina y la consulta de recuperaci
 - Tradeoff: el relay agrega latencia, pero mantiene el acceso físico dentro del POS inscrito.
 - Inferencia de Umi: un solo comando de dominio reduce las diferencias entre el Dashboard y UmiPOS.
 
-Gate 5A está `INCOMPLETE` por una falta de prueba de extremo a extremo.
-Las pruebas unitarias validan el cableado y los 24 rechazos de autoridad.
-Estas pruebas sustituyen los servicios de dominio con dobles de prueba.
-El recorrido P0 también usa dobles de prueba para los servicios de dominio.
-Falta una prueba con Dashboard autenticado, API, servicios canónicos y PostgreSQL.
-Gate 6A no está autorizado.
+## Certificación en vivo
+
+Gate 5A está `COMPLETE`.
+La certificación usó el Dashboard real, una sesión web real y el token CSRF real.
+La API derivó el contexto `dashboard_administrative` y ejecutó los servicios canónicos.
+PostgreSQL guardó los comandos, los hechos, las aprobaciones y la auditoría.
+
+El recorrido continuo certificó estas operaciones:
+
+- edición de catálogo;
+- configuración de registro y hardware;
+- diagnóstico, prueba de impresora y reprint `COPY` con el simulador canónico;
+- ajuste y conteo de inventario;
+- refund parcial y recibo compensatorio;
+- ajuste de loyalty;
+- emisión promocional de gift card con entrega única;
+- configuración de una ruta de cocina;
+- recuperación y auditoría.
+
+La matriz ejecutó 24 casos negativos con la API y PostgreSQL reales.
+La matriz rechazó una sesión, un permiso y una location revocados.
+La matriz también rechazó la repetición de una aprobación y un fingerprint diferente.
+La matriz rechazó una sesión revocada mientras el navegador permaneció abierto.
+
+La prueba repitió los comandos exactos de refund, inventario, loyalty e impresora.
+Los cuatro reintentos devolvieron el resultado original y no agregaron un hecho.
+
+La base desechable registró 137 tablas con RLS forzada.
+El rol de la API no fue propietario ni superusuario.
+La prueba no interceptó las solicitudes de dominio.
+Solo el Hardware Runtime usó un simulador autorizado.
+
+Gate 6A está autorizado. Gate 6A no ha comenzado.
 
 ## Límites de producto
 

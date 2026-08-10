@@ -295,7 +295,7 @@ export class PosHardwareRepository {
   ): Promise<HardwareCommandResult | null> {
     await client.query(
       `INSERT INTO merchant.hardware_command_event(
-         merchant_id,command_id,sequence,status,failure_code,safe_result_metadata
+         merchant_id,command_id,sequence,status,failure_code,safe_result
        )
        SELECT c.merchant_id,c.id,coalesce(max(e.sequence),0)+1,'unknown','unknown_outcome',
               '{"statusMessage":"verify_physical_result"}'::jsonb
@@ -1162,7 +1162,7 @@ export class PosHardwareRepository {
               j.safe_document->'printPayload' AS "printPayload"
          FROM merchant.hardware_print_job j
          JOIN merchant.hardware_device d ON d.id=j.printer_id AND d.merchant_id=j.merchant_id
-        WHERE (j.id=$1::uuid OR j.source_aggregate_id=$1)
+        WHERE (j.id=$1::uuid OR j.source_aggregate_id=$1::text)
           AND j.merchant_id=$2::uuid AND j.location_id=$3::uuid
         ORDER BY CASE WHEN j.id=$1::uuid THEN 0 ELSE 1 END,j.created_at DESC LIMIT 1`,
       [jobId, merchantId, locationId],

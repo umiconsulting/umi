@@ -1655,8 +1655,10 @@ export class PosCustomerValueRepository {
     if (active) {
       await client.query(
         `SELECT merchant.append_gift_card_fact($1::uuid,$2::uuid,jsonb_build_object(
-          'delta',$3,'amountMinorUnits',$3,'reason','issued','entryType','issued','currency',$4,
-          'direction','credit','commandId',$5::text,'idempotencyKey',$6::text,'fingerprint',$7,
+          'delta',$3::bigint,'amountMinorUnits',$3::bigint,'reason','issued',
+          'entryType','issued','currency',$4::text,
+          'direction','credit','commandId',$5::text,'idempotencyKey',$6::text,
+          'fingerprint',$7::text,
           'operatorId',$8::text,'deviceId',$9::text,'businessDate',current_date,
           'sourceType','gift_card_issuance','sourceId',$2::text,'saleId',$10::text))`,
         [

@@ -280,15 +280,13 @@ export class PosEntryRepository {
     actingUserId: string;
     dashboardSessionId: string;
   }) {
-    const { rows } = await this.scopedQuery<{
+    const { rows } = await this.pg.query<{
       staffId: string;
       userId: string;
       salt: string | null;
       hash: string | null;
       lockedUntil: Date | null;
     }>(
-      input.merchantId,
-      input.locationId,
       `SELECT s.id::text AS "staffId",s.user_id::text AS "userId",
               s.operator_pin_salt AS salt,s.operator_pin_hash AS hash,
               ds.approval_locked_until AS "lockedUntil"
@@ -320,9 +318,7 @@ export class PosEntryRepository {
     locationId: string,
     dashboardSessionId: string,
   ): Promise<void> {
-    await this.scopedQuery(
-      merchantId,
-      locationId,
+    await this.pg.query(
       `UPDATE runtime.dashboard_session
           SET approval_failed_attempts=least(approval_failed_attempts+1,10),
               approval_locked_until=CASE WHEN approval_failed_attempts+1>=5
@@ -476,9 +472,7 @@ export class PosEntryRepository {
     permission: string;
     commandFingerprint: string | null;
   }) {
-    const { rows } = await this.scopedQuery<{ id: string; expiresAt: Date }>(
-      input.merchantId,
-      input.locationId,
+    const { rows } = await this.pg.query<{ id: string; expiresAt: Date }>(
       `WITH manager_allowed AS (
          SELECT 1 FROM merchant.staff ms
           WHERE ms.user_id=$1::uuid AND ms.id=$2::uuid AND ms.merchant_id=$5::uuid

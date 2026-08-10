@@ -201,9 +201,7 @@ describe('Gate 5A negative administrative authority matrix', () => {
 
   it('18. rejects forbidden self-approval', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [] });
-    const repo = new PosEntryRepository({
-      runWithMerchant: vi.fn(async (_merchant, _user, action) => action({ query })),
-    } as never);
+    const repo = new PosEntryRepository({ query } as never);
     await repo.administrativeManagerPinRecord({
       lookupHash: 'lookup',
       merchantId: access.merchantId,

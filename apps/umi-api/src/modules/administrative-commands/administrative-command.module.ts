@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
 import { AdministrativeCommandContextService } from './administrative-command-context.service';
 import { AdministrativeCommandController } from './administrative-command.controller';
 import { AdministrativeCommandExecutionService } from './administrative-command-execution.service';
@@ -13,6 +14,7 @@ import { PosCatalogModule } from '../pos-catalog/pos-catalog.module';
 
 @Module({
   imports: [
+    AuthModule,
     KdsModule,
     PosCatalogModule,
     PosCustomerValueModule,

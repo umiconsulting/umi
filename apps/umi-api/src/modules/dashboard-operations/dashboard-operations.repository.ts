@@ -179,11 +179,11 @@ const QUERIES: Record<DashboardOperationDomain, ReturnType<typeof row>> = {
   ),
   recovery: row(
     `SELECT c.command_id::text AS id,c.command_id::text AS "publicReference",c.command_type AS title,
-    c.failure_code AS detail,c.status,c.location_id::text AS "locationId",coalesce(c.completed_at,c.created_at)::text AS "occurredAt",
+    c.failure_code AS detail,c.status,c.location_id::text AS "locationId",coalesce(c.completed_at,c.started_at)::text AS "occurredAt",
     NULL::bigint AS "amountMinorUnits",NULL::text AS currency,c.expected_version AS version,c.correlation_id AS "correlationId"
     FROM merchant.business_command c`,
     `c.merchant_id=$1::uuid AND (c.status<>'succeeded' OR c.retryable)`,
-    'c.created_at DESC,c.command_id',
+    'c.started_at DESC,c.command_id',
   ),
   audit: row(
     `SELECT a.id::text,coalesce(a.entity_id::text,a.id::text) AS "publicReference",a.event_type AS title,
@@ -218,7 +218,15 @@ export class DashboardOperationsRepository {
       async (client) => {
         const definition = QUERIES[query.domain];
         const params: unknown[] = [merchantId];
-        const isMerchantFact = ['organization', 'catalog', 'rewards'].includes(query.domain);
+        const isMerchantFact = [
+          'organization',
+          'catalog',
+          'customers',
+          'loyalty',
+          'rewards',
+          'wallet',
+          'gift_cards',
+        ].includes(query.domain);
         const scoped = Boolean(locationId && !isMerchantFact);
         if (scoped) params.push(locationId);
         params.push(query.limit + 1, query.cursor);

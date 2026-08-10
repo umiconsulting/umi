@@ -50,6 +50,20 @@ describe('DashboardOperationsRepository', () => {
     expect(params).toEqual(['00000000-0000-4000-8000-000000000002', 21, 0]);
   });
 
+  it('uses the business command start time for recovery rows', async () => {
+    const fixture = make();
+    await fixture.repository.list(
+      '00000000-0000-4000-8000-000000000001',
+      '00000000-0000-4000-8000-000000000002',
+      { domain: 'recovery', locationId: undefined, cursor: 0, limit: 20 },
+      '00000000-0000-4000-8000-000000000003',
+    );
+
+    const [sql] = fixture.query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('coalesce(c.completed_at,c.started_at)');
+    expect(sql).not.toContain('c.created_at');
+  });
+
   it('bounds text and rejects unsafe integer projections', async () => {
     const fixture = make([
       {

@@ -147,7 +147,7 @@ export class AdministrativeCommandRepository {
         }>(
           `SELECT command_id::text AS "commandId",command_type AS "commandType",idempotency_key AS "idempotencyKey",status,retryable,
                   failure_code AS "failureCode",correlation_id AS "correlationId",
-                  created_at::text AS "createdAt",completed_at::text AS "completedAt"
+                  started_at::text AS "createdAt",completed_at::text AS "completedAt"
              FROM merchant.business_command
             WHERE merchant_id=$1::uuid AND command_id=$2::uuid
               AND ($3::uuid IS NULL OR location_id=$3::uuid)`,

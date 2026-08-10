@@ -228,9 +228,9 @@ Future clients use `packages/contract` and controlled UMI APIs.
   `ac23d09d92f252f8e770e84fef90ab4c42c30afb85d8e08a0c0a15df2376ff6f`.
 - Gate 4A passed focused contract, API, Flutter, PostgreSQL, RLS, security, and PR checks.
 - The Linux runner had no Xcode toolchain. Static KDS reviews passed, but the iPad build remains an observation.
-- Gate 5A: incomplete. The Dashboard has permission-scoped read and command wiring for pilot operations.
-- Gate 5A uses contract version `2.11.0`, with content hash
-  `5cccb2974addbf9833a7c3b2ecf31733161120ed9449a6e5f7b2aeb4d115c66f`.
+- Gate 5A: complete. The Dashboard has permission-scoped read and command execution for pilot operations.
+- Gate 5A uses contract version `2.12.0`, with content hash
+  `5aafd2d554267c27c523686d95b44474d9783971223b63e95f25696d13fb67ba`.
 - Gate 5A limits each location membership to its assigned location.
 - Gate 5A uses effective permissions for navigation and direct API access.
 - Gate 5A uses a distinct `dashboard_administrative` context for operational commands.
@@ -241,10 +241,12 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Physical commands use a persistent relay to the assigned enrolled POS runtime.
 - Cash movement remains POS-only. Wallet funding remains unavailable by product policy.
 - Gate 5A does not create a false POS device or operator session.
-- The 24-case authority matrix and the P0 command walkthrough passed with mocked domain services.
-- The focused API, Dashboard, Flutter, PostgreSQL, and RLS checks passed.
-- An authenticated end-to-end run through the Dashboard, API, domain services, and PostgreSQL remains required.
-- Gate 6A is not authorized. Gate 6A has not started.
+- The continuous P0 walkthrough passed through the real Dashboard, API, domain services, and PostgreSQL.
+- The 24-case authority matrix passed through real sessions, CSRF, authorization, services, and persistence.
+- Exact refund, inventory, loyalty, and hardware retries returned the original result without a new fact.
+- The disposable database reported 137 tables with forced RLS and no duplicate domain fact.
+- The hardware relay used the canonical simulator. No other P0 domain used a test double.
+- Gate 6A is authorized. Gate 6A has not started.
 
 ## Gate 3C decision basis
 

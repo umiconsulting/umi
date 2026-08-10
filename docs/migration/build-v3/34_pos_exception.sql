@@ -281,8 +281,7 @@ begin
     select value as receipt_line from jsonb_array_elements(r.snapshot->'lines') value
     where value->>'lineRef'=new.sale_line_id::text
   ) receipt
-  where l.id=new.sale_line_id
-  for share of l,s,r;
+  where l.id=new.sale_line_id;
   if source_quantity is not null and not receipt_has_discount then
     with pairs as (
       select draft.value as draft,entry.value as entry

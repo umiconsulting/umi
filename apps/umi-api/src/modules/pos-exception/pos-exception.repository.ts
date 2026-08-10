@@ -612,11 +612,15 @@ export class PosExceptionRepository {
     if (!hasPermission(authorization, permission)) {
       throw new ConflictException({ code: 'PERMISSION_REVOKED' });
     }
+    await client.query(
+      `SELECT pg_advisory_xact_lock(hashtextextended(concat_ws(':','sale_exception',$1::text),0))`,
+      [saleId],
+    );
     const currentVersion = await client.query<{ version: string }>(
       `SELECT o.version::text FROM merchant.pos_committed_sale s
        JOIN merchant.customer_order o ON o.id=s.order_id
        WHERE s.id=$1::uuid AND s.merchant_id=$2::uuid AND s.location_id=$3::uuid
-       FOR UPDATE OF s,o`,
+       `,
       [saleId, merchantId, dto.locationId],
     );
     if (Number(currentVersion.rows[0]?.version) !== dto.expectedSaleVersion) {
@@ -1276,6 +1280,12 @@ export class PosExceptionRepository {
     saleId: string,
     lock: boolean,
   ): Promise<SaleSource | null> {
+    if (lock) {
+      await client.query(
+        `SELECT pg_advisory_xact_lock(hashtextextended(concat_ws(':','sale_exception',$1::text),0))`,
+        [saleId],
+      );
+    }
     const header = await client.query<{
       id: string;
       cartId: string;
@@ -1324,8 +1334,7 @@ export class PosExceptionRepository {
        JOIN merchant.customer_order o ON o.id=s.order_id
        JOIN merchant.pos_payment_attempt p ON p.id=s.payment_attempt_id
        LEFT JOIN merchant.pos_checkout_draft d ON d.cart_id=s.cart_id
-       WHERE s.id=$1::uuid AND s.merchant_id=$2::uuid AND s.location_id=$3::uuid
-       ${lock ? 'FOR UPDATE OF s,o' : ''}`,
+       WHERE s.id=$1::uuid AND s.merchant_id=$2::uuid AND s.location_id=$3::uuid`,
       [saleId, merchantId, authorizationLocation(authorization)],
     );
     const row = header.rows[0];
@@ -1711,6 +1720,14 @@ export class PosExceptionRepository {
     ledgerSequence: number;
     expectedCash: number;
   } | null> {
+    if (authorization.commandContextType === 'dashboard_administrative') {
+      if (!authorization.administrativeCommandId) {
+        throw new ConflictException({ code: 'DASHBOARD_COMMAND_CONTEXT_REQUIRED' });
+      }
+      await client.query(`SELECT set_config('app.administrative_command_id',$1,true)`, [
+        authorization.administrativeCommandId,
+      ]);
+    }
     const shift = await client.query<{
       id: string;
       registerId: string;

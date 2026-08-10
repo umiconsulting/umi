@@ -167,11 +167,11 @@
       "subject": "Authoritative kitchen projection, station routing, existing KDS integration, reconnect, recovery, and POS visibility"
     },
     {
-      "commit": "HEAD (Gate 5A operational wiring commit)",
+      "commit": "HEAD (Gate 5A live certification commit)",
       "id": "5A",
-      "status": "incomplete",
+      "status": "complete",
       "stateMachineVersion": 1,
-      "subject": "Dashboard command wiring requires authenticated end-to-end execution evidence"
+      "subject": "Live Dashboard command execution with real sessions, API, PostgreSQL, RLS, and audit"
     }
   ]
 }

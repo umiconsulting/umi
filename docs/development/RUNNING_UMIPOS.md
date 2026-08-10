@@ -729,3 +729,45 @@ El Dashboard envía `X-UMI-CSRF` en cada mutación con cookies.
 El Dashboard usa `POST /api/merchants/:merchantId/administrative-commands` para cada comando permitido.
 UmiPOS consulta el relay tipado con `GET /api/merchants/:merchantId/pos/hardware/remote-commands/claim`.
 Checkout, preparación KDS y movimiento físico de efectivo permanecen en su cliente operativo.
+
+### Certificación en vivo de Gate 5A
+
+Usa una base PostgreSQL desechable. Aplica las migraciones de `docs/migration/build-v3`.
+Aplica después el fixture determinista:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f scripts/umi-pos-gate5a-live-fixture.sql
+```
+
+Inicia la UMI API real en `http://127.0.0.1:4001`.
+Inicia el Dashboard real en `http://127.0.0.1:4000`.
+Define `GATE5A_PG_DATABASE` con el nombre de la base desechable.
+
+Ejecuta el recorrido continuo:
+
+```bash
+GATE5A_CERT_PHASE=walkthrough \
+GATE5A_PG_DATABASE="$GATE5A_PG_DATABASE" \
+python3 scripts/umi-pos-gate5a-live-certification.py
+```
+
+Ejecuta la matriz de 24 casos:
+
+```bash
+GATE5A_CERT_PHASE=matrix \
+GATE5A_PG_DATABASE="$GATE5A_PG_DATABASE" \
+python3 scripts/umi-pos-gate5a-live-certification.py
+```
+
+Ejecuta la inspección final:
+
+```bash
+GATE5A_CERT_PHASE=evidence \
+GATE5A_PG_DATABASE="$GATE5A_PG_DATABASE" \
+python3 scripts/umi-pos-gate5a-live-certification.py
+```
+
+La prueba exige una cookie de sesión, CSRF, la API real y PostgreSQL real.
+La prueba falla si el host de la API o el nombre de PostgreSQL no cumplen el perfil.
+La prueba no usa `page.route` ni sustituye un servicio de dominio.

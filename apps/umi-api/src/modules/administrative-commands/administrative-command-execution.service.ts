@@ -439,7 +439,9 @@ export class AdministrativeCommandExecutionService {
       },
       request.operation === 'gift_card.reveal'
         ? () => ({ deliveryStatus: 'revealed_once' })
-        : undefined,
+        : request.operation === 'gift_card.promotional_issue'
+          ? redactGiftCardIssuePersistence
+          : undefined,
     );
   }
 
@@ -513,6 +515,14 @@ export class AdministrativeCommandExecutionService {
       commandFingerprint: String(request.parameters.commandFingerprint || ''),
     });
   }
+}
+
+function redactGiftCardIssuePersistence(result: unknown): unknown {
+  if (!result || typeof result !== 'object' || Array.isArray(result)) {
+    return { deliveryStatus: 'issued_once' };
+  }
+  const { deliveryToken: _deliveryToken, ...safe } = result as Record<string, unknown>;
+  return { ...safe, deliveryStatus: 'issued_once' };
 }
 
 function objectParameter(value: unknown): Record<string, unknown> {

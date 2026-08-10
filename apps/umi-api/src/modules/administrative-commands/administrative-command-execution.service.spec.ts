@@ -342,4 +342,68 @@ describe('Dashboard administrative command execution', () => {
       expect.objectContaining({ targetAggregateId: id(23) }),
     );
   });
+
+  it('returns a gift-card delivery token once and excludes it from command persistence', async () => {
+    let persistedResult: unknown;
+    const commandContext = context('gift_card.promotional_issue');
+    commandContext.execute = vi.fn(
+      async (
+        _command: unknown,
+        action: () => Promise<unknown>,
+        transform: (result: unknown) => unknown,
+      ) => {
+        const result = await action();
+        persistedResult = transform(result);
+        return result;
+      },
+    );
+    const customerValue = {
+      issueGiftCardAdministrative: vi.fn().mockResolvedValue({
+        card: { id: id(30), maskedCode: '****-1234' },
+        deliveryToken: 'secret-delivery-token',
+        deliveryExpiresAt: '2026-08-10T00:05:00.000Z',
+        recovered: false,
+        fundingAssignment: null,
+      }),
+    };
+    const service = new AdministrativeCommandExecutionService(
+      commandContext as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      customerValue as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    const result = await service.execute(user, access, {
+      operation: 'gift_card.promotional_issue',
+      locationId: id(5),
+      targetAggregateId: id(30),
+      targetVersion: null,
+      commandId: id(6),
+      idempotencyKey: id(7),
+      approvalId: null,
+      parameters: {
+        currency: 'MXN',
+        initialValueMinorUnits: 5000,
+        expectedVersion: null,
+        saleId: null,
+        saleLineId: null,
+        customerId: null,
+        approvalFingerprint: null,
+      },
+    });
+
+    expect(result).toMatchObject({ deliveryToken: 'secret-delivery-token' });
+    expect(persistedResult).toEqual({
+      card: { id: id(30), maskedCode: '****-1234' },
+      deliveryExpiresAt: '2026-08-10T00:05:00.000Z',
+      recovered: false,
+      fundingAssignment: null,
+      deliveryStatus: 'issued_once',
+    });
+  });
 });
