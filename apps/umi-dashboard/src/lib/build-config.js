@@ -1,5 +1,24 @@
 const deployedEnvironments = new Set(['staging', 'pilot', 'production']);
 
+export function resolveDashboardBuildConfig(env) {
+  if (env.VITE_UMI_ENVIRONMENT || !env.VERCEL_ENV) return env;
+  const host = env.VERCEL_URL ? `https://${env.VERCEL_URL}` : undefined;
+  return {
+    ...env,
+    VITE_UMI_ENVIRONMENT: env.VERCEL_ENV === 'production' ? 'production' : 'staging',
+    VITE_AUTH_MODE: 'cookie',
+    VITE_PUBLIC_URL: host,
+    VITE_API_BASE: '',
+    VITE_RELEASE_VERSION: env.VERCEL_GIT_COMMIT_REF || 'vercel-preview',
+    VITE_RELEASE_GIT_COMMIT: env.VERCEL_GIT_COMMIT_SHA,
+    VITE_RELEASE_BUILD_TIMESTAMP: env.VERCEL_BUILD_TIMESTAMP
+      ? new Date(Number(env.VERCEL_BUILD_TIMESTAMP)).toISOString()
+      : new Date().toISOString(),
+    VITE_CONTRACT_VERSION: '2.12.0',
+    VITE_CONFIG_SCHEMA_VERSION: '1',
+  };
+}
+
 export function validateDashboardBuildConfig(env) {
   const errors = [];
   const environment = env.VITE_UMI_ENVIRONMENT;
