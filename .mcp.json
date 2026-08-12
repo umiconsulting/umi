@@ -8,6 +8,7 @@
       "type": "stdio",
       "command": "npx",
       "args": [
+        "-y",
         "@playwright/mcp@latest"
       ],
       "env": {}
@@ -20,18 +21,6 @@
         "@modelcontextprotocol/server-puppeteer"
       ],
       "env": {}
-    },
-    "slack": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-slack"
-      ],
-      "env": {
-        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
-        "SLACK_TEAM_ID": "${SLACK_TEAM_ID}"
-      }
     },
     "deepseek": {
       "type": "stdio",
@@ -46,35 +35,23 @@
       "type": "stdio",
       "command": "npx",
       "args": [
+        "-y",
         "nano-banana-mcp"
       ],
       "env": {
         "GEMINI_API_KEY": "${GEMINI_API_KEY}"
       }
     },
-    "magic": {
-      "type": "stdio",
-      "command": "npx",
+    "plane": {
+      "command": "uvx",
       "args": [
-        "-y",
-        "@21st-dev/magic@latest"
+        "plane-mcp-server",
+        "stdio"
       ],
       "env": {
-        "API_KEY": "${MAGIC_API_KEY}"
-      }
-    },
-    "xapi": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@xdevplatform/xurl",
-        "mcp",
-        "https://api.x.com/mcp"
-      ],
-      "env": {
-        "CLIENT_ID": "${XAPI_CLIENT_ID}",
-        "CLIENT_SECRET": "${XAPI_CLIENT_SECRET}"
+        "PLANE_API_KEY": "${PLANE_API_KEY}",
+        "PLANE_WORKSPACE_SLUG": "umi",
+        "PLANE_BASE_URL": "https://plane.umiconsulting.co"
       }
     }
   }
