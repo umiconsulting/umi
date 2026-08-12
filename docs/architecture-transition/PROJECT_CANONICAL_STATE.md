@@ -246,7 +246,16 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Exact refund, inventory adjustment, inventory waste, loyalty, and hardware retries returned the original result without a new fact.
 - The disposable database reported 137 tables with forced RLS and no duplicate domain fact.
 - The hardware relay used the canonical simulator. No other P0 domain used a test double.
-- Gate 6A is authorized. Gate 6A has not started.
+- Gate 6A: complete with observations. The pilot has a production-shaped deployment runtime.
+- The runtime supports `development`, `test`, `staging`, `pilot`, and `production` environments.
+- Pilot startup validates the configuration and fails when a required secret or safe setting is absent.
+- Each artifact has an immutable release identity and a generated release manifest with checksums.
+- Docker Compose deploys PostgreSQL 16, Redis 7.4, the API, the worker, the Dashboard, Caddy, and OpenTelemetry.
+- A clean deployment reached readiness and passed the real pilot smoke suite.
+- A real PostgreSQL backup and isolated restore passed with measured recovery times.
+- The compatible application rollback and the A-to-B upgrade simulation passed.
+- Production DNS, TLS certificates, provider backups, signing tools, and physical devices remain external observations.
+- Gate 6B is authorized. Gate 6B has not started.
 
 ## Gate 3C decision basis
 

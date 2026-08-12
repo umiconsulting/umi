@@ -1,6 +1,6 @@
 # UmiPOS Product Roadmap
 
-Updated: 2026-08-10
+Updated: 2026-08-11
 
 | Gate                                    | Status                     | Dependency             | Next objective                            | Blocker                                              | Validation                                                                                                               |
 | --------------------------------------- | -------------------------- | ---------------------- | ----------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -22,9 +22,10 @@ Updated: 2026-08-10
 | 3G-B Pilot hardware integration         | Complete with observations | 3G-A                   | Authorize Gate 4A KDS integration         | Physical hardware validation remains                 | Generic printer, drawer, scanner, simulator, API, PostgreSQL, RLS, Flutter, Linux, Web, and PR checks passed             |
 | 4A KDS operational integration          | Complete with observations | 3G-B                   | Authorize Gate 5A Dashboard completion    | Xcode validation was unavailable in the Linux runner | Existing KDS static review, API, contracts, POS status, 10 real races, PostgreSQL, RLS, reconnect, and PR checks passed  |
 | 5A Dashboard operational completion     | Complete                   | 4A                     | Authorize Gate 6A pilot deployment        | None                                                 | Live Dashboard, CSRF, API, PostgreSQL, RLS, inventory waste, 24-case matrix, and P0 walkthrough passed                   |
+| 6A Pilot deployment and release runtime | Complete with observations | 5A                     | Authorize Gate 6B pilot operations kit    | External production infrastructure remains           | Clean deploy, smoke, backup, restore, upgrade, rollback, release builds, and PR checks passed                            |
 
-The latest relevant revision is the Gate 5A live certification commit in PR #72.
-PR #72 keeps Gates 3A through 5A complete.
+The latest relevant revision is the Gate 6A pilot deployment commit in PR #72.
+PR #72 keeps Gates 3A through 6A complete.
 Native encrypted offline support covers the explicit allowlist and server-policy-authorized cash;
 Web sensitive journaling remains disabled. UMI remains the
 sole business authority; Flutter owns presentation, hardware integration, encrypted local state,
@@ -77,4 +78,10 @@ Cash movement remains POS-only. Wallet funding remains read-only by product poli
 Gate 5A passed one authenticated browser walkthrough and the 24-case authority matrix.
 Both tests used the real API, domain services, PostgreSQL, RLS, approvals, idempotency, and audit.
 Exact retries for refund, inventory, loyalty, and hardware added no duplicate fact.
-Gate 6A is authorized and has not started.
+Gate 6A adds the canonical pilot deployment and release runtime.
+It validates each environment, protects server secrets, and gives each artifact an immutable identity.
+It deploys PostgreSQL, Redis, the API, the worker, the Dashboard, Caddy, and OpenTelemetry.
+The Linux POS artifact installs without the source checkout.
+A clean deployment, real smoke suite, database backup, isolated restore, rollback, and upgrade passed.
+Production DNS, TLS certificates, provider backups, signing tools, and physical devices remain observations.
+Gate 6B is authorized and has not started.

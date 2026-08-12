@@ -185,12 +185,15 @@ final class PilotHardwareLab
         HardwareScanObserver,
         HardwareConnectionStateResolver,
         HardwareRegistryAwareResolver {
-  PilotHardwareLab({HardwareSocketClient Function()? socketClientFactory})
-    : _socketClientFactory =
-          socketClientFactory ?? createNativeHardwareSocketClient,
-      _simulators = SimulatorHardwareLab();
+  PilotHardwareLab({
+    HardwareSocketClient Function()? socketClientFactory,
+    this.allowSimulator = true,
+  }) : _socketClientFactory =
+           socketClientFactory ?? createNativeHardwareSocketClient,
+       _simulators = SimulatorHardwareLab();
 
   final HardwareSocketClient Function() _socketClientFactory;
+  final bool allowSimulator;
   final SimulatorHardwareLab _simulators;
   final Map<String, DeviceAdapter> _adapters = {};
   final Map<String, HardwareByteTransport> _transports = {};
@@ -218,7 +221,9 @@ final class PilotHardwareLab
       _lastWedgeScanAt.remove(device.id);
       return null;
     }
-    if (device.transport == 'simulator') return _simulators.resolve(device);
+    if (device.transport == 'simulator') {
+      return allowSimulator ? _simulators.resolve(device) : null;
+    }
     if (device.type == 'barcode_scanner' &&
         device.transport == 'keyboard_wedge') {
       _keyboardWedgeIds.add(device.id);

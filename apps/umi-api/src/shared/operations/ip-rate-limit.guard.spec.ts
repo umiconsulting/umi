@@ -16,7 +16,11 @@ describe('IpRateLimitGuard', () => {
       getType: () => 'http',
       switchToHttp: () => ({ getRequest: () => request, getResponse: () => reply }),
     } as unknown as ExecutionContext;
-    const guard = new IpRateLimitGuard(limits as unknown as RateLimitService, new MetricsService());
+    const guard = new IpRateLimitGuard(
+      limits as unknown as RateLimitService,
+      new MetricsService(),
+      { get: vi.fn().mockReturnValue(300) } as never,
+    );
 
     expect(() => guard.canActivate(context)).toThrow('Request rate limit exceeded.');
     expect(limits.hit).toHaveBeenCalledWith('http:ip:203.0.113.10', 300, 60_000);

@@ -2,8 +2,9 @@ import { CanActivate, ExecutionContext, HttpException, Injectable } from '@nestj
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { RateLimitService } from '../ratelimit/rate-limit.service';
 import { MetricsService } from './metrics.service';
+import { ConfigService } from '@nestjs/config';
+import type { AppConfig } from '../config/config.schema';
 
-const IP_LIMIT = 300;
 const WINDOW_MS = 60_000;
 
 @Injectable()
@@ -11,6 +12,7 @@ export class IpRateLimitGuard implements CanActivate {
   constructor(
     private readonly limits: RateLimitService,
     private readonly metrics: MetricsService,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
@@ -18,7 +20,11 @@ export class IpRateLimitGuard implements CanActivate {
     const http = context.switchToHttp();
     const request = http.getRequest<FastifyRequest>();
     const reply = http.getResponse<FastifyReply>();
-    const result = this.limits.hit(`http:ip:${request.ip}`, IP_LIMIT, WINDOW_MS);
+    const result = this.limits.hit(
+      `http:ip:${request.ip}`,
+      this.config.get('RATE_LIMIT_IP_PER_MINUTE', { infer: true }),
+      WINDOW_MS,
+    );
     void reply.header('x-ratelimit-remaining', String(result.remaining));
     void reply.header('x-ratelimit-reset', String(Math.ceil(result.resetAt / 1_000)));
     if (!result.allowed) {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MetricsService } from './metrics.service';
-import { redactTelemetry } from './redaction';
+import { redactLogString, redactTelemetry } from './redaction';
 import { BoundedConcurrency, CircuitBreaker, OperationalFailure, withTimeout } from './resilience';
 
 describe('operational foundations', () => {
@@ -21,6 +21,15 @@ describe('operational foundations', () => {
       nested: { cardNumber: '[REDACTED]', safe: 'ok' },
       long: `${'x'.repeat(2_000)}[TRUNCATED]`,
     });
+  });
+
+  it('removes credentials from unstructured log text', () => {
+    const value = redactLogString(
+      'failed postgresql://user:password@db:5432/umi Authorization: Bearer token-value',
+    );
+    expect(value).not.toContain('password');
+    expect(value).not.toContain('token-value');
+    expect(value).toContain('[REDACTED]');
   });
 
   it('records bounded counters and duration summaries', () => {

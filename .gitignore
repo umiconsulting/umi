@@ -59,3 +59,5 @@ apps/*/supabase/.temp/
 # are unreviewable binaries and version-specific (cpython-314 here).
 __pycache__/
 *.pyc
+# Pilot runtime secrets
+deploy/pilot/pilot.env

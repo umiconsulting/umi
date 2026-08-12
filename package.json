@@ -57,7 +57,15 @@
     "umi-pos:print-role-matrix": "node scripts/umipos-pilot-rbac.mjs print",
     "umi-pos:seed-pilot-roles": "bash scripts/umi-pos-local-access-seed.sh && bash scripts/umi-pos-demo-seed.sh",
     "umi-pos:rbac-api-tests": "pnpm --filter @umi/api exec vitest run src/modules/auth/pilot-rbac.spec.ts src/modules/auth/roles.spec.ts src/modules/auth/guards.spec.ts src/modules/pos-entry/pos-entry.service.spec.ts src/modules/pos-sale/pos-sale.service.spec.ts src/modules/pos-checkout/pos-checkout.service.spec.ts src/modules/pos-cash/pos-cash.service.spec.ts src/modules/pos-exception/pos-exception.service.spec.ts",
-    "umi-pos:rbac-db-check": "bash scripts/umi-pos-db-check.sh"
+    "umi-pos:rbac-db-check": "bash scripts/umi-pos-db-check.sh",
+    "umipos:pilot:precheck": "bash scripts/umipos-pilot.sh precheck",
+    "umipos:pilot:build": "bash scripts/umipos-pilot.sh build",
+    "umipos:pilot:deploy": "bash scripts/umipos-pilot.sh deploy",
+    "umipos:pilot:smoke": "bash scripts/umipos-pilot.sh smoke",
+    "umipos:pilot:certify-clean": "bash scripts/umipos-pilot.sh certify-clean",
+    "umipos:pilot:backup": "bash scripts/umipos-pilot.sh backup",
+    "umipos:pilot:runtime-tests": "node --test scripts/umipos-pilot-runtime.spec.mjs",
+    "umipos:pilot:update-check": "node scripts/umipos-update-check.mjs"
   },
   "devDependencies": {
     "prettier": "3.9.4",

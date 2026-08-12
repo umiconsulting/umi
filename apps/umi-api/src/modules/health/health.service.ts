@@ -4,12 +4,16 @@ import type { Queue } from 'bullmq';
 import { PgService } from '../../shared/database/pg.service';
 import { QUEUES } from '../../jobs/queues';
 import { MetricsService } from '../../shared/operations/metrics.service';
+import { ReleaseIdentityService } from '../../shared/release/release-identity.service';
 
 export interface HealthResult {
   status: 'ok' | 'degraded';
+  state: 'Healthy' | 'Unready';
   db: boolean;
   redis: boolean;
   ts: string;
+  release: ReturnType<ReleaseIdentityService['current']>;
+  schema: { current: string | null; expected: string; compatible: boolean };
 }
 
 @Injectable()
@@ -18,18 +22,38 @@ export class HealthService {
     private readonly pg: PgService,
     @InjectQueue(QUEUES.system) private readonly systemQueue: Queue,
     private readonly metrics: MetricsService,
+    private readonly releaseIdentity: ReleaseIdentityService,
   ) {}
 
-  live(): { status: 'ok'; ts: string } {
-    return { status: 'ok', ts: new Date().toISOString() };
+  live(): { status: 'ok'; state: 'Healthy'; release: object; ts: string } {
+    return {
+      status: 'ok',
+      state: 'Healthy',
+      release: this.releaseIdentity.current(),
+      ts: new Date().toISOString(),
+    };
   }
 
   async check(): Promise<HealthResult> {
-    const [db, redis] = await Promise.all([this.checkDb(), this.checkRedis()]);
+    const [db, redis, schemaVersion] = await Promise.all([
+      this.checkDb(),
+      this.checkRedis(),
+      this.checkSchemaVersion(),
+    ]);
+    const release = this.releaseIdentity.current();
+    const schemaCompatible = schemaVersion === release.expectedSchemaVersion;
+    const ready = db && redis && schemaCompatible;
     return {
-      status: db && redis ? 'ok' : 'degraded',
+      status: ready ? 'ok' : 'degraded',
+      state: ready ? 'Healthy' : 'Unready',
       db,
       redis,
+      release,
+      schema: {
+        current: schemaVersion,
+        expected: release.expectedSchemaVersion,
+        compatible: schemaCompatible,
+      },
       ts: new Date().toISOString(),
     };
   }
@@ -45,8 +69,13 @@ export class HealthService {
         heapTotalBytes: memory.heapTotal,
       },
       metrics: this.metrics.snapshot(),
+      release: this.releaseIdentity.current(),
       ts: new Date().toISOString(),
     };
+  }
+
+  release(): object {
+    return this.releaseIdentity.current();
   }
 
   private async checkDb(): Promise<boolean> {
@@ -65,6 +94,14 @@ export class HealthService {
       return (await client.ping()) === 'PONG';
     } catch {
       return false;
+    }
+  }
+
+  private async checkSchemaVersion(): Promise<string | null> {
+    try {
+      return await this.pg.schemaVersion();
+    } catch {
+      return null;
     }
   }
 }

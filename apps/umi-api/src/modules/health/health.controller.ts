@@ -32,6 +32,11 @@ export class HealthController {
     return result;
   }
 
+  @Get('release')
+  release(): object {
+    return this.health.release();
+  }
+
   @Get('diagnostics')
   diagnostics(@Headers('x-umi-operations-token') supplied?: string): object {
     const expected = this.config.get('OPERATIONS_TOKEN', { infer: true });

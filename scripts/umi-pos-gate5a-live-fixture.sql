@@ -378,6 +378,41 @@ insert into merchant.station(
   array['prepare','ready'],1
 );
 
+insert into merchant.device(
+  id,merchant_id,location_id,station_id,name,kind,public_id,status,platform,last_seen_at
+) values(
+  '85000000-0000-4000-8000-000000000102',
+  '10000000-0000-4000-8000-000000000101',
+  '20000000-0000-4000-8000-000000000101',
+  '85000000-0000-4000-8000-000000000101',
+  'KDS Simulado Gate 6A','kds','85000000-0000-4000-8000-000000000103',
+  'active','ios',clock_timestamp()
+);
+
+insert into merchant.kitchen_device_station(
+  merchant_id,location_id,device_id,station_id,active,configuration_version
+) values(
+  '10000000-0000-4000-8000-000000000101',
+  '20000000-0000-4000-8000-000000000101',
+  '85000000-0000-4000-8000-000000000102',
+  '85000000-0000-4000-8000-000000000101',true,1
+);
+
+insert into runtime.session(
+  id,merchant_id,principal_type,principal_id,token_hash,station_id,device_name,
+  is_active,metadata,last_used_at
+) values(
+  '85000000-0000-4000-8000-000000000104',
+  '10000000-0000-4000-8000-000000000101','device',
+  '85000000-0000-4000-8000-000000000102',
+  encode(extensions.digest('gate6a-pilot-kds-token','sha256'),'hex'),
+  '85000000-0000-4000-8000-000000000101','KDS Simulado Gate 6A',true,
+  jsonb_build_object(
+    'location_id','20000000-0000-4000-8000-000000000101',
+    'permissions',jsonb_build_array('kitchen.read','kitchen.prepare','kitchen.ready','kitchen.complete')
+  ),clock_timestamp()
+);
+
 -- A failed, query-first inventory command proves the real Recovery Center path.
 insert into merchant.business_command(
   id,merchant_id,location_id,command_id,idempotency_key,command_type,fingerprint,

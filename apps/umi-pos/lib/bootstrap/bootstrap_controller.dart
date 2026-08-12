@@ -4,6 +4,7 @@ import '../core/config/app_config.dart';
 import '../core/contracts/contract_gateway.dart';
 import '../core/errors/app_error.dart';
 import '../core/observability/telemetry.dart';
+import '../core/release/release_compatibility.dart';
 import '../core/storage/storage.dart';
 import 'bootstrap_state.dart';
 
@@ -11,12 +12,14 @@ final class BootstrapController extends ChangeNotifier {
   BootstrapController({
     required AppConfig config,
     required ContractGateway contracts,
+    required ReleaseCompatibilityGateway releaseCompatibility,
     required SecureKeyValueStorage secureStorage,
     required Telemetry telemetry,
   }) : // ignore: prefer_initializing_formals
        _config = config,
        // ignore: prefer_initializing_formals
        _contracts = contracts,
+       _releaseCompatibility = releaseCompatibility,
        // ignore: prefer_initializing_formals
        _secureStorage = secureStorage,
        // ignore: prefer_initializing_formals
@@ -24,6 +27,7 @@ final class BootstrapController extends ChangeNotifier {
 
   final AppConfig _config;
   final ContractGateway _contracts;
+  final ReleaseCompatibilityGateway _releaseCompatibility;
   final SecureKeyValueStorage _secureStorage;
   final Telemetry _telemetry;
   BootstrapState _state = const BootstrapState.initializing();
@@ -50,6 +54,25 @@ final class BootstrapController extends ChangeNotifier {
       }
       if (!_contracts.isCompatible) {
         _setState(const BootstrapState(BootstrapPhase.sdkUnavailable));
+        return;
+      }
+      final releaseCompatibility = await _releaseCompatibility.check();
+      if (releaseCompatibility == ReleaseCompatibility.apiUnavailable) {
+        _setState(
+          const BootstrapState(
+            BootstrapPhase.recoverableFailure,
+            diagnosticCategory: 'apiUnavailable',
+          ),
+        );
+        return;
+      }
+      if (releaseCompatibility != ReleaseCompatibility.compatible) {
+        _setState(
+          BootstrapState(
+            BootstrapPhase.unrecoverableFailure,
+            diagnosticCategory: releaseCompatibility.name,
+          ),
+        );
         return;
       }
       final storage = await _secureStorage.healthCheck();

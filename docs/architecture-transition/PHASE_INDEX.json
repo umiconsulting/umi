@@ -172,6 +172,13 @@
       "status": "complete",
       "stateMachineVersion": 1,
       "subject": "Live Dashboard command execution with real sessions, API, PostgreSQL, RLS, and audit"
+    },
+    {
+      "commit": "HEAD (Gate 6A pilot deployment commit)",
+      "id": "6A",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "Pilot deployment, release artifacts, health, backup, restore, upgrade, rollback, and smoke certification"
     }
   ]
 }

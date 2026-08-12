@@ -8,6 +8,7 @@ import '../core/feature_flags/feature_flags.dart';
 import '../core/network/api_client.dart';
 import '../core/observability/telemetry.dart';
 import '../core/platform/platform_adapters.dart';
+import '../core/release/release_compatibility.dart';
 import '../core/security/credential_vault.dart';
 import '../core/storage/storage.dart';
 import '../features/cart/cart_controller.dart';
@@ -99,7 +100,9 @@ final class AppCompositionRoot {
       deviceCredentialProvider: credentials,
     );
     final connectivity = ConnectivityController();
-    final hardwareLab = PilotHardwareLab();
+    final hardwareLab = PilotHardwareLab(
+      allowSimulator: config.hardwareSimulatorEnabled,
+    );
     final hardware = HardwareService(
       repository: ApiHardwareRepository(apiClient),
       coordinator: HardwareCoordinator(adapters: const {}, devices: const []),
@@ -123,6 +126,10 @@ final class AppCompositionRoot {
     final controller = BootstrapController(
       config: config,
       contracts: const GeneratedContractGateway(),
+      releaseCompatibility: ApiReleaseCompatibilityGateway(
+        api: apiClient,
+        config: config,
+      ),
       secureStorage: secureStorage,
       telemetry: telemetry,
     );
@@ -316,7 +323,9 @@ final class AppCompositionRoot {
   void _scheduleHardwareRelay() {
     if (_hardwareRelayBusy) return;
     _hardwareRelayBusy = true;
-    unawaited(_drainHardwareRelay().whenComplete(() => _hardwareRelayBusy = false));
+    unawaited(
+      _drainHardwareRelay().whenComplete(() => _hardwareRelayBusy = false),
+    );
   }
 
   Future<void> _drainHardwareRelay() async {
@@ -326,7 +335,11 @@ final class AppCompositionRoot {
     final location = state.selectedBranch;
     final operator = state.operator;
     final device = state.device;
-    if (service == null || merchant == null || location == null || operator == null || device == null) {
+    if (service == null ||
+        merchant == null ||
+        location == null ||
+        operator == null ||
+        device == null) {
       return;
     }
     final scope = HardwareScope(

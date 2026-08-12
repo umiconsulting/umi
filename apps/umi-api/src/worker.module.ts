@@ -22,6 +22,8 @@ import { LifecycleModule } from './modules/lifecycle/lifecycle.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { PosCustomerValueModule } from './modules/pos-customer-value/pos-customer-value.module';
 import { CustomerValueExpiryScheduler } from './jobs/customer-value-expiry.scheduler';
+import { ReleaseModule } from './shared/release/release.module';
+import { RateLimitModule } from './shared/ratelimit/rate-limit.module';
 
 /**
  * Root module for the WORKER process. Same shared infrastructure as the web
@@ -31,6 +33,8 @@ import { CustomerValueExpiryScheduler } from './jobs/customer-value-expiry.sched
 @Module({
   imports: [
     AppConfigModule,
+    RateLimitModule,
+    ReleaseModule,
     DatabaseModule,
     AdaptersModule,
     LoggingModule,

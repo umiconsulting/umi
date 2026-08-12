@@ -6,6 +6,7 @@ import 'package:umi_pos/core/feature_flags/feature_flags.dart';
 import 'package:umi_pos/core/network/api_client.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
 import 'package:umi_pos/core/platform/platform_adapters.dart';
+import 'package:umi_pos/core/release/release_compatibility.dart';
 import 'package:umi_pos/core/security/credential_vault.dart';
 import 'package:umi_pos/core/storage/storage.dart';
 import 'package:umi_pos/features/cart/cart_controller.dart';
@@ -32,7 +33,34 @@ final testConfig = AppConfig(
   telemetryEnabled: true,
   developmentDiagnostics: true,
   featureBootstrapMode: FeatureBootstrapMode.localSafeDefaults,
+  hardwareSimulatorEnabled: true,
+  release: const ReleaseIdentity(
+    application: 'umi-pos',
+    version: '0.1.0-test',
+    gitCommit: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    buildTimestamp: '2026-08-11T12:00:00.000Z',
+    contractVersion: '2.12.0',
+    configurationSchemaVersion: '1',
+  ),
 );
+
+final pilotTestConfig = AppConfig(
+  environment: AppEnvironment.pilot,
+  apiBaseUri: Uri.parse('https://pilot.example.test'),
+  telemetryEnabled: true,
+  developmentDiagnostics: false,
+  featureBootstrapMode: FeatureBootstrapMode.disabled,
+  hardwareSimulatorEnabled: false,
+  release: testConfig.release,
+);
+
+final class TestReleaseCompatibility implements ReleaseCompatibilityGateway {
+  const TestReleaseCompatibility(this.result);
+  final ReleaseCompatibility result;
+
+  @override
+  Future<ReleaseCompatibility> check() async => result;
+}
 
 final class TestContracts implements ContractGateway {
   const TestContracts({this.compatible = true});
@@ -97,12 +125,18 @@ final class TestApiClient implements ApiClient {
 AppCompositionRoot testRoot({
   MemorySecureStorage? storage,
   ContractGateway contracts = const TestContracts(),
+  AppConfig? config,
+  ReleaseCompatibilityGateway? releaseCompatibility,
 }) {
+  config ??= testConfig;
+  releaseCompatibility ??= const TestReleaseCompatibility(
+    ReleaseCompatibility.compatible,
+  );
   final secureStorage = storage ?? MemorySecureStorage();
   final exporter = RecordingExporter();
   final telemetry = SafeTelemetry(
     enabled: true,
-    context: TelemetryContext.current(testConfig),
+    context: TelemetryContext.current(config),
     exporter: exporter,
   );
   final credentials = CredentialVault(secureStorage);
@@ -114,8 +148,9 @@ AppCompositionRoot testRoot({
   return AppCompositionRoot(
     config: testConfig,
     controller: BootstrapController(
-      config: testConfig,
+      config: config,
       contracts: contracts,
+      releaseCompatibility: releaseCompatibility,
       secureStorage: secureStorage,
       telemetry: telemetry,
     ),

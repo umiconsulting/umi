@@ -65,6 +65,10 @@ begin
     select 1 from information_schema.tables
     where table_schema='runtime' and table_name='device_pairing_session'
   ) then raise exception 'missing UmiPOS device pairing session'; end if;
+  if not exists (
+    select 1 from runtime.schema_migration
+    where version='build-v3-45' and status='applied'
+  ) then raise exception 'missing Gate 6A schema version'; end if;
 
   -- observability must NOT exist (killed 2026-07-11)
   if exists (select 1 from information_schema.schemata where schema_name='observability') then raise exception 'observability schema should not exist'; end if;

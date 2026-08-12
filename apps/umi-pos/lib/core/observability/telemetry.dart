@@ -16,7 +16,7 @@ final class TelemetryContext {
   });
 
   factory TelemetryContext.current(AppConfig config) => TelemetryContext(
-    appVersion: '0.1.0',
+    appVersion: config.release.version,
     environment: config.environment.name,
     platform: kIsWeb ? 'web' : defaultTargetPlatform.name,
   );

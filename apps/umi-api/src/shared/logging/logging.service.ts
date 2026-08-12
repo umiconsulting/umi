@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { getRequestContext } from '../database/request-context';
 import { redactTelemetry } from '../operations/redaction';
+import { ReleaseIdentityService } from '../release/release-identity.service';
 
 type Meta = Record<string, unknown>;
 
@@ -11,6 +12,7 @@ type Meta = Record<string, unknown>;
  */
 @Injectable()
 export class LoggingService {
+  constructor(private readonly releaseIdentity: ReleaseIdentityService) {}
   log(message: string, meta: Meta = {}): void {
     this.write('info', message, meta);
   }
@@ -25,7 +27,15 @@ export class LoggingService {
     const context = getRequestContext();
     const requestId = context?.requestId;
     const correlationId = context?.correlationId;
-    const base = { ts: new Date().toISOString(), level, message };
+    const release = this.releaseIdentity.current();
+    const base = {
+      timestamp: new Date().toISOString(),
+      service: release.application,
+      environment: release.environment,
+      release: release.version,
+      severity: level,
+      message,
+    };
     // requestId is spread LAST so caller-supplied meta can never override the
     // contextual request id. The whole thing is guarded so a circular/
     // unserializable meta can never crash the logger.

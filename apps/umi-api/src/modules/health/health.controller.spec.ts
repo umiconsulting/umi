@@ -29,4 +29,16 @@ describe('HealthController diagnostics', () => {
 
     expect(controller.diagnostics('a'.repeat(32))).toBe(diagnostics);
   });
+
+  it('returns safe release identity without a credential', () => {
+    const identity = { application: 'umi-api', version: '6.0.0-pilot.1' };
+    const health = { release: vi.fn().mockReturnValue(identity) };
+    const config = { get: vi.fn() };
+    const controller = new HealthController(
+      health as unknown as HealthService,
+      config as unknown as ConfigService<AppConfig, true>,
+    );
+
+    expect(controller.release()).toBe(identity);
+  });
 });

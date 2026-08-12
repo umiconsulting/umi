@@ -41,6 +41,7 @@ import { PosHardwareModule } from './modules/pos-hardware/pos-hardware.module';
 import { DashboardOperationsModule } from './modules/dashboard-operations/dashboard-operations.module';
 import { CsrfGuard } from './modules/auth/csrf.guard';
 import { AdministrativeCommandModule } from './modules/administrative-commands/administrative-command.module';
+import { ReleaseModule } from './shared/release/release.module';
 
 /**
  * Root module for the WEB process. Imports shared infrastructure + domain
@@ -50,6 +51,7 @@ import { AdministrativeCommandModule } from './modules/administrative-commands/a
 @Module({
   imports: [
     AppConfigModule,
+    ReleaseModule,
     DatabaseModule,
     AdaptersModule,
     SharedAuthModule,
