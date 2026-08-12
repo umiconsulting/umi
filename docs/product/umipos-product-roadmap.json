@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-08-11",
-  "latestRelevantCommit": "HEAD (Gate 6A pilot deployment commit)",
-  "integrationState": "Gates 3A through 6A are complete. Gate 6B is authorized and has not started.",
+  "latestRelevantCommit": "HEAD (Gate 6B pilot operations commit)",
+  "integrationState": "Gates 3A through 6A are complete. Gate 6B is incomplete. Gate 7A is not authorized.",
   "items": [
     {
       "id": "platform-certification",
@@ -54,7 +54,7 @@
     },
     {
       "id": "2F",
-      "status": "complete_with_observations",
+      "status": "incomplete",
       "dependencies": ["2E"],
       "nextObjective": "Preserve the certified offline authority boundary",
       "blockers": [],
@@ -161,6 +161,17 @@
         "Production DNS, TLS certificates, provider backups, signing tools, and physical devices require external infrastructure"
       ],
       "validationState": "Clean deployment, pilot smoke, release builds, migration, RLS, database backup, isolated restore, rollback, upgrade, support redaction, and deterministic PR checks passed"
+    },
+    {
+      "id": "6B",
+      "status": "complete_with_observations",
+      "dependencies": ["6A"],
+      "nextObjective": "Prove merchant onboarding and execute the business and role walkthroughs",
+      "blockers": [
+        "Merchant root onboarding has no reproducible operator surface",
+        "Business and role walkthrough evidence is not executed"
+      ],
+      "validationState": "Business profile, readiness validator, deterministic fixture, operator training, support runbooks, and daily checklists exist; final walkthrough evidence is pending"
     }
   ]
 }

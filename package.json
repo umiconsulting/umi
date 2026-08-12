@@ -65,7 +65,9 @@
     "umipos:pilot:certify-clean": "bash scripts/umipos-pilot.sh certify-clean",
     "umipos:pilot:backup": "bash scripts/umipos-pilot.sh backup",
     "umipos:pilot:runtime-tests": "node --test scripts/umipos-pilot-runtime.spec.mjs",
-    "umipos:pilot:update-check": "node scripts/umipos-update-check.mjs"
+    "umipos:pilot:update-check": "node scripts/umipos-update-check.mjs",
+    "pilot:readiness": "node scripts/umipos-pilot-readiness.mjs",
+    "pilot:readiness:test": "node --test scripts/umipos-pilot-readiness.spec.mjs scripts/umipos-pilot-fixture.spec.mjs"
   },
   "devDependencies": {
     "prettier": "3.9.4",

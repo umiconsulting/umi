@@ -398,6 +398,54 @@ insert into merchant.kitchen_device_station(
   '85000000-0000-4000-8000-000000000101',true,1
 );
 
+insert into merchant.kitchen_route(
+  id,merchant_id,location_id,category_id,station_id,requires_preparation,
+  route_priority,target_seconds,active,version
+) values(
+  '85000000-0000-4000-8000-000000000105',
+  '10000000-0000-4000-8000-000000000101',
+  '20000000-0000-4000-8000-000000000101',
+  '51000000-0000-4000-8000-000000000101',
+  '85000000-0000-4000-8000-000000000101',true,100,480,true,1
+);
+
+insert into merchant.hardware_device(
+  id,merchant_id,location_id,register_id,assigned_pos_device_id,device_type,
+  manufacturer,model,public_reference,transport,capabilities,enabled,
+  configuration_version,connection_state,created_by,optimistic_version
+) values(
+  '68000000-0000-4000-8000-000000000110',
+  '10000000-0000-4000-8000-000000000101',
+  '20000000-0000-4000-8000-000000000101',
+  '57000000-0000-4000-8000-000000000101',
+  '67000000-0000-4000-8000-000000000101','barcode_scanner','Umi',
+  'Deterministic Scanner','SCN-LIVE-01','simulator',
+  array['scanner.barcode','scanner.single'],true,1,'connected',
+  '30000000-0000-4000-8000-000000000200',1
+);
+
+insert into merchant.hardware_assignment(
+  id,merchant_id,hardware_id,location_id,register_id,assigned_pos_device_id,
+  primary_device,configuration_version,assigned_by
+) values(
+  '68000000-0000-4000-8000-000000000111',
+  '10000000-0000-4000-8000-000000000101',
+  '68000000-0000-4000-8000-000000000110',
+  '20000000-0000-4000-8000-000000000101',
+  '57000000-0000-4000-8000-000000000101',
+  '67000000-0000-4000-8000-000000000101',false,1,
+  '30000000-0000-4000-8000-000000000200'
+);
+
+insert into merchant.pos_offline_policy(
+  merchant_id,version,expires_at,allowed_command_types,cash_sale_enabled,
+  max_queue_depth,max_batch_size,max_command_age_seconds
+) values(
+  '10000000-0000-4000-8000-000000000101','gate6b-training-1',
+  clock_timestamp()+interval '30 days',
+  array['operational.ack','sale.cash.commit'],true,250,20,86400
+);
+
 insert into runtime.session(
   id,merchant_id,principal_type,principal_id,token_hash,station_id,device_name,
   is_active,metadata,last_used_at

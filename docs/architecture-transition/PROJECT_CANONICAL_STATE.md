@@ -255,7 +255,14 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - A real PostgreSQL backup and isolated restore passed with measured recovery times.
 - The compatible application rollback and the A-to-B upgrade simulation passed.
 - Production DNS, TLS certificates, provider backups, signing tools, and physical devices remain external observations.
-- Gate 6B is authorized. Gate 6B has not started.
+- Gate 6B: incomplete. The pilot has a draft operations and training kit.
+- The business profile is machine-readable and contains no secret values.
+- `pnpm pilot:readiness` reports `READY`, `READY WITH WARNINGS`, or `NOT READY`.
+- The clean fixture includes the café, roles, POS, printer, scanner, KDS, catalog, inventory, customer value, and policies.
+- The operator runbooks cover onboarding, daily opening, selling, kitchen work, closing, recovery, support, backup, and release.
+- The Owner decision register contains all unresolved commercial and physical choices.
+- Physical hardware, iPad, public infrastructure, provider integrations, and final UX remain external observations.
+- Gate 7A is not authorized. Gate 6B still needs reproducible merchant onboarding and executed walkthrough evidence.
 
 ## Gate 3C decision basis
 

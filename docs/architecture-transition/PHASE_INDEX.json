@@ -90,7 +90,7 @@
     {
       "commit": "HEAD (Gate 2F final closeout commit)",
       "id": "2F",
-      "status": "complete_with_observations",
+      "status": "incomplete",
       "subject": "Encrypted offline checkout, serialized journal, ordered replay, recovery, and reconciliation"
     },
     {
@@ -179,6 +179,13 @@
       "status": "complete_with_observations",
       "stateMachineVersion": 1,
       "subject": "Pilot deployment, release artifacts, health, backup, restore, upgrade, rollback, and smoke certification"
+    },
+    {
+      "commit": "HEAD (Gate 6B pilot operations commit)",
+      "id": "6B",
+      "status": "incomplete",
+      "stateMachineVersion": 1,
+      "subject": "Pilot operations kit, readiness validation, training, support, daily procedures, and Owner decisions"
     }
   ]
 }
