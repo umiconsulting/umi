@@ -1,10 +1,19 @@
 import type { PaymentSummary } from '@umi/contract';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { PosCheckoutRepository } from './pos-checkout.repository';
 
 const id = (value: number) => `00000000-0000-4000-8000-${value.toString().padStart(12, '0')}`;
 
 describe('Gate 3B checkout persistence', () => {
+  it('leaves the protected stock balance write lock to append_stock_ledger', async () => {
+    const source = readFileSync(join(__dirname, 'pos-checkout.repository.ts'), 'utf8');
+    expect(source).toContain('FROM merchant.stock_balance');
+    expect(source).not.toContain('inventory_item_id=$2::uuid FOR UPDATE');
+    expect(source).toContain('sum(quantity_numerator/quantity_denominator)::bigint::text');
+  });
+
   it('consumes one exact approval for each required permission', async () => {
     const query = vi
       .fn()

@@ -3,6 +3,12 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('POS cash center SQL regression', () => {
+  it('uses the merchant timezone for the cash business date', () => {
+    const source = readFileSync(join(__dirname, 'pos-cash.repository.ts'), 'utf8');
+    expect(source).toContain('now() at time zone coalesce(location.timezone,merchant.timezone)');
+    expect(source).not.toContain('SELECT current_date::text');
+  });
+
   it('uses contiguous parameters for the active shift query', () => {
     const source = readFileSync(join(__dirname, 'pos-cash.repository.ts'), 'utf8');
     const query = source.slice(

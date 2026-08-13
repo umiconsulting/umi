@@ -1719,6 +1719,7 @@ export class PosExceptionRepository {
     registerId: string;
     ledgerSequence: number;
     expectedCash: number;
+    businessDate: string;
   } | null> {
     if (authorization.commandContextType === 'dashboard_administrative') {
       if (!authorization.administrativeCommandId) {
@@ -1732,9 +1733,10 @@ export class PosExceptionRepository {
       id: string;
       registerId: string;
       ledgerSequence: string;
+      businessDate: string;
     }>(
       `SELECT s.id::text,s.register_id::text AS "registerId",
-              s.ledger_sequence::text AS "ledgerSequence"
+              s.ledger_sequence::text AS "ledgerSequence",s.business_date::text AS "businessDate"
        FROM merchant.cash_shift s
        WHERE s.merchant_id=$1::uuid AND s.location_id=$2::uuid
          AND (($6='pos_device' AND s.operator_session_id=$3::uuid AND s.device_id=$4::uuid)
@@ -1854,7 +1856,7 @@ export class PosExceptionRepository {
           amount_minor_units,currency,command_id,sale_id,
           sale_exception_id,business_date,public_data)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,'cash_refund',$6,$7,
-               $8::uuid,$9::uuid,$10::uuid,current_date,
+               $8::uuid,$9::uuid,$10::uuid,$11::date,
                jsonb_build_object('exceptionType','refund'))
        RETURNING id::text`,
       [
@@ -1868,6 +1870,7 @@ export class PosExceptionRepository {
         commandId,
         saleId,
         exceptionId,
+        shift.businessDate,
       ],
     );
     const sequence = await client.query(

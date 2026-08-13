@@ -285,7 +285,11 @@ export class PosCashRepository {
       throw new Error('CASH_POLICY_DENIED');
     }
     const businessDate = await client.query<{ value: string }>(
-      `SELECT current_date::text AS value`,
+      `SELECT (now() at time zone coalesce(location.timezone,merchant.timezone))::date::text AS value
+         FROM merchant.location location
+         JOIN merchant.merchant merchant ON merchant.id=location.merchant_id
+        WHERE location.id=$1::uuid AND location.merchant_id=$2::uuid`,
+      [dto.locationId, merchantId],
     );
     const authoritativeBusinessDate = businessDate.rows[0].value;
     const shift = await client.query<{
@@ -1311,7 +1315,12 @@ export class PosCashRepository {
           : null;
         const closeSummary = closeSummaryResult?.rows[0]?.summary ?? null;
         const businessDateResult = await client.query<{ businessDate: string }>(
-          `SELECT current_date::text AS "businessDate"`,
+          `SELECT (now() at time zone coalesce(location.timezone,merchant.timezone))::date::text
+                    AS "businessDate"
+             FROM merchant.location location
+             JOIN merchant.merchant merchant ON merchant.id=location.merchant_id
+            WHERE location.id=$1::uuid AND location.merchant_id=$2::uuid`,
+          [locationId, merchantId],
         );
         const currency = shift?.currency ?? mappedRegisters[0]?.currency ?? 'MXN';
         const policy = await this.policy(client, merchantId, locationId, currency);

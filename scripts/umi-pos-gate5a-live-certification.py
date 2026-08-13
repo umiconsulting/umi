@@ -369,7 +369,8 @@ def run_positive_walkthrough(page: Page) -> None:
     dialog.wait_for(state="detached")
 
     select_domain(page, "Ventas")
-    page.get_by_role("button", name="Refund").click()
+    fixture_sale = page.get_by_role("row").filter(has_text="LIVE-0001")
+    fixture_sale.get_by_role("button", name="Refund").click()
     dialog = page.get_by_role("dialog", name="Refund")
     dialog.get_by_role("button", name="Consultar elegibilidad").click()
     dialog.get_by_label("Cantidad para Americano").fill("1")

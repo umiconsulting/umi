@@ -703,7 +703,7 @@ export class PosCheckoutRepository {
          ), recipe AS (
            SELECT inventory_item_id::text AS "inventoryItemId",sale_line_id::text AS "saleLineId",
                   CASE WHEN bool_and(mod(quantity_numerator,quantity_denominator)=0)
-                    THEN sum(quantity_numerator/quantity_denominator)::text ELSE null END
+                    THEN sum(quantity_numerator/quantity_denominator)::bigint::text ELSE null END
                     AS "requiredQuantity",
                   quantity_scale AS scale,base_unit AS unit,mapping_id::text AS "mappingId",
                   mapping_version AS "mappingVersion",recipe_id::text AS "recipeId",
@@ -739,7 +739,7 @@ export class PosCheckoutRepository {
       for (const line of resolved.rows) {
         const balance = await client.query<{ sequence: string }>(
           `SELECT coalesce(ledger_sequence,0)::text AS sequence FROM merchant.stock_balance
-            WHERE inventory_location_id=$1::uuid AND inventory_item_id=$2::uuid FOR UPDATE`,
+            WHERE inventory_location_id=$1::uuid AND inventory_item_id=$2::uuid`,
           [inventoryLocationId, line.inventoryItemId],
         );
         await client.query(

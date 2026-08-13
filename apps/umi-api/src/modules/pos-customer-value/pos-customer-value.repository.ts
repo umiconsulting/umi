@@ -141,7 +141,7 @@ export class PosCustomerValueRepository {
       `SELECT DISTINCT merchant_id::text AS id
          FROM merchant.customer_value_authorization
         WHERE status='authorized' AND expires_at<=clock_timestamp()
-        ORDER BY merchant_id LIMIT 500`,
+        ORDER BY id LIMIT 500`,
     );
     let expired = 0;
     for (const merchant of merchants.rows) {
