@@ -18,7 +18,7 @@ on conflict(key) do nothing;
 
 insert into umi.plan_feature(plan_id,feature_id)
 select 'e1000000-0000-4000-8000-000000000101'::uuid,id
-from umi.feature where key in ('dashboard','pos','kds')
+from umi.feature where key in ('dashboard','pos','kds','pos.offline_cash')
 on conflict do nothing;
 
 insert into umi.subscription(
@@ -529,6 +529,19 @@ insert into merchant.pos_offline_policy(
   '10000000-0000-4000-8000-000000000101','gate6b-training-1',
   clock_timestamp()+interval '30 days',
   array['operational.ack','sale.cash.commit'],true,250,20,86400
+);
+
+insert into merchant.pos_offline_cash_policy(
+  merchant_id,location_id,enabled,version,currency,max_policy_age_seconds,
+  max_single_sale_minor_units,max_accumulated_minor_units,max_offline_sale_count,
+  max_active_queue_depth,max_command_age_seconds,max_catalog_age_seconds,
+  max_pricing_age_seconds,max_tax_age_seconds,manager_approval_threshold_minor_units,
+  allowed_device_classes,expires_at
+) values(
+  '10000000-0000-4000-8000-000000000101',
+  '20000000-0000-4000-8000-000000000101',true,'gate7a-native-1','MXN',86400,
+  100000,300000,10,250,86400,86400,86400,86400,null,array['pos_terminal'],
+  clock_timestamp()+interval '30 days'
 );
 
 insert into runtime.session(

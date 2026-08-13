@@ -145,9 +145,8 @@ export class PosCustomerValueRepository {
     );
     let expired = 0;
     for (const merchant of merchants.rows) {
-      const result = await this.pg.tquery<{ count: number }>(
-        merchant.id,
-        `SELECT merchant.expire_customer_value_authorizations($1::uuid,$2)::int AS count`,
+      const result = await this.pg.query<{ count: number }>(
+        `SELECT merchant.expire_customer_value_authorizations_worker($1::uuid,$2)::int AS count`,
         [merchant.id, batchSize],
       );
       expired += Number(result.rows[0]?.count ?? 0);
@@ -456,14 +455,15 @@ export class PosCustomerValueRepository {
       userId,
       async (client) => {
         const cart = await client.query<Row>(
-          `SELECT c.id::text,c.customer_id::text AS "customerId",c.version,c.currency,
+          `SELECT c.id::text,c.customer_id::text AS "customerId",c.version,business.currency,
              c.business_date::text AS "businessDate",
              coalesce(sum(l.quantity*(l.base_price+l.variant_delta+l.modifier_total)),0)::bigint AS total,
              coalesce(d.payment_summary,'{}'::jsonb) AS "paymentSummary"
-           FROM merchant.pos_cart c LEFT JOIN merchant.pos_cart_line l ON l.cart_id=c.id
+           FROM merchant.pos_cart c JOIN merchant.merchant business ON business.id=c.merchant_id
+           LEFT JOIN merchant.pos_cart_line l ON l.cart_id=c.id
            LEFT JOIN merchant.pos_checkout_draft d ON d.cart_id=c.id AND d.merchant_id=c.merchant_id
           WHERE c.id=$1::uuid AND c.merchant_id=$2::uuid AND c.location_id=$3::uuid
-          GROUP BY c.id,d.payment_summary`,
+          GROUP BY c.id,business.currency,d.payment_summary`,
           [dto.saleId, merchantId, dto.locationId],
         );
         const row = cart.rows[0];
@@ -889,7 +889,7 @@ export class PosCustomerValueRepository {
          r.version,p.policy_version AS "policyVersion",p.policy_fingerprint AS "policyFingerprint",
          a.id::text AS "accountId",
          coalesce(b.available,0)::bigint AS available,coalesce(b.authorized,0)::bigint AS authorized,
-         c.currency,c.business_date::text AS "businessDate",
+         business.currency,c.business_date::text AS "businessDate",
          coalesce(d.payment_summary,'{}'::jsonb) AS "paymentSummary",
          coalesce((select sum(l.quantity*(l.base_price+l.variant_delta+l.modifier_total))
            from merchant.pos_cart_line l where l.cart_id=c.id),0)::bigint AS "cartTotal",
@@ -930,6 +930,7 @@ export class PosCustomerValueRepository {
        JOIN merchant.loyalty_points_account a ON a.merchant_id=r.merchant_id AND a.customer_id=$2::uuid
        JOIN merchant.loyalty_points_balance b ON b.account_id=a.id
        JOIN merchant.pos_cart c ON c.id=$3::uuid AND c.merchant_id=r.merchant_id AND c.customer_id=$2::uuid
+       JOIN merchant.merchant business ON business.id=c.merchant_id
        LEFT JOIN merchant.pos_checkout_draft d ON d.cart_id=c.id AND d.merchant_id=c.merchant_id
        JOIN merchant.loyalty_earn_preview ep ON ep.cart_id=c.id AND ep.customer_id=$2::uuid
          AND ep.preview_fingerprint=$5 AND ep.checkout_version=$6 AND ep.expires_at>clock_timestamp()
@@ -1211,9 +1212,9 @@ export class PosCustomerValueRepository {
     if (dto.accountType === 'wallet') {
       await client.query(
         `SELECT merchant.append_stored_value_fact($1::uuid,$2::uuid,jsonb_build_object(
-          'delta',0,'amountMinorUnits',$3,'reason','authorized','idempotencyKey',$4::text,
-          'entryType','authorized','currency',$5,'direction','hold','authorizationId',$6::text,
-          'commandId',$7::text,'fingerprint',$8,'operatorId',$9::text,'deviceId',$10::text,
+          'delta',0,'amountMinorUnits',$3::bigint,'reason','authorized','idempotencyKey',$4::text,
+          'entryType','authorized','currency',$5::text,'direction','hold','authorizationId',$6::text,
+          'commandId',$7::text,'fingerprint',$8::text,'operatorId',$9::text,'deviceId',$10::text,
           'businessDate',current_date,'sourceType','stored_value_authorization','sourceId',$6::text))`,
         [
           merchantId,
@@ -1231,9 +1232,9 @@ export class PosCustomerValueRepository {
     } else {
       await client.query(
         `SELECT merchant.append_gift_card_fact($1::uuid,$2::uuid,jsonb_build_object(
-          'delta',0,'amountMinorUnits',$3,'reason','authorized','entryType','authorized',
-          'currency',$4,'direction','hold','authorizationId',$5::text,'commandId',$6::text,
-          'idempotencyKey',$7::text,'fingerprint',$8,'operatorId',$9::text,'deviceId',$10::text,
+          'delta',0,'amountMinorUnits',$3::bigint,'reason','authorized','entryType','authorized',
+          'currency',$4::text,'direction','hold','authorizationId',$5::text,'commandId',$6::text,
+          'idempotencyKey',$7::text,'fingerprint',$8::text,'operatorId',$9::text,'deviceId',$10::text,
           'businessDate',current_date,'sourceType','stored_value_authorization','sourceId',$5::text))`,
         [
           merchantId,

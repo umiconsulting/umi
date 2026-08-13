@@ -140,7 +140,7 @@ export class PosOfflineRepository {
       async (client) => {
         const existing = await client.query<{ fingerprint: string; result: ReplayResult }>(
           `SELECT fingerprint, result FROM merchant.offline_replay_command
-         WHERE command_id=$1::uuid FOR SHARE`,
+         WHERE command_id=$1::uuid`,
           [command.commandId],
         );
         if (existing.rows[0]) {
@@ -500,7 +500,7 @@ export class PosOfflineRepository {
         (merchant_id,location_id,device_id,command_id,device_sequence,classification,
          blocks_following,operator_action_required,manager_action_required,guidance_code,
          correlation_id,provisional_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,true,false,$6,$4::text,$8)
+       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6::text,$7,true,false,$6::text,$4::text,$8::uuid)
        ON CONFLICT (merchant_id,device_id,command_id) DO UPDATE
         SET last_observed_at=clock_timestamp()
        RETURNING id::text`,

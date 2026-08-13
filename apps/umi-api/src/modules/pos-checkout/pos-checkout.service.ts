@@ -112,7 +112,13 @@ export class PosCheckoutService {
           );
           const customerValueBasisFingerprint = calculateCheckout(
             repriced.public,
-            { ...dto, customerValue: null },
+            {
+              ...dto,
+              customerValue: null,
+              tenderDrafts: dto.tenderDrafts.filter(
+                (tender) => tender.type !== 'wallet' && tender.type !== 'gift_card',
+              ),
+            },
             policy,
             lineAmounts,
             null,

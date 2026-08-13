@@ -14,6 +14,10 @@ const finalCloseout = readFileSync(
   resolve(process.cwd(), '../../docs/migration/build-v3/39_pos_customer_value_final_closeout.sql'),
   'utf8',
 );
+const workerScope = readFileSync(
+  resolve(process.cwd(), '../../docs/migration/build-v3/48_customer_value_worker_scope.sql'),
+  'utf8',
+);
 const checkout = readFileSync(
   resolve(process.cwd(), 'src/modules/pos-checkout/pos-checkout.repository.ts'),
   'utf8',
@@ -124,6 +128,13 @@ describe('Gate 3F customer and value authority', () => {
     expect(closeout).toContain("status='expired'");
     expect(closeout).toContain('authorization_released');
     expect(closeout).toContain('points_released');
+  });
+
+  it('keeps worker expiry separate from API device context', () => {
+    expect(workerScope).toContain('v_api:=not v_worker');
+    expect(workerScope).toContain("current_user='worker'");
+    expect(workerScope).toContain('expire_customer_value_authorizations_worker');
+    expect(workerScope).toContain("values('build-v3-48','applied')");
   });
 
   it('supports secure adjustment, issuance, abuse control, and composite history', () => {

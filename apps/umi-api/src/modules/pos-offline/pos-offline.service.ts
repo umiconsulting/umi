@@ -256,8 +256,9 @@ export class PosOfflineService {
         }
         const preview = await this.checkout.checkout(user, merchantId, {
           ...snapshot.checkoutCommand,
+          commandId: randomUUID(),
           totalsFingerprint: null,
-          idempotencyKey: command.idempotencyKey,
+          idempotencyKey: randomUUID(),
         });
         const authoritativeAmount = preview.confirmation.totals.grandTotal.minorUnits;
         const authoritativeCurrency = preview.confirmation.totals.grandTotal.currency;
