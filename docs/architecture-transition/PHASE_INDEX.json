@@ -207,6 +207,13 @@
       "status": "complete_with_observations",
       "stateMachineVersion": 1,
       "subject": "POS operator UX, accessibility, localization, responsive layouts, failure states, and Design Language V1"
+    },
+    {
+      "commit": "HEAD (Gate 8B certification commit)",
+      "id": "8B",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "Dashboard and KDS UX, accessibility, responsive layouts, failure states, and operator experience"
     }
   ]
 }

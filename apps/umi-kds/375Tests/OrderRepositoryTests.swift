@@ -37,6 +37,14 @@ struct OrderRepositoryTests {
     }
 
     @Test
+    func operatorLabelsDoNotExposeRawKitchenEnums() {
+        #expect(KitchenPriority.high.displayName == "High priority")
+        #expect(KitchenItemStatus.preparing.displayName == "Preparing")
+        #expect(!previewKitchenOrders[0].accessibilitySummary.contains("_"))
+        #expect(previewKitchenOrders[0].accessibilitySummary.contains("Order 1024"))
+    }
+
+    @Test
     func duplicateAndStaleEventsCannotRegressState() {
         var seen: Set<Int> = []
         #expect(kdsEventNeedsSnapshot(

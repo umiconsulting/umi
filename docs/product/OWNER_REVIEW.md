@@ -215,3 +215,16 @@ Recommended Mac review sequence:
 - Remaining P2: Owner preference for visual density, receipt density, and final aesthetic detail.
 - External: touch hardware, physical devices, Xcode/iPad, and provider payment remain pending.
 - Owner approval remains pending. This record does not infer approval.
+
+## Gate 8B Dashboard and KDS operator experience
+
+- Certified: Dashboard shell, business context, permission navigation, operational modules, recovery, audit, and diagnostics.
+- Certified: KDS board, order cards, preparation actions, priority, cancellation, degraded state, and reconciliation.
+- Corrected: compact Dashboard layouts no longer force a 1280-pixel page width.
+- Corrected: Dashboard navigation now uses native keyboard controls and visible focus.
+- Corrected: normal Dashboard views no longer expose the reviewed internal terms or development controls.
+- Corrected: KDS cards show modifiers and use operator labels for priority and item state.
+- Corrected: KDS cards, columns, connection state, settings, and actions have accessibility context.
+- Remaining P2: final density, spacing, and visual preference require Owner review.
+- External: physical iPad, touch distance, physical peripherals, and provider payment remain pending.
+- Owner approval remains pending. This record does not infer approval.

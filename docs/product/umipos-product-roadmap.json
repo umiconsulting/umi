@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-08-13",
-  "latestRelevantCommit": "HEAD (Gate 8A certification commit)",
-  "integrationState": "Gates 3A through 8A are complete with recorded observations. Gate 8B is authorized and has not started.",
+  "latestRelevantCommit": "HEAD (Gate 8B certification commit)",
+  "integrationState": "Gates 3A through 8B are complete with recorded observations. Gate 9A is authorized and has not started.",
   "items": [
     {
       "id": "platform-certification",
@@ -199,6 +199,16 @@
         "Physical touch, physical peripherals, Xcode/iPad, Owner aesthetics, and provider payment remain external"
       ],
       "validationState": "Enrollment, PIN, operator flows, failures, accessibility, localization, responsive layouts, builds, and Design Language V1 passed"
+    },
+    {
+      "id": "8B",
+      "status": "complete_with_observations",
+      "dependencies": ["8A"],
+      "nextObjective": "Authorize Gate 9A Pilot Dry Run",
+      "blockers": [
+        "Physical iPad, physical peripherals, Owner aesthetics, and provider payment remain external"
+      ],
+      "validationState": "Dashboard and KDS workflows, accessibility, responsive layouts, failure states, focused tests, and builds passed"
     }
   ]
 }

@@ -1473,7 +1473,7 @@ const AddPosDevicePanel = ({ onClose, onCreated }) => {
                 </select>
               </div>
               <p style={{ color: 'var(--ink-3)', fontSize: 13 }}>
-                La solicitud queda vinculada al tenant y a la sucursal seleccionada.
+                La solicitud queda vinculada al negocio y a la sucursal seleccionada.
               </p>
             </>
           ) : (

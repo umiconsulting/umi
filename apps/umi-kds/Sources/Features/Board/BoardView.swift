@@ -70,6 +70,7 @@ struct BoardView: View {
                         )
                 }
                 .frame(width: 44, height: 44)
+                .accessibilityLabel("Station settings")
             }
         }
         .padding(.horizontal, KDSTheme.Spacing.large)
@@ -92,6 +93,8 @@ struct BoardView: View {
             Glass.regular.tint(connectionTint.opacity(KDSTheme.Glass.chromeTint)),
             in: Capsule()
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Connection: \(repository.connectionState.displayName)")
     }
 
     private var connectionSignalValue: Double {

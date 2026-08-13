@@ -1496,7 +1496,7 @@ export default function OperationsScreen() {
           <div style={{ textAlign: 'right', fontSize: 12, color: 'var(--ink-3)' }}>
             <div>
               {state.data?.scope === 'merchant'
-                ? 'Alcance del merchant'
+                ? 'Alcance de todo el negocio'
                 : 'Alcance de la ubicación'}
             </div>
             <div>{merchant?.selectedLocation?.name || 'Todas las ubicaciones autorizadas'}</div>
@@ -1511,20 +1511,14 @@ export default function OperationsScreen() {
                 }}
                 style={{ marginTop: 8 }}
               >
-                {merchantWide ? 'Usar ubicación seleccionada' : 'Ver alcance del merchant'}
+                {merchantWide ? 'Usar ubicación seleccionada' : 'Ver todo el negocio'}
               </button>
             )}
           </div>
         </div>
       </section>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(230px, 0.72fr) minmax(0, 2fr)',
-          gap: 18,
-        }}
-      >
+      <div className="operations-layout">
         <nav
           className="card"
           aria-label="Dominios operativos"

@@ -288,7 +288,12 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - The theme now defines shared touch targets, focus, typography, surfaces, sheets, dialogs, and status feedback.
 - Normal operator errors use business language instead of internal command codes.
 - Physical touch hardware, physical peripherals, Xcode/iPad, Owner aesthetics, and provider payment remain observations.
-- Gate 8B is authorized with observations. It has not started.
+- Gate 8B: complete with observations. Dashboard and KDS pilot UX passed.
+- Dashboard navigation, compact layouts, terminology, and development controls passed focused review.
+- KDS cards, state labels, modifiers, actions, degraded state, and accessibility passed code review.
+- Browser checks passed at 1440, 1024, and 390 CSS pixels without global overflow.
+- Physical iPad, physical peripherals, Owner aesthetics, and provider payment remain observations.
+- Gate 9A is authorized with observations. It has not started.
 
 ## Gate 3C decision basis
 

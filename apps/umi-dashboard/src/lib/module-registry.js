@@ -7,7 +7,7 @@ export { PRODUCT_ACTIVE_STATUSES };
 export const MODULES = {
   overview: {
     id: 'overview',
-    label: 'Overview',
+    label: 'Panorama',
     icon: 'Home',
     section: 'OPERATIONS',
     product: 'dashboard',
@@ -48,7 +48,7 @@ export const MODULES = {
   },
   devices: {
     id: 'devices',
-    label: 'Devices',
+    label: 'Dispositivos',
     icon: 'Tablet',
     section: 'OPERATIONS',
     product: 'dashboard',
@@ -57,7 +57,7 @@ export const MODULES = {
   },
   staff: {
     id: 'staff',
-    label: 'Staff & Access',
+    label: 'Equipo y acceso',
     icon: 'Users',
     section: 'OPERATIONS',
     product: 'dashboard',
@@ -65,7 +65,7 @@ export const MODULES = {
   },
   customers: {
     id: 'customers',
-    label: 'Customers',
+    label: 'Clientes',
     icon: 'Users2',
     section: 'OPERATIONS',
     product: 'dashboard',
@@ -73,7 +73,7 @@ export const MODULES = {
   },
   members: {
     id: 'members',
-    label: 'Loyalty',
+    label: 'Lealtad',
     icon: 'CreditCard',
     section: 'GROWTH',
     product: 'cash',
@@ -81,7 +81,7 @@ export const MODULES = {
   },
   'gift-cards': {
     id: 'gift-cards',
-    label: 'Gift Cards',
+    label: 'Gift cards',
     icon: 'Gift',
     section: 'GROWTH',
     product: 'cash',
@@ -89,7 +89,7 @@ export const MODULES = {
   },
   hours: {
     id: 'hours',
-    label: 'Hours & Availability',
+    label: 'Horario y disponibilidad',
     icon: 'Clock',
     section: 'CONFIGURATION',
     product: 'conversaflow',
@@ -98,7 +98,7 @@ export const MODULES = {
   },
   settings: {
     id: 'settings',
-    label: 'Settings',
+    label: 'Ajustes',
     icon: 'Settings',
     section: 'CONFIGURATION',
     product: 'dashboard',
@@ -106,7 +106,7 @@ export const MODULES = {
   },
   'products-billing': {
     id: 'products-billing',
-    label: 'Products & Billing',
+    label: 'Productos y plan',
     icon: 'Sparkles',
     section: 'CONFIGURATION',
     product: 'dashboard',

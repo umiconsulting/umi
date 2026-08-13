@@ -69,6 +69,14 @@ enum KitchenPriority: String, Codable, Sendable {
     case normal
     case high
     case urgent
+
+    var displayName: String {
+        switch self {
+        case .normal: return "Normal"
+        case .high: return "High priority"
+        case .urgent: return "Urgent"
+        }
+    }
 }
 
 enum KitchenItemStatus: String, Codable, Sendable {
@@ -77,6 +85,16 @@ enum KitchenItemStatus: String, Codable, Sendable {
     case ready
     case cancelled
     case exception
+
+    var displayName: String {
+        switch self {
+        case .queued: return "Queued"
+        case .preparing: return "Preparing"
+        case .ready: return "Ready"
+        case .cancelled: return "Cancelled"
+        case .exception: return "Needs attention"
+        }
+    }
 }
 
 struct Station: Codable, Hashable, Identifiable, Sendable {
@@ -116,6 +134,11 @@ struct KitchenOrder: Codable, Identifiable, Hashable, Sendable {
     let lastEventSequence: Int
 
     var displayName: String { "Order \(publicReference)" }
+
+    var accessibilitySummary: String {
+        let itemCount = items.reduce(0) { $0 + $1.quantity }
+        return "\(displayName), \(status.boardTitle), \(priority.displayName), \(itemCount) items, \(ageInMinutes) minutes"
+    }
 
     var nextActionStatuses: [KitchenStatus] {
         let active = items.filter { $0.status != .cancelled }

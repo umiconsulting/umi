@@ -30,4 +30,10 @@ describe('Dashboard permission navigation', () => {
     expect(ids).not.toContain('staff');
     expect(ids).not.toContain('gift-cards');
   });
+
+  it('uses operator language in visible navigation', () => {
+    const labels = getVisibleModules(capabilities(['customer.read'])).map((item) => item.label);
+    expect(labels).toContain('Clientes');
+    expect(labels).not.toContain('Customers');
+  });
 });

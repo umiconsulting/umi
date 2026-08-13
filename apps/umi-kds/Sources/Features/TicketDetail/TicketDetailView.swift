@@ -19,12 +19,6 @@ struct TicketDetailView: View {
                         actions(order)
                         metrics(order)
                         itemList(order)
-                        Label(
-                            "Last event #\(order.lastEventSequence)",
-                            systemImage: "dot.radiowaves.left.and.right"
-                        )
-                        .font(.footnote)
-                        .foregroundStyle(KDSTheme.Brand.blue.opacity(0.5))
                     }
                     .padding(KDSTheme.Spacing.large)
                 }
@@ -57,7 +51,7 @@ struct TicketDetailView: View {
                 detailChip(order.status.boardTitle, tint: order.status.tint)
                 detailChip(order.station.name, tint: KDSTheme.Brand.blue)
                 if order.priority != .normal {
-                    detailChip(order.priority.rawValue.uppercased(), tint: .orange)
+                    detailChip(order.priority.displayName, tint: .orange)
                 }
             }
             Text(order.createdAt.formatted(date: .omitted, time: .shortened))
@@ -85,6 +79,7 @@ struct TicketDetailView: View {
                             .buttonStyle(.borderedProminent)
                             .tint(status.tint)
                             .disabled(repository.connectionState != .connected && !repository.isDemoMode)
+                            .accessibilityHint("Changes this kitchen order to \(status.boardTitle)")
                         }
                     }
                     .sensoryFeedback(.impact(weight: .medium), trigger: actionCount)
@@ -101,7 +96,7 @@ struct TicketDetailView: View {
                     metricCard("Age", value: "\(order.ageInMinutes)m")
                 }
                 metricCard("Items", value: "\(order.items.count)")
-                metricCard("Version", value: "\(order.version)")
+                metricCard("Priority", value: order.priority.displayName)
             }
         }
     }
@@ -126,7 +121,7 @@ struct TicketDetailView: View {
                             }
                         }
                         Spacer()
-                        Text(item.status.rawValue.replacingOccurrences(of: "_", with: " "))
+                        Text(item.status.displayName)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                     }

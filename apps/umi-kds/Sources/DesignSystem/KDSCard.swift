@@ -102,9 +102,16 @@ struct KDSCard: View {
                         .foregroundStyle(item.isCancelled ? .tertiary : .primary)
                         .strikethrough(item.isCancelled, color: .secondary)
                 }
+                if !item.modifiers.isEmpty {
+                    Text(item.modifiers.joined(separator: " · "))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.orange)
+                        .lineLimit(2)
+                        .padding(.leading, 40)
+                }
             }
             if order.items.count > 4 {
-                Text("+\(order.items.count - 4) more")
+                Text("+\(order.items.count - 4) more items")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.tertiary)
                     .padding(.leading, 40)

@@ -27,9 +27,10 @@ Updated: 2026-08-13
 | 7A End-to-end operational certification   | Complete with observations | 6B                     | Authorize Gate 7B certification           | External and physical observations only              | Stored value, native offline replay, refund, close, EOD, reconciliation, recovery, and audit passed                      |
 | 7B Resilience and financial certification | Complete with observations | 7A                     | Authorize Gate 8A UX/UI certification     | External and physical observations only              | Service failures, security, races, 100 sales, reconciliation, backup, restore, recovery, and audit passed                |
 | 8A POS UX/UI certification                | Complete with observations | 7B                     | Authorize Gate 8B Dashboard/KDS UX        | Physical touch, Owner review, iPad, and providers    | Enrollment, PIN, operator flows, failures, accessibility, localization, layouts, builds, and Design Language V1 passed   |
+| 8B Dashboard and KDS UX certification     | Complete with observations | 8A                     | Authorize Gate 9A pilot dry run           | Physical iPad, hardware, Owner review, and providers | Dashboard and KDS workflows, accessibility, responsive layouts, failures, focused tests, and builds passed               |
 
-The latest relevant revision is the Gate 8A certification commit in PR #72.
-PR #72 keeps Gates 3A through 8A complete with recorded observations.
+The latest relevant revision is the Gate 8B certification commit in PR #72.
+PR #72 keeps Gates 3A through 8B complete with recorded observations.
 Native encrypted offline support covers the explicit allowlist and server-policy-authorized cash;
 Web sensitive journaling remains disabled. UMI remains the
 sole business authority; Flutter owns presentation, hardware integration, encrypted local state,
@@ -93,4 +94,5 @@ It adds a readiness validator, Spanish operator guides, daily lists, incident ru
 Gate 7A passed the integrated business journey.
 Gate 7B passed service failures, security pressure, concurrency, 100 sales, reconciliation, backup, restore, recovery, and audit.
 Gate 8A passed the POS operator flows, failure states, accessibility, localization, responsive layouts, and focused builds.
-Design Language V1 is frozen for the pilot. Gate 8B is authorized with observations and has not started.
+Design Language V1 remains frozen for the pilot. Gate 8B passed the Dashboard and KDS operator surfaces.
+Gate 9A is authorized with observations and has not started.
