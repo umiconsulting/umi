@@ -38,10 +38,12 @@ services:
       - log_min_duration_statement=-1
       - -c
       - log_parameter_max_length=0
+    entrypoint: [bash, /pilot/postgres-start.sh]
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ../../:/workspace:ro
       - ./postgres-init.sh:/docker-entrypoint-initdb.d/00-umipos-pilot.sh:ro
+      - ./postgres-start.sh:/pilot/postgres-start.sh:ro
     healthcheck:
       test:
         [
