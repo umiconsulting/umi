@@ -29,6 +29,15 @@ EVIDENCE = Path(os.environ.get("GATE6B_EVIDENCE_FILE", "artifacts/certification/
 BROWSER_EXECUTABLE = os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE", "/usr/bin/google-chrome")
 
 
+def closing_count_minor_units() -> int:
+    raw = os.environ.get("GATE6B_CLOSING_COUNT_MINOR_UNITS")
+    if raw is None:
+        raise ValueError("GATE6B_CLOSING_COUNT_MINOR_UNITS is required for the disposable fixture.")
+    if not raw.isdigit():
+        raise ValueError("GATE6B_CLOSING_COUNT_MINOR_UNITS must be a non-negative integer.")
+    return int(raw)
+
+
 def check(value: bool, message: str) -> None:
     if not value:
         raise AssertionError(message)
@@ -264,7 +273,7 @@ def close_shift_with_pin(pin: str, open_new: bool) -> dict:
                 center_url, headers=headers, params=center_params, verify=VERIFY_TLS, timeout=10
             ).json()
             shift = snapshot["currentShift"]
-        money = {"minorUnits": 95501, "currency": "MXN"}
+        money = {"minorUnits": closing_count_minor_units(), "currency": "MXN"}
     shift_id = shift["id"]
 
     counted = requests.post(
