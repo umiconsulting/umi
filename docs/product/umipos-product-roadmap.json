@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-08-13",
-  "latestRelevantCommit": "HEAD (Gate 9B certification commit; RC source 9ea8560b6c0e7304834eae0cd960804132acac89)",
-  "integrationState": "Gates 3A through 9B are complete with recorded observations. Gate 9C is authorized and has not started.",
+  "latestRelevantCommit": "HEAD (Gate 9C certification commit; RC2 source 50b26713dfc074a00510256afaf22d691f847d1b)",
+  "integrationState": "Gate 9C certified RC2 for controlled pilot with conditions. No later gate has started.",
   "items": [
     {
       "id": "platform-certification",
@@ -229,6 +229,14 @@
         "Physical iPad, peripherals, enabled object storage, Owner preferences, and provider payment remain external"
       ],
       "validationState": "RC build, clean migration, bootstrap, backup, reconciliation, configuration, security, deployment, and rollback passed"
+    },
+    {
+      "id": "9C",
+      "status": "certified_for_controlled_pilot_with_conditions",
+      "dependencies": ["9B"],
+      "nextObjective": "Enter controlled real-world pilot under documented conditions",
+      "blockers": [],
+      "validationState": "RC2 fresh deployment, smoke, business truth, restart, backup, restore, support, boundaries, and activation conditions passed"
     }
   ]
 }

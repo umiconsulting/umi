@@ -228,6 +228,13 @@
       "status": "complete_with_observations",
       "stateMachineVersion": 1,
       "subject": "Pilot RC identity, release artifacts, migration, configuration, deployment, rollback, and readiness"
+    },
+    {
+      "commit": "HEAD (Gate 9C certification commit; RC2 source 50b26713dfc074a00510256afaf22d691f847d1b)",
+      "id": "9C",
+      "status": "certified_for_controlled_pilot_with_conditions",
+      "stateMachineVersion": 1,
+      "subject": "Controlled pilot certification, final operating boundaries, support, recovery, and activation conditions"
     }
   ]
 }

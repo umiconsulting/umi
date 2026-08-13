@@ -5,10 +5,9 @@ Updated: 2026-08-13
 ## Decision
 
 Gate 9B is `COMPLETE WITH OBSERVATIONS`.
-`UMI POS Pilot RC1` is ready for Gate 9C with observations.
-Gate 9C has not started.
+`UMI POS Pilot RC2` is ready for controlled pilot certification with observations.
 
-The artifact source is `9ea8560b6c0e7304834eae0cd960804132acac89`.
+The artifact source is `50b26713dfc074a00510256afaf22d691f847d1b`.
 The starting Gate 9A commit is `3c9b5a01fdfab6406047d112096da88445d2d778`.
 
 ## Evidence summary
@@ -23,7 +22,7 @@ The starting Gate 9A commit is `3c9b5a01fdfab6406047d112096da88445d2d778`.
 | KDS lifecycle and reconnect               | PASS        | VERIFIED VIA SIMULATION             |
 | KDS Apple artifact                        | OBSERVATION | NOT PHYSICALLY VERIFIED             |
 | Configuration contract                    | PASS        | STATICALLY VERIFIED and AUTOMATION  |
-| Object storage                            | OBSERVATION | PROVIDER-DEPENDENT; disabled in RC1 |
+| Object storage                            | OBSERVATION | PROVIDER-DEPENDENT; disabled in RC2 |
 | External payment provider                 | OBSERVATION | PROVIDER-DEPENDENT                  |
 | Physical peripherals                      | OBSERVATION | NOT PHYSICALLY VERIFIED             |
 | NEXO legacy runtime dependency            | NONE        | STATICALLY VERIFIED                 |
@@ -39,6 +38,9 @@ The clean smoke check passed in 22 seconds.
 
 The first business certification attempt stopped before migration because PostgreSQL was not ready.
 The bounded retry passed. No partial business fact existed from the first attempt.
+
+Gate 9C reproduced a startup race in RC1. PostgreSQL health could pass during its temporary initialization server.
+RC2 waits for a durable initialization marker. A fresh RC2 deployment and business certification passed.
 
 ## Business authority results
 
@@ -76,11 +78,12 @@ The file is local evidence and remains outside Git. The deployment guide defines
 
 ## Defect ledger
 
-| ID     | Severity | Result                                                                    |
-| ------ | -------- | ------------------------------------------------------------------------- |
-| G9B-01 | P2       | Closed. The legacy closing runner now requires an explicit fixture count. |
+| ID     | Severity | Result                                                                     |
+| ------ | -------- | -------------------------------------------------------------------------- |
+| G9B-01 | P2       | Closed. The legacy closing runner now requires an explicit fixture count.  |
+| G9C-01 | P1       | Closed in RC2. Clean database readiness now waits for full initialization. |
 
-P0 found: 0. P0 open: 0. P1 found: 0. P1 open: 0.
+P0 found: 0. P0 open: 0. P1 found: 1. P1 closed: 1. P1 open: 0.
 
 ## Validation commands
 

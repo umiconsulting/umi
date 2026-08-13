@@ -249,3 +249,13 @@ Recommended Mac review sequence:
 - External: physical iPad, peripherals, provider payment, and enabled object storage remain pending.
 - Rollback uses the last certified application with the forward-compatible schema.
 - Owner approval remains pending. This record does not infer approval.
+
+## Gate 9C controlled pilot acceptance
+
+- RC1 is superseded. Gate 9C found a clean-database startup race before pilot activation.
+- RC2 closes the startup race and passed a fresh deployment, business smoke, restart, backup, and isolated restore.
+- Certified use includes administration, catalog, inventory, sales, receipts, refunds, shifts, devices, KDS, audit, diagnostics, and recovery.
+- Do not enable real integrated payment authorization or object storage without provider validation.
+- Test each required physical device on-site before opening.
+- Stop the pilot for incorrect money, duplicate facts, authority crossing, data loss, secret exposure, or reconciliation drift.
+- Owner approval remains pending. This record does not infer approval.

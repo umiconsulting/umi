@@ -2,6 +2,8 @@
 
 Use this runbook for the first controlled pilot. Use the current release manifest and approved pilot environment.
 
+Deploy `UMI POS Pilot RC2`. RC1 is superseded and must not be deployed.
+
 ## Before pilot
 
 1. Verify PostgreSQL, Redis, API, worker, Dashboard, Caddy, and telemetry.
@@ -16,6 +18,8 @@ Use this runbook for the first controlled pilot. Use the current release manifes
 10. Resolve all Owner policy decisions before live use.
 11. Run `pnpm pilot:readiness`.
 12. Record physical hardware and provider checks that remain pending.
+13. Confirm the payment mode is manual unless provider certification exists.
+14. Confirm the current backup checksum and monitoring contact.
 
 Do not use the certification fixture for a real business. Do not use SQL or Supabase for normal onboarding.
 
@@ -48,6 +52,11 @@ Do not use the certification fixture for a real business. Do not use SQL or Supa
 6. Review sales, refunds, receipts, inventory, customer value, audit, and diagnostics.
 7. Confirm no unresolved code-controlled recovery item remains.
 8. Create and verify the scheduled backup.
+9. Record unresolved issues with `UMIPOS_PILOT_ISSUE_LOG_TEMPLATE.md`.
+
+## Pilot stop conditions
+
+Stop affected operation for an incorrect financial effect, duplicate irreversible fact, tenant crossing, data loss, unresolved transaction ambiguity, authority bypass, secret exposure, unsafe recovery, or reconciliation drift.
 
 ## Incident handling
 

@@ -30,6 +30,7 @@ Updated: 2026-08-13
 | 8B Dashboard and KDS UX certification     | Complete with observations | 8A                     | Authorize Gate 9A pilot dry run           | Physical iPad, hardware, Owner review, and providers           | Dashboard and KDS workflows, accessibility, responsive layouts, failures, focused tests, and builds passed               |
 | 9A Pilot dry run                          | Complete with observations | 8B                     | Authorize Gate 9B Pilot RC                | Physical devices, storage, Owner review, and providers         | Bootstrap, lifecycle, KDS, restart, reconciliation, recovery, support, and readiness passed                              |
 | 9B Pilot release candidate                | Complete with observations | 9A                     | Authorize Gate 9C Pilot Certification     | Physical devices, enabled storage, Owner review, and providers | RC build, clean migration, bootstrap, backup, reconciliation, release security, deployment, and rollback passed          |
+| 9C Pilot certification                    | Certified with conditions  | 9B                     | Enter controlled real-world pilot         | On-site devices, disabled providers, and Owner review          | RC2 fresh deployment, smoke, business truth, restart, backup, restore, support, and final boundaries passed              |
 
 The latest relevant revision is the Gate 9B certification commit in PR #72.
 PR #72 keeps Gates 3A through 9B complete with recorded observations.
@@ -98,6 +99,7 @@ Gate 7B passed service failures, security pressure, concurrency, 100 sales, reco
 Gate 8A passed the POS operator flows, failure states, accessibility, localization, responsive layouts, and focused builds.
 Design Language V1 remains frozen for the pilot. Gate 8B passed the Dashboard and KDS operator surfaces.
 Gate 9A passed the first pilot rehearsal.
-Gate 9B froze `UMI POS Pilot RC1` at source commit `9ea8560b6c0e7304834eae0cd960804132acac89`.
-Its builds, clean migrations, bootstrap, backup, reconciliation, configuration, deployment, and rollback passed.
-Gate 9C is authorized with observations and has not started.
+Gate 9B froze RC1. Gate 9C found a clean-database initialization race before pilot activation.
+Gate 9C superseded RC1 with `UMI POS Pilot RC2` at source commit `50b26713dfc074a00510256afaf22d691f847d1b`.
+RC2 passed fresh deployment, smoke, business truth, restart, backup, restore, support, and final boundary checks.
+Controlled pilot is authorized with conditions. No later gate has started.

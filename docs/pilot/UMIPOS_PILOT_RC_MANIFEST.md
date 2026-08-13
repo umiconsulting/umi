@@ -6,9 +6,9 @@ Updated: 2026-08-13
 
 | Field                | Value                                                              |
 | -------------------- | ------------------------------------------------------------------ |
-| Release              | `UMI POS Pilot RC1`                                                |
-| Version              | `6.0.0-pilot.rc1`                                                  |
-| Source commit        | `9ea8560b6c0e7304834eae0cd960804132acac89`                         |
+| Release              | `UMI POS Pilot RC2`                                                |
+| Version              | `6.0.0-pilot.rc2`                                                  |
+| Source commit        | `50b26713dfc074a00510256afaf22d691f847d1b`                         |
 | Branch               | `architectureUMIposIntegration`                                    |
 | PR                   | `#72`                                                              |
 | Base                 | `build-v3`                                                         |
@@ -23,14 +23,14 @@ The source commit is the artifact authority. A later documentation commit record
 
 | Component | Artifact                              | Identity                                                                   | Status                 |
 | --------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------------------- |
-| UMI API   | `umipos-api:6.0.0-pilot.rc1`          | `sha256:d3021ddd4f8ce8f31ecd78bafa59a07e023e845fdd10e8fc51f3b4e3b55a3835`  | Built                  |
+| UMI API   | `umipos-api:6.0.0-pilot.rc2`          | `sha256:73e3fbbc4f0734df76c22dd4883b4579d2e3aa83765be30b9fc4bc830e06b7c4`  | Built                  |
 | Worker    | API image with worker command         | Same digest as API                                                         | Built                  |
-| Dashboard | `umipos-dashboard:6.0.0-pilot.rc1`    | `sha256:0faa0eed132f83a31ec52a470f9de97fb755f8ffa677a92368b67885402dcc3a`  | Built                  |
-| Linux POS | `umipos-linux-6.0.0-pilot.rc1.tar.gz` | SHA-256 `6b33fadef2e66a05517c067acb93c74f9d82fbd3bfc1085b8bbd6714097ad402` | Built                  |
+| Dashboard | `umipos-dashboard:6.0.0-pilot.rc2`    | `sha256:115e5cfee7b4c06175a1466d8a052eedbdcce78fdecf9b7b204b162442e3b92f`  | Built                  |
+| Linux POS | `umipos-linux-6.0.0-pilot.rc2.tar.gz` | SHA-256 `7a3fd9be6bb9dac7c89ee39ccc0a9af05803dd4d12eb4baec13e6089c0aeba25` | Built                  |
 | KDS       | Source tree                           | `9f0e88f1c839a453472294ce305a515476ac0d90`                                 | Statically verified    |
 | Database  | Build-v3 migrations                   | Digest above                                                               | Clean migration passed |
 
-The generated machine manifest is `artifacts/releases/6.0.0-pilot.rc1/release-manifest.json`.
+The generated machine manifest is `artifacts/releases/6.0.0-pilot.rc2/release-manifest.json`.
 Release artifacts remain outside Git by repository policy.
 
 ## Infrastructure
@@ -39,7 +39,7 @@ The RC requires PostgreSQL, Redis, the API, the worker, the Dashboard, Caddy, an
 Use TLS at public ingress. Use PostgreSQL TLS when the database crosses a trusted private boundary.
 The deployment must inject all secrets outside Git.
 
-Object storage is disabled in RC1. No current pilot operation requires it.
+Object storage is disabled in RC2. No current pilot operation requires it.
 If enabled later, configure an endpoint, bucket, region, access key, secret key, durability, and backup policy.
 
 External payment authorization is not included. Manual terminal payment remains an operator assertion.
@@ -76,6 +76,7 @@ Do not use template placeholders or localhost values in the real pilot environme
 - External payment provider validation is pending.
 - Final Owner preferences depend on the pilot.
 - The closing runner P2 is closed. It now requires an explicit fixture count.
+- RC1 is superseded. Gate 9C found and fixed a clean-database startup race before pilot activation.
 
 ## Deployment and recovery
 
