@@ -45,13 +45,14 @@ final class ApiCartRepository implements CartRepository {
   );
 
   @override
-  Future<Cart> add(String merchantId, CartLineInput input) async => Cart.fromJson(
-    await _api.request(
-      method: ApiMethod.post,
-      path: UmiRoutes.posCartLines(merchantId),
-      body: input.toJson(),
-    ),
-  );
+  Future<Cart> add(String merchantId, CartLineInput input) async =>
+      Cart.fromJson(
+        await _api.request(
+          method: ApiMethod.post,
+          path: UmiRoutes.posCartLines(merchantId),
+          body: input.toJson(),
+        ),
+      );
 
   @override
   Future<Cart> update(

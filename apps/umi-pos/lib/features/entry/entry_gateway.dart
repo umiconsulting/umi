@@ -22,7 +22,10 @@ abstract interface class EntryGateway {
   Future<void> logout();
   Future<void> globalLogout();
   Future<EntryContextResponse> entryContext();
-  Future<OperatorSessionView> startOperator(String merchantId, String locationId);
+  Future<OperatorSessionView> startOperator(
+    String merchantId,
+    String locationId,
+  );
   Future<void> lockOperator(String id);
   Future<void> endOperator(String id);
   Future<ElevationGrantView> verifyPin({

@@ -203,4 +203,15 @@ Recommended Mac review sequence:
 - Owner decision: define the earn rate, reward limits, wallet issuance, and gift-card limits.
 - Owner decision: define the partial-refund policy for rewards.
 - Legal review: approve consent text, retention, anonymization, and gift-card expiry rules.
-- Engineering validation is complete. Owner approval and final UX certification remain pending.
+- Engineering validation is complete. Owner approval remains pending.
+
+## Gate 8A POS operator experience
+
+- Certified: enrollment, PIN, catalog, cart, checkout, customer value, refund, shift, offline, recovery, hardware, and KDS status.
+- Corrected: invalid enrollment and PIN actions remain disabled until the input is valid.
+- Corrected: normal customer errors no longer show an internal code.
+- Frozen: Design Language V1 defines spacing, type, controls, money, states, accessibility, responsive behavior, and motion.
+- Passed: Spanish, English, keyboard, focus, compact width, tablet layouts, and text at 200 percent.
+- Remaining P2: Owner preference for visual density, receipt density, and final aesthetic detail.
+- External: touch hardware, physical devices, Xcode/iPad, and provider payment remain pending.
+- Owner approval remains pending. This record does not infer approval.

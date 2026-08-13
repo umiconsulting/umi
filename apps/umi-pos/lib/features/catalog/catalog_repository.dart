@@ -123,10 +123,10 @@ final class ApiCatalogRepository implements CatalogRepository {
   ) async => CatalogProductDetail.fromJson(
     await _api.request(
       method: ApiMethod.get,
-      path: _path(UmiRoutes.posCatalogProduct(partition.merchantId, productId), {
-        'locationId': partition.locationId,
-        'locale': partition.locale,
-      }),
+      path: _path(
+        UmiRoutes.posCatalogProduct(partition.merchantId, productId),
+        {'locationId': partition.locationId, 'locale': partition.locale},
+      ),
     ),
   );
 

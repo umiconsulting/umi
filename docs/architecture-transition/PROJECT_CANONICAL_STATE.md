@@ -282,7 +282,13 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - RLS and FORCE RLS covered 133 scoped tables. The API login cannot bypass RLS.
 - Backup and isolated restore matched 103 sales, 105 tenders, 230 inventory facts, and 317 audit events.
 - Recovery reported zero unresolved commands. Audit data reported zero secret matches.
-- Gate 8A is authorized with external and physical observations. It has not started.
+- Gate 8A: complete with observations. The pilot POS operator experience passed.
+- Design Language V1 freezes the pilot rules for type, space, controls, money, states, accessibility, responsive layouts, and motion.
+- Enrollment, PIN, sales, payments, customer value, refunds, shifts, inventory, KDS, hardware, offline, and recovery passed focused UX review.
+- The theme now defines shared touch targets, focus, typography, surfaces, sheets, dialogs, and status feedback.
+- Normal operator errors use business language instead of internal command codes.
+- Physical touch hardware, physical peripherals, Xcode/iPad, Owner aesthetics, and provider payment remain observations.
+- Gate 8B is authorized with observations. It has not started.
 
 ## Gate 3C decision basis
 

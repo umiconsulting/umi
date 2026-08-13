@@ -33,7 +33,8 @@
     "6A",
     "6B",
     "7A",
-    "7B"
+    "7B",
+    "8A"
   ],
   "authorities": {
     "api": "apps/umi-api",
@@ -264,6 +265,7 @@
     "gate6BStatus": "complete_with_observations",
     "gate7AStatus": "complete_with_observations",
     "gate7BStatus": "complete_with_observations",
+    "gate8AStatus": "complete_with_observations",
     "dashboardOperations": "permission-scoped read projections and operational pilot commands",
     "dashboardCommandContext": "server-validated dashboard_administrative commands with current authority, CSRF, deterministic fingerprints, approvals, and recovery",
     "dashboardMutationBoundary": "checkout, physical cash movement, and KDS preparation remain in their assigned operational clients",
@@ -276,9 +278,11 @@
     "pilotBusinessCertification": "Clean bootstrap, Dashboard operations, KDS lifecycle, representative roles, smoke, RLS, and persisted evidence passed",
     "endToEndCertification": "Wallet, gift card, mixed tender, native offline replay, full refund, shift close, Dashboard EOD, exact reconciliation, recovery, and audit passed",
     "resilienceCertification": "Service outages, revocation, rate limits, RLS, 26 customer-value races, 100 sales, exact reconciliation, backup, restore, recovery, and audit passed",
-    "latestLocalCommit": "HEAD (Gate 7B certification commit in PR #72)",
-    "pushStatus": "Gate 7B certification publication uses PR #72",
+    "posUxCertification": "Enrollment, PIN, sales, payments, customer value, exceptions, operations, accessibility, localization, responsive layouts, and operator failures passed",
+    "posDesignLanguage": "UMIPOS_DESIGN_LANGUAGE_V1 is frozen for the pilot",
+    "latestLocalCommit": "HEAD (Gate 8A certification commit in PR #72)",
+    "pushStatus": "Gate 8A certification publication uses PR #72",
     "pullRequestStatus": "PR #72 targets build-v3"
   },
-  "nextGate": "Gate 8A is authorized with observations but has not started."
+  "nextGate": "Gate 8B is authorized with observations but has not started."
 }

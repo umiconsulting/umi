@@ -512,12 +512,20 @@ final class EntryController extends ChangeNotifier {
       );
     } else if (merchants.length == 1) {
       _set(
-        EntryState(EntryPhase.tenantRequired, device: device, merchants: merchants),
+        EntryState(
+          EntryPhase.tenantRequired,
+          device: device,
+          merchants: merchants,
+        ),
       );
       await selectTenant(merchants.single);
     } else {
       _set(
-        EntryState(EntryPhase.tenantRequired, device: device, merchants: merchants),
+        EntryState(
+          EntryPhase.tenantRequired,
+          device: device,
+          merchants: merchants,
+        ),
       );
     }
   }

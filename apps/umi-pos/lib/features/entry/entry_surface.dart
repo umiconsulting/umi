@@ -78,13 +78,17 @@ final class _EnrollmentState extends State<_Enrollment> {
               FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9]')),
               LengthLimitingTextInputFormatter(8),
             ],
-            onChanged: (_) {
-              if (_invalidCode) setState(() => _invalidCode = false);
-            },
+            onChanged: (_) => setState(() => _invalidCode = false),
             onSubmitted: (_) => _submit(),
           ),
           const SizedBox(height: UmiSpacing.lg),
-          ElevatedButton(onPressed: _submit, child: Text(l.continueAction)),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: code.text.length == 8 ? _submit : null,
+              child: Text(l.continueAction),
+            ),
+          ),
         ],
       ),
     );
@@ -227,16 +231,14 @@ final class _PinLoginState extends State<_PinLogin> {
                     ? l.operatorPinLength
                     : _pinError(l, widget.controller.state.errorCode),
               ),
-              onChanged: (_) {
-                if (_tooShort) setState(() => _tooShort = false);
-              },
+              onChanged: (_) => setState(() => _tooShort = false),
               onSubmitted: (_) => _submit(),
             ),
             const SizedBox(height: UmiSpacing.md),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _submit,
+                onPressed: pin.text.length >= 4 ? _submit : null,
                 child: Text(l.operatorPinAction),
               ),
             ),

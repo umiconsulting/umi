@@ -395,7 +395,11 @@ final class SaleLifecycleController extends ChangeNotifier {
 
   Future<void> openReceipt(SaleSnapshot sale) async {
     try {
-      final receipt = await _repository.receipt(_merchantId!, sale.id, _query());
+      final receipt = await _repository.receipt(
+        _merchantId!,
+        sale.id,
+        _query(),
+      );
       _set(
         SaleLifecycleState(
           phase: _state.phase,

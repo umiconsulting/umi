@@ -200,6 +200,13 @@
       "status": "complete_with_observations",
       "stateMachineVersion": 1,
       "subject": "Service failure, security, concurrency, stress, reconciliation, backup, restore, recovery, and audit"
+    },
+    {
+      "commit": "HEAD (Gate 8A certification commit)",
+      "id": "8A",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "POS operator UX, accessibility, localization, responsive layouts, failure states, and Design Language V1"
     }
   ]
 }

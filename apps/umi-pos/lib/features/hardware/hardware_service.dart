@@ -663,7 +663,11 @@ final class HardwareService {
       failureCode: local.failureCode,
       safeMetadata: local.safeMetadata,
     );
-    if (const {'succeeded', 'failed', 'cancelled'}.contains(result.command['status'])) {
+    if (const {
+      'succeeded',
+      'failed',
+      'cancelled',
+    }.contains(result.command['status'])) {
       await _recovery.clear(command.commandId);
     }
     return result;

@@ -60,7 +60,8 @@ final class MemoryCashRecoveryStore implements CashRecoveryStore {
   @override
   Future<PendingCashCommand?> load(String merchantId, String locationId) async {
     final command = _command;
-    if (command?.merchantId != merchantId || command?.locationId != locationId) {
+    if (command?.merchantId != merchantId ||
+        command?.locationId != locationId) {
       return null;
     }
     return command;
@@ -73,7 +74,8 @@ final class MemoryCashRecoveryStore implements CashRecoveryStore {
 
   @override
   Future<void> clear(String merchantId, String locationId) async {
-    if (_command?.merchantId == merchantId && _command?.locationId == locationId) {
+    if (_command?.merchantId == merchantId &&
+        _command?.locationId == locationId) {
       _command = null;
     }
   }

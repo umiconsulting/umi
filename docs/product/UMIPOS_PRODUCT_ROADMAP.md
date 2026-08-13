@@ -26,9 +26,10 @@ Updated: 2026-08-13
 | 6B Pilot operations kit                   | Complete with observations | 6A                     | Authorize Gate 7A certification           | External and Owner policy observations only          | Clean bootstrap, live Dashboard, KDS, role, RLS, smoke, readiness, and persisted evidence passed                         |
 | 7A End-to-end operational certification   | Complete with observations | 6B                     | Authorize Gate 7B certification           | External and physical observations only              | Stored value, native offline replay, refund, close, EOD, reconciliation, recovery, and audit passed                      |
 | 7B Resilience and financial certification | Complete with observations | 7A                     | Authorize Gate 8A UX/UI certification     | External and physical observations only              | Service failures, security, races, 100 sales, reconciliation, backup, restore, recovery, and audit passed                |
+| 8A POS UX/UI certification                | Complete with observations | 7B                     | Authorize Gate 8B Dashboard/KDS UX        | Physical touch, Owner review, iPad, and providers    | Enrollment, PIN, operator flows, failures, accessibility, localization, layouts, builds, and Design Language V1 passed   |
 
-The latest relevant revision is the Gate 7B certification commit in PR #72.
-PR #72 keeps Gates 3A through 7B complete with recorded observations.
+The latest relevant revision is the Gate 8A certification commit in PR #72.
+PR #72 keeps Gates 3A through 8A complete with recorded observations.
 Native encrypted offline support covers the explicit allowlist and server-policy-authorized cash;
 Web sensitive journaling remains disabled. UMI remains the
 sole business authority; Flutter owns presentation, hardware integration, encrypted local state,
@@ -91,4 +92,5 @@ Gate 6B adds one machine-readable business profile and one deterministic trainin
 It adds a readiness validator, Spanish operator guides, daily lists, incident runbooks, and the Owner decision register.
 Gate 7A passed the integrated business journey.
 Gate 7B passed service failures, security pressure, concurrency, 100 sales, reconciliation, backup, restore, recovery, and audit.
-Gate 8A is authorized with observations and has not started.
+Gate 8A passed the POS operator flows, failure states, accessibility, localization, responsive layouts, and focused builds.
+Design Language V1 is frozen for the pilot. Gate 8B is authorized with observations and has not started.

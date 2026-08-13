@@ -7,7 +7,7 @@ import 'support/fakes.dart';
 
 void main() {
   test('generated canonical contract is linked', () {
-    expect(contractVersion, '1.2.0');
+    expect(contractVersion, '2.12.0');
     expect(contractContentHash, hasLength(64));
   });
 
@@ -20,6 +20,6 @@ void main() {
     await tester.pumpWidget(UmiPosApp(root: root));
     await tester.pumpAndSettle();
     expect(find.text('Registrar este dispositivo'), findsOneWidget);
-    expect(find.byType(TextField), findsNWidgets(2));
+    expect(find.byType(TextField), findsOneWidget);
   });
 }

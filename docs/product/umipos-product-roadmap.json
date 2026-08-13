@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-08-13",
-  "latestRelevantCommit": "HEAD (Gate 7B certification commit)",
-  "integrationState": "Gates 3A through 7B are complete with recorded observations. Gate 8A is authorized and has not started.",
+  "latestRelevantCommit": "HEAD (Gate 8A certification commit)",
+  "integrationState": "Gates 3A through 8A are complete with recorded observations. Gate 8B is authorized and has not started.",
   "items": [
     {
       "id": "platform-certification",
@@ -189,6 +189,16 @@
         "Physical hardware, iPad, public infrastructure, providers, and final UX remain external"
       ],
       "validationState": "Service failures, revocation, rate limits, RLS, concurrency, 100 sales, exact reconciliation, backup, restore, recovery, and audit passed"
+    },
+    {
+      "id": "8A",
+      "status": "complete_with_observations",
+      "dependencies": ["7B"],
+      "nextObjective": "Authorize Gate 8B Dashboard and KDS UX Certification",
+      "blockers": [
+        "Physical touch, physical peripherals, Xcode/iPad, Owner aesthetics, and provider payment remain external"
+      ],
+      "validationState": "Enrollment, PIN, operator flows, failures, accessibility, localization, responsive layouts, builds, and Design Language V1 passed"
     }
   ]
 }

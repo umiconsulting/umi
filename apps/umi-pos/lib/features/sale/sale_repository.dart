@@ -65,13 +65,15 @@ final class ApiSaleRepository implements SaleRepository {
   );
 
   @override
-  Future<SaleSnapshot> current(String merchantId, SaleHistoryQuery query) async =>
-      SaleSnapshot.fromJson(
-        await _api.request(
-          method: ApiMethod.get,
-          path: _query(UmiRoutes.posCurrentSale(merchantId), query),
-        ),
-      );
+  Future<SaleSnapshot> current(
+    String merchantId,
+    SaleHistoryQuery query,
+  ) async => SaleSnapshot.fromJson(
+    await _api.request(
+      method: ApiMethod.get,
+      path: _query(UmiRoutes.posCurrentSale(merchantId), query),
+    ),
+  );
 
   @override
   Future<SaleHistoryPage> history(

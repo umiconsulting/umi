@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:umi_contract/umi_contract.dart';
 
+import '../../core/errors/operator_error_message.dart';
 import '../../core/security/operator_permissions.dart';
 import '../entry/entry_controller.dart';
 import '../sale/sale_lifecycle_controller.dart';
@@ -130,7 +131,9 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
                       'The operation did not finish.',
                     ),
                   ),
-                  subtitle: Text(state.errorCode!),
+                  subtitle: Text(
+                    operatorErrorMessage(context, state.errorCode!),
+                  ),
                 ),
               ),
             Expanded(

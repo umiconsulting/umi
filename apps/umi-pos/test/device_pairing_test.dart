@@ -173,6 +173,7 @@ void main() {
     );
 
     await tester.enterText(find.byType(TextField), 'BADCODE1');
+    await tester.pump();
     await tester.tap(find.text('Continuar'));
     await tester.pumpAndSettle();
 
@@ -215,6 +216,7 @@ void main() {
     );
 
     await tester.enterText(find.byType(TextField), 'ABCDEFGH');
+    await tester.pump();
     await tester.tap(find.text('Continuar'));
     await tester.pumpAndSettle();
 
@@ -266,6 +268,7 @@ void main() {
     expect(find.text('Use 4 to 8 digits.'), findsOneWidget);
     expect(find.text('0/8'), findsNothing);
     await tester.enterText(find.byType(TextField), '2468');
+    await tester.pump();
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
 
@@ -507,25 +510,27 @@ final class _PairingGateway implements EntryGateway {
         ],
       );
   @override
-  Future<OperatorSessionView> startOperator(String merchantId, String locationId) =>
-      Future.value(
-        OperatorSessionView(
-          id: _sessionId,
-          userId: '00000000-0000-4000-8000-000000000007',
-          staffId: '00000000-0000-4000-8000-000000000008',
-          merchantId: merchantId,
-          locationId: locationId,
-          deviceId: _deviceId,
-          state: 'active',
-          permissions: const ['catalog.read', 'cart.write', 'checkout.commit'],
-          entitlements: const [
-            {'key': 'pos', 'enabled': true},
-          ],
-          startedAt: '2026-07-28T00:00:00.000Z',
-          lastActivityAt: '2026-07-28T00:00:00.000Z',
-          expiresAt: '2026-07-28T08:00:00.000Z',
-        ),
-      );
+  Future<OperatorSessionView> startOperator(
+    String merchantId,
+    String locationId,
+  ) => Future.value(
+    OperatorSessionView(
+      id: _sessionId,
+      userId: '00000000-0000-4000-8000-000000000007',
+      staffId: '00000000-0000-4000-8000-000000000008',
+      merchantId: merchantId,
+      locationId: locationId,
+      deviceId: _deviceId,
+      state: 'active',
+      permissions: const ['catalog.read', 'cart.write', 'checkout.commit'],
+      entitlements: const [
+        {'key': 'pos', 'enabled': true},
+      ],
+      startedAt: '2026-07-28T00:00:00.000Z',
+      lastActivityAt: '2026-07-28T00:00:00.000Z',
+      expiresAt: '2026-07-28T08:00:00.000Z',
+    ),
+  );
   @override
   Future<void> lockOperator(String id) async {
     if (failLock) {
