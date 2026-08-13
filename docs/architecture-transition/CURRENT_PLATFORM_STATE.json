@@ -36,7 +36,8 @@
     "7B",
     "8A",
     "8B",
-    "9A"
+    "9A",
+    "9B"
   ],
   "authorities": {
     "api": "apps/umi-api",
@@ -270,11 +271,12 @@
     "gate8AStatus": "complete_with_observations",
     "gate8BStatus": "complete_with_observations",
     "gate9AStatus": "complete_with_observations",
+    "gate9BStatus": "complete_with_observations",
     "dashboardOperations": "permission-scoped read projections and operational pilot commands",
     "dashboardCommandContext": "server-validated dashboard_administrative commands with current authority, CSRF, deterministic fingerprints, approvals, and recovery",
     "dashboardMutationBoundary": "checkout, physical cash movement, and KDS preparation remain in their assigned operational clients",
     "pilotRuntime": "production-shaped Docker Compose with validated environment configuration and explicit secrets",
-    "pilotRelease": "6.0.0-pilot.a with immutable component identities and generated checksums",
+    "pilotRelease": "6.0.0-pilot.rc1 from source commit 9ea8560b6c0e7304834eae0cd960804132acac89",
     "pilotCertification": "clean deployment, smoke, backup, isolated restore, compatible rollback, and upgrade passed",
     "pilotOperationsKit": "Certified Spanish operator guides, daily checklists, support runbooks, Owner decisions, deterministic training fixture, and machine-readable business profile",
     "pilotBootstrap": "Protected platform context creates the first merchant, location, and Owner atomically before normal Dashboard authority takes over",
@@ -286,9 +288,10 @@
     "posDesignLanguage": "UMIPOS_DESIGN_LANGUAGE_V1 is frozen for the pilot",
     "dashboardKdsUxCertification": "Dashboard and KDS workflows, accessibility, responsive layouts, failure states, and focused builds passed",
     "pilotDryRun": "Clean bootstrap, roles, business operations, KDS, restart recovery, exact reconciliation, support, and readiness passed",
-    "latestLocalCommit": "HEAD (Gate 9A certification commit in PR #72)",
-    "pushStatus": "Gate 9A certification publication uses PR #72",
+    "pilotRcCertification": "Release builds, clean migration, bootstrap, readiness, backup, reconciliation, configuration, and legacy dependency audit passed",
+    "latestLocalCommit": "HEAD (Gate 9B certification commit in PR #72)",
+    "pushStatus": "Gate 9B certification publication uses PR #72",
     "pullRequestStatus": "PR #72 targets build-v3"
   },
-  "nextGate": "Gate 9B is authorized with observations but has not started."
+  "nextGate": "Gate 9C is authorized with observations but has not started."
 }

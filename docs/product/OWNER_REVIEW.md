@@ -238,3 +238,14 @@ Recommended Mac review sequence:
 - Remaining P2: the old close runner uses a fixed count and needs fixture-aware certification input.
 - External: physical iPad, peripherals, object storage, provider payment, and Owner preferences remain pending.
 - Owner approval remains pending. This record does not infer approval.
+
+## Gate 9B pilot release candidate
+
+- Produced: `UMI POS Pilot RC1` from source commit `9ea8560b6c0e7304834eae0cd960804132acac89`.
+- Certified: clean build, clean migration, bootstrap, smoke, readiness, backup, and business reconciliation.
+- Verified: the old NEXO system is not a runtime dependency.
+- Closed P2: the closing runner now requires an explicit fixture count.
+- Required before activation: configure secrets, public origins, backups, devices, registers, catalog, and inventory.
+- External: physical iPad, peripherals, provider payment, and enabled object storage remain pending.
+- Rollback uses the last certified application with the forward-compatible schema.
+- Owner approval remains pending. This record does not infer approval.

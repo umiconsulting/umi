@@ -297,7 +297,11 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Clean bootstrap, roles, catalog, inventory, sale, refund, hardware, KDS, recovery, and readiness passed.
 - API restart preserved one sale and one refund. Inventory drift and unresolved recovery were zero.
 - Physical iPad, peripherals, object storage, provider payment, and Owner preferences remain observations.
-- Gate 9B is authorized with observations. It has not started.
+- Gate 9B: complete with observations. `UMI POS Pilot RC1` is frozen at source commit `9ea8560b6c0e7304834eae0cd960804132acac89`.
+- Release images, the Linux POS archive, clean migrations, bootstrap, readiness, backup, and reconciliation passed.
+- NEXO legacy runtime dependency is none. The legacy closing runner P2 is closed.
+- Physical iPad, peripherals, enabled object storage, provider payment, and Owner preferences remain observations.
+- Gate 9C is authorized with observations. It has not started.
 
 ## Gate 3C decision basis
 

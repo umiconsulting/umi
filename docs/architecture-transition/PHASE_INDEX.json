@@ -221,6 +221,13 @@
       "status": "complete_with_observations",
       "stateMachineVersion": 1,
       "subject": "First pilot rehearsal, operational lifecycle, failure recovery, support, and readiness"
+    },
+    {
+      "commit": "HEAD (Gate 9B certification commit; RC source 9ea8560b6c0e7304834eae0cd960804132acac89)",
+      "id": "9B",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "Pilot RC identity, release artifacts, migration, configuration, deployment, rollback, and readiness"
     }
   ]
 }
