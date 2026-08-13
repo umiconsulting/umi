@@ -9,7 +9,7 @@ Gate 9C verdict: `CERTIFIED FOR CONTROLLED PILOT WITH CONDITIONS`.
 Controlled Pilot: `GO WITH CONDITIONS`.
 
 Certified release: `UMI POS Pilot RC2`, version `6.0.0-pilot.rc2`.
-Artifact source: `50b26713dfc074a00510256afaf22d691f847d1b`.
+Artifact source: `1e885022b654dcecf943377ea2e1e3b739a9027a`.
 RC1 is superseded and must not be deployed.
 
 Gate 9A completed the pilot rehearsal. Gate 9B produced RC1 and release procedures.
@@ -73,6 +73,9 @@ Application rollback keeps the forward-compatible schema and immutable facts.
 Do not reverse migrations after business facts use them. Pause workers before an incompatible rollback.
 The checked backup restored into `umipos_restore_gate9c_rc2` in 25 seconds.
 
+Executed: API and worker restart, state comparison, backup checksum, and isolated restore.
+Reviewed only: rollback to an older application image. No destructive database rollback occurred.
+
 ## Support and observability
 
 The pilot runbook and support runbook cover authentication, location, devices, registers, KDS, connectivity, transaction uncertainty, duplicates, refunds, inventory, workers, service degradation, and escalation.
@@ -125,7 +128,15 @@ Object storage remains disabled. No required RC2 workflow uses it.
 
 Continue while authority is correct, reconciliation has no drift, retries create no duplicates, KDS remains coherent, and support can resolve normal failures.
 
-Stop immediately for an incorrect financial effect, duplicate irreversible fact, tenant crossing, data loss, unresolved transaction ambiguity, broad authority bypass, secret exposure, unsafe recovery, or material reconciliation drift.
+Stop immediately for any condition in this list:
+
+- An incorrect financial effect.
+- A duplicate irreversible fact.
+- Tenant crossing or data loss.
+- Unresolved transaction ambiguity.
+- A broad authority bypass.
+- Secret exposure or unsafe recovery.
+- Material reconciliation drift.
 
 ## Defect ledger
 
@@ -135,6 +146,21 @@ Stop immediately for an incorrect financial effect, duplicate irreversible fact,
 
 P0 found: `0`. P0 open: `0`. P1 found: `1`. P1 closed: `1`. P1 open: `0`.
 No code-controlled P2 remains.
+
+## Command evidence
+
+The run used local pilot infrastructure on 2026-08-13.
+
+- `pnpm umipos:pilot:build` — RC2 images and Linux archive passed.
+- `pnpm umipos:pilot:certify-business` — fresh deployment and business smoke passed in 57 seconds.
+- Gate 7A reconciliation functions — financial, inventory, customer value, and recovery passed.
+- `pnpm umipos:pilot:backup` — backup and checksum passed.
+- `bash scripts/umipos-pilot.sh restore ... umipos_restore_gate9c_rc2` — passed in 25 seconds.
+- API and worker restart state check — `1|1|1` before and after.
+- `pnpm --filter @umi/dashboard test` — 12 tests passed.
+- `PR_BASE_REF=origin/build-v3 pnpm check:pr` — passed.
+
+Runtime evidence is under `artifacts/certification/`. Release evidence is under `artifacts/releases/6.0.0-pilot.rc2/`.
 
 ## Final conditions
 

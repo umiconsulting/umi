@@ -258,4 +258,6 @@ Recommended Mac review sequence:
 - Do not enable real integrated payment authorization or object storage without provider validation.
 - Test each required physical device on-site before opening.
 - Stop the pilot for incorrect money, duplicate facts, authority crossing, data loss, secret exposure, or reconciliation drift.
+- Pilot start succeeds when health is green, context is correct, smoke passes, and no duplicate or drift exists.
+- Operators stop uncertain actions. Managers verify context. Support uses diagnostics, audit, recovery, and correlation references.
 - Owner approval remains pending. This record does not infer approval.

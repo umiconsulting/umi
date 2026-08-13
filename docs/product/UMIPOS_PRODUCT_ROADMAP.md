@@ -100,6 +100,6 @@ Gate 8A passed the POS operator flows, failure states, accessibility, localizati
 Design Language V1 remains frozen for the pilot. Gate 8B passed the Dashboard and KDS operator surfaces.
 Gate 9A passed the first pilot rehearsal.
 Gate 9B froze RC1. Gate 9C found a clean-database initialization race before pilot activation.
-Gate 9C superseded RC1 with `UMI POS Pilot RC2` at source commit `50b26713dfc074a00510256afaf22d691f847d1b`.
+Gate 9C superseded RC1 with `UMI POS Pilot RC2` at source commit `1e885022b654dcecf943377ea2e1e3b739a9027a`.
 RC2 passed fresh deployment, smoke, business truth, restart, backup, restore, support, and final boundary checks.
 Controlled pilot is authorized with conditions. No later gate has started.

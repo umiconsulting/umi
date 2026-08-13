@@ -7,7 +7,8 @@ Updated: 2026-08-13
 Gate 9B is `COMPLETE WITH OBSERVATIONS`.
 `UMI POS Pilot RC2` is ready for controlled pilot certification with observations.
 
-The artifact source is `50b26713dfc074a00510256afaf22d691f847d1b`.
+Gate 9B certified RC1 from `9ea8560b6c0e7304834eae0cd960804132acac89`.
+Gate 9C superseded it with RC2 from `1e885022b654dcecf943377ea2e1e3b739a9027a`.
 The starting Gate 9A commit is `3c9b5a01fdfab6406047d112096da88445d2d778`.
 
 ## Evidence summary

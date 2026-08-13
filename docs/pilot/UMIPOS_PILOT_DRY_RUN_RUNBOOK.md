@@ -56,7 +56,15 @@ Do not use the certification fixture for a real business. Do not use SQL or Supa
 
 ## Pilot stop conditions
 
-Stop affected operation for an incorrect financial effect, duplicate irreversible fact, tenant crossing, data loss, unresolved transaction ambiguity, authority bypass, secret exposure, unsafe recovery, or reconciliation drift.
+Stop the affected operation for any condition in this list:
+
+- An incorrect financial effect.
+- A duplicate irreversible fact.
+- Tenant crossing or data loss.
+- Unresolved transaction ambiguity.
+- An authority bypass.
+- Secret exposure or unsafe recovery.
+- Reconciliation drift.
 
 ## Incident handling
 

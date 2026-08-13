@@ -278,7 +278,7 @@
     "dashboardCommandContext": "server-validated dashboard_administrative commands with current authority, CSRF, deterministic fingerprints, approvals, and recovery",
     "dashboardMutationBoundary": "checkout, physical cash movement, and KDS preparation remain in their assigned operational clients",
     "pilotRuntime": "production-shaped Docker Compose with validated environment configuration and explicit secrets",
-    "pilotRelease": "6.0.0-pilot.rc2 from source commit 50b26713dfc074a00510256afaf22d691f847d1b",
+    "pilotRelease": "6.0.0-pilot.rc2 from source commit 1e885022b654dcecf943377ea2e1e3b739a9027a",
     "pilotCertification": "clean deployment, smoke, backup, isolated restore, compatible rollback, and upgrade passed",
     "pilotOperationsKit": "Certified Spanish operator guides, daily checklists, support runbooks, Owner decisions, deterministic training fixture, and machine-readable business profile",
     "pilotBootstrap": "Protected platform context creates the first merchant, location, and Owner atomically before normal Dashboard authority takes over",

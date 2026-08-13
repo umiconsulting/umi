@@ -303,7 +303,7 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Physical iPad, peripherals, enabled object storage, provider payment, and Owner preferences remain observations.
 - Gate 9C: certified for controlled pilot with conditions.
 - RC1 is superseded because its clean-database readiness had an initialization race.
-- `UMI POS Pilot RC2` is frozen at source commit `50b26713dfc074a00510256afaf22d691f847d1b`.
+- `UMI POS Pilot RC2` is frozen at source commit `1e885022b654dcecf943377ea2e1e3b739a9027a`.
 - RC2 passed fresh deployment, business smoke, restart, backup, isolated restore, and exact reconciliation.
 - Controlled pilot requires on-site device checks and disabled unverified providers.
 - No later gate has started.

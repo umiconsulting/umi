@@ -23,6 +23,15 @@ Usa el comando de bundle de `docs/deployment/UMIPOS_PILOT_DEPLOYMENT.md`. Compar
 
 No recopiles contraseñas, PIN, tokens, cookies, secretos de gift cards, credenciales de base de datos ni claves.
 
+## Responsabilidad
+
+| Rol             | Acción                                                                                               |
+| --------------- | ---------------------------------------------------------------------------------------------------- |
+| Operador        | Detén la acción incierta. Conserva la referencia. Usa solo la recuperación que indique el producto.  |
+| Owner o Manager | Verifica el usuario, la ubicación, el dispositivo, el turno y la aprobación.                         |
+| Soporte técnico | Revisa health, diagnostics, audit, Recovery Center, workers, logs redactados y correlación.          |
+| Todos           | Escala un resultado financiero incierto, un duplicado, una pérdida de datos o un cruce de autoridad. |
+
 ## Incidentes
 
 Cada fila indica síntomas, comprobación, acción, prohibición y escalamiento.

@@ -8,7 +8,7 @@ Updated: 2026-08-13
 | -------------------- | ------------------------------------------------------------------ |
 | Release              | `UMI POS Pilot RC2`                                                |
 | Version              | `6.0.0-pilot.rc2`                                                  |
-| Source commit        | `50b26713dfc074a00510256afaf22d691f847d1b`                         |
+| Source commit        | `1e885022b654dcecf943377ea2e1e3b739a9027a`                         |
 | Branch               | `architectureUMIposIntegration`                                    |
 | PR                   | `#72`                                                              |
 | Base                 | `build-v3`                                                         |
@@ -23,10 +23,10 @@ The source commit is the artifact authority. A later documentation commit record
 
 | Component | Artifact                              | Identity                                                                   | Status                 |
 | --------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------------------- |
-| UMI API   | `umipos-api:6.0.0-pilot.rc2`          | `sha256:73e3fbbc4f0734df76c22dd4883b4579d2e3aa83765be30b9fc4bc830e06b7c4`  | Built                  |
+| UMI API   | `umipos-api:6.0.0-pilot.rc2`          | `sha256:17ba3a2294eb0d91c5e29237d428a93c94bfb9b2ebba99f486978b87945582fd`  | Built                  |
 | Worker    | API image with worker command         | Same digest as API                                                         | Built                  |
-| Dashboard | `umipos-dashboard:6.0.0-pilot.rc2`    | `sha256:115e5cfee7b4c06175a1466d8a052eedbdcce78fdecf9b7b204b162442e3b92f`  | Built                  |
-| Linux POS | `umipos-linux-6.0.0-pilot.rc2.tar.gz` | SHA-256 `7a3fd9be6bb9dac7c89ee39ccc0a9af05803dd4d12eb4baec13e6089c0aeba25` | Built                  |
+| Dashboard | `umipos-dashboard:6.0.0-pilot.rc2`    | `sha256:2cb2c1a2b003ff5c081987bbcc95fcb9a29881b4d2e258b7bca09f71b0d79995`  | Built                  |
+| Linux POS | `umipos-linux-6.0.0-pilot.rc2.tar.gz` | SHA-256 `15a27dad69597b7dcae8b355380383f44df0fc6ad0c1a5fcb1cf19cd8f370d3a` | Built                  |
 | KDS       | Source tree                           | `9f0e88f1c839a453472294ce305a515476ac0d90`                                 | Statically verified    |
 | Database  | Build-v3 migrations                   | Digest above                                                               | Clean migration passed |
 

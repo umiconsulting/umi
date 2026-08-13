@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-08-13",
-  "latestRelevantCommit": "HEAD (Gate 9C certification commit; RC2 source 50b26713dfc074a00510256afaf22d691f847d1b)",
+  "latestRelevantCommit": "HEAD (Gate 9C certification commit; RC2 source 1e885022b654dcecf943377ea2e1e3b739a9027a)",
   "integrationState": "Gate 9C certified RC2 for controlled pilot with conditions. No later gate has started.",
   "items": [
     {

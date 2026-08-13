@@ -2,7 +2,7 @@
 
 Updated: 2026-08-13
 
-This procedure deploys `UMI POS Pilot RC2` from source commit `50b26713dfc074a00510256afaf22d691f847d1b`.
+This procedure deploys `UMI POS Pilot RC2` from source commit `1e885022b654dcecf943377ea2e1e3b739a9027a`.
 
 ## Deploy
 
@@ -71,7 +71,7 @@ Re-enroll a device only through the approved device process. Reconcile KDS from 
 
 ## Pilot go/no-go checklist
 
-- [ ] The deployed commit is `50b26713dfc074a00510256afaf22d691f847d1b`.
+- [ ] The deployed commit is `1e885022b654dcecf943377ea2e1e3b739a9027a`.
 - [ ] The environment is the approved pilot environment.
 - [ ] Migrations end at `build-v3-48`.
 - [ ] All required configuration is present.
