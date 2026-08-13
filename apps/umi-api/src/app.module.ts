@@ -42,6 +42,7 @@ import { DashboardOperationsModule } from './modules/dashboard-operations/dashbo
 import { CsrfGuard } from './modules/auth/csrf.guard';
 import { AdministrativeCommandModule } from './modules/administrative-commands/administrative-command.module';
 import { ReleaseModule } from './shared/release/release.module';
+import { PlatformBootstrapModule } from './modules/platform-bootstrap/platform-bootstrap.module';
 
 /**
  * Root module for the WEB process. Imports shared infrastructure + domain
@@ -86,6 +87,7 @@ import { ReleaseModule } from './shared/release/release.module';
     PosHardwareModule,
     DashboardOperationsModule,
     AdministrativeCommandModule,
+    PlatformBootstrapModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

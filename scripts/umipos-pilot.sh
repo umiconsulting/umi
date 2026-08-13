@@ -91,6 +91,7 @@ precheck() {
     UMIPOS_DB_WORKER_PASSWORD DATABASE_URL_APP DATABASE_URL_WORKER REDIS_PASSWORD REDIS_URL
     JWT_SECRET APP_QR_SECRET JWT_ACCESS_SECRET JWT_REFRESH_SECRET MFA_OTP_PEPPER
     CUSTOMER_VALUE_SECRET OPERATIONS_TOKEN OTEL_EXPORTER_OTLP_ENDPOINT
+    PILOT_BOOTSTRAP_TOKEN PILOT_BOOTSTRAP_EXPIRES_AT
   )
   for name in "${required[@]}"; do require_value "$name"; done
   [ "$UMI_ENVIRONMENT" = pilot ] || { echo "UMI_ENVIRONMENT must be pilot." >&2; exit 1; }
@@ -394,6 +395,57 @@ certify_clean() {
   echo "clean deployment certified: STARTUP_SECONDS=$(( $(date +%s) - started ))"
 }
 
+certify_business() {
+  precheck
+  [ "${PILOT_CERTIFICATION_CONFIRM:-}" = disposable ] || {
+    echo "Set PILOT_CERTIFICATION_CONFIRM=disposable." >&2
+    exit 1
+  }
+  local started evidence_dir bootstrap_retry
+  started="$(date +%s)"
+  evidence_dir="$ROOT/artifacts/certification"
+  mkdir -p "$evidence_dir"
+  compose down --volumes --remove-orphans
+  compose up -d postgres redis otel-collector
+  apply_migrations
+  compose exec -T postgres psql -X -At -U postgres -d "$POSTGRES_DB" \
+    -c 'select count(*) from merchant.merchant' | grep -qx 0
+  compose up -d umi-api umi-worker umi-dashboard caddy
+  wait_ready
+  UMIPOS_BUSINESS_PROFILE="$ROOT/config/umipos-pilot-business-profile.certification.json" \
+    bash "$ROOT/scripts/umipos-pilot-bootstrap.sh" | tee "$evidence_dir/bootstrap.json"
+  bootstrap_retry="$(UMIPOS_BUSINESS_PROFILE="$ROOT/config/umipos-pilot-business-profile.certification.json" \
+    bash "$ROOT/scripts/umipos-pilot-bootstrap.sh")"
+  "$NODE_BIN" -e 'const v=JSON.parse(process.argv[1]);if(v.replayed!==true)process.exit(1)' "$bootstrap_retry"
+  printf '%s\n' "$bootstrap_retry" >"$evidence_dir/bootstrap-retry.json"
+  (
+    cd "$ROOT"
+    GATE6B_CERT_PHASE=bootstrap python3 scripts/umipos-gate6b-final-certification.py
+  )
+  seed_certification
+  smoke
+  GATE5A_DASHBOARD_URL="$PUBLIC_DASHBOARD_URL" \
+    GATE5A_API_URL="$PUBLIC_API_URL" \
+    GATE5A_PG_CONTAINER="$(compose ps -q postgres)" \
+    GATE5A_PG_DATABASE="$POSTGRES_DB" \
+    GATE5A_APP_DATABASE_ROLE=umi_api_login \
+    GATE5A_DISPOSABLE_PILOT_CONFIRM=disposable \
+    GATE5A_CERT_PHASE=walkthrough \
+    python3 "$ROOT/scripts/umi-pos-gate5a-live-certification.py" \
+    | tee "$evidence_dir/business-walkthrough.log"
+  (
+    cd "$ROOT"
+    GATE6B_CERT_PHASE=roles python3 scripts/umipos-gate6b-final-certification.py \
+      | tee "$evidence_dir/role-walkthrough.log"
+    GATE6B_CERT_PHASE=evidence python3 scripts/umipos-gate6b-final-certification.py \
+      | tee "$evidence_dir/persistence.log"
+  )
+  UMIPOS_BUSINESS_PROFILE="$ROOT/config/umipos-pilot-business-profile.certification.json" \
+    "$NODE_BIN" "$ROOT/scripts/umipos-pilot-readiness.mjs" --json \
+    | tee "$evidence_dir/readiness.json"
+  echo "Gate 6B business certification passed: RUNTIME_SECONDS=$(( $(date +%s) - started ))"
+}
+
 deploy_release() {
   precheck
   local manifest="$ROOT/artifacts/releases/$RELEASE_VERSION/release-manifest.json"
@@ -494,8 +546,9 @@ case "${1:-}" in
   smoke) smoke ;;
   seed-certification) seed_certification ;;
   certify-clean) certify_clean ;;
+  certify-business) certify_business ;;
   restore) restore_database "${2:-}" "${3:-}" ;;
   rollback) rollback_application "${2:-}" ;;
   status) compose ps ;;
-  *) echo "Usage: $0 {precheck|build|backup|migrate|deploy|smoke|seed-certification|certify-clean|restore DUMP [TARGET]|rollback VERSION|status}" >&2; exit 2 ;;
+  *) echo "Usage: $0 {precheck|build|backup|migrate|deploy|smoke|seed-certification|certify-clean|certify-business|restore DUMP [TARGET]|rollback VERSION|status}" >&2; exit 2 ;;
 esac

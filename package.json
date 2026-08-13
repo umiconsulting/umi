@@ -63,11 +63,13 @@
     "umipos:pilot:deploy": "bash scripts/umipos-pilot.sh deploy",
     "umipos:pilot:smoke": "bash scripts/umipos-pilot.sh smoke",
     "umipos:pilot:certify-clean": "bash scripts/umipos-pilot.sh certify-clean",
+    "umipos:pilot:certify-business": "bash scripts/umipos-pilot.sh certify-business",
     "umipos:pilot:backup": "bash scripts/umipos-pilot.sh backup",
     "umipos:pilot:runtime-tests": "node --test scripts/umipos-pilot-runtime.spec.mjs",
     "umipos:pilot:update-check": "node scripts/umipos-update-check.mjs",
     "pilot:readiness": "node scripts/umipos-pilot-readiness.mjs",
-    "pilot:readiness:test": "node --test scripts/umipos-pilot-readiness.spec.mjs scripts/umipos-pilot-fixture.spec.mjs"
+    "pilot:readiness:test": "node --test scripts/umipos-pilot-readiness.spec.mjs scripts/umipos-pilot-fixture.spec.mjs",
+    "pilot:bootstrap": "bash scripts/umipos-pilot-bootstrap.sh"
   },
   "devDependencies": {
     "prettier": "3.9.4",

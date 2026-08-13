@@ -828,7 +828,8 @@ export class KdsRepository {
                  jsonb_build_object(
                    'location_id', $6::text,
                    'permissions', jsonb_build_array(
-                     'kitchen.read','kitchen.prepare','kitchen.ready','kitchen.complete'
+                     'kitchen.read','kitchen.prepare','kitchen.ready','kitchen.complete',
+                     'kitchen.recall','kitchen.cancel_ack'
                    )
                  ))
          RETURNING id, merchant_id, station_id, device_name`,
@@ -1174,7 +1175,7 @@ export class KdsRepository {
       OrderScopeRow & { status: KitchenOrderStatus; station_ids: string[]; version: string }
     >(
       `SELECT ko.id,ko.merchant_id,ko.location_id,
-              min(i.station_id)::text AS station_id,
+              min(i.station_id::text) AS station_id,
               array_agg(DISTINCT i.station_id::text) FILTER (WHERE i.station_id IS NOT NULL)
                 AS station_ids,
               ko.status,ko.version::text,co.customer_id AS person_id,

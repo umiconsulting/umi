@@ -409,6 +409,89 @@ insert into merchant.kitchen_route(
   '85000000-0000-4000-8000-000000000101',true,100,480,true,1
 );
 
+insert into merchant.order_item(
+  id,order_id,product_id,name,quantity,unit_price,display_order,station_id
+) values(
+  '85000000-0000-4000-8000-000000000106',
+  '84000000-0000-4000-8000-000000000103',
+  '52000000-0000-4000-8000-000000000101','Americano KDS',1,4500,1,
+  '85000000-0000-4000-8000-000000000101'
+);
+
+insert into merchant.kitchen_order(
+  id,merchant_id,location_id,source_order_id,public_reference,source,
+  fulfillment_type,business_date,status,priority,version,route_snapshot,queued_at
+) values(
+  '85000000-0000-4000-8000-000000000107',
+  '10000000-0000-4000-8000-000000000101',
+  '20000000-0000-4000-8000-000000000101',
+  '84000000-0000-4000-8000-000000000103','KDS-CERT-0001','pos',
+  'dine_in',current_date,'queued','normal',1,'[]',clock_timestamp()
+);
+
+insert into merchant.kitchen_order_item(
+  id,merchant_id,location_id,kitchen_order_id,source_order_id,source_order_item_id,
+  station_id,status,product_id,product_name,modifiers,quantity,display_order,route_reason,
+  target_seconds,version
+) values(
+  '85000000-0000-4000-8000-000000000108',
+  '10000000-0000-4000-8000-000000000101',
+  '20000000-0000-4000-8000-000000000101',
+  '85000000-0000-4000-8000-000000000107',
+  '84000000-0000-4000-8000-000000000103',
+  '85000000-0000-4000-8000-000000000106',
+  '85000000-0000-4000-8000-000000000101','queued',
+  '52000000-0000-4000-8000-000000000101','Americano KDS','[]',1,1,
+  'category_route',480,1
+);
+
+insert into merchant.customer_order(
+  id,merchant_id,location_id,customer_id,source,fulfillment_type,status,version,
+  external_ref,business_date
+) values(
+  '84000000-0000-4000-8000-000000000113',
+  '10000000-0000-4000-8000-000000000101',
+  '20000000-0000-4000-8000-000000000101',
+  '71000000-0000-4000-8000-000000000101','pos','pickup','completed',1,
+  'gate6b-kds-cancel',current_date
+);
+
+insert into merchant.order_item(
+  id,order_id,product_id,name,quantity,unit_price,display_order,station_id
+) values(
+  '85000000-0000-4000-8000-000000000116',
+  '84000000-0000-4000-8000-000000000113',
+  '52000000-0000-4000-8000-000000000101','Americano KDS Cancel',1,4500,1,
+  '85000000-0000-4000-8000-000000000101'
+);
+
+insert into merchant.kitchen_order(
+  id,merchant_id,location_id,source_order_id,public_reference,source,
+  fulfillment_type,business_date,status,priority,version,route_snapshot,queued_at
+) values(
+  '85000000-0000-4000-8000-000000000117',
+  '10000000-0000-4000-8000-000000000101',
+  '20000000-0000-4000-8000-000000000101',
+  '84000000-0000-4000-8000-000000000113','KDS-CERT-CANCEL','pos',
+  'pickup',current_date,'queued','normal',1,'[]',clock_timestamp()
+);
+
+insert into merchant.kitchen_order_item(
+  id,merchant_id,location_id,kitchen_order_id,source_order_id,source_order_item_id,
+  station_id,status,product_id,product_name,modifiers,quantity,display_order,route_reason,
+  target_seconds,version
+) values(
+  '85000000-0000-4000-8000-000000000118',
+  '10000000-0000-4000-8000-000000000101',
+  '20000000-0000-4000-8000-000000000101',
+  '85000000-0000-4000-8000-000000000117',
+  '84000000-0000-4000-8000-000000000113',
+  '85000000-0000-4000-8000-000000000116',
+  '85000000-0000-4000-8000-000000000101','queued',
+  '52000000-0000-4000-8000-000000000101','Americano KDS Cancel','[]',1,1,
+  'category_route',480,1
+);
+
 insert into merchant.hardware_device(
   id,merchant_id,location_id,register_id,assigned_pos_device_id,device_type,
   manufacturer,model,public_reference,transport,capabilities,enabled,
@@ -457,7 +540,10 @@ insert into runtime.session(
   '85000000-0000-4000-8000-000000000101','KDS Simulado Gate 6A',true,
   jsonb_build_object(
     'location_id','20000000-0000-4000-8000-000000000101',
-    'permissions',jsonb_build_array('kitchen.read','kitchen.prepare','kitchen.ready','kitchen.complete')
+    'permissions',jsonb_build_array(
+      'kitchen.read','kitchen.prepare','kitchen.ready','kitchen.complete',
+      'kitchen.recall','kitchen.cancel_ack'
+    )
   ),clock_timestamp()
 );
 

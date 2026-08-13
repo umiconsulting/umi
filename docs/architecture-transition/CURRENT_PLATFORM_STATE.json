@@ -256,18 +256,20 @@
     "readyShell": true,
     "gate5AStatus": "complete",
     "gate6AStatus": "complete_with_observations",
-    "gate6BStatus": "incomplete",
+    "gate6BStatus": "complete_with_observations",
     "dashboardOperations": "permission-scoped read projections and operational pilot commands",
     "dashboardCommandContext": "server-validated dashboard_administrative commands with current authority, CSRF, deterministic fingerprints, approvals, and recovery",
     "dashboardMutationBoundary": "checkout, physical cash movement, and KDS preparation remain in their assigned operational clients",
     "pilotRuntime": "production-shaped Docker Compose with validated environment configuration and explicit secrets",
     "pilotRelease": "6.0.0-pilot.a with immutable component identities and generated checksums",
     "pilotCertification": "clean deployment, smoke, backup, isolated restore, compatible rollback, and upgrade passed",
-    "pilotOperationsKit": "Spanish operator guides, daily checklists, support runbooks, Owner decisions, deterministic training fixture, and machine-readable business profile",
-    "pilotReadiness": "pnpm pilot:readiness checks runtime, migration, RLS, business setup, policy, recovery backlog, and backup freshness",
-    "latestLocalCommit": "HEAD (Gate 6B pilot operations commit in PR #72)",
-    "pushStatus": "Gate 6B pilot operations publication uses PR #72",
+    "pilotOperationsKit": "Certified Spanish operator guides, daily checklists, support runbooks, Owner decisions, deterministic training fixture, and machine-readable business profile",
+    "pilotBootstrap": "Protected platform context creates the first merchant, location, and Owner atomically before normal Dashboard authority takes over",
+    "pilotReadiness": "READY WITH WARNINGS; only deferred object storage policy remains",
+    "pilotBusinessCertification": "Clean bootstrap, Dashboard operations, KDS lifecycle, representative roles, smoke, RLS, and persisted evidence passed",
+    "latestLocalCommit": "HEAD (Gate 6B final closeout commit in PR #72)",
+    "pushStatus": "Gate 6B final closeout publication uses PR #72",
     "pullRequestStatus": "PR #72 targets build-v3"
   },
-  "nextGate": "Gate 6B remains active. Gate 7A is not authorized."
+  "nextGate": "Gate 7A is authorized but has not started."
 }

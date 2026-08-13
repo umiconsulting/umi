@@ -36,7 +36,17 @@ Copia `config/umipos-pilot-business-profile.json` fuera del repositorio. Cambia 
 
 ## Alta de un comercio
 
-El alta de la raíz del comercio es una acción de aprovisionamiento técnico. El Dashboard requiere una membresía existente. Después del aprovisionamiento, completa estos pasos:
+El Admin técnico crea el primer comercio y el primer Owner una sola vez. Este flujo no requiere una membresía previa.
+
+1. Define `PILOT_BOOTSTRAP_*` en `deploy/pilot/pilot.env`.
+2. Guarda la contraseña mediante la inyección segura del entorno.
+3. Ejecuta `pnpm pilot:bootstrap` desde la raíz.
+4. Conserva la referencia del comando y el resultado seguro.
+5. Inicia sesión como el primer Owner en el Dashboard.
+
+El bootstrap solo crea el comercio, la ubicación inicial y el primer Owner. La autoridad normal del Owner controla las acciones siguientes.
+
+Después del bootstrap, completa estos pasos:
 
 1. Inicia sesión como Owner/Admin.
 2. Confirma el comercio activo.
@@ -52,6 +62,8 @@ El alta de la raíz del comercio es una acción de aprovisionamiento técnico. E
 12. Ejecuta `pnpm pilot:readiness`.
 
 No uses la fixture de certificación para un comercio real. El despliegue limpio la habilita solo con `PILOT_CERTIFICATION_CONFIRM=disposable`.
+
+La certificación limpia de Gate 6B repitió el bootstrap desde cero. También pasó el recorrido de KDS, los roles y `pilot:readiness`.
 
 ## Ubicación, caja y dispositivos
 

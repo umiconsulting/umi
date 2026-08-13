@@ -1283,10 +1283,10 @@ export class PosCashRepository {
                   closed_at::text AS "closedAt",ledger_sequence AS "ledgerSequence",version
            FROM merchant.cash_shift
            WHERE merchant_id=$1::uuid AND location_id=$2::uuid
-             AND device_id=$4::uuid AND status<>'closed'
-             AND responsible_operator_id=$5::uuid
+             AND device_id=$3::uuid AND status<>'closed'
+             AND responsible_operator_id=$4::uuid
            ORDER BY opened_at DESC LIMIT 1`,
-          [merchantId, locationId, operatorSessionId, deviceId, operatorId],
+          [merchantId, locationId, deviceId, operatorId],
         );
         const mappedRegisters = registers.rows.map((row) => ({
           ...row,

@@ -39,11 +39,19 @@ elif [ "$current_version" = "$EXPECTED_SCHEMA_VERSION" ]; then
   echo "migration path: $current_version -> verification" | tee "$log"
   psql -X -v ON_ERROR_STOP=1 -d "$POSTGRES_DB" \
     -f /workspace/docs/migration/build-v3/99_verify.sql 2>&1 | tee -a "$log"
+elif [ "$current_version" = "build-v3-45" ]; then
+  echo "migration path: build-v3-45 -> $EXPECTED_SCHEMA_VERSION" | tee "$log"
+  psql -X -v ON_ERROR_STOP=1 -d "$POSTGRES_DB" \
+    -f /workspace/docs/migration/build-v3/46_platform_bootstrap.sql 2>&1 | tee -a "$log"
+  psql -X -v ON_ERROR_STOP=1 -d "$POSTGRES_DB" \
+    -f /workspace/docs/migration/build-v3/99_verify.sql 2>&1 | tee -a "$log"
 elif [ -z "$current_version" ] && \
   [ "$(psql -X -At -v ON_ERROR_STOP=1 -d "$POSTGRES_DB" -c "select to_regclass('merchant.administrative_command') is not null")" = t ]; then
   echo "migration path: certified build-v3-44 -> $EXPECTED_SCHEMA_VERSION" | tee "$log"
   psql -X -v ON_ERROR_STOP=1 -d "$POSTGRES_DB" \
     -f /workspace/docs/migration/build-v3/45_pilot_runtime.sql 2>&1 | tee -a "$log"
+  psql -X -v ON_ERROR_STOP=1 -d "$POSTGRES_DB" \
+    -f /workspace/docs/migration/build-v3/46_platform_bootstrap.sql 2>&1 | tee -a "$log"
   psql -X -v ON_ERROR_STOP=1 -d "$POSTGRES_DB" \
     -f /workspace/docs/migration/build-v3/99_verify.sql 2>&1 | tee -a "$log"
 else

@@ -42,7 +42,7 @@ describe('Gate 5A administrative command migration', () => {
 
   it('installs the operational wiring before RLS', () => {
     expect(runnerSql).toMatch(
-      /43_dashboard_administrative_commands 44_dashboard_operational_wiring 45_pilot_runtime 50_cross_schema_fk/,
+      /43_dashboard_administrative_commands 44_dashboard_operational_wiring 45_pilot_runtime 46_platform_bootstrap 50_cross_schema_fk/,
     );
     expect(wiringSql).toContain('administrative_command_id uuid');
     expect(wiringSql).toContain('inventory_count_command_context_ck');

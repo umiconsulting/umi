@@ -12,6 +12,14 @@ Android, iOS (from macOS), and Flutter Web are supported when their platform SDK
 
 Use paths that work on each development machine. UmiPOS accepts only client credentials.
 
+For a clean pilot, create the first merchant after deployment:
+
+```sh
+UMIPOS_PILOT_ENV_FILE=deploy/pilot/pilot.env pnpm pilot:bootstrap
+```
+
+This command uses the protected platform bootstrap context. Normal Dashboard authority starts after the first Owner login.
+
 ## Configuration
 
 Pass compile-time values with `--dart-define`:

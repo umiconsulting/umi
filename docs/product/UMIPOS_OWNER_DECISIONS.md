@@ -19,3 +19,5 @@ Este archivo contiene solo decisiones abiertas. Usa los valores seguros hasta qu
 | Retención                  | conserva la política técnica actual               | privacidad y auditoría         | antes de producción     |
 | Hardware elegido           | simulador solo para certificación                 | compatibilidad física          | antes del piloto físico |
 | Infraestructura            | runtime local de piloto                           | DNS, TLS, respaldo y soporte   | antes de producción     |
+
+Gate 6B usa valores seguros para estas decisiones. `pilot:readiness` solo advierte sobre el almacenamiento de objetos diferido por política.

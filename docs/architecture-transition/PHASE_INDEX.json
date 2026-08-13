@@ -181,11 +181,11 @@
       "subject": "Pilot deployment, release artifacts, health, backup, restore, upgrade, rollback, and smoke certification"
     },
     {
-      "commit": "HEAD (Gate 6B pilot operations commit)",
+      "commit": "HEAD (Gate 6B final closeout commit)",
       "id": "6B",
-      "status": "incomplete",
+      "status": "complete_with_observations",
       "stateMachineVersion": 1,
-      "subject": "Pilot operations kit, readiness validation, training, support, daily procedures, and Owner decisions"
+      "subject": "Certified bootstrap, pilot operations, KDS and role walkthroughs, readiness, training, and support"
     }
   ]
 }

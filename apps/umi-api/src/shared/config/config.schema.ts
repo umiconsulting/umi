@@ -63,6 +63,8 @@ export const configSchema = z
       .regex(/^[0-9A-Za-z][0-9A-Za-z._-]{0,79}$/)
       .optional(),
     CONFIG_SCHEMA_VERSION: z.string().regex(/^\d+$/).default('1'),
+    PILOT_BOOTSTRAP_TOKEN: z.string().min(32).max(256).optional(),
+    PILOT_BOOTSTRAP_EXPIRES_AT: z.string().datetime().optional(),
     MINIMUM_POS_VERSION: z
       .string()
       .regex(/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/)
@@ -246,6 +248,8 @@ export const configSchema = z
         'RELEASE_BUILD_TIMESTAMP',
         'CONTRACT_VERSION',
         'EXPECTED_SCHEMA_VERSION',
+        'PILOT_BOOTSTRAP_TOKEN',
+        'PILOT_BOOTSTRAP_EXPIRES_AT',
         'OTEL_EXPORTER_OTLP_ENDPOINT',
       ] as const) {
         requireValue(key);

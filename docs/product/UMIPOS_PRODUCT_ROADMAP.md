@@ -23,7 +23,7 @@ Updated: 2026-08-12
 | 4A KDS operational integration          | Complete with observations | 3G-B                   | Authorize Gate 5A Dashboard completion    | Xcode validation was unavailable in the Linux runner | Existing KDS static review, API, contracts, POS status, 10 real races, PostgreSQL, RLS, reconnect, and PR checks passed  |
 | 5A Dashboard operational completion     | Complete                   | 4A                     | Authorize Gate 6A pilot deployment        | None                                                 | Live Dashboard, CSRF, API, PostgreSQL, RLS, inventory waste, 24-case matrix, and P0 walkthrough passed                   |
 | 6A Pilot deployment and release runtime | Complete with observations | 5A                     | Authorize Gate 6B pilot operations kit    | External production infrastructure remains           | Clean deploy, smoke, backup, restore, upgrade, rollback, release builds, and PR checks passed                            |
-| 6B Pilot operations kit                 | Incomplete                 | 6A                     | Prove onboarding and walkthroughs         | Merchant bootstrap and walkthrough evidence          | Profile, readiness, fixture, operator pack, support runbooks, and daily lists exist                                      |
+| 6B Pilot operations kit                 | Complete with observations | 6A                     | Authorize Gate 7A certification           | External and Owner policy observations only          | Clean bootstrap, live Dashboard, KDS, role, RLS, smoke, readiness, and persisted evidence passed                         |
 
 The latest relevant revision is the Gate 6B pilot operations commit in PR #72.
 PR #72 keeps Gates 3A through 6B complete.
@@ -87,4 +87,4 @@ A clean deployment, real smoke suite, database backup, isolated restore, rollbac
 Production DNS, TLS certificates, provider backups, signing tools, and physical devices remain observations.
 Gate 6B adds one machine-readable business profile and one deterministic training fixture.
 It adds a readiness validator, Spanish operator guides, daily lists, incident runbooks, and the Owner decision register.
-Gate 7A is not authorized. Gate 6B still needs reproducible merchant onboarding and executed walkthrough evidence.
+Gate 7A is authorized. Gate 6B passed reproducible merchant onboarding and executed walkthrough evidence.

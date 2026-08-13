@@ -381,7 +381,7 @@ export class PosEntryRepository {
             entity_type, entity_id, outcome, metadata)
          VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 'elevation.granted',
                  'elevation_grant', $5::uuid, 'success',
-                 jsonb_build_object('method','operator_pin','permission',$6))`,
+                 jsonb_build_object('method','operator_pin','permission',$6::text))`,
         [
           input.userId,
           input.sessionId,
@@ -455,7 +455,7 @@ export class PosEntryRepository {
             entity_id, outcome, metadata)
          VALUES ($1::uuid, $2::uuid, $3::uuid, 'elevation.manager_granted',
                  'elevation_grant', $4::uuid, 'success',
-                 jsonb_build_object('method','manager_approval','permission',$5))`,
+                 jsonb_build_object('method','manager_approval','permission',$5::text))`,
         [input.managerUserId, input.merchantId, input.locationId, rows[0].id, input.permission],
       );
     }

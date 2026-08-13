@@ -162,6 +162,21 @@ The command performs these actions:
 The command stops after any failed action.
 It does not mark a failed release as active.
 
+## Create the first merchant
+
+Set the `PILOT_BOOTSTRAP_*` values through the secure environment boundary.
+Then run the one-time bootstrap command:
+
+```sh
+UMIPOS_PILOT_ENV_FILE=deploy/pilot/pilot.env pnpm pilot:bootstrap
+```
+
+The command uses the internal API and the deployment bootstrap token.
+It does not use SQL or a public bootstrap endpoint.
+The command creates the merchant, the initial location, and the first Owner atomically.
+Run the same command again only to recover its idempotent result.
+After completion, use normal Dashboard authentication and merchant RBAC.
+
 ## Service health
 
 | Service       | Liveness                   | Readiness                               | Release identity      |
