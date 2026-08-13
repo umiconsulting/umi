@@ -28,3 +28,5 @@ alter role umi_worker_login set log_statement = 'none';
 alter role umi_worker_login set log_min_duration_statement = -1;
 alter role umi_worker_login set log_parameter_max_length = 0;
 SQL
+
+touch /var/lib/postgresql/data/.umipos-init-complete
