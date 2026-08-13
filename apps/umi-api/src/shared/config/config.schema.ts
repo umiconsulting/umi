@@ -45,10 +45,43 @@ export const configSchema = z
       .regex(/^[A-Za-z_][A-Za-z0-9_]*$/)
       .default('conversaflow'),
 
-    // Wallet-pass refresh (Apple PassKit + Google Wallet). Best-effort push fired
-    // after cash money writes; when unset, the refresh is skipped (money write is
-    // unaffected). Points at the pass-push service once cert infra is provisioned.
-    WALLET_PASS_PUSH_URL: z.string().url().optional(),
+    // ── Apple Wallet pass signing ───────────────────────────────────────────
+    // The three PEMs, base64-encoded. A pass needs all three to get a signature.
+    // `ApplePassBuilder.isConfigured()` gives false until they are all present,
+    // and the pass routes then answer 503.
+    // The private key is encrypted, so APPLE_KEY_PASSPHRASE goes with it.
+    APPLE_SIGNER_CERT: z.string().optional(),
+    APPLE_SIGNER_KEY: z.string().optional(),
+    APPLE_WWDR_CERT: z.string().optional(),
+    APPLE_KEY_PASSPHRASE: z.string().optional(),
+    APPLE_PASS_TYPE_ID: z.string().default('pass.co.umicash.loyalty'),
+    APPLE_TEAM_ID: z.string().optional(),
+
+    // APNs token auth for pass updates: the .p8 base64-encoded, plus its Key ID.
+    // This is the "Keys" mechanism, not an APNs SSL certificate. The .p8 can never
+    // be re-downloaded from Apple, so these values are the only copy.
+    APPLE_APN_KEY: z.string().optional(),
+    APPLE_APN_KEY_ID: z.string().optional(),
+
+    // ── Google Wallet ───────────────────────────────────────────────────────
+    // Classes are pre-created through the REST API and are named
+    // `{issuer}.{handle}_{classIdPrefix}`; only the loyalty OBJECT travels in the
+    // save JWT. The private key arrives with literal "\n" sequences from most
+    // secret stores, so it is un-escaped where it is read.
+    GOOGLE_WALLET_ISSUER_ID: z.string().optional(),
+    GOOGLE_WALLET_CLASS_ID: z.string().default('loyalty_v2'),
+    GOOGLE_SERVICE_ACCOUNT_EMAIL: z.string().optional(),
+    GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: z.string().optional(),
+
+    // The origin that serves the customer-facing wallet surface.
+    //
+    // THIS VALUE IS PERMANENT. It is written into `webServiceURL` inside every
+    // `.pkpass` at signing time, and the copy on a customer's phone can never be
+    // changed — Apple calls back to whatever host was signed in. It must stay
+    // `https://cash.umiconsulting.co` for as long as any issued pass exists.
+    // It is also the base for `/logos/*` brand assets, which live in umi-cash's
+    // `public/` directory and are fetched over HTTP rather than duplicated here.
+    WALLET_PUBLIC_ORIGIN: z.string().url().optional(),
 
     // Feature flags.
     CASH_WRITE_ENABLED: booleanFromEnv.default(false), // retained; cash writes are live

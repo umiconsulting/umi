@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { PasswordService } from './password.service';
 import { JwtService } from './jwt.service';
 import { QrService } from './qr.service';
+import { CustomerTokenService } from './customer-token.service';
 
 /**
  * Cross-cutting auth primitives (one auth layer, §4.3). Global so guards in any
@@ -11,7 +12,7 @@ import { QrService } from './qr.service';
  */
 @Global()
 @Module({
-  providers: [PasswordService, JwtService, QrService],
-  exports: [PasswordService, JwtService, QrService],
+  providers: [PasswordService, JwtService, QrService, CustomerTokenService],
+  exports: [PasswordService, JwtService, QrService, CustomerTokenService],
 })
 export class SharedAuthModule {}

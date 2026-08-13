@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import { WalletModule } from '../../modules/wallet/wallet.module';
 import { AnthropicAdapter } from './anthropic.adapter';
 import { VoyageAdapter } from './voyage.adapter';
 import { TwilioAdapter } from './twilio.adapter';
@@ -12,6 +13,9 @@ import { WalletPassAdapter } from './wallet-pass.adapter';
  */
 @Global()
 @Module({
+  // WalletPassAdapter delegates to ApplePushService now that the wallet layer
+  // lives in this process rather than behind an HTTP call to umi-cash.
+  imports: [WalletModule],
   providers: [
     AnthropicAdapter,
     VoyageAdapter,

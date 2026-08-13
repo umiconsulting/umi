@@ -6,6 +6,7 @@ import { RequireProduct } from '../auth/require-product.decorator';
 import { Merchant } from '../auth/current-user.decorator';
 import type { MerchantAccess } from '../auth/auth.types';
 import { CashReadService } from './cash-read.service';
+import { WalletPassAdapter } from '../../shared/adapters/wallet-pass.adapter';
 
 /**
  * Cash READ side (D11 — always live) + admin-config writes (settings branding,
@@ -17,7 +18,10 @@ import { CashReadService } from './cash-read.service';
 @RequireProduct('cash')
 @Controller('api/:merchantRef/admin')
 export class CashController {
-  constructor(private readonly cash: CashReadService) {}
+  constructor(
+    private readonly cash: CashReadService,
+    private readonly walletPass: WalletPassAdapter,
+  ) {}
 
   @Get('settings')
   getSettings(@Merchant() t: MerchantAccess) {
@@ -27,6 +31,10 @@ export class CashController {
   @Patch('settings')
   async updateSettings(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
     await this.cash.updateSettings(t.merchantId, body);
+    // Not awaited. A café-wide refresh reaches every issued pass, and the café
+    // must not wait for Apple to save a setting. It never throws — see the
+    // adapter — so nothing can escape into this response.
+    void this.walletPass.refreshMerchant(t.merchantId);
     return { ok: true };
   }
 
@@ -51,14 +59,23 @@ export class CashController {
   }
 
   // Admin-config write (not the inert customer-facing path — preflight §4).
+  //
+  // Both of these change what every pass at the café shows. The reward name and
+  // the stamps threshold appear on the card face, so each issued pass needs a
+  // refresh. umi-cash also pushed here, but it did not touch the card rows first,
+  // so the push did nothing. See ApplePushService.pushMerchant.
   @Put('reward-config')
-  putRewardConfig(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
-    return this.cash.updateRewardConfig(t.merchantId, body);
+  async putRewardConfig(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
+    const result = await this.cash.updateRewardConfig(t.merchantId, body);
+    void this.walletPass.refreshMerchant(t.merchantId);
+    return result;
   }
 
   @Patch('reward-config')
-  patchRewardConfig(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
-    return this.cash.updateRewardConfig(t.merchantId, body);
+  async patchRewardConfig(@Merchant() t: MerchantAccess, @Body() body: Record<string, unknown>) {
+    const result = await this.cash.updateRewardConfig(t.merchantId, body);
+    void this.walletPass.refreshMerchant(t.merchantId);
+    return result;
   }
 
   @Get('gift-cards')

@@ -1,17 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
 import { isOpenAt, parseOpenHours } from '../business-hours/open-hours';
-
-/** dow 0=Sun..6=Sat — the same indexing as open-hours DAY_KEYS and Postgres `dow`. */
-const WEEKDAY_INDEX: Record<string, number> = {
-  Sunday: 0,
-  Monday: 1,
-  Tuesday: 2,
-  Wednesday: 3,
-  Thursday: 4,
-  Friday: 5,
-  Saturday: 6,
-};
+import { WEEKDAY_INDEX } from '../../shared/format/weekday';
+import { LOYALTY_CARD_STATE_SQL, type LoyaltyCardState } from '../../shared/loyalty/card-state.sql';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>;
@@ -44,13 +35,11 @@ export interface PerformScanInput {
   newQrToken: string;
 }
 
-export interface ScannedCard {
-  total_visits: number;
-  visits_this_cycle: number;
-  pending_rewards: number;
-  balance_cents: number;
-  card_number: string;
-}
+/**
+ * What a scan reports back. It is the shared derived state, unchanged — the
+ * register and the wallet pass must never disagree about these numbers.
+ */
+export type ScannedCard = LoyaltyCardState;
 
 /**
  * Scan reads + the atomic visit/redeem/birthday mutation. Scan touches loyalty
@@ -260,30 +249,13 @@ export class CashScanRepository {
       // instead of returning undefined (which callers read as ScannedCard).
       if (!upd.rows[0]) throw new NotFoundException('card_not_found');
 
-      // Derived summary (identity-only card): visits_this_cycle = visits % threshold;
-      // pending = floor(visits/threshold) − redemptions; balance = SUM(ledger).
-      // loyalty_reward.stamps_required COALESCEs to 10 when unset → no div-by-zero.
-      const { rows } = await c.query<ScannedCard>(
-        `WITH vr AS (
-           SELECT COALESCE((
-             SELECT stamps_required FROM merchant.loyalty_reward
-             WHERE merchant_id=$1::uuid AND active AND type='stamps_free_item'
-             ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
-         ),
-         tv  AS (SELECT COUNT(*)::int AS n FROM merchant.loyalty_visit
-                  WHERE merchant_id=$1::uuid AND card_id=$2::uuid),
-         rr  AS (SELECT COUNT(*)::int AS n FROM merchant.loyalty_redemption
-                  WHERE merchant_id=$1::uuid AND card_id=$2::uuid),
-         bal AS (SELECT COALESCE(SUM(delta),0)::int AS n FROM merchant.loyalty_stored_value_ledger
-                  WHERE merchant_id=$1::uuid AND card_id=$2::uuid)
-         SELECT $3::text            AS card_number,
-                tv.n                AS total_visits,
-                (tv.n % vr.n)       AS visits_this_cycle,
-                (tv.n / vr.n - rr.n) AS pending_rewards,
-                bal.n               AS balance_cents
-         FROM vr, tv, rr, bal`,
-        [input.merchantId, input.cardId, upd.rows[0].card_number],
-      );
+      // Derived summary (identity-only card). The formula lives in one place
+      // because the wallet pass shows the same four numbers to the same customer
+      // at the same moment — see shared/loyalty/card-state.sql.ts.
+      const { rows } = await c.query<LoyaltyCardState>(LOYALTY_CARD_STATE_SQL, [
+        input.merchantId,
+        input.cardId,
+      ]);
       return rows[0];
     });
   }

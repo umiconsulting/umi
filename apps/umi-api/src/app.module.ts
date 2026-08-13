@@ -20,6 +20,7 @@ import { VoiceModule } from './modules/voice/voice.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { CashModule } from './modules/cash/cash.module';
 import { KdsModule } from './modules/kds/kds.module';
+import { WalletModule } from './modules/wallet/wallet.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { LeadsModule } from './modules/leads/leads.module';
 
@@ -47,6 +48,7 @@ import { LeadsModule } from './modules/leads/leads.module';
     CustomersModule,
     CashModule,
     KdsModule,
+    WalletModule,
     ConversationsModule,
     LeadsModule,
   ],
