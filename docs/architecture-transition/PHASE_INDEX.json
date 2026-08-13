@@ -186,6 +186,13 @@
       "status": "complete_with_observations",
       "stateMachineVersion": 1,
       "subject": "Certified bootstrap, pilot operations, KDS and role walkthroughs, readiness, training, and support"
+    },
+    {
+      "commit": "HEAD (Gate 7A final certification commit)",
+      "id": "7A",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "Integrated sales, stored value, offline replay, refunds, shift close, reconciliation, recovery, and audit"
     }
   ]
 }

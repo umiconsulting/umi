@@ -268,7 +268,13 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Owner, Manager, Cashier, KDS, Viewer, and location-scope checks used real sessions and persisted authority.
 - `pnpm pilot:readiness` returned `READY WITH WARNINGS` only for deferred object storage policy.
 - Physical hardware, iPad, public infrastructure, provider integrations, and final UX remain external observations.
-- Gate 7A is authorized. It has not started.
+- Gate 7A: complete with observations. The integrated operating journey passed.
+- Wallet, gift-card, mixed-tender, native offline replay, full refund, and shift close passed with real persistence.
+- Financial, inventory, loyalty, wallet, and gift-card projections matched their immutable facts.
+- The authenticated Dashboard loaded all end-of-day operational views.
+- Recovery reported zero unresolved commands. Audit continuity reported no secret leak.
+- Physical hardware, iPad, public infrastructure, provider integration, and final UX remain external observations.
+- Gate 7B is authorized. It has not started.
 
 ## Gate 3C decision basis
 

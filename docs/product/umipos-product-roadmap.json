@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "updatedAt": "2026-08-11",
   "latestRelevantCommit": "HEAD (Gate 6B final closeout commit)",
-  "integrationState": "Gates 3A through 6B are complete. Gate 7A is authorized and has not started.",
+  "integrationState": "Gates 3A through 7A are complete. Gate 7B is authorized with observations and has not started.",
   "items": [
     {
       "id": "platform-certification",
@@ -169,6 +169,16 @@
       "nextObjective": "Authorize Gate 7A Full End-to-End Operational Certification",
       "blockers": ["Object storage provider policy remains an external decision"],
       "validationState": "Clean bootstrap, Dashboard operations, KDS lifecycle, representative roles, smoke, RLS, readiness, and persisted evidence passed"
+    },
+    {
+      "id": "7A",
+      "status": "complete_with_observations",
+      "dependencies": ["6B"],
+      "nextObjective": "Authorize Gate 7B Resilience, Security, and Financial Certification",
+      "blockers": [
+        "Physical hardware, iPad, public infrastructure, providers, and final UX remain external"
+      ],
+      "validationState": "Wallet, gift card, mixed tender, native offline replay, full refund, shift close, Dashboard EOD, exact reconciliation, recovery, and audit passed"
     }
   ]
 }

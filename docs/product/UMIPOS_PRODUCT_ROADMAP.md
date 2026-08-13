@@ -24,6 +24,7 @@ Updated: 2026-08-12
 | 5A Dashboard operational completion     | Complete                   | 4A                     | Authorize Gate 6A pilot deployment        | None                                                 | Live Dashboard, CSRF, API, PostgreSQL, RLS, inventory waste, 24-case matrix, and P0 walkthrough passed                   |
 | 6A Pilot deployment and release runtime | Complete with observations | 5A                     | Authorize Gate 6B pilot operations kit    | External production infrastructure remains           | Clean deploy, smoke, backup, restore, upgrade, rollback, release builds, and PR checks passed                            |
 | 6B Pilot operations kit                 | Complete with observations | 6A                     | Authorize Gate 7A certification           | External and Owner policy observations only          | Clean bootstrap, live Dashboard, KDS, role, RLS, smoke, readiness, and persisted evidence passed                         |
+| 7A End-to-end operational certification | Complete with observations | 6B                     | Authorize Gate 7B certification           | External and physical observations only              | Stored value, native offline replay, refund, close, EOD, reconciliation, recovery, and audit passed                      |
 
 The latest relevant revision is the Gate 6B pilot operations commit in PR #72.
 PR #72 keeps Gates 3A through 6B complete.
@@ -87,4 +88,4 @@ A clean deployment, real smoke suite, database backup, isolated restore, rollbac
 Production DNS, TLS certificates, provider backups, signing tools, and physical devices remain observations.
 Gate 6B adds one machine-readable business profile and one deterministic training fixture.
 It adds a readiness validator, Spanish operator guides, daily lists, incident runbooks, and the Owner decision register.
-Gate 7A is authorized. Gate 6B passed reproducible merchant onboarding and executed walkthrough evidence.
+Gate 7A passed the integrated business journey. Gate 7B is authorized with observations and has not started.
