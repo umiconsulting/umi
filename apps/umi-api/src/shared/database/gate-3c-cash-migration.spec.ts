@@ -71,7 +71,9 @@ describe('Gate 3C cash persistence', () => {
   });
 
   it('derives the shift business date on the server', () => {
-    expect(repository).toContain('SELECT current_date::text AS value');
+    expect(repository).toContain(
+      'now() at time zone coalesce(location.timezone,merchant.timezone)',
+    );
     expect(repository).not.toContain('dto.businessDate');
   });
 
