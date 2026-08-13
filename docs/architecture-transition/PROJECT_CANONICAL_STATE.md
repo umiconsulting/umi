@@ -293,7 +293,11 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - KDS cards, state labels, modifiers, actions, degraded state, and accessibility passed code review.
 - Browser checks passed at 1440, 1024, and 390 CSS pixels without global overflow.
 - Physical iPad, physical peripherals, Owner aesthetics, and provider payment remain observations.
-- Gate 9A is authorized with observations. It has not started.
+- Gate 9A: complete with observations. The first pilot rehearsal passed.
+- Clean bootstrap, roles, catalog, inventory, sale, refund, hardware, KDS, recovery, and readiness passed.
+- API restart preserved one sale and one refund. Inventory drift and unresolved recovery were zero.
+- Physical iPad, peripherals, object storage, provider payment, and Owner preferences remain observations.
+- Gate 9B is authorized with observations. It has not started.
 
 ## Gate 3C decision basis
 

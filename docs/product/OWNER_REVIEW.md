@@ -228,3 +228,13 @@ Recommended Mac review sequence:
 - Remaining P2: final density, spacing, and visual preference require Owner review.
 - External: physical iPad, touch distance, physical peripherals, and provider payment remain pending.
 - Owner approval remains pending. This record does not infer approval.
+
+## Gate 9A pilot dry run
+
+- Rehearsed: clean bootstrap, roles, catalog, inventory, sale, refund, hardware, KDS, recovery, and readiness.
+- Verified: financial, inventory, loyalty, wallet, and gift-card projections matched their facts.
+- Verified: API restart preserved the sale and refund facts.
+- Verified: KDS completed, recalled, cancelled, and reconciled work without financial authority.
+- Remaining P2: the old close runner uses a fixed count and needs fixture-aware certification input.
+- External: physical iPad, peripherals, object storage, provider payment, and Owner preferences remain pending.
+- Owner approval remains pending. This record does not infer approval.

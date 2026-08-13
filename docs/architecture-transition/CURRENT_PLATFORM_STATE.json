@@ -35,7 +35,8 @@
     "7A",
     "7B",
     "8A",
-    "8B"
+    "8B",
+    "9A"
   ],
   "authorities": {
     "api": "apps/umi-api",
@@ -268,6 +269,7 @@
     "gate7BStatus": "complete_with_observations",
     "gate8AStatus": "complete_with_observations",
     "gate8BStatus": "complete_with_observations",
+    "gate9AStatus": "complete_with_observations",
     "dashboardOperations": "permission-scoped read projections and operational pilot commands",
     "dashboardCommandContext": "server-validated dashboard_administrative commands with current authority, CSRF, deterministic fingerprints, approvals, and recovery",
     "dashboardMutationBoundary": "checkout, physical cash movement, and KDS preparation remain in their assigned operational clients",
@@ -283,9 +285,10 @@
     "posUxCertification": "Enrollment, PIN, sales, payments, customer value, exceptions, operations, accessibility, localization, responsive layouts, and operator failures passed",
     "posDesignLanguage": "UMIPOS_DESIGN_LANGUAGE_V1 is frozen for the pilot",
     "dashboardKdsUxCertification": "Dashboard and KDS workflows, accessibility, responsive layouts, failure states, and focused builds passed",
-    "latestLocalCommit": "HEAD (Gate 8B certification commit in PR #72)",
-    "pushStatus": "Gate 8B certification publication uses PR #72",
+    "pilotDryRun": "Clean bootstrap, roles, business operations, KDS, restart recovery, exact reconciliation, support, and readiness passed",
+    "latestLocalCommit": "HEAD (Gate 9A certification commit in PR #72)",
+    "pushStatus": "Gate 9A certification publication uses PR #72",
     "pullRequestStatus": "PR #72 targets build-v3"
   },
-  "nextGate": "Gate 9A is authorized with observations but has not started."
+  "nextGate": "Gate 9B is authorized with observations but has not started."
 }

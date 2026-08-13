@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-08-13",
-  "latestRelevantCommit": "HEAD (Gate 8B certification commit)",
-  "integrationState": "Gates 3A through 8B are complete with recorded observations. Gate 9A is authorized and has not started.",
+  "latestRelevantCommit": "HEAD (Gate 9A certification commit)",
+  "integrationState": "Gates 3A through 9A are complete with recorded observations. Gate 9B is authorized and has not started.",
   "items": [
     {
       "id": "platform-certification",
@@ -209,6 +209,16 @@
         "Physical iPad, physical peripherals, Owner aesthetics, and provider payment remain external"
       ],
       "validationState": "Dashboard and KDS workflows, accessibility, responsive layouts, failure states, focused tests, and builds passed"
+    },
+    {
+      "id": "9A",
+      "status": "complete_with_observations",
+      "dependencies": ["8B"],
+      "nextObjective": "Authorize Gate 9B Pilot RC",
+      "blockers": [
+        "Physical iPad, peripherals, object storage, Owner preferences, and provider payment remain external"
+      ],
+      "validationState": "Clean bootstrap, business lifecycle, KDS, restart recovery, reconciliation, support, and readiness passed"
     }
   ]
 }

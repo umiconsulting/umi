@@ -214,6 +214,13 @@
       "status": "complete_with_observations",
       "stateMachineVersion": 1,
       "subject": "Dashboard and KDS UX, accessibility, responsive layouts, failure states, and operator experience"
+    },
+    {
+      "commit": "HEAD (Gate 9A certification commit)",
+      "id": "9A",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "First pilot rehearsal, operational lifecycle, failure recovery, support, and readiness"
     }
   ]
 }
