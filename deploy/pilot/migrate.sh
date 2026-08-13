@@ -29,8 +29,13 @@ done
 
 schema_exists="$(psql -X -At -v ON_ERROR_STOP=1 -d "$POSTGRES_DB" \
   -c "select to_regclass('merchant.merchant') is not null")"
-current_version="$(psql -X -At -v ON_ERROR_STOP=1 -d "$POSTGRES_DB" \
-  -c "select case when to_regclass('runtime.schema_migration') is null then '' else coalesce((select version from runtime.schema_migration order by applied_at desc limit 1),'') end")"
+schema_migration_exists="$(psql -X -At -v ON_ERROR_STOP=1 -d "$POSTGRES_DB" \
+  -c "select to_regclass('runtime.schema_migration') is not null")"
+current_version=""
+if [ "$schema_migration_exists" = t ]; then
+  current_version="$(psql -X -At -v ON_ERROR_STOP=1 -d "$POSTGRES_DB" \
+    -c "select coalesce((select version from runtime.schema_migration order by applied_at desc limit 1),'')")"
+fi
 
 if [ "$schema_exists" = f ]; then
   echo "migration path: empty database -> $EXPECTED_SCHEMA_VERSION" | tee "$log"
