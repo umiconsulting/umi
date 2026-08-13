@@ -274,7 +274,15 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - The authenticated Dashboard loaded all end-of-day operational views.
 - Recovery reported zero unresolved commands. Audit continuity reported no secret leak.
 - Physical hardware, iPad, public infrastructure, provider integration, and final UX remain external observations.
-- Gate 7B is authorized. It has not started.
+- Gate 7B: complete with observations. Resilience, security, and financial pressure passed.
+- API, worker, PostgreSQL, Redis, network, KDS, and client restart scenarios failed safely.
+- A bounded sequence added 100 sales through real API and PostgreSQL authority.
+- Financial, inventory, wallet, gift-card, and loyalty facts reconciled with zero drift.
+- The customer-value matrix passed 26 real PostgreSQL races and 52 terminal results.
+- RLS and FORCE RLS covered 133 scoped tables. The API login cannot bypass RLS.
+- Backup and isolated restore matched 103 sales, 105 tenders, 230 inventory facts, and 317 audit events.
+- Recovery reported zero unresolved commands. Audit data reported zero secret matches.
+- Gate 8A is authorized with external and physical observations. It has not started.
 
 ## Gate 3C decision basis
 

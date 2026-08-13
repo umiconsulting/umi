@@ -193,6 +193,13 @@
       "status": "complete_with_observations",
       "stateMachineVersion": 1,
       "subject": "Integrated sales, stored value, offline replay, refunds, shift close, reconciliation, recovery, and audit"
+    },
+    {
+      "commit": "HEAD (Gate 7B certification commit)",
+      "id": "7B",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "Service failure, security, concurrency, stress, reconciliation, backup, restore, recovery, and audit"
     }
   ]
 }

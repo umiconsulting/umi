@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-11",
+  "updatedAt": "2026-08-13",
   "branch": "architectureUMIposIntegration",
   "certificationSourceCommit": "a1e794d8fe0e9883f5677147ab81c4342f1a3980",
   "certificationDate": "2026-07-27",
@@ -28,7 +28,12 @@
     "3F",
     "3G-A",
     "3G-B",
-    "4A"
+    "4A",
+    "5A",
+    "6A",
+    "6B",
+    "7A",
+    "7B"
   ],
   "authorities": {
     "api": "apps/umi-api",
@@ -258,6 +263,7 @@
     "gate6AStatus": "complete_with_observations",
     "gate6BStatus": "complete_with_observations",
     "gate7AStatus": "complete_with_observations",
+    "gate7BStatus": "complete_with_observations",
     "dashboardOperations": "permission-scoped read projections and operational pilot commands",
     "dashboardCommandContext": "server-validated dashboard_administrative commands with current authority, CSRF, deterministic fingerprints, approvals, and recovery",
     "dashboardMutationBoundary": "checkout, physical cash movement, and KDS preparation remain in their assigned operational clients",
@@ -269,9 +275,10 @@
     "pilotReadiness": "READY WITH WARNINGS; only deferred object storage policy remains",
     "pilotBusinessCertification": "Clean bootstrap, Dashboard operations, KDS lifecycle, representative roles, smoke, RLS, and persisted evidence passed",
     "endToEndCertification": "Wallet, gift card, mixed tender, native offline replay, full refund, shift close, Dashboard EOD, exact reconciliation, recovery, and audit passed",
-    "latestLocalCommit": "HEAD (Gate 6B final closeout commit in PR #72)",
-    "pushStatus": "Gate 6B final closeout publication uses PR #72",
+    "resilienceCertification": "Service outages, revocation, rate limits, RLS, 26 customer-value races, 100 sales, exact reconciliation, backup, restore, recovery, and audit passed",
+    "latestLocalCommit": "HEAD (Gate 7B certification commit in PR #72)",
+    "pushStatus": "Gate 7B certification publication uses PR #72",
     "pullRequestStatus": "PR #72 targets build-v3"
   },
-  "nextGate": "Gate 7B is authorized with observations but has not started."
+  "nextGate": "Gate 8A is authorized with observations but has not started."
 }
