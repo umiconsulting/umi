@@ -310,10 +310,13 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Product inventory, documentation index, glossary, scope decisions, and troubleshooting baseline are complete.
 - Physical hardware, providers, real network, and site validation moved to deferred Gate 13.
 - Gate 11 de Base de Conocimiento y entrega al Owner está completo con P2.
-- Gate 12 and Gate 13 have not started.
+- Gate 12 está completo con P2. Gate 13 no ha iniciado.
 - Los dos P2 heredados permanecen fuera de los flujos productivos.
 - `docs/knowledge-base/README.md` es la entrada canónica en español.
-- Gate 12, con la etiqueta formal `Final Software Certification & Release Closure`, queda autorizado con P2.
+- RC2 está reemplazado por un healthcheck no saludable del worker.
+- `UMI POS Pilot RC3` usa `5b852c5e8152ca3dc6f9070ae2d49a277406dc72` como artifact source.
+- Gate 12 certificó el software final con cero P0 y cero P1 abiertos.
+- Gate 13 conserva únicamente la validación física y del entorno real.
 
 ## Gate 3C decision basis
 

@@ -27,7 +27,9 @@ describe('pilot worker healthcheck', () => {
   it('uses only direct API runtime dependencies', () => {
     const compose = readFileSync(join(root, 'deploy/pilot/compose.yml'), 'utf8');
     const packageJson = JSON.parse(readFileSync(join(root, 'apps/umi-api/package.json'), 'utf8'));
-    const workerHealthcheck = compose.match(/umi-worker:[\s\S]*?healthcheck:[\s\S]*?interval:/)?.[0];
+    const workerHealthcheck = compose.match(
+      /umi-worker:[\s\S]*?healthcheck:[\s\S]*?interval:/,
+    )?.[0];
 
     assert.ok(workerHealthcheck, 'No se encontró el healthcheck del worker.');
     const requiredModules = [...workerHealthcheck.matchAll(/require\('([^']+)'\)/g)].map(

@@ -1,5 +1,17 @@
 # UmiPOS Owner Review
 
+## Cierre de software de Gate 12
+
+- Estado: `UMI POS SOFTWARE COMPLETE WITH P2`.
+- Release vigente: `UMI POS Pilot RC3`, versión `6.0.0-pilot.rc3`.
+- RC1 y RC2 están reemplazados. No se deben desplegar.
+- Gate 12 encontró y cerró un P1 en el healthcheck del worker de RC2.
+- No existe un P0 o P1 abierto.
+- La Base de Conocimiento empieza en `docs/knowledge-base/README.md`.
+- Gate 13 validará hardware, sitio, red y proveedores reales.
+- El checkout local antiguo de NEXO es técnicamente desechable después de conservar su remoto e historial.
+- El desarrollo de software solo debe reabrirse por un defecto reproducible o un cambio de alcance autorizado.
+
 Updated: 2026-08-03
 
 This is the owner-maintained visual and interaction review. Future product gates must read it

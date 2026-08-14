@@ -1,6 +1,6 @@
 # Base de Conocimiento de UMI POS
 
-Estado: canónica para `UMI POS Pilot RC2`, versión `6.0.0-pilot.rc2`.
+Estado: canónica para `UMI POS Pilot RC3`, versión `6.0.0-pilot.rc3`.
 
 Esta base explica el producto, la operación y el soporte. Empieza en [Comienza aquí](START_HERE.md).
 

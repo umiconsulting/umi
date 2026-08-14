@@ -4,7 +4,7 @@
 
 ## Versión actual
 
-`UMI POS Pilot RC2`, versión `6.0.0-pilot.rc2`.
+`UMI POS Pilot RC3`, versión `6.0.0-pilot.rc3`. RC1 y RC2 están reemplazados.
 
 El artifact source es `1e885022b654dcecf943377ea2e1e3b739a9027a`.
 
@@ -56,7 +56,7 @@ El esquema actual termina en `build-v3-48`. Un fallo detiene la versión antes d
 
 PostgreSQL es la fuente autoritativa de hechos del negocio. Conserva respaldos con identidad, hora, tamaño y checksum.
 
-Object storage está deshabilitado en RC2. Si se habilita después, requiere su propia política de durabilidad.
+Object storage está deshabilitado en RC3. Si se habilita después, requiere su propia política de durabilidad.
 
 ## Recuperación
 

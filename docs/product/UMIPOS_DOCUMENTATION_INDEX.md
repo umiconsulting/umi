@@ -1,8 +1,8 @@
-# UmiPOS Documentation Index
+# Índice de documentación de UmiPOS
 
 Updated: 2026-08-13
 
-This index separates current instructions from historical evidence. Use current instructions for operation. Use historical evidence only to trace a decision or certification.
+Este índice separa las instrucciones actuales de la evidencia histórica. Usa las instrucciones actuales para operar.
 
 ## Base de Conocimiento del Owner
 
@@ -42,7 +42,7 @@ Organiza producto, operación, soporte, desarrollo, alcance y Gate 13.
 | --------------------- | ----------------------------------------------------------------------------------------------------- |
 | Current authoritative | The tables in this document identify each current owner.                                              |
 | Historical evidence   | Gate 7 through Gate 10A evidence remains immutable history.                                           |
-| Superseded            | RC1 is `SUPERSEDED — DO NOT DEPLOY`. RC2 is current.                                                  |
+| Superseded            | RC1 y RC2 son `SUPERSEDED — DO NOT DEPLOY`. RC3 es vigente.                                           |
 | Duplicate             | Certification files overlap by design. They record separate gates and are not operation instructions. |
 | Incomplete            | No baseline technical or operational area remains incomplete.                                         |
 | Missing               | No required baseline area is missing.                                                                 |
@@ -53,6 +53,8 @@ Organiza producto, operación, soporte, desarrollo, alcance y Gate 13.
 | Area                         | Document                                                          |
 | ---------------------------- | ----------------------------------------------------------------- |
 | Product completion           | `docs/certification/UMIPOS_PRODUCT_COMPLETION.md`                 |
+| Estado final                 | `docs/product/UMIPOS_SOFTWARE_STATUS.md`                          |
+| Certificación final          | `docs/certification/UMIPOS_FINAL_SOFTWARE_CERTIFICATION.md`       |
 | Base del Owner               | `docs/knowledge-base/README.md`                                   |
 | Manifiesto de la Base        | `docs/knowledge-base/MANIFEST.md`                                 |
 | Certificación de la Base     | `docs/certification/UMIPOS_OWNER_KNOWLEDGE_BASE_CERTIFICATION.md` |
@@ -98,12 +100,13 @@ Organiza producto, operación, soporte, desarrollo, alcance y Gate 13.
 | 8B          | `docs/certification/UMIPOS_DASHBOARD_KDS_UX_CERTIFICATION.md`              | Historical certification evidence              |
 | 9A          | `docs/certification/UMIPOS_PILOT_DRY_RUN.md`                               | Historical certification evidence              |
 | 9B          | `docs/certification/UMIPOS_PILOT_RC_CERTIFICATION.md`                      | Historical release evidence; RC1 is superseded |
-| 9C          | `docs/certification/UMIPOS_PILOT_CERTIFICATION.md`                         | Current RC2 certification evidence             |
+| 9C          | `docs/certification/UMIPOS_PILOT_CERTIFICATION.md`                         | Evidencia histórica de RC2                     |
+| 12          | `docs/certification/UMIPOS_FINAL_SOFTWARE_CERTIFICATION.md`                | Certificación vigente de RC3                   |
 | 10A attempt | `docs/certification/UMIPOS_CONTROLLED_PILOT_ACTIVATION.md`                 | Blocked site evidence; not an activation       |
 
 ## Superseded or historical material
 
-- All RC1 artifacts are historical. They must state `SUPERSEDED — DO NOT DEPLOY`.
+- Los artefactos RC1 y RC2 son históricos. Deben indicar `SUPERSEDED — DO NOT DEPLOY`.
 - Dated architecture audits and migration plans remain decision evidence. They are not current deployment instructions.
 - NEXO discovery and response documents remain historical source evidence. They do not define runtime architecture.
 - Build-v2 and migration audit files remain migration history. New product behavior must not use them as an owner.
@@ -112,4 +115,4 @@ Organiza producto, operación, soporte, desarrollo, alcance y Gate 13.
 ## Missing documentation status
 
 Gate 10 closed the baseline gaps for the product inventory, glossary, deferred register, documentation index, and completion decision.
-Gate 11 can now build the Owner knowledge base. Product scope is already defined.
+Gate 11 completó la Base de Conocimiento. Gate 12 cerró la certificación de software con RC3.

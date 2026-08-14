@@ -250,8 +250,9 @@
     },
     {
       "id": "12",
-      "status": "authorized_with_p2",
-      "subject": "Gate 12: Final Software Certification & Release Closure"
+      "commit": "HEAD (certificación final; RC3 source 5b852c5e8152ca3dc6f9070ae2d49a277406dc72)",
+      "status": "software_complete_with_p2",
+      "subject": "Cierre final de software, RC3 y documentación canónica"
     },
     {
       "id": "13",

@@ -1,91 +1,91 @@
-# UMI POS Pilot RC Deployment
+# Despliegue de UMI POS Pilot RC
 
-Updated: 2026-08-13
+Actualizado: 2026-08-13
 
-This procedure deploys `UMI POS Pilot RC2` from source commit `1e885022b654dcecf943377ea2e1e3b739a9027a`.
+Este procedimiento despliega `UMI POS Pilot RC3` desde `5b852c5e8152ca3dc6f9070ae2d49a277406dc72`.
+RC1 y RC2 están reemplazados. No los despliegues.
 
-## Deploy
+## Despliegue
 
-1. Check out the certified source commit.
-2. Verify the release manifest and artifact checksums.
-3. Copy `deploy/pilot/pilot.env.example` to the protected pilot environment.
-4. Replace all placeholders through the platform secret store.
-5. Set public HTTPS origins, trusted proxy ranges, and database TLS values.
-6. Keep object storage disabled unless the provider contract is complete.
-7. Keep real payment providers disabled until provider certification passes.
-8. Run `pnpm umipos:pilot:precheck`.
-9. Create a current database backup.
-10. Run the ordered build-v3 migration chain through `build-v3-48`.
-11. Start PostgreSQL and Redis readiness checks.
-12. Deploy the API image.
-13. Deploy the worker command from the API image.
-14. Deploy the Dashboard image and Caddy.
-15. Install the verified Linux POS artifact on an enrolled device.
-16. Install KDS only through the supported Apple release process.
-17. Run `pnpm umipos:pilot:smoke`.
-18. Run `pnpm umipos:pilot:readiness`.
-19. Verify release version, commit, contract, and schema identity in diagnostics.
+1. Selecciona el commit certificado.
+2. Verifica el manifiesto y los checksums.
+3. Copia `deploy/pilot/pilot.env.example` al entorno protegido.
+4. Sustituye cada placeholder desde el almacén de secretos.
+5. Define los orígenes HTTPS y los proxies de confianza.
+6. Configura TLS de PostgreSQL cuando cruce una red privada confiable.
+7. Mantén object storage desactivado hasta certificar su proveedor.
+8. Mantén los proveedores de pago desactivados hasta su certificación.
+9. Ejecuta `pnpm umipos:pilot:precheck`.
+10. Crea un respaldo actual de PostgreSQL.
+11. Ejecuta las migraciones ordenadas hasta `build-v3-48`.
+12. Verifica readiness de PostgreSQL y Redis.
+13. Despliega la imagen de API.
+14. Despliega el worker desde la imagen de API.
+15. Despliega Dashboard y Caddy.
+16. Instala Linux POS en un dispositivo inscrito.
+17. Instala KDS mediante el proceso compatible de Apple.
+18. Ejecuta `pnpm umipos:pilot:smoke`.
+19. Ejecuta `pnpm pilot:readiness`.
+20. Verifica versión, commit, contrato y esquema en Diagnostics.
 
-Stop the deployment if a migration, readiness check, identity check, or smoke check fails.
+Detén el despliegue si falla una migración, readiness, identidad o smoke.
 
-## Post-deploy smoke plan
+## Smoke posterior
 
-1. Verify API liveness and readiness.
-2. Open the Dashboard through HTTPS.
-3. Authenticate the Owner.
-4. Verify the merchant and location context.
-5. Verify the Manager location scope.
-6. Verify the device, register, and shift state.
-7. Load the representative catalog.
-8. Verify inventory visibility.
-9. Connect the assigned KDS station.
-10. Commit one safe cash transaction.
-11. Verify one sale, tender, and receipt fact.
-12. Verify the transaction in Dashboard history.
-13. Verify that no duplicate fact exists.
-14. Review diagnostics, audit, and Recovery Center.
+1. Verifica liveness y readiness de API.
+2. Abre Dashboard mediante HTTPS.
+3. Autentica al Owner.
+4. Verifica merchant y location.
+5. Verifica el alcance del Manager.
+6. Verifica device, register y shift.
+7. Carga un catálogo representativo.
+8. Verifica la visibilidad del inventario.
+9. Conecta la estación KDS asignada.
+10. Confirma una venta segura en efectivo.
+11. Verifica un hecho de venta, tender y recibo.
+12. Verifica la venta en Dashboard.
+13. Confirma que no existe un duplicado.
+14. Revisa Diagnostics, Audit y Recovery Center.
 
-## Rollback and recovery
+## Rollback y recuperación
 
-Use an application rollback for an application defect. Select the last certified artifact.
-Keep the current schema when it is forward-compatible. Pause the worker before an incompatible rollback.
+Usa rollback de aplicación para un defecto de aplicación.
+Selecciona el último artefacto certificado compatible con el esquema actual.
+Pausa el worker antes de un rollback incompatible.
 
-Do not reverse a migration after authoritative facts use its schema.
-Do not delete or edit sale, receipt, refund, inventory, cash, customer-value, or audit facts.
-Drain or pause the outbox before a worker rollback. Preserve every pending job and command identity.
+No reviertas una migración que ya contiene hechos de negocio.
+No edites hechos de ventas, recibos, reembolsos, inventario o auditoría.
+Pausa o drena outbox antes de cambiar el worker.
+Conserva cada job pendiente y su identidad.
 
-Use a verified backup restore only for database loss or corruption.
-Stop all writers before a restore. Restore into an isolated database first.
-Run the reconciliation and smoke checks before traffic resumes.
+Usa un respaldo verificado solo para pérdida o corrupción de PostgreSQL.
+Detén todos los writers antes de una restauración.
+Restaura primero en una base aislada.
+Ejecuta reconciliación y smoke antes de reanudar tráfico.
 
-Provider operations can require provider-side recovery. Record the provider reference before escalation.
-Re-enroll a device only through the approved device process. Reconcile KDS from the server snapshot.
+## Protección de datos
 
-## Data protection
+- PostgreSQL es la autoridad de los hechos de negocio.
+- Crea un respaldo verificado antes de cada despliegue.
+- Guarda respaldos fuera del host de aplicación.
+- Redis, tarjetas KDS, caché POS y estado de UI no son respaldos.
+- El operador de plataforma ejecuta la restauración.
 
-- PostgreSQL is the authority for business facts. Take a checked backup before each deployment.
-- Store backup files outside the application host according to the provider retention policy.
-- Object storage needs versioning, durability, and backup before it becomes authoritative.
-- UI state, Redis, KDS cards, and POS cache are not business backup sources.
-- The pilot operator owns daily verification. The platform operator owns restore execution.
+## Lista go/no-go
 
-## Pilot go/no-go checklist
-
-- [ ] The deployed commit is `1e885022b654dcecf943377ea2e1e3b739a9027a`.
-- [ ] The environment is the approved pilot environment.
-- [ ] Migrations end at `build-v3-48`.
-- [ ] All required configuration is present.
-- [ ] The secret store contains all pilot secrets.
-- [ ] Object storage is disabled or provider-ready.
-- [ ] Payment provider mode is correct.
-- [ ] The merchant and locations are configured.
-- [ ] Owner and Manager accounts are ready.
-- [ ] Devices and registers are assigned.
-- [ ] KDS is assigned and connected.
-- [ ] The catalog is active.
-- [ ] The inventory baseline has zero drift.
-- [ ] API, worker, database, Redis, and Dashboard are ready.
-- [ ] The post-deploy smoke plan passed.
-- [ ] The current database backup has a valid checksum.
-- [ ] Support and escalation contacts are known.
-- [ ] All physical and provider observations were reviewed.
+- [ ] El commit desplegado es `5b852c5e8152ca3dc6f9070ae2d49a277406dc72`.
+- [ ] El entorno corresponde al entorno aprobado.
+- [ ] Las migraciones terminan en `build-v3-48`.
+- [ ] La configuración requerida está presente.
+- [ ] El almacén contiene todos los secretos.
+- [ ] Object storage está desactivado o certificado.
+- [ ] El modo de pago es correcto.
+- [ ] Merchant, locations, Owner y Manager están listos.
+- [ ] Devices, registers y KDS están asignados.
+- [ ] El catálogo está activo.
+- [ ] El inventario tiene drift cero.
+- [ ] API, worker, PostgreSQL, Redis y Dashboard están saludables.
+- [ ] El smoke posterior pasó.
+- [ ] El respaldo tiene un checksum válido.
+- [ ] Soporte conoce la ruta de escalamiento.
+- [ ] Se revisaron los elementos de Gate 13.

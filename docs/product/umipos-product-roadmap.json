@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-08-13",
-  "latestRelevantCommit": "HEAD (commit de Gate 11; artefactos RC2 sin cambios)",
-  "integrationState": "Gate 11 completó la Base de Conocimiento con dos P2 heredados. Gate 12 está autorizado. Gate 13 conserva validación física.",
+  "latestRelevantCommit": "HEAD (certificación final de Gate 12; artefactos RC3)",
+  "integrationState": "UMI POS está completo como software con dos P2. RC3 corrige el healthcheck del worker. Gate 13 conserva validación física.",
   "items": [
     {
       "id": "platform-certification",
@@ -256,11 +256,11 @@
     },
     {
       "id": "12",
-      "status": "authorized_with_p2",
+      "status": "software_complete_with_p2",
       "dependencies": ["11"],
-      "nextObjective": "Gate 12: Final Software Certification & Release Closure",
+      "nextObjective": "Esperar Gate 13 hasta que existan hardware y un entorno real",
       "blockers": [],
-      "validationState": "Not started"
+      "validationState": "RC3, builds, pruebas, migración, reconciliación, recuperación y documentación pasaron"
     },
     {
       "id": "13",

@@ -33,7 +33,7 @@ Updated: 2026-08-13
 | 9C Pilot certification                    | Certified with conditions  | 9B                     | Enter controlled real-world pilot         | On-site devices, disabled providers, and Owner review          | RC2 fresh deployment, smoke, business truth, restart, backup, restore, support, and final boundaries passed              |
 | 10 Product completion                     | Complete with P2           | 9C                     | Authorize Gate 11 Owner handoff           | None                                                           | Product inventory, software audit, documentation closure, glossary, scope decisions, and Gate 13 register passed         |
 | 11 Conocimiento y entrega al Owner        | Completo con P2            | 10                     | Autorizar Gate 12                         | Ninguno                                                        | Base en español, soporte, diagnóstico, desarrollo, diagramas, alcance y entrega completos                                |
-| 12 Cierre final de software               | Autorizado con P2          | 11                     | Certificación final de software           | Ninguno                                                        | No iniciado                                                                                                              |
+| 12 Cierre final de software               | Completo con P2            | 11                     | Esperar Gate 13                           | Ninguno                                                        | RC3, builds, pruebas, migración, reconciliación, recuperación y documentación pasaron                                    |
 | 13 Hardware and real-world certification  | Deferred                   | 12, hardware available | Validate physical and provider behavior   | Hardware and real site are unavailable                         | Deferred by Owner decision; does not block Gates 10 through 12                                                           |
 
 La revisión relevante es el commit de Gate 11 en PR #72.
@@ -109,5 +109,7 @@ RC2 passed fresh deployment, smoke, business truth, restart, backup, restore, su
 Controlled pilot remains authorized with conditions under Gate 9C evidence.
 Gate 10 now closes the software product scope with two bounded P2 source-cleanup items.
 Gate 11 completó la Base de Conocimiento del Owner con los dos P2 heredados.
-Gate 12 queda autorizado con P2.
-Gate 13 owns physical hardware, real network, provider, and site validation after hardware exists.
+Gate 12 encontró un P1 en el healthcheck del worker de RC2 y lo cerró en RC3.
+`UMI POS Pilot RC3` usa `5b852c5e8152ca3dc6f9070ae2d49a277406dc72` como artifact source.
+Gate 12 completó el cierre final de software con dos P2 no bloqueantes.
+Gate 13 valida hardware, red, proveedores y sitio cuando estén disponibles.

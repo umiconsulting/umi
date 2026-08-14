@@ -527,3 +527,4 @@ Record successful and failed cross-workspace traces here before proposing new re
 - promotion follow-up: none — fix is localized to conversaflow-functions; the pattern (missing Supabase secret disabling a search tier) is not yet recurrent enough to warrant a new skill
 
 - 2026-07-29: Routed UmiPOS device pairing to `packages/contract`, `umi-api`, `umi-dashboard`, `umi-pos`, and platform migrations. Used `workspace-boundary-check`. Implemented administrator-approved pairing.
+- 2026-08-13: Gate 12 se enrutó a la raíz para certificación transversal. `apps/umi-api` recibió la corrección del healthcheck. `docs/` recibió el cierre y RC3. No se creó un servicio ni una autoridad nueva.

@@ -1,93 +1,80 @@
-# UMI POS Pilot RC Manifest
+# Manifiesto de UMI POS Pilot RC
 
-Updated: 2026-08-13
+Actualizado: 2026-08-13
 
-## Release identity
+## Identidad
 
-| Field                | Value                                                              |
-| -------------------- | ------------------------------------------------------------------ |
-| Release              | `UMI POS Pilot RC2`                                                |
-| Version              | `6.0.0-pilot.rc2`                                                  |
-| Source commit        | `1e885022b654dcecf943377ea2e1e3b739a9027a`                         |
-| Branch               | `architectureUMIposIntegration`                                    |
-| PR                   | `#72`                                                              |
-| Base                 | `build-v3`                                                         |
-| Contract             | `2.12.0`                                                           |
-| Configuration schema | `1`                                                                |
-| Migration range      | `build-v3-00` through `build-v3-48`                                |
-| Migration digest     | `b00445e57382ec33e9780e51cc9af5c3f2561bf9c686e2a64356647eccb2c555` |
+| Campo                    | Valor                                                              |
+| ------------------------ | ------------------------------------------------------------------ |
+| Release                  | `UMI POS Pilot RC3`                                                |
+| Versión                  | `6.0.0-pilot.rc3`                                                  |
+| Source commit            | `5b852c5e8152ca3dc6f9070ae2d49a277406dc72`                         |
+| Rama                     | `architectureUMIposIntegration`                                    |
+| PR                       | `#72`                                                              |
+| Base                     | `build-v3`                                                         |
+| Contrato                 | `2.12.0`                                                           |
+| Esquema de configuración | `1`                                                                |
+| Migraciones              | `build-v3-00` a `build-v3-48`                                      |
+| Digest de migración      | `b00445e57382ec33e9780e51cc9af5c3f2561bf9c686e2a64356647eccb2c555` |
 
-The source commit is the artifact authority. A later documentation commit records certification results.
+El source commit es la autoridad de los artefactos.
 
-## Release components
+RC1 y RC2 están reemplazados. No los despliegues.
 
-| Component | Artifact                              | Identity                                                                   | Status                 |
-| --------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------------------- |
-| UMI API   | `umipos-api:6.0.0-pilot.rc2`          | `sha256:17ba3a2294eb0d91c5e29237d428a93c94bfb9b2ebba99f486978b87945582fd`  | Built                  |
-| Worker    | API image with worker command         | Same digest as API                                                         | Built                  |
-| Dashboard | `umipos-dashboard:6.0.0-pilot.rc2`    | `sha256:2cb2c1a2b003ff5c081987bbcc95fcb9a29881b4d2e258b7bca09f71b0d79995`  | Built                  |
-| Linux POS | `umipos-linux-6.0.0-pilot.rc2.tar.gz` | SHA-256 `15a27dad69597b7dcae8b355380383f44df0fc6ad0c1a5fcb1cf19cd8f370d3a` | Built                  |
-| KDS       | Source tree                           | `9f0e88f1c839a453472294ce305a515476ac0d90`                                 | Statically verified    |
-| Database  | Build-v3 migrations                   | Digest above                                                               | Clean migration passed |
+## Artefactos
 
-The generated machine manifest is `artifacts/releases/6.0.0-pilot.rc2/release-manifest.json`.
-Release artifacts remain outside Git by repository policy.
+| Componente    | Artefacto                             | Identidad                                                                  | Estado                    |
+| ------------- | ------------------------------------- | -------------------------------------------------------------------------- | ------------------------- |
+| API           | `umipos-api:6.0.0-pilot.rc3`          | `sha256:6945291a794578c0fbfa1f3d9fb6b4e96cfb3739df34154364a877ee0fad4292`  | Construido                |
+| Worker        | Imagen de API con comando worker      | Mismo digest de API                                                        | Construido y saludable    |
+| Dashboard     | `umipos-dashboard:6.0.0-pilot.rc3`    | `sha256:2a3e7574dec89883a20aa263e0855f45c66519c8e9428a2ecdd193234d754c21`  | Construido                |
+| Linux POS     | `umipos-linux-6.0.0-pilot.rc3.tar.gz` | SHA-256 `3db93292801e22821751c8253ed42e2fcd8d4b98cfa0aebbd52e2fa1679209e9` | Construido                |
+| KDS           | Árbol de origen                       | `git-tree:9f0e88f1c839a453472294ce305a515476ac0d90`                        | Verificado por software   |
+| Base de datos | Migraciones build-v3                  | Digest anterior                                                            | Migración limpia aprobada |
 
-## Infrastructure
+El manifiesto de máquina está en `artifacts/releases/6.0.0-pilot.rc3/release-manifest.json`.
+La política del repositorio mantiene los artefactos fuera de Git.
 
-The RC requires PostgreSQL, Redis, the API, the worker, the Dashboard, Caddy, and OpenTelemetry.
-Use TLS at public ingress. Use PostgreSQL TLS when the database crosses a trusted private boundary.
-The deployment must inject all secrets outside Git.
+## Infraestructura
 
-Object storage is disabled in RC2. No current pilot operation requires it.
-If enabled later, configure an endpoint, bucket, region, access key, secret key, durability, and backup policy.
+RC3 requiere PostgreSQL, Redis, API, worker, Dashboard, Caddy y OpenTelemetry.
+Usa TLS en el ingreso público. Inyecta todos los secretos fuera de Git.
 
-External payment authorization is not included. Manual terminal payment remains an operator assertion.
-Do not enable a real provider until its test environment and reconciliation procedure pass.
+Object storage está desactivado. Ninguna operación v1 lo requiere.
+El procesamiento integrado de pagos está desactivado.
+El registro manual de una terminal externa es una afirmación del operador.
 
-## Supported boundaries
+## Contrato de configuración
 
-- The Linux POS artifact is built and verified.
-- Dashboard and API container artifacts are built and verified.
-- KDS behavior is statically and locally simulated.
-- Physical iPad and Xcode builds are not verified in this environment.
-- Physical printer, drawer, scanner, and customer display are not verified.
+Usa `deploy/pilot/pilot.env.example` como plantilla.
+Usa `apps/umi-api/src/shared/config/config.schema.ts` como autoridad de runtime.
 
-## Configuration contract
+- Runtime: entorno, PostgreSQL, Redis, orígenes y release.
+- Secretos: contraseñas, claves de sesión, customer value y tokens operativos.
+- Pilot: bootstrap, versiones mínimas, cookies seguras y proxies de confianza.
+- Opcional: object storage, telemetría y adaptadores externos.
+- Pruebas: identidades smoke, confirmación desechable y fixture de cierre.
 
-`deploy/pilot/pilot.env.example` is the template. `apps/umi-api/src/shared/config/config.schema.ts` is the runtime authority.
+Los valores de producción fallan de forma cerrada.
+No uses placeholders, credenciales de prueba o localhost en un entorno real.
 
-Required classes:
+## Observaciones
 
-- Runtime: environment, database URLs, Redis URL, public origins, release identity, and schema identity.
-- Secrets: database passwords, session keys, customer-value keys, bootstrap token, and operations token.
-- Pilot-only: bootstrap identity, minimum client versions, secure cookies, trusted proxy ranges, and release identity.
-- Optional: object storage, telemetry exporter, provider adapters, lifecycle jobs, and external message services.
-- Test-only: smoke identities, disposable confirmation, and fixture closing count.
+- Gate 13 validará iOS, KDS físico y periféricos.
+- Gate 13 validará el sitio, la red y los proveedores si se activan.
+- Dos P2 de código no alcanzable o comentarios históricos permanecen aceptados.
+- Gate 12 cerró el P1 del healthcheck del worker de RC2.
 
-Production values fail closed. Keep insecure webhook mode disabled. Keep secure cookies enabled.
-Do not use template placeholders or localhost values in the real pilot environment.
+## Despliegue y recuperación
 
-## Known observations and P2 items
+Usa [el procedimiento de despliegue](../deployment/UMIPOS_PILOT_RC_DEPLOYMENT.md).
+Usa rollback de aplicación con un esquema compatible.
+No reviertas hechos de negocio inmutables.
+Usa un respaldo verificado solo para pérdida o corrupción de PostgreSQL.
 
-- Physical iPad validation is pending.
-- Physical peripheral validation is pending.
-- Provider-specific object storage validation is pending if storage becomes enabled.
-- External payment provider validation is pending.
-- Final Owner preferences depend on the pilot.
-- The closing runner P2 is closed. It now requires an explicit fixture count.
-- RC1 is superseded. Gate 9C found and fixed a clean-database startup race before pilot activation.
+## Evidencia
 
-## Deployment and recovery
-
-Use [UMIPOS_PILOT_RC_DEPLOYMENT.md](../deployment/UMIPOS_PILOT_RC_DEPLOYMENT.md).
-Use application rollback with the forward-compatible schema.
-Do not reverse immutable business facts.
-Use a verified backup restore only for database loss or corruption.
-
-## Certification evidence
-
-- [Pilot RC certification](../certification/UMIPOS_PILOT_RC_CERTIFICATION.md)
-- [Pilot dry run](../certification/UMIPOS_PILOT_DRY_RUN.md)
-- [End-to-end certification](../certification/UMIPOS_END_TO_END_CERTIFICATION.md)
-- [Resilience certification](../certification/UMIPOS_RESILIENCE_SECURITY_FINANCIAL_CERTIFICATION.md)
+- [Certificación final de software](../certification/UMIPOS_FINAL_SOFTWARE_CERTIFICATION.md)
+- [Certificación del Pilot RC](../certification/UMIPOS_PILOT_RC_CERTIFICATION.md)
+- [Certificación del pilot](../certification/UMIPOS_PILOT_CERTIFICATION.md)
+- [Gate 13 diferido](../certification/UMIPOS_DEFERRED_HARDWARE_VALIDATION.md)
