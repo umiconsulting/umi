@@ -133,6 +133,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
       if (data.birthdayRewardName !== undefined) programData.birthday_reward_name = data.birthdayRewardName;
       if (programRow) {
         await tx.programs.update({ where: { id: programRow.id }, data: programData });
+      } else {
+        // No loyalty.programs row yet (partially-provisioned tenant) — create it so
+        // self-registration / birthday / lifecycle settings actually persist instead
+        // of being silently dropped while the response still says { ok: true }.
+        await tx.programs.create({ data: { tenant_id: tenant.id, ...programData } });
       }
     });
 

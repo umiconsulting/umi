@@ -80,6 +80,15 @@ services:
     environment:
       # Set API_DOMAIN in .env to a real hostname on the VPS for automatic TLS.
       - API_DOMAIN=${API_DOMAIN:-:80}
+      # Set PLANE_DOMAIN in .env to route that hostname to the self-hosted Plane
+      # stack in /opt/plane. Left unset (local dev) the site falls back to an
+      # unpublished port and does nothing.
+      - PLANE_DOMAIN=${PLANE_DOMAIN:-:8081}
+    extra_hosts:
+      # Plane runs as a separate compose project, so its proxy is not reachable
+      # by service name from here. It publishes on the Docker bridge IP and this
+      # gives Caddy the route back out to the host.
+      - 'host.docker.internal:host-gateway'
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

@@ -5,3 +5,14 @@
 	encode gzip
 	reverse_proxy umi-api:3000
 }
+
+# Self-hosted Plane, which runs as its own stack out of /opt/plane. Its proxy
+# binds to the Docker bridge IP only (never the public interface), so this Caddy
+# stays the single TLS entrypoint on the box. PLANE_DOMAIN comes from the
+# environment:
+#   - local:  unset  -> falls back to :8081, an unpublished no-op port
+#   - VPS:    PLANE_DOMAIN=plane.umiconsulting.co   (Caddy provisions a cert)
+{$PLANE_DOMAIN::8081} {
+	encode gzip
+	reverse_proxy host.docker.internal:8080
+}

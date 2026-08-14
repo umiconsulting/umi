@@ -1,71 +1,90 @@
-# Issue tracker: Trello (+ GitHub PRs as the review surface)
+# Issue tracker: Azure Boards (+ GitHub PRs as the review surface)
 
-Work items and PRDs for this repo live as **Trello cards**; code review happens on **GitHub PRs**. A card is the _spec_ (what the change must do); a PR is the _implementation and review_. Use the official **Trello MCP** (`https://mcp.trello.com/v1`) for all card operations, and the `gh` CLI for pull requests.
+Work items and specs for this repository live in **Azure Boards**. Code review happens
+on **GitHub pull requests**. A work item is the _spec_ — what the change must do. A pull
+request is the _implementation and the review_.
 
-The connected Trello workspace is Umi's — one workspace per MCP connection. If the Trello MCP is not connected in the current session, say so and stop; do not guess a card's contents.
+- Organization: `https://dev.azure.com/umiconsulting`
+- Project: **`Umi Consulting`**
+- Work items read as a bare number: `#93`, `AB#93`
 
-Cards and PRs are independent. A card can exist with no PR — future work, a bug handed to another dev, a request a client phoned in — and a PR can exist with no card (a small fix). A card may be created by the ticket skills (`to-tickets`, `to-spec`, `triage`) **or** by a person straight on the board; both are equally valid, and nothing here assumes a card came from an agent. Linking a PR to a card (below) is an optional enrichment, never a requirement.
+Use the **Azure DevOps MCP** for every work-item operation, and the `gh` CLI for pull
+requests.
+
+⚠ **Pin the organization on every call.** The local `az` login belongs to a different
+organization and is not authorized here. Never rely on a global CLI default.
+
+If the Azure DevOps MCP is not connected in the current session, say so and stop. Do not
+guess the contents of a work item.
+
+Work items and pull requests are independent. A work item can exist with no pull request —
+future work, a bug handed to another person, a request a client phoned in. A pull request
+can exist with no work item, for a small fix. A work item can come from the ticket skills
+(`to-tickets`, `to-spec`, `triage`) or from a person straight in the UI. Both are equally
+valid.
+
+## Retired trackers
+
+Two systems held this role before. Neither holds it now. Do not read a specification from
+either one.
+
+| System     | Status                | What to do with it                                                                                                                                                                                       |
+| ---------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Trello** | Retired.              | The `build-v3` lineage sent `code-review` and `pr-gates` here, and the board holds no Build v3 work. The MCP server is removed from `.mcp.json`.                                                         |
+| **Plane**  | Retired as a tracker. | Declared by GitHub PR #91 on `main`. The `plane.umiconsulting.co` instance stays up until its data is exported. Its MCP server stays declared for that export only. It is not a source of specification. |
 
 ## Where the spec lives
 
-The spec/PRD for a change is its linked **Trello card**:
+The spec for a change is its Azure Boards work item:
 
-- **Description** — the requirement / problem statement.
-- **Checklist items** — acceptance criteria.
+- **Description** — the requirement and the measured condition.
+- **Acceptance Criteria** — what must be true to close it.
+- **Repro Steps** — on a Bug, the observed and the expected result.
 - **Comments** — clarifications and decisions.
-- **List (column)** — status; **labels** — type / area.
+- **State** — status. **Area Path** — the owning product. **Tags** — type and phase.
 
-## Linking a PR to its card — optional
+**Read every field, not only the description.** A work item is not one text field. A
+correction that lands in the description and not in the repro steps leaves the reader
+following the stale half.
 
-Linking is opportunistic, never required — most PRs won't carry one. When a PR _does_ implement a specific card, it can declare it with a line in the **PR description**:
+## One project, area paths per product
 
-```
-Trello: https://trello.com/c/<shortLink>
-```
+The `Umi Consulting` project holds the whole monorepo. The **Area Path** carries the
+product: `Platform\Database`, `Platform\API`, `Products\Umi Cash`, `Products\Umi Dashboard`,
+`Products\UmiPOS`, `Operations\Security`, `Operations\Cutover`, `Program`.
 
-Resolve the card shortLink in this order:
+The project boundary follows the repository and its deployment, not the directory. The
+monorepo deploys as a unit, so it plans as a unit. A separate repository gets its own
+project when it starts. `Umi Ticket Seller` is such a project, and it is not this one.
 
-1. A `Trello:` line in the PR body.
-2. Any `trello.com/c/<shortLink>` URL in the PR body or the latest commit trailer.
-3. A card shortLink embedded in the branch name (`feat/<shortLink>-...`).
+## Linking a pull request to its work item
 
-If none resolve, that is normal: `code-review` runs its Standards axis and simply skips the Spec axis — a missing link is **not** a finding. The Trello GitHub Power-Up, when enabled, also attaches the PR to the card and back-links automatically — a convenience for humans, not something the skills depend on.
+The Azure Boards app is installed on the GitHub organization, so a reference inside a
+commit message or a pull-request description creates a real link. **The syntax decides
+whether the work item also moves.**
 
-## Conventions (via the Trello MCP)
+| Form          | Effect                                                                                                                                                     |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AB#93`       | Links only. The state does not change.                                                                                                                     |
+| `Fixes AB#93` | Links, and transitions the work item when the pull request completes. Also `Fix`, `Fixed`, `Close`, `Closes`, `Closed`, `Resolve`, `Resolves`, `Resolved`. |
 
-- **Fetch a card** — get the card by its shortLink or id, then read its description, checklists, and comments.
-- **Search** — search cards across the connected workspace by text, list, or label.
-- **Create a card** — create it in the agreed intake list with a title, a structured description, and a checklist of acceptance criteria.
-- **Comment** — add a comment to a card.
-- **Label / status** — apply a label, or move the card to the target list.
+**Use the bare form by default.** A merge is rarely the whole of a work item in this
+repository, because most items ask for attached evidence that no automation can produce.
 
-Discover the exact `mcp__trello__*` tool names at runtime; the operations above map to whatever the connected server exposes (boards, lists, cards, checklists, search).
+Use the transition form only when completing the pull request genuinely completes the item,
+including its acceptance evidence.
 
-## When a skill says "publish to the issue tracker"
+## When a work item closes
 
-Create a Trello card, or comment on the relevant one, via the Trello MCP. For AI-authored triage output, start the card or comment body with:
+A work item closes when the work is done **and** tested. When the code is done and the test
+is missing, the item stays `Active` and names what is missing.
 
-```
-> This was generated by AI.
-```
+Evidence is the **output of a command**, with its date and its commit. A sentence that says
+"proven" is not evidence. A closed item with no evidence is an item that nobody can
+re-verify.
 
-Cards a person creates by hand — e.g. straight from a client message — are ordinary cards and need no disclaimer.
+⚠ **A state value is legal for a work-item type, not for the project.** `Removed` is valid
+for a User Story and returns HTTP 400 for a Bug. On a Bug, use `Closed` with a reason.
 
-## When a skill says "fetch the relevant ticket"
-
-Resolve the card shortLink (order above) and read the card via the Trello MCP — its description, checklists, and comments are the full ticket.
-
-## Pull requests as a triage surface
-
-**PRs as a request surface: no.** PRs are the review surface for internal changes, not an external feature-request queue. `code-review`'s Spec axis reviews a PR's code against its linked Trello card; `triage` operates on Trello cards, not PRs.
-
-## Wayfinding operations
-
-Used by `wayfinder`. The **map** is a single Trello card; **child tickets** are cards linked to it.
-
-- **Map** — a card labelled `wayfinder:map`, holding the Notes / Decisions-so-far / Fog body.
-- **Child ticket** — a card linked to the map (as a checklist item or an attached card link), labelled `wayfinder:<type>` (`research` / `prototype` / `grilling` / `task`), assigned to the driving dev once claimed.
-- **Blocking** — express with a `Blocked by: <shortLink>, <shortLink>` line at the top of the child card's description (Trello has no native issue-dependency graph). A child is unblocked when every blocker card sits in the Done list.
-- **Frontier query** — list the map's open child cards, drop any with an unmet `Blocked by` line or an assignee; first in map order wins.
-- **Claim** — assign the card to yourself.
-- **Resolve** — comment the answer on the card, move it to Done, then append a pointer to the map's Decisions-so-far.
+⚠ **`System.Parent` is read-only.** Set the parent when you create the item, or use the
+work-item link API. A direct field write fails.

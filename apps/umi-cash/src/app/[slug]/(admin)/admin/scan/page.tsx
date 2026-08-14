@@ -6,6 +6,7 @@ import jsQR from 'jsqr';
 import { centavosFromPesos, formatMXN, COMMON_TOPUP_AMOUNTS } from '@/lib/currency';
 import { useTenant } from '@/context/TenantContext';
 import { authedFetch } from '@/lib/authed-fetch';
+import { describeReadFailure, handleWriteFailure } from '@/lib/request-failure';
 
 interface CardPreview {
   cardId: string;
@@ -63,6 +64,20 @@ export default function ScanPage() {
   const [topupAmount, setTopupAmount] = useState('');
   const [topupNote, setTopupNote] = useState('');
   const [showTopup, setShowTopup] = useState(false);
+
+  // Agregar sellos flow (multi-seal catch-up — only shown when tenant.multiSealEnabled)
+  const [sealsCount, setSealsCount] = useState('1');
+  const [showSeals, setShowSeals] = useState(false);
+
+  // Stable per-operation idempotency tokens: reused if the operator re-taps after a
+  // lost response (server dedups instead of double-charging/crediting), reset on
+  // success or whenever the target card / amount / note changes.
+  const chargeKeyRef = useRef<string>('');
+  const topupKeyRef = useRef<string>('');
+  const sealsKeyRef = useRef<string>('');
+  useEffect(() => { chargeKeyRef.current = ''; }, [preview, chargeAmount, chargeNote]);
+  useEffect(() => { topupKeyRef.current = ''; }, [preview, topupAmount, topupNote]);
+  useEffect(() => { sealsKeyRef.current = ''; }, [preview, sealsCount]);
 
   // ── Camera ──────────────────────────────────────────────────────────────
 
@@ -139,6 +154,8 @@ export default function ScanPage() {
     setChargeAmount('');
     setShowTopup(false);
     setTopupAmount('');
+    setShowSeals(false);
+    setSealsCount('1');
 
     try {
       const res = await authedFetch(slug, `/api/${slug}/admin/scan/preview`, {
@@ -161,8 +178,9 @@ export default function ScanPage() {
       } else {
         setResult({ success: false, message: data.error ?? 'Error al leer la tarjeta' });
       }
-    } catch {
-      setResult({ success: false, message: 'Error de conexión' });
+    } catch (err) {
+      // Preview only reads — nothing to have half-happened, so this one can say so.
+      setResult({ success: false, ...describeReadFailure(err) });
     } finally {
       setProcessing(false);
     }
@@ -191,8 +209,15 @@ export default function ScanPage() {
       const data = await res.json();
       setResult({ success: res.ok, message: data.message ?? data.error });
       if (res.ok) setPreview(null);
-    } catch {
-      setResult({ success: false, message: 'Error de conexión' });
+    } catch (err) {
+      setResult({
+        success: false,
+        ...handleWriteFailure(err, {
+          slug,
+          action: 'scan:actions',
+          verifyHint: 'Vuelve a escanear la tarjeta para ver si ya se aplicó.',
+        }),
+      });
     } finally {
       setProcessing(false);
     }
@@ -220,13 +245,15 @@ export default function ScanPage() {
     }
 
     try {
+      if (!chargeKeyRef.current) chargeKeyRef.current = crypto.randomUUID();
       const res = await authedFetch(slug, `/api/${slug}/admin/purchase`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId: preview.cardId, amountCentavos, note: chargeNote }),
+        body: JSON.stringify({ cardId: preview.cardId, amountCentavos, note: chargeNote, idempotencyKey: chargeKeyRef.current }),
       });
       const data = await res.json();
       if (res.ok) {
+        chargeKeyRef.current = '';
         setResult({ success: true, message: `Cobrado: ${data.amountMXN}`, detail: `Nuevo saldo: ${data.newBalanceMXN}` });
         setPreview(null);
         setShowCharge(false);
@@ -235,8 +262,15 @@ export default function ScanPage() {
       } else {
         setResult({ success: false, message: data.error ?? 'Error al cobrar' });
       }
-    } catch {
-      setResult({ success: false, message: 'Error de conexión' });
+    } catch (err) {
+      setResult({
+        success: false,
+        ...handleWriteFailure(err, {
+          slug,
+          action: 'scan:charge',
+          verifyHint: 'Verifica el saldo del cliente antes de volver a cobrar.',
+        }),
+      });
     } finally {
       setProcessing(false);
     }
@@ -256,13 +290,15 @@ export default function ScanPage() {
     }
 
     try {
+      if (!topupKeyRef.current) topupKeyRef.current = crypto.randomUUID();
       const res = await authedFetch(slug, `/api/${slug}/admin/topup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId: preview.cardId, amountCentavos, note: topupNote }),
+        body: JSON.stringify({ cardId: preview.cardId, amountCentavos, note: topupNote, idempotencyKey: topupKeyRef.current }),
       });
       const data = await res.json();
       if (res.ok) {
+        topupKeyRef.current = '';
         setResult({ success: true, message: `Recarga exitosa: ${data.amountMXN}`, detail: `Nuevo saldo: ${data.newBalanceMXN}` });
         setPreview(null);
         setShowTopup(false);
@@ -271,8 +307,15 @@ export default function ScanPage() {
       } else {
         setResult({ success: false, message: data.error ?? 'Error al recargar' });
       }
-    } catch {
-      setResult({ success: false, message: 'Error de conexión' });
+    } catch (err) {
+      setResult({
+        success: false,
+        ...handleWriteFailure(err, {
+          slug,
+          action: 'scan:topup',
+          verifyHint: 'Verifica el saldo del cliente antes de volver a recargar.',
+        }),
+      });
     } finally {
       setProcessing(false);
     }
@@ -287,7 +330,51 @@ export default function ScanPage() {
     setShowTopup(false);
     setTopupAmount('');
     setTopupNote('');
+    setShowSeals(false);
+    setSealsCount('1');
     setManualInput('');
+  }
+
+  async function doSeals(e: React.FormEvent) {
+    e.preventDefault();
+    if (!preview) return;
+    const count = parseInt(sealsCount, 10);
+    if (!Number.isInteger(count) || count < 1) {
+      setResult({ success: false, message: 'Cantidad inválida' });
+      return;
+    }
+    setProcessing(true);
+    setResult(null);
+
+    try {
+      if (!sealsKeyRef.current) sealsKeyRef.current = crypto.randomUUID();
+      const res = await authedFetch(slug, `/api/${slug}/admin/scan/seals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId: preview.cardId, seals: count, idempotencyKey: sealsKeyRef.current }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        sealsKeyRef.current = '';
+        setResult({ success: true, message: data.message ?? 'Sellos agregados' });
+        setPreview(null);
+        setShowSeals(false);
+        setSealsCount('1');
+      } else {
+        setResult({ success: false, message: data.error ?? 'Error al agregar sellos' });
+      }
+    } catch (err) {
+      setResult({
+        success: false,
+        ...handleWriteFailure(err, {
+          slug,
+          action: 'scan:seals',
+          verifyHint: 'Vuelve a escanear la tarjeta para ver los sellos antes de reintentar.',
+        }),
+      });
+    } finally {
+      setProcessing(false);
+    }
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -541,6 +628,54 @@ export default function ScanPage() {
               </form>
             </div>
 
+          /* Agregar sellos form (inline) */
+          ) : showSeals ? (
+            <div className="u-surface p-5 border-2 border-coffee-brand/20 bg-coffee-brand/5">
+              <p className="text-sm font-semibold text-coffee-dark mb-1">Agregar sellos</p>
+              <p className="text-xs mb-3" style={{ color: 'var(--color-ink-light)' }}>
+                Para clientes que migraron de otro sistema. Se suman a su tarjeta actual.
+              </p>
+              <form onSubmit={doSeals} className="space-y-3">
+                <input
+                  type="number"
+                  value={sealsCount}
+                  onChange={(e) => setSealsCount(e.target.value)}
+                  placeholder="Número de sellos"
+                  className="u-input"
+                  min="1"
+                  max="50"
+                  step="1"
+                  autoFocus
+                />
+                {(() => {
+                  const n = parseInt(sealsCount, 10);
+                  if (!Number.isInteger(n) || n < 1) return null;
+                  const req = preview.card.visitsRequired;
+                  const total = preview.card.visitsThisCycle + n;
+                  const rewards = Math.floor(total / req);
+                  const cycle = total % req;
+                  return (
+                    <p className="text-sm -mt-1" style={{ color: 'var(--color-ink-light)' }}>
+                      Quedará en {cycle}/{req}
+                      {rewards > 0 ? ` · +${rewards} recompensa${rewards === 1 ? '' : 's'}` : ''}
+                    </p>
+                  );
+                })()}
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => { setShowSeals(false); setSealsCount('1'); }} className="u-btn u-btn-secondary flex-1">
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={processing || !(parseInt(sealsCount, 10) >= 1)}
+                    className="u-btn u-btn-primary flex-1"
+                  >
+                    {processing ? 'Procesando...' : 'Confirmar sellos'}
+                  </button>
+                </div>
+              </form>
+            </div>
+
           ) : (
             /* Action checklist + Confirmar */
             <div className="space-y-3">
@@ -634,6 +769,22 @@ export default function ScanPage() {
                   </>
                 );
               })()}
+
+              {/* Agregar sellos (multi-seal catch-up, gated per tenant) */}
+              {tenant.multiSealEnabled && (
+                <button
+                  onClick={() => setShowSeals(true)}
+                  disabled={processing}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-coffee-brand text-white font-semibold text-sm disabled:opacity-40 hover:opacity-90 transition-opacity"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="9" />
+                    <line x1="12" y1="8" x2="12" y2="16" />
+                    <line x1="8" y1="12" x2="16" y2="12" />
+                  </svg>
+                  <span className="flex-1 text-left">Agregar sellos</span>
+                </button>
+              )}
 
               {/* Top up balance */}
               {tenant.topupEnabled && (

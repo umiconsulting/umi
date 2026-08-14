@@ -6,8 +6,8 @@
  */
 
 import { SignJWT } from 'jose';
-import { formatMXN } from './currency';
 import { signWalletBarcode } from './auth';
+import { formatMXN } from './currency';
 
 const ISSUER_ID = (process.env.GOOGLE_WALLET_ISSUER_ID || '').trim();
 const CLASS_ID_PREFIX = (process.env.GOOGLE_WALLET_CLASS_ID || 'loyalty_v2').trim();
@@ -50,24 +50,10 @@ function getLoyaltyObject(data: GooglePassData) {
   const remaining = data.visitsRequired - data.visitsThisCycle;
   const objectId = `${ISSUER_ID}.card_${data.cardId}`;
 
-  // Stamp progress: ● for filled, ○ for empty
-  const filled = '●'.repeat(data.visitsThisCycle);
-  const empty = '○'.repeat(remaining);
-  const stampProgress = `${filled}${empty} (${data.visitsThisCycle}/${data.visitsRequired})`;
-
-  // Build text modules to match Apple pass fields
-  const textModules: { header: string; body: string; id: string }[] = [
-    {
-      header: 'MIEMBRO',
-      body: data.customerName || 'Cliente',
-      id: 'member_name',
-    },
-    {
-      header: data.rewardName.toUpperCase(),
-      body: stampProgress,
-      id: 'stamp_progress',
-    },
-  ];
+  // Visual stamp progress lives in the heroImage (a rendered stamp strip); the
+  // customer name lives in accountName. So the only text modules left are the
+  // genuinely free-form ones: lifecycle message, birthday, and reward status.
+  const textModules: { header: string; body: string; id: string }[] = [];
 
   // Lifecycle message (welcome/winback/expiring) — surfaces first so it's prominent
   if (data.lifecycleMessage) {
@@ -87,18 +73,44 @@ function getLoyaltyObject(data: GooglePassData) {
     });
   }
 
-  // Reward status
+  // Reward status — copy escalates as the customer nears the reward so the line
+  // pulls its weight on the card face (surfaced there by the class cardTemplateOverride)
+  // and in the details view. The `pending_rewards` / `next_reward` ids are referenced
+  // by that override — keep them stable.
   if (data.pendingRewards > 0) {
+    const plural = data.pendingRewards > 1;
     textModules.push({
-      header: 'RECOMPENSAS DISPONIBLES',
-      body: `${data.pendingRewards} recompensa${data.pendingRewards > 1 ? 's' : ''} — ¡canjéala en tienda!`,
+      header: plural ? 'RECOMPENSAS DISPONIBLES' : 'RECOMPENSA LISTA',
+      body: plural
+        ? `🎉 Tienes ${data.pendingRewards} ${data.rewardName} — ¡canjéalas en tienda!`
+        : `🎉 Tu ${data.rewardName} te espera — ¡canjéala en tienda!`,
       id: 'pending_rewards',
     });
   } else {
+    let body: string;
+    if (remaining === 1) {
+      body = `¡Última visita! Tu próxima compra desbloquea ${data.rewardName} 🎁`;
+    } else if (remaining === 2) {
+      body = `¡Ya casi! Solo 2 visitas para ${data.rewardName}`;
+    } else {
+      body = `${remaining} visitas para ${data.rewardName}`;
+    }
     textModules.push({
       header: 'PRÓXIMA RECOMPENSA',
-      body: `${remaining} visita${remaining !== 1 ? 's' : ''} para ${data.rewardName}`,
+      body,
       id: 'next_reward',
+    });
+  }
+
+  // Saldo as a STRING text module. `secondaryLoyaltyPoints` (money) is the native
+  // balance display, but money does NOT render inside a cardTemplateOverride row —
+  // so when the card-face override is active, its row references this string instead.
+  // Kept in sync with the balance on every object update.
+  if (data.topupEnabled !== false) {
+    textModules.push({
+      header: 'SALDO',
+      body: formatMXN(data.balanceCentavos),
+      id: 'saldo',
     });
   }
 
@@ -110,9 +122,9 @@ function getLoyaltyObject(data: GooglePassData) {
     accountName: data.customerName || 'Cliente',
     loyaltyPoints: {
       balance: {
-        string: String(data.visitsThisCycle),
+        string: `${data.visitsThisCycle} / ${data.visitsRequired}`,
       },
-      label: `Visitas (meta: ${data.visitsRequired})`,
+      label: 'Visitas',
     },
     barcode: {
       type: 'qrCode',
@@ -152,6 +164,24 @@ function getLoyaltyObject(data: GooglePassData) {
       ],
     },
   };
+
+  // Visual stamp card (Google's analog of the Apple strip). Content-addressed by state
+  // so a stamp advance points at a new URL and Google re-fetches it; a fixed URL would be
+  // served from Google's image cache and never update. Skipped when tenantSlug is absent —
+  // the URL (and the whole pass, whose classId is slug-derived) would be malformed anyway.
+  if (data.tenantSlug) {
+    object.heroImage = {
+      sourceUri: {
+        uri: `${APP_URL}/api/${data.tenantSlug}/stamp-strip/${data.visitsThisCycle}-${data.visitsRequired}.png`,
+      },
+      contentDescription: {
+        defaultValue: {
+          language: 'es-MX',
+          value: `Progreso: ${data.visitsThisCycle} de ${data.visitsRequired} visitas`,
+        },
+      },
+    };
+  }
 
   // Balance — only when topup/monedero is enabled (matches Apple pass)
   if (data.topupEnabled !== false) {
@@ -204,6 +234,20 @@ export async function generateGoogleWalletURL(data: GooglePassData): Promise<str
   return `https://pay.google.com/gp/v/save/${jwt}`;
 }
 
+// Every hop to Google is bounded: an unbounded one keeps the invocation alive until
+// the platform kills it, which loses the wallet update AND (before afterResponse) held
+// the scan response hostage. Google's own p99 here is well under a second.
+const GOOGLE_TIMEOUT_MS = 8_000;
+
+/** Bound a promise that carries no cancellation of its own (googleapis' token fetch). */
+function withTimeout<T>(work: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const expiry = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([work, expiry]).finally(() => clearTimeout(timer));
+}
+
 // Singleton — GoogleAuth and its OAuth client are expensive to re-create on every wallet update
 let googleAuthClient: any = null;
 async function getGoogleAuthToken(): Promise<string> {
@@ -228,9 +272,9 @@ export async function updateGoogleWalletObject(data: GooglePassData): Promise<vo
   try {
     const objectId = `${ISSUER_ID}.card_${data.cardId}`;
     const object = getLoyaltyObject(data);
-    const token = await getGoogleAuthToken();
+    const token = await withTimeout(getGoogleAuthToken(), GOOGLE_TIMEOUT_MS, 'google auth token');
 
-    await fetch(
+    const patched = await fetch(
       `https://walletobjects.googleapis.com/walletobjects/v1/loyaltyObject/${encodeURIComponent(objectId)}`,
       {
         method: 'PATCH',
@@ -239,8 +283,13 @@ export async function updateGoogleWalletObject(data: GooglePassData): Promise<vo
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(object),
+        signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
       }
     );
+    // A rejected PATCH means the customer's pass silently keeps stale state — say so.
+    if (!patched.ok) {
+      console.warn('[Google Wallet] PATCH failed:', patched.status, await patched.text().catch(() => ''));
+    }
 
     // Push a real device notification for the lifecycle message. PATCHing textModules
     // alone updates the card UI but does NOT generate a notification — Google requires
@@ -262,6 +311,7 @@ export async function updateGoogleWalletObject(data: GooglePassData): Promise<vo
               messageType: 'TEXT_AND_NOTIFY',
             },
           }),
+          signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
         }
       );
       if (!res.ok) {

@@ -291,8 +291,127 @@ file errors `42601`, so a gated migration is run statement by statement.
   cron **and** set `LEADS_SEQUENCE_ENABLED=true` together → retire SQLite.
   **Rollback:** unset the base var and re-enable the landing cron.
 
+## Plane (self-hosted) shares this Caddy
+
+Plane runs as its **own** compose project out of `/opt/plane` — separate stack,
+separate Postgres, nothing to do with umi-api beyond sharing the box and the
+proxy. This Caddy terminates TLS for both.
+
+Version in production: **Commercial Edition v3.0.1** (the commercial build runs
+free at 12 seats, so it costs the same as Community while leaving the paid tiers
+one license key away — no reinstall, no data migration).
+
+### How the ports are wired — and the trap in it
+
+Caddy already owns 80/443, so Plane's proxy must not bind them. The end state:
+
+| File                                     | Setting                                                                |
+| ---------------------------------------- | ---------------------------------------------------------------------- |
+| `/opt/plane/plane.env`                   | `LISTEN_HTTP_PORT=8080`, `LISTEN_HTTPS_PORT=8443` — **plain integers** |
+| `/opt/plane/docker-compose.override.yml` | `ports: !override` pinning the real binds to `172.17.0.1`              |
+
+```yaml
+services:
+  proxy:
+    ports: !override
+      - "172.17.0.1:8080:80"
+      - "172.17.0.1:8443:443"
+```
+
+Binding to the Docker bridge IP rather than `0.0.0.0` makes the port
+**structurally** unreachable from the internet — no firewall rule to maintain or
+forget after a reboot. `ufw` was never an option: Docker's published ports bypass
+its `INPUT` chain, so `ufw deny 8080` looks correct and does nothing.
+
+Two things had to be learned the hard way here:
+
+1. **`plane.env` will not take `172.17.0.1:8080`.** prime-cli validates that
+   value as an integer and rejects the host-IP form, which is why the bind lives
+   in an override instead of the env file where it belongs.
+2. **`ports:` in a compose override CONCATENATES — it does not replace.** The
+   first attempt added the bridge binds without `!override`, so the base file's
+   `0.0.0.0` mappings survived alongside them. Result: Plane served the full app
+   in cleartext on a public port (`9080`) while `8080` looked correctly closed.
+   `!override` (Compose 2.24+) is what actually replaces the list.
+
+### ⚠ Verify the ports after every Plane upgrade
+
+The override file is **fragile by construction**: prime-cli does not know it
+exists. If an upgrade changes the proxy's service name, or the override stops
+applying for any reason, Plane silently goes back to binding `0.0.0.0` and the
+app is exposed in cleartext again. Nothing errors. Nothing logs.
+
+So after any `setup.sh` upgrade, from the box:
+
+```sh
+docker ps --format '{{.Names}}\t{{.Ports}}' | grep plane   # expect ZERO 0.0.0.0
+```
+
+and from off the box — this is the check that actually counts:
+
+```sh
+for p in 8080 8443 9080 9443 20025 20465 20587; do
+  nc -z -w3 <vps-ip> $p && echo "$p OPEN — FIX IT" || echo "$p closed"
+done
+```
+
+Only 80 and 443 should ever answer.
+
+### The rest of the wiring
+
+- **`extra_hosts: host.docker.internal:host-gateway`** on the caddy service is
+  what lets it reach that bridge IP. Plane is a different compose project, so
+  service-name resolution is not available.
+- **`PLANE_DOMAIN` lives only in the VPS `.env`** (gitignored). Never edit the
+  `Caddyfile` or `docker-compose.yml` on the box: `deploy/deploy.sh` runs
+  `git reset --hard` before every `compose up`, so the edit is destroyed on the
+  next deploy — silently. Route changes go through a PR, like this one did.
+
+### If you ever reinstall
+
+- **Do not pipe the installer into `sh`.** `curl … | sh -` makes stdin the pipe,
+  so the interactive prompts cannot be answered and it exits 1. Download first,
+  then run: `curl -fsSL https://prime.plane.so/install/ -o /tmp/i.sh && sudo bash /tmp/i.sh`.
+- **`prime-cli setup` requires port 80 to be free**, and the check is compiled
+  into the binary — no flag, no env var, no config skips it. Caddy has to be
+  stopped for the duration. Use a fail-safe so a hung installer cannot leave the
+  API down:
+
+  ```sh
+  cd ~/umi/apps/umi-api
+  docker compose stop caddy && timeout 180 sudo bash /tmp/i.sh; docker compose up -d caddy
+  curl -s https://api.umiconsulting.co/health
+  ```
+
+  The `;` before `up -d` is deliberate: Caddy comes back even if the installer
+  fails or the timeout kills it. With `&&`, a hung installer leaves
+  `api.umiconsulting.co` down indefinitely.
+
+### Operating it
+
+```sh
+cd /opt/plane && ./setup.sh     # 2=start 3=stop 4=restart 5=upgrade 6=logs
+```
+
+Plane's installer **regenerates its `docker-compose.yaml` on every upgrade**, so
+all configuration must live in `plane.env` or the override file — never in the
+generated compose.
+
+**Rollback:** remove `PLANE_DOMAIN` from `apps/umi-api/.env`, then
+`docker compose up -d caddy`. umi-api is untouched either way.
+
 ### Not yet done
 
+- **Plane's data is not backed up.** It lives in **bind mounts**, not Docker
+  volumes: `/opt/plane/data/{db,minio,mq,redis,monitor}`. This VPS has no backup
+  schedule at all — for Plane or for anything else.
+- **No swap is configured.** 15 GiB total with Plane at ~3.3 GiB leaves room, but
+  without swap a memory spike hands the choice of what to kill to the OOM killer,
+  and it may pick umi-api. Fix:
+  `sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile`,
+  then persist in `/etc/fstab` and set `vm.swappiness=10`.
+- **`plane-space-1` reports unhealthy.** Seen right after install; not yet
+  reconfirmed once the stack settled.
 - **Stage 4 — dual-writer cutover:** `umi-cash` still live-writes `loyalty.*`.
   Both writers coexist safely (append-only ledger, `balance = SUM`); retiring
   umi-cash's writes is a separate decision.
