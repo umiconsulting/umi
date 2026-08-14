@@ -1,9 +1,5 @@
 {
   "mcpServers": {
-    "trello": {
-      "type": "http",
-      "url": "https://mcp.trello.com/v1"
-    },
     "azure-devops": {
       "type": "stdio",
       "command": "npx",
@@ -21,6 +17,18 @@
         "pipelines",
         "wiki"
       ]
+    },
+    "plane": {
+      "command": "uvx",
+      "args": [
+        "plane-mcp-server",
+        "stdio"
+      ],
+      "env": {
+        "PLANE_API_KEY": "${PLANE_API_KEY}",
+        "PLANE_WORKSPACE_SLUG": "umi",
+        "PLANE_BASE_URL": "https://plane.umiconsulting.co"
+      }
     },
     "playwright-mcp": {
       "type": "stdio",
@@ -58,18 +66,6 @@
       ],
       "env": {
         "GEMINI_API_KEY": "${GEMINI_API_KEY}"
-      }
-    },
-    "plane": {
-      "command": "uvx",
-      "args": [
-        "plane-mcp-server",
-        "stdio"
-      ],
-      "env": {
-        "PLANE_API_KEY": "${PLANE_API_KEY}",
-        "PLANE_WORKSPACE_SLUG": "umi",
-        "PLANE_BASE_URL": "https://plane.umiconsulting.co"
       }
     }
   }

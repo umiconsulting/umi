@@ -5,6 +5,16 @@ export const metadata: Metadata = {
   title: 'Umi Cash — Plataforma de Lealtad',
   description: 'Sistema de lealtad y saldo para cafeterías',
   manifest: '/manifest.json',
+  // Declared so the browser resolves these from the advertised links instead of
+  // probing the root and 404ing (favicon.ico / apple-touch-icon.png used to). The
+  // files live in /public at these exact paths.
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon.png', type: 'image/png', sizes: '32x32' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
 };
 
 export default function RootLayout({

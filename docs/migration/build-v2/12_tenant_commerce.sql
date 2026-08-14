@@ -85,7 +85,7 @@ create table if not exists tenant.product (
   updated_at      timestamptz not null default now(),
   primary key (tenant_id, id),
   foreign key (tenant_id, category_id)
-    references tenant.product_category (tenant_id, id) on delete set null
+    references tenant.product_category (tenant_id, id) on delete set null (category_id)
 );
 
 create index if not exists tenant_product_available_idx
@@ -182,9 +182,9 @@ create table if not exists tenant."order" (
   updated_at            timestamptz not null default now(),
   primary key (tenant_id, id),
   foreign key (tenant_id, branch_id)
-    references tenant.branch (tenant_id, id) on delete set null,
+    references tenant.branch (tenant_id, id) on delete set null (branch_id),
   foreign key (tenant_id, customer_id)
-    references tenant.customer (tenant_id, id) on delete set null,
+    references tenant.customer (tenant_id, id) on delete set null (customer_id),
   foreign key (channel_id)
     references tenant.channel (id) on delete set null
 );
@@ -228,7 +228,7 @@ create table if not exists tenant.order_item (
   foreign key (tenant_id, order_id)
     references tenant."order" (tenant_id, id) on delete cascade,
   foreign key (tenant_id, product_id)
-    references tenant.product (tenant_id, id) on delete set null
+    references tenant.product (tenant_id, id) on delete set null (product_id)
 );
 
 create index if not exists tenant_order_item_order_idx
@@ -302,7 +302,7 @@ create table if not exists tenant.payment (
   updated_at    timestamptz not null default now(),
   primary key (tenant_id, id),
   foreign key (tenant_id, order_id)
-    references tenant."order" (tenant_id, id) on delete set null
+    references tenant."order" (tenant_id, id) on delete set null (order_id)
 );
 
 create index if not exists tenant_payment_order_idx
@@ -335,7 +335,7 @@ create table if not exists tenant.refund (
   foreign key (tenant_id, payment_id)
     references tenant.payment (tenant_id, id) on delete cascade,
   foreign key (tenant_id, order_id)
-    references tenant."order" (tenant_id, id) on delete set null
+    references tenant."order" (tenant_id, id) on delete set null (order_id)
 );
 
 create index if not exists tenant_refund_payment_idx

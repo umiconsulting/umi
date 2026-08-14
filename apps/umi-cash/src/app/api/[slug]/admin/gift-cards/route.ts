@@ -130,7 +130,9 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   }
 
   const url = new URL(req.url);
-  const page = Math.max(1, parseInt(url.searchParams.get('page') ?? '1'));
+  // `?? '1'` only guards null; `|| 1` also catches a non-numeric param (parseInt →
+  // NaN) so `skip: NaN` can't throw a PrismaClientValidationError (bare 500).
+  const page = Math.max(1, parseInt(url.searchParams.get('page') ?? '1') || 1);
   const limit = 20;
 
   const [giftCards, total] = await Promise.all([

@@ -54,10 +54,12 @@ build/
 # frozen, so nothing here should ever be committed.
 apps/*/supabase/.temp/
 
-# Python bytecode caches. Build artifacts of whatever interpreter last ran; they
-# are unreviewable binaries and version-specific (cpython-314 here).
+# Python bytecode and test caches. Generated on import, version-stamped
+# (cpython-314), and useless on a machine with a different interpreter — the
+# .agents/skills/design/* skills ship Python scripts, so these appear locally.
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
 
 # Claude Code per-developer settings. Contains machine-specific permission
 # allowlists that have historically included credentials in command strings.
