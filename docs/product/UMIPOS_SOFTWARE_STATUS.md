@@ -13,6 +13,13 @@ Su artifact source es `5b852c5e8152ca3dc6f9070ae2d49a277406dc72`.
 
 RC1 y RC2 están reemplazados. No los despliegues.
 
+## Estado de integración
+
+El merge de PR #72 se revirtió en `9e43c3ca3f80aef7e3ede061bd6c428c9c2c6bd0` por decisión de gobierno.
+PR #72 permanece como evidencia histórica de la integración certificada.
+PR #94 sustituye esa integración y permanece abierto hasta la aprobación explícita del Product Owner.
+Este cambio de gobierno no modifica la certificación de RC3.
+
 ## Calidad
 
 - P0 abiertos: `0`.
