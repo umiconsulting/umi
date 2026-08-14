@@ -15,15 +15,16 @@ routing. What lives here is what no agent can infer.
 
 ## Product boundaries
 
-| Path                    | Owns                                                                                 |
-| ----------------------- | ------------------------------------------------------------------------------------ |
-| `apps/umi-kds`          | Native iPad Kitchen Display System client                                            |
-| `apps/umi-cash`         | Loyalty, wallet, passes, Cash-specific Prisma                                        |
-| `apps/umi-conversaflow` | Shared Supabase backend, workflow jobs, prompts, traces, cross-channel normalization |
-| `apps/umi-logs`         | ConversaFlow operational logs and trace UI                                           |
-| `apps/umi-dashboard`    | Owner dashboard app shell and live-data UI                                           |
-| `apps/umi-landing-page` | Public landing and lead capture                                                      |
-| root `docs/`            | Architecture, migration, governance, cross-product planning                          |
+| Path                    | Owns                                                                                                                                        |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/umi-api`          | The canonical backend. Auth, cash, KDS, conversations, leads, and the wallet-pass layer for Apple and Google                                |
+| `apps/umi-kds`          | Native iPad Kitchen Display System client                                                                                                   |
+| `apps/umi-cash`         | Cash customer site and Cash-specific Prisma. It answers the frozen wallet-pass URL and forwards it to `umi-api`; it no longer builds passes |
+| `apps/umi-conversaflow` | Shared Supabase backend, workflow jobs, prompts, traces, cross-channel normalization                                                        |
+| `apps/umi-logs`         | ConversaFlow operational logs and trace UI                                                                                                  |
+| `apps/umi-dashboard`    | Owner dashboard app shell and live-data UI                                                                                                  |
+| `apps/umi-landing-page` | Public landing and lead capture                                                                                                             |
+| root `docs/`            | Architecture, migration, governance, cross-product planning                                                                                 |
 
 ## Database ownership
 

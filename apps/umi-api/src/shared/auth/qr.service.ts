@@ -69,6 +69,21 @@ export class QrService {
     }
   }
 
+  /**
+   * The barcode printed on a wallet pass: the card number, then a truncated
+   * HMAC so a guessed card number cannot be scanned.
+   *
+   * This is the inverse of `verifyWalletBarcode` below and MUST stay keyed the
+   * same way — the raw secret string, not the UTF-8 bytes used for the in-app
+   * JWT. See the dual-derivation warning in the class comment. A pass signed
+   * with a differently derived key produces a barcode the register rejects.
+   */
+  signWalletBarcode(cardNumber: string): string {
+    if (!this.hmacKey) throw new Error('APP_QR_SECRET is not set');
+    const tag = createHmac('sha256', this.hmacKey).update(cardNumber).digest('hex').slice(0, 16);
+    return `${cardNumber}.${tag}`;
+  }
+
   /** "<cardNumber>.<first 16 hex of HMAC-SHA256(cardNumber, rawSecret)>". */
   private verifyWalletBarcode(payload: string): string | null {
     if (!this.hmacKey) return null;
