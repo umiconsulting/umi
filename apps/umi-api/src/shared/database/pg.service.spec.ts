@@ -5,9 +5,24 @@ import {
   PgService,
   poolRoleProblem,
   poolLoggingProblem,
+  boundedStartupRetry,
   type PoolRoleAttributes,
   type PoolLoggingPosture,
 } from './pg.service';
+
+describe('boundedStartupRetry', () => {
+  it('stops after the configured attempt count', async () => {
+    const operation = vi.fn().mockRejectedValue(new Error('unavailable'));
+    await expect(boundedStartupRetry(operation, 3, 0)).rejects.toThrow('unavailable');
+    expect(operation).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns after a later successful attempt', async () => {
+    const operation = vi.fn().mockRejectedValueOnce(new Error('retry')).mockResolvedValue('ready');
+    await expect(boundedStartupRetry(operation, 3, 0)).resolves.toBe('ready');
+    expect(operation).toHaveBeenCalledTimes(2);
+  });
+});
 
 /**
  * D1 boot-guard tests (SECURITY_GATE.md §4). The guard is exercised at two

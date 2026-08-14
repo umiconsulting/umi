@@ -7,10 +7,35 @@ export { PRODUCT_ACTIVE_STATUSES };
 export const MODULES = {
   overview: {
     id: 'overview',
-    label: 'Overview',
+    label: 'Panorama',
     icon: 'Home',
     section: 'OPERATIONS',
     product: 'dashboard',
+  },
+  operations: {
+    id: 'operations',
+    label: 'Centro operativo',
+    icon: 'Activity',
+    section: 'OPERATIONS',
+    product: 'dashboard',
+    permissions: [
+      'merchant.manage',
+      'audit.read',
+      'hardware.read',
+      'hardware.diagnostics',
+      'inventory.read',
+      'sale.lifecycle',
+      'sale.exception.read',
+      'cash.shift.read',
+      'customer.read',
+      'loyalty.read',
+      'wallet.read',
+      'gift_card.read',
+      'kitchen.read',
+      'device.enroll',
+      'catalog.read',
+    ],
+    locationScoped: true,
   },
   orders: {
     id: 'orders',
@@ -18,71 +43,80 @@ export const MODULES = {
     icon: 'Receipt',
     section: 'OPERATIONS',
     product: 'kds',
+    permissions: ['kitchen.read'],
     locationScoped: true,
   },
   devices: {
     id: 'devices',
-    label: 'Devices',
+    label: 'Dispositivos',
     icon: 'Tablet',
     section: 'OPERATIONS',
-    product: 'kds',
+    product: 'dashboard',
+    permissions: ['device.enroll'],
     locationScoped: true,
   },
   staff: {
     id: 'staff',
-    label: 'Staff & Access',
+    label: 'Equipo y acceso',
     icon: 'Users',
     section: 'OPERATIONS',
     product: 'dashboard',
+    permissions: ['merchant.manage'],
   },
   customers: {
     id: 'customers',
-    label: 'Customers',
+    label: 'Clientes',
     icon: 'Users2',
     section: 'OPERATIONS',
     product: 'dashboard',
+    permissions: ['customer.read'],
   },
   members: {
     id: 'members',
-    label: 'Loyalty',
+    label: 'Lealtad',
     icon: 'CreditCard',
     section: 'GROWTH',
     product: 'cash',
+    permissions: ['loyalty.read'],
   },
   'gift-cards': {
     id: 'gift-cards',
-    label: 'Gift Cards',
+    label: 'Gift cards',
     icon: 'Gift',
     section: 'GROWTH',
     product: 'cash',
+    permissions: ['gift_card.read'],
   },
   hours: {
     id: 'hours',
-    label: 'Hours & Availability',
+    label: 'Horario y disponibilidad',
     icon: 'Clock',
     section: 'CONFIGURATION',
     product: 'conversaflow',
+    permissions: ['merchant.manage'],
     locationScoped: true,
   },
   settings: {
     id: 'settings',
-    label: 'Settings',
+    label: 'Ajustes',
     icon: 'Settings',
     section: 'CONFIGURATION',
     product: 'dashboard',
+    permissions: ['merchant.manage'],
   },
   'products-billing': {
     id: 'products-billing',
-    label: 'Products & Billing',
+    label: 'Productos y plan',
     icon: 'Sparkles',
     section: 'CONFIGURATION',
     product: 'dashboard',
-    role: 'super_admin',
+    permissions: ['merchant.manage'],
   },
 };
 
 export const MODULE_ORDER = [
   'overview',
+  'operations',
   'orders',
   'devices',
   'staff',
@@ -99,10 +133,12 @@ export function isProductActive(productKey, capabilities) {
   return PRODUCT_ACTIVE_STATUSES.has(status);
 }
 
-export function hasRequiredRole(moduleConfig, capabilities) {
-  if (!moduleConfig?.role) return true;
-  const membership = capabilities?.membership;
-  return membership?.role === moduleConfig.role || membership?.permissions?.includes?.('*');
+export function hasRequiredPermission(moduleConfig, capabilities) {
+  if (!moduleConfig?.permissions?.length) return true;
+  const permissions = capabilities?.membership?.permissions || [];
+  return (
+    permissions.includes('*') || moduleConfig.permissions.some((key) => permissions.includes(key))
+  );
 }
 
 export function getModuleAvailability(moduleKey, capabilities) {
@@ -118,11 +154,10 @@ export function getModuleAvailability(moduleKey, capabilities) {
       locationScoped: !!moduleConfig.locationScoped,
     };
   }
-  if (!hasRequiredRole(moduleConfig, capabilities)) {
+  if (!hasRequiredPermission(moduleConfig, capabilities)) {
     return {
       available: false,
-      reason: 'role_required',
-      role: moduleConfig.role,
+      reason: 'permission_required',
       locationScoped: !!moduleConfig.locationScoped,
     };
   }

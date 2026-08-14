@@ -5,7 +5,7 @@ import Testing
 struct OrderRepositoryTests {
     @MainActor
     @Test
-    func ordersAreFilteredAndSortedByStatus() async {
+    func ordersAreFilteredByCanonicalStatus() {
         let repository = OrderRepository(
             apiClient: KDSAPIClient(),
             realtimeClient: KDSRealtimeClient(),
@@ -14,65 +14,56 @@ struct OrderRepositoryTests {
                 station: Station(id: "expo", name: "Expo"),
                 deviceName: "Kitchen iPad"
             ),
-            orders: previewKitchenOrders
+            orders: previewKitchenOrders,
+            demoMode: true
         )
-
-        let newOrders = repository.orders(for: .new)
-
-        #expect(newOrders.count == 1)
-        #expect(newOrders.first?.id == "txn_1001")
+        #expect(repository.orders(for: .queued).count == 1)
     }
 
     @Test
-    func kitchenOrderDisplayNamePrefersPickupPersonThenCustomerName() {
-        let pickupOrder = KitchenOrder(
-            id: "txn_pickup",
-            businessID: "demo-business",
-            source: .whatsapp,
-            status: .new,
-            station: nil,
-            createdAt: .now,
-            updatedAt: .now,
-            customerName: "Ana Customer",
-            pickupPerson: "Ana Pickup",
-            customerNote: nil,
-            cancellationReason: nil,
-            partialCancellationReason: nil,
-            totalAmount: nil,
-            items: [],
-            lastEventSequence: nil
-        )
-
-        let customerOrder = KitchenOrder(
-            id: "txn_customer",
-            businessID: "demo-business",
-            source: .whatsapp,
-            status: .new,
-            station: nil,
-            createdAt: .now,
-            updatedAt: .now,
-            customerName: "Carlos Customer",
-            pickupPerson: nil,
-            customerNote: nil,
-            cancellationReason: nil,
-            partialCancellationReason: nil,
-            totalAmount: nil,
-            items: [],
-            lastEventSequence: nil
-        )
-
-        #expect(pickupOrder.displayName == "Ana Pickup")
-        #expect(customerOrder.displayName == "Carlos Customer")
+    func kitchenOrderUsesOnlySafePublicReference() {
+        #expect(previewKitchenOrders[0].displayName == "Order 1024")
     }
 
     @Test
-    func kitchenStatusOnlyExposesLegalNextActions() {
-        #expect(KitchenStatus.new.nextActionStatuses == [.accepted, .cancelled])
-        #expect(KitchenStatus.accepted.nextActionStatuses == [.preparing, .cancelled])
-        #expect(KitchenStatus.preparing.nextActionStatuses == [.ready, .cancelled])
-        #expect(KitchenStatus.partialCancelled.nextActionStatuses == [.accepted, .cancelled])
+    func kitchenStatusExposesServerTransitions() {
+        #expect(KitchenStatus.queued.nextActionStatuses == [.inPreparation])
+        #expect(KitchenStatus.inPreparation.nextActionStatuses == [.ready])
+        #expect(KitchenStatus.partiallyReady.nextActionStatuses == [.ready])
         #expect(KitchenStatus.ready.nextActionStatuses == [.completed])
         #expect(KitchenStatus.completed.nextActionStatuses.isEmpty)
         #expect(KitchenStatus.cancelled.nextActionStatuses.isEmpty)
+        #expect(KitchenStatus.exception.nextActionStatuses.isEmpty)
+    }
+
+    @Test
+    func operatorLabelsDoNotExposeRawKitchenEnums() {
+        #expect(KitchenPriority.high.displayName == "High priority")
+        #expect(KitchenItemStatus.preparing.displayName == "Preparing")
+        #expect(!previewKitchenOrders[0].accessibilitySummary.contains("_"))
+        #expect(previewKitchenOrders[0].accessibilitySummary.contains("Order 1024"))
+    }
+
+    @Test
+    func duplicateAndStaleEventsCannotRegressState() {
+        var seen: Set<Int> = []
+        #expect(kdsEventNeedsSnapshot(
+            sequence: 20,
+            aggregateVersion: 3,
+            currentVersion: 2,
+            seenSequences: &seen
+        ))
+        #expect(!kdsEventNeedsSnapshot(
+            sequence: 20,
+            aggregateVersion: 3,
+            currentVersion: 2,
+            seenSequences: &seen
+        ))
+        #expect(!kdsEventNeedsSnapshot(
+            sequence: 21,
+            aggregateVersion: 2,
+            currentVersion: 2,
+            seenSequences: &seen
+        ))
     }
 }

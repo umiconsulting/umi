@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var environment: AppEnvironment
+    private let release = KDSReleaseIdentity.load()
 
     var body: some View {
         Form {
@@ -26,7 +27,7 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 LabeledContent("Data") {
-                    Text((environment.orderRepository?.isDemoMode ?? true) ? "Demo preview (no backend keys)" : "Live (Supabase kds RPCs)")
+                    Text((environment.orderRepository?.isDemoMode ?? true) ? "Demo preview (no backend keys)" : "Live (UMI API)")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -55,6 +56,13 @@ struct SettingsView: View {
                     Label("Reconnect", systemImage: "arrow.clockwise")
                 }
                 .tint(reconnectTint)
+            }
+
+            Section("Release") {
+                LabeledContent("Environment", value: release.environment)
+                LabeledContent("Version", value: release.version)
+                LabeledContent("Contract", value: release.contractVersion)
+                LabeledContent("Commit", value: String(release.gitCommit.prefix(12)))
             }
         }
         .navigationTitle("Settings")

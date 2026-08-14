@@ -2,6 +2,9 @@
 export interface AuthUser {
   id: string;
   email: string;
+  sessionId: string;
+  deviceId: string | null;
+  commandContextType?: 'pos_device' | 'dashboard_administrative';
 }
 
 /** Resolved merchant membership attached by MerchantAccessGuard. */
@@ -17,6 +20,8 @@ export interface MerchantAccess {
   role: string | null;
   roles: string[];
   permissions: string[];
+  /** Null grants merchant scope. A value limits this employment to one location. */
+  locationId: string | null;
 }
 
 /**
@@ -26,7 +31,10 @@ export interface MerchantAccess {
  */
 export interface AuthedRequest {
   cookies?: Record<string, string | undefined>;
+  headers?: Record<string, string | string[] | undefined>;
   params?: Record<string, string>;
+  query?: Record<string, unknown>;
+  body?: Record<string, unknown>;
   authUser?: AuthUser;
   merchantAccess?: MerchantAccess;
 }

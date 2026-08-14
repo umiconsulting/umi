@@ -45,8 +45,11 @@ comment on function umi.current_device() is
 
 -- ---- No ambient authority: lock schema public (CVE-2018-1058) and our schemas ----
 revoke create on schema public from public;
-revoke all on all tables in schema umi, merchant, runtime from public;
+revoke all on all tables in schema umi, merchant, runtime, kds from public;
+revoke all on schema kds from public, api;
 grant usage on schema umi, merchant, runtime to api, worker, readonly;
+grant usage on schema kds to worker, readonly;
+grant select on all tables in schema kds to worker, readonly;
 
 -- ===========================================================================
 -- GRANTS — least privilege per role
@@ -64,6 +67,60 @@ revoke select on runtime.session, runtime.otp, runtime.password_reset_token,
 -- api (the café REQUEST-PATH role): full DML on merchant (RLS-bound); umi limited to
 -- global catalogs + per-café tables (RLS-scoped); minimal, scoped runtime.
 grant select, insert, update, delete on all tables in schema merchant to api;
+
+-- Gate 4A writes kitchen authority only through the scoped UMI API repositories.
+revoke insert, update, delete on
+  merchant.kitchen_route,
+  merchant.kitchen_order,
+  merchant.kitchen_order_item,
+  merchant.kitchen_command,
+  merchant.kitchen_event,
+  merchant.kitchen_device_station
+from api;
+grant select on
+  merchant.kitchen_route,
+  merchant.kitchen_order,
+  merchant.kitchen_order_item,
+  merchant.kitchen_command,
+  merchant.kitchen_event,
+  merchant.kitchen_device_station
+to api;
+
+-- Gate 3F permits points and stored-value facts only through command boundaries.
+revoke insert, update, delete on
+  merchant.customer_consent_history,
+  merchant.loyalty_points_ledger,
+  merchant.loyalty_stored_value_ledger,
+  merchant.loyalty_gift_card_ledger
+from api, worker;
+grant select on
+  merchant.customer_consent_history,
+  merchant.loyalty_points_ledger,
+  merchant.loyalty_stored_value_ledger,
+  merchant.loyalty_gift_card_ledger
+to api, worker;
+revoke all on merchant.gift_card_secret_delivery,merchant.gift_card_lookup_attempt
+from api,worker,readonly;
+revoke update,delete on merchant.loyalty_earn_preview,merchant.loyalty_sale_policy_snapshot
+from api,worker;
+
+-- Gate 3D keeps policy server-owned and committed compensation append-only.
+revoke insert, update, delete on merchant.pos_exception_policy from api;
+revoke delete on merchant.pos_exception_preview from api;
+
+-- Gate 3E permits stock changes only through the scoped ledger functions.
+-- The balance is a rebuildable projection. It is not a direct write boundary.
+revoke insert, update, delete on merchant.stock_ledger_entry from api, worker;
+revoke insert, update, delete on merchant.stock_balance from api, worker;
+grant select on merchant.stock_ledger_entry, merchant.stock_balance to api, worker;
+revoke update, delete on
+  merchant.pos_sale_exception,
+  merchant.pos_sale_exception_line,
+  merchant.pos_tender_compensation,
+  merchant.pos_cash_compensation,
+  merchant.pos_restock_intent,
+  merchant.pos_exception_receipt
+from api;
 
 --   umi global catalogs — same for every merchant, safe to read cross-merchant
 grant select on umi.role, umi.permission, umi.role_permission, umi.channel_type,
@@ -443,15 +500,56 @@ end $$;
 -- any future device-related table it legitimately reads. Opt-in, plus the assertion
 -- below so that forgetting is LOUD instead of silent.
 do $$
-declare t text;
+declare
+  t text;
+  predicate text;
 begin
   foreach t in array array[
     'device_replay_cursor', 'offline_replay_command', 'offline_reconciliation',
-    'offline_replay_conflict', 'offline_provisional_mapping'
+    'offline_replay_conflict', 'offline_provisional_mapping',
+    'pos_checkout_draft', 'cash_shift',
+    'pos_exception_preview', 'pos_sale_exception',
+    'inventory_count'
   ] loop
+    predicate := case
+      when t in ('pos_exception_preview', 'pos_sale_exception', 'inventory_count') then
+        format($p$(
+          (umi.current_device() is not null and %1$I.device_id = umi.current_device())
+          or
+          (%1$I.administrative_command_id is not null and exists (
+            select 1
+              from merchant.administrative_command ac
+             where ac.id = %1$I.administrative_command_id
+               and ac.merchant_id = umi.current_merchant()
+               and ac.actor_user_id = nullif(current_setting('app.user_id', true), '')::uuid
+               and (ac.location_id is null or umi.current_location() is null
+                    or ac.location_id = umi.current_location())
+          ))
+        )$p$, t)
+      when t = 'cash_shift' then
+        $p$(
+          (umi.current_device() is not null and cash_shift.device_id = umi.current_device())
+          or
+          (nullif(current_setting('app.administrative_command_id', true), '') is not null
+            and exists (
+              select 1
+                from merchant.administrative_command ac
+               where ac.id = nullif(
+                       current_setting('app.administrative_command_id', true), ''
+                     )::uuid
+                 and ac.merchant_id = umi.current_merchant()
+                 and ac.actor_user_id = nullif(current_setting('app.user_id', true), '')::uuid
+                 and ac.location_id = umi.current_location()
+                 and ac.operation in ('refund.preview', 'refund.commit')
+                 and ac.status = 'pending'
+            ))
+        )$p$
+      else
+        '(umi.current_device() is not null and device_id = umi.current_device())'
+    end;
     execute format($f$create policy device_scoping on merchant.%I as restrictive
-      using      (umi.current_device() is not null and device_id = umi.current_device())
-      with check (umi.current_device() is not null and device_id = umi.current_device())$f$, t);
+      using      (%s)
+      with check (%s)$f$, t, predicate, predicate);
   end loop;
 end $$;
 
@@ -461,11 +559,18 @@ end $$;
 do $$
 declare
   undecided text[];
-  -- Empty today: every merchant table with a device_id is device-scoped. Add a name here
-  -- WITH A REASON when one legitimately is not — e.g. a dashboard-readable device
-  -- inventory or a telemetry roll-up. The cast is required: Postgres cannot infer the
-  -- element type of an empty array literal.
-  not_device_scoped constant text[] := array[]::text[];
+  -- Ledger history belongs to the merchant and location. Its device_id records provenance.
+  -- A later trusted device can read the original fact for refund and support workflows.
+  not_device_scoped constant text[] := array[
+    'stock_ledger_entry',
+    'loyalty_points_ledger',
+    'loyalty_stored_value_ledger',
+    'loyalty_gift_card_ledger',
+    -- These rows record a target device or command actor. The column is provenance.
+    -- Merchant, location, permission, and station checks control access.
+    'kitchen_command',
+    'kitchen_device_station'
+  ]::text[];
 begin
   select array_agg(c.relname order by c.relname) into undecided
     from pg_class c
@@ -583,3 +688,28 @@ grant  update (acknowledged_at) on merchant.offline_reconciliation to api;
 revoke update on merchant.offline_replay_conflict from api;
 grant  update (last_observed_at, resolution_state, resolution_acknowledged_at)
   on merchant.offline_replay_conflict to api;
+
+-- Gate 3F customer history is available only through the scoped function.
+revoke all on merchant.customer_history_event,merchant.customer_history_event_scoped
+  from api,worker,readonly;
+do $$ begin
+  if to_regprocedure('merchant.read_customer_history_event_scoped(uuid,uuid)') is not null then
+    execute 'revoke all on function merchant.read_customer_history_event_scoped(uuid,uuid) '
+      'from public,api,worker,readonly';
+  end if;
+end $$;
+grant execute on function merchant.read_customer_history_event_scoped(
+  uuid,uuid,uuid
+) to api;
+do $$ begin
+  if to_regprocedure('merchant.read_customer_history_event_scoped(uuid,uuid,uuid,boolean,boolean,boolean)') is not null then
+    execute 'revoke all on function merchant.read_customer_history_event_scoped(uuid,uuid,uuid,boolean,boolean,boolean) '
+      'from public,api,worker,readonly';
+  end if;
+end $$;
+revoke all on function merchant.commit_customer_value_closeout(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,integer,text,date,uuid,uuid,jsonb
+) from public,api,worker,readonly;
+revoke all on function merchant.activate_sale_funded_gift_card(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,date,jsonb
+) from public,api,worker,readonly;

@@ -41,9 +41,6 @@
     }
   },
   "src/screens/devices.jsx": {
-    "react-hooks/purity": {
-      "count": 1
-    },
     "react-hooks/set-state-in-effect": {
       "count": 3
     }

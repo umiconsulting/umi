@@ -15,6 +15,7 @@ test('auth route literals are byte-exact to the controllers', () => {
   assert.equal(routes.auth.forgotPassword, '/api/auth/local/forgot-password');
   assert.equal(routes.auth.resetPassword, '/api/auth/local/reset-password');
   assert.equal(routes.auth.me, '/api/auth/me');
+  assert.equal(routes.auth.pos.pinLogin, '/api/v1/auth/pos/pin-login');
 });
 
 test('me + merchant-scoped route builders', () => {

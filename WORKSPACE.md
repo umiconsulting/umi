@@ -16,7 +16,8 @@ Root files and root `docs/` coordinate multiple independent product repos, share
 
 - `apps/umi-conversaflow` owns shared Supabase backend, workflow jobs, prompts, memory, traces, schema contracts, and cross-channel normalization.
 - `apps/umi-kds` owns the native iPad Kitchen Display System client.
-- `apps/umi-cash` owns loyalty, wallet, passes, and Cash-specific Prisma behavior.
+- `apps/umi-cash` owns Cash consumer loyalty, wallet, passes, and Cash-specific Prisma behavior.
+- `apps/umi-api` owns UmiPOS merchant loyalty and stored-value transaction facts in build-v3.
 - `apps/umi-logs` owns ConversaFlow operational logs and trace UI.
 - `apps/umi-dashboard` owns the Umi owner dashboard app shell and live-data UI. Its visible functions and workflows should be preserved as the behavior contract for future production hardening.
 

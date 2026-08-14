@@ -7,12 +7,22 @@ export const CFG = {
   merchantId: import.meta.env.VITE_MERCHANT_ID || '',
   merchantSlug: import.meta.env.VITE_MERCHANT_SLUG || '',
   // 'supabase' | 'local' (server.js, X-UMI-User-ID header) | 'cookie' (umi-api, httpOnly cookie)
-  authMode: import.meta.env.VITE_AUTH_MODE || 'supabase',
+  authMode: import.meta.env.VITE_AUTH_MODE || 'invalid',
   // Origin of the API backend. '' = same-origin (Vite proxy / server.js). For the umi-api
   // cutover set VITE_API_BASE=https://api.umiconsulting.co (used by 'cookie' mode).
   apiBase: (import.meta.env.VITE_API_BASE || '').replace(/\/+$/, ''),
   // cashApiBase is empty — cash routes ride the same apiUrl() base as everything else.
   cashApiBase: '',
+  environment: import.meta.env.VITE_UMI_ENVIRONMENT || 'invalid',
+  publicUrl: import.meta.env.VITE_PUBLIC_URL || '',
+  release: Object.freeze({
+    application: 'umi-dashboard',
+    version: import.meta.env.VITE_RELEASE_VERSION || 'unavailable',
+    gitCommit: import.meta.env.VITE_RELEASE_GIT_COMMIT || 'unavailable',
+    buildTimestamp: import.meta.env.VITE_RELEASE_BUILD_TIMESTAMP || 'unavailable',
+    contractVersion: import.meta.env.VITE_CONTRACT_VERSION || 'unavailable',
+    configurationSchemaVersion: import.meta.env.VITE_CONFIG_SCHEMA_VERSION || 'unavailable',
+  }),
 };
 
 export const LIVE = !!(CFG.supabaseUrl && CFG.supabaseAnonKey && CFG.merchantId);
