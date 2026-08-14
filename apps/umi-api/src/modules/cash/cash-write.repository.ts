@@ -164,11 +164,11 @@ export class CashWriteRepository {
    * Insert-only: writes ONE card_ledger row; balance is SUM(delta), never cached.
    */
   private async applyWalletDelta(c: PoolClient, d: WalletDelta): Promise<number> {
+    await c.query("SELECT set_config('app.current_merchant',$1,true)", [d.merchantId]);
     const ledger = await c.query(
-      `INSERT INTO merchant.loyalty_stored_value_ledger
-         (merchant_id, card_id, staff_id, delta, reason, external_ref, idempotency_key)
-       VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7)
-       ON CONFLICT (merchant_id, idempotency_key) DO NOTHING`,
+      `SELECT merchant.append_stored_value_fact($1::uuid,$2::uuid,jsonb_build_object(
+        'staffId',$3::text,'delta',$4,'reason',$5,'externalRef',$6,
+        'idempotencyKey',$7,'sourceType','umi_cash'))`,
       [
         d.merchantId,
         d.cardId,
@@ -262,13 +262,13 @@ export class CashWriteRepository {
     recipientName: string | null;
   }): Promise<{ id: string; code: string; amount_cents: number }> {
     return this.pg.withMerchant(async (c) => {
-      const { rows } = await c.query<{ id: string; code: string; amount_cents: number }>(
+      const { rows } = await c.query<{ id: string; amount_cents: number }>(
         // balance_cents cache DROPPED — remaining value = SUM(gift_card_ledger.delta).
         `INSERT INTO merchant.loyalty_gift_card
            (merchant_id, code, amount_cents, created_by_staff_id,
             sender_name, message, recipient_email, recipient_phone, recipient_name)
          VALUES ($1::uuid, $2, $3, $4::uuid, $5, $6, $7, $8, $9)
-         RETURNING id::text, code, amount_cents`,
+         RETURNING id::text, amount_cents`,
         [
           input.merchantId,
           input.code,
@@ -281,13 +281,13 @@ export class CashWriteRepository {
           input.recipientName,
         ],
       );
-      const gc = rows[0];
+      const gc = { ...rows[0], code: input.code };
       await c.query(
         // gift_card_ledger reason CHECK is (migration_initial_load/load/redeem/
         // adjustment/expire) — 'load' is the issuance reason.
-        `INSERT INTO merchant.loyalty_gift_card_ledger
-           (merchant_id, gift_card_id, delta, reason, source_type, source_id, idempotency_key)
-         VALUES ($1::uuid, $2::uuid, $3, 'load', 'gift_card', $2::text, $4)`,
+        `SELECT merchant.append_gift_card_fact($1::uuid,$2::uuid,jsonb_build_object(
+          'delta',$3,'reason','load','sourceType','gift_card','sourceId',$2::text,
+          'idempotencyKey',$4))`,
         [input.merchantId, gc.id, input.amountCents, `giftissue_${gc.id}`],
       );
       return gc;
@@ -301,9 +301,9 @@ export class CashWriteRepository {
   ): Promise<{ code: string; isRedeemed: boolean; hasMessage: boolean } | null> {
     const { rows } = await this.pg.workerTx((c) =>
       c.query<Row>(
-        `SELECT code, (redeemed_at IS NOT NULL) AS is_redeemed, (message IS NOT NULL) AS has_message
+        `SELECT masked_code AS code, (redeemed_at IS NOT NULL) AS is_redeemed, (message IS NOT NULL) AS has_message
          FROM merchant.loyalty_gift_card
-         WHERE merchant_id=$1::uuid AND code=$2 LIMIT 1`,
+         WHERE merchant_id=$1::uuid AND code_hash=extensions.digest($2,'sha256') LIMIT 1`,
         [merchantId, code],
       ),
     );
@@ -317,7 +317,7 @@ export class CashWriteRepository {
       c.query<Row>(
         `SELECT id::text, amount_cents, sender_name, redeemed_at, expires_at
          FROM merchant.loyalty_gift_card
-         WHERE merchant_id=$1::uuid AND code=$2 LIMIT 1`,
+         WHERE merchant_id=$1::uuid AND code_hash=extensions.digest($2,'sha256') LIMIT 1`,
         [merchantId, code],
       ),
     );
@@ -393,6 +393,7 @@ export class CashWriteRepository {
     senderName: string | null;
   }): Promise<number> {
     return this.pg.workerTx(async (c) => {
+      await c.query("SELECT set_config('app.current_merchant',$1,true)", [args.merchantId]);
       const claim = await c.query<Row>(
         `UPDATE merchant.loyalty_gift_card
          SET redeemed_at=now(), redeemed_card_id=$3::uuid
@@ -405,9 +406,9 @@ export class CashWriteRepository {
       await c.query(
         // gift_card_ledger.reason='redeem'; the wallet credit below uses card_ledger
         // reason 'gift_card_redeem' (its own CHECK allows it).
-        `INSERT INTO merchant.loyalty_gift_card_ledger
-           (merchant_id, gift_card_id, delta, reason, source_type, source_id, idempotency_key)
-         VALUES ($1::uuid, $2::uuid, $3, 'redeem', 'loyalty_card', $4::text, $5)`,
+        `SELECT merchant.append_gift_card_fact($1::uuid,$2::uuid,jsonb_build_object(
+          'delta',$3,'reason','redeem','sourceType','loyalty_card','sourceId',$4::text,
+          'idempotencyKey',$5))`,
         [
           args.merchantId,
           args.giftCardId,

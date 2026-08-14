@@ -4,6 +4,7 @@ import { JwtService } from '../../shared/auth/jwt.service';
 import { getRequestContext } from '../../shared/database/request-context';
 import { ACCESS_COOKIE, type AuthedRequest } from './auth.types';
 import { IS_PUBLIC } from './public.decorator';
+import { AuthRepository } from './auth.repository';
 
 /**
  * Verifies the `umi_access` JWT cookie (D9), attaches `req.authUser`, and
@@ -15,6 +16,7 @@ export class AuthGuard implements CanActivate {
   constructor(
     private readonly jwt: JwtService,
     private readonly reflector: Reflector,
+    private readonly repository: AuthRepository,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -25,14 +27,34 @@ export class AuthGuard implements CanActivate {
     if (isPublic) return true;
 
     const req = context.switchToHttp().getRequest<AuthedRequest>();
-    const token = req.cookies?.[ACCESS_COOKIE];
+    const authorization = req.headers?.authorization;
+    const bearer =
+      typeof authorization === 'string' && authorization.startsWith('Bearer ')
+        ? authorization.slice(7)
+        : undefined;
+    const token = req.cookies?.[ACCESS_COOKIE] ?? bearer;
     if (!token) throw new UnauthorizedException('authentication_required');
 
     const claims = await this.jwt.verifyAccess(token);
-    req.authUser = { id: claims.sub, email: claims.email };
+    if (
+      claims.deviceId === null &&
+      !(await this.repository.validateDashboardSession(claims.sub, claims.sessionId))
+    ) {
+      throw new UnauthorizedException('session_revoked');
+    }
+    req.authUser = {
+      id: claims.sub,
+      email: claims.email,
+      sessionId: claims.sessionId,
+      deviceId: claims.deviceId,
+      commandContextType: claims.deviceId ? 'pos_device' : 'dashboard_administrative',
+    };
 
     const ctx = getRequestContext();
-    if (ctx) ctx.userId = claims.sub;
+    if (ctx) {
+      ctx.userId = claims.sub;
+      ctx.deviceId = claims.deviceId;
+    }
 
     return true;
   }

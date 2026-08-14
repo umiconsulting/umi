@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "workspace": "apps/umi-dashboard",
+  "maximumWarnings": {
+    "src/data.jsx": {
+      "react-refresh/only-export-components": 39
+    },
+    "src/lib/auth.jsx": {
+      "react-refresh/only-export-components": 8
+    },
+    "src/lib/merchant-context.jsx": {
+      "react-refresh/only-export-components": 1
+    },
+    "src/tweaks-panel.jsx": {
+      "react-refresh/only-export-components": 1
+    }
+  }
+}

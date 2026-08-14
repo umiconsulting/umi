@@ -31,6 +31,10 @@ node_modules/
 dist/
 build/
 .next/
+**/.dart_tool/
+
+# Generated Dart SDK package metadata
+packages/contract/generated/dart/pubspec.lock
 
 # Exception: packages/tokens ships its generator (build/) AND its generated output
 # (dist/) in git. The frontends deploy as separate Vercel projects that run an
@@ -55,6 +59,8 @@ apps/*/supabase/.temp/
 # are unreviewable binaries and version-specific (cpython-314 here).
 __pycache__/
 *.pyc
+# Pilot runtime secrets
+deploy/pilot/pilot.env
 
 # Claude Code per-developer settings. Contains machine-specific permission
 # allowlists that have historically included credentials in command strings.

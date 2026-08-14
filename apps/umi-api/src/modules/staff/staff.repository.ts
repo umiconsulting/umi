@@ -66,7 +66,15 @@ export class StaffRepository {
   async insert(
     merchantId: string,
     locationId: string | null,
-    data: { name: string; phone: string | null; email: string | null; status: string },
+    data: {
+      name: string;
+      phone: string | null;
+      email: string | null;
+      status: string;
+      pinSalt: string | null;
+      pinHash: string | null;
+      pinLookup: string | null;
+    },
   ): Promise<StaffRow> {
     const { rows } = await this.pg.withMerchant((c) =>
       c.query<StaffRow>(
@@ -113,15 +121,27 @@ export class StaffRepository {
            SELECT id FROM created
          ), ins AS (
            INSERT INTO merchant.staff
-             (merchant_id, location_id, user_id, role_id, name, phone, email, status)
-           SELECT $1::uuid, $2::uuid, person.id, ${DEFAULT_ROLE}, $3, $4, $5, $6
+             (merchant_id, location_id, user_id, role_id, name, phone, email, status,
+              operator_pin_salt, operator_pin_hash, operator_pin_lookup)
+           SELECT $1::uuid, $2::uuid, person.id, ${DEFAULT_ROLE}, $3, $4, $5, $6,
+                  $7, $8, $9
              FROM person
            RETURNING *
          )
          SELECT ${PROJECTION}, NULL::timestamptz AS "disabledAt"
          FROM ins AS s
          LEFT JOIN umi.role AS r ON r.id = s.role_id`,
-        [merchantId, locationId, data.name, data.phone, data.email, data.status],
+        [
+          merchantId,
+          locationId,
+          data.name,
+          data.phone,
+          data.email,
+          data.status,
+          data.pinSalt,
+          data.pinHash,
+          data.pinLookup,
+        ],
       ),
     );
     return rows[0];

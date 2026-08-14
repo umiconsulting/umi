@@ -4,7 +4,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { iso } from '../../shared/format/money';
+import { PasswordService } from '../../shared/auth/password.service';
+import { posPinLookupHash } from '../../shared/auth/pos-pin';
+import type { AppConfig } from '../../shared/config/config.schema';
 import { MerchantsRepository } from '../merchants/merchants.repository';
 import { StaffRepository, type StaffRow } from './staff.repository';
 
@@ -51,6 +55,7 @@ export interface StaffInput {
   role?: unknown;
   status?: unknown;
   permissions?: unknown;
+  operatorPin?: unknown;
 }
 
 @Injectable()
@@ -58,6 +63,8 @@ export class StaffService {
   constructor(
     private readonly repo: StaffRepository,
     private readonly merchants: MerchantsRepository,
+    private readonly passwords: PasswordService,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
   private toDto(row: StaffRow): StaffDto {
@@ -101,12 +108,20 @@ export class StaffService {
     }
 
     const locationId = await this.merchants.resolveLocationId(merchantId, requestedLocationId);
+    const operatorPin = String(body.operatorPin ?? '');
+    if (operatorPin && !/^\d{4,8}$/.test(operatorPin)) {
+      throw new BadRequestException('operatorPin must contain four to eight digits');
+    }
+    const pin = operatorPin ? this.pinMaterial(merchantId, operatorPin) : null;
     try {
       const row = await this.repo.insert(merchantId, locationId, {
         name,
         phone,
         email,
         status,
+        pinSalt: pin?.salt ?? null,
+        pinHash: pin?.hash ?? null,
+        pinLookup: pin?.lookupHash ?? null,
       });
       return this.toDto(row);
     } catch (err) {
@@ -141,6 +156,22 @@ export class StaffService {
   async remove(merchantId: string, staffId: string): Promise<void> {
     const ok = await this.repo.softDelete(merchantId, staffId);
     if (!ok) throw new NotFoundException('Staff member not found');
+  }
+
+  private pinMaterial(
+    merchantId: string,
+    pin: string,
+  ): {
+    salt: string;
+    hash: string;
+    lookupHash: string;
+  } {
+    const secret = this.config.get('JWT_SECRET', { infer: true });
+    if (!secret) throw new Error('JWT_SECRET is required for POS PIN management');
+    return {
+      ...this.passwords.hash(pin),
+      lookupHash: posPinLookupHash(secret, merchantId, pin),
+    };
   }
 }
 

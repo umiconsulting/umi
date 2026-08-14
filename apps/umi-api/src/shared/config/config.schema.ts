@@ -21,13 +21,15 @@ const booleanFromEnv = z.preprocess((v) => {
  */
 export const configSchema = z
   .object({
-    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    NODE_ENV: z.enum(['development', 'test', 'production']),
+    UMI_ENVIRONMENT: z.enum(['development', 'test', 'staging', 'pilot', 'production']),
     PORT: z.coerce.number().int().positive().default(3000),
 
     // Database — two roles (spec §11.2).
     DATABASE_URL_APP: z.string().url(), // umi_app (RLS request role)
     DATABASE_URL_WORKER: z.string().url(), // umi_worker (BYPASSRLS)
     DATABASE_URL_READONLY: z.string().url().optional(), // umi_readonly (analytics)
+    DATABASE_TLS_MODE: z.enum(['disable', 'verify-full']).default('disable'),
     // TLS: path to (or inline PEM of) the Postgres server's root CA. When set, both
     // pools use verify-full (CA + hostname + rejectUnauthorized). Unset = plaintext
     // (local dev against localhost). Do NOT put sslmode in the URLs — this governs TLS.
@@ -35,15 +37,66 @@ export const configSchema = z
 
     // Redis / BullMQ.
     REDIS_URL: z.string().url(),
+    OPERATIONS_TOKEN: z.string().min(32).optional(),
 
-    // Observability schema that holds the runtime trace tables umi-logs reads
-    // (ai_turn_logs, edge_function_logs, security_logs, pipeline_traces). Live
-    // default is `conversaflow`; confirm against the platform DB. Validated as a
-    // safe SQL identifier since it's interpolated into INSERT statements.
+    // Public routing and trusted ingress. No public URL is inferred from a request.
+    PUBLIC_API_URL: z.string().url().optional(),
+    PUBLIC_DASHBOARD_URL: z.string().url().optional(),
+    TRUSTED_PROXY_CIDRS: z.string().optional(),
+
+    // Artifact identity. Release tooling sets these values from the actual build.
+    RELEASE_VERSION: z
+      .string()
+      .regex(/^[0-9A-Za-z][0-9A-Za-z.+-]{0,79}$/)
+      .optional(),
+    RELEASE_GIT_COMMIT: z
+      .string()
+      .regex(/^[0-9a-f]{40}$/)
+      .optional(),
+    RELEASE_BUILD_TIMESTAMP: z.string().datetime().optional(),
+    CONTRACT_VERSION: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/)
+      .optional(),
+    EXPECTED_SCHEMA_VERSION: z
+      .string()
+      .regex(/^[0-9A-Za-z][0-9A-Za-z._-]{0,79}$/)
+      .optional(),
+    CONFIG_SCHEMA_VERSION: z.string().regex(/^\d+$/).default('1'),
+    PILOT_BOOTSTRAP_TOKEN: z.string().min(32).max(256).optional(),
+    PILOT_BOOTSTRAP_EXPIRES_AT: z.string().datetime().optional(),
+    MINIMUM_POS_VERSION: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/)
+      .default('0.1.0'),
+    MINIMUM_DASHBOARD_VERSION: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/)
+      .default('0.2.0'),
+
+    // OpenTelemetry uses OTLP. Headers can contain credentials and are never logged.
+    OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
+    OTEL_EXPORTER_OTLP_HEADERS: z.string().max(4096).optional(),
     OBSERVABILITY_SCHEMA: z
       .string()
-      .regex(/^[A-Za-z_][A-Za-z0-9_]*$/)
+      .regex(/^[a-z_][a-z0-9_]*$/)
       .default('conversaflow'),
+
+    // Object storage remains optional until a deployed UmiPOS path uses it.
+    OBJECT_STORAGE_ENABLED: booleanFromEnv.default(false),
+    OBJECT_STORAGE_ENDPOINT: z.string().url().optional(),
+    OBJECT_STORAGE_BUCKET: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+      .optional(),
+    OBJECT_STORAGE_REGION: z.string().min(1).max(80).optional(),
+    OBJECT_STORAGE_ACCESS_KEY: z.string().min(8).optional(),
+    OBJECT_STORAGE_SECRET_KEY: z.string().min(16).optional(),
+
+    // One rate-limit schema controls ingress defaults.
+    RATE_LIMIT_IP_PER_MINUTE: z.coerce.number().int().min(10).max(10000).default(300),
+    STARTUP_RETRY_ATTEMPTS: z.coerce.number().int().min(1).max(12).default(5),
+    STARTUP_RETRY_DELAY_MS: z.coerce.number().int().min(0).max(10000).default(1000),
 
     // Wallet-pass refresh (Apple PassKit + Google Wallet). Best-effort push fired
     // after cash money writes; when unset, the refresh is skipped (money write is
@@ -76,6 +129,8 @@ export const configSchema = z
     // landing cutover (and disables the landing cron). Public contact/diagnostic
     // routes stay live regardless — only the background sequence tick is gated.
     LEADS_SEQUENCE_ENABLED: booleanFromEnv.default(false),
+    // Releases expired points and stored-value holds through one idempotent command.
+    CUSTOMER_VALUE_EXPIRY_ENABLED: booleanFromEnv.default(true),
 
     // CORS.
     CORS_ORIGINS: z.string().optional(), // comma-separated origins
@@ -130,6 +185,8 @@ export const configSchema = z
     APP_QR_SECRET: z.string().min(32).optional(),
     JWT_ACCESS_SECRET: z.string().min(32).optional(), // cash CUSTOMER access token (24h)
     JWT_REFRESH_SECRET: z.string().min(32).optional(), // cash CUSTOMER refresh token (30d)
+    // HMAC and AES key source for customer-history cursors and one-time gift-card delivery.
+    CUSTOMER_VALUE_SECRET: z.string().min(32).optional(),
 
     ANTHROPIC_API_KEY: z.string().optional(),
     VOYAGE_API_KEY: z.string().optional(),
@@ -166,6 +223,100 @@ export const configSchema = z
     LEADS_WEBHOOK_SECRET: z.string().optional(),
   })
   .superRefine((cfg, ctx) => {
+    const deployed = ['staging', 'pilot', 'production'].includes(cfg.UMI_ENVIRONMENT);
+    const requireValue = (key: keyof typeof cfg) => {
+      if (cfg[key] === undefined || cfg[key] === '') {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: 'is required' });
+      }
+    };
+
+    if (deployed) {
+      for (const key of [
+        'PUBLIC_API_URL',
+        'PUBLIC_DASHBOARD_URL',
+        'CORS_ORIGINS',
+        'TRUSTED_PROXY_CIDRS',
+        'JWT_SECRET',
+        'APP_QR_SECRET',
+        'JWT_ACCESS_SECRET',
+        'JWT_REFRESH_SECRET',
+        'MFA_OTP_PEPPER',
+        'CUSTOMER_VALUE_SECRET',
+        'OPERATIONS_TOKEN',
+        'RELEASE_VERSION',
+        'RELEASE_GIT_COMMIT',
+        'RELEASE_BUILD_TIMESTAMP',
+        'CONTRACT_VERSION',
+        'EXPECTED_SCHEMA_VERSION',
+        'PILOT_BOOTSTRAP_TOKEN',
+        'PILOT_BOOTSTRAP_EXPIRES_AT',
+        'OTEL_EXPORTER_OTLP_ENDPOINT',
+      ] as const) {
+        requireValue(key);
+      }
+      if (cfg.NODE_ENV !== 'production') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['NODE_ENV'],
+          message: 'must be production for staging, pilot, and production',
+        });
+      }
+      for (const key of ['PUBLIC_API_URL', 'PUBLIC_DASHBOARD_URL'] as const) {
+        const value = cfg[key];
+        if (value && new URL(value).protocol !== 'https:') {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: 'must use https' });
+        }
+      }
+      if (!cfg.COOKIE_SECURE) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['COOKIE_SECURE'],
+          message: 'must be true outside development and test',
+        });
+      }
+      if (cfg.CORS_ORIGINS?.split(',').some((origin) => origin.trim() === '*')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['CORS_ORIGINS'],
+          message: 'must contain explicit origins',
+        });
+      }
+    }
+
+    if (cfg.DATABASE_TLS_MODE === 'verify-full' && !cfg.PGSSLROOTCERT) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['PGSSLROOTCERT'],
+        message: 'is required when DATABASE_TLS_MODE=verify-full',
+      });
+    }
+    if (cfg.DATABASE_TLS_MODE === 'disable' && cfg.PGSSLROOTCERT) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['DATABASE_TLS_MODE'],
+        message: 'must be verify-full when PGSSLROOTCERT is set',
+      });
+    }
+
+    if (cfg.OBJECT_STORAGE_ENABLED) {
+      for (const key of [
+        'OBJECT_STORAGE_ENDPOINT',
+        'OBJECT_STORAGE_BUCKET',
+        'OBJECT_STORAGE_REGION',
+        'OBJECT_STORAGE_ACCESS_KEY',
+        'OBJECT_STORAGE_SECRET_KEY',
+      ] as const) {
+        requireValue(key);
+      }
+    }
+
+    if (cfg.COOKIE_SAMESITE === 'none' && !cfg.COOKIE_SECURE) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['COOKIE_SECURE'],
+        message: 'must be true when COOKIE_SAMESITE=none',
+      });
+    }
     // The Twilio signature bypass is a local-dev escape hatch only. Reject it at
     // boot in production so it can never silently disable webhook verification.
     if (cfg.NODE_ENV === 'production' && cfg.ALLOW_INSECURE_TWILIO_WEBHOOK) {

@@ -1,15 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SpanStatusCode, trace } from '@opentelemetry/api';
 import { createHash } from 'node:crypto';
 import { PgService } from '../database/pg.service';
 import type { AppConfig } from '../config/config.schema';
-
-// Ported from umi-conversaflow `_shared/logger.ts`. Writes the runtime trace
-// tables that umi-logs reads (ai_turn_logs, edge_function_logs, security_logs)
-// plus the internal pipeline_traces, in the observability schema (default
-// `conversaflow`). All writes are BEST-EFFORT: a trace insert must never break
-// the request or job — failures are logged and swallowed. Uses the worker
-// (BYPASSRLS) pool since these are service-role-only tables.
+import { errorCategory, redactTelemetry } from '../operations/redaction';
 
 export interface AiTurnLog {
   conversation_id?: string;
@@ -58,14 +53,9 @@ export class TraceService {
     private readonly pg: PgService,
     config: ConfigService<AppConfig, true>,
   ) {
-    // Already validated as a safe identifier by the config schema.
     this.schema = config.get('OBSERVABILITY_SCHEMA', { infer: true });
   }
 
-  /**
-   * SEC-04: a stable, non-reversible 16-hex-char (8-byte) SHA-256 prefix of a
-   * phone number — loggable and correlatable, but not the raw value.
-   */
   hashPhone(phone: string): string {
     return createHash('sha256').update(phone).digest('hex').slice(0, 16);
   }
@@ -90,11 +80,15 @@ export class TraceService {
         data.latency_ms ?? null,
         data.response_type ?? null,
         this.json(data.products_referenced),
-        this.json(data.customer_context),
-        this.json(data.metadata),
+        this.json(redactTelemetry(data.customer_context)),
+        this.json(redactTelemetry(data.metadata)),
         data.request_id ?? null,
       ],
     );
+    this.emit('umi.ai.turn', {
+      'gen_ai.request.model': data.model,
+      'umi.duration_ms': data.latency_ms,
+    });
   }
 
   async logEdgeFunction(data: EdgeFunctionLog): Promise<void> {
@@ -107,11 +101,16 @@ export class TraceService {
         data.function_name,
         data.status,
         data.duration_ms ?? null,
-        data.error_message ?? null,
-        data.error_stack ?? null,
-        this.json(data.metadata),
+        data.error_message ? '[REDACTED_ERROR]' : null,
+        data.error_stack ? '[REDACTED_STACK]' : null,
+        this.json(redactTelemetry(data.metadata)),
         data.request_id ?? null,
       ],
+    );
+    this.emit(
+      'umi.edge.operation',
+      { 'umi.operation.name': data.function_name },
+      data.status === 'error',
     );
   }
 
@@ -128,14 +127,15 @@ export class TraceService {
          (phone, event_type, input_text, details, timestamp, request_id)
        VALUES ($1,$2,$3,$4,$5,$6)`,
       [
-        params.phone, // raw phone only in the restricted security_logs table
+        this.hashPhone(params.phone),
         params.eventType,
-        params.inputText.substring(0, 500),
-        params.details ?? null,
+        '[REDACTED_INPUT]',
+        params.details ? '[REDACTED_DETAILS]' : null,
         new Date().toISOString(),
         params.requestId ?? null,
       ],
     );
+    this.emit('umi.security.event', { 'umi.security.event_type': params.eventType });
   }
 
   async logPipelineTrace(data: PipelineTrace): Promise<void> {
@@ -151,34 +151,43 @@ export class TraceService {
         data.merchant_id ?? null,
         data.stage,
         data.event,
-        this.json(data.detail),
-        data.error ?? null,
+        this.json(redactTelemetry(data.detail)),
+        data.error ? '[REDACTED_ERROR]' : null,
       ],
     );
+    this.emit('umi.pipeline.event', { 'umi.pipeline.stage': data.stage }, Boolean(data.error));
   }
 
   private json(value: unknown): string | null {
     if (value == null) return null;
-    // Truly best-effort: JSON.stringify throws on circular/BigInt values, and a
-    // trace must never break its caller (see insert()'s contract).
     try {
       return JSON.stringify(value);
     } catch (err) {
-      this.logger.warn(
-        `trace_json_serialize_failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      this.logger.warn(`trace_json_serialize_failed category=${errorCategory(err)}`);
       return JSON.stringify({ _unserializable: true });
     }
   }
 
-  /** Best-effort insert: never throws — a failed trace must not break the caller. */
   private async insert(table: string, text: string, params: unknown[]): Promise<void> {
     try {
       await this.pg.query(text, params);
     } catch (err) {
-      this.logger.warn(
-        `${table}_insert_failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      this.logger.warn(`${table}_insert_failed category=${errorCategory(err)}`);
     }
+  }
+
+  private emit(
+    name: string,
+    attributes: Record<string, string | number | undefined>,
+    failed = false,
+  ): void {
+    trace.getTracer('umi-api').startActiveSpan(name, (span) => {
+      for (const [key, value] of Object.entries(attributes)) {
+        if (value !== undefined)
+          span.setAttribute(key, typeof value === 'string' ? value.slice(0, 120) : value);
+      }
+      if (failed) span.setStatus({ code: SpanStatusCode.ERROR });
+      span.end();
+    });
   }
 }

@@ -12,6 +12,7 @@ import {
   TweakToggle,
 } from './tweaks-panel.jsx';
 import { useMerchantData, useKdsConnection } from './data.jsx';
+import { CFG } from './lib/config.js';
 import { Sidebar, Topbar } from './shell.jsx';
 
 import LoginScreen from '@/screens/login.jsx';
@@ -26,6 +27,7 @@ import CustomersScreen from '@/screens/customers.jsx';
 import HoursScreen from '@/screens/hours.jsx';
 import SettingsScreen from '@/screens/settings.jsx';
 import ProductsBillingScreen from '@/screens/products-billing.jsx';
+import OperationsScreen from '@/screens/operations.jsx';
 
 const TWEAK_DEFAULTS = { merchantHue: '#1A5632', density: 'comfy', lang: 'es' };
 
@@ -45,14 +47,12 @@ function ProductUnavailable({ moduleName = 'Modulo', product = 'producto' }) {
         <div className="sec-index" style={{ marginBottom: 12 }}>
           <span className="nn">OFF</span>
           <span>/</span>
-          <span>PRODUCTO NO ACTIVO</span>
+          <span>ACCESO NO DISPONIBLE</span>
         </div>
-        <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>
-          {moduleName} no esta activo para este merchant
-        </h2>
+        <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>{moduleName} no está disponible</h2>
         <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 620 }}>
-          Este modulo depende de {product}. El super admin puede revisarlo en Products & Billing,
-          pero no hay controles operativos hasta activar el producto.
+          Esta sección requiere {product} y el permiso correspondiente. Solicita acceso al Owner o
+          Admin del negocio.
         </div>
       </div>
     </div>
@@ -108,7 +108,7 @@ function DashboardLayout() {
           fontSize: 14,
         }}
       >
-        Cargando merchant...
+        Cargando negocio…
       </div>
     );
   }
@@ -151,6 +151,18 @@ function DashboardLayout() {
               }
             />
             <Route
+              path="operations"
+              element={
+                <GuardedScreen
+                  moduleKey="operations"
+                  moduleName="Centro operativo"
+                  product="Dashboard"
+                >
+                  <OperationsScreen />
+                </GuardedScreen>
+              }
+            />
+            <Route
               path="orders"
               element={
                 <GuardedScreen moduleKey="orders" moduleName="Pedidos" product="KDS">
@@ -161,7 +173,7 @@ function DashboardLayout() {
             <Route
               path="devices"
               element={
-                <GuardedScreen moduleKey="devices" moduleName="Devices" product="KDS">
+                <GuardedScreen moduleKey="devices" moduleName="Devices" product="Dashboard">
                   <DevicesScreen />
                 </GuardedScreen>
               }
@@ -211,55 +223,57 @@ function DashboardLayout() {
         </div>
       </main>
 
-      <TweaksPanel title="Tweaks">
-        <TweakSection title="Wallet card brand">
-          <TweakColor
-            label="Quick merchant"
-            value={tweaks.merchantHue}
-            options={['#B5605A', '#223979', '#5B7A4C', '#B5812A', '#7692CB', '#1F1410']}
-            onChange={(v) => {
-              setTweak('merchantHue', v);
-              document.documentElement.style.setProperty('--merchant-brand', v);
-            }}
-          />
-        </TweakSection>
-        <TweakSection title="Density">
-          <TweakRadio
-            label="Spacing"
-            value={tweaks.density}
-            options={['cozy', 'comfy']}
-            onChange={(v) => setTweak('density', v)}
-          />
-        </TweakSection>
-        <TweakSection title="Language">
-          <TweakRadio
-            label="Greeting"
-            value={tweaks.lang}
-            options={['es', 'en']}
-            onChange={(v) => setTweak('lang', v)}
-          />
-        </TweakSection>
-        <TweakSection title="Sidebar">
-          <TweakToggle
-            label="Collapsed"
-            value={collapsed}
-            onChange={() => setCollapsed((c) => !c)}
-          />
-        </TweakSection>
-        <TweakSection title="Operations">
-          <TweakToggle
-            label="WhatsApp orders paused"
-            value={ordersPaused}
-            onChange={() => setOrdersPaused((p) => !p)}
-          />
-        </TweakSection>
-      </TweaksPanel>
+      {CFG.environment === 'development' && (
+        <TweaksPanel title="Ajustes de desarrollo">
+          <TweakSection title="Wallet card brand">
+            <TweakColor
+              label="Quick merchant"
+              value={tweaks.merchantHue}
+              options={['#B5605A', '#223979', '#5B7A4C', '#B5812A', '#7692CB', '#1F1410']}
+              onChange={(v) => {
+                setTweak('merchantHue', v);
+                document.documentElement.style.setProperty('--merchant-brand', v);
+              }}
+            />
+          </TweakSection>
+          <TweakSection title="Density">
+            <TweakRadio
+              label="Spacing"
+              value={tweaks.density}
+              options={['cozy', 'comfy']}
+              onChange={(v) => setTweak('density', v)}
+            />
+          </TweakSection>
+          <TweakSection title="Language">
+            <TweakRadio
+              label="Greeting"
+              value={tweaks.lang}
+              options={['es', 'en']}
+              onChange={(v) => setTweak('lang', v)}
+            />
+          </TweakSection>
+          <TweakSection title="Sidebar">
+            <TweakToggle
+              label="Collapsed"
+              value={collapsed}
+              onChange={() => setCollapsed((c) => !c)}
+            />
+          </TweakSection>
+          <TweakSection title="Operations">
+            <TweakToggle
+              label="WhatsApp orders paused"
+              value={ordersPaused}
+              onChange={() => setOrdersPaused((p) => !p)}
+            />
+          </TweakSection>
+        </TweaksPanel>
+      )}
     </div>
   );
 }
 
 function RequireAuth({ children }) {
-  const { session, loading, needsPasswordReset } = useAuth();
+  const { session, loading } = useAuth();
   if (loading)
     return (
       <div
@@ -275,7 +289,6 @@ function RequireAuth({ children }) {
         Cargando…
       </div>
     );
-  if (needsPasswordReset) return <ResetPasswordScreen />;
   return session ? children : <Navigate to="/login" replace />;
 }
 

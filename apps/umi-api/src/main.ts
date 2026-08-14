@@ -6,6 +6,9 @@ import { ConfigService } from '@nestjs/config';
 import fastifyCookie from '@fastify/cookie';
 import { AppModule } from './app.module';
 import type { AppConfig } from './shared/config/config.schema';
+import { RESOURCE_LIMITS } from './shared/operations/resource-limits';
+import { validateConfig } from './shared/config/config.schema';
+import { JsonLogger } from './shared/logging/json.logger';
 
 /**
  * Web process. Handles all HTTP ingress (health now; Twilio webhook, KDS,
@@ -13,9 +16,25 @@ import type { AppConfig } from './shared/config/config.schema';
  * never runs the heavy work itself — that is the worker (src/worker.ts).
  */
 async function bootstrap(): Promise<void> {
+  const bootConfig = validateConfig(process.env);
+  const trustedProxies = bootConfig.TRUSTED_PROXY_CIDRS?.split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({ trustProxy: true }),
+    new FastifyAdapter({
+      trustProxy: trustedProxies?.length ? trustedProxies : false,
+      bodyLimit: RESOURCE_LIMITS.httpBodyBytes,
+      requestTimeout: RESOURCE_LIMITS.httpRequestMs,
+      connectionTimeout: RESOURCE_LIMITS.httpConnectionMs,
+    }),
+    {
+      logger: new JsonLogger({
+        service: 'umi-api',
+        environment: bootConfig.UMI_ENVIRONMENT,
+        release: bootConfig.RELEASE_VERSION ?? 'development',
+      }),
+    },
   );
 
   // Cookie parsing/signing for the JWT auth cookies (D9). Reads `req.cookies`
