@@ -3,6 +3,7 @@ import { I, UmiX } from './icons.jsx';
 
 const NAV = [
   { id: 'overview', label: 'Overview', icon: 'Home', section: 'OPERATIONS' },
+  { id: 'operations', label: 'Centro operativo', icon: 'Activity', section: 'OPERATIONS' },
   { id: 'orders', label: 'Pedidos', icon: 'Receipt', section: 'OPERATIONS' },
   { id: 'devices', label: 'Devices', icon: 'Tablet', section: 'OPERATIONS', badge: '4' },
   { id: 'staff', label: 'Staff & Access', icon: 'Users', section: 'OPERATIONS' },
@@ -104,13 +105,13 @@ const Sidebar = ({
           {sec.items.map((item) => {
             const Ic = I[item.icon] || I.Settings;
             return (
-              <div
+              <button
                 key={item.id}
+                type="button"
                 className={'side-item focusable x-active' + (active === item.id ? ' active' : '')}
                 onClick={() => onChange(item.id)}
-                tabIndex={0}
-                role="button"
                 aria-current={active === item.id ? 'page' : undefined}
+                title={collapsed ? item.label : undefined}
               >
                 <span className="ic">
                   <Ic />
@@ -121,7 +122,7 @@ const Sidebar = ({
                     {item.badge}
                   </span>
                 )}
-              </div>
+              </button>
             );
           })}
         </React.Fragment>
@@ -290,8 +291,9 @@ const Topbar = ({
   const greetingName = formatMerchantGreetingName(merchantName);
   const titles = {
     overview: { eyebrow: '01 / OPERACIONES', title: 'Panorama', en: 'Overview' },
+    operations: { eyebrow: '02 / OPERACIONES', title: 'Centro operativo', en: 'Operations Center' },
     orders: { eyebrow: '02 / OPERACIONES', title: 'Pedidos WhatsApp', en: 'KDS tickets' },
-    devices: { eyebrow: '03 / OPERACIONES', title: 'Dispositivos KDS', en: 'Kitchen displays' },
+    devices: { eyebrow: '03 / OPERACIONES', title: 'Dispositivos', en: 'Trusted devices' },
     staff: { eyebrow: '04 / OPERACIONES', title: 'Equipo y permisos', en: 'Staff & Access' },
     customers: { eyebrow: '05 / OPERACIONES', title: 'Customers', en: 'Customer platform' },
     members: { eyebrow: '06 / GROWTH', title: 'Loyalty', en: 'Umi Cash members' },
@@ -309,7 +311,7 @@ const Topbar = ({
     },
   };
 
-  const locationScoped = ['orders', 'devices', 'hours'].includes(screen);
+  const locationScoped = ['operations', 'orders', 'devices', 'hours'].includes(screen);
   const showLocationSelect = locationScoped && locations.length > 1;
   const LocationSelect = () =>
     showLocationSelect ? (

@@ -33,6 +33,11 @@ const EMPTY_HOURS = {
 const EMPTY_VOICE = { voice: null, presets: [], businessName: '', defaults: null };
 const EMPTY_GIFT_CARDS = { giftCards: [], total: 0, page: 1, totalPages: 1 };
 const EMPTY_CONVERSATIONS = { conversations: [], total: 0, page: 1, totalPages: 1 };
+const EMPTY_OPERATIONS = {
+  domains: [],
+  items: [],
+  page: { limit: 20, hasMore: false, nextCursor: null },
+};
 const DEVICE_LIVE_MS = 10_000;
 const DEVICE_OFFLINE_MS = 20_000;
 
@@ -62,6 +67,13 @@ async function _apiFetch(path, opts, _retried) {
   // empty body when Content-Type is application/json, so bodyless mutations
   // (pairing approve/deny, deletes) must NOT carry the header.
   const headers = Object.assign({}, authHeaders);
+  if (COOKIE_AUTH && opts.method && !['GET', 'HEAD', 'OPTIONS'].includes(opts.method)) {
+    const csrf = document.cookie
+      .split(';')
+      .map((part) => part.trim())
+      .find((part) => part.startsWith('umi_csrf='));
+    if (csrf) headers['X-UMI-CSRF'] = decodeURIComponent(csrf.slice('umi_csrf='.length));
+  }
   if (opts.body != null) headers['Content-Type'] = 'application/json';
   const res = await fetch(
     apiUrl(path),
@@ -92,8 +104,16 @@ async function _apiFetch(path, opts, _retried) {
     // HTTP status so callers can map to friendly copy and log the raw detail.
     const err = new Error(errMessage(payload, `${res.status} ${path}`));
     err.status = res.status;
-    err.code = payload && typeof payload.error === 'string' ? payload.error : null;
+    err.code =
+      payload && typeof payload.code === 'string'
+        ? payload.code
+        : payload && payload.error && typeof payload.error.code === 'string'
+          ? payload.error.code
+          : payload && typeof payload.error === 'string'
+            ? payload.error
+            : null;
     err.path = path;
+    err.details = payload;
     throw err;
   }
   return payload;
@@ -106,23 +126,28 @@ function _merchantPath(ctx, suffix) {
 }
 
 function _useAsync(asyncFn, deps, seed) {
-  const [state, setState] = useStateD({ data: seed, loading: true, error: null });
+  const [state, setState] = useStateD({ data: seed, loading: true, error: null, errorCode: null });
   useEffectD(function () {
     var active = true;
     setState(function (s) {
-      return Object.assign({}, s, { loading: true, error: null });
+      return Object.assign({}, s, { loading: true, error: null, errorCode: null });
     });
     Promise.resolve()
       .then(function () {
         return asyncFn();
       })
       .then(function (data) {
-        if (active) setState({ data: data, loading: false, error: null });
+        if (active) setState({ data: data, loading: false, error: null, errorCode: null });
       })
       .catch(function (err) {
         if (active)
           setState(function (s) {
-            return Object.assign({}, s, { data: seed, loading: false, error: err.message });
+            return Object.assign({}, s, {
+              data: seed,
+              loading: false,
+              error: err.message,
+              errorCode: err.code || null,
+            });
           });
       });
     return function () {
@@ -412,6 +437,39 @@ async function _loadConversations(ctx, opts) {
   return _apiFetch(_merchantPath(ctx, '/conversaflow/conversations?' + q));
 }
 
+async function _loadOperations(ctx, domain, cursor, merchantWide) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId) return EMPTY_OPERATIONS;
+  const query = new URLSearchParams({ domain: domain || 'organization', limit: '20' });
+  const locationId = merchantWide ? '' : _locationId(ctx);
+  if (locationId) query.set('locationId', locationId);
+  if (cursor) query.set('cursor', String(cursor));
+  return _apiFetch(`${routes.merchants.operations(merchantId)}?${query}`);
+}
+
+async function executeAdministrativeCommand(operation, targetAggregateId, options) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  const locationId = window.localStorage.getItem('umi-dashboard-selected-location');
+  if (!merchantId) throw new Error('No active merchant selected');
+  const input = options || {};
+  const commandId = input.commandId || crypto.randomUUID();
+  const idempotencyKey = input.idempotencyKey || crypto.randomUUID();
+  const result = await _apiFetch(routes.merchants.administrativeCommands(merchantId), {
+    method: 'POST',
+    body: JSON.stringify({
+      operation,
+      locationId: input.locationId === undefined ? locationId || null : input.locationId,
+      targetAggregateId,
+      targetVersion: input.targetVersion ?? null,
+      commandId,
+      idempotencyKey,
+      parameters: input.parameters || {},
+      approvalId: input.approvalId || null,
+    }),
+  });
+  return { result, commandId, idempotencyKey };
+}
+
 async function _loadBusinessHours(ctx) {
   if (!_active(ctx, 'conversaflow')) return EMPTY_HOURS;
   return _apiFetch(_withLocation(ctx, _merchantPath(ctx, '/conversaflow/hours')));
@@ -530,24 +588,58 @@ async function generateDevicePairingPin(device) {
   });
 }
 
-async function createKdsStation(station) {
-  return _apiFetch(merchantScopedPath('/kds/stations'), {
+async function createPosEnrollmentRequest(device) {
+  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
+  if (!tenantId) throw new Error('No active tenant selected');
+  return _apiFetch(routes.devices.beginEnrollment(tenantId), {
     method: 'POST',
-    body: JSON.stringify(station),
+    body: JSON.stringify(device),
   });
+}
+
+async function getPosEnrollmentRequests() {
+  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
+  if (!tenantId) throw new Error('No active tenant selected');
+  return _apiFetch(routes.devices.enrollmentRequests(tenantId));
+}
+
+async function approvePosEnrollmentRequest(requestId) {
+  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
+  if (!tenantId) throw new Error('No active tenant selected');
+  return _apiFetch(routes.devices.approveEnrollment(tenantId, requestId), {
+    method: 'POST',
+    body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
+  });
+}
+
+async function denyPosEnrollmentRequest(requestId) {
+  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
+  if (!tenantId) throw new Error('No active tenant selected');
+  return _apiFetch(routes.devices.denyEnrollment(tenantId, requestId), {
+    method: 'POST',
+    body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
+  });
+}
+
+async function createKdsStation(station) {
+  const result = await executeAdministrativeCommand('kitchen.station.create', crypto.randomUUID(), {
+    parameters: station,
+  });
+  return result.result;
 }
 
 async function updateKdsStation(stationId, patch) {
-  return _apiFetch(merchantScopedPath(`/kds/stations/${encodeURIComponent(stationId)}`), {
-    method: 'PATCH',
-    body: JSON.stringify(patch),
+  const result = await executeAdministrativeCommand('kitchen.station.update', stationId, {
+    parameters: patch,
   });
+  return result.result;
 }
 
 async function deleteKdsStation(stationId) {
-  return _apiFetch(merchantScopedPath(`/kds/stations/${encodeURIComponent(stationId)}`), {
-    method: 'DELETE',
+  const result = await executeAdministrativeCommand('kitchen.station.update', stationId, {
+    parameters: { archive: true },
   });
+  return result.result;
 }
 
 async function approveDevicePairing(pairingId) {
@@ -567,10 +659,10 @@ async function denyDevicePairing(pairingId) {
 }
 
 async function updateDevice(deviceId, patch) {
-  return _apiFetch(merchantScopedPath(`/kds/devices/${encodeURIComponent(deviceId)}`), {
-    method: 'PATCH',
-    body: JSON.stringify(patch),
+  const result = await executeAdministrativeCommand('kitchen.device.assign', deviceId, {
+    parameters: patch,
   });
+  return result.result;
 }
 
 async function revokeDevice(deviceId, reason) {
@@ -764,6 +856,17 @@ function useConversationsData(opts) {
   );
 }
 
+function useOperationsData(domain, cursor, refresh, merchantWide) {
+  const ctx = useMerchant();
+  return _useAsync(
+    function () {
+      return _loadOperations(ctx, domain, cursor, merchantWide);
+    },
+    _deps(ctx, [domain || 'organization', cursor || 0, refresh || 0, merchantWide ? 1 : 0]),
+    EMPTY_OPERATIONS,
+  );
+}
+
 // Polls /api/health and tracks connectivity to the dashboard backend.
 // status: 'connecting' | 'online' | 'offline'
 // Retries every 5 s while offline, every 20 s while online.
@@ -782,8 +885,7 @@ function useKdsConnection() {
         const ctrl = new AbortController();
         const timeout = setTimeout(() => ctrl.abort(), 5000);
         try {
-          // umi-api exposes /health; server.js exposes /api/health.
-          const res = await fetch(apiUrl(COOKIE_AUTH ? '/health' : '/api/health'), {
+          const res = await fetch(apiUrl('/health'), {
             cache: 'no-store',
             signal: ctrl.signal,
           });
@@ -865,6 +967,11 @@ export {
   useVoiceConfig,
   useGiftCardsData,
   useConversationsData,
+  // This hook follows the existing data module boundary. Do not increase the warning baseline.
+  // eslint-disable-next-line react-refresh/only-export-components
+  useOperationsData,
+  // eslint-disable-next-line react-refresh/only-export-components
+  executeAdministrativeCommand,
   saveMerchantSettings,
   saveRewardConfig,
   saveBusinessHours,
@@ -876,6 +983,10 @@ export {
   deleteStaffMember,
   provisionDevice,
   generateDevicePairingPin,
+  createPosEnrollmentRequest,
+  getPosEnrollmentRequests,
+  approvePosEnrollmentRequest,
+  denyPosEnrollmentRequest,
   approveDevicePairing,
   denyDevicePairing,
   updateDevice,

@@ -26,6 +26,10 @@ export class CreateStaffDto {
   @IsOptional()
   @IsObject()
   permissions?: Record<string, boolean>;
+
+  @IsOptional()
+  @IsString()
+  operatorPin?: string;
 }
 
 export class UpdateStaffDto extends CreateStaffDto {}

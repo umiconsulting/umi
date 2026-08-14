@@ -1,6 +1,7 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
+import { randomUUID } from 'node:crypto';
 import type { AppConfig } from '../config/config.schema';
 
 /**
@@ -17,6 +18,13 @@ export type TokenKind = 'access' | 'refresh' | 'mfa_challenge';
 export interface AccessClaims {
   sub: string; // user id
   email: string;
+  sessionId: string;
+  deviceId: string | null;
+}
+
+export interface RefreshClaims {
+  sub: string;
+  sessionId: string;
 }
 
 const ISSUER = 'umi-api';
@@ -53,11 +61,27 @@ export class JwtService {
   }
 
   async signAccess(claims: AccessClaims): Promise<string> {
-    return this.sign({ ...claims, typ: 'access' }, this.accessTtl);
+    return this.sign(
+      {
+        sub: claims.sub,
+        email: claims.email,
+        sid: claims.sessionId,
+        device_id: claims.deviceId,
+        typ: 'access',
+      },
+      this.accessTtl,
+    );
   }
 
-  async signRefresh(userId: string): Promise<string> {
-    return this.sign({ sub: userId, typ: 'refresh' }, this.refreshTtl);
+  async signRefresh(userId: string, sessionId: string): Promise<string> {
+    return new SignJWT({ sub: userId, sid: sessionId, typ: 'refresh' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setJti(randomUUID())
+      .setIssuer(ISSUER)
+      .setAudience(AUDIENCE)
+      .setExpirationTime(this.refreshTtl)
+      .sign(this.key());
   }
 
   /**
@@ -91,19 +115,28 @@ export class JwtService {
   /** Verify an access token. Throws UnauthorizedException on any failure. */
   async verifyAccess(token: string): Promise<AccessClaims> {
     const payload = await this.verify(token, 'access');
-    if (typeof payload.sub !== 'string' || typeof payload.email !== 'string') {
+    if (
+      typeof payload.sub !== 'string' ||
+      typeof payload.email !== 'string' ||
+      typeof payload.sid !== 'string'
+    ) {
       throw new UnauthorizedException('invalid_token');
     }
-    return { sub: payload.sub, email: payload.email };
+    return {
+      sub: payload.sub,
+      email: payload.email,
+      sessionId: payload.sid,
+      deviceId: typeof payload.device_id === 'string' ? payload.device_id : null,
+    };
   }
 
-  /** Verify a refresh token, returning the user id. */
-  async verifyRefresh(token: string): Promise<string> {
+  /** Verify a refresh token and return its durable session identity. */
+  async verifyRefresh(token: string): Promise<RefreshClaims> {
     const payload = await this.verify(token, 'refresh');
-    if (typeof payload.sub !== 'string') {
+    if (typeof payload.sub !== 'string' || typeof payload.sid !== 'string') {
       throw new UnauthorizedException('invalid_token');
     }
-    return payload.sub;
+    return { sub: payload.sub, sessionId: payload.sid };
   }
 
   private async verify(

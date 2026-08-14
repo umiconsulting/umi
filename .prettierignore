@@ -6,12 +6,14 @@
 **/coverage/
 **/.turbo/
 **/.vercel/
+**/.dart_tool/
 
 # Generated / lockfiles
 pnpm-lock.yaml
 **/package-lock.json
 **/*.tsbuildinfo
 **/next-env.d.ts
+packages/contract/generated/
 
 # The contract artifact. Emitted byte-for-byte by packages/contract/scripts/generate.mjs
 # and guarded by `generate:check`, which compares exact bytes. Prettier reformatting it

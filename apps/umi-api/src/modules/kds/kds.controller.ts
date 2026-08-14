@@ -7,16 +7,7 @@ const PAIRING_ALLOW_HEADERS = 'authorization, x-client-info, apikey, content-typ
 const DEVICE_ALLOW_HEADERS =
   'authorization, x-client-info, apikey, content-type, x-kds-device-token';
 
-/**
- * FROZEN iPad-facing KDS endpoints (spec §8.1). These bypass Nest's normal
- * response shaping and the global `AllExceptionsFilter` by owning the Fastify
- * reply via `@Res()` — the Swift client depends on the EXACT JSON/status/headers
- * (e.g. the `device_revoked` body), and the global filter's `{statusCode,error,…}`
- * envelope would break the contract. `@Body()` is deliberately NOT used (the
- * global `whitelist` ValidationPipe would strip the un-DTO'd body); we read
- * `req.body` directly. Both the new paths and the legacy `/functions/v1/*`
- * aliases are registered so already-installed builds keep working at cutover.
- */
+/** The updated iPad KDS uses these canonical API routes. */
 @Controller()
 export class KdsController {
   private readonly logger = new Logger(KdsController.name);
@@ -25,12 +16,12 @@ export class KdsController {
 
   // ── pairing (no device auth) ───────────────────────────────────────────────
 
-  @Options(['kds/pairing', 'functions/v1/kds-pairing'])
+  @Options(['api/kds/pairing', 'kds/pairing', 'functions/v1/kds-pairing'])
   pairingPreflight(@Res() reply: FastifyReply): void {
     preflight(reply, PAIRING_ALLOW_HEADERS);
   }
 
-  @Post(['kds/pairing', 'functions/v1/kds-pairing'])
+  @Post(['api/kds/pairing', 'kds/pairing', 'functions/v1/kds-pairing'])
   async pairing(@Req() req: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
     cors(reply, PAIRING_ALLOW_HEADERS);
     const body = readJson(req);
@@ -51,12 +42,12 @@ export class KdsController {
 
   // ── board (device auth) ────────────────────────────────────────────────────
 
-  @Options(['kds/board', 'functions/v1/kds-board'])
+  @Options(['api/kds/board', 'kds/board', 'functions/v1/kds-board'])
   boardPreflight(@Res() reply: FastifyReply): void {
     preflight(reply, DEVICE_ALLOW_HEADERS);
   }
 
-  @Post(['kds/board', 'functions/v1/kds-board'])
+  @Post(['api/kds/board', 'kds/board', 'functions/v1/kds-board'])
   async board(@Req() req: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
     cors(reply, DEVICE_ALLOW_HEADERS);
     const body = readJson(req);
@@ -77,12 +68,12 @@ export class KdsController {
 
   // ── command (device auth) ──────────────────────────────────────────────────
 
-  @Options(['kds/command', 'functions/v1/kds-command'])
+  @Options(['api/kds/command', 'kds/command', 'functions/v1/kds-command'])
   commandPreflight(@Res() reply: FastifyReply): void {
     preflight(reply, DEVICE_ALLOW_HEADERS);
   }
 
-  @Post(['kds/command', 'functions/v1/kds-command'])
+  @Post(['api/kds/command', 'kds/command', 'functions/v1/kds-command'])
   async command(@Req() req: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
     cors(reply, DEVICE_ALLOW_HEADERS);
     const body = readJson(req);
@@ -101,14 +92,19 @@ export class KdsController {
     }
   }
 
-  // ── heartbeat (unauth; device_id is the credential) ───────────────────────
+  // ── heartbeat (device auth) ────────────────────────────────────────────────
 
   @Post('api/kds/heartbeat')
   async heartbeat(@Req() req: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
     cors(reply, DEVICE_ALLOW_HEADERS);
-    const body = readJson(req) ?? {};
-    const r = await this.kds.heartbeat(body, req.ip ?? null);
-    return send(reply, r.status, r.body);
+    try {
+      const session = await this.kds.verifyDevice(deviceToken(req));
+      const r = await this.kds.heartbeat(session, req.ip ?? null);
+      return send(reply, r.status, r.body);
+    } catch (err) {
+      if (err instanceof KdsHttpError) return send(reply, err.status, err.body);
+      return send(reply, 500, { error: 'internal_error' });
+    }
   }
 }
 

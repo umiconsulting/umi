@@ -1,0 +1,352 @@
+{
+  "@@locale": "es",
+  "appName": "UmiPOS",
+  "bootstrapLoadingTitle": "Preparando UmiPOS",
+  "bootstrapLoadingBody": "Verificando la configuración y el almacenamiento seguro.",
+  "readyTitle": "Listo para comenzar",
+  "readyBody": "La base de UmiPOS está preparada. La autenticación se habilitará en el siguiente paso.",
+  "configurationInvalidTitle": "Configuración incompleta",
+  "configurationInvalidBody": "UmiPOS no puede iniciar de forma segura con esta configuración.",
+  "storageUnavailableTitle": "Almacenamiento seguro no disponible",
+  "storageUnavailableBody": "No se guardarán credenciales en almacenamiento sin cifrar.",
+  "sdkUnavailableTitle": "Contrato no disponible",
+  "sdkUnavailableBody": "La aplicación no pudo verificar el contrato de la plataforma.",
+  "recoverableFailureTitle": "No pudimos terminar la preparación",
+  "unrecoverableFailureTitle": "UmiPOS necesita atención",
+  "retryAction": "Reintentar",
+  "diagnosticsAction": "Ver diagnóstico",
+  "diagnosticsTitle": "Diagnóstico de desarrollo",
+  "unknownRouteTitle": "Ruta no disponible",
+  "unknownRouteBody": "Esta sección todavía no está habilitada.",
+  "enrollmentTitle": "Registrar este dispositivo",
+  "enrollmentBody": "Ingresa el código de configuración de ocho caracteres que muestra el administrador.",
+  "challengeIdLabel": "ID del desafío",
+  "enrollmentCodeLabel": "Código de registro",
+  "enrollmentCodeInvalid": "Ingresa el código completo de ocho caracteres. Usa tu PIN de operador después de aprobar el dispositivo.",
+  "enrollmentCodeRejected": "El código de registro no es válido o caducó. Solicita un código nuevo al administrador.",
+  "enrollmentCodeExpired": "El código de registro caducó. Solicita un código nuevo al administrador.",
+  "enrollmentCodeAttemptsExceeded": "Esta solicitud alcanzó el límite de intentos. Solicita un código nuevo al administrador.",
+  "enrollmentCodeRateLimited": "Se hicieron demasiados intentos. Espera antes de volver a intentarlo.",
+  "enrollmentCodeUnavailable": "UmiPOS no puede verificar este código ahora. Revisa la conexión e inténtalo de nuevo.",
+  "enrollmentPendingTitle": "Se requiere la aprobación del administrador",
+  "enrollmentPendingBody": "Este dispositivo solicitó acceso. Pide a un administrador que lo revise en el Dashboard de UMI.",
+  "enrollmentPendingSecure": "La credencial de pareo está protegida en este dispositivo.",
+  "cancelEnrollmentAction": "Cancelar solicitud",
+  "continueAction": "Continuar",
+  "loginTitle": "Iniciar sesión en UmiPOS",
+  "usernameLabel": "Correo",
+  "passwordLabel": "Contraseña",
+  "signInAction": "Iniciar sesión",
+  "operatorPinTitle": "Ingresa tu PIN de operador",
+  "operatorPinBody": "Tu PIN te identifica y carga tus permisos actuales.",
+  "operatorPinLabel": "PIN de operador",
+  "operatorPinHint": "Usa de 4 a 8 dígitos.",
+  "operatorPinAction": "Continuar",
+  "operatorPinInvalid": "El PIN no es válido para esta sucursal.",
+  "operatorPinLocked": "El ingreso de PIN está bloqueado temporalmente. Intenta más tarde.",
+  "operatorPinRateLimited": "Hay demasiados intentos. Espera antes de intentar de nuevo.",
+  "operatorPinEntitlementDisabled": "UmiPOS no está habilitado para este negocio.",
+  "operatorPinBranchInvalid": "Este dispositivo no está asignado a una sucursal activa.",
+  "operatorPinLength": "Ingresa al menos cuatro dígitos.",
+  "selectTenantTitle": "Selecciona un negocio",
+  "noTenantTitle": "Sin acceso a negocios",
+  "noTenantBody": "Tu cuenta no tiene acceso activo a UmiPOS.",
+  "selectBranchTitle": "Selecciona una sucursal",
+  "noBranchBody": "No hay una sucursal activa permitida para tu usuario y dispositivo.",
+  "operatorTitle": "Iniciar sesión de operador",
+  "operatorBody": "Confirma esta sucursal para entrar al entorno protegido de POS.",
+  "startOperatorAction": "Iniciar sesión",
+  "lockAction": "Bloquear operador",
+  "logoutAction": "Cerrar sesión",
+  "deviceActiveLabel": "Dispositivo confiable",
+  "connectivityUnknownLabel": "Conectividad desconocida",
+  "shellReadyTitle": "Sesión de operador lista",
+  "catalogNotImplemented": "El catálogo todavía no está implementado.",
+  "deviceRevokedTitle": "Dispositivo revocado",
+  "deviceRevokedBody": "Esta instalación ya no es confiable. Solicita su reemplazo a un administrador.",
+  "rotationRequiredTitle": "Rotación de credencial requerida",
+  "rotationRequiredBody": "Un administrador debe rotar la credencial antes de continuar.",
+  "recoverableNetworkBody": "No fue posible contactar de forma segura el servicio de acceso.",
+  "catalogTitle": "Catálogo",
+  "catalogSearchHint": "Buscar nombre, SKU o código",
+  "allCategories": "Todo",
+  "catalogLoading": "Cargando catálogo autorizado",
+  "catalogEmpty": "No hay productos disponibles para esta sucursal.",
+  "catalogNoResults": "No hay productos para esta búsqueda.",
+  "catalogPermissionDenied": "No tienes permiso para ver este catálogo.",
+  "catalogNetworkError": "No se pudo conectar con el catálogo. Intenta de nuevo.",
+  "catalogUnexpectedError": "El catálogo no está disponible temporalmente.",
+  "unavailableLabel": "No disponible",
+  "variantsLabel": "Variantes",
+  "modifiersLabel": "Modificadores",
+  "taxIncludedLabel": "Impuesto configurado",
+  "closeAction": "Cerrar",
+  "cartTitle": "Carrito actual",
+  "cartEmpty": "Abre un producto para iniciar este carrito.",
+  "cartUnavailable": "El carrito no está disponible temporalmente.",
+  "cartNoteLabel": "Nota del operador",
+  "addToCartAction": "Agregar al carrito",
+  "removeFromCartAction": "Eliminar línea",
+  "increaseQuantity": "Aumentar cantidad",
+  "decreaseQuantity": "Disminuir cantidad",
+  "subtotalLabel": "Subtotal",
+  "taxLabel": "Impuestos",
+  "discountLabel": "Vista previa de descuentos",
+  "totalLabel": "Total",
+  "businessDateLabel": "Fecha operativa",
+  "checkoutNextGate": "Checkout disponible en el siguiente Gate",
+  "checkoutAction": "Cobrar",
+  "checkoutTitle": "Cobro autorizado",
+  "operatorLabel": "Operador",
+  "paymentMethodLabel": "Método de pago",
+  "cashPayment": "Efectivo",
+  "externalTerminalPayment": "Terminal externa",
+  "reviewTotalsAction": "Revisar totales autorizados",
+  "confirmAndPayAction": "Confirmar y cobrar",
+  "confirmAction": "Confirmar",
+  "confirmSaleTitle": "¿Confirmar esta venta?",
+  "confirmSaleBody": "UMI recalculó los totales mostrados. Esta confirmación inicia el pago.",
+  "totalsConfirmedBody": "UMI recalculó el carrito. Revisa cada total antes de confirmar el pago.",
+  "paymentProcessing": "Procesando pago",
+  "paymentUnknownTitle": "Estado de pago desconocido",
+  "paymentUnknownBody": "No inicies otro pago. Consulta el estado de este pago o solicita ayuda a un gerente.",
+  "queryPaymentAction": "Consultar estado del pago",
+  "correlationLabel": "Correlación",
+  "saleCompletedTitle": "Venta completada",
+  "finishSaleAction": "Finalizar e iniciar otro carrito",
+  "checkoutFailed": "No fue posible completar el cobro de forma segura.",
+  "provisionalSalePendingTitle": "Venta pendiente de sincronización",
+  "provisionalSalePendingBody": "La venta se guardó de forma segura en este dispositivo y está pendiente de sincronización. Los datos oficiales del recibo se asignarán cuando el servidor la acepte.",
+  "returnToCatalogAction": "Volver al catálogo",
+  "recoveryCenterTitle": "Centro de recuperación",
+  "recoveryWebUnsupportedTitle": "La recuperación sin conexión no está disponible en Web",
+  "recoveryWebUnsupportedBody": "La versión Web funciona en línea. Usa una aplicación nativa compatible para almacenar y recuperar ventas sin conexión de forma segura.",
+  "synchronizingPendingSales": "Sincronizando ventas pendientes…",
+  "pendingSalesSecure": "Tus ventas pendientes permanecen almacenadas de forma segura en este dispositivo.",
+  "synchronizeNowAction": "Sincronizar ahora",
+  "conflictNeedsAttention": "Una venta requiere tu atención.",
+  "officialReceiptAvailable": "Recibo oficial disponible",
+  "cashReceivedLabel": "Efectivo recibido",
+  "tenderSelectionTitle": "Selección de pago",
+  "cashTenderTitle": "Efectivo",
+  "tenderAmountLabel": "Importe aplicado",
+  "exactAmountAction": "Importe exacto",
+  "manualTerminalLabel": "Terminal manual",
+  "terminalProcessingAction": "Procesando fuera del POS",
+  "terminalSuccessAction": "Confirmar éxito",
+  "terminalFailureAction": "Informar fallo",
+  "terminalUnknownAction": "Resultado desconocido",
+  "tipLabel": "Propina",
+  "noTipAction": "Sin propina",
+  "customTipPercentLabel": "Porcentaje de propina personalizado",
+  "customTipFixedLabel": "Importe de propina personalizado",
+  "discountLabel": "Descuento",
+  "percentageDiscountAction": "Porcentaje",
+  "fixedDiscountAction": "Importe fijo",
+  "discountPercentLabel": "Porcentaje de descuento",
+  "discountAmountLabel": "Importe del descuento",
+  "discountReasonLabel": "Motivo del descuento",
+  "receiptDestinationLabel": "Destino del recibo",
+  "displayReceiptAction": "Mostrar recibo",
+  "printLaterAction": "Imprimir después",
+  "noReceiptAction": "Sin recibo",
+  "managerApprovalAction": "Solicitar aprobación",
+  "managerApprovalTitle": "Se requiere aprobación del gerente",
+  "managerPinLabel": "PIN del gerente",
+  "managerApprovalDeniedMessage": "El PIN o el permiso del gerente no es válido para este cobro.",
+  "approveAction": "Aprobar",
+  "insufficientCashMessage": "El efectivo recibido no cubre el importe aplicado.",
+  "remainingBalanceMessage": "Agrega un pago para cubrir el saldo pendiente.",
+  "approvalRequiredMessage": "Un gerente debe aprobar este cobro.",
+  "terminalFailureMessage": "El pago de la terminal falló. Revisa los pagos.",
+  "tipRejectedMessage": "La política de propinas rechazó esta propina.",
+  "discountRejectedMessage": "La política de descuentos rechazó este descuento.",
+  "changeDueLabel": "Cambio",
+  "appliedAmountLabel": "Importe aplicado",
+  "remainingBalanceLabel": "Saldo pendiente",
+  "offlineAdvancedTenderBlockedMessage": "Reconecta para usar la terminal manual, el pago mixto, las propinas o los descuentos. La venta se conserva.",
+  "recoveryQueryTitle": "Consultar resultado guardado",
+  "recoveryQueryDescription": "Pregunta a UMI si esta misma operación ya fue aceptada.",
+  "recoveryPolicyTitle": "Actualizar política sin conexión",
+  "recoveryPolicyDescription": "Reconecta para cargar el permiso vigente del servidor para ventas sin conexión.",
+  "recoveryAuthenticationTitle": "Iniciar sesión de nuevo",
+  "recoveryAuthenticationDescription": "Restablece tu sesión autorizada antes de continuar la sincronización.",
+  "recoveryBranchTitle": "Seleccionar la sucursal autorizada",
+  "recoveryBranchDescription": "Vuelve a seleccionar sucursal sin mover las ventas pendientes.",
+  "recoveryManagerTitle": "Solicitar revisión de gerente",
+  "recoveryManagerDescription": "Verifica un gerente autorizado únicamente para esta acción de recuperación.",
+  "recoveryManagerCredentialLabel": "PIN de gerente",
+  "recoveryAcknowledgeTitle": "Confirmar conciliación",
+  "recoveryAcknowledgeDescription": "Confirma la conciliación del servidor solo después de guardar la recuperación local.",
+  "recoveryReceiptTitle": "Ver estado del recibo",
+  "recoveryReceiptDescription": "Abre el estado conservado del recibo provisional u oficial.",
+  "recoveryPaymentTitle": "Consultar pago original",
+  "recoveryPaymentDescription": "Consulta únicamente el pago original. No se iniciará otro cargo.",
+  "recoveryDeviceTitle": "Verificar este dispositivo",
+  "recoveryDeviceDescription": "Este dispositivo está bloqueado. Restablece la autorización antes de reproducir.",
+  "recoveryCredentialTitle": "Recuperar credenciales rotadas",
+  "recoveryCredentialDescription": "Los comandos históricos permanecen ligados a su versión de credencial original.",
+  "recoveryStorageTitle": "Conservar almacenamiento para recuperación",
+  "recoveryStorageDescription": "Conserva intactos los datos cifrados y sigue la recuperación autorizada.",
+  "recoverySnapshotTitle": "Actualizar datos autorizados",
+  "recoverySnapshotDescription": "Reconecta para actualizar catálogo, precios e impuestos vencidos.",
+  "recoverySupportTitle": "Copiar referencia de soporte",
+  "recoverySupportDescription": "Copia la referencia de diagnóstico segura sin exponer el contenido de la venta.",
+  "saleActionsTitle": "Acciones de venta",
+  "newSaleAction": "Nueva venta",
+  "suspendSaleAction": "Suspender venta",
+  "resumeSaleAction": "Reanudar venta",
+  "renameSaleAction": "Cambiar nombre de venta suspendida",
+  "cancelSaleAction": "Cancelar venta",
+  "suspendedSaleLabel": "Nombre de la venta suspendida",
+  "cancelSaleReasonLabel": "Motivo de cancelación",
+  "confirmCancelSaleTitle": "¿Cancelar esta venta?",
+  "confirmCancelSaleBody": "El carrito se cerrará sin pago ni recibo. La cancelación permanecerá en el historial de auditoría.",
+  "saleRestoredMessage": "Tu venta activa se restauró.",
+  "readyForNextCustomerMessage": "Listo para el siguiente cliente.",
+  "currentCustomerLabel": "Cliente actual",
+  "anonymousCustomerLabel": "Cliente anónimo",
+  "attachCustomerAction": "Asignar cliente",
+  "detachCustomerAction": "Usar cliente anónimo",
+  "searchCustomerHint": "Buscar clientes",
+  "recentCustomersAction": "Clientes recientes",
+  "saleHistoryTitle": "Ventas",
+  "currentSaleLabel": "Venta actual",
+  "suspendedSalesLabel": "Ventas suspendidas",
+  "committedSalesLabel": "Ventas completadas recientes",
+  "cancelledSalesLabel": "Ventas canceladas",
+  "saleHistoryEmpty": "No hay ventas para esta vista.",
+  "sortNewestLabel": "Más recientes primero",
+  "sortOldestLabel": "Más antiguas primero",
+  "loadMoreSalesAction": "Cargar más ventas",
+  "saleStateBuilding": "En curso",
+  "saleStateSuspended": "Suspendida",
+  "saleStateCommitted": "Completada",
+  "saleStateCancelled": "Cancelada",
+  "saleStateRecovered": "Recuperada",
+  "openReceiptAction": "Abrir recibo",
+  "reprintReceiptAction": "Ver para reimpresión",
+  "receiptAvailableMessage": "Recibo disponible",
+  "saleLifecycleError": "No fue posible completar la acción de venta de forma segura.",
+  "saleSearchHint": "Buscar por nombre, cliente o recibo",
+  "saleNameFallback": "Venta"
+  ,"editCartLineAction": "Editar producto"
+  ,"saveCartLineAction": "Guardar cambios"
+  ,"clearCartAction": "Vaciar carrito"
+  ,"confirmClearCartTitle": "¿Vaciar este carrito?"
+  ,"confirmClearCartBody": "Se eliminarán todos los productos de la venta actual."
+  ,"cashCenterTitle": "Centro de caja"
+  ,"cashCenterAction": "Abrir Centro de caja"
+  ,"registerAvailableLabel": "Caja disponible"
+  ,"registerAssignedLabel": "Caja asignada"
+  ,"shiftRequiredMessage": "Abre un turno de caja antes de aceptar efectivo."
+  ,"openShiftAction": "Abrir turno de caja"
+  ,"openingFloatLabel": "Fondo inicial"
+  ,"denominationCountLabel": "Conteo por denominación"
+  ,"paidInAction": "Entrada de efectivo"
+  ,"paidOutAction": "Salida de efectivo"
+  ,"safeDropAction": "Retiro a caja fuerte"
+  ,"drawerCorrectionAction": "Corrección de caja"
+  ,"noSaleDrawerAction": "Solicitar apertura de cajón"
+  ,"drawerRequestRecordedMessage": "La solicitud se registró. No se verificó una operación de hardware."
+  ,"suspendShiftAction": "Suspender turno"
+  ,"resumeShiftAction": "Reanudar turno"
+  ,"handoffShiftAction": "Entregar turno"
+  ,"incomingOperatorPinLabel": "PIN del operador entrante"
+  ,"blindCountAction": "Iniciar conteo ciego"
+  ,"recountAction": "Iniciar reconteo"
+  ,"expectedCashLabel": "Efectivo esperado"
+  ,"countedCashLabel": "Efectivo contado"
+  ,"cashVarianceLabel": "Diferencia"
+  ,"cashOverageLabel": "Sobrante"
+  ,"cashShortageLabel": "Faltante"
+  ,"cashToleranceLabel": "Tolerancia"
+  ,"varianceReasonLabel": "Motivo de la diferencia"
+  ,"cashApprovalAction": "Solicitar aprobación de diferencia"
+  ,"reconcileShiftAction": "Conciliar turno"
+  ,"closeShiftAction": "Cerrar turno"
+  ,"shiftClosedMessage": "El turno de caja está cerrado."
+  ,"blockedShiftMessage": "Este turno está bloqueado. Sigue la guía de recuperación."
+  ,"pendingCashPostingMessage": "Un movimiento pendiente debe terminar antes del cierre."
+  ,"ambiguousCashEffectMessage": "Se desconoce un efecto de caja. Verifica la operación original."
+  ,"cashRecoveryMessage": "Se restauró el estado guardado de la operación de caja."
+  ,"shiftSummaryTitle": "Resumen del turno"
+  ,"cashMovementAmountLabel": "Importe del movimiento"
+  ,"cashMovementReasonLabel": "Motivo del movimiento"
+  ,"submitCashMovementAction": "Confirmar movimiento de caja"
+  ,"submitBlindCountAction": "Enviar conteo ciego"
+  ,"cashOperationFailedMessage": "No fue posible completar la operación de caja de forma segura."
+  ,"cashStatusOpen": "Turno abierto"
+  ,"cashStatusSuspended": "Turno suspendido"
+  ,"cashStatusCounting": "Conteo de efectivo en curso"
+  ,"cashStatusReconciliation": "Se requiere conciliación"
+  ,"cashStatusClosed": "Turno cerrado"
+  ,"confirmCloseShiftTitle": "¿Cerrar este turno de caja?"
+  ,"confirmCloseShiftBody": "El cierre es definitivo. Los nuevos movimientos requieren otro turno."
+  ,"confirmAction": "Confirmar"
+  ,"varianceReasonNone": "Sin diferencia"
+  ,"varianceReasonCounting": "Error de conteo"
+  ,"varianceReasonChange": "Error de cambio"
+  ,"varianceReasonHandling": "Error de manejo de efectivo"
+  ,"varianceReasonUnknown": "Diferencia operativa"
+  ,"saleExceptionAction": "Acciones posteriores a la venta"
+  ,"saleExceptionTitle": "Reembolso o anulación"
+  ,"fullRefundAction": "Reembolso total"
+  ,"partialRefundAction": "Reembolso parcial"
+  ,"voidSaleAction": "Anular venta"
+  ,"refundableAmountLabel": "Importe restante reembolsable"
+  ,"remainingRefundableQuantityLabel": "Cantidad restante"
+  ,"alreadyRefundedLabel": "Ya reembolsado"
+  ,"refundReasonLabel": "Motivo del reembolso"
+  ,"restockAction": "Reponer"
+  ,"doNotRestockAction": "No reponer"
+  ,"inspectionRequiredAction": "Requiere inspección"
+  ,"taxRefundLabel": "Reembolso de impuestos"
+  ,"discountAllocationLabel": "Asignación del descuento"
+  ,"tipRefundLabel": "Reembolso de propina"
+  ,"cashRefundLabel": "Reembolso en efectivo"
+  ,"manualTerminalRefundLabel": "Reembolso en terminal manual"
+  ,"manualTerminalRefundProviderNotice": "Procesa el reembolso en la terminal externa. UmiPOS registra tu observación. No prueba el éxito del proveedor."
+  ,"managerPinLabel": "PIN del gerente"
+  ,"approvalExpiredMessage": "La aprobación venció. Solicita una aprobación nueva."
+  ,"paymentOutcomeUnknownMessage": "Se desconoce el resultado de la terminal. Verifica la operación original."
+  ,"verifyTerminalAction": "Verificar resultado de la terminal"
+  ,"terminalRefundSuccessAction": "El reembolso externo tuvo éxito"
+  ,"terminalRefundFailureAction": "El reembolso externo falló"
+  ,"terminalRefundUnknownAction": "Se desconoce el resultado"
+  ,"refundBlockedMessage": "El servidor bloqueó esta acción posterior a la venta."
+  ,"refundPolicyExpiredMessage": "El periodo permitido para el reembolso venció."
+  ,"supportRequiredMessage": "Se requiere una revisión de soporte."
+  ,"compensatingReceiptTitle": "Recibo de reembolso"
+  ,"fullyRefundedLabel": "Reembolso total"
+  ,"partiallyRefundedLabel": "Reembolso parcial"
+  ,"voidedSaleLabel": "Venta anulada"
+  ,"recoveredRefundMessage": "Se restauró el resultado guardado del reembolso."
+  ,"refundCommittedMessage": "El reembolso quedó confirmado."
+  ,"refundPreviewAction": "Revisar reembolso"
+  ,"commitRefundAction": "Confirmar reembolso"
+  ,"refundConfirmationTitle": "¿Confirmar este reembolso?"
+  ,"refundConfirmationBody": "Esta acción crea ajustes permanentes. La venta original no cambia."
+  ,"originalSaleLabel": "Venta original"
+  ,"exceptionHistoryLabel": "Historial de ajustes"
+  ,"refundOperationFailedMessage": "No fue posible completar la acción de forma segura."
+  ,"selectRefundLinesMessage": "Selecciona al menos una línea reembolsable."
+  ,"refundReasonCustomerChangedMind": "El cliente cambió de opinión"
+  ,"refundReasonProductDefect": "Producto defectuoso"
+  ,"refundReasonIncorrectItem": "Producto incorrecto"
+  ,"refundReasonIncorrectQuantity": "Cantidad incorrecta"
+  ,"refundReasonDuplicateCharge": "Cobro duplicado"
+  ,"refundReasonQualityIssue": "Problema de calidad"
+  ,"refundReasonOrderPreparationError": "Error de preparación del pedido"
+  ,"refundReasonPricingError": "Error de precio"
+  ,"voidReasonOperatorError": "Error del operador"
+  ,"voidReasonDuplicateSale": "Venta duplicada"
+  ,"voidReasonIncorrectTender": "Forma de pago incorrecta"
+  ,"voidReasonSaleEnteredByMistake": "Venta registrada por error"
+  ,"otherApprovedReasonLabel": "Otro motivo aprobado"
+  ,"decreaseRefundQuantityTooltip": "Reducir cantidad del reembolso"
+  ,"increaseRefundQuantityTooltip": "Aumentar cantidad del reembolso"
+  ,"restockIntentLabel": "Decisión de reposición"
+  ,"restockNotApplicableLabel": "No aplica la reposición"
+  ,"restockInventoryReviewLabel": "Se requiere una revisión de inventario"
+}

@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { deviceStatus, KdsService, stationKeyFromName, ticketBelongsToDevice } from './kds.service';
 import {
@@ -9,7 +9,7 @@ import {
   validateTransition,
 } from './dto/kds-contract';
 
-function make(notifyEnabled = true) {
+function make() {
   const repo = {
     findSessionByToken: vi.fn(),
     touchSession: vi.fn().mockResolvedValue(undefined),
@@ -27,30 +27,42 @@ function make(notifyEnabled = true) {
       sort_order: 0,
       location_id: null,
     }),
+    listRoutes: vi.fn().mockResolvedValue([]),
+    createRoute: vi.fn().mockResolvedValue({ id: 'route-1', version: 1 }),
+    updateRoute: vi.fn().mockResolvedValue({ id: 'route-1', version: 2 }),
     createDeviceSession: vi.fn(),
     claimPairing: vi.fn(),
     deleteDevice: vi.fn().mockResolvedValue(undefined),
     boardSnapshot: vi.fn().mockResolvedValue([]),
     ticketEvents: vi.fn().mockResolvedValue([]),
+    executeKitchenCommand: vi.fn().mockResolvedValue({
+      status: 'succeeded',
+      result: { kitchenOrderId: 'o1', status: 'in_preparation', version: 2, sequence: 5 },
+    }),
     loadOrderForScope: vi.fn(),
-    transitionTicket: vi.fn().mockResolvedValue({ sequence: 5 }),
-    partialCancelItems: vi.fn().mockResolvedValue({ sequence: 6, newStatus: 'partial_cancelled' }),
     heartbeatTouch: vi.fn().mockResolvedValue(true),
   };
-  const config = { get: vi.fn().mockReturnValue(notifyEnabled) };
   const rateLimit = {
     hit: vi.fn().mockReturnValue({ allowed: true, remaining: 9, resetAt: 0 }),
   };
-  const svc = new KdsService(repo as never, rateLimit as never, config as never);
+  const svc = new KdsService(repo as never, rateLimit as never);
   return { svc, repo, rateLimit };
 }
 
 const SESSION: KdsDeviceSession = {
   deviceId: 'dev-1',
   merchantId: 't1',
-  locationId: null,
-  stationId: null,
+  locationId: 'loc-1',
+  stationId: 'station-1',
   deviceName: 'iPad',
+  permissions: ['kitchen.read', 'kitchen.prepare', 'kitchen.ready', 'kitchen.complete'],
+};
+
+const COMMAND = {
+  command_id: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
+  idempotency_key: 'kitchen-command-1',
+  correlation_id: 'kitchen-correlation-1',
+  expected_version: 1,
 };
 
 describe('KdsService.verifyDevice', () => {
@@ -247,22 +259,29 @@ describe('KdsService.pairing — kds_status', () => {
 });
 
 describe('KdsService.board', () => {
-  it('remaps snapshot items to the frozen shape (unit_price in currency)', async () => {
+  it('reads only the assigned location and station', async () => {
+    const { svc, repo } = make();
+    const session = { ...SESSION, locationId: 'loc-1', stationId: 'station-1' };
+    await svc.board(session, { action: 'snapshot' });
+    expect(repo.boardSnapshot).toHaveBeenCalledWith('t1', 'loc-1', ['station-1']);
+  });
+
+  it('returns preparation facts without contact or money data', async () => {
     const { svc, repo } = make();
     repo.boardSnapshot.mockResolvedValue([
       {
         ticket_id: 'o1',
-        source_transaction_id: null,
+        source_transaction_id: '3f2504e0-4f89-41d3-9a0c-0305e82c3302',
+        public_reference: '1024',
         merchant_id: 't1',
-        source_channel: 'whatsapp',
-        status: 'new',
-        station_id: null,
-        station_name: null,
-        customer_name: 'Ana',
-        customer_phone: '+521',
-        pickup_person: null,
-        customer_note: null,
-        total_amount: '50',
+        source_channel: 'pos',
+        location_id: 'loc-1',
+        business_date: '2026-08-09',
+        priority: 'normal',
+        version: 1,
+        status: 'queued',
+        station_id: 'station-1',
+        station_name: 'Kitchen',
         created_at: 'now',
         updated_at: 'now',
         last_event_sequence: '3',
@@ -271,7 +290,9 @@ describe('KdsService.board', () => {
             ticket_item_id: 'i1',
             name: 'Latte',
             quantity: 1,
-            unit_price_cents: 4500,
+            status: 'queued',
+            modifiers: [],
+            version: 1,
             display_order: 0,
           },
         ],
@@ -281,11 +302,13 @@ describe('KdsService.board', () => {
     expect(r.status).toBe(200);
     const data = (
       r.body as {
-        data: Array<{ items: Array<{ unit_price: number }>; last_event_sequence: number }>;
+        data: Array<{ items: Array<{ productName: string }>; lastEventSequence: number }>;
       }
     ).data;
-    expect(data[0].items[0].unit_price).toBe(45);
-    expect(data[0].last_event_sequence).toBe(3);
+    expect(data[0].items[0].productName).toBe('Latte');
+    expect(data[0].lastEventSequence).toBe(3);
+    expect(JSON.stringify(data[0])).not.toContain('customer');
+    expect(JSON.stringify(data[0])).not.toContain('4500');
   });
 
   it('session_status returns the device id', async () => {
@@ -299,8 +322,9 @@ describe('KdsService.command — transition_ticket', () => {
   const order = {
     id: 'o1',
     merchant_id: 't1',
-    location_id: null,
-    station_id: null,
+    location_id: 'loc-1',
+    station_id: 'station-1',
+    station_ids: ['station-1'],
     kitchen_status: 'new',
     person_id: 'p1',
     source_transaction_id: null,
@@ -312,6 +336,17 @@ describe('KdsService.command — transition_ticket', () => {
     expect(r).toEqual({ status: 400, body: { error: 'missing_required_fields' } });
   });
 
+  it('requires stable command identity and optimistic version', async () => {
+    const { svc, repo } = make();
+    repo.loadOrderForScope.mockResolvedValue({ ...order, version: 1 });
+    const r = await svc.command(SESSION, {
+      action: 'transition_ticket',
+      ticket_id: 'o1',
+      target_status: 'preparing',
+    });
+    expect(r).toEqual({ status: 400, body: { error: 'kitchen_command_identity_required' } });
+  });
+
   it('404s when the ticket is not in the device scope', async () => {
     const { svc, repo } = make();
     repo.loadOrderForScope.mockResolvedValue({ ...order, merchant_id: 'OTHER' });
@@ -319,6 +354,7 @@ describe('KdsService.command — transition_ticket', () => {
       action: 'transition_ticket',
       ticket_id: 'o1',
       target_status: 'accepted',
+      ...COMMAND,
     });
     expect(r).toEqual({ status: 404, body: { error: 'ticket_not_found' } });
   });
@@ -326,59 +362,65 @@ describe('KdsService.command — transition_ticket', () => {
   it('422s on an invalid transition', async () => {
     const { svc, repo } = make();
     repo.loadOrderForScope.mockResolvedValue({ ...order, kitchen_status: 'completed' });
+    repo.executeKitchenCommand.mockResolvedValue({
+      status: 'conflict',
+      result: { code: 'KITCHEN_INVALID_TRANSITION' },
+    });
     const r = await svc.command(SESSION, {
       action: 'transition_ticket',
       ticket_id: 'o1',
       target_status: 'preparing',
+      ...COMMAND,
     });
-    expect(r.status).toBe(422);
+    expect(r.status).toBe(409);
   });
 
-  it('transitions and passes a notify body when notifications are enabled', async () => {
-    const { svc, repo } = make(true);
+  it('runs an authoritative kitchen transition', async () => {
+    const { svc, repo } = make();
     repo.loadOrderForScope.mockResolvedValue(order);
     const r = await svc.command(SESSION, {
       action: 'transition_ticket',
       ticket_id: 'o1',
       target_status: 'accepted',
+      ...COMMAND,
     });
     expect(r.status).toBe(200);
-    expect(r.body).toMatchObject({ ok: true, data: { status: 'accepted', sequence: 5 } });
-    expect(repo.transitionTicket.mock.calls[0][0].notifyBody).toBe(
-      'Tu pedido fue aceptado y está en cola en cocina.',
-    );
+    expect(r.body).toMatchObject({ ok: true, data: { status: 'in_preparation', sequence: 5 } });
+    expect(repo.executeKitchenCommand).toHaveBeenCalledTimes(1);
   });
 
-  it('passes a null notify body when notifications are disabled', async () => {
-    const { svc, repo } = make(false);
+  it('uses one canonical command path', async () => {
+    const { svc, repo } = make();
     repo.loadOrderForScope.mockResolvedValue(order);
     await svc.command(SESSION, {
       action: 'transition_ticket',
       ticket_id: 'o1',
       target_status: 'accepted',
+      ...COMMAND,
     });
-    expect(repo.transitionTicket.mock.calls[0][0].notifyBody).toBeNull();
+    expect(repo.executeKitchenCommand).toHaveBeenCalledTimes(1);
   });
 });
 
-describe('KdsService.command — partial_cancel_items', () => {
-  it('400s without item_ids', async () => {
+describe('KdsService.command — financial separation', () => {
+  it('denies legacy item cancellation without the exact permission', async () => {
     const { svc } = make();
     const r = await svc.command(SESSION, {
       action: 'partial_cancel_items',
       ticket_id: 'o1',
       reason_code: 'out_of_stock',
     });
-    expect(r).toEqual({ status: 400, body: { error: 'missing_required_fields' } });
+    expect(r).toEqual({ status: 403, body: { error: 'kitchen_permission_denied' } });
   });
 
-  it('cancels items and returns the new status', async () => {
+  it('does not let an ordinary KDS device cancel commercial items', async () => {
     const { svc, repo } = make();
     repo.loadOrderForScope.mockResolvedValue({
       id: 'o1',
       merchant_id: 't1',
-      location_id: null,
-      station_id: null,
+      location_id: 'loc-1',
+      station_id: 'station-1',
+      station_ids: ['station-1'],
       kitchen_status: 'preparing',
       person_id: 'p1',
       source_transaction_id: null,
@@ -388,9 +430,43 @@ describe('KdsService.command — partial_cancel_items', () => {
       ticket_id: 'o1',
       item_ids: ['3f2504e0-4f89-41d3-9a0c-0305e82c3301'],
       reason_code: 'out_of_stock',
+      ...COMMAND,
     });
-    expect(r.status).toBe(200);
-    expect(r.body).toMatchObject({ ok: true, data: { status: 'partial_cancelled' } });
+    expect(r).toEqual({ status: 403, body: { error: 'kitchen_permission_denied' } });
+    expect(repo.executeKitchenCommand).not.toHaveBeenCalled();
+  });
+});
+
+describe('KdsService.command — canonical request', () => {
+  it('binds an optimistic version and stable command identity', async () => {
+    const { svc, repo } = make();
+    const kitchenOrderId = '3f2504e0-4f89-41d3-9a0c-0305e82c3303';
+    repo.loadOrderForScope.mockResolvedValue({
+      id: kitchenOrderId,
+      merchant_id: 't1',
+      location_id: 'loc-1',
+      station_id: 'station-1',
+      station_ids: ['station-1'],
+      kitchen_status: 'new',
+      kitchen_order_status: 'queued',
+      version: 1,
+      person_id: null,
+      source_transaction_id: null,
+    });
+    const result = await svc.command(SESSION, {
+      action: 'command',
+      commandId: COMMAND.command_id,
+      idempotencyKey: COMMAND.idempotency_key,
+      correlationId: COMMAND.correlation_id,
+      expectedVersion: 1,
+      kitchenOrderId,
+      commandType: 'start_preparation',
+      itemIds: [],
+    });
+    expect(result.status).toBe(200);
+    expect(repo.executeKitchenCommand).toHaveBeenCalledWith(
+      expect.objectContaining({ commandType: 'start_preparation', expectedVersion: 1 }),
+    );
   });
 });
 
@@ -410,8 +486,9 @@ describe('pure helpers', () => {
         {
           id: 'o',
           merchant_id: 't1',
-          location_id: null,
-          station_id: null,
+          location_id: 'loc-1',
+          station_id: 'station-1',
+          station_ids: ['station-1'],
           kitchen_status: 'new',
           person_id: null,
           source_transaction_id: null,
@@ -436,11 +513,7 @@ describe('pure helpers', () => {
     expect(ticketBelongsToDevice(null, SESSION)).toBe(false);
   });
 
-  it('ticketBelongsToDevice lets a location-bound device act on a broadcast (null-location) order', () => {
-    // Conversaflow/WhatsApp orders land with location_id=null and broadcast to
-    // every board (like null-station). A location-bound device must still be able
-    // to transition them — regression for the silent cancel 404 on order
-    // 09695aa6-… (order.location_id null vs session.locationId 7cb0a615-…).
+  it('ticketBelongsToDevice rejects null location and null station as wildcards', () => {
     const boundSession: KdsDeviceSession = {
       ...SESSION,
       locationId: 'loc-1',
@@ -459,7 +532,7 @@ describe('pure helpers', () => {
         },
         boundSession,
       ),
-    ).toBe(true);
+    ).toBe(false);
     // A different, explicit location on the order is still rejected (merchant-scoped, not global).
     expect(
       ticketBelongsToDevice(
@@ -477,22 +550,30 @@ describe('pure helpers', () => {
     ).toBe(false);
   });
 
-  it('createStation blocks a duplicate active key before inserting (NULL-safe)', async () => {
+  it('createStation requires a location', async () => {
+    const { svc, repo } = make();
+    await expect(svc.createStation('t1', null, { name: 'Estación Fría' })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(repo.createStation).not.toHaveBeenCalled();
+  });
+
+  it('createStation blocks a duplicate active key before inserting', async () => {
     const { svc, repo } = make();
     repo.findActiveStationByKey.mockResolvedValue({ id: 'existing' });
-    await expect(svc.createStation('t1', null, { name: 'Estación Fría' })).rejects.toBeInstanceOf(
-      ConflictException,
-    );
-    expect(repo.findActiveStationByKey).toHaveBeenCalledWith('t1', null, 'estacion_fria');
+    await expect(
+      svc.createStation('t1', 'location-1', { name: 'Estación Fría' }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(repo.findActiveStationByKey).toHaveBeenCalledWith('t1', 'location-1', 'estacion_fria');
     expect(repo.createStation).not.toHaveBeenCalled();
   });
 
   it('createStation inserts an accent-folded key when unique', async () => {
     const { svc, repo } = make();
-    const out = await svc.createStation('t1', null, { name: 'Estación Fría' });
+    const out = await svc.createStation('t1', 'location-1', { name: 'Estación Fría' });
     expect(repo.createStation).toHaveBeenCalledWith({
       merchantId: 't1',
-      locationId: null,
+      locationId: 'location-1',
       name: 'Estación Fría',
       stationKey: 'estacion_fria',
     });
@@ -506,6 +587,29 @@ describe('pure helpers', () => {
     expect(stationKeyFromName('PASTELERÍA #2')).toBe('pasteleria_2');
     expect(stationKeyFromName('!!!')).toBe(''); // no usable chars ⇒ caller rejects
     expect(stationKeyFromName('x'.repeat(60)).length).toBe(40);
+  });
+
+  it('creates a location route through server authority', async () => {
+    const { svc, repo } = make();
+    await svc.createRoute(
+      'a0000000-0000-4000-8000-000000000001',
+      'a1000000-0000-4000-8000-000000000001',
+      {
+        stationId: 'a2000000-0000-4000-8000-000000000001',
+        productId: 'a3000000-0000-4000-8000-000000000001',
+        routePriority: 10,
+        targetSeconds: 600,
+      },
+    );
+    expect(repo.createRoute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        locationId: 'a1000000-0000-4000-8000-000000000001',
+        stationId: 'a2000000-0000-4000-8000-000000000001',
+        productId: 'a3000000-0000-4000-8000-000000000001',
+        categoryId: null,
+        routePriority: 10,
+      }),
+    );
   });
 
   it('validateTransition enforces the matrix', () => {

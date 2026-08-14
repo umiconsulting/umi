@@ -3,123 +3,96 @@ import SwiftUI
 
 enum ChannelSource: String, Codable, CaseIterable, Sendable {
     case whatsapp
+    case pos
+    case web
+    case dashboard
 
-    var displayName: String {
-        switch self {
-        case .whatsapp:
-            return "WhatsApp"
-        }
-    }
+    var displayName: String { rawValue.uppercased() }
 }
 
 enum KitchenStatus: String, Codable, CaseIterable, Sendable {
-    case new
-    case accepted
-    case preparing
-    case partialCancelled
+    case queued
+    case inPreparation = "in_preparation"
+    case partiallyReady = "partially_ready"
     case ready
     case completed
     case cancelled
+    case exception
 
     var boardTitle: String {
         switch self {
-        case .new:
-            return "New"
-        case .accepted:
-            return "Accepted"
-        case .preparing:
-            return "Preparing"
-        case .partialCancelled:
-            return "Partial Cancel"
-        case .ready:
-            return "Ready"
-        case .completed:
-            return "Completed"
-        case .cancelled:
-            return "Cancelled"
+        case .queued: return "Queued"
+        case .inPreparation: return "Preparing"
+        case .partiallyReady: return "Partially Ready"
+        case .ready: return "Ready"
+        case .completed: return "Completed"
+        case .cancelled: return "Cancelled"
+        case .exception: return "Exception"
         }
     }
 
     var tint: Color {
         switch self {
-        case .new:
-            return .orange
-        case .accepted:
-            return .blue
-        case .preparing:
-            return .indigo
-        case .partialCancelled:
-            return .orange
-        case .ready:
-            return .green
-        case .completed:
-            return .secondary
-        case .cancelled:
-            return .red
+        case .queued: return .orange
+        case .inPreparation: return .indigo
+        case .partiallyReady: return .blue
+        case .ready: return .green
+        case .completed: return .secondary
+        case .cancelled: return .red
+        case .exception: return .red
         }
     }
 
     var nextActionStatuses: [KitchenStatus] {
         switch self {
-        case .new:
-            return [.accepted, .cancelled]
-        case .accepted:
-            return [.preparing, .cancelled]
-        case .preparing:
-            return [.ready, .cancelled]
-        case .partialCancelled:
-            return [.accepted, .cancelled]
-        case .ready:
-            return [.completed]
-        case .completed, .cancelled:
-            return []
+        case .queued: return [.inPreparation]
+        case .inPreparation, .partiallyReady: return [.ready]
+        case .ready: return [.completed]
+        case .completed, .cancelled, .exception: return []
         }
     }
 
     var actionLabel: String {
         switch self {
-        case .new:
-            return "Mark New"
-        case .accepted:
-            return "Accept"
-        case .preparing:
-            return "Start Prep"
-        case .partialCancelled:
-            return "Partial Cancel"
-        case .ready:
-            return "Mark Ready"
-        case .completed:
-            return "Complete"
-        case .cancelled:
-            return "Cancel"
+        case .queued: return "Queue"
+        case .inPreparation: return "Start Prep"
+        case .partiallyReady: return "Partially Ready"
+        case .ready: return "Mark Ready"
+        case .completed: return "Complete"
+        case .cancelled: return "Cancelled"
+        case .exception: return "Route Required"
         }
     }
 }
 
-enum CancelReasonCode: String, Codable, CaseIterable, Sendable, Identifiable {
-    case outOfStock = "out_of_stock"
-    case kitchenOverload = "kitchen_overload"
-    case closingSoon = "closing_soon"
-    case customerNoShow = "customer_no_show"
-    case duplicateOrder = "duplicate_order"
-    case other
-
-    var id: String { rawValue }
+enum KitchenPriority: String, Codable, Sendable {
+    case normal
+    case high
+    case urgent
 
     var displayName: String {
         switch self {
-        case .outOfStock:
-            return "Sin existencias"
-        case .kitchenOverload:
-            return "Alta demanda"
-        case .closingSoon:
-            return "Por cerrar"
-        case .customerNoShow:
-            return "Cliente no llegó"
-        case .duplicateOrder:
-            return "Pedido duplicado"
-        case .other:
-            return "Otro"
+        case .normal: return "Normal"
+        case .high: return "High priority"
+        case .urgent: return "Urgent"
+        }
+    }
+}
+
+enum KitchenItemStatus: String, Codable, Sendable {
+    case queued
+    case preparing
+    case ready
+    case cancelled
+    case exception
+
+    var displayName: String {
+        switch self {
+        case .queued: return "Queued"
+        case .preparing: return "Preparing"
+        case .ready: return "Ready"
+        case .cancelled: return "Cancelled"
+        case .exception: return "Needs attention"
         }
     }
 }
@@ -134,51 +107,47 @@ struct KitchenItem: Codable, Identifiable, Hashable, Sendable {
     let name: String
     let quantity: Int
     let variantName: String?
+    let modifiers: [String]
     let notes: String?
-    let isCancelled: Bool
+    let status: KitchenItemStatus
+    let targetSeconds: Int?
+    let version: Int
 
-    init(
-        id: UUID = UUID(),
-        name: String,
-        quantity: Int,
-        variantName: String? = nil,
-        notes: String? = nil,
-        isCancelled: Bool = false
-    ) {
-        self.id = id
-        self.name = name
-        self.quantity = quantity
-        self.variantName = variantName
-        self.notes = notes
-        self.isCancelled = isCancelled
-    }
+    var isCancelled: Bool { status == .cancelled }
 }
 
 struct KitchenOrder: Codable, Identifiable, Hashable, Sendable {
     let id: String
+    let sourceOrderID: String
+    let publicReference: String
     let businessID: String
     let source: ChannelSource
     let status: KitchenStatus
-    let station: Station?
+    let priority: KitchenPriority
+    let station: Station
+    let businessDate: String
     let createdAt: Date
+    let preparationStartedAt: Date?
     let updatedAt: Date
-    let customerName: String?
-    let pickupPerson: String?
-    let customerNote: String?
-    let cancellationReason: String?
-    let partialCancellationReason: String?
-    let totalAmount: Decimal?
+    let version: Int
     let items: [KitchenItem]
-    let lastEventSequence: Int?
+    let lastEventSequence: Int
 
-    var displayName: String {
-        if let pickupPerson, !pickupPerson.isEmpty {
-            return pickupPerson
+    var displayName: String { "Order \(publicReference)" }
+
+    var accessibilitySummary: String {
+        let itemCount = items.reduce(0) { $0 + $1.quantity }
+        return "\(displayName), \(status.boardTitle), \(priority.displayName), \(itemCount) items, \(ageInMinutes) minutes"
+    }
+
+    var nextActionStatuses: [KitchenStatus] {
+        let active = items.filter { $0.status != .cancelled }
+        if active.allSatisfy({ $0.status == .ready }) {
+            return status == .ready ? [.completed] : []
         }
-        if let customerName, !customerName.isEmpty {
-            return customerName
-        }
-        return "Order \(id.prefix(6))"
+        if active.contains(where: { $0.status == .preparing }) { return [.ready] }
+        if active.contains(where: { $0.status == .queued }) { return [.inPreparation] }
+        return []
     }
 
     var ageInMinutes: Int {
@@ -187,38 +156,21 @@ struct KitchenOrder: Codable, Identifiable, Hashable, Sendable {
 }
 
 enum KitchenEventKind: String, Codable, Sendable {
-    case snapshotReconciled
-    case orderUpserted
-    case statusChanged
-    case orderRemoved
+    case orderCreated = "order_created"
+    case orderUpdated = "order_updated"
+    case itemUpdated = "item_updated"
+    case orderCancelled = "order_cancelled"
+    case priorityChanged = "priority_changed"
+    case orderRecalled = "order_recalled"
+    case recoveryRequired = "recovery_required"
 }
 
 struct KitchenEvent: Codable, Identifiable, Hashable, Sendable {
-    let id: UUID
+    let id: Int
     let sequence: Int
     let orderID: KitchenOrder.ID
     let kind: KitchenEventKind
+    let aggregateVersion: Int
     let status: KitchenStatus?
     let occurredAt: Date
-    /// Backend source of this event. Operator-intent transitions use actor-supplied
-    /// values (e.g. "kds_app"). Projection-maintenance rows use "trigger".
-    let source: String
-
-    init(
-        id: UUID = UUID(),
-        sequence: Int,
-        orderID: KitchenOrder.ID,
-        kind: KitchenEventKind,
-        status: KitchenStatus? = nil,
-        occurredAt: Date = .now,
-        source: String = "unknown"
-    ) {
-        self.id = id
-        self.sequence = sequence
-        self.orderID = orderID
-        self.kind = kind
-        self.status = status
-        self.occurredAt = occurredAt
-        self.source = source
-    }
 }

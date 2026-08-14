@@ -25,46 +25,12 @@ const modulesDir = resolve(
  */
 const PENDING = new Map([
   // Gate 2.3 — modules/devices
-  ['devices.beginEnrollment', 'Gate 2.3: modules/devices'],
   ['devices.completeEnrollment', 'Gate 2.3: modules/devices'],
-  ['devices.status', 'Gate 2.3: modules/devices'],
   // Gate 2.3 — POS authentication on modules/auth
   ['auth.posLogin', 'Gate 2.3: auth.controller POS routes'],
-  ['auth.posRefresh', 'Gate 2.3: auth.controller POS routes'],
-  ['auth.posLogout', 'Gate 2.3: auth.controller POS routes'],
-  ['auth.posGlobalLogout', 'Gate 2.3: auth.controller POS routes'],
   ['auth.globalLogout', 'Gate 2.3: auth.controller global logout'],
-  // Gate 2.3 — modules/integrity
-  ['merchants.audit', 'Gate 2.3: modules/integrity'],
   // Gate 2.3 — the POS surface proper
-  ...[
-    'pos.entryContext',
-    'pos.operatorSessions',
-    'pos.operatorLock',
-    'pos.operatorEnd',
-    'pos.verifyPin',
-    'pos.managerApproval',
-    'pos.catalogCategories',
-    'pos.catalogProducts',
-    'pos.catalogProduct',
-    'pos.cartCreate',
-    'pos.cartGet',
-    'pos.cartLines',
-    'pos.cartLineUpdate',
-    'pos.cartLineRemove',
-    'pos.cartPrepare',
-    'pos.checkout',
-    'pos.checkoutPayment',
-    'pos.offlineReplayBegin',
-    'pos.offlinePolicy',
-    'pos.offlineReplayBatch',
-    'pos.offlineReplayCursor',
-    'pos.offlineReplayCommand',
-    'pos.offlineConflicts',
-    'pos.offlineReconcile',
-    'pos.offlineReconcileAcknowledge',
-    'pos.offlineDiagnostics',
-  ].map((id) => [id, 'Gate 2.3: modules/pos-*']),
+  ...['pos.operatorLock', 'pos.operatorEnd'].map((id) => [id, 'Gate 2.3: modules/pos-*']),
 ]);
 
 const METHOD_DECORATOR = /@(Get|Post|Patch|Put|Delete)\(([^)]*)\)/g;

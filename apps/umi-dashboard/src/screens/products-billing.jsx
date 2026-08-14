@@ -6,7 +6,7 @@ import { useMerchant } from '@/lib/merchant-context.jsx';
 const PRODUCT_COPY = {
   dashboard: {
     title: 'Umi Dashboard',
-    body: 'Owner console, merchant switching, location context, and account settings.',
+    body: 'Administración del negocio, ubicaciones y ajustes de la cuenta.',
     icon: 'Home',
   },
   conversaflow: {
@@ -96,7 +96,7 @@ export default function ProductsBillingScreen() {
           <span>PRODUCTS & BILLING</span>
         </div>
         <h2 style={{ margin: '0 0 8px', fontSize: 26 }}>
-          Product contract for {merchantState?.selectedMerchant?.name || 'merchant'}
+          Productos disponibles para {merchantState?.selectedMerchant?.name || 'este negocio'}
         </h2>
         <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 760 }}>
           Product status controls which modules exist in the dashboard. Roles decide actions inside

@@ -234,16 +234,6 @@ const MembersScreen = () => {
           <I.Activity size={12} style={{ verticalAlign: '-2px', marginRight: 4 }} /> totalVisits ·
           visitsThisCycle · pendingRewards
         </span>
-        <span
-          style={{
-            marginLeft: 'auto',
-            fontSize: 12,
-            color: 'var(--ink-3)',
-            fontFamily: 'var(--font-mono)',
-          }}
-        >
-          GET /api/:merchantRef/admin/customers
-        </span>
       </div>
 
       {/* Member detail slide-out */}

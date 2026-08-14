@@ -10,7 +10,15 @@ function make() {
     softDelete: vi.fn(),
   };
   const merchants = { resolveLocationId: vi.fn().mockResolvedValue('loc-1') };
-  return { svc: new StaffService(repo as never, merchants as never), repo, merchants };
+  const passwords = {
+    hash: vi.fn().mockReturnValue({ salt: 'a'.repeat(32), hash: 'b'.repeat(128) }),
+  };
+  const config = { get: vi.fn().mockReturnValue('secret') };
+  return {
+    svc: new StaffService(repo as never, merchants as never, passwords as never, config as never),
+    repo,
+    merchants,
+  };
 }
 
 const ROW = {
