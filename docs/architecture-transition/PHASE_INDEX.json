@@ -90,7 +90,7 @@
     {
       "commit": "HEAD (Gate 2F final closeout commit)",
       "id": "2F",
-      "status": "incomplete",
+      "status": "complete_with_documented_limitation",
       "subject": "Encrypted offline checkout, serialized journal, ordered replay, recovery, and reconciliation"
     },
     {
@@ -235,6 +235,27 @@
       "status": "certified_for_controlled_pilot_with_conditions",
       "stateMachineVersion": 1,
       "subject": "Controlled pilot certification, final operating boundaries, support, recovery, and activation conditions"
+    },
+    {
+      "commit": "HEAD (Gate 10 completion commit; RC2 executable artifacts unchanged)",
+      "id": "10",
+      "status": "software_product_complete_with_p2",
+      "subject": "Software product completion, documentation closure, scope decisions, and Gate 13 deferred validation"
+    },
+    {
+      "id": "11",
+      "status": "authorized_with_p2",
+      "subject": "Owner Knowledge Base and Operational Handoff"
+    },
+    {
+      "id": "12",
+      "status": "not_started",
+      "subject": "Final Software Certification and Release Closure"
+    },
+    {
+      "id": "13",
+      "status": "deferred_until_hardware_exists",
+      "subject": "Hardware and Real-World Certification"
     }
   ]
 }

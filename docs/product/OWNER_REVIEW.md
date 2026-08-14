@@ -241,7 +241,7 @@ Recommended Mac review sequence:
 
 ## Gate 9B pilot release candidate
 
-- Produced: `UMI POS Pilot RC1` from source commit `9ea8560b6c0e7304834eae0cd960804132acac89`.
+- Historical: Gate 9B produced `UMI POS Pilot RC1` from source commit `9ea8560b6c0e7304834eae0cd960804132acac89`. RC1 is superseded and must not be deployed.
 - Certified: clean build, clean migration, bootstrap, smoke, readiness, backup, and business reconciliation.
 - Verified: the old NEXO system is not a runtime dependency.
 - Closed P2: the closing runner now requires an explicit fixture count.
@@ -258,6 +258,19 @@ Recommended Mac review sequence:
 - Do not enable real integrated payment authorization or object storage without provider validation.
 - Test each required physical device on-site before opening.
 - Stop the pilot for incorrect money, duplicate facts, authority crossing, data loss, secret exposure, or reconciliation drift.
+
+## Gate 10 product completion
+
+- Software product status: complete with two bounded P2 source-cleanup items.
+- Finished scope includes the UMI authority, Flutter POS, Dashboard, KDS, catalog, inventory, sales, receipts, refunds, and shifts.
+- It also includes customers, customer value, recovery, security, deployment, and support.
+- Integrated provider payments and object storage remain disabled for the current v1 release boundary.
+- Physical iPad, KDS hardware, printer, drawer, scanner, customer display, real provider, real network, and site evidence belong to Gate 13.
+- Gate 11 will create the Owner knowledge base and complete the operational handoff.
+- Gate 12 will perform final software certification and release closure.
+- Gate 13 remains deferred until hardware and a real-world environment exist.
+- RC2 remains the current executable release. Gate 10 changed documentation only.
+- Owner preference work remains separate from software correctness.
 - Pilot start succeeds when health is green, context is correct, smoke passes, and no duplicate or drift exists.
 - Operators stop uncertain actions. Managers verify context. Support uses diagnostics, audit, recovery, and correlation references.
 - Owner approval remains pending. This record does not infer approval.

@@ -306,7 +306,11 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - `UMI POS Pilot RC2` is frozen at source commit `1e885022b654dcecf943377ea2e1e3b739a9027a`.
 - RC2 passed fresh deployment, business smoke, restart, backup, isolated restore, and exact reconciliation.
 - Controlled pilot requires on-site device checks and disabled unverified providers.
-- No later gate has started.
+- Gate 10: software product complete with P2.
+- Product inventory, documentation index, glossary, scope decisions, and troubleshooting baseline are complete.
+- Physical hardware, providers, real network, and site validation moved to deferred Gate 13.
+- Gate 11 Owner Knowledge Base and Operational Handoff is authorized with P2.
+- Gate 12 and Gate 13 have not started.
 
 ## Gate 3C decision basis
 

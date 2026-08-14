@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-08-13",
-  "latestRelevantCommit": "HEAD (Gate 9C certification commit; RC2 source 1e885022b654dcecf943377ea2e1e3b739a9027a)",
-  "integrationState": "Gate 9C certified RC2 for controlled pilot with conditions. No later gate has started.",
+  "latestRelevantCommit": "HEAD (Gate 10 completion commit; RC2 executable artifacts unchanged)",
+  "integrationState": "Gate 10 completed the software product with two bounded P2 items. Gate 11 is authorized. Gate 13 owns physical and provider validation.",
   "items": [
     {
       "id": "platform-certification",
@@ -54,7 +54,7 @@
     },
     {
       "id": "2F",
-      "status": "incomplete",
+      "status": "complete_with_documented_limitation",
       "dependencies": ["2E"],
       "nextObjective": "Preserve the certified offline authority boundary",
       "blockers": [],
@@ -237,6 +237,38 @@
       "nextObjective": "Enter controlled real-world pilot under documented conditions",
       "blockers": [],
       "validationState": "RC2 fresh deployment, smoke, business truth, restart, backup, restore, support, boundaries, and activation conditions passed"
+    },
+    {
+      "id": "10",
+      "status": "software_product_complete_with_p2",
+      "dependencies": ["9C"],
+      "nextObjective": "Authorize Gate 11 Owner Knowledge Base and Operational Handoff",
+      "blockers": [],
+      "validationState": "Product inventory, software completion audit, documentation index, glossary, scope ledger, and Gate 13 deferred register completed"
+    },
+    {
+      "id": "11",
+      "status": "authorized_with_p2",
+      "dependencies": ["10"],
+      "nextObjective": "Create the Owner Knowledge Base and complete operational handoff",
+      "blockers": [],
+      "validationState": "Not started"
+    },
+    {
+      "id": "12",
+      "status": "not_started",
+      "dependencies": ["11"],
+      "nextObjective": "Final Software Certification and Release Closure",
+      "blockers": [],
+      "validationState": "Not started"
+    },
+    {
+      "id": "13",
+      "status": "deferred_until_hardware_exists",
+      "dependencies": ["12", "hardware_availability"],
+      "nextObjective": "Run physical hardware, provider, network, and real-world certification",
+      "blockers": ["Hardware and real-world environment are not available"],
+      "validationState": "Deferred by Owner roadmap decision; does not block Gates 10 through 12"
     }
   ]
 }

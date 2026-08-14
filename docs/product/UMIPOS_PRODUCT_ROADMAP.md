@@ -31,9 +31,13 @@ Updated: 2026-08-13
 | 9A Pilot dry run                          | Complete with observations | 8B                     | Authorize Gate 9B Pilot RC                | Physical devices, storage, Owner review, and providers         | Bootstrap, lifecycle, KDS, restart, reconciliation, recovery, support, and readiness passed                              |
 | 9B Pilot release candidate                | Complete with observations | 9A                     | Authorize Gate 9C Pilot Certification     | Physical devices, enabled storage, Owner review, and providers | RC build, clean migration, bootstrap, backup, reconciliation, release security, deployment, and rollback passed          |
 | 9C Pilot certification                    | Certified with conditions  | 9B                     | Enter controlled real-world pilot         | On-site devices, disabled providers, and Owner review          | RC2 fresh deployment, smoke, business truth, restart, backup, restore, support, and final boundaries passed              |
+| 10 Product completion                     | Complete with P2           | 9C                     | Authorize Gate 11 Owner handoff           | None                                                           | Product inventory, software audit, documentation closure, glossary, scope decisions, and Gate 13 register passed         |
+| 11 Owner knowledge and handoff            | Authorized with P2         | 10                     | Build the Owner knowledge base            | None                                                           | Not started                                                                                                              |
+| 12 Final software closure                 | Not started                | 11                     | Final software certification              | None                                                           | Not started                                                                                                              |
+| 13 Hardware and real-world certification  | Deferred                   | 12, hardware available | Validate physical and provider behavior   | Hardware and real site are unavailable                         | Deferred by Owner decision; does not block Gates 10 through 12                                                           |
 
-The latest relevant revision is the Gate 9B certification commit in PR #72.
-PR #72 keeps Gates 3A through 9B complete with recorded observations.
+The latest relevant revision is the Gate 10 completion commit in PR #72.
+PR #72 keeps Gates 3A through 10 complete with recorded limitations.
 Native encrypted offline support covers the explicit allowlist and server-policy-authorized cash;
 Web sensitive journaling remains disabled. UMI remains the
 sole business authority; Flutter owns presentation, hardware integration, encrypted local state,
@@ -102,4 +106,7 @@ Gate 9A passed the first pilot rehearsal.
 Gate 9B froze RC1. Gate 9C found a clean-database initialization race before pilot activation.
 Gate 9C superseded RC1 with `UMI POS Pilot RC2` at source commit `1e885022b654dcecf943377ea2e1e3b739a9027a`.
 RC2 passed fresh deployment, smoke, business truth, restart, backup, restore, support, and final boundary checks.
-Controlled pilot is authorized with conditions. No later gate has started.
+Controlled pilot remains authorized with conditions under Gate 9C evidence.
+Gate 10 now closes the software product scope with two bounded P2 source-cleanup items.
+Gate 11 is authorized with P2. Gate 12 remains not started.
+Gate 13 owns physical hardware, real network, provider, and site validation after hardware exists.

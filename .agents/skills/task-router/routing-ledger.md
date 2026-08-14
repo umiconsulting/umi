@@ -21,6 +21,19 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-08-13 - UmiPOS Gate 10 product completion
+- task type: cross-workspace product and documentation closure
+- request summary: audit all UmiPOS software owners, close repository-controlled gaps, and defer physical evidence to Gate 13
+- filesystem slice inspected: root docs, `apps/umi-api`, `apps/umi-dashboard`, `apps/umi-pos`, `apps/umi-kds`, release scripts, migrations, and tests
+- chosen owner: root `docs/` for closure evidence; each existing app retains its runtime ownership
+- chosen path: direct audit and documentation corrections; no new service, repo, schema, or product boundary
+- skill or subagent used: `task-router`, `repository-cartographer`, `pr-gates`
+- files touched: product completion evidence, deferred register, glossary, documentation index, support and deployment docs, canonical roadmap, Owner review, and app README files
+- tools used: repository cartographer, `rg`, Flutter, Vitest, Vite, TypeScript, Prettier, JSON validation, Git, and PR checks
+- outcome: software product complete with two bounded P2 cleanup items; Gate 11 authorized with P2; Gate 13 deferred
+- reusable pattern observed: certification closure needs one inventory that separates software limitations from physical evidence
+- promotion follow-up: none; one Gate-specific trace is not sufficient for promotion
+
 ### 2026-07-29 - UmiPOS Gate 3C cash shift operations
 - task type: product implementation and publication
 - request summary: Implement the physical register and cashier shift lifecycle.
