@@ -243,14 +243,15 @@
       "subject": "Software product completion, documentation closure, scope decisions, and Gate 13 deferred validation"
     },
     {
+      "commit": "HEAD (commit de Gate 11; artefactos RC2 sin cambios)",
       "id": "11",
-      "status": "authorized_with_p2",
-      "subject": "Owner Knowledge Base and Operational Handoff"
+      "status": "owner_knowledge_base_complete_with_p2",
+      "subject": "Base de Conocimiento y entrega operativa al Owner"
     },
     {
       "id": "12",
-      "status": "not_started",
-      "subject": "Final Software Certification and Release Closure"
+      "status": "authorized_with_p2",
+      "subject": "Gate 12: Final Software Certification & Release Closure"
     },
     {
       "id": "13",

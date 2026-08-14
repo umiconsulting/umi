@@ -309,8 +309,11 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Gate 10: software product complete with P2.
 - Product inventory, documentation index, glossary, scope decisions, and troubleshooting baseline are complete.
 - Physical hardware, providers, real network, and site validation moved to deferred Gate 13.
-- Gate 11 Owner Knowledge Base and Operational Handoff is authorized with P2.
+- Gate 11 de Base de Conocimiento y entrega al Owner está completo con P2.
 - Gate 12 and Gate 13 have not started.
+- Los dos P2 heredados permanecen fuera de los flujos productivos.
+- `docs/knowledge-base/README.md` es la entrada canónica en español.
+- Gate 12, con la etiqueta formal `Final Software Certification & Release Closure`, queda autorizado con P2.
 
 ## Gate 3C decision basis
 

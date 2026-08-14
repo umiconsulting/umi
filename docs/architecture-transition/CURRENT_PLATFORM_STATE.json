@@ -39,7 +39,8 @@
     "9A",
     "9B",
     "9C",
-    "10"
+    "10",
+    "11"
   ],
   "authorities": {
     "api": "apps/umi-api",
@@ -276,6 +277,7 @@
     "gate9BStatus": "complete_with_observations",
     "gate9CStatus": "certified_for_controlled_pilot_with_conditions",
     "gate10Status": "software_product_complete_with_p2",
+    "gate11Status": "owner_knowledge_base_complete_with_p2",
     "dashboardOperations": "permission-scoped read projections and operational pilot commands",
     "dashboardCommandContext": "server-validated dashboard_administrative commands with current authority, CSRF, deterministic fingerprints, approvals, and recovery",
     "dashboardMutationBoundary": "checkout, physical cash movement, and KDS preparation remain in their assigned operational clients",
@@ -294,9 +296,9 @@
     "pilotDryRun": "Clean bootstrap, roles, business operations, KDS, restart recovery, exact reconciliation, support, and readiness passed",
     "pilotRcCertification": "Release builds, clean migration, bootstrap, readiness, backup, reconciliation, configuration, and legacy dependency audit passed",
     "controlledPilotCertification": "RC2 passed fresh deployment, smoke, business truth, restart, backup, isolated restore, support, and bounded-condition review",
-    "latestLocalCommit": "HEAD (Gate 10 completion commit; RC2 executable artifacts unchanged)",
-    "pushStatus": "Gate 10 completion publication uses PR #72",
+    "latestLocalCommit": "HEAD (commit de Gate 11; artefactos RC2 sin cambios)",
+    "pushStatus": "La publicación de Gate 11 usa PR #72",
     "pullRequestStatus": "PR #72 targets build-v3"
   },
-  "nextGate": "Gate 11 Owner Knowledge Base and Operational Handoff is authorized with P2. Gate 13 hardware certification is deferred."
+  "nextGate": "Gate 12, con la etiqueta formal Final Software Certification & Release Closure, está autorizado con P2. Gate 13 permanece diferido."
 }

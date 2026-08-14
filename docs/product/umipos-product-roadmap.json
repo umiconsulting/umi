@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-08-13",
-  "latestRelevantCommit": "HEAD (Gate 10 completion commit; RC2 executable artifacts unchanged)",
-  "integrationState": "Gate 10 completed the software product with two bounded P2 items. Gate 11 is authorized. Gate 13 owns physical and provider validation.",
+  "latestRelevantCommit": "HEAD (commit de Gate 11; artefactos RC2 sin cambios)",
+  "integrationState": "Gate 11 completó la Base de Conocimiento con dos P2 heredados. Gate 12 está autorizado. Gate 13 conserva validación física.",
   "items": [
     {
       "id": "platform-certification",
@@ -248,17 +248,17 @@
     },
     {
       "id": "11",
-      "status": "authorized_with_p2",
+      "status": "complete_with_p2",
       "dependencies": ["10"],
-      "nextObjective": "Create the Owner Knowledge Base and complete operational handoff",
+      "nextObjective": "Autorizar Gate 12, con la etiqueta formal Final Software Certification & Release Closure",
       "blockers": [],
-      "validationState": "Not started"
+      "validationState": "Base en español, operación, soporte, desarrollo, alcance, FAQ, diagramas y entrega completos"
     },
     {
       "id": "12",
-      "status": "not_started",
+      "status": "authorized_with_p2",
       "dependencies": ["11"],
-      "nextObjective": "Final Software Certification and Release Closure",
+      "nextObjective": "Gate 12: Final Software Certification & Release Closure",
       "blockers": [],
       "validationState": "Not started"
     },

@@ -21,6 +21,19 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-08-13 - UmiPOS Gate 11 entrega al Owner
+- tipo de tarea: conocimiento del workspace y entrega operativa
+- resumen: crear una Base de Conocimiento en español para producto, operación, soporte y desarrollo
+- área inspeccionada: documentación y rutas de API, Dashboard, Flutter POS, KDS, worker, contratos, migraciones y versiones
+- owner seleccionado: `docs/knowledge-base/` con enlaces a owners de aplicación y certificación
+- ruta seleccionada: documentación directa; sin cambios de código, servicio, esquema o límite de producto
+- skills: `task-router` y `pr-gates`
+- archivos: Base de Conocimiento, certificación, índice, Owner review, roadmap y estado canónico
+- herramientas: `rg`, validación de enlaces, Prettier, validación JSON, Git y PR checks
+- resultado: Base de Conocimiento completa con dos P2 heredados; Gate 12 autorizado con P2
+- patrón observado: un índice conecta la guía del Owner con fuentes exactas de ingeniería
+- seguimiento: ninguno; conserva la estructura específica en `docs/knowledge-base/`
+
 ### 2026-08-13 - UmiPOS Gate 10 product completion
 - task type: cross-workspace product and documentation closure
 - request summary: audit all UmiPOS software owners, close repository-controlled gaps, and defer physical evidence to Gate 13

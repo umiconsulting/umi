@@ -4,6 +4,14 @@ Updated: 2026-08-13
 
 This index separates current instructions from historical evidence. Use current instructions for operation. Use historical evidence only to trace a decision or certification.
 
+## Base de Conocimiento del Owner
+
+La entrada canónica es `docs/knowledge-base/README.md`.
+
+La Base de Conocimiento del Owner está escrita en español.
+
+Organiza producto, operación, soporte, desarrollo, alcance y Gate 13.
+
 ## Baseline coverage
 
 | Required area                              | Current owner                                                       | Classification                      | Status   |
@@ -42,30 +50,33 @@ This index separates current instructions from historical evidence. Use current 
 
 ## Current authoritative documents
 
-| Area                         | Document                                                    |
-| ---------------------------- | ----------------------------------------------------------- |
-| Product completion           | `docs/certification/UMIPOS_PRODUCT_COMPLETION.md`           |
-| Architecture state           | `docs/architecture-transition/PROJECT_CANONICAL_STATE.md`   |
-| Architecture boundary        | `docs/architecture-transition/ADR_GATE_1A_AUTHORITY.md`     |
-| Product roles and use cases  | `docs/product/UMIPOS_CASOS_DE_USO_Y_ROLES.md`               |
-| Glossary                     | `docs/product/UMIPOS_GLOSSARY.md`                           |
-| Design system                | `docs/design/UMIPOS_DESIGN_LANGUAGE_V1.md`                  |
-| RBAC                         | `docs/product/UMIPOS_PILOT_RBAC.md`                         |
-| Device enrollment            | `docs/product/UMIPOS_DEVICE_ENROLLMENT_SPEC.md`             |
-| Dashboard operations         | `docs/product/UMIPOS_DASHBOARD_OPERATIONS.md`               |
-| KDS operation                | `docs/product/UMIPOS_KDS_OPERATIONAL_MODEL.md`              |
-| Catalog decisions            | `docs/product/CATALOG_UI_DECISIONS.md`                      |
-| Inventory authority          | `docs/product/UMIPOS_INVENTORY_AUTHORITY.md`                |
-| Customers and value          | `docs/product/UMIPOS_CUSTOMERS_LOYALTY_STORED_VALUE.md`     |
-| Hardware runtime             | `docs/product/UMIPOS_HARDWARE_RUNTIME.md`                   |
-| Deployment                   | `docs/deployment/UMIPOS_PILOT_RC_DEPLOYMENT.md`             |
-| Configuration                | `docs/pilot/UMIPOS_PILOT_RC_MANIFEST.md`                    |
-| Backup and restore           | `docs/deployment/UMIPOS_BACKUP_RESTORE.md`                  |
-| Pilot operation              | `docs/pilot/UMIPOS_PILOT_OPERATIONS.md`                     |
-| Opening and closing          | `docs/pilot/UMIPOS_OPENING_CLOSING_CHECKLISTS.md`           |
-| Support and troubleshooting  | `docs/pilot/UMIPOS_SUPPORT_RUNBOOK.md`                      |
-| Owner review                 | `docs/product/OWNER_REVIEW.md`                              |
-| Deferred physical validation | `docs/certification/UMIPOS_DEFERRED_HARDWARE_VALIDATION.md` |
+| Area                         | Document                                                          |
+| ---------------------------- | ----------------------------------------------------------------- |
+| Product completion           | `docs/certification/UMIPOS_PRODUCT_COMPLETION.md`                 |
+| Base del Owner               | `docs/knowledge-base/README.md`                                   |
+| Manifiesto de la Base        | `docs/knowledge-base/MANIFEST.md`                                 |
+| Certificación de la Base     | `docs/certification/UMIPOS_OWNER_KNOWLEDGE_BASE_CERTIFICATION.md` |
+| Architecture state           | `docs/architecture-transition/PROJECT_CANONICAL_STATE.md`         |
+| Architecture boundary        | `docs/architecture-transition/ADR_GATE_1A_AUTHORITY.md`           |
+| Product roles and use cases  | `docs/product/UMIPOS_CASOS_DE_USO_Y_ROLES.md`                     |
+| Glossary                     | `docs/product/UMIPOS_GLOSSARY.md`                                 |
+| Design system                | `docs/design/UMIPOS_DESIGN_LANGUAGE_V1.md`                        |
+| RBAC                         | `docs/product/UMIPOS_PILOT_RBAC.md`                               |
+| Device enrollment            | `docs/product/UMIPOS_DEVICE_ENROLLMENT_SPEC.md`                   |
+| Dashboard operations         | `docs/product/UMIPOS_DASHBOARD_OPERATIONS.md`                     |
+| KDS operation                | `docs/product/UMIPOS_KDS_OPERATIONAL_MODEL.md`                    |
+| Catalog decisions            | `docs/product/CATALOG_UI_DECISIONS.md`                            |
+| Inventory authority          | `docs/product/UMIPOS_INVENTORY_AUTHORITY.md`                      |
+| Customers and value          | `docs/product/UMIPOS_CUSTOMERS_LOYALTY_STORED_VALUE.md`           |
+| Hardware runtime             | `docs/product/UMIPOS_HARDWARE_RUNTIME.md`                         |
+| Deployment                   | `docs/deployment/UMIPOS_PILOT_RC_DEPLOYMENT.md`                   |
+| Configuration                | `docs/pilot/UMIPOS_PILOT_RC_MANIFEST.md`                          |
+| Backup and restore           | `docs/deployment/UMIPOS_BACKUP_RESTORE.md`                        |
+| Pilot operation              | `docs/pilot/UMIPOS_PILOT_OPERATIONS.md`                           |
+| Opening and closing          | `docs/pilot/UMIPOS_OPENING_CLOSING_CHECKLISTS.md`                 |
+| Support and troubleshooting  | `docs/pilot/UMIPOS_SUPPORT_RUNBOOK.md`                            |
+| Owner review                 | `docs/product/OWNER_REVIEW.md`                                    |
+| Deferred physical validation | `docs/certification/UMIPOS_DEFERRED_HARDWARE_VALIDATION.md`       |
 
 ## Current application instructions
 

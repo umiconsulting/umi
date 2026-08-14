@@ -216,6 +216,19 @@ Recommended Mac review sequence:
 - External: touch hardware, physical devices, Xcode/iPad, and provider payment remain pending.
 - Owner approval remains pending. This record does not infer approval.
 
+## Gate 11 Base de Conocimiento del Owner
+
+- La Base de Conocimiento del Owner está en `docs/knowledge-base/README.md`.
+- La ruta explica el producto desde cero y conserva referencias técnicas para soporte.
+- Incluye arquitectura, roles, POS, Dashboard, KDS y todos los dominios de v1.
+- Incluye despliegue, recuperación, solución de problemas, incidentes, desarrollo y gestión de versiones.
+- Incluye una guía para explicar el producto sin promesas no certificadas.
+- RC2 permanece vigente. RC1 permanece `SUPERSEDED — DO NOT DEPLOY`.
+- Los dos P2 de Gate 10 permanecen sin impacto operativo.
+- Gate 13 conserva iOS, hardware, red real, sitio real y proveedores habilitados.
+- Gate 12 queda autorizado con P2.
+- Esta actualización no infiere aprobación del Owner.
+
 ## Gate 8B Dashboard and KDS operator experience
 
 - Certified: Dashboard shell, business context, permission navigation, operational modules, recovery, audit, and diagnostics.
@@ -266,7 +279,7 @@ Recommended Mac review sequence:
 - It also includes customers, customer value, recovery, security, deployment, and support.
 - Integrated provider payments and object storage remain disabled for the current v1 release boundary.
 - Physical iPad, KDS hardware, printer, drawer, scanner, customer display, real provider, real network, and site evidence belong to Gate 13.
-- Gate 11 will create the Owner knowledge base and complete the operational handoff.
+- Gate 11 creó la Base de Conocimiento del Owner y completó la entrega operativa.
 - Gate 12 will perform final software certification and release closure.
 - Gate 13 remains deferred until hardware and a real-world environment exist.
 - RC2 remains the current executable release. Gate 10 changed documentation only.
