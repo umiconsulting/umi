@@ -21,6 +21,122 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-08-14 - Rewrite the work items themselves, and retire the ones with a dead premise
+- task type: tracker correction pass, no new triage
+- request summary: "Don't comment on the WI, just rewrite them according to the new CodeGraph findings; if some are already solved, erase them; if others are different, change them."
+- filesystem slice inspected: `apps/umi-api/src/modules/identity/`, `apps/umi-api/src/shared/ratelimit/`, `docs/migration/build-v3/*.sql`; plus `gh pr view 93 94`, `git rev-list`, and the live Azure Repos tree through `repo_file` / `repo_branch`
+- chosen owner: the Azure Boards project as the write target; no repository change beyond this ledger
+- chosen path: re-read every rewritten description from the tracker first, then re-verify each closure candidate against source before any state change
+- skill or subagent used: `triage-work-items-with-codegraph`, `task-router` (this entry). No subagents — the user's session rule forbids the Agent tool unless requested.
+- files touched:
+  - `.agents/skills/task-router/routing-ledger.md` (this entry)
+  - Azure Boards: 10 titles, 16 descriptions, 3 acceptance-criteria blocks, 1 repro-steps block, 1 system-info block, 5 tag sets, 1 severity, 1 state
+- tools used: Azure DevOps MCP (`wit_query`, `wit_work_item`, `wit_work_item_write`, `repo_repository`, `repo_branch`, `repo_file`), `git`, `gh`
+- outcome: exactly ONE item had a dead premise — work item 79. Every other open item survived verification as real work. Work item 79 closed `Cannot Reproduce`; four items that cited it were corrected.
+- reusable pattern observed: **"erase the solved ones" is a claim to verify, not an instruction to execute.** The user expected several closures. Re-verifying each candidate against source produced one. The advisory lock made work item 19's *stated defect* unreproducible, but the residual gap (no database constraint) is real, so it was re-scoped and downgraded instead of closed. Closing it would have deleted the only record of that gap. Report the honest count; do not manufacture closures to match the expected shape of the request.
+- reusable pattern observed: **verify the tracker's own premises against the tracker's own system, not only against code.** Work item 79 said the Azure Repos mirror "lacks build-v3". The repository named `Umi Consulting` is **TicketSeller**, an unrelated product; its `main` head `343939f0` does not exist in `umiconsulting/umi`. Four work items (75, 79, 84, 85) had reasoned for weeks from a mirror that never existed. CodeGraph and `rg` cannot see this class — it lives in the tracker's sibling services.
+- reusable pattern observed: **a Bug has no `Removed` state in the Agile process.** `System.State = "Removed"` returns HTTP 400 for a Bug. Use `Closed` with a `System.Reason`, and never write "this item is Removed" in the body before the write succeeds.
+- promotion follow-up: fold both verification rules into `triage-work-items-with-codegraph` — check the tracker's own linked services, and never assume a state value is legal for a work-item type.
+
+### 2026-08-14 - Triage and rewrite the whole code-bearing Umi Consulting backlog
+- task type: backlog-wide work-item triage plus a live tracker rewrite
+- request summary: Run `triage-work-items-with-codegraph` against every work item in the Azure Boards project and rewrite each one from the findings.
+- filesystem slice inspected: `apps/umi-api/src/**`, `apps/umi-cash/**`, `docs/migration/build-v3/**`, `.github/workflows/**`, root governance docs; plus `git`/`gh` state for `main`, `build-v3` and PRs 72, 73, 93, 94
+- chosen owner: root `.agents/skills/` procedure plus the Azure Boards project as the write target
+- chosen path: scope with the user (47 of 89 items), 11 thematic report-only subagent clusters, verify every claim against the tree, then write descriptions and comments directly
+- skill or subagent used: `triage-work-items-with-codegraph`, `task-router` (this entry), 11 `general-purpose` subagents
+- files touched:
+  - `.agents/skills/triage-work-items-with-codegraph/SKILL.md` (branch-state rule added to Step 3; now 206 lines)
+  - `.agents/skills/task-router/routing-ledger.md` (this entry)
+  - Azure Boards: 47 descriptions replaced, 47 comments added, then a second pass over the OTHER fields — 11 repro-steps, 6 system-info, 6 acceptance-criteria, 5 titles
+- tools used: Azure DevOps MCP (`wit_query`, `wit_work_item`, `wit_work_item_write`, `wit_work_item_comment_write`), CodeGraph CLI, `rg`, `git`, `gh`
+- outcome: 47 items triaged. Verdicts: 26 Confirmed pending, 12 Tracker drift, 6 Partially implemented, 2 Appears implemented, 1 External or manual. Every load-bearing agent claim re-verified against the tree before writing; none failed.
+- reusable pattern observed: **rewrite every field, not just the description.** The first pass corrected each description and put the evidence in a comment, which left 13 items self-contradicting — WI 19's repro steps still proposed the wrong unique index, WI 45's still proposed a fix already proven permission-denied, WI 92's still said the flag was off. A work item is not one text field. Correct the repro steps, the system info, the acceptance criteria and the title, or the reader follows the stale half.
+- reusable pattern observed: **cluster the fan-out by shared code surface, not one agent per item.** 43 items collapsed to 11 agents because related work items read the same files, which cut cost and improved accuracy — a cluster agent sees contradictions between sibling items that a per-item agent cannot. Also: a backlog sweep finds cross-item defects no single triage can (one unstated merge blocker shared by three items; two gates structurally blind to the same defect class; a "required" CI check with no branch protection behind it).
+- promotion follow-up: none — this is the skill being used, not a new pattern. The branch-state gap it exposed was folded into the skill itself.
+
+### 2026-08-13 - Promote work-item triage with CodeGraph into a skill
+- task type: skill authoring plus blind forward test
+- request summary: Create the canonical skill `triage-work-items-with-codegraph`, register it, and forward-test it on live work items 93, 21, 19, and 13.
+- filesystem slice inspected: `.agents/skills/**`, `docs/reports/2026-08-13-codegraph-evaluation.md`, `apps/umi-api/src/{shared/ratelimit,modules/wallet,modules/identity,modules/cash}/**`, `docs/migration/build-v3/**`
+- chosen owner: root `.agents/skills/` — the procedure is cross-product, so no single app repo owns it
+- chosen path: direct authorship at root, then four report-only subagents for the blind forward test
+- skill or subagent used: `task-router` (this entry), `adapter-sync-check`, `skill-creator`, four `general-purpose` subagents
+- files touched:
+  - `.agents/skills/triage-work-items-with-codegraph/SKILL.md` (new, 186 lines)
+  - `.agents/skills/task-router/registry.md` (skill entry plus one selection rule)
+  - `.agents/skills/task-router/routing-ledger.md` (this entry)
+- tools used: Azure DevOps MCP (`wit_work_item`, organization `umiconsulting`, project `Umi Consulting`), CodeGraph CLI `1.5.0` (`status`, `explore`, `callers`, `impact`, `affected`), `rg`, `git log -S`, skill validator `quick_validate`
+- outcome: successful. All four blind agents reached a defensible verdict, and every load-bearing claim held on independent source re-check. WI 93 Confirmed pending (in-memory `Map` at `rate-limit.service.ts:26`). WI 21 Confirmed pending (six routes mapped, no controller test, no HTTP harness installed). WI 19 **Tracker drift** (`pg_advisory_xact_lock` at `identity.resolver.ts:128` landed 2026-07-06 in `df9ba66`, five weeks before the item). WI 13 Confirmed pending with **Low** CodeGraph confidence, deferred to `sql-preflight`. All four agents discarded foreign-product symbols under the owner test.
+- reusable pattern observed: `codegraph affected` is unsafe as a test set. On the PassKit controller, depth two returned five tests, none in the wallet module, and missed the covering `wallet-pass.service.spec.ts`. The skill now tells the reader to find tests beside the symbol and use `affected` only to widen. A blind forward test needs the prior evaluation report withheld, or the agent copies its conclusions instead of deriving them.
+- promotion follow-up: this entry closes the `promotion-follow-up: none` left by the 2026-08-13 CodeGraph work-item pilot below. The pattern recurred across that pilot and this test, so it passed the `promotion-criteria.md` recurrence gate and became a skill.
+
+### 2026-08-13 - CodeGraph work-item pilot
+- task type: cross-product work-item triage evaluation
+- request summary: Use CodeGraph to inspect pending Azure work items and compare it with scoped text search.
+- filesystem slice inspected: Umi API rate limit, wallet, identity, Cash code, and the root evaluation report
+- chosen owner: Umi workspace
+- chosen path: `docs/reports/2026-08-13-codegraph-evaluation.md`
+- skill or subagent used: `task-router`
+- files touched: `docs/reports/2026-08-13-codegraph-evaluation.md` and this ledger
+- tools used: Azure CLI, CodeGraph CLI, ripgrep, Git, and direct source inspection
+- outcome: CodeGraph helped with impact and tracker drift. Scoped `rg` stayed faster and smaller for exact work-item terms.
+- reusable pattern observed: Work-item graph checks need one structured query, one exact follow-up, and an authoritative domain validation.
+- promotion follow-up: none
+
+### 2026-08-13 - CodeGraph installation and retrieval pilot
+- task type: workspace code navigation integration and evaluation
+- request summary: Install CodeGraph and compare Umi retrieval with and without its local graph.
+- filesystem slice inspected: workspace root, selected API, Dashboard, Cash, KDS code, and root reports
+- chosen owner: Umi workspace
+- chosen path: root `.codegraph/`, `.gitignore`, and `docs/reports/2026-08-13-codegraph-evaluation.md`
+- skill or subagent used: `task-router`, `research`, `scientific-research-check`, and `codegraph_research`
+- files touched: `.gitignore`, `docs/reports/2026-08-13-codegraph-evaluation.md`, and this ledger
+- tools used: CodeGraph CLI, ripgrep, Git, npm metadata, and official web sources
+- outcome: Installed CodeGraph 1.5.0. The pilot supports optional use with `rg` and direct file verification.
+- reusable pattern observed: A graph retrieval test needs freshness checks, scoped text controls, and an isolated agent A/B campaign.
+- promotion follow-up: none
+
+### 2026-08-13 - Azure build cost comparison
+- task type: cross-product build cost research
+- request summary: Measure current Umi builds and compare their projected cost with Azure.
+- filesystem slice inspected: root workflows, Umi API deployment files, package scripts, and root docs
+- chosen owner: Umi workspace
+- chosen path: `docs/research/2026-08-13-azure-build-cost-comparison.md`
+- skill or subagent used: `task-router`, `research`, `vercel:vercel-cli`, and `azure_build_cost_research`
+- files touched: `docs/research/2026-08-13-azure-build-cost-comparison.md` and this ledger
+- tools used: GitHub CLI, Vercel CLI, Azure CLI, Azure DevOps REST API, GitHub REST API, and official web sources
+- outcome: Keep GitHub Actions. Azure free capacity fits current volume but serializes four PR jobs.
+- reusable pattern observed: Build cost studies need job minutes, concurrency, registry cost, and runtime separation.
+- promotion follow-up: none
+
+### 2026-08-13 - Configuración de Azure Boards para Build v3
+- task type: configuración de programa entre productos
+- request summary: Crear la jerarquía, las fases, los bugs, las pruebas y las consultas de Build v3 en Azure DevOps.
+- filesystem slice inspected: raíz del workspace, docs/migration/build-v3, historial Git y solicitudes de cambio de GitHub
+- chosen owner: programa Build v3 de Umi
+- chosen path: ejecución directa en Azure Boards del proyecto Umi Consulting
+- skill or subagent used: task-router
+- files touched: .mcp.json, .agents/skills/task-router/routing-ledger.md
+- tools used: Azure CLI, Azure DevOps REST API, git, gh y rg
+- outcome: Se creó una épica con siete funciones y 74 elementos secundarios. Se configuraron áreas, fases, tableros y cinco consultas compartidas.
+- reusable pattern observed: Azure Boards puede controlar la ejecución de un programa sin reemplazar todavía el sistema general de trabajo.
+- promotion follow-up: Resolver primero la regla única para Trello, Plane y Azure.
+
+### 2026-08-13 - Revisión del estado de Build v3
+
+- task type: revisión de programa entre ramas
+- request summary: Revisar el avance actual de Build v3 con documentos, Git, PR y controles.
+- filesystem slice inspected: documentos raíz, `docs/migration/build-v3`, `apps/umi-api` y ramas remotas
+- chosen owner: plataforma Umi
+- chosen path: `docs/migration/build-v3/GATED_CUTOVER_PLAN.md`
+- skill or subagent used: `task-router`; sin subagente
+- files touched: `.agents/skills/task-router/routing-ledger.md`
+- tools used: `git`, `gh`, `rg`, `pnpm`, `psql`
+- outcome: Se identificaron dos líneas activas y una diferencia entre sus fuentes de estado.
+- reusable pattern observed: Comparar el plan de cutover con la rama de integración antes de publicar un estado.
+- promotion follow-up: ninguno
+
 ### 2026-07-29 - stashed documentation swept back into the tree
 - task type: root workspace documentation reconciliation (stash archaeology)
 - request summary: look through the stashed changes for instructions in the documentation that were never looked at or considered, then land what is necessary

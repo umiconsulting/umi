@@ -4,6 +4,24 @@
       "type": "http",
       "url": "https://mcp.trello.com/v1"
     },
+    "azure-devops": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@azure-devops/mcp@2.9.0",
+        "umiconsulting",
+        "--authentication",
+        "interactive",
+        "-d",
+        "core",
+        "work",
+        "work-items",
+        "repositories",
+        "pipelines",
+        "wiki"
+      ]
+    },
     "playwright-mcp": {
       "type": "stdio",
       "command": "npx",

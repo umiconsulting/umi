@@ -68,8 +68,16 @@
   - confidence: high
   - provenance: authored 2026-07-02; every structural claim primary-source-backed (`references/research-basis.md`); engine validated against ground truth and adversarially reviewed against the live monorepo (18 findings fixed). Registered 2026-07-29 — the skill shipped but its registry, seed and ledger entries stayed in a stash, so nothing routed to it for four weeks.
 
+- `triage-work-items-with-codegraph`
+  - scope: test an Azure Boards work item against the current code by combining live work-item fields with the local CodeGraph index, then return one verdict plus the file, symbol, caller, and test evidence.
+  - trigger patterns: inspect pending work items, triage a WI or a backlog, validate an Azure Boards item against code, find the code or the missing tests a WI affects, find stale or already-implemented work items, scope work-item impact with CodeGraph.
+  - placement hints: run from the workspace root so the graph spans every product; pin Azure Boards to organization `https://dev.azure.com/umiconsulting` and project `Umi Consulting`, never the global `az` defaults. Read-only on the tracker. Hand SQL, migration, and schema-compatibility questions to `sql-preflight` or database validation; read Markdown architecture docs directly.
+  - confidence: medium
+  - provenance: authored 2026-08-13 on the CodeGraph pilot in `docs/reports/2026-08-13-codegraph-evaluation.md` (CLI `1.5.0`, 689 files / 9,677 nodes). Forward-tested blind on live WIs 93, 21, 19, and 13.
+
 ## Selection rules
 - Workspace-level docs and planning: root `docs/` plus root `CLAUDE.md`.
+- Work-item triage, backlog validation, and stale-ticket detection against real code: `triage-work-items-with-codegraph`.
 - Source-sensitive technical decisions: `scientific-research-check` before locking the recommendation.
 - Codebase architecture mapping, dependency cycles, data ownership, DDD/aggregate analysis, or bounded-context/context-map questions: `repository-cartographer` (run from the repo root).
 - Database staging, promotion, and cutover validation: `staging-validation-runner`.

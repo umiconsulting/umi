@@ -46,6 +46,9 @@ build/
 .vercel
 .env*
 
+# CodeGraph local SQLite index
+.codegraph/
+
 # Supabase CLI scratch. Written by `supabase link`/`db` commands; holds the linked
 # project ref and a pooler URL. Machine-local state, not source — and umi-cash is
 # frozen, so nothing here should ever be committed.
