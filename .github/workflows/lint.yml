@@ -80,8 +80,25 @@ jobs:
       #
       # WHY IT IS HERE AT ALL: GitHub gives PUBLIC repositories secret scanning and
       # push protection free; PRIVATE repositories on the free plan get neither.
-      # This repository is going private, so the control that would BLOCK a
-      # credential at push time has to be replaced rather than simply lost.
+      # The repository has been private once and is public again today, because a
+      # Vercel Hobby project cannot deploy a private ORG repository. Treat the free
+      # control as borrowed, not owned: this scan is what survives the next flip.
+      #
+      # It also does something push protection does not. Push protection blocks a
+      # known pattern at the moment of the push; this reads EVERY commit on EVERY
+      # ref, so it still finds a credential that was committed and later "removed".
+      #
+      # NOT HYPOTHETICAL. On 2026-08-07 the then-public umiconsulting/umi-cash held
+      # `passes/apple/certificates/signerKey.pem` in HEAD: an unencrypted RSA private
+      # key beside its certificate and the WWDR chain — a complete working kit for
+      # signing Apple Wallet passes as Umi.
+      #
+      # THIS IS THE ONLY COPY OF THE SCAN. `main` carried a standalone
+      # `secret-scan.yml` because `main` has no `lint` workflow. That file arrived
+      # here in the main→build-v3 merge and was deleted in the same pull request:
+      # it made gitleaks run twice per PR, and its own header said to fold rather
+      # than duplicate. Deleting the step below therefore removes the control
+      # outright — restore the standalone workflow in the same commit if you ever do.
       #
       # The binary is installed directly instead of using gitleaks/gitleaks-action:
       # that action requires a paid GITLEAKS_LICENSE for repositories owned by an
