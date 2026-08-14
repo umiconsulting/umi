@@ -1,11 +1,21 @@
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 
 /**
- * This compatibility contract keeps the existing iPad pairing and device session.
- * The canonical kitchen projection and command models are in `@umi/contract`.
+ * FROZEN KDS contract (spec §8.1). The iPad Swift client depends on these exact
+ * header names, enum values, constants, and error bodies. They are ported
+ * byte-for-byte from the legacy Deno edge functions
+ * (`supabase/functions/kds-{pairing,board,command}` + `_shared/kds-device-auth.ts`)
+ * and are contract-tested (`kds-contract.spec.ts`). Do NOT paraphrase — the app
+ * keys off these strings (e.g. it clears Keychain on `device_revoked`).
+ *
+ * Underneath the frozen JSON the module reads/writes the build-v2 model
+ * (`merchant.order_ticket` over `customer_order`/`order_item`, `merchant.station`,
+ * `merchant.device` + `runtime.session`) — there is no `kds.*` schema and no
+ * canonical transition RPC, so the logic lives in `KdsService`/`KdsRepository`,
+ * not in the database.
  */
 
-// Device authentication compatibility
+// ── Device auth (frozen) ───────────────────────────────────────────────────
 
 export const KDS_DEVICE_TOKEN_HEADER = 'x-kds-device-token';
 
@@ -18,7 +28,7 @@ export const DEVICE_REVOKED_BODY = {
   message: 'This KDS device has been removed. Pair it again from the dashboard.',
 } as const;
 
-// Pairing compatibility
+// ── Pairing constants (frozen) ─────────────────────────────────────────────
 
 export const PIN_TTL_MINUTES = 10;
 export const POLL_AFTER_SECONDS = 5;
@@ -33,7 +43,7 @@ export const PAIRING_LIST_LIMIT = 20;
 export const DEVICE_LIVE_MS = 10_000; // < 10s since last_used_at → live
 export const DEVICE_OFFLINE_MS = 20_000; // < 20s → slow; else offline
 
-// KDS status compatibility
+// ── Enums (frozen) ─────────────────────────────────────────────────────────
 
 export type PairingStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'used';
 
@@ -66,12 +76,39 @@ export const STATUS_TRANSITIONS: Record<KitchenStatus, KitchenStatus[]> = {
   cancelled: [],
 };
 
-/** Map the commercial order status to the KDS compatibility status. */
+/**
+ * The two status vocabularies, and the only place they meet.
+ *
+ * The iPad app is FROZEN: `KitchenStatus` in apps/umi-kds is a Swift enum with seven
+ * raw values, and `KDSSnapshotRow.asKitchenOrder()` does `guard let … else { throw }`
+ * on it. The call site is `try rows.map { try $0.asKitchenOrder() }`, so `try` inside
+ * `map` propagates on the FIRST failure — one unmappable ticket blanks the WHOLE board.
+ *
+ * build-v3 speaks a different, merchant-neutral vocabulary
+ * (`placed·preparing·ready·completed·canceled`), and the two disagree on exactly the
+ * states that matter: `placed` (the default for every new order) and `canceled` (the
+ * iPad spells it with two l's). Measured on the prod snapshot: 27 of 51 orders carry a
+ * status the iPad cannot map, and going forward every newly-placed order would.
+ *
+ * No gate can see this. `o.status` resolves fine under sql-preflight — it is a Postgres
+ * CHECK disagreeing with a Swift enum, and nothing in the repo reads both. So the
+ * mapping is pinned here, in one typed bidirectional place, and unit-tested.
+ */
 
 /** Statuses `merchant.customer_order.status` may hold (the CHECK, in code). */
 export type OrderStatus = 'placed' | 'preparing' | 'ready' | 'completed' | 'canceled';
 
-/** Map a KDS compatibility status to the commercial order status. */
+/**
+ * KDS → build-v3, for the write path.
+ *
+ * `accepted` and `partial_cancelled` COLLAPSE onto `preparing`: build-v3 models one
+ * status axis, not two (ORDER_MODEL.md §5 — the order-level and line-level
+ * kitchen_status never once diverged across all 51 source orders), and neither state
+ * was ever used in production (0 of 51; `partial_*` used 0×). The visible cost is that
+ * a barista's "accept" tap round-trips as `preparing`, so the ticket settles one column
+ * over on the next poll. Accepted deliberately (owner, 2026-07-24) rather than adding a
+ * status to the schema whose only consumer is one screen of one frozen client.
+ */
 export function mapKitchenToOrderStatus(k: KitchenStatus): OrderStatus {
   switch (k) {
     case 'new':
@@ -89,7 +126,12 @@ export function mapKitchenToOrderStatus(k: KitchenStatus): OrderStatus {
   }
 }
 
-/** Map a commercial order status to the KDS compatibility status. */
+/**
+ * build-v3 → KDS, for the read path. Total: every value the CHECK permits maps to
+ * something the frozen Swift enum accepts, which is the property that keeps the board
+ * alive. `accepted` and `partial_cancelled` are never produced — they have no build-v3
+ * counterpart to come back from (see the collapse above).
+ */
 export function mapOrderToKitchenStatus(s: string): KitchenStatus {
   switch (s) {
     case 'placed':
@@ -141,7 +183,6 @@ export interface KdsDeviceSession {
   locationId: string | null;
   stationId: string | null;
   deviceName: string | null;
-  permissions: string[];
 }
 
 // ── Result envelope for the byte-exact iPad responses ──────────────────────

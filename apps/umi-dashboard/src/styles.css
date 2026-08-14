@@ -23,7 +23,7 @@ body {
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  min-width: 0;
+  min-width: 1280px; /* design width — pane scrolls below this */
 }
 button {
   font-family: inherit;
@@ -44,15 +44,7 @@ textarea:focus,
 button:focus {
   outline: none;
 }
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-[tabindex]:focus-visible,
 .focusable:focus-visible {
-  outline: 2px solid var(--umi-blue);
-  outline-offset: 2px;
   box-shadow: 0 0 0 3px rgba(118, 146, 203, 0.32);
 }
 
@@ -183,8 +175,6 @@ textarea:focus-visible,
     background 0.18s var(--ease),
     color 0.18s var(--ease);
   white-space: nowrap;
-  width: 100%;
-  text-align: left;
 }
 .side-item:hover {
   background: rgba(255, 255, 255, 0.04);
@@ -2495,7 +2485,6 @@ time,
     height: 36px;
     padding: 0 10px;
     border-radius: 9px;
-    width: auto;
   }
   .side-item .label {
     font-size: 12.5px;
@@ -2557,30 +2546,6 @@ time,
   .insight-row .badge {
     grid-column: 2;
     justify-self: start;
-  }
-}
-
-@media (min-width: 901px) and (max-width: 1180px) {
-  .app {
-    --side-w: 210px;
-  }
-  .main {
-    padding: 24px 20px 40px;
-  }
-  .screen-body {
-    min-width: 0;
-  }
-}
-
-.operations-layout {
-  display: grid;
-  grid-template-columns: minmax(230px, 0.72fr) minmax(0, 2fr);
-  gap: 18px;
-}
-
-@media (max-width: 1080px) {
-  .operations-layout {
-    grid-template-columns: 1fr;
   }
 }
 

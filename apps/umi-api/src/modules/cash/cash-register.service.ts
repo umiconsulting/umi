@@ -7,7 +7,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { QrService } from '../../shared/auth/qr.service';
-import type { RegisterMemberRequest } from '@umi/contract';
 import { CashRegisterRepository } from './cash-register.repository';
 import { CustomerSessionService } from './customer-session.service';
 
@@ -18,7 +17,11 @@ function generateCardNumber(prefix: string | null | undefined): string {
   return `${p}-${num}`;
 }
 
-export type RegisterInput = RegisterMemberRequest;
+export interface RegisterInput {
+  name: string;
+  phone: string;
+  birthDate: string; // YYYY-MM-DD
+}
 
 /**
  * Customer self-registration → resolves the customer (identity resolver),

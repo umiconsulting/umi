@@ -13,7 +13,7 @@ export interface ModuleConfig {
   section: 'OPERATIONS' | 'GROWTH' | 'CONFIGURATION';
   product: string;
   locationScoped?: boolean;
-  permissions?: string[];
+  role?: string;
 }
 
 export interface CapabilitiesShape {
@@ -29,38 +29,12 @@ export const MODULES: Record<string, ModuleConfig> = {
     section: 'OPERATIONS',
     product: 'dashboard',
   },
-  operations: {
-    id: 'operations',
-    label: 'Centro operativo',
-    icon: 'Activity',
-    section: 'OPERATIONS',
-    product: 'dashboard',
-    permissions: [
-      'merchant.manage',
-      'audit.read',
-      'hardware.read',
-      'hardware.diagnostics',
-      'inventory.read',
-      'sale.lifecycle',
-      'sale.exception.read',
-      'cash.shift.read',
-      'customer.read',
-      'loyalty.read',
-      'wallet.read',
-      'gift_card.read',
-      'kitchen.read',
-      'device.enroll',
-      'catalog.read',
-    ],
-    locationScoped: true,
-  },
   orders: {
     id: 'orders',
     label: 'Pedidos',
     icon: 'Receipt',
     section: 'OPERATIONS',
     product: 'kds',
-    permissions: ['kitchen.read'],
     locationScoped: true,
   },
   devices: {
@@ -68,8 +42,7 @@ export const MODULES: Record<string, ModuleConfig> = {
     label: 'Devices',
     icon: 'Tablet',
     section: 'OPERATIONS',
-    product: 'dashboard',
-    permissions: ['device.enroll'],
+    product: 'kds',
     locationScoped: true,
   },
   staff: {
@@ -78,7 +51,6 @@ export const MODULES: Record<string, ModuleConfig> = {
     icon: 'Users',
     section: 'OPERATIONS',
     product: 'dashboard',
-    permissions: ['merchant.manage'],
   },
   customers: {
     id: 'customers',
@@ -86,7 +58,6 @@ export const MODULES: Record<string, ModuleConfig> = {
     icon: 'Users2',
     section: 'OPERATIONS',
     product: 'dashboard',
-    permissions: ['customer.read'],
   },
   members: {
     id: 'members',
@@ -94,7 +65,6 @@ export const MODULES: Record<string, ModuleConfig> = {
     icon: 'CreditCard',
     section: 'GROWTH',
     product: 'cash',
-    permissions: ['loyalty.read'],
   },
   'gift-cards': {
     id: 'gift-cards',
@@ -102,7 +72,6 @@ export const MODULES: Record<string, ModuleConfig> = {
     icon: 'Gift',
     section: 'GROWTH',
     product: 'cash',
-    permissions: ['gift_card.read'],
   },
   hours: {
     id: 'hours',
@@ -110,7 +79,6 @@ export const MODULES: Record<string, ModuleConfig> = {
     icon: 'Clock',
     section: 'CONFIGURATION',
     product: 'conversaflow',
-    permissions: ['merchant.manage'],
     locationScoped: true,
   },
   settings: {
@@ -119,7 +87,6 @@ export const MODULES: Record<string, ModuleConfig> = {
     icon: 'Settings',
     section: 'CONFIGURATION',
     product: 'dashboard',
-    permissions: ['merchant.manage'],
   },
   'products-billing': {
     id: 'products-billing',
@@ -127,13 +94,12 @@ export const MODULES: Record<string, ModuleConfig> = {
     icon: 'Sparkles',
     section: 'CONFIGURATION',
     product: 'dashboard',
-    permissions: ['merchant.manage'],
+    role: 'super_admin',
   },
 };
 
 export const MODULE_ORDER = [
   'overview',
-  'operations',
   'orders',
   'devices',
   'staff',
@@ -147,19 +113,17 @@ export const MODULE_ORDER = [
 
 export type ModuleAvailability =
   | { available: true; locationScoped: boolean }
-  | { available: false; reason: string; product?: string; locationScoped?: boolean };
+  | { available: false; reason: string; product?: string; role?: string; locationScoped?: boolean };
 
 function isProductActive(productKey: string, cap: CapabilitiesShape): boolean {
   const status = cap.products?.[productKey]?.status;
   return isProductStatusActive(status);
 }
 
-function hasRequiredPermission(moduleConfig: ModuleConfig, cap: CapabilitiesShape): boolean {
-  if (!moduleConfig.permissions?.length) return true;
-  const permissions = cap.membership?.permissions ?? [];
-  return (
-    permissions.includes('*') || moduleConfig.permissions.some((key) => permissions.includes(key))
-  );
+function hasRequiredRole(moduleConfig: ModuleConfig, cap: CapabilitiesShape): boolean {
+  if (!moduleConfig.role) return true;
+  const membership = cap.membership;
+  return membership?.role === moduleConfig.role || !!membership?.permissions?.includes('*');
 }
 
 export function getModuleAvailability(
@@ -176,10 +140,11 @@ export function getModuleAvailability(
       locationScoped: !!moduleConfig.locationScoped,
     };
   }
-  if (!hasRequiredPermission(moduleConfig, cap)) {
+  if (!hasRequiredRole(moduleConfig, cap)) {
     return {
       available: false,
-      reason: 'permission_required',
+      reason: 'role_required',
+      role: moduleConfig.role,
       locationScoped: !!moduleConfig.locationScoped,
     };
   }

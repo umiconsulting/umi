@@ -18,7 +18,7 @@ struct KDSAPIClient {
             body: [:],
             deviceSession: session
         )
-        return try rows.map { try $0.asKitchenOrder(stationName: session.station.name) }
+        return try rows.map { try $0.asKitchenOrder() }
     }
 
     func fetchTicketEvents(for session: DeviceSession, after sequence: Int?) async throws -> [KitchenEvent] {
@@ -34,34 +34,55 @@ struct KDSAPIClient {
     }
 
     func transitionTicket(
-        order: KitchenOrder,
+        orderID: KitchenOrder.ID,
         to status: KitchenStatus,
-        identity: KDSCommandIdentity,
+        reasonCode: CancelReasonCode? = nil,
+        reasonNote: String? = nil,
         for session: DeviceSession
-    ) async throws -> KDSCommandResult {
-        let commandType: String
-        switch status {
-        case .inPreparation: commandType = "start_preparation"
-        case .ready: commandType = "mark_order_ready"
-        case .completed: commandType = "complete"
-        default: throw KDSDataError.invalidCommand
-        }
+    ) async throws -> KitchenOrder {
         let body: [String: Any] = [
-            "action": "command",
-            "commandId": identity.commandID.uuidString.lowercased(),
-            "idempotencyKey": identity.idempotencyKey,
-            "correlationId": identity.correlationID,
-            "expectedVersion": order.version,
-            "kitchenOrderId": order.id,
-            "commandType": commandType,
-            "itemIds": [],
-            "reasonCode": NSNull(),
-            "reasonNote": NSNull(),
-            "priority": NSNull()
+            "action": "transition_ticket",
+            "ticket_id": orderID,
+            "target_status": status.rawValue,
+            "actor_source": "kds_app",
+            "actor_id": session.deviceName,
+            "actor_channel": session.station.id,
+            "cancellation_reason_code": reasonCode?.rawValue ?? NSNull(),
+            "cancellation_reason_note": reasonNote ?? NSNull()
         ]
-        let data = try await commandData(body: body, deviceSession: session)
-        return try JSONDecoder.kdsDecoder
-            .decode(KDSEnvelope<KDSCommandResult>.self, from: data).data
+        _ = try await commandData(body: body, deviceSession: session)
+
+        let snapshot = try await fetchBoardSnapshot(for: session)
+        guard let order = snapshot.first(where: { $0.id == orderID }) else {
+            throw KDSDataError.invalidResponse
+        }
+        return order
+    }
+
+    func partialCancelItems(
+        ticketID: KitchenOrder.ID,
+        itemIDs: [UUID],
+        reasonCode: CancelReasonCode,
+        reasonNote: String?,
+        for session: DeviceSession
+    ) async throws -> KitchenOrder {
+        let body: [String: Any] = [
+            "action": "partial_cancel_items",
+            "ticket_id": ticketID,
+            "item_ids": itemIDs.map(\.uuidString),
+            "reason_code": reasonCode.rawValue,
+            "reason_note": reasonNote ?? NSNull(),
+            "actor_source": "kds_app",
+            "actor_id": session.deviceName,
+            "actor_channel": session.station.id
+        ]
+        _ = try await commandData(body: body, deviceSession: session)
+
+        let snapshot = try await fetchBoardSnapshot(for: session)
+        guard let order = snapshot.first(where: { $0.id == ticketID }) else {
+            throw KDSDataError.invalidResponse
+        }
+        return order
     }
 
     func submitPairingPIN(pin: String, deviceName: String) async throws -> PairingSubmission {
@@ -102,7 +123,7 @@ struct KDSAPIClient {
         return try await responseData(for: request)
     }
 
-    /// Sends first-pairing requests to the authoritative UMI API.
+    /// Sends first-pairing requests to the backend-owned kds-pairing edge function.
     private func pairingData(body: [String: Any]) async throws -> Data {
         guard let configuration else {
             throw KDSDataError.notConfigured

@@ -162,7 +162,7 @@ describe('build-v3 RLS · live-DB harness', () => {
     expect(await modulesFor('Néctar Café')).toEqual([]);
   });
 
-  it('AuthRepository.effectiveEntitlement gates off the entitlement view', async () => {
+  it('AuthRepository.productStatus gates off the entitlement view (worker pool)', async () => {
     const auth = new AuthRepository(pg);
     // The café's real subscription status, straight from the source of truth.
     const sub = await pg.query<{ status: string }>(
@@ -173,17 +173,14 @@ describe('build-v3 RLS · live-DB harness', () => {
     // Each entitled feature resolves to the café's ACTUAL status (proves the
     // join to umi.subscription), and that status grants access…
     for (const feature of ['cash', 'kds'] as const) {
-      const entitlement = await auth.effectiveEntitlement(id('Kalala Café'), feature);
-      expect(entitlement?.subscriptionStatus, `${feature} status`).toBe(kalalaStatus);
-      expect(entitlement?.enabled, `${feature} enabled`).toBe(true);
-      expect(isProductStatusActive(entitlement?.subscriptionStatus), `${feature} active`).toBe(
-        true,
-      );
+      const status = await auth.productStatus(id('Kalala Café'), feature);
+      expect(status, `${feature} status`).toBe(kalalaStatus);
+      expect(isProductStatusActive(status), `${feature} active`).toBe(true);
     }
     // …a feature the café isn't entitled to → null → EntitlementGuard 403s…
-    expect(await auth.effectiveEntitlement(id('El Gran Ribera'), 'kds')).toBeNull();
+    expect(await auth.productStatus(id('El Gran Ribera'), 'kds')).toBeNull();
     // …and a canceled café is absent from the view entirely (fails closed).
-    expect(await auth.effectiveEntitlement(id('Néctar Café'), 'cash')).toBeNull();
+    expect(await auth.productStatus(id('Néctar Café'), 'cash')).toBeNull();
   });
 
   it('MerchantsRepository.loadProducts mirrors the entitlement view per café', async () => {

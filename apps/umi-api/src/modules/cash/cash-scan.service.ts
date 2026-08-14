@@ -7,7 +7,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { formatMxn2 } from '../../shared/format/money';
-import type { ScanRequest } from '@umi/contract';
 import { QrService } from '../../shared/auth/qr.service';
 import { WalletPassAdapter } from '../../shared/adapters/wallet-pass.adapter';
 import { EmailAdapter } from '../../shared/adapters/email.adapter';
@@ -30,7 +29,11 @@ function tooMany(message: string): never {
   throw new HttpException({ error: message }, HttpStatus.TOO_MANY_REQUESTS);
 }
 
-export type ScanInput = ScanRequest;
+export interface ScanInput {
+  qrPayload: string;
+  action?: string;
+  actions?: string[];
+}
 
 /**
  * Loyalty scan — visit / reward redeem / birthday redeem. Ported faithfully from

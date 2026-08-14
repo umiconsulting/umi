@@ -28,13 +28,13 @@ export class DeadLetterService {
   constructor(private readonly repo: QueueRepository) {}
 
   async recordTerminalFailure(job: Job, error: unknown): Promise<void> {
-    const category = error instanceof Error ? error.name : 'Error';
+    const message = error instanceof Error ? error.message : String(error);
     const merchantId = extractMerchantId(job.data);
 
     if (!merchantId) {
       this.logger.error(
         `dead-letter (no merchant — log only): ${job.queueName}/${job.name} #${job.id} ` +
-          `after ${job.attemptsMade} attempts: ${category}`,
+          `after ${job.attemptsMade} attempts: ${message}`,
       );
       return;
     }
@@ -47,12 +47,12 @@ export class DeadLetterService {
         sourceId: typeof job.id === 'string' && UUID_RE.test(job.id) ? job.id : null,
         eventType: job.name,
         payload: job.data,
-        error: category,
+        error: message,
         attempts: job.attemptsMade,
       });
       this.logger.error(
         `dead-lettered ${job.queueName}/${job.name} #${job.id} ` +
-          `after ${job.attemptsMade} attempts: ${category}`,
+          `after ${job.attemptsMade} attempts: ${message}`,
       );
     } catch (err) {
       this.logger.warn(

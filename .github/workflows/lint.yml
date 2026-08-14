@@ -68,12 +68,6 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      # Fast Refresh has a reviewed, file-and-rule-scoped warning baseline.
-      # A new warning category or a count increase fails this step.
-      - name: Lint warning baseline
-        if: '!cancelled()'
-        run: pnpm check:lint-warnings
-
       # Runs even when lint fails, so one CI round reports BOTH problems rather
       # than hiding the formatting behind the first error.
       - name: Format check

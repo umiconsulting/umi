@@ -33,7 +33,7 @@ describe('DeadLetterService', () => {
         merchantId: 't1',
         sourceTable: 'turns',
         eventType: 'turn.process',
-        error: 'Error',
+        error: 'boom',
         attempts: 3,
       }),
     );

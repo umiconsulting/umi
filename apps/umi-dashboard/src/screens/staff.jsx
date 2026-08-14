@@ -10,7 +10,7 @@ const PERMS = [
   { id: 'scan', label: 'Scan customer QR', sub: 'Register visits and redeem' },
   { id: 'topup', label: 'Top-up monedero', sub: 'Add balance to a wallet' },
   { id: 'analytics', label: 'View analytics', sub: 'KPI dashboard and reports' },
-  { id: 'settings', label: 'Administrar ajustes', sub: 'Horario, marca y promociones' },
+  { id: 'settings', label: 'Manage merchant settings', sub: 'Hours, branding, promos' },
   { id: 'staff', label: 'Manage staff', sub: 'Invite, remove, change roles' },
   { id: 'giftcards', label: 'View gift cards', sub: 'Issued cards and balances' },
 ];

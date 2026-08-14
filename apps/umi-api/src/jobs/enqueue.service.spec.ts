@@ -5,10 +5,7 @@ import { QUEUES } from './queues';
 import { JobPriority, toBullPriority } from './job-options';
 
 function makeQueue(): Queue {
-  return {
-    add: vi.fn().mockResolvedValue({ id: 'job-1' }),
-    getJobCounts: vi.fn().mockResolvedValue({ active: 0, waiting: 0, delayed: 0, paused: 0 }),
-  } as unknown as Queue;
+  return { add: vi.fn().mockResolvedValue({ id: 'job-1' }) } as unknown as Queue;
 }
 
 function serviceWithQueues(): { svc: EnqueueService; queues: Record<string, Queue> } {

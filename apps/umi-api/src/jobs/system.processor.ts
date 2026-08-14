@@ -4,7 +4,6 @@ import { QUEUES } from './queues';
 import { workerOptions } from './job-options';
 import { BaseProcessor } from './base.processor';
 import { DeadLetterService } from './dead-letter.service';
-import { PosCustomerValueRepository } from '../modules/pos-customer-value/pos-customer-value.repository';
 
 /**
  * Infra/maintenance queue processor. Proves the BullMQ wiring end-to-end and
@@ -14,21 +13,11 @@ import { PosCustomerValueRepository } from '../modules/pos-customer-value/pos-cu
  */
 @Processor(QUEUES.system, workerOptions(QUEUES.system))
 export class SystemProcessor extends BaseProcessor {
-  constructor(
-    deadLetters: DeadLetterService,
-    private readonly customerValue: PosCustomerValueRepository,
-  ) {
+  constructor(deadLetters: DeadLetterService) {
     super(deadLetters);
   }
 
   async process(job: Job): Promise<void> {
-    if (job.name === 'customer_value_authorization_expiry') {
-      const count = await this.customerValue.expireAllAuthorizations(
-        Number(job.data?.batchSize ?? 100),
-      );
-      this.logger.log(`customer value authorizations expired: ${count}`);
-      return;
-    }
     this.logger.log(`system job processed: ${job.name} #${job.id}`);
   }
 }

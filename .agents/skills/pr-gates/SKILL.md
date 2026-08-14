@@ -7,29 +7,22 @@ description: The validation gates that run every time a pull request is publishe
 
 A pull request is not publishable until the **Before** gates pass, not mergeable until the **During** gate is green, and not done until the **After** gate confirms it. Gates are ordered; a failing gate stops the flow — fix on the branch, never wave it through.
 
-Fixed point for every diff and affected filter: the merge-base with the PR base. `origin/main`
-is the default when the PR base is not supplied.
+Fixed point for every diff and affected filter: the merge-base with `main`.
 
 ```
-BASE_REF=${PR_BASE_REF:-origin/main}
-BASE=$(git merge-base "$BASE_REF" HEAD)
+BASE=$(git merge-base origin/main HEAD)
 ```
 
 ## Before — local, before the PR exists
 
 1. **Tests-first** (`tdd` skill) — new behavior ships with tests written test-first; the full affected suite is green, and every regression test is red-green verified (revert the fix → test fails → restore → passes). No test, no code.
 2. **Review** (`code-review` skill) — review `git diff $BASE...HEAD` for **Standards** (repo conventions); resolve every finding. If the PR links a Trello card (see `docs/agents/issue-tracker.md`), the **Spec** axis also checks the code against that card — resolve or consciously accept each Spec finding. An unlinked PR is normal; Standards gates on its own.
-3. **Mechanical green** — all return **0 errors and no warning above the approved baseline**. Read real output; never say "should pass":
+3. **Mechanical green** — all return **0 errors, 0 warnings**, read from real output (never "should pass"):
    ```
-   PR_BASE_REF=$BASE_REF pnpm check:pr
-   pnpm turbo run build lint test --filter=...[$BASE_REF]
+   pnpm turbo run build lint test --filter=...[origin/main]
    pnpm --filter <affected-pkg> typecheck      # per package, e.g. @umi/api
+   pnpm format:check
    ```
-
-   `pnpm check:pr` is the canonical pre-publication check. It runs the exact root lint and
-   format commands used by CI. It also checks the lint warning baseline, contract drift, JSON
-   data, generated artifacts, the UmiPOS use-case document, and Git whitespace. Run affected
-   builds and tests separately.
 
 Open the PR only when 1–3 are green.
 

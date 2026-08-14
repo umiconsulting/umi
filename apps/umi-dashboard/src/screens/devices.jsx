@@ -2,15 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { I } from '@/icons.jsx';
 import { XSep } from '@/shell.jsx';
 import {
-  approvePosEnrollmentRequest,
   approveDevicePairing,
-  createPosEnrollmentRequest,
   createKdsStation,
   deleteKdsStation,
   denyDevicePairing,
-  denyPosEnrollmentRequest,
   generateDevicePairingPin,
-  getPosEnrollmentRequests,
   revokeDevice,
   updateDevice,
   updateKdsStation,
@@ -50,12 +46,8 @@ const DevicesScreen = () => {
   const [refresh, setRefresh] = useState(0);
   const [stationOpen, setStationOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  const [posAddOpen, setPosAddOpen] = useState(false);
   const [editDevice, setEditDevice] = useState(null);
   const [countdown, setCountdown] = useState(POLL_INTERVAL);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [posRequests, setPosRequests] = useState([]);
-  const [posRequestError, setPosRequestError] = useState(null);
 
   // Auto-poll local heartbeat data so offline/online transitions are picked up.
   useEffect(function () {
@@ -67,7 +59,6 @@ const DevicesScreen = () => {
       setCountdown(POLL_INTERVAL);
     }, POLL_INTERVAL * 1000);
     const tickId = setInterval(function () {
-      setCurrentTime(Date.now());
       setCountdown(function (c) {
         return c <= 1 ? POLL_INTERVAL : c - 1;
       });
@@ -81,25 +72,6 @@ const DevicesScreen = () => {
   const { data: rawDevices, loading } = useDevicesData(refresh);
   const { data: stations } = useKdsStations(refresh);
   const { data: pairings } = useDevicePairings(refresh);
-  useEffect(
-    function () {
-      let active = true;
-      getPosEnrollmentRequests()
-        .then(function (result) {
-          if (active) {
-            setPosRequests(result.requests || []);
-            setPosRequestError(null);
-          }
-        })
-        .catch(function (error) {
-          if (active) setPosRequestError(error.message);
-        });
-      return function () {
-        active = false;
-      };
-    },
-    [refresh],
-  );
   const devices = (rawDevices || []).map(function (d) {
     // Heartbeat (local, 5-s cadence) is the authoritative connection signal.
     // last_used_at (cloud) only updates on order bumps — not a heartbeat.
@@ -159,9 +131,6 @@ const DevicesScreen = () => {
           </button>
           <button className="btn btn-primary focusable" onClick={() => setAddOpen(true)}>
             <I.Plus size={16} /> Añadir dispositivo
-          </button>
-          <button className="btn btn-primary focusable" onClick={() => setPosAddOpen(true)}>
-            <I.Tablet size={16} /> Registrar UmiPOS
           </button>
         </div>
       </div>
@@ -322,17 +291,9 @@ const DevicesScreen = () => {
         <PairingRequestsCard
           pairings={pairings}
           stations={stations || []}
-          currentTime={currentTime}
           onChanged={() => setRefresh((r) => r + 1)}
         />
       )}
-
-      <PosEnrollmentRequestsCard
-        requests={posRequests}
-        error={posRequestError}
-        currentTime={currentTime}
-        onChanged={() => setRefresh((r) => r + 1)}
-      />
 
       {/* Connection legend */}
       <div
@@ -377,12 +338,6 @@ const DevicesScreen = () => {
           onProvisioned={() => setRefresh((r) => r + 1)}
         />
       )}
-      {posAddOpen && (
-        <AddPosDevicePanel
-          onClose={() => setPosAddOpen(false)}
-          onCreated={() => setRefresh((r) => r + 1)}
-        />
-      )}
       {editDevice && (
         <EditDevicePanel
           device={editDevice}
@@ -411,7 +366,7 @@ function pairingErrorMessage(err) {
   );
 }
 
-const PairingRequestsCard = ({ pairings, stations, currentTime, onChanged }) => {
+const PairingRequestsCard = ({ pairings, stations, onChanged }) => {
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
   const stationById = Object.fromEntries(
@@ -485,9 +440,7 @@ const PairingRequestsCard = ({ pairings, stations, currentTime, onChanged }) => 
           const requested = p.requested_name || 'Esperando iPad';
           const pendingApproval = p.status === 'pending' && p.requested_name;
           const expired =
-            p.status === 'pending' &&
-            p.expires_at &&
-            new Date(p.expires_at).getTime() < currentTime;
+            p.status === 'pending' && p.expires_at && new Date(p.expires_at).getTime() < Date.now();
           return (
             <div key={p.id} className="list-card" style={{ padding: 14, alignItems: 'center' }}>
               <div style={{ paddingLeft: 14, flex: 1, minWidth: 0 }}>
@@ -1268,256 +1221,6 @@ const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
             <I.Refresh size={15} />{' '}
             {saving ? 'Generando…' : pairing ? 'PIN generado' : 'Generar PIN'}
           </button>
-        </div>
-      </aside>
-    </>
-  );
-};
-
-const POS_STATE_LABELS = {
-  created: 'Código creado',
-  awaiting_approval: 'Requiere aprobación',
-  credential_ready: 'Aprobado',
-  credential_delivered: 'Credencial entregada',
-  completed: 'Completado',
-  denied: 'Denegado',
-  expired: 'Expirado',
-  cancelled: 'Cancelado',
-};
-
-const PosEnrollmentRequestsCard = ({ requests, error, currentTime, onChanged }) => {
-  const [busy, setBusy] = useState(null);
-  const [actionError, setActionError] = useState(null);
-  const visible = (requests || []).filter(function (request) {
-    return (
-      request.state !== 'completed' || currentTime - new Date(request.createdAt).getTime() < 3600000
-    );
-  });
-
-  async function decide(request, approved) {
-    setBusy(request.id);
-    setActionError(null);
-    try {
-      if (approved) await approvePosEnrollmentRequest(request.id);
-      else await denyPosEnrollmentRequest(request.id);
-    } catch (failure) {
-      console.error('[umipos] enrollment decision failed', failure);
-      setActionError('No se pudo guardar la decisión. Actualiza y vuelve a intentarlo.');
-    } finally {
-      setBusy(null);
-      onChanged && onChanged();
-    }
-  }
-
-  return (
-    <section className="card fade-up d3" style={{ padding: '18px 22px' }}>
-      <div
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}
-      >
-        <div>
-          <div className="eyebrow">UmiPOS</div>
-          <h2 className="h-section" style={{ marginTop: 4 }}>
-            Solicitudes de registro
-          </h2>
-        </div>
-        <button className="btn btn-ghost btn-sm focusable" onClick={onChanged}>
-          <I.Refresh size={14} /> Actualizar
-        </button>
-      </div>
-      {(error || actionError) && (
-        <div
-          role="alert"
-          style={{
-            marginTop: 12,
-            color: 'var(--danger)',
-            background: 'var(--danger-soft)',
-            borderRadius: 10,
-            padding: '9px 12px',
-          }}
-        >
-          {actionError || error}
-        </div>
-      )}
-      {visible.length === 0 ? (
-        <p style={{ color: 'var(--ink-3)', marginBottom: 0 }}>No hay solicitudes de UmiPOS.</p>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-          {visible.map(function (request) {
-            const pending = request.state === 'awaiting_approval';
-            return (
-              <div key={request.id} className="list-card" style={{ padding: 14 }}>
-                <div style={{ paddingLeft: 14, flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <b>{request.displayName}</b>
-                    <span className="chip">{POS_STATE_LABELS[request.state] || request.state}</span>
-                  </div>
-                  <div style={{ color: 'var(--ink-3)', fontSize: 12, marginTop: 4 }}>
-                    {request.type} · {request.requestedPlatform || request.platform}
-                    {request.installationReference
-                      ? ` · Instalación ${request.installationReference}`
-                      : ''}
-                  </div>
-                </div>
-                {pending && (
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      className="btn btn-ghost btn-sm focusable"
-                      disabled={busy === request.id}
-                      onClick={() => decide(request, false)}
-                    >
-                      Denegar
-                    </button>
-                    <button
-                      className="btn btn-primary btn-sm focusable"
-                      disabled={busy === request.id}
-                      onClick={() => decide(request, true)}
-                    >
-                      Aprobar
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-};
-
-const AddPosDevicePanel = ({ onClose, onCreated }) => {
-  const [name, setName] = useState('');
-  const [platform, setPlatform] = useState('web');
-  const [deviceType, setDeviceType] = useState('pos_terminal');
-  const [created, setCreated] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const branchId = window.localStorage.getItem('umi-dashboard-selected-location');
-
-  async function createRequest() {
-    setSaving(true);
-    setError(null);
-    try {
-      const result = await createPosEnrollmentRequest({
-        branchId: branchId || null,
-        displayName: name.trim(),
-        type: deviceType,
-        platform,
-        idempotencyKey: crypto.randomUUID(),
-      });
-      setCreated(result);
-      onCreated && onCreated();
-    } catch (failure) {
-      console.error('[umipos] enrollment request failed', failure);
-      setError('No se pudo crear el código. Verifica la sucursal y vuelve a intentarlo.');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <>
-      <div className="sheet-backdrop" onClick={onClose} />
-      <aside className="sheet" aria-labelledby="pos-enrollment-title">
-        <div className="sheet-head">
-          <div>
-            <div className="eyebrow">UmiPOS</div>
-            <h2 id="pos-enrollment-title" className="h-section" style={{ marginTop: 4 }}>
-              Registrar dispositivo
-            </h2>
-          </div>
-          <button className="btn-icon focusable" onClick={onClose} aria-label="Cerrar">
-            <I.X size={16} />
-          </button>
-        </div>
-        <div className="sheet-body">
-          {!created ? (
-            <>
-              <div className="field">
-                <label htmlFor="pos-device-name">Nombre del dispositivo</label>
-                <input
-                  id="pos-device-name"
-                  className="input tall"
-                  value={name}
-                  maxLength={120}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Caja principal"
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="pos-device-type">Tipo</label>
-                <select
-                  id="pos-device-type"
-                  className="select"
-                  value={deviceType}
-                  onChange={(event) => setDeviceType(event.target.value)}
-                >
-                  <option value="pos_terminal">Terminal UmiPOS</option>
-                  <option value="kds">Pantalla KDS</option>
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="pos-device-platform">Plataforma</label>
-                <select
-                  id="pos-device-platform"
-                  className="select"
-                  value={platform}
-                  onChange={(event) => setPlatform(event.target.value)}
-                >
-                  <option value="web">Web</option>
-                  <option value="linux">Linux</option>
-                  <option value="macos">macOS</option>
-                  <option value="windows">Windows</option>
-                  <option value="android">Android</option>
-                  <option value="ios">iOS</option>
-                </select>
-              </div>
-              <p style={{ color: 'var(--ink-3)', fontSize: 13 }}>
-                La solicitud queda vinculada al negocio y a la sucursal seleccionada.
-              </p>
-            </>
-          ) : (
-            <div className="card-warm" style={{ padding: 24, textAlign: 'center' }}>
-              <div className="eyebrow on-warm">Código de configuración</div>
-              <div
-                aria-label={`Código ${created.setupCode}`}
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 38,
-                  letterSpacing: '0.12em',
-                  marginTop: 12,
-                  color: 'var(--ink-warm)',
-                }}
-              >
-                {created.setupCode.slice(0, 4)} {created.setupCode.slice(4)}
-              </div>
-              <p style={{ color: 'var(--ink-warm-soft)', marginBottom: 0 }}>
-                Escribe este código en UmiPOS. Después, aprueba la solicitud en esta pantalla.
-              </p>
-              <p style={{ color: 'var(--ink-warm-soft)', fontSize: 12 }}>
-                Expira a las {new Date(created.expiresAt).toLocaleTimeString('es-MX')}.
-              </p>
-            </div>
-          )}
-          {error && (
-            <div role="alert" style={{ color: 'var(--danger)' }}>
-              {error}
-            </div>
-          )}
-        </div>
-        <div className="sheet-foot">
-          <button className="btn btn-ghost focusable" onClick={onClose}>
-            Cerrar
-          </button>
-          {!created && (
-            <button
-              className="btn btn-primary focusable"
-              disabled={!name.trim() || saving}
-              onClick={createRequest}
-            >
-              {saving ? 'Creando…' : 'Crear código'}
-            </button>
-          )}
         </div>
       </aside>
     </>

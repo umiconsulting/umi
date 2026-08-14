@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CatalogMoney, CatalogSaleAction } from './pos-catalog';
+import { CatalogMoney } from './pos-catalog';
 
 const Uuid = z.string().uuid();
 const Timestamp = z.string().datetime({ offset: true });
@@ -40,7 +40,6 @@ export const CartItem = z
     id: Uuid,
     productId: Uuid,
     productName: z.string().min(1).max(240),
-    saleAction: CatalogSaleAction,
     quantity: z.number().int().min(1).max(999),
     variant: VariantSelection.nullable(),
     modifiers: z.array(ModifierSelection).max(100),
@@ -57,7 +56,6 @@ export const DiscountPreview = z
           code: z.string().max(80),
           label: z.string().max(160),
           amount: CatalogMoney,
-          lineId: Uuid.nullable().default(null),
         }),
       )
       .max(20),
@@ -78,7 +76,7 @@ export const Cart = z
     merchantId: Uuid,
     locationId: Uuid,
     operatorSessionId: Uuid,
-    status: z.enum(['draft', 'prepared', 'committed', 'abandoned']),
+    status: z.enum(['draft', 'prepared', 'abandoned']),
     version: z.number().int().positive(),
     items: z.array(CartItem).max(250),
     totals: TotalsPreview,
@@ -116,7 +114,6 @@ export const RemoveCartLineRequest = z
     idempotencyKey: Idempotency,
   })
   .strict();
-export const ClearCartRequest = RemoveCartLineRequest;
 export const PrepareSaleRequest = z
   .object({
     cartId: Uuid,
@@ -133,7 +130,6 @@ export type CartItem = z.infer<typeof CartItem>;
 export type CartLineInput = z.infer<typeof CartLineInput>;
 export type CreateCartRequest = z.infer<typeof CreateCartRequest>;
 export type RemoveCartLineRequest = z.infer<typeof RemoveCartLineRequest>;
-export type ClearCartRequest = z.infer<typeof ClearCartRequest>;
 export type PrepareSaleRequest = z.infer<typeof PrepareSaleRequest>;
 export type CartQuery = z.infer<typeof CartQuery>;
 export const posCartModels = {
@@ -147,7 +143,6 @@ export const posCartModels = {
   CreateCartRequest,
   CartLineInput,
   RemoveCartLineRequest,
-  ClearCartRequest,
   PrepareSaleRequest,
   CartQuery,
 };

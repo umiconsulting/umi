@@ -16,8 +16,6 @@ const {
   LoginRequest,
   SessionResponse,
   OkResponse,
-  PosPinLoginRequest,
-  CreateStaffRequest,
 } = require('../dist/index.cjs');
 
 test('ScanRequest', () => {
@@ -132,45 +130,8 @@ test('session schemas (auth surface) — representative parse', () => {
         merchants: [{ id: 't', handle: 's', name: 'n', roles: ['owner'] }],
         provider: 'local',
         accessExpiresIn: 1800,
-        sessionId: '00000000-0000-4000-8000-000000000001',
-        deviceId: null,
       },
     }).success,
-  );
-});
-
-test('POS PIN login requires scoped device input and four to eight digits', () => {
-  const request = {
-    pin: '2468',
-    merchantId: '00000000-0000-4000-8000-000000000001',
-    locationId: '00000000-0000-4000-8000-000000000002',
-    installationId: '00000000-0000-4000-8000-000000000003',
-  };
-  assert.ok(PosPinLoginRequest.safeParse(request).success);
-  assert.equal(PosPinLoginRequest.safeParse({ ...request, pin: '123' }).success, false);
-  assert.equal(PosPinLoginRequest.safeParse({ ...request, pin: '123456789' }).success, false);
-  assert.equal(PosPinLoginRequest.safeParse({ ...request, locationId: 'wrong' }).success, false);
-});
-
-test('staff creation accepts a personal operator PIN without exposing it in responses', () => {
-  assert.ok(
-    CreateStaffRequest.safeParse({
-      name: 'Cashier',
-      email: 'cashier@example.test',
-      role: 'cashier',
-      locationId: null,
-      operatorPin: '2468',
-    }).success,
-  );
-  assert.equal(
-    CreateStaffRequest.safeParse({
-      name: 'Cashier',
-      email: 'cashier@example.test',
-      role: 'cashier',
-      locationId: null,
-      operatorPin: '12ab',
-    }).success,
-    false,
   );
 });
 

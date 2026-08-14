@@ -12,16 +12,7 @@ import { posCatalogModels } from './pos-catalog';
 import { posCartModels } from './pos-cart';
 import { posCheckoutModels } from './pos-checkout';
 import { posOfflineModels } from './pos-offline';
-import { posSaleModels } from './pos-sale';
-import { posCashModels } from './pos-cash';
-import { posExceptionModels } from './pos-exception';
-import { posInventoryModels } from './pos-inventory';
-import { posCustomerValueModels } from './pos-customer-value';
-import { posHardwareModels } from './pos-hardware';
-import { posKitchenModels } from './pos-kitchen';
-import { dashboardOperationsModels } from './dashboard-operations';
 import { ROUTE_TABLE, type RouteContract } from './route-table';
-import type { ZodTypeAny } from 'zod';
 
 /**
  * Semantic version of the generated artifact. This is NOT the URL major — see
@@ -33,7 +24,7 @@ import type { ZodTypeAny } from 'zod';
  * breaking change to the described paths, so the artifact major moves, even though
  * no client is pinned in the field yet and the URL major is unchanged at 1.
  */
-export const CONTRACT_VERSION = '2.12.0';
+export const CONTRACT_VERSION = '2.0.0';
 
 /** The major in the URL. A v1 client never silently receives v2 behaviour. */
 export const API_MAJOR_VERSION = 1;
@@ -64,7 +55,7 @@ export const routeCatalog: Readonly<Record<string, RouteContract>> = Object.free
   ),
 );
 
-export const modelCatalog: Readonly<Record<string, ZodTypeAny>> = {
+export const modelCatalog = {
   ...httpModels,
   ...contractModels,
   ...deviceModels,
@@ -72,14 +63,6 @@ export const modelCatalog: Readonly<Record<string, ZodTypeAny>> = {
   ...posCartModels,
   ...posCheckoutModels,
   ...posOfflineModels,
-  ...posSaleModels,
-  ...posCashModels,
-  ...posExceptionModels,
-  ...posInventoryModels,
-  ...posCustomerValueModels,
-  ...posHardwareModels,
-  ...posKitchenModels,
-  ...dashboardOperationsModels,
 };
 
 export const invariantCatalog = {
@@ -96,28 +79,6 @@ export const invariantCatalog = {
    * charge — the client must query the command result instead.
    */
   IdempotencyRetention: 'A command result replays for 72 hours, then returns IDEMPOTENCY_EXPIRED.',
-  PostSaleCompensation:
-    'Original sale facts stay immutable. Each exception creates linked append-only compensation facts.',
-  RefundLimit:
-    'Cumulative line, tax, discount, tip, tender, and cash compensation cannot exceed original facts.',
-  RefundAmbiguity: 'An unknown terminal refund is query-only and blocks a replacement refund.',
-  InventoryLedger:
-    'Every stock effect is an immutable ledger fact. A projection is never the sole authority.',
-  InventoryAtomicity:
-    'A stock-tracked sale and its inventory effects commit in one database transaction.',
-  InventoryRestockLimit:
-    'A restock cannot exceed the refunded quantity or the original stock consumption.',
-  CustomerPrivacy:
-    'Customer identity is merchant scoped. Receipt delivery never grants marketing consent.',
-  LoyaltyLedger:
-    'Every points effect is an immutable ledger fact. A projection is never the sole authority.',
-  StoredValueAtomicity: 'A stored-value debit and its committed sale are one database transaction.',
-  HardwareSideEffect:
-    'A hardware command has stable identity. An unknown physical outcome is never retried blindly.',
-  KitchenAuthority:
-    'A kitchen projection references one committed sale. A KDS command cannot change a financial fact.',
-  KitchenEventOrder:
-    'A client applies only a newer aggregate version. It recovers a gap from the authoritative snapshot.',
 } as const;
 
 /** Hours a recorded command result stays replayable. Mirrored by `business_command.expires_at`. */

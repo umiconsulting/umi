@@ -11,15 +11,6 @@ function make() {
     findResetToken: vi.fn(),
     updatePassword: vi.fn().mockResolvedValue(undefined),
     markResetTokenUsed: vi.fn().mockResolvedValue(undefined),
-    validatePosSession: vi.fn(),
-    rotatePosSessionToken: vi.fn().mockResolvedValue(true),
-    revokePosSession: vi.fn().mockResolvedValue(undefined),
-    revokePosSessionsForOperator: vi.fn().mockResolvedValue(undefined),
-    createDashboardSession: vi.fn().mockResolvedValue(undefined),
-    validateDashboardSession: vi.fn().mockResolvedValue(true),
-    rotateDashboardSession: vi.fn().mockResolvedValue(true),
-    revokeDashboardSession: vi.fn().mockResolvedValue(undefined),
-    revokeDashboardSessionsForUser: vi.fn().mockResolvedValue(undefined),
   };
   const passwords = { verify: vi.fn(), hash: vi.fn() };
   const jwt = {
@@ -27,7 +18,6 @@ function make() {
     signRefresh: vi.fn().mockResolvedValue('refresh-tok'),
     signMfaChallenge: vi.fn().mockResolvedValue('challenge-tok'),
     verifyMfaChallenge: vi.fn().mockResolvedValue('u1'),
-    verifyRefresh: vi.fn().mockResolvedValue({ sub: 'u1', sessionId: 'session-1' }),
   };
   const email = { send: vi.fn().mockResolvedValue({ messageId: 'm1' }) };
   const config = { get: vi.fn().mockReturnValue('https://app.test') };
@@ -36,9 +26,6 @@ function make() {
     issueChallenge: vi.fn().mockResolvedValue(undefined),
     verifyCode: vi.fn().mockResolvedValue(undefined),
   };
-  const rateLimit = {
-    hit: vi.fn().mockReturnValue({ allowed: true, resetAt: Date.now() + 1_000 }),
-  };
   const svc = new AuthService(
     repo as never,
     passwords,
@@ -46,7 +33,6 @@ function make() {
     email as never,
     config as never,
     mfa as never,
-    rateLimit as never,
   );
   return { svc, repo, passwords, jwt, email, mfa };
 }
@@ -84,9 +70,6 @@ describe('AuthService.login', () => {
       email: 'owner@kala.co',
       displayName: 'Owner',
     });
-    expect(h.repo.createDashboardSession).toHaveBeenCalledWith(
-      expect.objectContaining({ id: expect.any(String), userId: 'u1' }),
-    );
   });
 
   it('401s on wrong password', async () => {
@@ -98,45 +81,6 @@ describe('AuthService.login', () => {
   it('401s (no enumeration) on unknown user', async () => {
     h.repo.findCredentialByEmail.mockResolvedValue(null);
     await expect(h.svc.login('nobody@x.co', 'pw')).rejects.toBeInstanceOf(UnauthorizedException);
-  });
-});
-
-describe('AuthService POS session lifecycle', () => {
-  let h: ReturnType<typeof make>;
-  beforeEach(() => {
-    h = make();
-    h.repo.findUserById.mockResolvedValue({
-      userId: 'u1',
-      email: 'owner@kala.co',
-      displayName: 'Owner',
-    });
-  });
-
-  it('rotates a device-bound POS session', async () => {
-    h.repo.validatePosSession.mockResolvedValue({ deviceId: 'device-1' });
-    const result = await h.svc.posRefresh({
-      refreshToken: 'old-refresh',
-      installationId: 'installation-1',
-      deviceCredential: 'credential-1',
-    });
-    expect(result.deviceId).toBe('device-1');
-    expect(h.repo.rotatePosSessionToken).toHaveBeenCalledWith('session-1', expect.any(String));
-  });
-
-  it('rejects refresh after device authority ends', async () => {
-    h.repo.validatePosSession.mockResolvedValue(null);
-    await expect(
-      h.svc.posRefresh({
-        refreshToken: 'old-refresh',
-        installationId: 'installation-1',
-        deviceCredential: 'credential-1',
-      }),
-    ).rejects.toBeInstanceOf(UnauthorizedException);
-  });
-
-  it('revokes the original session on logout', async () => {
-    await h.svc.posLogout('refresh-token');
-    expect(h.repo.revokePosSession).toHaveBeenCalledWith('session-1', 'u1', expect.any(String));
   });
 });
 

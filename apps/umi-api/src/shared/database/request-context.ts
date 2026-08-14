@@ -8,11 +8,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
  */
 export interface RequestContext {
   merchantId: string | null;
-  locationId?: string | null;
-  deviceId?: string | null;
   userId: string | null;
   requestId: string;
-  correlationId?: string;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();

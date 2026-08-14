@@ -1,7 +1,9 @@
 import Foundation
 import os
 
-/// Sends periodic heartbeats to the UMI API.
+/// Sends periodic heartbeats to the dashboard so it can track device liveness.
+/// Only active when KDSHeartbeatURL is set in Info.plist. Safe to start without
+/// a configured URL — it silently skips each interval.
 actor KDSHeartbeatClient {
     private let configuration: KDSBackendConfiguration?
     private let session: URLSession
@@ -32,14 +34,17 @@ actor KDSHeartbeatClient {
     }
 
     private func send(to url: URL, deviceSession: DeviceSession) async {
-        guard let deviceToken = deviceSession.deviceToken, !deviceToken.isEmpty else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(deviceToken, forHTTPHeaderField: "X-KDS-Device-Token")
         request.timeoutInterval = 5
 
-        let body = ["action": "heartbeat"]
+        let body: [String: String?] = [
+            "device_id":   deviceSession.deviceID,
+            "device_name": deviceSession.deviceName,
+            "station_id":  deviceSession.station.id,
+            "station_name": deviceSession.station.name,
+        ]
 
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body.compactMapValues { $0 })

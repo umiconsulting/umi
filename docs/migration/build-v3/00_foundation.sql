@@ -19,25 +19,6 @@ create schema if not exists umi;
 create schema if not exists merchant;
 create schema if not exists runtime;
 
--- Gate-specific DDL files need these fail-closed scope helpers before 90_rls.
-create or replace function umi.current_merchant() returns uuid
-  language sql stable
-  set search_path = pg_catalog as $$
-  select nullif(current_setting('app.current_merchant', true), '')::uuid
-$$;
-
-create or replace function umi.current_location() returns uuid
-  language sql stable
-  set search_path = pg_catalog as $$
-  select nullif(current_setting('app.current_location', true), '')::uuid
-$$;
-
-create or replace function umi.current_device() returns uuid
-  language sql stable
-  set search_path = pg_catalog as $$
-  select nullif(current_setting('app.current_device', true), '')::uuid
-$$;
-
 -- Extensions (own schema, matches Supabase layout)
 create schema if not exists extensions;
 create extension if not exists vector schema extensions;   -- pgvector -> runtime.*_embedding

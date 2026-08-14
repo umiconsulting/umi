@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { COOKIE_AUTH, LOCAL_SESSION, apiUrl, withCreds, errMessage } from './config.js';
+import { CFG, COOKIE_AUTH, LOCAL_SESSION, apiUrl, withCreds, errMessage } from './config.js';
+import { supabase } from './supabase.js';
 import { routes } from '@umi/contract/routes';
 
 const AuthContext = createContext(null);
@@ -22,7 +23,18 @@ export function getStoredSession() {
 }
 
 export async function getAuthHeaders() {
-  return {};
+  // umi-api: auth rides in the httpOnly cookie (sent via credentials:'include'), no header.
+  if (COOKIE_AUTH) return {};
+
+  if (CFG.authMode === 'local') {
+    const session = getLocalSession();
+    return session?.user?.id ? { 'X-UMI-User-ID': session.user.id } : {};
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return session ? { Authorization: 'Bearer ' + session.access_token } : {};
 }
 
 // ---------------------------------------------------------------------------
@@ -152,13 +164,28 @@ export function startSessionAutoRefresh() {
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(undefined); // undefined = loading
+  const [needsPasswordReset, setNeedsPasswordReset] = useState(false);
+
   useEffect(() => {
-    setSession(getLocalSession());
-    return startSessionAutoRefresh();
+    if (LOCAL_SESSION) {
+      setSession(getLocalSession());
+      return startSessionAutoRefresh();
+    }
+
+    supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === 'PASSWORD_RECOVERY') setNeedsPasswordReset(true);
+      setSession(s);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ session, loading: session === undefined }}>
+    <AuthContext.Provider
+      value={{ session, loading: session === undefined, needsPasswordReset, setNeedsPasswordReset }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -173,30 +200,46 @@ export async function signIn(email, password, remember = false) {
   // is umi-api sets an httpOnly cookie (withCreds sends/stores it) while server.js relies on the
   // localStorage session id echoed as X-UMI-User-ID. Either way we cache session.* for the UI.
   // `remember` makes umi-api issue persistent cookies (vs session cookies).
-  const res = await fetch(
-    apiUrl(routes.auth.login),
-    withCreds({
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: email, password, remember }),
-    }),
-  );
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(errMessage(payload, 'Credenciales incorrectas'));
-  setLocalSession(payload.session);
-  window.location.assign('/');
-  return payload.session;
+  if (LOCAL_SESSION) {
+    const res = await fetch(
+      apiUrl(routes.auth.login),
+      withCreds({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: email, password, remember }),
+      }),
+    );
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(errMessage(payload, 'Credenciales incorrectas'));
+    setLocalSession(payload.session);
+    window.location.assign('/');
+    return payload.session;
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  return data.session;
 }
 
 export async function signOut() {
-  try {
-    const res = await fetch(apiUrl(routes.auth.logout), withCreds({ method: 'POST' }));
-    if (!res.ok) {
-      console.warn(`logout failed (${res.status}); auth cookie may persist server-side`);
+  if (LOCAL_SESSION) {
+    // umi-api: clear the httpOnly cookie server-side (best-effort) before dropping local state.
+    if (COOKIE_AUTH) {
+      // fetch only rejects on network errors and a non-OK status is not thrown,
+      // so check both — a failed server logout can leave the httpOnly cookie
+      // valid. We still clear local state + redirect, but never silently.
+      try {
+        const res = await fetch(apiUrl(routes.auth.logout), withCreds({ method: 'POST' }));
+        if (!res.ok)
+          console.warn(`logout failed (${res.status}); auth cookie may persist server-side`);
+      } catch (err) {
+        console.warn('logout request failed; auth cookie may persist server-side', err);
+      }
     }
-  } catch (err) {
-    console.warn('logout request failed; auth cookie may persist server-side', err);
+    window.localStorage.removeItem(LOCAL_SESSION_KEY);
+    window.location.assign('/login');
+    return;
   }
-  window.localStorage.removeItem(LOCAL_SESSION_KEY);
-  window.location.assign('/login');
+
+  await supabase.auth.signOut();
 }

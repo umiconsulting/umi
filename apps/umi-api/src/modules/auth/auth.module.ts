@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { AuthController, PosAuthController } from './auth.controller';
+import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthRepository } from './auth.repository';
 import { AuthGuard } from './auth.guard';
@@ -8,7 +8,6 @@ import { PublicMerchantGuard } from './public-merchant.guard';
 import { EntitlementGuard } from './entitlement.guard';
 import { RolesGuard } from './roles.guard';
 import { MfaService } from './mfa.service';
-import { CsrfGuard } from './csrf.guard';
 
 /**
  * Auth domain (D9). Owns login/refresh/logout/reset + the four guards that the
@@ -17,7 +16,7 @@ import { CsrfGuard } from './csrf.guard';
  * PasswordService/JwtService come from the global SharedAuthModule.
  */
 @Module({
-  controllers: [AuthController, PosAuthController],
+  controllers: [AuthController],
   providers: [
     AuthService,
     AuthRepository,
@@ -27,7 +26,6 @@ import { CsrfGuard } from './csrf.guard';
     PublicMerchantGuard,
     EntitlementGuard,
     RolesGuard,
-    CsrfGuard,
   ],
   exports: [
     AuthRepository,
@@ -36,7 +34,6 @@ import { CsrfGuard } from './csrf.guard';
     PublicMerchantGuard,
     EntitlementGuard,
     RolesGuard,
-    CsrfGuard,
   ],
 })
 export class AuthModule {}

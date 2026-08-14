@@ -25,7 +25,6 @@ const ACCESS: MerchantAccess = {
   role: 'owner',
   roles: ['owner'],
   permissions: ['*'],
-  locationId: null,
 };
 
 const LOCS = [
@@ -56,7 +55,9 @@ describe('MerchantsService.buildCapabilities', () => {
       reason: 'product_missing',
       product: 'cash',
     });
-    // Permission authority controls the module. A wildcard fixture has access.
+    // super_admin-only module: owner with ['*'] permissions passes the role gate
+    // only when dashboard is active AND role matches; owner != super_admin, but
+    // permissions includes '*' → available.
     expect(caps.modules['products-billing'].available).toBe(true);
   });
 
@@ -72,13 +73,6 @@ describe('MerchantsService.buildCapabilities', () => {
     h.repo.loadProducts.mockResolvedValue({});
     const caps = await h.svc.buildCapabilities(ACCESS, 'l1');
     expect(caps.selectedLocation?.id).toBe('l1');
-  });
-
-  it('limits a location-bound membership to its assigned location', async () => {
-    h.repo.loadProducts.mockResolvedValue({ dashboard: { status: 'active' } });
-    const caps = await h.svc.buildCapabilities({ ...ACCESS, locationId: 'l2' }, 'l1');
-    expect(caps.locations.map((location) => location.id)).toEqual(['l2']);
-    expect(caps.selectedLocation?.id).toBe('l2');
   });
 });
 

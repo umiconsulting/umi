@@ -21,25 +21,21 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>KDSBackendURL</key>
-	<string>$(KDS_BACKEND_URL)</string>
-	<key>KDSEnvironment</key>
-	<string>$(KDS_ENVIRONMENT)</string>
-	<key>KDSReleaseVersion</key>
-	<string>$(KDS_RELEASE_VERSION)</string>
-	<key>KDSReleaseGitCommit</key>
-	<string>$(KDS_RELEASE_GIT_COMMIT)</string>
-	<key>KDSReleaseBuildTimestamp</key>
-	<string>$(KDS_RELEASE_BUILD_TIMESTAMP)</string>
-	<key>KDSContractVersion</key>
-	<string>$(KDS_CONTRACT_VERSION)</string>
+	<string>https://api.umiconsulting.co</string>
+	<key>KDSPairingURL</key>
+	<string>https://api.umiconsulting.co/kds/pairing</string>
+	<key>KDSBoardURL</key>
+	<string>https://api.umiconsulting.co/kds/board</string>
+	<key>KDSCommandURL</key>
+	<string>https://api.umiconsulting.co/kds/command</string>
 	<key>KDSBusinessID</key>
-	<string>$(KDS_BUSINESS_ID)</string>
+	<string>ef9005a2-efe1-45bf-9da0-313b5902d9b4</string>
 	<key>KDSStationID</key>
-	<string>$(KDS_STATION_ID)</string>
+	<string>expo</string>
 	<key>KDSStationName</key>
-	<string>$(KDS_STATION_NAME)</string>
+	<string>Expo</string>
 	<key>KDSDeviceName</key>
-	<string>$(KDS_DEVICE_NAME)</string>
+	<string>Kitchen iPad</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Umi KDS uses the local network to pair this iPad with your Umi dashboard.</string>
 	<key>NSAppTransportSecurity</key>

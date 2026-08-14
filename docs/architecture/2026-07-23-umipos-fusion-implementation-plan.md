@@ -1,9 +1,9 @@
 # UmiPOS Fusion and Product Development Plan
 
-**Status:** Decision-complete implementation plan
-**Date:** 2026-07-23
-**Owners:** Umi platform, POS client, KDS, dashboard, operations
-**Pilot:** Kalala, one café branch
+**Status:** Decision-complete implementation plan  
+**Date:** 2026-07-23  
+**Owners:** Umi platform, POS client, KDS, dashboard, operations  
+**Pilot:** Kalala, one café branch  
 **Canonical architecture:** One Umi backend and one Supabase PostgreSQL database
 
 ## 1. Executive decision

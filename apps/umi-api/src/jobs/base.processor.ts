@@ -2,7 +2,6 @@ import { Logger } from '@nestjs/common';
 import { OnWorkerEvent, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { DeadLetterService } from './dead-letter.service';
-import { errorCategory } from '../shared/operations/redaction';
 
 /**
  * Base class for every BullMQ processor. Subclasses implement `process(job)`;
@@ -28,7 +27,7 @@ export abstract class BaseProcessor extends WorkerHost {
     if (job.attemptsMade < maxAttempts) {
       this.logger.warn(
         `retry ${job.attemptsMade}/${maxAttempts} ${job.queueName}/${job.name} ` +
-          `#${job.id} category=${errorCategory(error)}`,
+          `#${job.id}: ${error.message}`,
       );
       return;
     }

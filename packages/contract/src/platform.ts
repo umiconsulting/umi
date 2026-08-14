@@ -342,8 +342,6 @@ export const ReceiptLineSnapshot = z
     variantName: z.string().min(1).max(160).nullable().optional(),
     modifiers: z.array(z.string().min(1).max(160)).max(100).optional(),
     tax: Money.optional(),
-    discount: Money.optional(),
-    tip: Money.optional(),
     note: z.string().max(500).nullable().optional(),
   })
   .strict();
@@ -374,22 +372,6 @@ export const ReceiptSnapshot = z
       })
       .strict()
       .optional(),
-    payments: z
-      .array(
-        z
-          .object({
-            tenderId: Uuid,
-            method: z.enum(['cash', 'manual_terminal', 'wallet', 'gift_card']),
-            amount: Money,
-            received: Money.nullable(),
-            change: Money,
-          })
-          .strict(),
-      )
-      .max(8)
-      .optional(),
-    tip: Money.optional(),
-    receiptDestination: z.enum(['display', 'print_later', 'digital', 'none']).optional(),
     discountTotal: Money.optional(),
   })
   .strict();
@@ -457,31 +439,6 @@ export const API_ERROR_CODES = [
   'CHECKOUT_CONFIRMATION_REQUIRED',
   'CHECKOUT_CART_CHANGED',
   'INVENTORY_UNAVAILABLE',
-  'INVENTORY_PARTIALLY_AVAILABLE',
-  'INVENTORY_POLICY_REQUIRED',
-  'INVENTORY_POLICY_CHANGED',
-  'INVENTORY_MAPPING_REQUIRED',
-  'INVENTORY_MAPPING_CHANGED',
-  'INVENTORY_CONSUMPTION_REQUIRED',
-  'INVENTORY_ITEM_ARCHIVED',
-  'INVENTORY_LOCATION_CHANGED',
-  'INVENTORY_UNIT_CONVERSION_REQUIRED',
-  'INVENTORY_QUANTITY_NOT_EXACT',
-  'INVENTORY_QUANTITY_OUT_OF_RANGE',
-  'INVENTORY_SOURCE_STATE_INSUFFICIENT',
-  'NEGATIVE_STOCK_BLOCKED',
-  'RESERVATION_CONFLICT',
-  'RESERVATION_EXPIRED',
-  'RESERVATION_VERSION_CHANGED',
-  'RECIPE_CHANGED',
-  'RESTOCK_INTENT_NOT_ELIGIBLE',
-  'RESTOCK_EXCEEDS_ORIGINAL_CONSUMPTION',
-  'STALE_INVENTORY_COUNT',
-  'INVENTORY_COUNT_NOT_FOUND',
-  'INVENTORY_COUNT_SCOPE_MISMATCH',
-  'APPROVAL_REQUIRED',
-  'APPROVAL_FINGERPRINT_MISMATCH',
-  'APPROVAL_INVALID',
   'PAYMENT_DECLINED',
   'PAYMENT_UNKNOWN',
   'PAYMENT_TIMEOUT',
@@ -493,17 +450,6 @@ export const API_ERROR_CODES = [
   'AUDIT_INTEGRITY_FAILURE',
   'PAYMENT_OUTCOME_UNKNOWN',
   'RESOURCE_NOT_FOUND',
-  'HARDWARE_NOT_FOUND',
-  'HARDWARE_DISABLED',
-  'HARDWARE_NOT_ASSIGNED',
-  'HARDWARE_CAPABILITY_UNSUPPORTED',
-  'HARDWARE_DISCONNECTED',
-  'HARDWARE_BUSY',
-  'HARDWARE_PAPER_OUT',
-  'HARDWARE_COMMAND_TIMEOUT',
-  'HARDWARE_OUTCOME_UNKNOWN',
-  'HARDWARE_CONFIGURATION_STALE',
-  'EXECUTION_DEVICE_UNAVAILABLE',
   'INTERNAL_ERROR',
 ] as const;
 

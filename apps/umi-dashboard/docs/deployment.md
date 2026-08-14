@@ -1,59 +1,59 @@
-# UMI Dashboard Deployment
+# Dashboard Deployment
 
-Updated: 2026-08-13
+Status: S4.1 schema cutover complete, 2026-06-10 — the dashboard has a single schema path
+(platform transition schema); `UMI_DASHBOARD_SCHEMA` no longer exists.
 
-UMI Dashboard is a static Vite application. UMI API owns all authentication, reads, commands, PostgreSQL access, and RLS enforcement.
+## Deployment Shape
 
-The Dashboard has no Express backend, direct database connection, Supabase credential, service-role credential, or independent identity system.
+`umi-dashboard` deploys as a Vite static frontend with an Express API exposed through Vercel Functions:
 
-## Build contract
+- static output: `dist`
+- API entrypoint: `api/index.js`
+- Express app source: `server.js`
+- route mapping: `/api/*` -> `api/index.js`
 
-Set these non-secret build values:
+This keeps the current Dashboard behavior contract in one repo while avoiding a new backend service before the platform schema cutover proves it is needed.
+
+## Required Environment Variables
+
+Set these in the Vercel Preview environment for staging validation:
 
 ```text
-VITE_UMI_ENVIRONMENT=staging|pilot|production
-VITE_AUTH_MODE=cookie
-VITE_PUBLIC_URL=https://dashboard.example.com
-VITE_API_BASE=https://api.example.com
-VITE_RELEASE_VERSION=6.0.0-pilot.rc2
-VITE_RELEASE_GIT_COMMIT=<40-character certified commit>
-VITE_RELEASE_BUILD_TIMESTAMP=<ISO-8601 timestamp>
-VITE_CONTRACT_VERSION=2.12.0
-VITE_CONFIG_SCHEMA_VERSION=1
+DATABASE_URL
+DIRECT_DATABASE_URL
+VITE_AUTH_MODE=local
+APP_URL
+DASHBOARD_ALLOWED_ORIGIN
 ```
 
-`VITE_API_BASE` can be empty only when the reverse proxy serves UMI API from the same origin.
+Set these only when pairing or KDS mutations must call Supabase functions:
 
-Do not add database credentials, service-role keys, provider secrets, or session tokens to a `VITE_` value. Vite embeds these values in the client artifact.
+```text
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+```
 
-## Build
+Password reset email requires:
 
-Use the root lockfile and package manager:
+```text
+SMTP_HOST
+SMTP_PORT
+SMTP_USER
+SMTP_PASSWORD
+EMAIL_FROM
+```
+
+## Checks
 
 ```sh
-pnpm install --frozen-lockfile
-pnpm --filter @umi/tokens build
-pnpm --filter @umi/dashboard test
-pnpm --filter @umi/dashboard lint
-pnpm --filter @umi/dashboard build
+npm run api:check
+npm run build
 ```
 
-The pilot Dockerfile supplies the same values as build arguments. It writes `release.json` into the static output.
+For local staging-rehearsal API checks, run:
 
-## Runtime
-
-Serve `dist/` through HTTPS. Route application paths to `index.html`.
-Route API requests to the configured UMI API. Do not weaken CORS, CSRF, secure-cookie, or trusted-proxy policy.
-
-Use `/health` on the Dashboard container for process health. Use UMI API `/health/live` and `/health/ready` for backend status.
-
-## Verification
-
-1. Read `release.json` and verify the release, commit, environment, contract, and schema version.
-2. Authenticate through the UMI API cookie flow.
-3. Verify the merchant and location context.
-4. Verify Owner access and Manager scope.
-5. Load one operational page and one diagnostic page.
-6. Confirm that browser storage and static assets contain no credential or secret.
-
-Use `docs/deployment/UMIPOS_PILOT_RC_DEPLOYMENT.md` for the complete RC2 deployment sequence.
+```sh
+UMI_DASHBOARD_DISABLE_LISTEN=1 node --env-file=.env.local-postgres -e "import('./server.js').then(() => console.log('server import ok'))"
+```

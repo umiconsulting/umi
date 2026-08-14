@@ -8,7 +8,8 @@ struct KDSBackendConfiguration: Sendable {
     private let commandURLOverride: URL?
     private let boardURLOverride: URL?
     private let pairingURLOverride: URL?
-    /// The heartbeat endpoint for the UMI API.
+    /// Heartbeat endpoint override — points at the local dashboard server during
+    /// development. Set KDSLocalBaseURL or KDSHeartbeatURL in Info.plist to activate.
     let heartbeatURL: URL?
 
     init(
@@ -29,19 +30,20 @@ struct KDSBackendConfiguration: Sendable {
         self.heartbeatURL = heartbeatURL
     }
 
-    /// UMI API command endpoint. KDS never calls Supabase functions directly.
+    /// URL of the kds-command edge function.
     var commandURL: URL {
-        commandURLOverride ?? projectURL.appending(path: "api/kds/command")
+        commandURLOverride ?? projectURL.appending(path: "functions/v1/kds-command")
     }
 
     /// URL of the device-aware KDS board read endpoint.
     var boardURL: URL {
-        boardURLOverride ?? projectURL.appending(path: "api/kds/board")
+        boardURLOverride ?? projectURL.appending(path: "functions/v1/kds-board")
     }
 
-    /// Pairing endpoint on the authoritative UMI API.
+    /// Pairing endpoint. Reads KDSLocalBaseURL or KDSPairingURL from Info.plist when set —
+    /// used to point at the local dashboard server during development without Supabase.
     var pairingURL: URL {
-        pairingURLOverride ?? projectURL.appending(path: "api/kds/pairing")
+        pairingURLOverride ?? projectURL.appending(path: "functions/v1/kds-pairing")
     }
 
     static func load(bundle: Bundle = .main) -> KDSBackendConfiguration? {
@@ -77,7 +79,6 @@ struct KDSBackendConfiguration: Sendable {
 
         let heartbeatURL: URL? = configuredURL("KDSHeartbeatURL")
             ?? localBaseURL?.appending(path: "api/kds/heartbeat")
-            ?? projectURL.appending(path: "api/kds/heartbeat")
 
         return KDSBackendConfiguration(
             projectURL: projectURL,
@@ -88,9 +89,5 @@ struct KDSBackendConfiguration: Sendable {
             pairingURLOverride: pairingURLOverride,
             heartbeatURL: heartbeatURL
         )
-    }
-
-    static func demoModeEnabled(bundle: Bundle = .main) -> Bool {
-        bundle.object(forInfoDictionaryKey: "KDSDemoMode") as? Bool == true
     }
 }

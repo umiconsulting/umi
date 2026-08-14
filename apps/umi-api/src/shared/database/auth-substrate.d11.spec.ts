@@ -33,8 +33,7 @@ import { describe, expect, it } from 'vitest';
 // a hypothetical `session_foo`, and the camelCase DTO field `passwordHash` (no
 // underscore) never match.
 const AUTH_SUBSTRATE: readonly RegExp[] = [
-  /(?<![\w"])"?runtime"?\s*\.\s*"?(?:session|otp|password_reset_token|device_session|pairing|security_audit_event|elevation_grant)"?(?![\w"])/i,
-  /(?<![\w"])"?umi"?\s*\.\s*"?user_permission_override"?(?![\w"])/i,
+  /(?<![\w"])"?runtime"?\s*\.\s*"?(?:session|otp|password_reset_token|device_session|pairing)"?(?![\w"])/i,
   /(?<![\w"])"?(?:password_hash|password_salt)"?(?![\w"])/i,
 ];
 
@@ -199,9 +198,6 @@ describe('D11 · AUTH_SUBSTRATE regexes', () => {
     'select token_hash from runtime.session',
     'insert into runtime.password_reset_token (user_id)',
     'delete from runtime.pairing where id = $1',
-    'insert into runtime.security_audit_event (event_type)',
-    'select permission_key from runtime.elevation_grant',
-    'select effect from umi.user_permission_override',
     'update umi.user set password_hash = $1, password_salt = $2',
     // quoted identifiers
     'from runtime."session"',

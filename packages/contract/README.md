@@ -11,17 +11,8 @@ surface can't drift between the two sides.
 | `@umi/contract/routes` | route path constants + builders           | **none** (safe for the dashboard bundle) |
 | `@umi/contract`        | routes **+** zod schemas + inferred types | `zod`                                    |
 
-The files in `src/` are the only editable contract sources. Domain files contain
-their Zod schemas. Each Zod schema supplies runtime validation and a TypeScript type.
-
-The generator creates these deterministic artifacts:
-
-- `generated/contract.json`: neutral and versioned contract.
-- `generated/typescript/umi_contract.ts`: standalone TypeScript models.
-- `generated/dart/lib/umi_contract.dart`: standalone Dart models.
-- `generated/contract.sha256`: artifact checksum.
-
-Do not edit generated files.
+`z.infer` means each schema is simultaneously a runtime validator and a TS type —
+one definition, both uses.
 
 ## How each side consumes it
 
@@ -42,16 +33,15 @@ every PR.
 
 ```
 pnpm --filter @umi/contract build      # dist/{index,routes}.{js,cjs,d.ts}
-pnpm --filter @umi/contract generate
-pnpm --filter @umi/contract generate:check
 pnpm --filter @umi/contract typecheck
 pnpm --filter @umi/contract test       # byte-exact route-literal assertions
 ```
 
-## Authority rules
+## Scope / follow-ups
 
-- Add a public model only in the editable Zod source.
-- Generate both SDKs after each contract change.
-- Use `ZodValidationPipe` in the API. Do not create a second validation DTO.
-- Keep public errors safe. Do not add service roles or private audit data.
-- Keep v1 changes additive unless an approved decision permits a break.
+- First seam: auth routes + `/api/me/tenants` + the tenant base path, with the
+  session/login/tenants schemas. class-validator DTOs on the server stay
+  authoritative for **request** validation for now; deriving them from these zod
+  schemas (via a `ZodValidationPipe`) is a flagged follow-up so the request half is
+  single-sourced too.
+- `CashStatsResponse` and the rest of the tenant surface are typed incrementally.

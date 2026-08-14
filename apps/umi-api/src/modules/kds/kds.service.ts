@@ -1,13 +1,12 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
+  HttpException,
   Injectable,
   NotFoundException,
-  UnauthorizedException,
 } from '@nestjs/common';
-import type { PosKitchenOrderQuery } from '@umi/contract';
-import type { AuthUser } from '../auth/auth.types';
+import { ConfigService } from '@nestjs/config';
+import type { AppConfig } from '../../shared/config/config.schema';
 import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 import {
   KdsRepository,
@@ -16,6 +15,7 @@ import {
   type EventRow,
   type DeviceListRow,
 } from './kds.repository';
+import { partialCancelNotificationBody, statusNotificationBody } from './kds-notify.copy';
 import {
   asSixDigitPin,
   asText,
@@ -36,23 +36,45 @@ import {
   randomHex,
   randomPin,
   sha256Hex,
+  validateTransition,
 } from './dto/kds-contract';
 
-// Limit PIN attempts from one IP address.
+// Per-IP brute-force guard on kds_start (the public PIN-guess vector). A legit
+// pairing is a single PIN entry; 10/min/IP is generous for staff yet caps an
+// attacker far below the 6-digit space within a pairing's 10-min TTL.
 const PAIR_RATE_MAX = 10;
 const PAIR_RATE_WINDOW_MS = 60_000;
 
-/** Serve the iPad KDS contract and the dashboard operations. */
+/**
+ * KDS domain logic. Two faces over one canonical model:
+ *   - the FROZEN iPad contract (`pairing`/`board`/`command`/`verifyDevice`),
+ *     which returns `{status, body}` envelopes the controller sends verbatim
+ *     (errors are values, not thrown — except device auth, a typed throw the
+ *     controller catches); and
+ *   - the dashboard owner surface (`*ForDashboard`, pairing admin, transition),
+ *     which returns plain objects and throws Nest HTTP exceptions.
+ */
 @Injectable()
 export class KdsService {
+  private readonly notifyEnabled: boolean;
+
   constructor(
     private readonly repo: KdsRepository,
     private readonly rateLimit: RateLimitService,
-  ) {}
+    config: ConfigService<AppConfig, true>,
+  ) {
+    this.notifyEnabled = config.get('KDS_STATUS_NOTIFY_ENABLED', {
+      infer: true,
+    });
+  }
 
   // ════════════════════════════ Device auth ════════════════════════════════
 
-  /** Resolve the KDS device token and update its last-use time. */
+  /**
+   * Resolve the `x-kds-device-token` header to a session, or throw the frozen
+   * `device_revoked` body (401 missing / 403 inactive). Touches `last_used_at`
+   * (the prod heartbeat signal).
+   */
   async verifyDevice(rawToken: string | undefined): Promise<KdsDeviceSession> {
     const token = rawToken?.trim();
     if (!token) throw new KdsHttpError(401, DEVICE_REVOKED_BODY);
@@ -68,9 +90,6 @@ export class KdsService {
       locationId: typeof row.metadata?.location_id === 'string' ? row.metadata.location_id : null,
       stationId: row.station_id,
       deviceName: row.device_name,
-      permissions: Array.isArray(row.metadata?.permissions)
-        ? row.metadata.permissions.filter((value): value is string => typeof value === 'string')
-        : ['kitchen.read', 'kitchen.prepare', 'kitchen.ready', 'kitchen.complete'],
     };
     await this.repo.touchSession(session.deviceId);
     return session;
@@ -178,7 +197,8 @@ export class KdsService {
           device_id: session.id,
           token: session.token,
           merchant_id: session.merchant_id,
-          // Keep tenant_id as a compatibility field for installed KDS clients.
+          // frozen iPad KDS contract still reads `tenant_id`; keep the wire key
+          // (sourced from the renamed column) until the device is updated.
           tenant_id: session.merchant_id,
           location_id: pairing.location_id,
           station_id: session.station_id,
@@ -194,36 +214,22 @@ export class KdsService {
   async board(session: KdsDeviceSession, body: Record<string, unknown>): Promise<KdsResult> {
     const action = asText(body.action);
     if (!action) return { status: 400, body: { error: 'missing_action' } };
-    if (!session.permissions.includes('kitchen.read')) {
-      return { status: 403, body: { error: 'kitchen_permission_denied' } };
-    }
 
     if (action === 'snapshot') {
-      if (!session.locationId || !session.stationId) {
-        return { status: 403, body: { error: 'kitchen_device_not_assigned' } };
-      }
-      const rows = await this.repo.boardSnapshot(session.merchantId, session.locationId, [
-        session.stationId,
-      ]);
+      // No station argument: the order carries no station, so the old filter matched
+      // every row — see KdsRepository.boardSnapshot.
+      const rows = await this.repo.boardSnapshot(session.merchantId);
       return { status: 200, body: { ok: true, data: rows.map(toSnapshotRow) } };
     }
 
     if (action === 'events') {
-      const afterValue = body.afterSequence ?? body.after_sequence;
-      const after = Number.isFinite(Number(afterValue)) ? Number(afterValue) : 0;
+      const after = Number.isFinite(Number(body.after_sequence)) ? Number(body.after_sequence) : 0;
       const limit = Number.isFinite(Number(body.limit))
         ? Math.min(Math.max(Number(body.limit), 1), 500)
         : 200;
-      if (!session.locationId || !session.stationId) {
-        return { status: 403, body: { error: 'kitchen_device_not_assigned' } };
-      }
-      const rows = await this.repo.ticketEvents(
-        session.merchantId,
-        session.locationId,
-        [session.stationId],
-        after,
-        limit,
-      );
+      // No station argument: build-v3 orders carry no station, so the old filter
+      // matched everything anyway — see KdsRepository.ticketEvents.
+      const rows = await this.repo.ticketEvents(session.merchantId, after, limit);
       return { status: 200, body: { ok: true, data: rows.map(toEventRow) } };
     }
 
@@ -240,17 +246,11 @@ export class KdsService {
     const action = asText(body.action);
     if (!action) return { status: 400, body: { error: 'missing_action' } };
 
-    if (action === 'command') return this.canonicalCommand(session, body);
-
     if (action === 'transition_ticket') {
       const ticketId = asText(body.ticket_id);
       const target = asText(body.target_status) as KitchenStatus;
       if (!ticketId || !target) {
         return { status: 400, body: { error: 'missing_required_fields' } };
-      }
-      const identity = kitchenCommandIdentity(body);
-      if (!identity) {
-        return { status: 400, body: { error: 'kitchen_command_identity_required' } };
       }
       const order = await this.repo.loadOrderForScope(
         session.merchantId,
@@ -260,52 +260,28 @@ export class KdsService {
       if (!ticketBelongsToDevice(order, session)) {
         return { status: 404, body: { error: 'ticket_not_found' } };
       }
-      const commandType =
-        target === 'preparing' && order.kitchen_order_status === 'ready'
-          ? 'recall'
-          : target === 'cancelled'
-            ? 'cancel_ack'
-            : kitchenCommandType(target);
-      const permission = kitchenPermission(commandType);
-      if (!session.permissions.includes(permission)) {
-        return { status: 403, body: { error: 'kitchen_permission_denied' } };
-      }
-      const result = await this.repo.executeKitchenCommand({
-        session,
-        order,
-        commandId: identity.commandId,
-        idempotencyKey: identity.idempotencyKey,
-        correlationId: identity.correlationId,
-        expectedVersion: identity.expectedVersion,
-        commandType,
-        targetStatus: canonicalKitchenStatus(target),
-        itemIds: [],
-        reasonCode: optText(body.cancellation_reason_code),
-        reasonNote: optText(body.cancellation_reason_note),
-        priority: null,
-        payloadFingerprint: sha256Hex(
-          JSON.stringify({
-            ticketId,
-            target,
-            expectedVersion: identity.expectedVersion,
-            reasonCode: optText(body.cancellation_reason_code),
-            reasonNote: optText(body.cancellation_reason_note),
-          }),
-        ),
+      const err = validateTransition(order.kitchen_status, target);
+      if (err) return { status: 422, body: { error: err } };
+
+      const result = await this.repo.transitionTicket({
+        order: order,
+        targetStatus: target,
+        actorId: session.deviceId,
+        actorChannel: session.stationId,
+        cancellationReasonCode: optText(body.cancellation_reason_code),
+        cancellationReasonNote: optText(body.cancellation_reason_note),
+        notifyBody: this.notifyEnabled ? statusNotificationBody(target) : null,
       });
       return {
-        status: result.status === 'conflict' ? 409 : 200,
+        status: 200,
         body: {
           ok: true,
-          data: result.result,
+          data: { ticket_id: order.id, status: target, sequence: result.sequence },
         },
       };
     }
 
     if (action === 'partial_cancel_items') {
-      if (!session.permissions.includes('kitchen.cancel_ack')) {
-        return { status: 403, body: { error: 'kitchen_permission_denied' } };
-      }
       const ticketId = asText(body.ticket_id);
       const rawIds = Array.isArray(body.item_ids) ? (body.item_ids as unknown[]) : [];
       // Validate every id as a uuid BEFORE the `::uuid[]` cast (a bad value would
@@ -314,10 +290,6 @@ export class KdsService {
       const reasonCode = asText(body.reason_code);
       if (!ticketId || mappedIds.length === 0 || mappedIds.some((x) => x === null) || !reasonCode) {
         return { status: 400, body: { error: 'missing_required_fields' } };
-      }
-      const identity = kitchenCommandIdentity(body);
-      if (!identity) {
-        return { status: 400, body: { error: 'kitchen_command_identity_required' } };
       }
       const itemIds = [...new Set(mappedIds as string[])];
       const order = await this.repo.loadOrderForScope(
@@ -329,34 +301,25 @@ export class KdsService {
         return { status: 404, body: { error: 'ticket_not_found' } };
       }
 
-      const result = await this.repo.executeKitchenCommand({
-        session,
-        order,
-        commandId: identity.commandId,
-        idempotencyKey: identity.idempotencyKey,
-        correlationId: identity.correlationId,
-        expectedVersion: identity.expectedVersion,
-        commandType: 'cancel_ack',
-        targetStatus: null,
+      const result = await this.repo.partialCancelItems({
+        order: order,
         itemIds,
         reasonCode,
         reasonNote: optText(body.reason_note),
-        priority: null,
-        payloadFingerprint: sha256Hex(
-          JSON.stringify({
-            ticketId,
-            itemIds: [...itemIds].sort(),
-            reasonCode,
-            reasonNote: optText(body.reason_note),
-            expectedVersion: identity.expectedVersion,
-          }),
-        ),
+        actorId: session.deviceId,
+        actorChannel: session.stationId,
+        buildNotifyBody: (cancelled, remaining) =>
+          this.notifyEnabled ? partialCancelNotificationBody(cancelled, remaining) : null,
       });
       return {
-        status: result.status === 'conflict' ? 409 : 200,
+        status: 200,
         body: {
           ok: true,
-          data: result.result,
+          data: {
+            ticket_id: order.id,
+            status: result.newStatus,
+            sequence: result.sequence,
+          },
         },
       };
     }
@@ -364,127 +327,16 @@ export class KdsService {
     return { status: 400, body: { error: 'unknown_action' } };
   }
 
-  private async canonicalCommand(
-    session: KdsDeviceSession,
-    body: Record<string, unknown>,
-  ): Promise<KdsResult> {
-    const kitchenOrderId = asUuid(body.kitchenOrderId);
-    const commandTypeValue = asText(body.commandType);
-    const allowedCommandTypes = [
-      'start_preparation',
-      'mark_item_ready',
-      'mark_order_ready',
-      'complete',
-      'recall',
-      'cancel_ack',
-      'change_priority',
-    ] as const;
-    const commandType = allowedCommandTypes.includes(commandTypeValue as never)
-      ? (commandTypeValue as
-          | 'start_preparation'
-          | 'mark_item_ready'
-          | 'mark_order_ready'
-          | 'complete'
-          | 'recall'
-          | 'cancel_ack'
-          | 'change_priority')
-      : null;
-    const identity = kitchenCommandIdentity(body);
-    if (!kitchenOrderId || !commandType || !identity) {
-      return { status: 400, body: { error: 'missing_required_fields' } };
-    }
-    const permission = kitchenPermission(commandType);
-    if (!session.permissions.includes(permission)) {
-      return { status: 403, body: { error: 'kitchen_permission_denied' } };
-    }
-    const rawItemIds = Array.isArray(body.itemIds) ? body.itemIds : [];
-    const parsedItemIds = rawItemIds.map(asUuid);
-    if (parsedItemIds.some((value) => value === null)) {
-      return { status: 400, body: { error: 'invalid_kitchen_item_id' } };
-    }
-    const itemIds = [...new Set(parsedItemIds as string[])];
-    const order = await this.repo.loadOrderForScope(
-      session.merchantId,
-      kitchenOrderId,
-      kitchenOrderId,
-    );
-    if (!ticketBelongsToDevice(order, session)) {
-      return { status: 404, body: { error: 'ticket_not_found' } };
-    }
-    const priorityValue = asText(body.priority);
-    const priority = ['normal', 'high', 'urgent'].includes(priorityValue)
-      ? (priorityValue as 'normal' | 'high' | 'urgent')
-      : null;
-    const reasonCode = optText(body.reasonCode);
-    const reasonNote = optText(body.reasonNote);
-    if (
-      (commandType === 'mark_item_ready' && itemIds.length === 0) ||
-      (commandType === 'change_priority' && priority === null) ||
-      (commandType === 'recall' && !reasonCode) ||
-      (reasonCode?.length ?? 0) > 100 ||
-      (reasonNote?.length ?? 0) > 500
-    ) {
-      return { status: 400, body: { error: 'invalid_kitchen_command' } };
-    }
-    const fingerprintInput = {
-      kitchenOrderId,
-      commandType,
-      itemIds: [...itemIds].sort(),
-      reasonCode,
-      reasonNote,
-      priority,
-      expectedVersion: identity.expectedVersion,
-    };
-    const result = await this.repo.executeKitchenCommand({
-      session,
-      order,
-      commandId: identity.commandId,
-      idempotencyKey: identity.idempotencyKey,
-      correlationId: identity.correlationId,
-      expectedVersion: identity.expectedVersion,
-      commandType,
-      targetStatus: null,
-      itemIds,
-      reasonCode: fingerprintInput.reasonCode,
-      reasonNote: fingerprintInput.reasonNote,
-      priority,
-      payloadFingerprint: sha256Hex(JSON.stringify(fingerprintInput)),
-    });
-    return {
-      status: result.status === 'conflict' ? 409 : 200,
-      body: { ok: true, data: result.result },
-    };
-  }
-
   // ════════════════════════════ Heartbeat ══════════════════════════════════
 
-  async heartbeat(session: KdsDeviceSession, ip: string | null): Promise<KdsResult> {
-    await this.repo.heartbeatTouch(session.deviceId, session.merchantId, ip);
+  async heartbeat(body: Record<string, unknown>, ip: string | null): Promise<KdsResult> {
+    const deviceId = asUuid(body.device_id);
+    if (deviceId) await this.repo.heartbeatTouch(deviceId, ip);
+    // Always 200 (fire-and-forget liveness ping), mirroring the legacy contract.
     return { status: 200, body: { ok: true, ts: new Date().toISOString() } };
   }
 
   // ═══════════════════════════ Dashboard surface ════════════════════════════
-
-  async statusForPos(
-    user: AuthUser,
-    merchantId: string,
-    sourceOrderId: string,
-    query: PosKitchenOrderQuery,
-  ) {
-    if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
-    const allowed = await this.repo.authorizePos(
-      user.id,
-      user.sessionId,
-      user.deviceId,
-      merchantId,
-      query.locationId,
-      query.operatorSessionId,
-    );
-    if (!allowed) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
-    const result = await this.repo.posKitchenStatus(merchantId, query.locationId, sourceOrderId);
-    if (!result) throw new NotFoundException({ code: 'KITCHEN_ORDER_NOT_FOUND' });
-    return result;
-  }
 
   async listDevicesForDashboard(
     merchantId: string,
@@ -529,14 +381,15 @@ export class KdsService {
     locationId: string | null,
     body: Record<string, unknown>,
   ): Promise<{ station: unknown }> {
-    if (!locationId) throw new BadRequestException({ error: 'kitchen_location_required' });
     const name = asText(body.name);
     if (!name) throw new BadRequestException({ error: 'missing_station_name' });
     const stationKey = stationKeyFromName(asText(body.station_key) || name);
     if (!stationKey) {
       throw new BadRequestException({ error: 'invalid_station_name' });
     }
-    // Detect an existing location key before the insert.
+    // Pre-check catches merchant-wide (location_id IS NULL) duplicates the DB's
+    // NULL-distinct unique index would let through; the 23505 catch below is the
+    // race backstop and covers location-scoped dupes.
     const existing = await this.repo.findActiveStationByKey(merchantId, locationId, stationKey);
     if (existing) throw new ConflictException({ error: 'station_exists' });
     try {
@@ -582,88 +435,6 @@ export class KdsService {
     const ok = await this.repo.archiveStation(merchantId, id);
     if (!ok) throw new NotFoundException({ error: 'station_not_found' });
     return { ok: true };
-  }
-
-  async listRoutes(merchantId: string, locationId: string | null) {
-    const location = asUuid(locationId);
-    if (!location) throw new BadRequestException({ error: 'location_required' });
-    return { routes: await this.repo.listRoutes(merchantId, location) };
-  }
-
-  async createRoute(merchantId: string, locationId: string | null, body: Record<string, unknown>) {
-    const location = asUuid(locationId);
-    const stationId = asUuid(body.stationId ?? body.station_id);
-    const productId =
-      body.productId || body.product_id ? asUuid(body.productId ?? body.product_id) : null;
-    const categoryId =
-      body.categoryId || body.category_id ? asUuid(body.categoryId ?? body.category_id) : null;
-    const routePriority = Number(body.routePriority ?? body.route_priority ?? 100);
-    const targetValue = body.targetSeconds ?? body.target_seconds;
-    const targetSeconds = targetValue == null ? null : Number(targetValue);
-    if (
-      !location ||
-      !stationId ||
-      (productId !== null && categoryId !== null) ||
-      !Number.isInteger(routePriority) ||
-      routePriority < 0 ||
-      routePriority > 10_000 ||
-      (targetSeconds !== null &&
-        (!Number.isInteger(targetSeconds) || targetSeconds < 30 || targetSeconds > 86_400))
-    ) {
-      throw new BadRequestException({ error: 'invalid_kitchen_route' });
-    }
-    try {
-      const route = await this.repo.createRoute({
-        merchantId,
-        locationId: location,
-        productId,
-        categoryId,
-        stationId,
-        routePriority,
-        targetSeconds,
-      });
-      if (!route) throw new NotFoundException({ error: 'station_not_found' });
-      return { route };
-    } catch (error) {
-      if ((error as { code?: string }).code === '23505') {
-        throw new ConflictException({ error: 'kitchen_route_exists' });
-      }
-      throw error;
-    }
-  }
-
-  async updateRoute(merchantId: string, routeId: string, body: Record<string, unknown>) {
-    const id = asUuid(routeId);
-    const stationId = asUuid(body.stationId ?? body.station_id);
-    const expectedVersion = Number(body.expectedVersion ?? body.expected_version);
-    const routePriority = Number(body.routePriority ?? body.route_priority ?? 100);
-    const targetValue = body.targetSeconds ?? body.target_seconds;
-    const targetSeconds = targetValue == null ? null : Number(targetValue);
-    const active = body.active !== false;
-    if (
-      !id ||
-      !stationId ||
-      !Number.isInteger(expectedVersion) ||
-      expectedVersion < 1 ||
-      !Number.isInteger(routePriority) ||
-      routePriority < 0 ||
-      routePriority > 10_000 ||
-      (targetSeconds !== null &&
-        (!Number.isInteger(targetSeconds) || targetSeconds < 30 || targetSeconds > 86_400))
-    ) {
-      throw new BadRequestException({ error: 'invalid_kitchen_route' });
-    }
-    const route = await this.repo.updateRoute({
-      merchantId,
-      routeId: id,
-      stationId,
-      active,
-      routePriority,
-      targetSeconds,
-      expectedVersion,
-    });
-    if (!route) throw new ConflictException({ error: 'kitchen_route_conflict' });
-    return { route };
   }
 
   async listPairingsForDashboard(
@@ -777,61 +548,40 @@ export class KdsService {
     ticketId: string,
     body: Record<string, unknown>,
   ): Promise<{ ok: true; data: unknown }> {
-    const actorId = asUuid(actorUserId);
-    const stationId = asUuid(body.stationId ?? body.station_id);
-    const identity = kitchenCommandIdentity(body);
-    const target = asText(body.targetStatus ?? body.target_status);
-    const reasonCode = optText(body.reasonCode ?? body.reason_code);
-    const reasonNote = optText(body.reasonNote ?? body.reason_note);
-    if (
-      !actorId ||
-      !stationId ||
-      !identity ||
-      target !== 'in_preparation' ||
-      !reasonCode ||
-      reasonCode.length > 100 ||
-      (reasonNote?.length ?? 0) > 500
-    ) {
-      throw new BadRequestException({ error: 'kitchen_recall_fields_required' });
+    const target = asText(body.target_status) as KitchenStatus;
+    if (!target) {
+      throw new BadRequestException({ error: 'missing_required_fields' });
     }
     const order = await this.repo.loadOrderForScope(merchantId, ticketId, asUuid(ticketId));
-    if (!order || !order.location_id || !order.station_ids?.includes(stationId)) {
+    if (!order) {
       throw new NotFoundException({ error: 'ticket_not_found' });
     }
-    const result = await this.repo.executeKitchenCommand({
-      session: {
-        deviceId: null,
-        merchantId,
-        locationId: order.location_id,
-        stationId,
-        deviceName: null,
-        permissions: ['kitchen.recall'],
-      },
-      actorUserId: actorId,
-      order,
-      commandId: identity.commandId,
-      idempotencyKey: identity.idempotencyKey,
-      correlationId: identity.correlationId,
-      expectedVersion: identity.expectedVersion,
-      commandType: 'recall',
-      targetStatus: 'in_preparation',
-      itemIds: [],
-      reasonCode,
-      reasonNote,
-      priority: null,
-      payloadFingerprint: sha256Hex(
-        JSON.stringify({
-          ticketId,
-          stationId,
-          target: 'in_preparation',
-          expectedVersion: identity.expectedVersion,
-        }),
-      ),
-    });
-    if (result.status === 'conflict') {
-      throw new ConflictException(result.result);
+    const err = validateTransition(order.kitchen_status, target);
+    if (err) throw new BadRequestException({ error: err });
+
+    let result: { sequence: number };
+    try {
+      result = await this.repo.transitionTicket({
+        order,
+        targetStatus: target,
+        actorId: actorUserId,
+        actorChannel: 'dashboard',
+        cancellationReasonCode: optText(body.cancellation_reason_code),
+        cancellationReasonNote: optText(body.cancellation_reason_note),
+        notifyBody: this.notifyEnabled ? statusNotificationBody(target) : null,
+      });
+    } catch (e) {
+      // The repo re-checks under a row lock; surface a lost-race conflict as a
+      // proper HTTP status (the iPad path catches KdsHttpError directly).
+      if (e instanceof KdsHttpError) {
+        throw new HttpException(e.body as string | Record<string, unknown>, e.status);
+      }
+      throw e;
     }
-    return { ok: true, data: result.result };
+    return {
+      ok: true,
+      data: { ticket_id: order.id, status: target, sequence: result.sequence },
+    };
   }
 }
 
@@ -840,64 +590,6 @@ export class KdsService {
 function optText(value: unknown): string | null {
   const t = asText(value);
   return t.length ? t : null;
-}
-
-function kitchenCommandIdentity(body: Record<string, unknown>): {
-  commandId: string;
-  idempotencyKey: string;
-  correlationId: string;
-  expectedVersion: number;
-} | null {
-  const commandId = asUuid(body.commandId ?? body.command_id);
-  const idempotencyKey = asText(body.idempotencyKey ?? body.idempotency_key);
-  const correlationId = asText(body.correlationId ?? body.correlation_id);
-  const expectedVersion = Number(body.expectedVersion ?? body.expected_version);
-  if (
-    !commandId ||
-    idempotencyKey.length < 8 ||
-    correlationId.length < 8 ||
-    !Number.isInteger(expectedVersion) ||
-    expectedVersion < 1
-  ) {
-    return null;
-  }
-  return { commandId, idempotencyKey, correlationId, expectedVersion };
-}
-
-function kitchenPermission(commandType: string): string {
-  if (commandType === 'mark_item_ready' || commandType === 'mark_order_ready') {
-    return 'kitchen.ready';
-  }
-  if (commandType === 'complete') return 'kitchen.complete';
-  if (commandType === 'recall') return 'kitchen.recall';
-  if (commandType === 'cancel_ack') return 'kitchen.cancel_ack';
-  if (commandType === 'change_priority') return 'kitchen.priority';
-  return 'kitchen.prepare';
-}
-
-function canonicalKitchenStatus(
-  status: KitchenStatus,
-): 'queued' | 'in_preparation' | 'ready' | 'completed' | 'cancelled' {
-  switch (status) {
-    case 'new':
-      return 'queued';
-    case 'accepted':
-    case 'preparing':
-    case 'partial_cancelled':
-      return 'in_preparation';
-    case 'ready':
-    case 'completed':
-    case 'cancelled':
-      return status;
-  }
-}
-
-function kitchenCommandType(
-  status: KitchenStatus,
-): 'start_preparation' | 'mark_order_ready' | 'complete' {
-  if (status === 'ready') return 'mark_order_ready';
-  if (status === 'completed') return 'complete';
-  return 'start_preparation';
 }
 
 /**
@@ -921,13 +613,12 @@ export function ticketBelongsToDevice(
   session: KdsDeviceSession,
 ): order is OrderScopeRow {
   if (!order) return false;
-  if (!session.locationId || !session.stationId) return false;
-  const stationIds = order.station_ids ?? (order.station_id ? [order.station_id] : []);
-  return (
-    order.merchant_id === session.merchantId &&
-    order.location_id === session.locationId &&
-    stationIds.includes(session.stationId)
-  );
+  const merchantMatches = order.merchant_id === session.merchantId;
+  const locationMatches =
+    !session.locationId || order.location_id === session.locationId || order.location_id == null;
+  const stationMatches =
+    !session.stationId || order.station_id === session.stationId || order.station_id == null;
+  return merchantMatches && locationMatches && stationMatches;
 }
 
 export function deviceStatus(lastUsedAt: string | null): string {
@@ -942,39 +633,37 @@ function remapItems(items: unknown): unknown[] {
   if (!Array.isArray(items)) return [];
   return items.map((raw) => {
     const i = (raw ?? {}) as Record<string, unknown>;
+    const cents = Number(i.unit_price_cents ?? 0);
     return {
-      id: i.ticket_item_id ?? i.id,
-      productName: i.name ?? i.productName,
+      ticket_item_id: i.ticket_item_id,
+      name: i.name,
       quantity: i.quantity,
-      variantName: i.variant_name ?? i.variantName ?? null,
-      preparationNote: i.notes ?? i.preparationNote ?? null,
-      modifiers: i.modifiers ?? [],
-      status: i.status ?? 'queued',
-      displayOrder: i.display_order ?? i.displayOrder,
-      targetSeconds: i.targetSeconds ?? null,
-      version: i.version ?? 1,
+      variant_name: i.variant_name,
+      notes: i.notes,
+      is_cancelled: i.is_cancelled,
+      unit_price: cents / 100,
+      display_order: i.display_order,
     };
   });
 }
 
 function toSnapshotRow(t: TicketRow) {
   return {
-    id: t.ticket_id,
-    sourceOrderId: t.source_transaction_id,
-    publicReference: t.public_reference ?? t.source_transaction_id,
-    merchantId: t.merchant_id,
-    locationId: (t as TicketRow & { location_id?: string }).location_id,
-    source: t.source_channel,
+    ticket_id: t.ticket_id,
+    source_transaction_id: t.source_transaction_id,
+    merchant_id: t.merchant_id,
+    source_channel: t.source_channel,
     status: t.status,
-    priority: (t as TicketRow & { priority?: string }).priority ?? 'normal',
-    stationId: t.station_id,
-    businessDate: (t as TicketRow & { business_date?: string }).business_date,
-    queuedAt: t.created_at,
-    preparationStartedAt:
-      (t as TicketRow & { preparation_started_at?: string }).preparation_started_at ?? null,
-    updatedAt: t.updated_at,
-    version: (t as TicketRow & { version?: number }).version ?? 1,
-    lastEventSequence: Number(t.last_event_sequence),
+    station_id: t.station_id,
+    station_name: t.station_name,
+    customer_name: t.customer_name,
+    customer_phone: t.customer_phone,
+    pickup_person: t.pickup_person,
+    customer_note: t.customer_note,
+    total_amount: Number(t.total_amount),
+    created_at: t.created_at,
+    updated_at: t.updated_at,
+    last_event_sequence: Number(t.last_event_sequence),
     items: remapItems(t.items),
   };
 }
@@ -982,18 +671,14 @@ function toSnapshotRow(t: TicketRow) {
 function toEventRow(e: EventRow) {
   return {
     sequence: Number(e.sequence),
-    kitchenOrderId: e.ticket_id,
-    merchantId: e.merchant_id,
-    sourceOrderId: e.source_transaction_id,
+    ticket_id: e.ticket_id,
+    merchant_id: e.merchant_id,
+    source_transaction_id: e.source_transaction_id,
     kind: e.kind,
     status: e.status,
-    occurredAt: e.occurred_at,
+    occurred_at: e.occurred_at,
     source: e.source,
     payload: e.payload,
-    locationId: e.location_id,
-    stationId: e.station_id ?? null,
-    aggregateVersion: e.aggregate_version ?? 1,
-    correlationId: e.correlation_id ?? 'kitchen-event',
   };
 }
 
@@ -1005,6 +690,11 @@ function toOrderRow(t: TicketRow) {
     status: t.status,
     station_id: t.station_id,
     station_name: t.station_name,
+    customer_name: t.customer_name,
+    customer_phone: t.customer_phone,
+    pickup_person: t.pickup_person,
+    customer_note: t.customer_note,
+    total_amount: Number(t.total_amount),
     created_at: t.created_at,
     updated_at: t.updated_at,
     items,

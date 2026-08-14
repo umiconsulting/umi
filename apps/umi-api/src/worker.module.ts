@@ -20,10 +20,6 @@ import { IdentityModule } from './modules/identity/identity.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { LifecycleModule } from './modules/lifecycle/lifecycle.module';
 import { LeadsModule } from './modules/leads/leads.module';
-import { PosCustomerValueModule } from './modules/pos-customer-value/pos-customer-value.module';
-import { CustomerValueExpiryScheduler } from './jobs/customer-value-expiry.scheduler';
-import { ReleaseModule } from './shared/release/release.module';
-import { RateLimitModule } from './shared/ratelimit/rate-limit.module';
 
 /**
  * Root module for the WORKER process. Same shared infrastructure as the web
@@ -33,8 +29,6 @@ import { RateLimitModule } from './shared/ratelimit/rate-limit.module';
 @Module({
   imports: [
     AppConfigModule,
-    RateLimitModule,
-    ReleaseModule,
     DatabaseModule,
     AdaptersModule,
     LoggingModule,
@@ -47,7 +41,6 @@ import { RateLimitModule } from './shared/ratelimit/rate-limit.module';
     ConversationsModule,
     LifecycleModule,
     LeadsModule,
-    PosCustomerValueModule,
   ],
   // Worker-only consumers: BullMQ processors, the dead-letter sink they route
   // terminal failures to, and the transactional-outbox relay (inert until
@@ -65,7 +58,6 @@ import { RateLimitModule } from './shared/ratelimit/rate-limit.module';
     LifecycleProcessor,
     LifecycleScheduler,
     LeadsScheduler,
-    CustomerValueExpiryScheduler,
   ],
 })
 export class WorkerModule {}

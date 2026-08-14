@@ -1,5 +1,0 @@
-arb-dir: lib/core/localization
-template-arb-file: app_es.arb
-output-localization-file: app_localizations.dart
-output-class: AppLocalizations
-nullable-getter: false

@@ -31,9 +31,6 @@ struct BoardColumnView: View {
                                     KDSCard(order: order, isSelected: selectedOrderID == order.id)
                                 }
                                 .buttonStyle(.plain)
-                                .accessibilityElement(children: .ignore)
-                                .accessibilityLabel(order.accessibilitySummary)
-                                .accessibilityHint("Opens preparation actions")
                                 .transition(.asymmetric(
                                     insertion: .push(from: .top).combined(with: .opacity),
                                     removal: .opacity
@@ -53,8 +50,6 @@ struct BoardColumnView: View {
         .background(KDSTheme.Colors.columnBackground)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .sensoryFeedback(.selection, trigger: selectedOrderID)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(title), \(orders.count) active orders")
     }
 
     // MARK: Sub-views

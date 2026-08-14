@@ -18,10 +18,10 @@
 
 # UMI × NEXO Platform Consolidation Strategy
 
-**Fecha de decisión:** 2026-07-22
-**Fuente primaria:** `docs/UMI_NEXO_DISCOVERY_REPORT.md`
-**Baseline UMI:** `build-v3` @ `71f603e4d5c49b139ee6aefe0fac13b535d55e9c`
-**Baseline NEXO:** filesystem de `main`; sin `HEAD` resoluble
+**Fecha de decisión:** 2026-07-22  
+**Fuente primaria:** `docs/UMI_NEXO_DISCOVERY_REPORT.md`  
+**Baseline UMI:** `build-v3` @ `71f603e4d5c49b139ee6aefe0fac13b535d55e9c`  
+**Baseline NEXO:** filesystem de `main`; sin `HEAD` resoluble  
 **Naturaleza:** estrategia y decisiones arquitectónicas; no autoriza cambios de código, datos o infraestructura
 
 # Executive Summary
@@ -575,102 +575,102 @@ Puntuaciones específicas NEXO: POS 9, Inventory 9, Sales 9, Payments 8, Cash 8.
 
 ## ADR-001 — Control Plane definitivo
 
-**Contexto:** ambos repositorios administran identity, tenant, branch y roles. UMI además gobierna entitlements, customers, KDS y engagement.
-**Problema:** doble alta/revocación y IDs divergentes comprometen todo el ecosistema.
-**Opciones:** NEXO authority; UMI authority; IdP externo nuevo; mantener dual.
-**Decisión:** UMI es control plane; un IdP externo puede ser adapter futuro, no un tercer domain writer. NEXO conserva ABAC/RLS local.
-**Consecuencias:** NEXO migra masters a referencias; tokens/scopes deben versionarse.
-**Riesgos:** auth cutover, branch scope y session revocation.
+**Contexto:** ambos repositorios administran identity, tenant, branch y roles. UMI además gobierna entitlements, customers, KDS y engagement.  
+**Problema:** doble alta/revocación y IDs divergentes comprometen todo el ecosistema.  
+**Opciones:** NEXO authority; UMI authority; IdP externo nuevo; mantener dual.  
+**Decisión:** UMI es control plane; un IdP externo puede ser adapter futuro, no un tercer domain writer. NEXO conserva ABAC/RLS local.  
+**Consecuencias:** NEXO migra masters a referencias; tokens/scopes deben versionarse.  
+**Riesgos:** auth cutover, branch scope y session revocation.  
 **Justificación:** UMI ya cubre ecosystem/entitlements; mantener dual es el mayor riesgo hallado.
 
 ## ADR-002 — Owner definitivo de Product
 
-**Contexto:** ambos escriben Product/Category; NEXO conecta variants, media, pricing, inventory, Sales y SDK.
-**Problema:** dos catálogos producen precios y stock incoherentes.
-**Opciones:** UMI; NEXO; shared write; nuevo servicio.
-**Decisión:** NEXO es owner. UMI consume proyección/read API para ConversaFlow, KDS y Copilot.
-**Consecuencias:** migración de IDs y tools UMI; no dual-write.
-**Riesgos:** productos históricos/semánticas no equivalentes.
+**Contexto:** ambos escriben Product/Category; NEXO conecta variants, media, pricing, inventory, Sales y SDK.  
+**Problema:** dos catálogos producen precios y stock incoherentes.  
+**Opciones:** UMI; NEXO; shared write; nuevo servicio.  
+**Decisión:** NEXO es owner. UMI consume proyección/read API para ConversaFlow, KDS y Copilot.  
+**Consecuencias:** migración de IDs y tools UMI; no dual-write.  
+**Riesgos:** productos históricos/semánticas no equivalentes.  
 **Justificación:** la profundidad transaccional y el consumidor POS real están en NEXO.
 
 ## ADR-003 — Owner definitivo de Inventory
 
-**Contexto:** sólo NEXO implementa ledger, reservations, transfers, FIFO y counts.
-**Problema:** inventario duplicado crearía unidades o overselling.
-**Opciones:** NEXO; reescribir UMI; servicio nuevo.
-**Decisión:** NEXO permanece sin migración de autoridad.
-**Consecuencias:** UMI usa availability API/events.
-**Riesgos:** latencia/stale projections; nunca usar proyección para commit.
+**Contexto:** sólo NEXO implementa ledger, reservations, transfers, FIFO y counts.  
+**Problema:** inventario duplicado crearía unidades o overselling.  
+**Opciones:** NEXO; reescribir UMI; servicio nuevo.  
+**Decisión:** NEXO permanece sin migración de autoridad.  
+**Consecuencias:** UMI usa availability API/events.  
+**Riesgos:** latencia/stale projections; nunca usar proyección para commit.  
 **Justificación:** activo único y ya certificado; reescritura carece de evidencia/beneficio.
 
 ## ADR-004 — Owner definitivo de Sales
 
-**Contexto:** NEXO tiene Sale/Checkout/Payments/folios/reservations; UMI tiene customer orders para ConversaFlow/KDS, pero no módulo POS.
-**Problema:** dos order writers duplican ventas y pagos.
-**Opciones:** NEXO; UMI target documentado; coexistencia por canal.
-**Decisión:** NEXO es commerce Order/Sale authority para todos los canales. ConversaFlow envía comandos a NEXO; KDS consume `OrderSubmitted`.
-**Consecuencias:** migrar lifecycle y conservar snapshots históricos.
-**Riesgos:** KDS timing, conversational drafts y outages.
+**Contexto:** NEXO tiene Sale/Checkout/Payments/folios/reservations; UMI tiene customer orders para ConversaFlow/KDS, pero no módulo POS.  
+**Problema:** dos order writers duplican ventas y pagos.  
+**Opciones:** NEXO; UMI target documentado; coexistencia por canal.  
+**Decisión:** NEXO es commerce Order/Sale authority para todos los canales. ConversaFlow envía comandos a NEXO; KDS consume `OrderSubmitted`.  
+**Consecuencias:** migrar lifecycle y conservar snapshots históricos.  
+**Riesgos:** KDS timing, conversational drafts y outages.  
 **Justificación:** sólo NEXO demuestra aggregate/checkout/financial integrity.
 
 ## ADR-005 — Owner definitivo de Dashboard
 
-**Contexto:** dos dashboards amplios con áreas complementarias y pantallas duplicadas.
-**Problema:** navegación, auth y administración fragmentadas.
-**Opciones:** UMI UI; NEXO UI; reescritura; federation.
-**Decisión:** UMI es shell; NEXO conserva módulos operativos federados hasta migración con paridad.
-**Consecuencias:** SSO, routing, design tokens y consistent navigation.
-**Riesgos:** UX híbrida y auth iframe/deep-link; evitar iframe si rompe seguridad.
+**Contexto:** dos dashboards amplios con áreas complementarias y pantallas duplicadas.  
+**Problema:** navegación, auth y administración fragmentadas.  
+**Opciones:** UMI UI; NEXO UI; reescritura; federation.  
+**Decisión:** UMI es shell; NEXO conserva módulos operativos federados hasta migración con paridad.  
+**Consecuencias:** SSO, routing, design tokens y consistent navigation.  
+**Riesgos:** UX híbrida y auth iframe/deep-link; evitar iframe si rompe seguridad.  
 **Justificación:** UMI cubre ecosystem; NEXO workflows operativos no deben reescribirse.
 
 ## ADR-006 — Owner definitivo de Customers
 
-**Contexto:** UMI tiene customer/contact/timeline/engagement; NEXO referencias parciales.
-**Problema:** PII y consent duplicados.
-**Opciones:** UMI; NEXO; CRM nuevo.
-**Decisión:** UMI owner; NEXO guarda ID y snapshots financieros mínimos.
-**Consecuencias:** minimal customer API/event y retention policy.
-**Riesgos:** disponibilidad en checkout y reconciliación de duplicados.
+**Contexto:** UMI tiene customer/contact/timeline/engagement; NEXO referencias parciales.  
+**Problema:** PII y consent duplicados.  
+**Opciones:** UMI; NEXO; CRM nuevo.  
+**Decisión:** UMI owner; NEXO guarda ID y snapshots financieros mínimos.  
+**Consecuencias:** minimal customer API/event y retention policy.  
+**Riesgos:** disponibilidad en checkout y reconciliación de duplicados.  
 **Justificación:** UMI tiene el aggregate e integraciones customer-facing más completos.
 
 ## ADR-007 — Owner definitivo de Copilot
 
-**Contexto:** UMI posee Anthropic, Voyage, pgvector, knowledge, tools, memory y safety; NEXO no.
-**Problema:** un Copilot commerce necesita datos NEXO sin acceso directo a DB.
-**Opciones:** UMI; NEXO; proveedor externo aislado.
-**Decisión:** UMI owner; tools NEXO contract-first, read-only por defecto y approvals para comandos.
-**Consecuencias:** corpus curado, evals, permissions y audit.
-**Riesgos:** prompt injection, PII y acciones erróneas.
+**Contexto:** UMI posee Anthropic, Voyage, pgvector, knowledge, tools, memory y safety; NEXO no.  
+**Problema:** un Copilot commerce necesita datos NEXO sin acceso directo a DB.  
+**Opciones:** UMI; NEXO; proveedor externo aislado.  
+**Decisión:** UMI owner; tools NEXO contract-first, read-only por defecto y approvals para comandos.  
+**Consecuencias:** corpus curado, evals, permissions y audit.  
+**Riesgos:** prompt injection, PII y acciones erróneas.  
 **Justificación:** reutiliza el único sustrato AI y preserva autoridad NEXO.
 
 ## ADR-008 — Owner definitivo de Flutter
 
-**Contexto:** NEXO tiene Flutter POS y design package; UMI sólo propone seam Dart.
-**Problema:** duplicar cliente retrasaría producto y fragmentaría contratos.
-**Opciones:** NEXO Flutter; nuevo shared app; UMI rewrite.
-**Decisión:** NEXO Client team mantiene Flutter POS; consume UMI auth/control context y NEXO Commerce API.
-**Consecuencias:** dos SDKs coordinados y bootstrap seguro.
-**Riesgos:** version skew/offline token expiry.
+**Contexto:** NEXO tiene Flutter POS y design package; UMI sólo propone seam Dart.  
+**Problema:** duplicar cliente retrasaría producto y fragmentaría contratos.  
+**Opciones:** NEXO Flutter; nuevo shared app; UMI rewrite.  
+**Decisión:** NEXO Client team mantiene Flutter POS; consume UMI auth/control context y NEXO Commerce API.  
+**Consecuencias:** dos SDKs coordinados y bootstrap seguro.  
+**Riesgos:** version skew/offline token expiry.  
 **Justificación:** único cliente funcional encontrado.
 
 ## ADR-009 — Owner definitivo de Payroll
 
-**Contexto:** Payroll no existe; sólo staff/branch/audit seams.
-**Problema:** incrustarlo en Identity o Cash mezclaría obligaciones y datos sensibles.
-**Opciones:** módulo UMI; módulo NEXO; bounded service separado; comprar SaaS.
-**Decisión:** bounded context futuro separado, patrocinado por plataforma UMI, con DB/API/workers propios. Build-vs-buy: **INSUFFICIENT EVIDENCE**.
-**Consecuencias:** consume UMI employee/org/branch; publica resultados mínimos.
-**Riesgos:** fiscalidad, PII, legislación y scope creep.
+**Contexto:** Payroll no existe; sólo staff/branch/audit seams.  
+**Problema:** incrustarlo en Identity o Cash mezclaría obligaciones y datos sensibles.  
+**Opciones:** módulo UMI; módulo NEXO; bounded service separado; comprar SaaS.  
+**Decisión:** bounded context futuro separado, patrocinado por plataforma UMI, con DB/API/workers propios. Build-vs-buy: **INSUFFICIENT EVIDENCE**.  
+**Consecuencias:** consume UMI employee/org/branch; publica resultados mínimos.  
+**Riesgos:** fiscalidad, PII, legislación y scope creep.  
 **Justificación:** no hay implementación y su ciclo difiere de commerce/control plane.
 
 ## ADR-010 — Estrategia de Integración
 
-**Contexto:** hoy no hay integración runtime; existen propuestas y sinks locales.
-**Problema:** shared DB o sync bidireccional crearían coupling y conflictos.
-**Opciones:** shared DB; REST-only; event-only; APIs+eventos.
-**Decisión:** comandos/queries sincrónicos por APIs versionadas; propagación/asíncrono por outbox+eventos; sin shared writes ni dual-write. Tecnología de broker: **INSUFFICIENT EVIDENCE**.
-**Consecuencias:** registry, idempotency, DLQ, observability y compatibility gates.
-**Riesgos:** eventual consistency y operación distribuida.
+**Contexto:** hoy no hay integración runtime; existen propuestas y sinks locales.  
+**Problema:** shared DB o sync bidireccional crearían coupling y conflictos.  
+**Opciones:** shared DB; REST-only; event-only; APIs+eventos.  
+**Decisión:** comandos/queries sincrónicos por APIs versionadas; propagación/asíncrono por outbox+eventos; sin shared writes ni dual-write. Tecnología de broker: **INSUFFICIENT EVIDENCE**.  
+**Consecuencias:** registry, idempotency, DLQ, observability y compatibility gates.  
+**Riesgos:** eventual consistency y operación distribuida.  
 **Justificación:** preserva los dos runtimes maduros y límites de datos.
 
 # Migration Strategy

@@ -8,7 +8,6 @@ begin
   if not exists (select 1 from information_schema.schemata where schema_name='umi')     then raise exception 'missing schema umi';     end if;
   if not exists (select 1 from information_schema.schemata where schema_name='merchant')  then raise exception 'missing schema merchant';  end if;
   if not exists (select 1 from information_schema.schemata where schema_name='runtime') then raise exception 'missing schema runtime'; end if;
-  if not exists (select 1 from information_schema.schemata where schema_name='kds')     then raise exception 'missing schema kds';     end if;
 
   -- roles
   if not exists (select 1 from pg_roles where rolname='api')      then raise exception 'missing role api'; end if;
@@ -28,47 +27,6 @@ begin
     select 1 from pg_class cl join pg_namespace ns on ns.oid=cl.relnamespace
     where ns.nspname='merchant' and cl.relname='loyalty_stored_value_ledger' and cl.relrowsecurity
   ) then raise exception 'RLS not enabled on merchant.loyalty_stored_value_ledger'; end if;
-
-  -- UmiPOS integration authorities must exist in the build-v3 chain.
-  if not exists (
-    select 1 from pg_class cl join pg_namespace ns on ns.oid=cl.relnamespace
-    where ns.nspname='merchant' and cl.relname='cash_ledger_entry'
-      and cl.relrowsecurity and cl.relforcerowsecurity
-  ) then raise exception 'Gate 3 cash ledger RLS is incomplete'; end if;
-  if not exists (
-    select 1 from pg_trigger where tgname='cash_ledger_immutable'
-  ) then raise exception 'missing append-only trigger: cash_ledger'; end if;
-  if not exists (
-    select 1 from pg_class cl join pg_namespace ns on ns.oid=cl.relnamespace
-    where ns.nspname='merchant' and cl.relname='pos_sale_exception'
-      and cl.relrowsecurity and cl.relforcerowsecurity
-  ) then raise exception 'Gate 3D sale exception RLS is incomplete'; end if;
-  if not exists (
-    select 1 from pg_class cl join pg_namespace ns on ns.oid=cl.relnamespace
-    where ns.nspname='merchant' and cl.relname='kitchen_order'
-      and cl.relrowsecurity and cl.relforcerowsecurity
-  ) then raise exception 'Gate 4A kitchen order RLS is incomplete'; end if;
-  if not exists (
-    select 1 from pg_trigger where tgname='kitchen_event_append_only'
-  ) then raise exception 'missing append-only trigger: kitchen_event'; end if;
-  if not exists (
-    select 1 from information_schema.views
-    where table_schema='kds' and table_name='station_order'
-  ) then raise exception 'missing Gate 4A station order view'; end if;
-  if not exists (
-    select 1 from pg_trigger where tgname='pos_sale_exception_append_only'
-  ) then raise exception 'missing append-only trigger: pos_sale_exception'; end if;
-  if not exists (
-    select 1 from pg_trigger where tgname='pos_exception_receipt_append_only'
-  ) then raise exception 'missing append-only trigger: pos_exception_receipt'; end if;
-  if not exists (
-    select 1 from information_schema.tables
-    where table_schema='runtime' and table_name='device_pairing_session'
-  ) then raise exception 'missing UmiPOS device pairing session'; end if;
-  if not exists (
-    select 1 from runtime.schema_migration
-    where version='build-v3-45' and status='applied'
-  ) then raise exception 'missing Gate 6A schema version'; end if;
 
   -- observability must NOT exist (killed 2026-07-11)
   if exists (select 1 from information_schema.schemata where schema_name='observability') then raise exception 'observability schema should not exist'; end if;

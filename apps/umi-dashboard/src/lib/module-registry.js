@@ -7,35 +7,10 @@ export { PRODUCT_ACTIVE_STATUSES };
 export const MODULES = {
   overview: {
     id: 'overview',
-    label: 'Panorama',
+    label: 'Overview',
     icon: 'Home',
     section: 'OPERATIONS',
     product: 'dashboard',
-  },
-  operations: {
-    id: 'operations',
-    label: 'Centro operativo',
-    icon: 'Activity',
-    section: 'OPERATIONS',
-    product: 'dashboard',
-    permissions: [
-      'merchant.manage',
-      'audit.read',
-      'hardware.read',
-      'hardware.diagnostics',
-      'inventory.read',
-      'sale.lifecycle',
-      'sale.exception.read',
-      'cash.shift.read',
-      'customer.read',
-      'loyalty.read',
-      'wallet.read',
-      'gift_card.read',
-      'kitchen.read',
-      'device.enroll',
-      'catalog.read',
-    ],
-    locationScoped: true,
   },
   orders: {
     id: 'orders',
@@ -43,80 +18,71 @@ export const MODULES = {
     icon: 'Receipt',
     section: 'OPERATIONS',
     product: 'kds',
-    permissions: ['kitchen.read'],
     locationScoped: true,
   },
   devices: {
     id: 'devices',
-    label: 'Dispositivos',
+    label: 'Devices',
     icon: 'Tablet',
     section: 'OPERATIONS',
-    product: 'dashboard',
-    permissions: ['device.enroll'],
+    product: 'kds',
     locationScoped: true,
   },
   staff: {
     id: 'staff',
-    label: 'Equipo y acceso',
+    label: 'Staff & Access',
     icon: 'Users',
     section: 'OPERATIONS',
     product: 'dashboard',
-    permissions: ['merchant.manage'],
   },
   customers: {
     id: 'customers',
-    label: 'Clientes',
+    label: 'Customers',
     icon: 'Users2',
     section: 'OPERATIONS',
     product: 'dashboard',
-    permissions: ['customer.read'],
   },
   members: {
     id: 'members',
-    label: 'Lealtad',
+    label: 'Loyalty',
     icon: 'CreditCard',
     section: 'GROWTH',
     product: 'cash',
-    permissions: ['loyalty.read'],
   },
   'gift-cards': {
     id: 'gift-cards',
-    label: 'Gift cards',
+    label: 'Gift Cards',
     icon: 'Gift',
     section: 'GROWTH',
     product: 'cash',
-    permissions: ['gift_card.read'],
   },
   hours: {
     id: 'hours',
-    label: 'Horario y disponibilidad',
+    label: 'Hours & Availability',
     icon: 'Clock',
     section: 'CONFIGURATION',
     product: 'conversaflow',
-    permissions: ['merchant.manage'],
     locationScoped: true,
   },
   settings: {
     id: 'settings',
-    label: 'Ajustes',
+    label: 'Settings',
     icon: 'Settings',
     section: 'CONFIGURATION',
     product: 'dashboard',
-    permissions: ['merchant.manage'],
   },
   'products-billing': {
     id: 'products-billing',
-    label: 'Productos y plan',
+    label: 'Products & Billing',
     icon: 'Sparkles',
     section: 'CONFIGURATION',
     product: 'dashboard',
-    permissions: ['merchant.manage'],
+    role: 'super_admin',
   },
 };
 
 export const MODULE_ORDER = [
   'overview',
-  'operations',
   'orders',
   'devices',
   'staff',
@@ -133,12 +99,10 @@ export function isProductActive(productKey, capabilities) {
   return PRODUCT_ACTIVE_STATUSES.has(status);
 }
 
-export function hasRequiredPermission(moduleConfig, capabilities) {
-  if (!moduleConfig?.permissions?.length) return true;
-  const permissions = capabilities?.membership?.permissions || [];
-  return (
-    permissions.includes('*') || moduleConfig.permissions.some((key) => permissions.includes(key))
-  );
+export function hasRequiredRole(moduleConfig, capabilities) {
+  if (!moduleConfig?.role) return true;
+  const membership = capabilities?.membership;
+  return membership?.role === moduleConfig.role || membership?.permissions?.includes?.('*');
 }
 
 export function getModuleAvailability(moduleKey, capabilities) {
@@ -154,10 +118,11 @@ export function getModuleAvailability(moduleKey, capabilities) {
       locationScoped: !!moduleConfig.locationScoped,
     };
   }
-  if (!hasRequiredPermission(moduleConfig, capabilities)) {
+  if (!hasRequiredRole(moduleConfig, capabilities)) {
     return {
       available: false,
-      reason: 'permission_required',
+      reason: 'role_required',
+      role: moduleConfig.role,
       locationScoped: !!moduleConfig.locationScoped,
     };
   }

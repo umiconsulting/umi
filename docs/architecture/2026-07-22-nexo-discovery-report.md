@@ -1,9 +1,9 @@
 # UMI × NEXO Platform Discovery Audit — Parte 1
 
-**Fecha de corte:** 2026-07-22
-**Modo:** discovery read-only; no se ejecutaron migraciones, builds, tests ni cambios de producto
-**UMI inspeccionado:** rama `build-v3`, commit `71f603e4d5c49b139ee6aefe0fac13b535d55e9c`
-**NEXO inspeccionado:** filesystem de `main`; el repositorio no tiene un `HEAD` resoluble
+**Fecha de corte:** 2026-07-22  
+**Modo:** discovery read-only; no se ejecutaron migraciones, builds, tests ni cambios de producto  
+**UMI inspeccionado:** rama `build-v3`, commit `71f603e4d5c49b139ee6aefe0fac13b535d55e9c`  
+**NEXO inspeccionado:** filesystem de `main`; el repositorio no tiene un `HEAD` resoluble  
 **Decisiones:** candidatos, no decisiones finales; Parte 2 conserva la autoridad de consolidación
 
 ## Executive Summary

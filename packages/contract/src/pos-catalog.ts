@@ -9,7 +9,6 @@ export const CatalogAvailability = z.enum([
   'out_of_assortment',
   'future_availability',
 ]);
-export const CatalogSaleAction = z.enum(['merchandise', 'gift_card']);
 export const CatalogMoney = z
   .object({ minorUnits: z.number().int().nonnegative(), currency: z.string().regex(/^[A-Z]{3}$/) })
   .strict();
@@ -67,7 +66,6 @@ export const CatalogProductSummary = z
     category: CatalogCategory.nullable(),
     price: CatalogMoney,
     taxRateBasisPoints: z.number().int().min(0).max(10000),
-    saleAction: CatalogSaleAction,
     availability: CatalogAvailability,
     availableFrom: Timestamp.nullable(),
     primaryMedia: ProductMedia.nullable(),
@@ -115,7 +113,6 @@ export type CatalogCategory = z.infer<typeof CatalogCategory>;
 
 export const posCatalogModels = {
   CatalogAvailability,
-  CatalogSaleAction,
   CatalogMoney,
   CatalogCategory,
   ProductMedia,

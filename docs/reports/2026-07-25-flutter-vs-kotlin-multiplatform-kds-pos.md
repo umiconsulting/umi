@@ -1,9 +1,9 @@
 # Flutter or Kotlin Multiplatform for Umi KDS and POS
 
-**Date:** 2026-07-25
-**Status:** Research and conditional recommendation
-**Scope:** A greenfield KDS and POS client for Android, iPadOS, and limited desktop use
-**Decision owner:** Umi product and engineering owners
+**Date:** 2026-07-25  
+**Status:** Research and conditional recommendation  
+**Scope:** A greenfield KDS and POS client for Android, iPadOS, and limited desktop use  
+**Decision owner:** Umi product and engineering owners  
 **Confidence:** Medium-high, subject to the hardware proof in section 9
 
 This file is a dated evidence artifact. It does not change the current KDS or POS architecture.

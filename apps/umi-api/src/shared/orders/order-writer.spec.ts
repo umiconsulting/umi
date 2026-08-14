@@ -59,19 +59,16 @@ describe('writeOrder', () => {
         { name: 'Panini', quantity: 1, unitPriceCents: 9000 },
       ],
     });
-    const shape = queries
-      .filter((q) => q.sql.includes('INSERT INTO'))
-      .map((q) =>
-        q.sql.includes('customer_order')
-          ? 'order'
-          : q.sql.includes('order_item')
-            ? 'line'
-            : q.sql.includes('order_event')
-              ? 'event'
-              : 'other',
-      );
+    const shape = queries.map((q) =>
+      q.sql.includes('customer_order')
+        ? 'order'
+        : q.sql.includes('order_item')
+          ? 'line'
+          : q.sql.includes('order_event')
+            ? 'event'
+            : 'other',
+    );
     expect(shape).toEqual(['order', 'line', 'line', 'event']);
-    expect(queries.some((q) => q.sql.includes('merchant.kitchen_order'))).toBe(true);
   });
 
   it('gives each line its display_order, so the ticket renders in cart order', async () => {
