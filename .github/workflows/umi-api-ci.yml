@@ -167,6 +167,17 @@ jobs:
           psql -v ON_ERROR_STOP=1 -d "$GATE_DB" \
             -f apps/umi-api/test/integration/harness-roles.sql
 
+      # The file the CUTOVER runs, on the same roles the harness just made. It
+      # carries no password, so it does not disturb the harness ones — it repairs
+      # the attributes and applies the D10 per-role log posture. Running it here
+      # means the cutover file is exercised on every CI round, instead of being
+      # read for the first time on the night it matters.
+      - name: Apply the build-v3 role provisioning file (D1 · D5 · D10)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -d "$GATE_DB" \
+            -f apps/umi-api/db/roles/004_buildv3_login_roles.sql
+
       - name: Schema instruments (preflight · check-values · parity · carry · stamps)
         working-directory: apps/umi-api
         env:

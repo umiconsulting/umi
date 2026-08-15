@@ -117,6 +117,45 @@ export function poolLoggingProblem(
   );
 }
 
+/** The TLS option both pools receive, or nothing at all. */
+export interface PoolSslOption {
+  ca: string | Buffer;
+  rejectUnauthorized: true;
+}
+
+/**
+ * Turn `PGSSLROOTCERT` into the `ssl` option for both pools.
+ *
+ * The variable holds one of two things, and this tells them apart: the PEM
+ * itself, or a path to it on disk. `rejectUnauthorized: true` is the
+ * enforcement — it makes node check the certificate chain AND the hostname, so a
+ * wrong CA or a wrong host fails the handshake at connect. Without it the
+ * connection is encrypted but unauthenticated, which is what `sslmode=require`
+ * gives and what this control exists to prevent.
+ *
+ * No value gives no option, which is plaintext. That case is LOCAL DEVELOPMENT
+ * only: `config.schema.ts` refuses a production boot without the variable.
+ *
+ * `readFile` is a parameter so a test can supply the file content.
+ */
+export function resolveSslOption(
+  caValue: string | undefined,
+  readFile: (path: string) => string | Buffer = readFileSync,
+): PoolSslOption | undefined {
+  if (!caValue) return undefined;
+  if (caValue.includes('BEGIN CERTIFICATE')) return { ca: caValue, rejectUnauthorized: true };
+  try {
+    return { ca: readFile(caValue), rejectUnauthorized: true };
+  } catch (err) {
+    // A bare ENOENT does not say which setting is wrong, and this one aborts the
+    // boot. Name the variable and the value.
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new Error(`PGSSLROOTCERT points at a file that cannot be read: ${reason}`, {
+      cause: err,
+    });
+  }
+}
+
 /**
  * The single data-access primitive. No ORM (D8) — raw parameterized SQL.
  * Two pools, one per Postgres role — the role is embedded in each connection
@@ -136,16 +175,9 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
 
   constructor(config: ConfigService<AppConfig, true>) {
     // verify-full TLS when a CA is provisioned (prod/Supabase); plaintext otherwise
-    // (local dev against localhost). rejectUnauthorized:true is the real enforcement —
-    // a wrong CA or hostname makes the handshake FAIL at connect. Accept a file path
-    // or an inline PEM. Do not set sslmode in the URL; this option governs TLS.
-    const caValue = config.get('PGSSLROOTCERT', { infer: true });
-    const ssl = caValue
-      ? {
-          ca: caValue.includes('BEGIN CERTIFICATE') ? caValue : readFileSync(caValue),
-          rejectUnauthorized: true,
-        }
-      : undefined;
+    // (local dev against localhost). A production boot without the CA is refused by
+    // the config schema. Do not set sslmode in the URL; this option governs TLS.
+    const ssl = resolveSslOption(config.get('PGSSLROOTCERT', { infer: true }));
     this.tlsEnforced = ssl !== undefined;
 
     this.app = new Pool({

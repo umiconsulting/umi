@@ -5,6 +5,7 @@ import {
   PgService,
   poolRoleProblem,
   poolLoggingProblem,
+  resolveSslOption,
   type PoolRoleAttributes,
   type PoolLoggingPosture,
 } from './pg.service';
@@ -215,5 +216,54 @@ describe('poolLoggingProblem — D10 pure decision', () => {
       posture({ role: 'postgres', logStatement: 'ddl', logMinDurationStatement: 500 }),
     );
     expect(worker).toMatch(/worker pool role "postgres"/);
+  });
+});
+
+/**
+ * D4 — how `PGSSLROOTCERT` becomes a `ssl` option.
+ *
+ * The variable holds one of two things, and the code must tell them apart: a
+ * path to the root CA on disk, or the PEM itself. A production boot without it
+ * is refused by the config schema, so the unset case here is local development
+ * only. This branch had no test.
+ */
+describe('resolveSslOption', () => {
+  const PEM = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----';
+
+  it('passes an inline PEM through, without a read from disk', () => {
+    const readFile = vi.fn();
+    expect(resolveSslOption(PEM, readFile)).toEqual({ ca: PEM, rejectUnauthorized: true });
+    expect(readFile).not.toHaveBeenCalled();
+  });
+
+  it('reads a file path from disk', () => {
+    const readFile = vi.fn().mockReturnValue(PEM);
+    expect(resolveSslOption('/certs/supabase-ca.crt', readFile)).toEqual({
+      ca: PEM,
+      rejectUnauthorized: true,
+    });
+    expect(readFile).toHaveBeenCalledWith('/certs/supabase-ca.crt');
+  });
+
+  it('always sets rejectUnauthorized, which is the enforcement', () => {
+    // Without it the CA is decoration: node accepts any certificate and the
+    // connection is encrypted but unauthenticated, which is the exact failure
+    // `sslmode=require` has and this control exists to prevent.
+    expect(resolveSslOption(PEM, () => PEM)?.rejectUnauthorized).toBe(true);
+  });
+
+  it('gives no ssl option when the variable is unset (local development)', () => {
+    expect(resolveSslOption(undefined, () => PEM)).toBeUndefined();
+  });
+
+  it('treats an empty value as unset rather than as an empty CA', () => {
+    expect(resolveSslOption('', () => PEM)).toBeUndefined();
+  });
+
+  it('names the variable when the file cannot be read, instead of a bare ENOENT', () => {
+    const readFile = vi.fn().mockImplementation(() => {
+      throw new Error("ENOENT: no such file or directory, open '/certs/gone.crt'");
+    });
+    expect(() => resolveSslOption('/certs/gone.crt', readFile)).toThrowError(/PGSSLROOTCERT/);
   });
 });

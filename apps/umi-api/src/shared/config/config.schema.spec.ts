@@ -48,3 +48,52 @@ describe('validateConfig', () => {
     expect(cfg.PORT).toBe(8080);
   });
 });
+
+/**
+ * D4 — the TLS control must not fail open.
+ *
+ * `PGSSLROOTCERT` carries the Postgres server's root CA. `PgService` builds
+ * `ssl: { ca, rejectUnauthorized: true }` from it, so a wrong CA or a wrong
+ * hostname makes the handshake fail at connect. Without the variable there is no
+ * `ssl` option at all, and the connection to Supabase is plaintext over the
+ * public internet.
+ *
+ * Before this rule, an absent variable in production logged `no TLS —
+ * local/dev` and the service booted. A silent downgrade of a security control is
+ * worse than an outage, because nothing reports it.
+ */
+describe('validateConfig · production TLS', () => {
+  const prod = { ...base, NODE_ENV: 'production' };
+
+  it('refuses a production boot when PGSSLROOTCERT is absent', () => {
+    expect(() => validateConfig(prod)).toThrowError(/PGSSLROOTCERT/);
+  });
+
+  it('names the control in the message, so the operator can act on it', () => {
+    expect(() => validateConfig(prod)).toThrowError(/TLS|plaintext/i);
+  });
+
+  it('accepts a production boot with a CA file path', () => {
+    const cfg = validateConfig({ ...prod, PGSSLROOTCERT: '/certs/supabase-ca.crt' });
+    expect(cfg.PGSSLROOTCERT).toBe('/certs/supabase-ca.crt');
+  });
+
+  it('accepts a production boot with an inline PEM', () => {
+    const pem = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----';
+    expect(validateConfig({ ...prod, PGSSLROOTCERT: pem }).PGSSLROOTCERT).toBe(pem);
+  });
+
+  it('rejects an EMPTY PGSSLROOTCERT, which reaches PgService as no TLS at all', () => {
+    // `config.get` returns '' and `ssl` stays undefined, so an empty value is a
+    // plaintext boot that LOOKS configured. Reject it with the absent case.
+    expect(() => validateConfig({ ...prod, PGSSLROOTCERT: '' })).toThrowError(/PGSSLROOTCERT/);
+  });
+
+  it('leaves development alone, where the target is a local postgres', () => {
+    expect(() => validateConfig({ ...base, NODE_ENV: 'development' })).not.toThrow();
+  });
+
+  it('leaves test alone, so the integration harness needs no certificate', () => {
+    expect(() => validateConfig({ ...base, NODE_ENV: 'test' })).not.toThrow();
+  });
+});

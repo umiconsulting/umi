@@ -292,28 +292,58 @@ select * from (values
   -- parameters the platform actually permits. If this one is ungrantable, pin
   -- `log_min_duration_statement = -1` per request-path role instead — that closes the
   -- real path and is BETTER than the global setting, being scoped to the request path.
+  --
+  -- The check accepts EITHER placement. A role-level `ALTER ROLE … SET` overrides
+  -- the cluster default for that role's sessions, so a pin on every request-path
+  -- role is equivalent for those sessions and NARROWER than the global setting.
+  -- `apps/umi-api/db/roles/004_buildv3_login_roles.sql` applies the role-level pin
+  -- and reports, per role, what a managed target refused.
   ('bind parameters are never logged (log_parameter_max_length = 0)',
-    (select case when setting = '0' then 'PASS' else 'WARN' end
-       from pg_settings where name = 'log_parameter_max_length')),
+    (select case
+       when (select setting from pg_settings where name='log_parameter_max_length') = '0'
+         then 'PASS'
+       -- COUNT the roles, never `not exists`. A bare `not exists (… role without
+       -- the pin …)` is TRUE when there is no request-path role at all, so an
+       -- unprovisioned target would read PASS while nothing was pinned and
+       -- nothing was checked. Require at least one role AND every one pinned,
+       -- the same shape the `never log statements` check above uses.
+       when (select count(*) filter (where not pinned) = 0 and count(*) > 0 from (
+               select exists (
+                        select 1 from pg_db_role_setting s
+                         where s.setrole = r.oid
+                           and array_to_string(s.setconfig, ',') ~ 'log_parameter_max_length=0'
+                      ) as pinned
+                 from pg_roles r
+                where r.rolcanlogin
+                  and not r.rolsuper
+                  and (r.rolname in ('api_login','worker_login','umi_app','umi_worker')
+                       or pg_has_role(r.oid, 'api', 'usage')
+                       or pg_has_role(r.oid, 'worker', 'usage'))
+             ) x)
+         then 'PASS'
+       else 'WARN' end)),
   -- The independent trigger named above. PASS when duration logging is off entirely,
   -- or pinned off for every request-path role.
   ('request-path roles are not exposed to duration-based logging',
     (select case
        when (select setting from pg_settings where name='log_min_duration_statement') = '-1'
          then 'PASS'
-       when not exists (
-         select 1 from pg_roles r
-          where r.rolcanlogin
-            and not r.rolsuper
-            and (r.rolname in ('api_login','worker_login','umi_app','umi_worker')
-                 or pg_has_role(r.oid, 'api', 'usage')
-                 or pg_has_role(r.oid, 'worker', 'usage'))
-            and not exists (
-              select 1 from pg_db_role_setting s
-               where s.setrole = r.oid
-                 and array_to_string(s.setconfig, ',') ~ 'log_min_duration_statement=-1'
-            )
-       ) then 'PASS'
+       -- Same counting rule as the check above: an unprovisioned target must not
+       -- read as PASS.
+       when (select count(*) filter (where not pinned) = 0 and count(*) > 0 from (
+               select exists (
+                        select 1 from pg_db_role_setting s
+                         where s.setrole = r.oid
+                           and array_to_string(s.setconfig, ',') ~ 'log_min_duration_statement=-1'
+                      ) as pinned
+                 from pg_roles r
+                where r.rolcanlogin
+                  and not r.rolsuper
+                  and (r.rolname in ('api_login','worker_login','umi_app','umi_worker')
+                       or pg_has_role(r.oid, 'api', 'usage')
+                       or pg_has_role(r.oid, 'worker', 'usage'))
+             ) x)
+         then 'PASS'
        else 'WARN' end)),
   ('bind parameters are never logged on error',
     (select case when setting = '0' then 'PASS' else 'FAIL' end
