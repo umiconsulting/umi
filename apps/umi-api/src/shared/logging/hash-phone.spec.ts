@@ -20,9 +20,10 @@ describe('hashPhone', () => {
   });
 
   it('matches a known value, so the handle survives a refactor', () => {
-    // A literal, not a recomputed sha256. Recomputing it here the way the code
-    // does would agree with the code however wrong it became — and this value is
-    // persisted, so a change to it silently orphans every stored phone_hash.
+    // A literal, not a sha256 that this test computes again. A second
+    // computation with the same steps agrees with the code even when the code is
+    // wrong. The value is persisted, so a change to it orphans every stored
+    // phone_hash.
     expect(hashPhone('+525512345678')).toBe('91e296c972c986bf');
   });
 });

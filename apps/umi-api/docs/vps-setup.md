@@ -416,4 +416,4 @@ generated compose.
   Both writers coexist safely (append-only ledger, `balance = SUM`); retiring
   umi-cash's writes is a separate decision.
 - PassKit/Google-Wallet cert port; CSRF double-submit guard (SameSite=Lax is the
-  current mitigation); `TraceService` → `observability.*` rebind.
+  current mitigation).

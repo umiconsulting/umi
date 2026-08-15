@@ -1,22 +1,25 @@
 import { createHash } from 'node:crypto';
 
 /**
- * A stable, non-reversible handle for a phone number.
+ * A stable handle for a phone number.
  *
- * Used where a row or a log line must identify a person WITHOUT holding their
- * number: `runtime.inbound_event.payload.phone_hash` is the current caller. Two
- * events from the same number get the same handle, so a duplicate is still
- * visible, and nothing stored can be read back into a phone number.
+ * Use it where a row or a log line must identify a person, but must not hold
+ * their number. Two events from the same number get the same handle. A duplicate
+ * stays visible, and the stored value holds no phone number.
  *
- * ⚠️ This is a HANDLE, not a secret. sha256 over a phone number is cheap to
- * reverse by trying every number in a country, so it protects a reader of the
- * row, not an attacker with the whole table. Do not use it to authenticate.
+ * The callers are `runtime.inbound_event.payload.phone_hash` and the security
+ * log lines in `security-event.ts`.
  *
- * 16 hex characters is 64 bits. Collisions need about 4 billion numbers before
- * they are likely, and Mexico has about 130 million.
+ * ⚠️ Do not use this handle to authenticate. It is not a secret. A country holds
+ * a limited count of phone numbers, and an attacker can hash each one. The
+ * handle protects a person who reads one row. It does not protect against an
+ * attacker who holds the whole table.
  *
- * Moved here from `trace.service.ts` when that service was deleted. It was the
- * one piece of that file with a live caller.
+ * 16 hex characters is 64 bits. A collision becomes likely at about 4 billion
+ * numbers, and Mexico has about 130 million.
+ *
+ * This function comes from `trace.service.ts`. It was the one part of that
+ * deleted service with a live caller.
  */
 export function hashPhone(phone: string): string {
   return createHash('sha256').update(phone).digest('hex').slice(0, 16);

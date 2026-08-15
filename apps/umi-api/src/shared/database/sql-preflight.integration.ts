@@ -186,8 +186,9 @@ const KNOWN_UNRESOLVED: ReadonlyArray<{ file: string; code: string; count: numbe
  * Every entry here is a deliberate, permanent limit of static rebuilding. A
  * statement whose clause is chosen at run time has no single form to check.
  *
- * `trace.service.ts` held four entries until 2026-08-14. It was dead code, and
- * decision L20 deleted it rather than accept it.
+ * `trace.service.ts` held four entries until 2026-08-14. Its four tables exist
+ * in no DDL, so we deleted the file instead of an acceptance of the entries. See
+ * decision L20 in `docs/migration/build-v3/BACKFILL_METHODOLOGY.md`.
  */
 const UNCOVERED_EXPECTED: ReadonlyArray<{ file: string; count: number; why: string }> = [
   {
