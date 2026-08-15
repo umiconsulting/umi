@@ -509,6 +509,19 @@ create table merchant.loyalty_program (
   card_prefix             text,
   topup_enabled           boolean not null default false,  -- does this café sell stored value (Saldo)?
   stamps_per_reward       integer,                          -- e.g. 8 visits -> 1 reward
+  -- May staff credit several stamps in ONE action ("Agregar sellos")? This is the
+  -- catch-up path for a customer migrated from an external loyalty system, and it
+  -- is the only writer that can mint a loyalty_visit worth more than one stamp.
+  --
+  -- It lives here as a TYPED column because build-v3 has no branding jsonb (see
+  -- the owner call above). In production it is `loyalty.programs.branding ->>
+  -- 'multi_seal_enabled'`, a JSON key, and the backfill must carry it — a café
+  -- that had the feature ON and arrives with it OFF loses the ability to correct
+  -- a migrated card, which is precisely the population that needs correcting.
+  --
+  -- Default false: OFF is the safe direction. A café that never had it keeps
+  -- exactly what it had, and one that did is turned back on by the carry.
+  multi_seal_enabled      boolean not null default false,
   birthday_reward_enabled boolean not null default false,
   birthday_reward_name    text,
   self_registration       boolean not null default false,  -- may a customer self-enrol (no staff)?
