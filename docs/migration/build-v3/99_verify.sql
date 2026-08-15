@@ -14,9 +14,19 @@ begin
   if not exists (select 1 from pg_roles where rolname='worker' and rolbypassrls) then raise exception 'worker must be BYPASSRLS'; end if;
   if not exists (select 1 from pg_roles where rolname='readonly') then raise exception 'missing role readonly'; end if;
 
-  -- append-only triggers on the two money ledgers
+  -- Append-only triggers on the two money ledgers, PRESENT AND ENABLED.
+  --
+  -- ⚠️ Test `tgenabled`, and do not test only for the row. `pg_trigger` keeps the
+  -- row when a trigger is disabled, so `not exists (...)` reported OK while
+  -- `alter table ... disable trigger` had left the ledger writable. That is the
+  -- exact state a half-applied migration leaves behind, and this check exists to
+  -- find it. Measured 2026-08-14: verify said OK with tgenabled = 'D'.
+  --
+  -- 'D' is disabled. 'O', 'R' and 'A' all fire on an ordinary write.
   if not exists (select 1 from pg_trigger where tgname='stored_value_ledger_append_only') then raise exception 'missing append-only trigger: stored_value_ledger'; end if;
   if not exists (select 1 from pg_trigger where tgname='gift_card_ledger_append_only')    then raise exception 'missing append-only trigger: gift_card_ledger';    end if;
+  if exists (select 1 from pg_trigger where tgname='stored_value_ledger_append_only' and tgenabled='D') then raise exception 'append-only trigger DISABLED: stored_value_ledger — the money ledger is writable'; end if;
+  if exists (select 1 from pg_trigger where tgname='gift_card_ledger_append_only'    and tgenabled='D') then raise exception 'append-only trigger DISABLED: gift_card_ledger — the money ledger is writable';    end if;
 
   -- views exist (derive, don't cache)
   if not exists (select 1 from information_schema.views where table_schema='umi'    and table_name='effective_entitlement')  then raise exception 'missing view umi.effective_entitlement'; end if;
