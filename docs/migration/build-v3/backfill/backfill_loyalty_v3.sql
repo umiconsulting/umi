@@ -62,17 +62,37 @@ select pl.id, pl.tenant_id, pl.loyalty_card_id, pl.delta, pl.reason,
        pl.idempotency_key, pl.source_id, pl.created_at, pl.created_at
 from loyalty.points_ledger pl;
 
--- 6a. loyalty_visit (real stamps) <- loyalty.visit_events
-insert into merchant.loyalty_visit (id, merchant_id, card_id, staff_id, source, occurred_at, created_at)
-select ve.id, ve.tenant_id, ve.loyalty_card_id, null, 'scan', ve.occurred_at, ve.occurred_at
+-- 6. loyalty_visit <- loyalty.visit_events, CARRYING THE MAGNITUDE.
+--
+-- The source has always held the magnitude and this backfill always dropped it.
+-- `metadata->>'seals'` is 1..50 on 28 of the 537 rows — the "Agregar sellos"
+-- catch-up path — and carrying only the row collapsed each of those to a single
+-- stamp. 537 rows carrying 624 stamps became 537 stamps, and 87 went missing.
+--
+-- The previous version papered over that with a §6b that INVENTED the difference:
+-- `generate_series` minted one synthetic row per missing stamp, stamped
+-- `source='migration'` at `card.created_at`. It balanced the total and destroyed
+-- the history — one card received 15 visits at a single microsecond, and every
+-- "when did she come in" read was a lie from that point on.
+--
+-- Now: carry 537 rows and 624 stamps. Both numbers are true, and 445/445 cards
+-- reconcile on sum(stamps) rather than on an invented count.
+insert into merchant.loyalty_visit
+       (id, merchant_id, card_id, staff_id, source, stamps, note, occurred_at, created_at)
+select ve.id,
+       ve.tenant_id,
+       ve.loyalty_card_id,
+       null,
+       -- A row carrying more than one stamp came from the bulk catch-up, by
+       -- definition — that endpoint is the only writer that can mint one.
+       case when coalesce((ve.metadata->>'seals')::int, 1) > 1
+            then 'manual_bulk' else 'scan' end,
+       -- Clamped to the CHECK. A source row outside 1..50 is corrupt, not a
+       -- reason to abort the cutover at 04:00; reconcile section H reports it.
+       least(greatest(coalesce((ve.metadata->>'seals')::int, 1), 1), 50),
+       ve.note,
+       ve.occurred_at,
+       ve.occurred_at
 from loyalty.visit_events ve;
-
--- 6b. loyalty_visit (synthetic) — fill total_visits gap per card
-insert into merchant.loyalty_visit (merchant_id, card_id, source, occurred_at)
-select c.tenant_id, c.id, 'migration', c.created_at
-from loyalty.cards c
-left join (select loyalty_card_id, count(*) cnt from loyalty.visit_events group by 1) v
-       on v.loyalty_card_id = c.id
-cross join lateral generate_series(1, greatest(c.total_visits - coalesce(v.cnt,0), 0)) g;
 
 commit;

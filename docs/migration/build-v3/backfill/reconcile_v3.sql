@@ -253,3 +253,71 @@ select r.key as role, count(*) as pos_grants
  where p.key in ('catalog.read','cart.write','checkout.commit','offline.replay',
                  'offline.cash.checkout','device.enroll','offline.recovery.review','audit.read')
  group by r.key order by r.key;
+
+\echo ''
+\echo '========== H. STAMPS · magnitude, per card (2026-08-14) =========='
+\echo '-- A row is not a magnitude. `loyalty.visit_events` carries `metadata.seals`'
+\echo '   1..50 on the bulk catch-up path, and the previous backfill dropped it, then'
+\echo '   INVENTED synthetic rows so that count(*) came out right. That balanced the'
+\echo '   total and destroyed the history: one card received 15 visits at a single'
+\echo '   microsecond. The carry is now sum(stamps), and these checks compare it PER'
+\echo '   CARD — an aggregate hides a +X and a -X that cancel.'
+\echo ''
+\echo '-- H1. Rows carried, not invented. Source visit_events = target rows (expect equal,'
+\echo '   and NOTHING with source = migration, which no longer exists):'
+select (select count(*) from loyalty.visit_events)                                as src_interactions,
+       (select count(*) from merchant.loyalty_visit)                              as dst_interactions,
+       (select count(*) from merchant.loyalty_visit where source = 'manual_bulk') as dst_bulk_rows;
+
+\echo ''
+\echo '-- H2. Stamps preserved PER CARD. Source stamps = sum of metadata.seals (default 1);'
+\echo '   target = sum(stamps). Every row here is a customer whose card got shorter or'
+\echo '   longer than it was (expect 0 rows):'
+with src as (
+  select loyalty_card_id as card_id,
+         sum(greatest(coalesce((metadata->>'seals')::int, 1), 1)) as stamps
+    from loyalty.visit_events group by 1
+), dst as (
+  select card_id, sum(stamps) as stamps
+    from merchant.loyalty_visit group by 1
+)
+select coalesce(src.card_id, dst.card_id)              as card_id,
+       coalesce(src.stamps, 0)                         as src_stamps,
+       coalesce(dst.stamps, 0)                         as dst_stamps,
+       coalesce(dst.stamps, 0) - coalesce(src.stamps, 0) as drift
+  from src full outer join dst on dst.card_id = src.card_id
+ where coalesce(src.stamps, 0) <> coalesce(dst.stamps, 0)
+ order by abs(coalesce(dst.stamps, 0) - coalesce(src.stamps, 0)) desc
+ limit 50;
+
+\echo ''
+\echo '-- H3. The same comparison as ONE number, so a green H2 cannot be read as'
+\echo '   "nothing to see" when the query silently returned no rows (expect 0):'
+with src as (
+  select loyalty_card_id as card_id,
+         sum(greatest(coalesce((metadata->>'seals')::int, 1), 1)) as stamps
+    from loyalty.visit_events group by 1
+), dst as (
+  select card_id, sum(stamps) as stamps from merchant.loyalty_visit group by 1
+)
+select count(*) as cards_with_stamp_drift
+  from src full outer join dst on dst.card_id = src.card_id
+ where coalesce(src.stamps, 0) <> coalesce(dst.stamps, 0);
+
+\echo ''
+\echo '-- H4. The bulk-seal population, named. These are the cards the old backfill'
+\echo '   would have shortened; the measurement on 2026-07 was 28 events, 115 stamps,'
+\echo '   22 cards, and 18 Kalala customers losing 87 stamps between them:'
+select count(*)                                          as bulk_events,
+       coalesce(sum((metadata->>'seals')::int), 0)       as bulk_stamps,
+       count(distinct loyalty_card_id)                   as cards_affected
+  from loyalty.visit_events
+ where coalesce((metadata->>'seals')::int, 1) > 1;
+
+\echo ''
+\echo '-- H5. No source row exceeded the CHECK. The carry clamps to 1..50, so a source'
+\echo '   value outside that range is silently trimmed rather than aborting the cutover'
+\echo '   at 04:00. If this is not 0, the clamp changed someone data (expect 0):'
+select count(*) as source_rows_outside_check
+  from loyalty.visit_events
+ where coalesce((metadata->>'seals')::int, 1) not between 1 and 50;

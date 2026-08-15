@@ -103,7 +103,7 @@ export class CustomersRepository {
            LEFT JOIN LATERAL (
              SELECT
                count(lc.id) AS loyalty_count,
-               COALESCE((SELECT count(*) FROM merchant.loyalty_visit v
+               COALESCE((SELECT sum(v.stamps) FROM merchant.loyalty_visit v
                  WHERE v.merchant_id = c.merchant_id
                    AND v.card_id IN (SELECT id FROM merchant.loyalty_card WHERE merchant_id = c.merchant_id AND customer_id = c.id)), 0) AS total_visits,
                COALESCE((SELECT sum(l.delta) FROM merchant.loyalty_stored_value_ledger l
@@ -322,7 +322,7 @@ export class CustomersRepository {
          CROSS JOIN vr
          CROSS JOIN LATERAL (
            SELECT
-             (SELECT count(*) FROM merchant.loyalty_visit v WHERE v.merchant_id = lc.merchant_id AND v.card_id = lc.id) AS total_visits,
+             (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v WHERE v.merchant_id = lc.merchant_id AND v.card_id = lc.id) AS total_visits,
              (SELECT count(*) FROM merchant.loyalty_redemption r WHERE r.merchant_id = lc.merchant_id AND r.card_id = lc.id) AS redemptions,
              COALESCE((SELECT sum(l.delta) FROM merchant.loyalty_stored_value_ledger l WHERE l.merchant_id = lc.merchant_id AND l.card_id = lc.id), 0) AS balance_cents
          ) AS agg

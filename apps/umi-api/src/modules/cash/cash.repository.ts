@@ -110,6 +110,9 @@ export class CashRepository {
     return this.pg.withMerchant(async (c) => {
       const [visits, topups, pending] = await Promise.all([
         c.query<Row>(
+          // count(*), NOT sum(stamps): this is "how many times did someone come
+          // in today", an activity counter. A bulk catch-up credit is ONE
+          // interaction worth many stamps. Card progress reads sum(stamps).
           `SELECT count(*)::int AS n FROM merchant.loyalty_visit
            WHERE merchant_id = $1::uuid AND occurred_at >= $2`,
           [merchantId, dayStart],
@@ -129,7 +132,7 @@ export class CashRepository {
            )
            SELECT COALESCE(sum(pend), 0)::int AS sum FROM (
              SELECT (
-               (SELECT count(*) FROM merchant.loyalty_visit v
+               (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v
                  WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id) / (SELECT n FROM vr)
                - (SELECT count(*) FROM merchant.loyalty_redemption r
                    WHERE r.merchant_id = c.merchant_id AND r.card_id = c.id)
@@ -175,7 +178,7 @@ export class CashRepository {
            LEFT JOIN merchant.customer AS cu ON cu.merchant_id = ca.merchant_id AND cu.id = ca.customer_id
            CROSS JOIN LATERAL (
              SELECT
-               (SELECT count(*) FROM merchant.loyalty_visit v
+               (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v
                  WHERE v.merchant_id = ca.merchant_id AND v.card_id = ca.id) AS total_visits,
                COALESCE((SELECT sum(l.delta) FROM merchant.loyalty_stored_value_ledger l
                  WHERE l.merchant_id = ca.merchant_id AND l.card_id = ca.id), 0) AS balance_cents
@@ -214,6 +217,11 @@ export class CashRepository {
              (SELECT count(*)::int FROM merchant.customer WHERE merchant_id = $1::uuid) AS "totalCustomers",
              (SELECT COALESCE(sum(abs(delta)), 0)::bigint FROM merchant.loyalty_stored_value_ledger
                 WHERE merchant_id = $1::uuid AND reason = 'purchase') AS "totalRevenueCentavos",
+             -- count(*), NOT sum(stamps): all-time INTERACTIONS. ⚠ This number
+             -- changes at the cutover, and the new one is the true one: the old
+             -- backfill invented 87 synthetic rows so that count(*) matched a
+             -- stamp total, so this read 624 where the customers had actually
+             -- come in 537 times.
              (SELECT count(*)::bigint FROM merchant.loyalty_visit
                 WHERE merchant_id = $1::uuid) AS "totalAllTimeVisits"`,
           [merchantId],
@@ -269,7 +277,7 @@ export class CashRepository {
           c.id AS card_id, c.card_number,
           COALESCE((SELECT sum(l.delta) FROM merchant.loyalty_stored_value_ledger l
             WHERE l.merchant_id = cu.merchant_id AND l.card_id = c.id), 0)::bigint          AS balance_cents,
-          (SELECT count(*) FROM merchant.loyalty_visit v
+          (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v
             WHERE v.merchant_id = cu.merchant_id AND v.card_id = c.id)::int                 AS total_visits,
           (SELECT count(*) FROM merchant.loyalty_redemption r
             WHERE r.merchant_id = cu.merchant_id AND r.card_id = c.id)::int                 AS redemptions,
