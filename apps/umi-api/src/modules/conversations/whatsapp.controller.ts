@@ -6,7 +6,8 @@ import { EnqueueService } from '../../jobs/enqueue.service';
 import { JobPriority } from '../../jobs/job-options';
 import { QUEUES } from '../../jobs/queues';
 import { QueueRepository } from '../../jobs/queue.repository';
-import { TraceService } from '../../shared/logging/trace.service';
+import { LoggingService } from '../../shared/logging/logging.service';
+import { hashPhone } from '../../shared/logging/hash-phone';
 import { twimlMessage, emptyTwiml } from '../../shared/format/whatsapp';
 import { MerchantResolutionService } from './merchant-resolution.service';
 import {
@@ -45,7 +46,7 @@ export class WhatsappController {
     private readonly messages: MessagesRepository,
     private readonly queue: QueueRepository,
     private readonly enqueue: EnqueueService,
-    private readonly trace: TraceService,
+    private readonly log: LoggingService,
   ) {
     this.authToken = config.get('TWILIO_AUTH_TOKEN', { infer: true });
     this.webhookUrl = config.get('TWILIO_WEBHOOK_URL', { infer: true });
@@ -121,7 +122,7 @@ export class WhatsappController {
     // ── Rate limit + prompt-injection ──
     const rate = await this.security.checkRateLimit(merchantId, personId);
     if (!rate.allowed) {
-      await this.trace.logSecurityEvent({
+      this.log.warn('security_event', {
         phone,
         eventType: 'rate_limit_exceeded',
         inputText: `${rate.count} messages`,
@@ -133,7 +134,7 @@ export class WhatsappController {
     }
     const injection = detectPromptInjection(rawMessage);
     if (injection.detected) {
-      await this.trace.logSecurityEvent({
+      this.log.warn('security_event', {
         phone,
         eventType: 'prompt_injection_attempt',
         inputText: rawMessage,
@@ -161,7 +162,7 @@ export class WhatsappController {
         provider: 'twilio',
         providerEventId: messageSid,
         eventType: 'whatsapp_message',
-        payload: { phone_hash: this.trace.hashPhone(phone), message_length: message.length },
+        payload: { phone_hash: hashPhone(phone), message_length: message.length },
       });
       if (gate.duplicate) {
         this.logger.log(
@@ -198,7 +199,7 @@ export class WhatsappController {
       { priority: JobPriority.Interactive, jobId: messageSid },
     );
 
-    await this.trace.logPipelineTrace({
+    this.log.log('pipeline_trace', {
       trace_id: requestId,
       conversation_id: conversation.id,
       merchant_id: merchantId,

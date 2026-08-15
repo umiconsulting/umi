@@ -5,7 +5,7 @@ import { workerOptions } from './job-options';
 import { BaseProcessor } from './base.processor';
 import { DeadLetterService } from './dead-letter.service';
 import { TwilioAdapter } from '../shared/adapters/twilio.adapter';
-import { TraceService } from '../shared/logging/trace.service';
+import { LoggingService } from '../shared/logging/logging.service';
 import { toWhatsAppMarkdown } from '../shared/format/whatsapp';
 
 /**
@@ -23,7 +23,7 @@ export class OutboundProcessor extends BaseProcessor {
   constructor(
     deadLetters: DeadLetterService,
     private readonly twilio: TwilioAdapter,
-    private readonly trace: TraceService,
+    private readonly log: LoggingService,
   ) {
     super(deadLetters);
   }
@@ -66,7 +66,7 @@ export class OutboundProcessor extends BaseProcessor {
         const res = await this.twilio.sendWhatsAppMessage({ to, body });
         if (!res) throw new Error(`twilio sendWhatsAppMessage returned null (${job.name})`);
         if (job.name === 'twilio.reply' && typeof p.trace_id === 'string') {
-          await this.trace.logPipelineTrace({
+          this.log.log('pipeline_trace', {
             trace_id: p.trace_id,
             conversation_id: typeof p.conversation_id === 'string' ? p.conversation_id : undefined,
             turn_id: typeof p.turn_id === 'string' ? p.turn_id : undefined,

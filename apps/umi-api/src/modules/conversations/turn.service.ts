@@ -3,7 +3,7 @@ import { OrderLocationResolver } from './order-location.resolver';
 import { EnqueueService } from '../../jobs/enqueue.service';
 import { JobPriority } from '../../jobs/job-options';
 import { QUEUES } from '../../jobs/queues';
-import { TraceService } from '../../shared/logging/trace.service';
+import { LoggingService } from '../../shared/logging/logging.service';
 import { MerchantConfigService, resolveVoiceConfig } from './merchant-config.service';
 import { ConversationsRepository } from './conversations.repository';
 import { ConversationTurnsRepository, type TurnRecord } from './conversation-turns.repository';
@@ -63,7 +63,7 @@ export class TurnService {
     private readonly toolLoop: ToolLoopService,
     private readonly commit: TurnCommitRepository,
     private readonly enqueue: EnqueueService,
-    private readonly trace: TraceService,
+    private readonly log: LoggingService,
     private readonly orderLocation: OrderLocationResolver,
   ) {}
 
@@ -98,7 +98,7 @@ export class TurnService {
     const start = Date.now();
     const traceId = payload.request_id ?? payload.conversation_id;
 
-    await this.trace.logPipelineTrace({
+    this.log.log('pipeline_trace', {
       trace_id: traceId,
       conversation_id: payload.conversation_id,
       turn_id: payload.turn_id,
@@ -248,7 +248,7 @@ export class TurnService {
       },
     });
 
-    await this.trace.logPipelineTrace({
+    this.log.log('pipeline_trace', {
       trace_id: traceId,
       conversation_id: payload.conversation_id,
       turn_id: payload.turn_id,
@@ -295,7 +295,7 @@ export class TurnService {
       metadata_bytes: jsonByteLength(metadata),
     };
 
-    await this.trace.logAiTurn({
+    this.log.log('ai_turn', {
       conversation_id: payload.conversation_id,
       customer_id: payload.person_id,
       merchant_id: payload.merchant_id,
@@ -360,7 +360,7 @@ export class TurnService {
       ),
     ]);
 
-    await this.trace.logPipelineTrace({
+    this.log.log('pipeline_trace', {
       trace_id: traceId,
       conversation_id: payload.conversation_id,
       turn_id: payload.turn_id,
@@ -389,7 +389,7 @@ export class TurnService {
       supersededAt: new Date().toISOString(),
     });
 
-    await this.trace.logPipelineTrace({
+    this.log.log('pipeline_trace', {
       trace_id: traceId,
       conversation_id: payload.conversation_id,
       turn_id: payload.turn_id,

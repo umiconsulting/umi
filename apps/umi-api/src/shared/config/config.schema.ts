@@ -36,15 +36,6 @@ export const configSchema = z
     // Redis / BullMQ.
     REDIS_URL: z.string().url(),
 
-    // Observability schema that holds the runtime trace tables umi-logs reads
-    // (ai_turn_logs, edge_function_logs, security_logs, pipeline_traces). Live
-    // default is `conversaflow`; confirm against the platform DB. Validated as a
-    // safe SQL identifier since it's interpolated into INSERT statements.
-    OBSERVABILITY_SCHEMA: z
-      .string()
-      .regex(/^[A-Za-z_][A-Za-z0-9_]*$/)
-      .default('conversaflow'),
-
     // ── Apple Wallet pass signing ───────────────────────────────────────────
     // The three PEMs, base64-encoded. A pass needs all three to get a signature.
     // `ApplePassBuilder.isConfigured()` gives false until they are all present,

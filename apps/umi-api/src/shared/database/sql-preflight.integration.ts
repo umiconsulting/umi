@@ -183,21 +183,13 @@ const KNOWN_UNRESOLVED: ReadonlyArray<{ file: string; code: string; count: numbe
  * it binding: a NEW uncovered statement fails the gate, and an entry that stops
  * being uncovered fails it too.
  *
- * The distinction between the two groups matters. One is dead code awaiting
- * deletion. The other is a deliberate, permanent limit of static rebuilding.
+ * Every entry here is a deliberate, permanent limit of static rebuilding. A
+ * statement whose clause is chosen at run time has no single form to check.
+ *
+ * `trace.service.ts` held four entries until 2026-08-14. It was dead code, and
+ * decision L20 deleted it rather than accept it.
  */
 const UNCOVERED_EXPECTED: ReadonlyArray<{ file: string; count: number; why: string }> = [
-  {
-    file: 'shared/logging/trace.service.ts',
-    count: 4,
-    // NOT accepted — scheduled for deletion. These write to
-    // `${OBSERVABILITY_SCHEMA}.ai_turn_logs` and three sibling tables. No Build
-    // v3 DDL file declares any of them and no base has ever held them, so every
-    // write already fails into logger.warn. Decision L20
-    // (BACKFILL_METHODOLOGY.md:175) deletes the service, its call sites and the
-    // OBSERVABILITY_SCHEMA setting. Delete this entry with them.
-    why: 'dead code, pending deletion per decision L20 (AB#18)',
-  },
   {
     file: 'modules/kds/kds.repository.ts',
     count: 2,
