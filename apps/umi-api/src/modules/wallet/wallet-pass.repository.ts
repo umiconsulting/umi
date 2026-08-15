@@ -265,15 +265,6 @@ export class WalletPassRepository {
   }
 
   /**
-   * Everything the pass builder needs, for one card.
-   *
-   * The geofences are the part that fails silently. `locations` is rebuilt on
-   * every render and is never carried forward from the pass already on the phone,
-   * so a location row that arrives with a null `lat`/`lng`, or with a `status`
-   * that is not exactly `'active'`, produces a pass with NO nearby behaviour and
-   * no error anywhere. Treat an empty result here as a fact worth logging.
-   */
-  /**
    * PASS HEALTH — the standing detector for the silent failure.
    *
    * An Apple pass that stops updating never reports an error. It stays
@@ -322,6 +313,15 @@ export class WalletPassRepository {
     };
   }
 
+  /**
+   * Everything the pass builder needs, for one card.
+   *
+   * The geofences are the part that fails silently. `locations` is rebuilt on
+   * every render and is never carried forward from the pass already on the phone,
+   * so a location row that arrives with a null `lat`/`lng`, or with a `status`
+   * that is not exactly `'active'`, produces a pass with NO nearby behaviour and
+   * no error anywhere. Treat an empty result here as a fact worth logging.
+   */
   async renderData(merchantId: string, cardId: string): Promise<PassRenderData | null> {
     const [head, locations, state] = await Promise.all([
       this.pg.query<PassHeadRow>(
@@ -412,6 +412,15 @@ export interface AuthenticatedPass {
   /** Apple's `authenticationToken`. Immutable for the life of the pass. */
   webServiceToken: string;
   cardUpdatedAt: Date;
+}
+
+/** What `passHealth` counts. Two questions, never added together. */
+export interface PassHealth {
+  total: number;
+  /** Passes with NO device registration. No push can ever reach them. */
+  unregistered: number;
+  /** Registered passes whose card has not changed in `staleDays`. A trend, not an alarm. */
+  stale: number;
 }
 
 export interface PassRenderData {

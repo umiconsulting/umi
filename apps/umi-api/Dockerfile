@@ -39,15 +39,15 @@ ENV NODE_ENV=production
 COPY --from=build /out/dist ./dist
 COPY --from=build /out/node_modules ./node_modules
 COPY --from=build /out/package.json ./package.json
-# The Apple pass template. PKPass.from() reads it at render time, and
-# apple-pass.builder.ts resolves TEMPLATE_ROOT from process.cwd(), which is /app
-# here. Without this line /app/passes/apple/template.pass does not exist and
-# EVERY Apple pass render throws — at issue time and at every refresh, on a path
-# no test covers because no test signs a real pass.
+# The Apple pass template.
+# PKPass.from() reads it at render time. apple-pass.builder.ts resolves
+# TEMPLATE_ROOT from process.cwd(), which is /app here.
+# Without this line, /app/passes/apple/template.pass does not exist.
+# Every Apple pass render then throws, at issue time and at each refresh.
+# No test finds this, because no test signs a real pass.
 #
-# `passes` is in the "files" list of package.json, so `pnpm deploy` puts it in
-# /out. Both lines are load-bearing: the list gets it into /out, this line gets
-# it into the image.
+# Keep this line and the "files" list in package.json together.
+# The list puts passes/ into /out. This line puts it into the image.
 COPY --from=build /out/passes ./passes
 RUN chown -R node:node /app
 USER node
