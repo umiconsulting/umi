@@ -167,7 +167,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -d "$GATE_DB" \
             -f apps/umi-api/test/integration/harness-roles.sql
 
-      - name: Schema instruments (preflight · check-values · parity · wallet carry)
+      - name: Schema instruments (preflight · check-values · parity · carry · stamps)
         working-directory: apps/umi-api
         env:
           DATABASE_URL_APP: postgresql://api_login:harness_api@localhost:5432/umi_build_v3_ci
@@ -181,7 +181,8 @@ jobs:
             src/shared/database/sql-preflight.integration.ts \
             src/shared/database/check-values.integration.ts \
             src/shared/database/schema-parity.integration.ts \
-            src/modules/wallet/wallet-carry.integration.ts
+            src/modules/wallet/wallet-carry.integration.ts \
+            src/shared/loyalty/loyalty-stamps.integration.ts
 
       # Runs LAST and unconditionally: one CI round should report every problem,
       # not stop at the first. A structural FAIL raises and exits non-zero; the

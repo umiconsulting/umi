@@ -43,7 +43,7 @@
 --    stamps_per_reward: DERIVED from the program's active reward_config.
 -- ----------------------------------------------------------------------------
 insert into merchant.loyalty_program
-  (merchant_id, card_prefix, topup_enabled, stamps_per_reward,
+  (merchant_id, card_prefix, topup_enabled, stamps_per_reward, multi_seal_enabled,
    birthday_reward_enabled, birthday_reward_name, self_registration, pass_style,
    primary_color, secondary_color, logo_url, strip_image_url,
    promo_message, promo_starts_at, promo_ends_at, promo_days, lifecycle_copy,
@@ -57,6 +57,10 @@ select
     where rc.program_id = p.id and rc.is_active
     order by rc.created_at
     limit 1)                                    as stamps_per_reward,
+  -- Carried from the branding jsonb. A café that had the bulk catch-up ON and
+  -- arrives with it OFF loses the ability to correct a migrated card — and the
+  -- migrated cards are exactly the population that needs correcting.
+  coalesce((p.branding ->> 'multi_seal_enabled')::boolean, false) as multi_seal_enabled,
   p.birthday_reward_enabled,
   p.birthday_reward_name,
   coalesce(p.self_registration, false)          as self_registration,
