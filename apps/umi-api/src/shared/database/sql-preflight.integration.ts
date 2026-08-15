@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { blankComments, sourceFiles } from './sql-scan';
+import { collectFragments, looksLikeSql, reconstruct } from './sql-rebuild';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { ConfigService } from '@nestjs/config';
 import type { AppConfig } from '../config/config.schema';
@@ -83,42 +84,6 @@ interface Stmt {
   reconstructed?: boolean;
 }
 
-/**
- * Module-level SQL fragment constants in one file: `const FROM = \`FROM merchant.x\``.
- * These are how this codebase shares a projection or a join across several queries,
- * and they are the single biggest reason a statement is not literal.
- */
-function collectFragments(text: string): Map<string, string> {
-  const frags = new Map<string, string>();
-  const DECL = /(?:const|let)\s+([A-Za-z_$][\w$]*)\s*(?::[^=`]+)?=\s*`([^`]*)`/g;
-  for (const m of text.matchAll(DECL)) frags.set(m[1], m[2]);
-  return frags;
-}
-
-/**
- * Rebuild an interpolated statement into something PREPARE can parse.
- * Substitutes known same-file fragments (recursively — a fragment may itself
- * reference another), then blanks whatever `${…}` is left, which is by definition
- * a runtime value. Returns whether any blanking was needed, because a blanked
- * statement is judged on a narrower set of error codes.
- */
-function reconstruct(body: string, frags: Map<string, string>): { sql: string; blanked: boolean } {
-  let sql = body;
-  // Bounded: a fragment referencing a fragment is normal, a cycle is not.
-  for (let pass = 0; pass < 8 && sql.includes('${'); pass++) {
-    const next = sql.replace(/\$\{\s*([A-Za-z_$][\w$]*)\s*\}/g, (whole, name: string) =>
-      frags.has(name) ? (frags.get(name) as string) : whole,
-    );
-    if (next === sql) break;
-    sql = next;
-  }
-  const blanked = sql.includes('${');
-  // Whatever survives is an expression, not a name we can resolve statically
-  // (`${locClause}`, `${isUuid ? … : ''}`). Blank it to get the minimal form.
-  if (blanked) sql = sql.replace(/\$\{[^}]*\}/g, '');
-  return { sql, blanked };
-}
-
 /** Pull every backtick template literal that looks like a SQL statement. */
 function extractStatements(root: string): {
   stmts: Stmt[];
@@ -128,13 +93,12 @@ function extractStatements(root: string): {
   const stmts: Stmt[] = [];
   const reconstructed: Stmt[] = [];
   const interpolated: Stmt[] = [];
-  const LOOKS_LIKE_SQL = /^\s*(?:with|select|insert|update|delete)\s/i;
 
   for (const file of sourceFiles(root)) {
     // Comments blanked first: a doc comment that quotes SQL is documentation, not a
     // statement the database has to be able to resolve.
     const text = blankComments(readFileSync(file, 'utf8'));
-    const frags = collectFragments(text);
+    const frags = collectFragments(text, file);
     // Walk backtick-delimited spans. Good enough for this codebase: every SQL
     // string is a plain template literal passed to query().
     let i = 0;
@@ -145,7 +109,9 @@ function extractStatements(root: string): {
       if (end === -1) break;
       const body = text.slice(start + 1, end);
       i = end + 1;
-      if (!LOOKS_LIKE_SQL.test(body)) continue;
+      // Pass the preceding source so a thrown Error MESSAGE that begins with
+      // a statement keyword is not counted as SQL.
+      if (!looksLikeSql(body, text.slice(Math.max(0, start - 120), start))) continue;
 
       const line = text.slice(0, start).split('\n').length;
       const rel = file.slice(root.length + 1);
@@ -207,6 +173,45 @@ interface Failure {
 const KNOWN_UNRESOLVED: ReadonlyArray<{ file: string; code: string; count: number }> = [
   { file: 'modules/cash/cash-write.repository.ts', code: '42703', count: 6 },
   { file: 'modules/cash/cash.repository.ts', code: '42703', count: 1 },
+];
+
+/**
+ * THE UNCOVERED REMAINDER — named, with a disposition for each.
+ *
+ * Work item 17 accepts a non-zero uncovered count only when "each exception is
+ * named and accepted in writing". This is that writing, and the test below makes
+ * it binding: a NEW uncovered statement fails the gate, and an entry that stops
+ * being uncovered fails it too.
+ *
+ * The distinction between the two groups matters. One is dead code awaiting
+ * deletion. The other is a deliberate, permanent limit of static rebuilding.
+ */
+const UNCOVERED_EXPECTED: ReadonlyArray<{ file: string; count: number; why: string }> = [
+  {
+    file: 'shared/logging/trace.service.ts',
+    count: 4,
+    // NOT accepted — scheduled for deletion. These write to
+    // `${OBSERVABILITY_SCHEMA}.ai_turn_logs` and three sibling tables. No Build
+    // v3 DDL file declares any of them and no base has ever held them, so every
+    // write already fails into logger.warn. Decision L20
+    // (BACKFILL_METHODOLOGY.md:175) deletes the service, its call sites and the
+    // OBSERVABILITY_SCHEMA setting. Delete this entry with them.
+    why: 'dead code, pending deletion per decision L20 (AB#18)',
+  },
+  {
+    file: 'modules/kds/kds.repository.ts',
+    count: 2,
+    // ACCEPTED. `${limitParam}` and `${patch}` are values chosen at run time, so
+    // no static rebuild can produce the statement the database will see.
+    // Blanking yields the minimal form, which is judged and reported separately.
+    why: 'true run-time clause; accepted 2026-08-14',
+  },
+  {
+    file: 'modules/cash/cash.repository.ts',
+    count: 1,
+    // ACCEPTED, same reason: `${order}` is a sort direction chosen at run time.
+    why: 'true run-time clause; accepted 2026-08-14',
+  },
 ];
 
 describe('build-v3 SQL preflight · every backend statement parses against the real schema', () => {
@@ -345,6 +350,38 @@ describe('build-v3 SQL preflight · every backend statement parses against the r
           `${stale.join('\n')}\n\n` +
           `If the gift-card model landed (AB#13), DELETE the whole constant and this test.\n` +
           `An allowlist that outlives its defect is how a gate quietly stops gating.\n`,
+      );
+    }
+  });
+
+  it('the uncovered remainder is exactly the list that is named and accepted', () => {
+    const actual = new Map<string, number>();
+    for (const st of unrebuildable) actual.set(st.file, (actual.get(st.file) ?? 0) + 1);
+
+    const expected = new Map(UNCOVERED_EXPECTED.map((e) => [e.file, e.count]));
+    const problems: string[] = [];
+
+    for (const [file, n] of actual) {
+      const want = expected.get(file);
+      if (want === undefined) {
+        problems.push(
+          `   NEW uncovered file: ${file} (${n}) — measure it, or name it in UNCOVERED_EXPECTED`,
+        );
+      } else if (want !== n) {
+        problems.push(`   ${file}: expected ${want} uncovered, found ${n}`);
+      }
+    }
+    for (const [file, n] of expected) {
+      if (!actual.has(file)) {
+        problems.push(`   ${file}: expected ${n} uncovered, found 0 — FIXED. Delete the entry.`);
+      }
+    }
+
+    if (problems.length > 0) {
+      throw new Error(
+        `The uncovered set no longer matches the written exceptions.\n${problems.join('\n')}\n\n` +
+          `An unmeasured statement is never approved. Either make the gate able to\n` +
+          `rebuild it, or name it with a reason.\n`,
       );
     }
   });
