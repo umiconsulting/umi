@@ -509,6 +509,22 @@ create table merchant.loyalty_program (
   card_prefix             text,
   topup_enabled           boolean not null default false,  -- does this café sell stored value (Saldo)?
   stamps_per_reward       integer,                          -- e.g. 8 visits -> 1 reward
+  -- Can staff give more than one stamp in one action?
+  -- This is the catch-up path for a customer from an external loyalty system.
+  -- It is the only writer that creates a visit worth more than one stamp.
+  --
+  -- The column is typed, because build-v3 has no branding jsonb. See the owner
+  -- call below. Production holds this value in `loyalty.programs.branding`, as a
+  -- JSON key. The backfill must carry it.
+  --
+  -- A cafe that had the flag ON must not arrive with it OFF. That cafe loses the
+  -- catch-up path, and its migrated cards are the cards that need a correction.
+  -- The default is false, because OFF is the safe direction.
+  --
+  -- 🔴 NO READER EXISTS YET. Do not read this column as proof that the gate works.
+  -- umi-cash reads the branding key, and umi-cash is frozen. umi-api has no
+  -- bulk-seal endpoint. This carry keeps the DATA. The endpoint is separate work.
+  multi_seal_enabled      boolean not null default false,
   birthday_reward_enabled boolean not null default false,
   birthday_reward_name    text,
   self_registration       boolean not null default false,  -- may a customer self-enrol (no staff)?
