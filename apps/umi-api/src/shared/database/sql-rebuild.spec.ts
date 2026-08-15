@@ -44,14 +44,29 @@ describe('collectFragments · same-file declarations', () => {
     expect(frags.get('STATUS')).toBe('active');
   });
 
-  it('does NOT collect an expression — a gate that guesses is worse than one that reports', () => {
+  it('does NOT collect an expression. A gate that guesses is worse than one that reports', () => {
     const frags = collectFragments('const N = compute() + 1;');
     expect(frags.has('N')).toBe(false);
   });
 
-  it('prefers the template declaration when a name is declared twice', () => {
-    const frags = collectFragments('const X = `FROM a`;\nconst X = 5;');
-    expect(frags.get('X')).toBe('FROM a');
+  it('reads a NESTED template whole, instead of stopping at the first backtick', () => {
+    // `[^`]*` stops at the first backtick, so this fragment used to arrive
+    // TRUNCATED at "SELECT ". Substitution ADDS text, so a truncated fragment can
+    // rebuild into a statement that PREPAREs green while the real SQL is never
+    // checked. That is a false green, which is the one result this gate must
+    // never produce.
+    const src = 'const Q = `SELECT ${flag ? `a` : `b`} FROM merchant.product`;';
+    expect(collectFragments(src).get('Q')).toBe('SELECT ${flag ? `a` : `b`} FROM merchant.product');
+  });
+
+  it('reads a fragment that follows a nested one, so the scan stays aligned', () => {
+    const src = 'const A = `SELECT ${x ? `p` : `q`} FROM t`;\nconst B = `FROM merchant.customer`;';
+    const frags = collectFragments(src);
+    expect(frags.get('B')).toBe('FROM merchant.customer');
+  });
+
+  it('skips an unterminated literal rather than guessing at its content', () => {
+    expect(collectFragments('const BROKEN = `SELECT 1').has('BROKEN')).toBe(false);
   });
 });
 
@@ -93,12 +108,17 @@ describe('collectFragments · imported declarations', () => {
     expect(collectFragments(src, caller).get('F')).toBe('FROM local');
   });
 
-  it('skips a package import — no dependency ships SQL fragments', () => {
+  it('skips a package import even when a file of that name sits beside it', () => {
+    // The earlier version of this test imported 'node:fs' and asserted an empty
+    // result. That passed whether or not the guard existed, because the path was
+    // unreadable either way. Put a REAL readable file at the resolved location,
+    // so only the package-import guard can keep it out.
     const dir = tmp();
+    writeFileSync(join(dir, 'frags.ts'), 'export const TRAP = `FROM merchant.customer`;');
     const caller = join(dir, 'caller.ts');
-    const src = "import { readFileSync } from 'node:fs';";
+    const src = "import { TRAP } from 'frags';"; // no leading './' — a package specifier
     writeFileSync(caller, src);
-    expect(collectFragments(src, caller).size).toBe(0);
+    expect(collectFragments(src, caller).has('TRAP')).toBe(false);
   });
 
   it('does not throw when the imported file cannot be read', () => {
@@ -142,7 +162,9 @@ describe('reconstruct', () => {
     // name, a schema error on a rebuilt statement would not prove a real defect.
     const r = reconstruct('SELECT a, ${x} b FROM t', frags);
     expect(r.sql).not.toMatch(/\$\{/);
-    expect(r.sql.length).toBeLessThan('SELECT a, ${x} b FROM t'.length);
+    // Every identifier that survives was already written by a person. Assert the
+    // exact output, not that it merely got shorter.
+    expect(r.sql).toBe('SELECT a,  b FROM t');
   });
 
   it('terminates on a cycle instead of hanging', () => {
@@ -182,6 +204,15 @@ describe('looksLikeSql', () => {
 
   it('still accepts real SQL that follows a call', () => {
     expect(looksLikeSql('SELECT 1', 'await this.pg.query(')).toBe(true);
+  });
+
+  it('rejects an SQL-shaped MESSAGE passed to a logger', () => {
+    // Work item 18 step 2 asks for "the literal must reach a query() call".
+    // That rule would hide most of the suite, because SQL here is usually
+    // assigned to a const first. The gate excludes message positions instead,
+    // and a logger argument is one.
+    expect(looksLikeSql('update skipped for card', 'this.logger.warn(')).toBe(false);
+    expect(looksLikeSql('select failed', 'console.error(')).toBe(false);
   });
 
   it('does not require a query call — most SQL here is assigned to a const first', () => {

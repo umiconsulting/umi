@@ -11,14 +11,17 @@ import { blankComments } from './sql-scan';
  * approved. `products.repository.ts` sat in that bucket with 13 broken
  * statements while every gate reported green.
  *
- * This module is the rebuild half, extracted from the integration suite so it
- * can be unit tested. It touches no database and no network, so its spec runs in
+ * This module is the rebuild half. It was moved out of the integration suite,
+ * so a unit test can reach it. It touches no database and no network, so its spec runs in
  * the ordinary `pnpm --filter @umi/api test` gate.
  *
  * The rules that keep the gate honest live here:
  *
- *   - Blanking can only REMOVE text, so it can never invent a bad column. A
- *     schema error on a rebuilt statement is therefore a real defect.
+ *   - BLANKING can only remove text. It can never invent a column name.
+ *   - SUBSTITUTION does add text, so it must add the RIGHT text. A truncated
+ *     fragment would rebuild a statement that PREPAREs green while the real SQL
+ *     goes unchecked, and a false green is the one result this gate must never
+ *     produce. `readTemplate` reads a literal whole for that reason.
  *   - Blanking CAN produce invalid syntax or a gap in the `$n` sequence, and
  *     neither is a schema defect. The caller judges a blanked statement on the
  *     four schema codes only.
@@ -29,11 +32,56 @@ import { blankComments } from './sql-scan';
 const INTERPOLATION = /\$\{\s*([A-Za-z_$][\w$]*)\s*\}/g;
 
 /**
- * Module-level SQL fragment constants: `const FROM = \`FROM merchant.product p\``.
- * This is how the codebase shares a projection or a join between queries, and it
- * is the single biggest reason a statement is not literal.
+ * A SQL fragment constant: `const FROM = \`FROM merchant.product p\``.
+ * The codebase shares a projection or a join this way.
+ * It is the largest single reason that a statement is not literal.
  */
-const TEMPLATE_DECL = /(?:const|let)\s+([A-Za-z_$][\w$]*)\s*(?::[^=`]+)?=\s*`([^`]*)`/g;
+const TEMPLATE_DECL_HEAD = /(?:const|let)\s+([A-Za-z_$][\w$]*)\s*(?::[^=`]+)?=\s*`/g;
+
+/**
+ * Read a whole template literal, starting at its opening backtick.
+ *
+ * A regular expression cannot do this. `` `([^`]*)` `` stops at the FIRST
+ * backtick, so a nested template — `` `SELECT ${flag ? `a` : `b`} FROM t` `` —
+ * yields a TRUNCATED fragment. That truncation is the dangerous kind of wrong:
+ * substitution ADDS text, so a truncated fragment can rebuild into a statement
+ * that PREPAREs green while the real SQL was never checked. The gate would then
+ * count it as covered.
+ *
+ * This walks the literal instead, and tracks `${ ... }` depth so a backtick
+ * inside an interpolation does not end it. Returns null when the literal never
+ * closes, and the caller then skips the fragment rather than guessing.
+ */
+function readTemplate(text: string, openIndex: number): { body: string; end: number } | null {
+  let i = openIndex + 1;
+  let depth = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch === '\\') {
+      i += 2;
+      continue;
+    }
+    if (depth === 0 && ch === '`') return { body: text.slice(openIndex + 1, i), end: i };
+    if (ch === '$' && text[i + 1] === '{') {
+      depth++;
+      i += 2;
+      continue;
+    }
+    if (depth > 0) {
+      if (ch === '{') depth++;
+      else if (ch === '}') depth--;
+      else if (ch === '`') {
+        // A nested template inside the interpolation. Skip it whole.
+        const nested = readTemplate(text, i);
+        if (!nested) return null;
+        i = nested.end + 1;
+        continue;
+      }
+    }
+    i++;
+  }
+  return null;
+}
 
 /**
  * Scalar constants: `const DEFAULT_VISITS_REQUIRED = 10;`
@@ -43,9 +91,9 @@ const TEMPLATE_DECL = /(?:const|let)\s+([A-Za-z_$][\w$]*)\s*(?::[^=`]+)?=\s*`([^
  * only template literals left four statements unrebuildable for the sake of one
  * integer. Strings are collected too, single or double quoted.
  *
- * Deliberately narrow: a literal number or a quoted string, and nothing else. An
- * expression could change meaning when substituted, and a gate that guesses is
- * worse than a gate that reports.
+ * The rule is narrow on purpose: a literal number or a quoted string, and
+ * nothing else. An expression can change meaning after substitution.
+ * A gate that reports an unknown is safer than a gate that assumes one.
  */
 const SCALAR_DECL =
   /(?:const|let)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*(\d+(?:\.\d+)?|'[^'\n]*'|"[^"\n]*")\s*[;\n]/g;
@@ -56,15 +104,13 @@ const NAMED_IMPORT = /import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/g;
 /**
  * Every fragment a file can see: its own, then the ones it imports.
  *
- * Own fragments win. A local declaration shadows an import in JavaScript, so it
- * must shadow one here too, or the gate rebuilds a statement the runtime would
- * never produce.
+ * A local declaration replaces an imported one, as JavaScript does. Without
+ * that rule the gate rebuilds a statement the runtime never produces.
  *
- * Imports are followed ONE level and only for relative paths. One level is what
- * the codebase actually does — `auth.repository.ts` imports `PLATFORM_GRANT_CTE`
- * straight from `rbac.sql.ts`. Following further would buy little and would need
- * cycle handling. A package import is skipped: no dependency ships SQL fragments,
- * and reading `node_modules` for this would be slow and wrong.
+ * An import resolves ONE level deep, and only for a relative path. One level is
+ * what this codebase does: `auth.repository.ts` imports `PLATFORM_GRANT_CTE`
+ * from `rbac.sql.ts`. A deeper walk adds cycle handling for little gain.
+ * A package import is skipped. No dependency supplies a SQL fragment.
  */
 export function collectFragments(text: string, filePath?: string): Map<string, string> {
   const frags = new Map<string, string>();
@@ -103,7 +149,16 @@ export function collectFragments(text: string, filePath?: string): Map<string, s
 /** The fragments and scalars declared in one file's own text. */
 function collectOwn(text: string): Map<string, string> {
   const frags = new Map<string, string>();
-  for (const m of text.matchAll(TEMPLATE_DECL)) frags.set(m[1], m[2]);
+  TEMPLATE_DECL_HEAD.lastIndex = 0;
+  for (let m = TEMPLATE_DECL_HEAD.exec(text); m; m = TEMPLATE_DECL_HEAD.exec(text)) {
+    const open = TEMPLATE_DECL_HEAD.lastIndex - 1;
+    const lit = readTemplate(text, open);
+    // An unterminated literal is skipped, so the statement stays UNCOVERED.
+    // Reporting it is honest; guessing at its content is not.
+    if (!lit) continue;
+    frags.set(m[1], lit.body);
+    TEMPLATE_DECL_HEAD.lastIndex = lit.end + 1;
+  }
   for (const m of text.matchAll(SCALAR_DECL)) {
     // A template declaration for the same name wins: it is the SQL one.
     if (frags.has(m[1])) continue;
@@ -166,15 +221,17 @@ const SQL_SHAPED = /^\s*(?:with|select|insert|update|delete)\s/i;
  * `precededBy` is the source text immediately before the literal. A literal that
  * is an argument to `new Error(...)`, or that follows `throw`, is a message.
  *
- * The check stays deliberately narrow. Requiring every literal to sit at a
- * `query(` call would be stricter and WRONG: the dominant pattern here assigns
- * SQL to a `const` and passes it somewhere else entirely, so that rule would
- * hide most of the suite.
+ * The check stays narrow. Work item 18 step 2 asks that a literal must reach a
+ * `query()` call. That rule is stricter and it is WRONG here: the dominant
+ * pattern assigns SQL to a `const` and passes it elsewhere, so the rule would
+ * hide most of the suite. The gate excludes known MESSAGE positions instead.
  */
 export function looksLikeSql(body: string, precededBy = ''): boolean {
   if (!SQL_SHAPED.test(body)) return false;
   const tail = precededBy.slice(-80);
+  // An argument to an error constructor, or to a logger, is a MESSAGE.
   if (/\bnew\s+(?:\w*Error|\w*Exception)\s*\(\s*$/.test(tail)) return false;
   if (/\bthrow\s+$/.test(tail)) return false;
+  if (/\b(?:logger|log|console)\s*\.\s*\w+\s*\(\s*$/.test(tail)) return false;
   return true;
 }
