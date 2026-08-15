@@ -312,3 +312,21 @@ test('Gate 2B device contracts are bounded and generated for Flutter', async () 
     assert.match(def.path, /^\/api\/v1\//, `${def.id} is exposed to the POS but unversioned`);
   }
 });
+
+test('a true union survives generation — both login outcomes reach the artifact', async () => {
+  // The generator's `withoutNull` helper exists for `z.nullable(X)`, which zod
+  // encodes as `anyOf: [X, {type:'null'}]`. It took `anyOf[0]` for EVERY anyOf,
+  // so `z.union([SessionResponse, MfaChallengeResponse])` published as the
+  // session branch alone. A generated consumer then could not see the MFA
+  // challenge, and would lock an enrolled account out exactly as the dashboard
+  // did. The zod source was right and the artifact was wrong.
+  const ts = await readFile(
+    new URL('../generated/typescript/umi_contract.ts', import.meta.url),
+    'utf8',
+  );
+  const line = ts.split('\n').find((l) => l.startsWith('export type LoginResponse ='));
+  assert.ok(line, 'LoginResponse must be generated');
+  assert.match(line, /"session"/, 'the session branch must survive');
+  assert.match(line, /"mfaRequired"/, 'the challenge branch must survive');
+  assert.match(line, /\|/, 'the two branches must be a union, not one of them');
+});

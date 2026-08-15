@@ -115,15 +115,15 @@ select * from (values
   --         A target with no grant holder also passes: there is nothing to protect.
   --   FAIL  SOME holder is enrolled and another is not. Enrolment demonstrably
   --         works on this very target, so the gap is a choice.
-  --   WARN  NO holder is enrolled anywhere. The rollout has not started. A check
-  --         that is red forever teaches people to skip the whole file, which costs
-  --         more than this one check buys, and this repository has been burned by
-  --         gates nobody believed.
+  --   WARN  NO holder is enrolled anywhere. The rollout has not started.
+  --
+  -- WARN, and not FAIL, for that last state. A check that stays red on every run
+  -- makes people skip the whole file. That costs more than this check gives.
   --
   -- ⚠️ Enrol the FIRST platform grant holder only after a client can read
   -- `mfaRequired`. `POST /api/auth/local/login` returns a challenge and NO session
-  -- for an enrolled account, so an older client stores nothing and that account
-  -- cannot sign in. The dashboard reads it as of PR #103.
+  -- for an enrolled account. An older client stores nothing, and that account
+  -- cannot sign in. The dashboard reads the field as of PR #103.
   --
   -- One stolen password otherwise reaches every café. A platform grant holder is
   -- the highest-value account in the system.

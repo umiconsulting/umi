@@ -135,7 +135,7 @@ export type LocationSummaryModel = { "id": string; "merchantId": string; "name":
 
 export type LoginRequest = { "username": string; "password": string; "remember"?: boolean };
 
-export type LoginResponse = { "session": { "user": { "id": string; "email": string; "displayName": string | null }; "merchants": Array<{ "id": string; "handle": string | null; "name": string; "roles": Array<string> }>; "provider": string; "accessExpiresIn": number } };
+export type LoginResponse = { "session": { "user": { "id": string; "email": string; "displayName": string | null }; "merchants": Array<{ "id": string; "handle": string | null; "name": string; "roles": Array<string> }>; "provider": string; "accessExpiresIn": number } } | { "mfaRequired": boolean; "method": string; "challengeToken": string; "expiresInSeconds": number };
 
 export type ManagerApprovalRequest = { "operatorSessionId": string; "managerPin": string; "permission": string; "merchantId": string; "locationId": string };
 

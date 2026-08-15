@@ -17,11 +17,12 @@ import { MfaChallengeResponse, SessionResponse, mfaChallenged } from '@umi/contr
  * `auth.service.spec.ts` calls the service directly, so it proves the branch and
  * says nothing about the wire.
  *
- * ⚠️ THIS FILE IS THE GUARD ON A LOCKOUT. Before the dashboard learned this
- * shape, it stored `payload.session` whatever came back. On a challenge that
- * stored `undefined` and returned the person to the login screen, so an enrolled
- * account could never sign in. `umi.user.mfa_method` is NULL for every row
- * today, which is the only reason nobody has hit it.
+ * ⚠️ KEEP THIS FILE. It is the guard on a lockout.
+ *
+ * Before the dashboard read this shape, it stored `payload.session` for either
+ * outcome. On a challenge it stored `undefined` and returned the person to the
+ * login screen. That account could then never sign in. `umi.user.mfa_method` is
+ * NULL for every row today, and that is the only reason nobody has met this.
  *
  * A rename of `mfaRequired`, or one `Set-Cookie` on the challenge branch, breaks
  * a person's ability to log in and breaks NO other test. It breaks this one.
@@ -152,6 +153,15 @@ describe('POST /api/auth/local/login · the two-outcome contract', () => {
 
     it('sends `mfaRequired` as the literal true, not a truthy value', async () => {
       expect(JSON.parse((await login()).body).mfaRequired).toBe(true);
+    });
+
+    it('passes `email_otp` through, because that method ships FIRST', async () => {
+      // `10_umi.sql:75` permits `email_otp` and `totp`, and `mfa.service.ts` says
+      // the mailed code ships first: it needs no enrolment ceremony. A client that
+      // assumes `totp` tells an email user to open an application they never set
+      // up. The server must state the method, and it must not flatten it.
+      auth.login.mockResolvedValue({ ...CHALLENGE_RESULT, method: 'email_otp' });
+      expect(JSON.parse((await login()).body).method).toBe('email_otp');
     });
   });
 

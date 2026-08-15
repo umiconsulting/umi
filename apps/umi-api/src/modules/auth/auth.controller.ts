@@ -52,13 +52,6 @@ const LOGIN_MAX_PER_WINDOW = 20;
 const MFA_VERIFY_MAX_PER_WINDOW = 20;
 
 /**
- * Login's other outcome. It now lives in `@umi/contract` and the dashboard reads
- * it, which is what an enrolment was always waiting for. `MfaChallengeResponse`
- * is re-exported here so this file keeps one import list for its own callers.
- */
-export type { MfaChallengeResponse } from '@umi/contract';
-
-/**
  * Auth ingress (D9). Issues/clears the httpOnly JWT cookies and returns the
  * session body the dashboard frontend renders. Cookie wiring lives here; the
  * service stays transport-agnostic.
@@ -88,10 +81,12 @@ export class AuthController {
    *   - A second factor enrolled → NO cookies, no session. The body carries
    *     `mfaRequired: true` and a challenge token to post back to `mfa/verify`.
    *
-   * This is a shape change for the dashboard, and it is inert until somebody enrols:
-   * `umi.user.mfa_method` is NULL for every row today, so the second branch is
-   * unreachable until an enrolment writes it. Enrol only after the client can read
-   * `mfaRequired`, or that account is locked out of the dashboard.
+   * The shape lives in `@umi/contract` as `MfaChallengeResponse`, and the dashboard
+   * reads it. `umi.user.mfa_method` is NULL for every row today, so the second
+   * branch is unreachable until an enrolment writes it.
+   *
+   * ⚠️ Check that a client reads `mfaRequired` before you enrol its users. A client
+   * that reads only `session` stores nothing, and that account cannot sign in.
    */
   @Public()
   @Post('local/login')

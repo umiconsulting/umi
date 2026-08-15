@@ -78,13 +78,34 @@ const artifactHash = createHash('sha256').update(artifact).digest('hex');
 const nullable = (schema) =>
   schema?.anyOf?.some((item) => item.type === 'null') ||
   (Array.isArray(schema?.type) && schema.type.includes('null'));
+
+/** The `anyOf` members that are not the null marker. */
+const branches = (schema) => (schema?.anyOf ?? []).filter((item) => item.type !== 'null');
+
+/**
+ * Strip the null marker and give back the ONE remaining schema.
+ *
+ * ⚠️ Call `branches` first when a schema can be a true union. This function
+ * takes the first member, which is correct for `z.nullable(X)` — that encodes as
+ * `anyOf: [X, {type: 'null'}]` — and WRONG for `z.union([A, B])`. It published
+ * `LoginResponse` as the session branch alone, so a generated consumer could not
+ * see the MFA challenge at all.
+ */
 const withoutNull = (schema) =>
-  schema?.anyOf?.find((item) => item.type !== 'null') ??
+  branches(schema)[0] ??
   (Array.isArray(schema?.type)
     ? { ...schema, type: schema.type.find((item) => item !== 'null') }
     : schema);
 
 function tsType(input) {
+  // A TRUE union — two or more non-null members. TypeScript can say this, so say
+  // it. `LoginResponse` is one, and a consumer that cannot see its second branch
+  // cannot handle an MFA challenge.
+  const members = branches(input);
+  if (members.length > 1) {
+    const union = members.map(tsType).join(' | ');
+    return nullable(input) ? `${union} | null` : union;
+  }
   const schema = withoutNull(input);
   let value = 'unknown';
   if (schema?.enum) value = schema.enum.map((item) => JSON.stringify(item)).join(' | ');
@@ -115,6 +136,10 @@ const tsOutput =
   `export const contractContentHash = ${JSON.stringify(contentHash)} as const;\n\n${tsModels}\n`;
 
 function dartType(input) {
+  // Dart has no union type. A true union becomes the open map, which is honest:
+  // the caller must branch on a field. Taking the first member instead would
+  // name one shape and hide the other.
+  if (branches(input).length > 1) return 'Map<String, Object?>';
   const schema = withoutNull(input);
   let value = 'Object?';
   if (schema?.type === 'string' || schema?.enum) value = 'String';

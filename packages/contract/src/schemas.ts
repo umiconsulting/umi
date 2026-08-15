@@ -84,12 +84,22 @@ export type SessionResponse = z.infer<typeof SessionResponse>;
  * ⚠️ Handle this branch before you enrol anybody. A client that reads only
  * `session` sees `undefined` here, and that account cannot sign in again.
  *
- * The challenge travels in the body, never in a cookie. A half-authenticated
- * credential in a cookie rides along on every unrelated request.
+ * The challenge travels in the body, never in a cookie. A browser attaches a
+ * cookie to every request to the origin, so a half-authenticated credential in a
+ * cookie reaches endpoints that never asked for it.
  */
 export const MfaChallengeResponse = z.object({
   mfaRequired: z.literal(true),
-  /** `totp` today. An email code is a second step, not a second factor. */
+  /**
+   * `email_otp` or `totp`. BOTH ship — `10_umi.sql:75` permits the two, and
+   * `email_otp` ships FIRST because it needs no enrolment ceremony
+   * (`mfa.service.ts`). The client must read this field. A screen that names one
+   * method gives the wrong instruction to the other.
+   *
+   * The type stays a string, not an enum. An unknown method must reach the
+   * client as itself, so the client can say it cannot handle it. A zod enum
+   * would reject the whole body and the person would see a parse error.
+   */
   method: z.string(),
   challengeToken: z.string(),
   expiresInSeconds: z.number(),

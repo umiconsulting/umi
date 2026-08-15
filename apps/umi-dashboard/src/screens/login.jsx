@@ -6,6 +6,23 @@ import '@/styles.css';
 
 const REMEMBER_KEY = 'umi.login.rememberedEmail';
 
+/**
+ * What to tell the person, for the method the server named.
+ *
+ * TWO methods ship. `10_umi.sql:75` permits `email_otp` and `totp`, and
+ * `email_otp` ships FIRST, because it needs no enrolment ceremony. A screen that
+ * names the authenticator application sends an email-code user to look in the
+ * wrong place.
+ *
+ * An unknown method gets neutral words rather than a guess.
+ */
+function mfaInstruction(method) {
+  if (method === 'email_otp') return 'Te enviamos un código de seis dígitos a tu correo.';
+  if (method === 'totp')
+    return 'Escribe el código de seis dígitos de tu aplicación de autenticación.';
+  return 'Escribe tu código de seis dígitos.';
+}
+
 /* ---- icons (match login-elegant.html) ---- */
 const WaveGlyph = () => (
   <svg width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -146,6 +163,23 @@ export default function LoginScreen() {
       /* localStorage unavailable */
     }
   }, []);
+
+  // The challenge dies on the server after `expiresInSeconds`. Return to the
+  // login view at that moment and say so. Without this the field stays open over
+  // a dead token, every code is refused, and the message blames the code.
+  useEffect(() => {
+    if (view !== 'mfa' || !challenge) return undefined;
+    const ms = Number(challenge.expiresInSeconds) * 1000;
+    if (!isFinite(ms) || ms <= 0) return undefined;
+    const timer = setTimeout(() => {
+      setChallenge(null);
+      setCode('');
+      setPassword('');
+      setView('login');
+      setError('Tu código venció. Inicia sesión otra vez.');
+    }, ms);
+    return () => clearTimeout(timer);
+  }, [view, challenge]);
 
   const persistRemember = (addr) => {
     try {
@@ -345,9 +379,7 @@ export default function LoginScreen() {
           {view === 'mfa' && (
             <section className="login-view" key="mfa">
               <h2>Verifica que eres tú</h2>
-              <p className="sub">
-                Escribe el código de seis dígitos de tu aplicación de autenticación.
-              </p>
+              <p className="sub">{mfaInstruction(challenge && challenge.method)}</p>
               <form onSubmit={handleMfa} noValidate>
                 <div className="field">
                   <label htmlFor="login-mfa">Código</label>

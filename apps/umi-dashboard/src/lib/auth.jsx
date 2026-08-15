@@ -204,9 +204,9 @@ export function useAuth() {
  *     the code and call `verifyMfaCode`.
  *
  * ⚠️ Read the outcome before you navigate. This function used to store
- * `payload.session` and go to `/` whatever came back. On a challenge that stored
- * `undefined` and bounced the person straight back to this screen, so an enrolled
- * account could never sign in again.
+ * `payload.session` and go to `/` for either shape. On a challenge it stored
+ * `undefined`, and the person returned to this screen. That account could then
+ * never sign in again.
  *
  * 'local' (server.js) and 'cookie' (umi-api) both POST the same login route. The
  * difference is that umi-api sets an httpOnly cookie, which `withCreds` carries,
@@ -238,9 +238,14 @@ export async function signIn(email, password, remember = false) {
 /**
  * Does this login answer ask for a second factor?
  *
- * The server sends the literal `true`. Test for it, and do not test for a truthy
- * value: an error body with a `mfaRequired` string would then look like a
- * challenge.
+ * ⚠️ Compare against the literal `true`. A truthy test lets an error body with a
+ * `mfaRequired` string open the code screen.
+ *
+ * This repeats `mfaChallenged` from `@umi/contract`. The copy is deliberate:
+ * that module is zod-aware, `packages/contract/src/routes.ts` is the ONLY
+ * zero-dependency entry, and a `routes.test.mjs` case fails if zod reaches it.
+ * The dashboard has no zod, and a login screen must not pull a validator into
+ * the browser bundle.
  */
 export function isMfaChallenge(payload) {
   return Boolean(payload) && payload.mfaRequired === true;
@@ -251,7 +256,7 @@ export function isMfaChallenge(payload) {
  *
  * ⚠️ Do not navigate without a session. `setLocalSession(undefined)` writes the
  * string "undefined" to localStorage, `/` finds no session, and the person lands
- * back on the login screen with no message. Fail loudly instead.
+ * back on the login screen with no message. Throw an error instead.
  */
 function completeLocalSignIn(payload) {
   if (!payload || !payload.session) {
