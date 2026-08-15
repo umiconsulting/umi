@@ -211,11 +211,14 @@ export const configSchema = z
         message: 'must be set when LEADS_SEQUENCE_ENABLED=true in production',
       });
     }
-    // D4 — the TLS control must not fail open. Without this variable `PgService`
-    // builds no `ssl` option, so both pools reach Supabase in plaintext over the
-    // public internet, and the only report is one line that says `no TLS —
-    // local/dev`. Refuse the boot instead. An empty string counts as absent,
-    // because `config.get` then returns '' and `ssl` stays undefined.
+    // D4 — the TLS control must not fail open.
+    //
+    // Without this variable `PgService` builds no `ssl` option. Both pools then
+    // reach Supabase in plaintext, over the public internet. The only report is
+    // one log line: `no TLS — local/dev`.
+    //
+    // Refuse the boot instead. An empty string counts as absent, because
+    // `config.get` returns '' and `ssl` stays undefined.
     if (cfg.NODE_ENV === 'production' && !cfg.PGSSLROOTCERT) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

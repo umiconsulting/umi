@@ -168,10 +168,15 @@ jobs:
             -f apps/umi-api/test/integration/harness-roles.sql
 
       # The file the CUTOVER runs, on the same roles the harness just made. It
-      # carries no password, so it does not disturb the harness ones — it repairs
-      # the attributes and applies the D10 per-role log posture. Running it here
-      # means the cutover file is exercised on every CI round, instead of being
-      # read for the first time on the night it matters.
+      # carries no password, so it does not disturb the harness ones. It repairs
+      # the attributes and applies the D10 per-role log posture.
+      #
+      # This step exercises the cutover file on every CI round. A file that first
+      # runs at the cutover is a file nobody has tested.
+      #
+      # ⚠️ Do not read the gate's D10 PASS as proof that a target without this
+      # file fails. The same round applies the pin and then measures it. The
+      # red-green proof is in the pull request, not here.
       - name: Apply the build-v3 role provisioning file (D1 · D5 · D10)
         run: |
           set -euo pipefail

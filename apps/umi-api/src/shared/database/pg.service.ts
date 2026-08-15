@@ -127,11 +127,15 @@ export interface PoolSslOption {
  * Turn `PGSSLROOTCERT` into the `ssl` option for both pools.
  *
  * The variable holds one of two things, and this tells them apart: the PEM
- * itself, or a path to it on disk. `rejectUnauthorized: true` is the
- * enforcement — it makes node check the certificate chain AND the hostname, so a
- * wrong CA or a wrong host fails the handshake at connect. Without it the
- * connection is encrypted but unauthenticated, which is what `sslmode=require`
- * gives and what this control exists to prevent.
+ * itself, or a path to it on disk.
+ *
+ * `rejectUnauthorized: true` is the enforcement. Node then checks the
+ * certificate chain AND the hostname. A wrong CA, or a wrong host, fails the
+ * handshake at connect.
+ *
+ * ⚠️ Do not remove that flag. Without it the connection is encrypted but
+ * unauthenticated. That is what `sslmode=require` gives, and this control exists
+ * to prevent it.
  *
  * No value gives no option, which is plaintext. That case is LOCAL DEVELOPMENT
  * only: `config.schema.ts` refuses a production boot without the variable.

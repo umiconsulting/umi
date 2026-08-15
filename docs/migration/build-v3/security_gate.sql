@@ -9,6 +9,34 @@
 \set ON_ERROR_STOP on
 
 create temp table gate(label text, status text);
+
+-- ----------------------------------------------------------------------------
+-- THE REQUEST-PATH LOGIN ROLES. Three D10 checks read this set. It was written
+-- out three times, and the name list is the part most likely to drift.
+--
+-- A NOLOGIN group role connects to nothing, so it logs nothing.
+--
+-- ⚠️ READ THIS LIMIT BEFORE YOU TRUST A D10 PASS. A SQL gate cannot see which
+-- role a pool actually connects as. It can only judge names. Production's worker
+-- pool connects as `postgres`, which is a superuser and is in no list here, so
+-- these three checks would report PASS and never measure it.
+--
+-- `poolLoggingProblem` in `apps/umi-api/src/shared/database/pg.service.ts` is
+-- the check that closes this gap. It runs at boot, on the role the pool really
+-- connected as, and it aborts. Treat that one as authoritative and these three
+-- as the schema-side companion.
+--
+-- A superuser named here is NOT skipped. D1 says the request path is never a
+-- superuser, so its presence is a defect, and a skipped role reads as a green
+-- one.
+-- ----------------------------------------------------------------------------
+create temp view request_path_role as
+select r.oid, r.rolname, r.rolsuper
+  from pg_roles r
+ where r.rolcanlogin
+   and (r.rolname in ('api_login', 'worker_login', 'umi_app', 'umi_worker')
+        or (not r.rolsuper and (pg_has_role(r.oid, 'api', 'usage')
+                                or pg_has_role(r.oid, 'worker', 'usage'))));
 insert into gate
 select * from (values
   -- RLS enablement & FORCE ---------------------------------------------------
@@ -252,18 +280,14 @@ select * from (values
        else 'FAIL' end
        from (
          select r.rolname,
-                (select setting from pg_settings where name='log_statement') = 'none'
-                or exists (
-                  select 1 from pg_db_role_setting s
-                   where s.setrole = r.oid
-                     and array_to_string(s.setconfig, ',') ~ 'log_statement=none'
-                ) as silenced
-           from pg_roles r
-          where r.rolcanlogin                        -- a NOLOGIN group logs nothing
-            and not r.rolsuper                       -- superuser is not the request path
-            and (r.rolname in ('api_login','worker_login','umi_app','umi_worker')
-                 or pg_has_role(r.oid, 'api', 'usage')
-                 or pg_has_role(r.oid, 'worker', 'usage'))
+                not r.rolsuper                       -- a superuser here is a D1 defect
+                and ((select setting from pg_settings where name='log_statement') = 'none'
+                  or exists (
+                    select 1 from pg_db_role_setting s
+                     where s.setrole = r.oid
+                       and array_to_string(s.setconfig, ',') ~ 'log_statement=none'
+                  )) as silenced
+           from request_path_role r
        ) x)),
   -- A cluster-wide 'none' is undone by one `ALTER ROLE api SET log_statement = 'all'`,
   -- which is invisible in pg_settings when read as anyone else.
@@ -302,23 +326,16 @@ select * from (values
     (select case
        when (select setting from pg_settings where name='log_parameter_max_length') = '0'
          then 'PASS'
-       -- COUNT the roles, never `not exists`. A bare `not exists (… role without
-       -- the pin …)` is TRUE when there is no request-path role at all, so an
-       -- unprovisioned target would read PASS while nothing was pinned and
-       -- nothing was checked. Require at least one role AND every one pinned,
-       -- the same shape the `never log statements` check above uses.
+       -- COUNT the roles, never `not exists`. `not exists (… role without the
+       -- pin …)` is TRUE when the set is empty. An unprovisioned target then
+       -- reads PASS, and nothing was measured. Require one role at least.
        when (select count(*) filter (where not pinned) = 0 and count(*) > 0 from (
-               select exists (
+               select not r.rolsuper and exists (
                         select 1 from pg_db_role_setting s
                          where s.setrole = r.oid
                            and array_to_string(s.setconfig, ',') ~ 'log_parameter_max_length=0'
                       ) as pinned
-                 from pg_roles r
-                where r.rolcanlogin
-                  and not r.rolsuper
-                  and (r.rolname in ('api_login','worker_login','umi_app','umi_worker')
-                       or pg_has_role(r.oid, 'api', 'usage')
-                       or pg_has_role(r.oid, 'worker', 'usage'))
+                 from request_path_role r
              ) x)
          then 'PASS'
        else 'WARN' end)),
@@ -328,23 +345,38 @@ select * from (values
     (select case
        when (select setting from pg_settings where name='log_min_duration_statement') = '-1'
          then 'PASS'
-       -- Same counting rule as the check above: an unprovisioned target must not
+       -- Same counting rule as the check above. An unprovisioned target must not
        -- read as PASS.
        when (select count(*) filter (where not pinned) = 0 and count(*) > 0 from (
-               select exists (
+               select not r.rolsuper and exists (
                         select 1 from pg_db_role_setting s
                          where s.setrole = r.oid
                            and array_to_string(s.setconfig, ',') ~ 'log_min_duration_statement=-1'
                       ) as pinned
-                 from pg_roles r
-                where r.rolcanlogin
-                  and not r.rolsuper
-                  and (r.rolname in ('api_login','worker_login','umi_app','umi_worker')
-                       or pg_has_role(r.oid, 'api', 'usage')
-                       or pg_has_role(r.oid, 'worker', 'usage'))
+                 from request_path_role r
              ) x)
          then 'PASS'
        else 'WARN' end)),
+  -- D5 · SCRAM on the login roles (SECURITY_GATE.md §4) ----------------------
+  -- The verifier lives in `pg_shadow.passwd`, and its first characters name the
+  -- method. `pg_shadow` has NO `passwdtype` column; the document named one and
+  -- the written method could not run.
+  --
+  -- Only a superuser reads `pg_shadow`. A managed target reports SKIP, which the
+  -- summary names. Unmeasured is never approved.
+  --
+  -- A role with no password cannot connect, so it is not a weak credential and
+  -- it does not fail this check. `004_buildv3_login_roles.sql` reports it.
+  ('every request-path login role holds a SCRAM verifier (no md5)',
+    (select case
+       when not has_table_privilege(current_user, 'pg_shadow', 'select') then 'SKIP'
+       when (select count(*) from request_path_role) = 0 then 'SKIP'
+       when exists (
+         select 1 from pg_shadow s
+          join request_path_role r on r.rolname = s.usename
+         where s.passwd is not null and s.passwd not like 'SCRAM-SHA-256$%'
+       ) then 'FAIL'
+       else 'PASS' end)),
   ('bind parameters are never logged on error',
     (select case when setting = '0' then 'PASS' else 'FAIL' end
        from pg_settings where name = 'log_parameter_max_length_on_error')),

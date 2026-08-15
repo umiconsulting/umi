@@ -23,7 +23,7 @@
 --   against a build-v3 target.
 --
 --   `harness-roles.sql` is the local test cluster only. It carries literal
---   passwords and it points at `127.0.0.1:5233`.
+--   passwords and it names the local port 5233.
 --
 -- ── Postgres semantics this file depends on ──
 --
@@ -44,22 +44,40 @@
 --    A role with no password cannot connect, which is the safe state until the
 --    operator runs `\password`.
 -- ----------------------------------------------------------------------------
+-- ⚠️ Every statement here runs inside a handler. BYPASSRLS and NOSUPERUSER need
+-- a superuser, and a managed target refuses them. Without the handler the first
+-- refusal aborts the file, and section 2 never runs. Report the refusal and
+-- continue; the D1 boot guard refuses the boot if a repair did not happen.
 do $$
+declare
+  stmt text;
 begin
   if not exists (select 1 from pg_roles where rolname = 'api_login') then
     create role api_login login in role api;
   end if;
   if not exists (select 1 from pg_roles where rolname = 'worker_login') then
-    create role worker_login login bypassrls in role worker;
+    begin
+      create role worker_login login bypassrls in role worker;
+    exception when insufficient_privilege then
+      create role worker_login login in role worker;
+      raise warning 'worker_login created WITHOUT bypassrls. The D1 boot guard will refuse the boot. Grant it from the provider console.';
+    end;
   end if;
+
+  -- Idempotent, and a repair for a role that already exists in the wrong shape.
+  foreach stmt in array array[
+    'alter role api_login    login nosuperuser nocreatedb nocreaterole nobypassrls inherit',
+    'alter role worker_login login nosuperuser nocreatedb nocreaterole bypassrls   inherit',
+    'grant api    to api_login',
+    'grant worker to worker_login'
+  ] loop
+    begin
+      execute stmt;
+    exception when insufficient_privilege then
+      raise warning 'REFUSED, and NOT applied: % — run it from the provider console. Record it as a gap.', stmt;
+    end;
+  end loop;
 end $$;
-
--- Idempotent, and a repair for a role that already exists in the wrong shape.
-alter role api_login    login nosuperuser nocreatedb nocreaterole nobypassrls inherit;
-alter role worker_login login nosuperuser nocreatedb nocreaterole bypassrls   inherit;
-
-grant api    to api_login;
-grant worker to worker_login;
 
 -- ----------------------------------------------------------------------------
 -- 2. D10 — the request path never writes a statement to the log.
@@ -72,12 +90,14 @@ grant worker to worker_login;
 -- is logged at all. It becomes a credential sink the moment somebody turns on
 -- slow-query logging to debug an incident — which is exactly when somebody will.
 --
--- `log_parameter_max_length` needs superuser or a `pg_parameter_acl` grant, and
--- the managed target refused `ALTER DATABASE … SET log_parameter_max_length`.
--- So pin the trigger instead of the payload: with
--- `log_min_duration_statement = -1` on the request-path roles, a cluster-wide
--- slow-query setting does not reach them, and no statement of theirs is logged.
--- This is the narrower control, and it survives a cluster-level change.
+-- `log_parameter_max_length` needs a superuser, or a `pg_parameter_acl` grant.
+-- The managed target refused `ALTER DATABASE … SET log_parameter_max_length`.
+--
+-- Set `log_min_duration_statement = -1` on the request-path roles instead. A
+-- cluster-wide slow-query setting then does not reach those roles. No statement
+-- of theirs is logged, so no parameter of theirs can be logged.
+--
+-- The role-level control is narrower, and a cluster-level change cannot undo it.
 --
 -- Both are attempted. A managed target may refuse either one; the block reports
 -- what it could not set and does not abort the file.
