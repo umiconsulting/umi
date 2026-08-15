@@ -57,6 +57,7 @@ const SERIAL = 'CARRY-SERIAL-1';
 const TOKEN = 'carry-web-service-token';
 const DEVICE = 'CARRY-DEVICE-1';
 const PUSH = 'carry-push-token';
+const BIRTHDAY_REWARD = 'Rebanada de pastel';
 
 describe('wallet carry list · the five values the cutover must move intact', () => {
   let pg: PgService;
@@ -86,6 +87,11 @@ describe('wallet carry list · the five values the cutover must move intact', ()
       `INSERT INTO merchant.location (merchant_id, name, status, lat, lng)
        VALUES ($1::uuid, 'Centro', 'active', 20.673600, -103.344000)`,
       [MERCHANT],
+    );
+    await pg.query(
+      `INSERT INTO merchant.loyalty_program (merchant_id, birthday_reward_enabled, birthday_reward_name)
+       VALUES ($1::uuid, true, $2)`,
+      [MERCHANT, BIRTHDAY_REWARD],
     );
     const created = await repo.findOrCreateApplePass(CARD, SERIAL, TOKEN);
     walletPassId = created.walletPassId;
@@ -190,5 +196,40 @@ describe('wallet carry list · the five values the cutover must move intact', ()
     await repo.touchCards([CARD]);
     const past = new Date(Date.now() - 60_000);
     expect(await repo.serialsUpdatedSince(MERCHANT, DEVICE, past)).toEqual([SERIAL]);
+  });
+
+  /**
+   * 7 · the birthday reward line.
+   *
+   * ⚠️ A REGRESSION, not a gap. umi-cash sets `birthdayRewardName` on the Google
+   * pass today, and both builders read it — `google-pass.service.ts:249` and
+   * `apple-pass.builder.ts:265`. The ported `renderData` never selected the
+   * column, so the field arrived undefined and the reward line vanished from
+   * every Android pass. Silent: the pass still renders, one row shorter.
+   */
+  it('7 · the birthday reward name reaches the pass renderer', async () => {
+    const data = await repo.renderData(MERCHANT, CARD);
+    expect(data).not.toBeNull();
+    expect(data!.birthdayRewardName).toBe(BIRTHDAY_REWARD);
+  });
+
+  /**
+   * 8 · pass health is measurable at all.
+   *
+   * Work item 31 stays open on DETECTION, not on prevention: four failure paths
+   * log and nothing counts them. This proves the counter exists and separates
+   * the two questions. The seeded pass HAS a device, so it is registered; the
+   * card was touched during setup, so it is not stale.
+   */
+  it('8 · pass health counts registered and stale passes apart', async () => {
+    const health = await repo.passHealth(30);
+    expect(health.total).toBeGreaterThanOrEqual(1);
+    expect(health.unregistered).toBe(0);
+    expect(health.stale).toBe(0);
+
+    // A threshold of 0 days makes every pass stale by definition — the counter
+    // moves, so a green result above is a measurement and not a constant.
+    const allStale = await repo.passHealth(0);
+    expect(allStale.stale).toBeGreaterThanOrEqual(1);
   });
 });

@@ -4,7 +4,8 @@
   "private": true,
   "description": "Umi centralized backend API (NestJS + Fastify). One service, two processes: web (HTTP) and worker (BullMQ).",
   "files": [
-    "dist"
+    "dist",
+    "passes"
   ],
   "engines": {
     "node": ">=22"
@@ -46,6 +47,8 @@
     "@eslint/js": "^10.0.1",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
+    "@nestjs/testing": "^11.2.1",
+    "@swc/core": "^1.16.0",
     "@types/node": "^22.10.0",
     "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.11.10",
@@ -53,6 +56,7 @@
     "globals": "^17.7.0",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.65.0",
+    "unplugin-swc": "^1.5.11",
     "vitest": "^2.1.8"
   }
 }

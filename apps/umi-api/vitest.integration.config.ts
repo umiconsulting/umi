@@ -1,3 +1,4 @@
+import swc from 'unplugin-swc';
 import { defineConfig } from 'vitest/config';
 
 /**
@@ -15,6 +16,10 @@ import { defineConfig } from 'vitest/config';
  * the `.spec.` nor `.test.` default globs), so mocked units stay DB-free.
  */
 export default defineConfig({
+  // The SAME transform as vitest.config.ts. esbuild drops decorator metadata,
+  // so a suite that boots a Nest module gets `undefined` for every injected
+  // dependency. Keeping both configs on SWC means the two cannot drift.
+  plugins: [swc.vite({ module: { type: 'es6' } })],
   test: {
     include: ['src/**/*.integration.ts'],
     testTimeout: 20_000,

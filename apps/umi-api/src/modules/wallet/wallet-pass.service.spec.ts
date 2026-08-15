@@ -41,6 +41,7 @@ const RENDER: PassRenderData = {
   promoMessage: null,
   topupEnabled: true,
   rewardName: 'Café gratis',
+  birthdayRewardName: 'Rebanada de pastel',
   state: {
     card_number: 'KLC-4076462081',
     total_visits: 23,
