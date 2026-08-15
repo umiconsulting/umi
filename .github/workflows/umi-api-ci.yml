@@ -55,3 +55,140 @@ jobs:
 
       - name: Test
         run: pnpm --filter @umi/api test
+
+  # ==========================================================================
+  # THE SCHEMA GATE — builds build-v3 from scratch and runs every instrument
+  # that a pristine schema can prove.
+  #
+  # WHY THIS JOB EXISTS. Seven integration suites and security_gate.sql decide
+  # whether the cutover is safe, and until now NO workflow ran any of them.
+  # `vitest run` matches `.spec.` and `.test.` only, so `.integration.ts` never
+  # executed in CI. Every green result in this program was a person's memory of
+  # a command they ran once — which is the same shape as the 2026-07-12 audit,
+  # where three gates reported green while ~89% of the SQL did not resolve.
+  #
+  # THE INSTRUMENTS ARE TWO FAMILIES. Measured 2026-08-14 against a pristine
+  # build. Do not conflate them:
+  #
+  #   SCHEMA instruments — provable against DDL alone, and run here:
+  #     sql-preflight · check-values · schema-parity · wallet-carry
+  #     security_gate.sql (structural half — 43 checks)
+  #
+  #   MIGRATION instruments — assert production-derived facts and CANNOT run
+  #   here. They need a backfilled target, and they belong to the P7 rehearsal:
+  #     rls.integration.ts            hardcodes id('Kalala Café')
+  #     pooler-isolation.integration  needs >= 2 seeded merchants
+  #     identity-normalization        pins against the legacy core.* snapshot
+  #     security_gate.sql behavioral  hardcodes two merchants AND exact counts
+  #     reconcile_v3.sql              compares source against target
+  #
+  # Excluding them is a stated limit, not a silent skip: security_gate.sql now
+  # prints "SKIPPED: fixture merchants absent" and names every unmeasured check,
+  # and the preflight prints UNCOVERED next to UNRESOLVED. A check nobody ran is
+  # unmeasured, never approved.
+  #
+  # ⚠️ NO `paths:` FILTER — the workflow-level trigger governs. A schema change
+  # can arrive from docs/migration/build-v3/**, and a backend SQL change from
+  # apps/umi-api/**; either can break the other, which is the entire point.
+  # ==========================================================================
+  gate:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # pgvector, NOT stock postgres: 00_foundation.sql:24 creates the `vector`
+        # extension for runtime.*_embedding, and stock postgres:17 cannot.
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      GATE_DB: umi_build_v3_ci
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Enable pnpm (corepack)
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.29.3 --activate
+
+      - name: Install
+        run: pnpm install --frozen-lockfile --filter @umi/api...
+
+      - name: Build workspace deps
+        run: pnpm --filter @umi/api... build
+
+      # A pristine build, every time. No production snapshot, so no customer PII
+      # ever reaches CI — and the run proves the DDL applies to an EMPTY database,
+      # which is the mode the cutover itself uses (AB#14).
+      - name: Apply build-v3 from scratch
+        run: |
+          set -euo pipefail
+          createdb "$GATE_DB"
+          bash docs/migration/build-v3/00_run.sh "$GATE_DB"
+
+      # Seeds the permission catalogue only — 8 permission keys and 2 rows. It
+      # creates NO user and NO merchant, so it cannot make a data-dependent check
+      # pass by accident. Without it, "super_admin holds every permission key"
+      # fails against an empty catalogue and reports a defect that does not exist.
+      - name: Seed the RBAC catalogue
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -d "$GATE_DB" \
+            -v bootstrap_email=ci@umi.invalid \
+            -f docs/migration/build-v3/backfill/seed_rbac.sql
+
+      # api_login / worker_login. build-v3 ships api/worker as NOLOGIN GROUP roles,
+      # so nothing can connect as them. worker_login must carry the BYPASSRLS
+      # ATTRIBUTE ITSELF — attributes are never inherited through membership, and
+      # the D1 boot guard checks the attribute, not the grant.
+      - name: Provision the harness login roles
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -d "$GATE_DB" \
+            -f apps/umi-api/test/integration/harness-roles.sql
+
+      - name: Schema instruments (preflight · check-values · parity · wallet carry)
+        working-directory: apps/umi-api
+        env:
+          DATABASE_URL_APP: postgresql://api_login:harness_api@localhost:5432/umi_build_v3_ci
+          DATABASE_URL_WORKER: postgresql://worker_login:harness_worker@localhost:5432/umi_build_v3_ci
+          # Declared because the config schema requires it. Nothing in these four
+          # suites opens a Redis connection — verified by running them with no
+          # Redis process at all.
+          REDIS_URL: redis://localhost:6379
+        run: |
+          npx vitest run --config vitest.integration.config.ts \
+            src/shared/database/sql-preflight.integration.ts \
+            src/shared/database/check-values.integration.ts \
+            src/shared/database/schema-parity.integration.ts \
+            src/modules/wallet/wallet-carry.integration.ts
+
+      # Runs LAST and unconditionally: one CI round should report every problem,
+      # not stop at the first. A structural FAIL raises and exits non-zero; the
+      # behavioral half prints SKIPPED with its reason and does not abort the file.
+      - name: Security gate (structural)
+        if: '!cancelled()'
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -d "$GATE_DB" \
+            -f docs/migration/build-v3/security_gate.sql

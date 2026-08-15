@@ -221,9 +221,16 @@ select * from (values
   -- credentials in the target database, and a user mapping holds the password. Left
   -- behind, the migration tool becomes a permanent unaudited path back to the source.
   -- Zero today; the check earns its place the moment the replay runs.
+  -- ⚠ Reads pg_user_mappingS (the VIEW), not pg_user_mapping (the CATALOG).
+  -- PUBLIC cannot SELECT the catalog: has_table_privilege('public',
+  -- 'pg_catalog.pg_user_mapping','select') is false, and the Supabase `postgres`
+  -- role is NOT a superuser. Under ON_ERROR_STOP=1 the catalog form aborts the
+  -- whole file with "permission denied", so the gate reports NOTHING — not a
+  -- FAIL — and never reaches the summary. The view is readable by anyone and
+  -- hides only the option values, which this check does not read.
   ('0 foreign servers / user mappings / FDWs remain',
     (select case when (select count(*) from pg_foreign_server)
-                    + (select count(*) from pg_user_mapping)
+                    + (select count(*) from pg_user_mappings)
                     + (select count(*) from pg_foreign_data_wrapper) = 0
                 then 'PASS' else 'FAIL' end)),
   -- D10 · request-path log redaction (SECURITY_GATE.md §4) ------------------
@@ -333,8 +340,18 @@ select * from (values
   ('0 legacy-sha256 hashes retained',
     (select case when count(*)=0 then 'PASS' else 'FAIL' end from umi."user"
        where password_algorithm='legacy-sha256-v1')),
+  -- ⚠ A BACKFILL-FIDELITY check, not a schema one — its own label says
+  -- "(functional)". It asserts that the migration preserved strong password
+  -- hashes, so it can only pass on a target the backfill has loaded. On a
+  -- pristine build `umi."user"` is EMPTY, and a FAIL there would be a false
+  -- verdict: nothing regressed, nothing was measured. It reports SKIP instead,
+  -- and the summary names every SKIP. Unmeasured is never approved.
   ('some strong scrypt logins survive (functional)',
-    (select case when count(*)>=1 then 'PASS' else 'FAIL' end from umi."user"
+    (select case
+       when (select count(*) from umi."user") = 0 then 'SKIP'
+       when count(*) >= 1 then 'PASS'
+       else 'FAIL' end
+     from umi."user"
        where status='active' and password_algorithm='scrypt-sha256-v1' and password_hash is not null)),
   ('ghost @umi.invalid account is not active',
     (select case when count(*)=0 then 'PASS' else 'FAIL' end from umi."user"
@@ -352,6 +369,28 @@ select * from (values
 \echo ''
 \echo '================= STRUCTURAL GATE ================='
 select status, label from gate order by (status='FAIL') desc, label;
+
+-- ============================================================================
+-- BEHAVIORAL GATE — requires a BACKFILLED target, and is SKIPPED on a pristine one.
+--
+-- The checks below assert production-derived facts: two merchants BY NAME, and
+-- exact row counts (11 conversations, 4 entitlements, 2 entitlements). None of
+-- that exists in a schema built from 00_run.sh alone.
+--
+-- Before this guard, a pristine run died HERE. `\gset` on a query returning no
+-- rows is an error, and under ON_ERROR_STOP=1 it killed the file after the
+-- structural gate had passed but BEFORE the summary — so the run printed 45 PASS
+-- rows and then reported nothing at all. The structural half is a SCHEMA
+-- instrument and is provable on any build; the behavioral half is a MIGRATION
+-- instrument and belongs to the P7 rehearsal. Do not conflate them.
+--
+-- The probe below is an aggregate, so it ALWAYS returns exactly one row and
+-- `\gset` can never fail on it.
+-- ============================================================================
+select case when count(*) = 2 then 'true' else 'false' end as have_fixtures
+  from merchant.merchant where name in ('Kalala Café', 'El Gran Ribera') \gset
+
+\if :have_fixtures
 
 -- capture merchant ids for behavioral tests (as superuser)
 select id as kalala from merchant.merchant where name='Kalala Café' \gset
@@ -388,21 +427,48 @@ end $$;
 
 reset role;
 
+\else
+
+\echo ''
+\echo '================= BEHAVIORAL GATE ================='
+\echo 'SKIPPED: fixture merchants absent — this target has no backfilled data.'
+\echo '         The 3 behavioral checks assert production-derived facts (two'
+\echo '         merchants by name, and exact row counts). They are a MIGRATION'
+\echo '         instrument, not a schema one, and cannot run on a pristine build.'
+\echo '         Run them in the P7 rehearsal against the backfilled clone.'
+\echo '         The structural gate above DID run and its verdict stands.'
+\echo ''
+\echo '⚠ THIS RUN DID NOT MEASURE THE BEHAVIORAL GATE. A skipped check is'
+\echo '  unmeasured, never approved. Record it as skipped in the evidence.'
+
+\endif
+
 \echo ''
 \echo '================= ENFORCE ================='
 -- A WARN does NOT block. It is an acknowledged, dated gap — not a passing check — so it
 -- is printed on its own, every run, and named in the summary. A warning nobody sees is
 -- just a failure that was renamed.
 do $$
-declare n int; w int; r record;
+declare n int; w int; s int; r record;
 begin
   select count(*) into n from gate where status='FAIL';
   select count(*) into w from gate where status='WARN';
+  select count(*) into s from gate where status='SKIP';
   for r in select label from gate where status='WARN' order by label loop
     raise warning 'ACKNOWLEDGED GAP: %', r.label;
   end loop;
+  -- A SKIP is a check this target could not measure, not a check that passed.
+  -- Name every one, on every run. An unnamed skip reads as coverage.
+  for r in select label from gate where status='SKIP' order by label loop
+    raise warning 'NOT MEASURED ON THIS TARGET: %', r.label;
+  end loop;
   if n > 0 then raise exception 'SECURITY GATE FAILED: % structural check(s) failed', n;
-  else raise notice 'SECURITY GATE PASSED: % structural + 3 behavioral checks green, % acknowledged gap(s)',
-    (select count(*) from gate where status='PASS'), w;
+  else raise notice 'SECURITY GATE PASSED: % structural check(s) green, % acknowledged gap(s), % not measured',
+    (select count(*) from gate where status='PASS'), w, s;
+    -- ⚠ This line reports the STRUCTURAL gate only. It used to read
+    -- "+ 3 behavioral checks green" unconditionally, which was false on any
+    -- target without the fixture merchants — and false in the one direction that
+    -- matters, because it claimed a measurement that had not been taken. The
+    -- behavioral section prints its own PASS or SKIPPED lines above. Read both.
   end if;
 end $$;

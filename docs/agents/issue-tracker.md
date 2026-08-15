@@ -60,19 +60,29 @@ project when it starts. `Umi Ticket Seller` is such a project, and it is not thi
 ## Linking a pull request to its work item
 
 The Azure Boards app is installed on the GitHub organization, so a reference inside a
-commit message or a pull-request description creates a real link. **The syntax decides
-whether the work item also moves.**
+commit message or a pull-request description creates a real link. **Linking is all it
+does — no form of the reference moves the state.**
 
-| Form          | Effect                                                                                                                                                     |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AB#93`       | Links only. The state does not change.                                                                                                                     |
-| `Fixes AB#93` | Links, and transitions the work item when the pull request completes. Also `Fix`, `Fixed`, `Close`, `Closes`, `Closed`, `Resolve`, `Resolves`, `Resolved`. |
+| Form          | Effect                                                                      |
+| ------------- | --------------------------------------------------------------------------- |
+| `AB#93`       | Links the work item to the commit and the pull request.                     |
+| `Fixes AB#93` | **Also links. It does NOT move the state here.** See the measurement below. |
 
-**Use the bare form by default.** A merge is rarely the whole of a work item in this
-repository, because most items ask for attached evidence that no automation can produce.
+⚠ **Measured on 2026-08-14: no `AB#` form transitions a work item in this repository.**
 
-Use the transition form only when completing the pull request genuinely completes the item,
-including its acceptance evidence.
+GitHub PR #95 carried `Fixes AB#74` and `Fixes AB#83` in its description. After the pull
+request completed, all three referenced items were still `New`, and unchanged at the same
+revision 60 seconds later. Work item 74 was then closed by hand through the API.
+
+The connection itself is healthy. `System.ChangedBy` reads `Azure Boards`, and work item 74
+gained three artifact links — the pull request plus both commits. **The app links and does
+not transition**, at least for a pull request whose base is not the default branch.
+
+**So: every closure in this project is a deliberate write, with evidence. No automation
+closes a work item.** Write the `AB#` reference for the link, then close the item yourself
+when its acceptance criteria are actually met.
+
+Do not read a `Fixes` keyword in a merged pull request as evidence that the item is done.
 
 ## When a work item closes
 

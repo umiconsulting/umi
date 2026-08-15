@@ -181,6 +181,34 @@ interface Failure {
   sql: string;
 }
 
+/**
+ * KNOWN UNRESOLVED — the gift-card bucket, and nothing else.
+ *
+ * This gate runs in CI (`.github/workflows/umi-api-ci.yml`, job `gate`). It could
+ * not become REQUIRED while it was red, and it is red for exactly one reason:
+ * `merchant.loyalty_gift_card` has 6 columns and the Cash repositories read ten.
+ * The model that closes it is decided in AB#10 and lands with AB#13.
+ *
+ * A named exception can be counted. A skipped job cannot. That is the whole
+ * argument for this list existing rather than the job being disabled.
+ *
+ * Keyed by file and code with an EXACT count, deliberately — not by line. Line
+ * numbers move whenever the file is edited, and an allowlist that rots into
+ * "close enough" is worse than none. Two assertions guard it:
+ *
+ *   1. Any failure NOT in this list fails the gate. New breakage is never masked.
+ *   2. Any entry here that STOPS failing also fails the gate. When AB#13 lands,
+ *      this list goes stale and CI says so, which is what forces its deletion.
+ *      An allowlist that outlives its defect is how a gate quietly stops gating.
+ *
+ * DELETE THIS ENTIRE CONSTANT when the gift-card model lands. Do not edit the
+ * counts down one at a time.
+ */
+const KNOWN_UNRESOLVED: ReadonlyArray<{ file: string; code: string; count: number }> = [
+  { file: 'modules/cash/cash-write.repository.ts', code: '42703', count: 6 },
+  { file: 'modules/cash/cash.repository.ts', code: '42703', count: 1 },
+];
+
 describe('build-v3 SQL preflight · every backend statement parses against the real schema', () => {
   let pg: PgService;
   const failures: Failure[] = [];
@@ -271,22 +299,75 @@ describe('build-v3 SQL preflight · every backend statement parses against the r
       .map(([f, n]) => `${f}×${n}`)
       .join(', ');
 
+    // UNRESOLVED and UNCOVERED are different numbers and must be read together.
+    // Unresolved = measured and broken. Uncovered = never measured at all. They
+    // were once both 15 by coincidence, which is exactly how a reader conflates
+    // them. AB#17's acceptance asks for them side by side; until now the
+    // unresolved count was thrown from a separate test and the two never met.
+    const allowlisted = KNOWN_UNRESOLVED.reduce((n, k) => n + k.count, 0);
     console.log(
       `\n  preflight coverage: ${checked} statements PREPAREd verbatim · ` +
         `${rebuiltChecked}/${interpolatedCount} interpolated RECONSTRUCTED and checked · ` +
         `${unrebuildable.length} could not be rebuilt (still uncovered) · ` +
         `${paramTypeUnknown.length} indeterminate param type (not a schema defect)` +
+        `\n  preflight verdict:  ${failures.length} UNRESOLVED (measured, broken) · ` +
+        `${allowlisted} of those allowlisted (AB#13 gift cards) · ` +
+        `${failures.length - allowlisted} unexpected · ` +
+        `${unrebuildable.length} UNCOVERED (never measured — not approved)` +
         (blindList ? `\n  still uncovered: ${blindList}` : ''),
     );
     expect(checked).toBeGreaterThan(0);
   });
 
+  it('the KNOWN_UNRESOLVED allowlist is exactly the live gift-card bucket, no more and no less', () => {
+    const actual = new Map<string, number>();
+    for (const f of failures) {
+      const k = `${f.file}|${f.code}`;
+      actual.set(k, (actual.get(k) ?? 0) + 1);
+    }
+
+    // 1. Every allowlisted entry must STILL be failing, at exactly its count.
+    //    A stale entry means the defect is fixed and the exception outlived it.
+    const stale: string[] = [];
+    for (const k of KNOWN_UNRESOLVED) {
+      const seen = actual.get(`${k.file}|${k.code}`) ?? 0;
+      if (seen !== k.count) {
+        stale.push(
+          `   ${k.file} (${k.code}): allowlist says ${k.count}, gate found ${seen}` +
+            (seen === 0 ? '  ← FIXED. Delete this entry.' : ''),
+        );
+      }
+    }
+
+    if (stale.length > 0) {
+      throw new Error(
+        `The KNOWN_UNRESOLVED allowlist no longer matches reality.\n` +
+          `${stale.join('\n')}\n\n` +
+          `If the gift-card model landed (AB#13), DELETE the whole constant and this test.\n` +
+          `An allowlist that outlives its defect is how a gate quietly stops gating.\n`,
+      );
+    }
+  });
+
   it('every backend SQL statement resolves against build-v3 (no 42703/42883/42P01/42P10)', () => {
-    if (failures.length === 0) return;
+    // Subtract the named, counted exception. Anything left is NEW breakage and
+    // fails the gate — the allowlist narrows this assertion, it never disables it.
+    const budget = new Map(KNOWN_UNRESOLVED.map((k) => [`${k.file}|${k.code}`, k.count]));
+    const unexpected = failures.filter((f) => {
+      const k = `${f.file}|${f.code}`;
+      const left = budget.get(k) ?? 0;
+      if (left > 0) {
+        budget.set(k, left - 1);
+        return false;
+      }
+      return true;
+    });
+
+    if (unexpected.length === 0) return;
 
     // Group by error code then file so the report is a worklist, not a wall.
     const byCode = new Map<string, Failure[]>();
-    for (const f of failures) {
+    for (const f of unexpected) {
       const list = byCode.get(f.code) ?? [];
       list.push(f);
       byCode.set(f.code, list);
@@ -317,14 +398,15 @@ describe('build-v3 SQL preflight · every backend statement parses against the r
     // below the 42703 cut and was invisible while every one of its statements failed.
     // A count you can trust beats a sample you cannot.
     const byFile = new Map<string, number>();
-    for (const f of failures) byFile.set(f.file, (byFile.get(f.file) ?? 0) + 1);
+    for (const f of unexpected) byFile.set(f.file, (byFile.get(f.file) ?? 0) + 1);
     const fileRollup = [...byFile.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([file, n]) => `   ${String(n).padStart(4)}  ${file}`)
       .join('\n');
 
     throw new Error(
-      `${failures.length} backend SQL statement(s) DO NOT RESOLVE against build-v3.\n` +
+      `${unexpected.length} backend SQL statement(s) DO NOT RESOLVE against build-v3.\n` +
+        `(${KNOWN_UNRESOLVED.reduce((n, k) => n + k.count, 0)} known gift-card statements are allowlisted and excluded — see AB#13.)\n` +
         `(The schema-parity gate is blind to these — it only checks table names.)\n${report}\n` +
         `\n══ BY FILE (complete — the detail above is capped at 40 per code)\n${fileRollup}\n`,
     );
