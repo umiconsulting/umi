@@ -200,6 +200,40 @@ jobs:
             src/modules/wallet/wallet-carry.integration.ts \
             src/shared/loyalty/loyalty-stamps.integration.ts
 
+      # THE RE-RUNNABLE RULE, proven rather than written down.
+      #
+      # After the cutover a schema change arrives as a file in migrations/, and it
+      # runs by hand against the database that holds the customers. A file that
+      # half-applies leaves a person reading a failed transcript.
+      #
+      # `90_rls.sql` is why this step exists. It carried 21 `create policy` and no
+      # `drop policy`, so a second apply died with `policy "merchant_isolation"
+      # for table "merchant" already exists`. Nothing tested a second apply.
+      #
+      # This runs as the DDL owner, which is why it is a CI step and not an
+      # integration test: the harness roles are least-privileged and cannot
+      # create a function in `umi`.
+      - name: Migrations and 90_rls apply TWICE (the re-runnable rule)
+        run: |
+          set -euo pipefail
+          echo "== 90_rls.sql, second apply =="
+          psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f docs/migration/build-v3/90_rls.sql
+
+          for f in docs/migration/build-v3/migrations/*.sql; do
+            [ -e "$f" ] || { echo "no forward migrations yet"; break; }
+            echo "== $(basename "$f") =="
+            psql -v ON_ERROR_STOP=1 -q --single-transaction -d "$GATE_DB" -f "$f"
+            psql -v ON_ERROR_STOP=1 -q --single-transaction -d "$GATE_DB" -f "$f"
+          done
+
+          # A guarded re-apply REPLACES a policy. It must never leave two with the
+          # same name — which also catches a drop that names the wrong table and
+          # therefore removes nothing.
+          dupes=$(psql -At -d "$GATE_DB" -c "select count(*) from (select schemaname,tablename,policyname from pg_policies group by 1,2,3 having count(*)>1) d")
+          test "$dupes" = "0" || { echo "duplicate policies after re-apply: $dupes"; exit 1; }
+
+          psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f docs/migration/build-v3/99_verify.sql
+
       # Runs LAST and unconditionally: one CI round should report every problem,
       # not stop at the first. A structural FAIL raises and exits non-zero; the
       # behavioral half prints SKIPPED with its reason and does not abort the file.

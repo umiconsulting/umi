@@ -17,6 +17,63 @@ begin
     tg_table_schema, tg_table_name, tg_op;
 end $$;
 
+/*
+ * Run one statement against an append-only ledger, then close it again.
+ *
+ * A forward migration sometimes must rewrite a ledger row. The append-only
+ * trigger refuses that, correctly, so the migration has to lift the guard.
+ *
+ * ⚠️ Do not write `alter table ... disable trigger` on its own. The statement
+ * after it can fail, and the ledger then stays writable with nothing to say so.
+ * The money lives in these two tables: `balance = SUM(delta)`, so a rewritten
+ * row changes a customer's balance and leaves no record of the change.
+ *
+ * This function is the safe form. It disables the trigger, runs the statement,
+ * and enables the trigger again. All three run inside the caller's transaction,
+ * and `exception` re-enables the trigger before it re-raises. A rollback undoes
+ * the disable with everything else, so no path leaves the ledger open.
+ *
+ * The caller stays in charge of the transaction:
+ *
+ *   begin;
+ *   select merchant.with_ledger_writable(
+ *     'merchant.loyalty_stored_value_ledger',
+ *     $sql$ update merchant.loyalty_stored_value_ledger set ... $sql$);
+ *   commit;
+ *
+ * Only the two ledgers are accepted. A caller that names another table gets an
+ * error, so this cannot become a way to turn off any trigger.
+ */
+create or replace function merchant.with_ledger_writable(ledger text, stmt text)
+  returns void
+  language plpgsql
+  set search_path = pg_catalog as $$
+declare
+  trigger_name text;
+begin
+  trigger_name := case ledger
+    when 'merchant.loyalty_stored_value_ledger' then 'stored_value_ledger_append_only'
+    when 'merchant.loyalty_gift_card_ledger'    then 'gift_card_ledger_append_only'
+  end;
+  if trigger_name is null then
+    raise exception 'with_ledger_writable accepts only the two append-only ledgers, not %', ledger;
+  end if;
+
+  execute format('alter table %s disable trigger %I', ledger, trigger_name);
+  begin
+    execute stmt;
+  exception when others then
+    -- Re-enable before the re-raise. A rollback would also undo the disable, and
+    -- this covers the caller who traps the error and commits anyway.
+    execute format('alter table %s enable trigger %I', ledger, trigger_name);
+    raise;
+  end;
+  execute format('alter table %s enable trigger %I', ledger, trigger_name);
+end $$;
+
+comment on function merchant.with_ledger_writable(text, text) is
+  'Run one statement against an append-only ledger with its guard lifted, inside the caller transaction. No path leaves the guard off.';
+
 -- ----------------------------------------------------------------------------
 -- ROOT
 -- ----------------------------------------------------------------------------

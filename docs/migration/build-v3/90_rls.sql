@@ -210,6 +210,7 @@ alter default privileges in schema merchant, runtime grant select on tables to r
 -- Root: merchant keys on id.
 alter table merchant.merchant enable row level security;
 alter table merchant.merchant force  row level security;
+drop policy if exists merchant_isolation on merchant.merchant;
 create policy merchant_isolation on merchant.merchant
   using      (id = umi.current_merchant())
   with check (id = umi.current_merchant());
@@ -228,6 +229,7 @@ begin
   loop
     execute format('alter table merchant.%I enable row level security', r.table_name);
     execute format('alter table merchant.%I force  row level security', r.table_name);
+    execute format('drop policy if exists merchant_isolation on merchant.%I', r.table_name);
     execute format($f$create policy merchant_isolation on merchant.%I
       using      (merchant_id = umi.current_merchant())
       with check (merchant_id = umi.current_merchant())$f$, r.table_name);
@@ -258,6 +260,7 @@ begin
   loop
     execute format('alter table merchant.%I enable row level security', r.child);
     execute format('alter table merchant.%I force  row level security', r.child);
+    execute format('drop policy if exists merchant_isolation on merchant.%I', r.child);
     execute format($f$create policy merchant_isolation on merchant.%I
       using (exists (select 1 from merchant.%I p where p.%I = merchant.%I.%I
                        and p.merchant_id = umi.current_merchant()))
@@ -270,6 +273,7 @@ end $$;
 -- product_modifier: two hops (option_group -> product).
 alter table merchant.product_modifier enable row level security;
 alter table merchant.product_modifier force  row level security;
+drop policy if exists merchant_isolation on merchant.product_modifier;
 create policy merchant_isolation on merchant.product_modifier
   using (exists (select 1 from merchant.product_option_group g
                    join merchant.product p on p.id = g.product_id
@@ -283,6 +287,7 @@ create policy merchant_isolation on merchant.product_modifier
 -- refund: two hops (payment -> customer_order).
 alter table merchant.refund enable row level security;
 alter table merchant.refund force  row level security;
+drop policy if exists merchant_isolation on merchant.refund;
 create policy merchant_isolation on merchant.refund
   using (exists (select 1 from merchant.payment pay
                    join merchant.customer_order o on o.id = pay.order_id
@@ -298,12 +303,14 @@ create policy merchant_isolation on merchant.refund
 -- ===========================================================================
 alter table umi.subscription enable row level security;
 alter table umi.subscription force  row level security;
+drop policy if exists merchant_isolation on umi.subscription;
 create policy merchant_isolation on umi.subscription
   using      (merchant_id = umi.current_merchant())
   with check (merchant_id = umi.current_merchant());
 
 alter table umi.invoice enable row level security;
 alter table umi.invoice force  row level security;
+drop policy if exists merchant_isolation on umi.invoice;
 create policy merchant_isolation on umi.invoice
   using      (merchant_id = umi.current_merchant())
   with check (merchant_id = umi.current_merchant());
@@ -323,6 +330,7 @@ create policy merchant_isolation on umi.invoice
 -- subscription_item / entitlement_override: scope via subscription.merchant_id.
 alter table umi.subscription_item enable row level security;
 alter table umi.subscription_item force  row level security;
+drop policy if exists merchant_isolation on umi.subscription_item;
 create policy merchant_isolation on umi.subscription_item
   using (exists (select 1 from umi.subscription s where s.id = subscription_item.subscription_id
                    and s.merchant_id = umi.current_merchant()))
@@ -331,6 +339,7 @@ create policy merchant_isolation on umi.subscription_item
 
 alter table umi.entitlement_override enable row level security;
 alter table umi.entitlement_override force  row level security;
+drop policy if exists merchant_isolation on umi.entitlement_override;
 create policy merchant_isolation on umi.entitlement_override
   using (exists (select 1 from umi.subscription s where s.id = entitlement_override.subscription_id
                    and s.merchant_id = umi.current_merchant()))
@@ -342,12 +351,14 @@ create policy merchant_isolation on umi.entitlement_override
 -- ===========================================================================
 alter table runtime.reminder_sent enable row level security;
 alter table runtime.reminder_sent force  row level security;
+drop policy if exists merchant_isolation on runtime.reminder_sent;
 create policy merchant_isolation on runtime.reminder_sent
   using      (merchant_id = umi.current_merchant())
   with check (merchant_id = umi.current_merchant());
 
 alter table runtime.conversation_cart enable row level security;
 alter table runtime.conversation_cart force  row level security;
+drop policy if exists merchant_isolation on runtime.conversation_cart;
 create policy merchant_isolation on runtime.conversation_cart
   using (exists (select 1 from merchant.conversation cv where cv.id = conversation_cart.conversation_id
                    and cv.merchant_id = umi.current_merchant()))
@@ -360,12 +371,14 @@ create policy merchant_isolation on runtime.conversation_cart
 -- check as a universal rather than a list of table names.
 alter table runtime.idempotency_key enable row level security;
 alter table runtime.idempotency_key force  row level security;
+drop policy if exists merchant_isolation on runtime.idempotency_key;
 create policy merchant_isolation on runtime.idempotency_key
   using      (merchant_id = umi.current_merchant())
   with check (merchant_id = umi.current_merchant());
 
 alter table runtime.conversation_turn enable row level security;
 alter table runtime.conversation_turn force  row level security;
+drop policy if exists merchant_isolation on runtime.conversation_turn;
 create policy merchant_isolation on runtime.conversation_turn
   using (exists (select 1 from merchant.conversation cv where cv.id = conversation_turn.conversation_id
                    and cv.merchant_id = umi.current_merchant()))
@@ -423,6 +436,7 @@ begin
        and not (c.relname = any(skip))
      order by c.relname
   loop
+    execute format('drop policy if exists location_narrowing on merchant.%I', t.relname);
     execute format($f$create policy location_narrowing on merchant.%I as restrictive
       using      (umi.current_location() is null or location_id is null
                   or location_id = umi.current_location())
@@ -449,6 +463,7 @@ begin
     'device_replay_cursor', 'offline_replay_command', 'offline_reconciliation',
     'offline_replay_conflict', 'offline_provisional_mapping'
   ] loop
+    execute format('drop policy if exists device_scoping on merchant.%I', t);
     execute format($f$create policy device_scoping on merchant.%I as restrictive
       using      (umi.current_device() is not null and device_id = umi.current_device())
       with check (umi.current_device() is not null and device_id = umi.current_device())$f$, t);
@@ -492,21 +507,25 @@ end $$;
 -- BYPASSRLS pool can write is an operator session with no merchant isolation at all.
 alter table runtime.operator_session enable row level security;
 alter table runtime.operator_session force  row level security;
+drop policy if exists merchant_isolation on runtime.operator_session;
 create policy merchant_isolation on runtime.operator_session
   using      (merchant_id = umi.current_merchant())
   with check (merchant_id = umi.current_merchant());
+drop policy if exists location_narrowing on runtime.operator_session;
 create policy location_narrowing on runtime.operator_session as restrictive
   using      (umi.current_location() is null or location_id = umi.current_location())
   with check (umi.current_location() is null or location_id = umi.current_location());
 
 alter table runtime.device_enrollment_challenge enable row level security;
 alter table runtime.device_enrollment_challenge force  row level security;
+drop policy if exists merchant_isolation on runtime.device_enrollment_challenge;
 create policy merchant_isolation on runtime.device_enrollment_challenge
   using      (merchant_id = umi.current_merchant())
   with check (merchant_id = umi.current_merchant());
 
 alter table runtime.elevation_grant enable row level security;
 alter table runtime.elevation_grant force  row level security;
+drop policy if exists merchant_isolation on runtime.elevation_grant;
 create policy merchant_isolation on runtime.elevation_grant
   using      (merchant_id = umi.current_merchant())
   with check (merchant_id = umi.current_merchant());
@@ -518,12 +537,14 @@ create policy merchant_isolation on runtime.elevation_grant
 -- merchant to name, and audit exhaust must outlive whatever it describes.
 alter table runtime.security_audit_event enable row level security;
 alter table runtime.security_audit_event force  row level security;
+drop policy if exists merchant_isolation on runtime.security_audit_event;
 create policy merchant_isolation on runtime.security_audit_event
   using      (merchant_id is null or merchant_id = umi.current_merchant())
   with check (merchant_id is null or merchant_id = umi.current_merchant());
 
 alter table runtime.audit_event_internal enable row level security;
 alter table runtime.audit_event_internal force  row level security;
+drop policy if exists merchant_isolation on runtime.audit_event_internal;
 create policy merchant_isolation on runtime.audit_event_internal
   using      (merchant_id = umi.current_merchant())
   with check (merchant_id = umi.current_merchant());
