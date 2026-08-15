@@ -6,7 +6,10 @@ import { EnqueueService } from '../../jobs/enqueue.service';
 import { JobPriority } from '../../jobs/job-options';
 import { QUEUES } from '../../jobs/queues';
 import { QueueRepository } from '../../jobs/queue.repository';
-import { TraceService } from '../../shared/logging/trace.service';
+import { LoggingService } from '../../shared/logging/logging.service';
+import { hashPhone } from '../../shared/logging/hash-phone';
+import { securityEvent } from '../../shared/logging/security-event';
+import { getRequestContext } from '../../shared/database/request-context';
 import { twimlMessage, emptyTwiml } from '../../shared/format/whatsapp';
 import { MerchantResolutionService } from './merchant-resolution.service';
 import {
@@ -45,7 +48,7 @@ export class WhatsappController {
     private readonly messages: MessagesRepository,
     private readonly queue: QueueRepository,
     private readonly enqueue: EnqueueService,
-    private readonly trace: TraceService,
+    private readonly log: LoggingService,
   ) {
     this.authToken = config.get('TWILIO_AUTH_TOKEN', { infer: true });
     this.webhookUrl = config.get('TWILIO_WEBHOOK_URL', { infer: true });
@@ -58,7 +61,11 @@ export class WhatsappController {
     @Body() rawBody: unknown,
     @Headers('x-twilio-signature') signature?: string,
   ): Promise<string> {
-    const requestId = randomUUID();
+    // One id for the whole request. `RequestContextMiddleware` mints it for every
+    // HTTP route, and `LoggingService` stamps it on every line it writes, so a
+    // second id here would appear on the `logger` lines only and would be dropped
+    // from the `log` lines. Mint one only when there is no HTTP context.
+    const requestId = getRequestContext()?.requestId ?? randomUUID();
     const params = new URLSearchParams(typeof rawBody === 'string' ? rawBody : '');
 
     // ── SEC-01/FT-02: signature validation against the exact signed URL ──
@@ -121,25 +128,31 @@ export class WhatsappController {
     // ── Rate limit + prompt-injection ──
     const rate = await this.security.checkRateLimit(merchantId, personId);
     if (!rate.allowed) {
-      await this.trace.logSecurityEvent({
-        phone,
-        eventType: 'rate_limit_exceeded',
-        inputText: `${rate.count} messages`,
-        requestId,
-      });
+      this.log.warn(
+        'security_event',
+        securityEvent({
+          phone,
+          eventType: 'rate_limit_exceeded',
+          inputText: `${rate.count} messages`,
+          requestId,
+        }),
+      );
       return twimlMessage(
         'Has enviado demasiados mensajes. Por favor, espera un momento antes de continuar.',
       );
     }
     const injection = detectPromptInjection(rawMessage);
     if (injection.detected) {
-      await this.trace.logSecurityEvent({
-        phone,
-        eventType: 'prompt_injection_attempt',
-        inputText: rawMessage,
-        details: injection.pattern,
-        requestId,
-      });
+      this.log.warn(
+        'security_event',
+        securityEvent({
+          phone,
+          eventType: 'prompt_injection_attempt',
+          inputText: rawMessage,
+          details: injection.pattern,
+          requestId,
+        }),
+      );
       return twimlMessage(
         'Lo siento, tu mensaje contiene caracteres no permitidos. Por favor, reformula tu pregunta.',
       );
@@ -161,7 +174,7 @@ export class WhatsappController {
         provider: 'twilio',
         providerEventId: messageSid,
         eventType: 'whatsapp_message',
-        payload: { phone_hash: this.trace.hashPhone(phone), message_length: message.length },
+        payload: { phone_hash: hashPhone(phone), message_length: message.length },
       });
       if (gate.duplicate) {
         this.logger.log(
@@ -198,7 +211,7 @@ export class WhatsappController {
       { priority: JobPriority.Interactive, jobId: messageSid },
     );
 
-    await this.trace.logPipelineTrace({
+    this.log.log('pipeline_trace', {
       trace_id: requestId,
       conversation_id: conversation.id,
       merchant_id: merchantId,

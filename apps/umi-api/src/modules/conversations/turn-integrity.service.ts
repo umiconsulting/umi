@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EnqueueService } from '../../jobs/enqueue.service';
 import { JobPriority } from '../../jobs/job-options';
 import { QUEUES } from '../../jobs/queues';
-import { TraceService } from '../../shared/logging/trace.service';
+import { LoggingService } from '../../shared/logging/logging.service';
 import { ConversationsRepository } from './conversations.repository';
 import { ConversationTurnsRepository } from './conversation-turns.repository';
 import { decideTurnIntegrity } from './turn-integrity.logic';
@@ -49,14 +49,14 @@ export class TurnIntegrityService {
     private readonly conversations: ConversationsRepository,
     private readonly turns: ConversationTurnsRepository,
     private readonly enqueue: EnqueueService,
-    private readonly trace: TraceService,
+    private readonly log: LoggingService,
   ) {}
 
   async process(payload: TurnIntegrityPayload): Promise<void> {
     const traceId = payload.request_id ?? payload.conversation_id;
     const conversation = await this.conversations.loadById(payload.conversation_id);
     if (!conversation) {
-      await this.trace.logPipelineTrace({
+      this.log.log('pipeline_trace', {
         trace_id: traceId,
         conversation_id: payload.conversation_id,
         merchant_id: payload.merchant_id,
@@ -69,7 +69,7 @@ export class TurnIntegrityService {
 
     const messages = await this.turns.getTrailingUserRun(payload.conversation_id);
     if (!messages.length) {
-      await this.trace.logPipelineTrace({
+      this.log.log('pipeline_trace', {
         trace_id: traceId,
         conversation_id: payload.conversation_id,
         merchant_id: payload.merchant_id,
@@ -105,7 +105,7 @@ export class TurnIntegrityService {
       decision.decision !== 'hold' &&
       decision.decision !== 'merge'
     ) {
-      await this.trace.logPipelineTrace({
+      this.log.log('pipeline_trace', {
         trace_id: traceId,
         conversation_id: payload.conversation_id,
         merchant_id: payload.merchant_id,
@@ -157,7 +157,7 @@ export class TurnIntegrityService {
       jobId: turnProcessJobId(turn.id, releasedAt),
     });
 
-    await this.trace.logPipelineTrace({
+    this.log.log('pipeline_trace', {
       trace_id: traceId,
       conversation_id: payload.conversation_id,
       turn_id: turn.id,
