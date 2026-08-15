@@ -109,7 +109,7 @@ export class CashWriteRepository {
          CROSS JOIN vr
          CROSS JOIN LATERAL (
            SELECT
-             (SELECT COUNT(*) FROM merchant.loyalty_visit v
+             (SELECT COALESCE(SUM(v.stamps), 0) FROM merchant.loyalty_visit v
                WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id)              AS total_visits,
              (SELECT COUNT(*) FROM merchant.loyalty_redemption r
                WHERE r.merchant_id = c.merchant_id AND r.card_id = c.id)             AS redemptions,

@@ -455,7 +455,25 @@ create table merchant.contact (
   -- contradicts the column comment below — and `verified` gates who we may proactively
   -- message, so a self-asserted number could be messaged as if it were consented.
   constraint contact_verified_needs_proof
-    check (not verified or verified_via = 'whatsapp_inbound')
+    check (not verified or verified_via = 'whatsapp_inbound'),
+  -- P0-9. The database half of contact dedup. `identity.resolver.ts:128` takes a
+  -- pg_advisory_xact_lock keyed on (merchant_id, normalized value) before it
+  -- looks up and before it creates, and that lock is the ONLY thing preventing a
+  -- duplicate contact today. It works — the race is not reproducible on either
+  -- live path — but it is application-only, no constraint backs it, and
+  -- security_gate.sql has no check for it.
+  --
+  -- ⚠ The key INCLUDES channel_id, and that is not a detail. A single E.164
+  -- deliberately reaches across `phone`, `whatsapp` and `sms`
+  -- (`identity.resolver.ts:118-121`), so one customer legitimately holds several
+  -- rows with the same normalized_value and different channel_id. A unique key on
+  -- (merchant_id, normalized_value) alone would REJECT those valid rows and break
+  -- getReplyContext. Work item 19 proposed exactly that shape; it is wrong.
+  --
+  -- NULL normalized_value stays uncovered — Postgres treats NULLs as distinct —
+  -- so the advisory lock is still load-bearing for the unnormalizable path.
+  -- Measured against the loaded target: 0 violations.
+  constraint contact_dedup_uq unique (merchant_id, channel_id, normalized_value)
 );
 comment on table  merchant.contact is
   'Reachability per channel. NOT uniquely keyed on phone — umi-cash collects an UNVERIFIED '
@@ -570,8 +588,39 @@ create table merchant.loyalty_visit (
   card_id      uuid not null references merchant.loyalty_card(id) on delete cascade,
   location_id    uuid references merchant.location(id),
   staff_id     uuid references merchant.staff(id),
+  -- 'migration' is GONE. It existed only to label the synthetic rows that the
+  -- backfill invented to make count(*) come out right, and those rows are gone
+  -- too (backfill_loyalty_v3.sql §6b, deleted). A source value whose only job is
+  -- to bless a fabrication should not survive the fabrication.
+  -- 'manual_bulk' is the catch-up path: staff crediting several stamps at once
+  -- for a customer who arrived from an external loyalty system.
   source       text not null default 'scan'
-                 check (source in ('scan','manual','migration','pos')),
+                 check (source in ('scan','manual','manual_bulk','pos')),
+  -- HOW MANY STAMPS THIS ROW IS WORTH.
+  --
+  -- A row is not a magnitude. The table used to say "Stamp count = count(*)",
+  -- and that was true only while every interaction was worth exactly one stamp.
+  -- It never was: the "Agregar sellos" catch-up path credits up to 50 at once,
+  -- and production holds 28 such events carrying 115 stamps across 22 cards.
+  --
+  -- Without this column the backfill had to choose between losing those stamps
+  -- and inventing rows to replace them. It invented them — 87 rows stamped at
+  -- `card.created_at`, one card receiving 15 visits at a single microsecond —
+  -- which balanced the total and destroyed the history. Measured cost of the
+  -- other choice: 18 Kalala customers lose 87 stamps, worst card 20 -> 5. The
+  -- customer sees that on her own phone, and no gate reports it.
+  --
+  -- With it the merchant can answer BOTH questions for the first time:
+  --   "how many times did she come in?"  -> count(*)          (537)
+  --   "how many stamps does she hold?"   -> sum(stamps)       (624)
+  -- Reward maths reads sum(stamps). Streaks and recency read count(*) and
+  -- occurred_at — one bulk credit was one real interaction, not nine visits.
+  stamps       smallint not null default 1 check (stamps between 1 and 50),
+  -- Why the staff member credited them. Carried from loyalty.visit_events.note.
+  note         text,
+  -- Makes a retried catch-up credit idempotent. The umi-cash bulk-seal endpoint
+  -- already mints one per action; carrying it keeps the guarantee across cutover.
+  idempotency_key text,
   -- WHAT THE STAMP BOUGHT. Until this column existed a visit knew that someone came in
   -- and nothing about what they purchased, so no reward could ever depend on spend and
   -- no basket could ever be attributed to a member. A POS sale writes the order here in
@@ -585,7 +634,18 @@ create table merchant.loyalty_visit (
 -- "Which visits came from a sale, newest first" — the attribution read.
 create index loyalty_visit_order_idx on merchant.loyalty_visit (merchant_id, order_id)
   where order_id is not null;
-comment on table merchant.loyalty_visit is 'One row per stamp. Stamp count = count(*), never a cached column.';
+-- One row per INTERACTION, carrying its magnitude. Stamp count = sum(stamps),
+-- never count(*) and never a cached column. count(*) answers a different and
+-- also useful question — how many times the customer came in.
+comment on table merchant.loyalty_visit is
+  'One row per interaction. Stamps = sum(stamps); visits = count(*). Never a cached column.';
+comment on column merchant.loyalty_visit.stamps is
+  'Stamps this interaction is worth. 1 for a scan; up to 50 for a manual_bulk catch-up.';
+-- Idempotency is per merchant, not global: two cafés may retry unrelated actions
+-- that happen to mint the same key. Partial, because most rows carry no key.
+create unique index loyalty_visit_idem_uq
+  on merchant.loyalty_visit (merchant_id, idempotency_key)
+  where idempotency_key is not null;
 
 create table merchant.loyalty_reward (
   id               uuid primary key default gen_random_uuid(),

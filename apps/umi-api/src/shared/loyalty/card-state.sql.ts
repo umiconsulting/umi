@@ -34,7 +34,13 @@ export const LOYALTY_CARD_STATE_SQL = `
       WHERE merchant_id = $1::uuid AND active AND type = 'stamps_free_item'
       ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
   ),
-  tv AS (SELECT COUNT(*)::int AS n FROM merchant.loyalty_visit
+  -- SUM(stamps), never COUNT(*). One interaction can be worth up to 50 stamps:
+  -- the "Agregar sellos" catch-up path credits a customer who arrived from an
+  -- external loyalty system. COUNT(*) reads that as one stamp and silently
+  -- shortens her card — measured at 18 Kalala customers and 87 stamps, worst
+  -- card 20 -> 5. She sees it on her own phone, and no gate reports it.
+  -- COALESCE because a card with no visits yet must read 0, not NULL.
+  tv AS (SELECT COALESCE(SUM(stamps), 0)::int AS n FROM merchant.loyalty_visit
           WHERE merchant_id = $1::uuid AND card_id = $2::uuid),
   rr AS (SELECT COUNT(*)::int AS n FROM merchant.loyalty_redemption
           WHERE merchant_id = $1::uuid AND card_id = $2::uuid),

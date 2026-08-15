@@ -65,7 +65,7 @@ const CARD_PERSON_JOIN = `
 const HAS_PHONE = `ph.phone IS NOT NULL`;
 // visits_this_cycle = COUNT(visit) % active visits_required (default 10).
 const VISITS_THIS_CYCLE = `(
-  (SELECT count(*) FROM merchant.loyalty_visit v WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id)
+  (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id)
   % COALESCE((SELECT stamps_required FROM merchant.loyalty_reward
        WHERE merchant_id = c.merchant_id AND active AND type = 'stamps_free_item'
        ORDER BY created_at DESC NULLS LAST LIMIT 1), ${DEFAULT_VISITS_REQUIRED})
@@ -167,6 +167,9 @@ export class LifecycleRepository {
          FROM merchant.loyalty_card c ${CARD_PERSON_JOIN}
         WHERE c.merchant_id = $1::uuid AND c.status = 'active' AND ${HAS_PHONE}
           AND $2::int = (
+            -- DISTINCT weeks, deliberately unchanged. A streak measures how many
+            -- weeks the customer showed up, and one bulk credit was one visit.
+            -- Weighting it by stamps would invent a habit she never had.
             SELECT count(DISTINCT date_trunc('week', ve.occurred_at))
               FROM merchant.loyalty_visit ve
              WHERE ve.merchant_id = c.merchant_id AND ve.card_id = c.id
