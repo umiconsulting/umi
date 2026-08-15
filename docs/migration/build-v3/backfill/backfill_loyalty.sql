@@ -57,9 +57,9 @@ select
     where rc.program_id = p.id and rc.is_active
     order by rc.created_at
     limit 1)                                    as stamps_per_reward,
-  -- Carried from the branding jsonb. A café that had the bulk catch-up ON and
-  -- arrives with it OFF loses the ability to correct a migrated card — and the
-  -- migrated cards are exactly the population that needs correcting.
+  -- Carry the flag from the branding jsonb.
+  -- A cafe that had the flag ON must not arrive with it OFF.
+  -- That cafe loses the catch-up path for its migrated cards.
   coalesce((p.branding ->> 'multi_seal_enabled')::boolean, false) as multi_seal_enabled,
   p.birthday_reward_enabled,
   p.birthday_reward_name,

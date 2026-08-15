@@ -50,9 +50,18 @@ function makeConfig(): ConfigService<AppConfig, true> {
 const MERCHANT = '9f000000-0000-4000-8000-0000000000a1';
 const CUSTOMER = '9f000000-0000-4000-8000-0000000000a2';
 const CARD = '9f000000-0000-4000-8000-0000000000a3';
-/** The café requires 10 stamps per reward, so the arithmetic below is legible. */
-const REQUIRED = 10;
+/** The cafe needs 10 stamps for one reward. This keeps the arithmetic legible. */
+const STAMPS_PER_REWARD = 10;
 
+/**
+ * ⚠ `total_visits` CARRIES A KNOWN LIE, and it is kept on purpose.
+ *
+ * The field holds SUM(stamps), so it is a stamp count, not a visit count.
+ * BACKFILL_METHODOLOGY.md finding L3 says to name it `total_stamps`, because
+ * "prod's column name was the original lie". The rename is correct and is NOT
+ * done here: the name crosses into 10+ files in umi-cash, and umi-cash is
+ * frozen. The DDL comment on merchant.loyalty_visit carries the correction.
+ */
 interface CardState {
   total_visits: number;
   visits_this_cycle: number;
@@ -84,7 +93,7 @@ describe('loyalty stamps · a row is not a magnitude', () => {
     await pg.query(
       `INSERT INTO merchant.loyalty_reward (merchant_id, name, type, stamps_required, active)
        VALUES ($1::uuid, 'Café gratis', 'stamps_free_item', $2, true)`,
-      [MERCHANT, REQUIRED],
+      [MERCHANT, STAMPS_PER_REWARD],
     );
   });
 
