@@ -154,3 +154,80 @@ test('RegisterMemberRequest — national digit count, not string length', () => 
   assert.equal(ok('+14804016182'), true);
   assert.equal(ok('+34612345678'), true);
 });
+
+// ── The two-outcome login ─────────────────────────────────────────────────────
+//
+// `POST /api/auth/local/login` answers with a session, OR with an MFA challenge.
+// The route table said `SessionResponse` and hid the second branch from every
+// client. The dashboard then stored `payload.session` whatever came back, so an
+// enrolled account could never sign in.
+const {
+  MfaChallengeResponse,
+  LoginResponse,
+  VerifyMfaRequest,
+  mfaChallenged,
+} = require('../dist/index.cjs');
+
+const CHALLENGE = {
+  mfaRequired: true,
+  method: 'totp',
+  challengeToken: 'tok-abc',
+  expiresInSeconds: 300,
+};
+
+const SESSION = {
+  session: {
+    user: { id: 'u1', email: 'a@b.c', displayName: 'A' },
+    merchants: [],
+    provider: 'local',
+    accessExpiresIn: 1800,
+  },
+};
+
+test('MfaChallengeResponse accepts the four fields the server sends', () => {
+  assert.equal(MfaChallengeResponse.safeParse(CHALLENGE).success, true);
+});
+
+test('MfaChallengeResponse rejects a session body', () => {
+  assert.equal(MfaChallengeResponse.safeParse(SESSION).success, false);
+});
+
+test('mfaRequired must be the LITERAL true, not a truthy value', () => {
+  // An error body carrying mfaRequired: "yes" must not read as a challenge.
+  assert.equal(MfaChallengeResponse.safeParse({ ...CHALLENGE, mfaRequired: 'yes' }).success, false);
+  assert.equal(MfaChallengeResponse.safeParse({ ...CHALLENGE, mfaRequired: false }).success, false);
+});
+
+test('LoginResponse accepts BOTH outcomes', () => {
+  assert.equal(LoginResponse.safeParse(SESSION).success, true);
+  assert.equal(LoginResponse.safeParse(CHALLENGE).success, true);
+});
+
+test('LoginResponse rejects a body that is neither', () => {
+  assert.equal(LoginResponse.safeParse({ error: 'nope' }).success, false);
+});
+
+test('mfaChallenged tells the two apart', () => {
+  assert.equal(mfaChallenged(CHALLENGE), true);
+  assert.equal(mfaChallenged(SESSION), false);
+});
+
+test('mfaChallenged does not read a truthy mfaRequired as a challenge', () => {
+  assert.equal(mfaChallenged({ mfaRequired: 'yes' }), false);
+  assert.equal(mfaChallenged({ mfaRequired: 1 }), false);
+});
+
+test('VerifyMfaRequest takes exactly six digits', () => {
+  assert.equal(VerifyMfaRequest.safeParse({ challengeToken: 't', code: '012345' }).success, true);
+  for (const code of ['12345', '1234567', 'abcdef', '12 456', '']) {
+    assert.equal(
+      VerifyMfaRequest.safeParse({ challengeToken: 't', code }).success,
+      false,
+      `code ${JSON.stringify(code)} must be rejected`,
+    );
+  }
+});
+
+test('VerifyMfaRequest needs a challenge token', () => {
+  assert.equal(VerifyMfaRequest.safeParse({ challengeToken: '', code: '123456' }).success, false);
+});

@@ -26,7 +26,11 @@ import {
   REMEMBER_COOKIE,
   type AuthUser,
 } from './auth.types';
-import type { SessionEnvelope, SessionResponse } from '@umi/contract';
+import type {
+  SessionEnvelope,
+  SessionResponse,
+  MfaChallengeResponse as MfaChallenge,
+} from '@umi/contract';
 import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -48,16 +52,11 @@ const LOGIN_MAX_PER_WINDOW = 20;
 const MFA_VERIFY_MAX_PER_WINDOW = 20;
 
 /**
- * Login's other outcome. Not in `@umi/contract` yet on purpose — the dashboard has to
- * learn this shape before an enrolment can safely exist, and promoting it to the
- * shared contract is the change that pairs with the client work.
+ * Login's other outcome. It now lives in `@umi/contract` and the dashboard reads
+ * it, which is what an enrolment was always waiting for. `MfaChallengeResponse`
+ * is re-exported here so this file keeps one import list for its own callers.
  */
-export interface MfaChallengeResponse {
-  mfaRequired: true;
-  method: string;
-  challengeToken: string;
-  expiresInSeconds: number;
-}
+export type { MfaChallengeResponse } from '@umi/contract';
 
 /**
  * Auth ingress (D9). Issues/clears the httpOnly JWT cookies and returns the
@@ -100,7 +99,7 @@ export class AuthController {
     @Body() dto: LoginDto,
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
-  ): Promise<SessionResponse | MfaChallengeResponse> {
+  ): Promise<SessionResponse | MfaChallenge> {
     this.throttle(reply, `auth:login:${clientIp(req)}`, LOGIN_MAX_PER_WINDOW);
     const result = await this.auth.login(dto.username, dto.password);
     if (isMfaChallenge(result)) {

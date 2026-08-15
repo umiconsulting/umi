@@ -104,21 +104,41 @@ select * from (values
   -- holder without a second factor is the single highest-value account in the system
   -- protected by the weakest possible control.
   --
-  -- WARN, NOT FAIL — deliberately, and temporarily. No MFA feature exists yet, so this
-  -- can only fail, on every run, until one is built. This repository has already been
-  -- burned by gates nobody believed ("the gate didn't flag it" is not evidence it is
-  -- fine); a check that is red forever teaches people to skip the whole file, which
-  -- costs more than this one check buys.
-  -- ⚠️ CHANGE 'WARN' BACK TO 'FAIL' when the MFA module ships, and BEFORE the build-v3
-  -- production cutover. A platform operator reaching every café on a password alone is
-  -- not an acceptable end state — only an acknowledged interim one.
+  -- THIS ROW FLIPS ITSELF. It used to carry an instruction to a person: "change
+  -- WARN back to FAIL when the MFA module ships". The module shipped, and the
+  -- instruction was still there. A control that waits for somebody to remember is
+  -- not a control.
+  --
+  -- The three states, and why each one is right:
+  --
+  --   PASS  Every live platform grant holder holds a second factor. Nothing to say.
+  --         A target with no grant holder also passes: there is nothing to protect.
+  --   FAIL  SOME holder is enrolled and another is not. Enrolment demonstrably
+  --         works on this very target, so the gap is a choice.
+  --   WARN  NO holder is enrolled anywhere. The rollout has not started. A check
+  --         that is red forever teaches people to skip the whole file, which costs
+  --         more than this one check buys, and this repository has been burned by
+  --         gates nobody believed.
+  --
+  -- ⚠️ Enrol the FIRST platform grant holder only after a client can read
+  -- `mfaRequired`. `POST /api/auth/local/login` returns a challenge and NO session
+  -- for an enrolled account, so an older client stores nothing and that account
+  -- cannot sign in. The dashboard reads it as of PR #103.
+  --
+  -- One stolen password otherwise reaches every café. A platform grant holder is
+  -- the highest-value account in the system.
   ('every live platform grant holder has a second factor',
-    (select case when count(*)=0 then 'PASS' else 'WARN' end
-       from umi.user_role ur
-       join umi.user u on u.id = ur.user_id
-      where ur.revoked_at is null
-        and (ur.expires_at is null or ur.expires_at > now())
-        and u.mfa_method is null)),
+    (select case
+       when count(*) filter (where mfa_method is null) = 0 then 'PASS'
+       when count(*) filter (where mfa_method is not null) > 0 then 'FAIL'
+       else 'WARN' end
+       from (
+         select distinct u.id, u.mfa_method
+           from umi.user_role ur
+           join umi.user u on u.id = ur.user_id
+          where ur.revoked_at is null
+            and (ur.expires_at is null or ur.expires_at > now())
+       ) holder)),
   -- PCI DSS 10.2.2 lists six fields. These are the two that were missing from the
   -- platform audit tables; the other four were always present.
   ('audit tables carry outcome + request_id (PCI DSS 10.2.2)',

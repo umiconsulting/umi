@@ -63,3 +63,9 @@ test('merchant reference + gift code are URL-encoded', () => {
   assert.equal(routes.cash.byRef.scan('a b'), '/api/a%20b/admin/scan');
   assert.equal(routes.cash.byRef.gift('a/b', 'c d'), '/api/a%2Fb/gift/c%20d');
 });
+
+test('routes.auth.mfaVerify names the second half of the login', () => {
+  // The server has carried this route since the MFA port; the table never
+  // declared it, so no client could reach it without a path literal.
+  assert.equal(routes.auth.mfaVerify, '/api/auth/local/mfa/verify');
+});

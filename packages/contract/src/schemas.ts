@@ -70,13 +70,54 @@ export type SessionEnvelope = z.infer<typeof SessionEnvelope>;
 
 // ── Responses ─────────────────────────────────────────────────────────────
 
-/** POST /api/auth/local/login + /refresh, GET /api/auth/me. */
+/** POST /api/auth/local/refresh + /mfa/verify, GET /api/auth/me. */
 export const SessionResponse = z.object({ session: SessionEnvelope });
 export type SessionResponse = z.infer<typeof SessionResponse>;
 
-/** Back-compat alias — login response is a SessionResponse. */
-export const LoginResponse = SessionResponse;
-export type LoginResponse = SessionResponse;
+/**
+ * The OTHER outcome of `POST /api/auth/local/login`.
+ *
+ * The account holds a second factor, so the server sets NO cookies and returns
+ * no session. The caller posts `challengeToken` and the code back to
+ * `POST /api/auth/local/mfa/verify`, which issues the cookies this step withheld.
+ *
+ * ⚠️ Handle this branch before you enrol anybody. A client that reads only
+ * `session` sees `undefined` here, and that account cannot sign in again.
+ *
+ * The challenge travels in the body, never in a cookie. A half-authenticated
+ * credential in a cookie rides along on every unrelated request.
+ */
+export const MfaChallengeResponse = z.object({
+  mfaRequired: z.literal(true),
+  /** `totp` today. An email code is a second step, not a second factor. */
+  method: z.string(),
+  challengeToken: z.string(),
+  expiresInSeconds: z.number(),
+});
+export type MfaChallengeResponse = z.infer<typeof MfaChallengeResponse>;
+
+/**
+ * POST /api/auth/local/login — one of two shapes.
+ *
+ * Read `mfaRequired` to tell them apart. `mfaChallenged()` does that, and it
+ * narrows the type.
+ */
+export const LoginResponse = z.union([SessionResponse, MfaChallengeResponse]);
+export type LoginResponse = z.infer<typeof LoginResponse>;
+
+/** True when the login needs a second factor. Narrows `LoginResponse`. */
+export function mfaChallenged(res: LoginResponse): res is MfaChallengeResponse {
+  return 'mfaRequired' in res && res.mfaRequired === true;
+}
+
+/** POST /api/auth/local/mfa/verify. */
+export const VerifyMfaRequest = z.object({
+  challengeToken: z.string().min(1),
+  /** Exactly six digits. The server rejects anything else at the edge. */
+  code: z.string().regex(/^\d{6}$/, 'code must be 6 digits'),
+  remember: z.boolean().optional(),
+});
+export type VerifyMfaRequest = z.infer<typeof VerifyMfaRequest>;
 
 /** GET /api/me/merchants. */
 export const MeMerchantsResponse = z.object({ merchants: z.array(MerchantSummary) });
@@ -245,6 +286,9 @@ export const httpModels = {
   MerchantSummary,
   SessionEnvelope,
   SessionResponse,
+  MfaChallengeResponse,
+  LoginResponse,
+  VerifyMfaRequest,
   MeMerchantsResponse,
   OkResponse,
   GlobalLogoutRequest,

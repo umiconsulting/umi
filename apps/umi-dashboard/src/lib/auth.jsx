@@ -195,11 +195,26 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
+/**
+ * Sign in. The umi-api login route answers with ONE OF TWO shapes.
+ *
+ *   - No second factor → `{ session }`. Cookies are set, and this navigates.
+ *   - A second factor  → `{ mfaRequired: true, method, challengeToken,
+ *     expiresInSeconds }`. NO cookies, and no session. The caller must collect
+ *     the code and call `verifyMfaCode`.
+ *
+ * ⚠️ Read the outcome before you navigate. This function used to store
+ * `payload.session` and go to `/` whatever came back. On a challenge that stored
+ * `undefined` and bounced the person straight back to this screen, so an enrolled
+ * account could never sign in again.
+ *
+ * 'local' (server.js) and 'cookie' (umi-api) both POST the same login route. The
+ * difference is that umi-api sets an httpOnly cookie, which `withCreds` carries,
+ * while server.js uses the localStorage session id in `X-UMI-User-ID`. Either
+ * way we cache `session.*` for the UI. `remember` makes umi-api issue persistent
+ * cookies instead of session cookies.
+ */
 export async function signIn(email, password, remember = false) {
-  // 'local' (server.js) and 'cookie' (umi-api) both POST the same login route; the difference
-  // is umi-api sets an httpOnly cookie (withCreds sends/stores it) while server.js relies on the
-  // localStorage session id echoed as X-UMI-User-ID. Either way we cache session.* for the UI.
-  // `remember` makes umi-api issue persistent cookies (vs session cookies).
   if (LOCAL_SESSION) {
     const res = await fetch(
       apiUrl(routes.auth.login),
@@ -211,14 +226,61 @@ export async function signIn(email, password, remember = false) {
     );
     const payload = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(errMessage(payload, 'Credenciales incorrectas'));
-    setLocalSession(payload.session);
-    window.location.assign('/');
-    return payload.session;
+    if (isMfaChallenge(payload)) return payload;
+    return completeLocalSignIn(payload);
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
   return data.session;
+}
+
+/**
+ * Does this login answer ask for a second factor?
+ *
+ * The server sends the literal `true`. Test for it, and do not test for a truthy
+ * value: an error body with a `mfaRequired` string would then look like a
+ * challenge.
+ */
+export function isMfaChallenge(payload) {
+  return Boolean(payload) && payload.mfaRequired === true;
+}
+
+/**
+ * Store a session and go to the panel. Shared by both halves of the login.
+ *
+ * ⚠️ Do not navigate without a session. `setLocalSession(undefined)` writes the
+ * string "undefined" to localStorage, `/` finds no session, and the person lands
+ * back on the login screen with no message. Fail loudly instead.
+ */
+function completeLocalSignIn(payload) {
+  if (!payload || !payload.session) {
+    throw new Error('El servidor no devolvió una sesión. Inténtalo otra vez.');
+  }
+  setLocalSession(payload.session);
+  window.location.assign('/');
+  return payload.session;
+}
+
+/**
+ * Second half of the two-step login. Exchanges the challenge token and the code
+ * for the cookies the first half withheld.
+ *
+ * `remember` must match what the first half was given, so the choice survives
+ * the second step.
+ */
+export async function verifyMfaCode(challengeToken, code, remember = false) {
+  const res = await fetch(
+    apiUrl(routes.auth.mfaVerify),
+    withCreds({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challengeToken, code, remember }),
+    }),
+  );
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(errMessage(payload, 'Código incorrecto o vencido.'));
+  return completeLocalSignIn(payload);
 }
 
 export async function signOut() {
