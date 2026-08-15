@@ -681,6 +681,47 @@ product catalog was uncovered until the gate learned to reconstruct interpolated
 
 ---
 
+## 6b · The DDL freeze — two regimes, and the cutover between them
+
+**The cutover date is the boundary.** Before it, the schema changes by editing the
+numbered DDL files. After it, the schema changes by adding a forward migration.
+Nothing else changes about how the schema is built.
+
+| Regime                 | How the schema changes                                           | Why                                                                                                                                                               |
+| ---------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **BEFORE the cutover** | Edit `00_foundation.sql` … `90_rls.sql`.                         | No production database carries this schema. CI applies the DDL from scratch to an empty database on every round, so an edit is free and a migration is ceremony.  |
+| **AFTER the cutover**  | Add a file to `migrations/`. **Never edit a numbered DDL file.** | A production database carries the schema AND the data. An edit to the DDL changes what a NEW database gets, and does nothing to the one that holds the customers. |
+
+⚠️ Do not edit a numbered DDL file after the cutover, even to correct a mistake.
+The correction must reach the live database, and only a migration does that. The
+numbered files become a record of what was applied on cutover day, not a
+description of production.
+
+**The rules a migration must satisfy** are in
+[`migrations/README.md`](migrations/README.md). Two are enforced, and both were
+written after the file that broke them:
+
+1. **The same file applies twice.** `90_rls.sql` carried 21 `create policy` and
+   zero `drop policy`, so a second apply died with `policy "merchant_isolation"
+for table "merchant" already exists`. Every policy is now guarded, and CI
+   applies `90_rls.sql` and every migration **twice** on each round.
+2. **The append-only tables stay closed.** NINE tables refuse every UPDATE and
+   DELETE, and two of them hold money. A migration that must rewrite a row calls
+   `merchant.with_append_only_writable`, which restores the previous trigger state
+   on every path — including the path where the caller traps the error and
+   commits. A bare `alter table … disable trigger` leaves the table open when the
+   next statement fails, and `balance = SUM(delta)`, so a rewritten ledger row
+   changes a customer balance and leaves no record of the change.
+   `migration-shape.spec.ts` fails a migration that writes the bare form, or that
+   sets `session_replication_role`.
+
+**What is NOT proven by CI.** Each migration applies to the gate database, which
+holds the DDL and the RBAC seed and no customer rows. A migration that adds a
+`not null` column meets no rows there and passes. **Rehearse every migration
+against a populated copy** — the command list is in the README.
+
+---
+
 ## 7 · Re-run cadence
 
 - **Every schema / grant / backfill change:** `security_gate.sql` + `sql-preflight` + `check-values`

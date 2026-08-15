@@ -17,6 +17,88 @@ begin
     tg_table_schema, tg_table_name, tg_op;
 end $$;
 
+/*
+ * Run one statement against an append-only table, then close it again.
+ *
+ * A forward migration sometimes must rewrite a protected row. The append-only
+ * trigger refuses that, correctly, so the migration has to lift the guard.
+ *
+ * ⚠️ Do not write `alter table ... disable trigger` on its own. The statement
+ * after it can fail, and the table then stays writable with nothing to say so.
+ * `merchant.loyalty_stored_value_ledger` holds the money: `balance = SUM(delta)`,
+ * so a rewritten row changes a customer balance and leaves no record.
+ *
+ * This function is the safe form. It disables the trigger, runs the statement,
+ * and PUTS THE TRIGGER BACK THE WAY IT FOUND IT. All of that runs inside the
+ * caller transaction, and the `exception` block restores the trigger before it
+ * re-raises. That covers the caller who traps the error and commits anyway,
+ * which is the one case a rollback does not cover.
+ *
+ * It restores the PREVIOUS state, and does not simply enable. Two nested calls
+ * on one table then behave: the inner call gives back the disabled state the
+ * outer call created, instead of closing the table under it.
+ *
+ * The caller stays in charge of the transaction:
+ *
+ *   begin;
+ *   select merchant.with_append_only_writable(
+ *     'merchant.loyalty_stored_value_ledger',
+ *     $sql$ update merchant.loyalty_stored_value_ledger set ... $sql$);
+ *   commit;
+ *
+ * ⚠️ Do not add `security definer` to this function. It runs a statement the
+ * caller supplies. Without that clause the statement carries the caller
+ * privileges and this function grants nothing; with it, any caller who can
+ * execute this function gets the owner privileges for one arbitrary statement.
+ *
+ * WHICH TABLES. Only a table that carries a trigger running
+ * `merchant.tg_append_only` — nine of them today, and any added later, because
+ * the set comes from the catalog and not from a list here. A table with no such
+ * trigger raises. This cannot become a way to disable an arbitrary trigger.
+ *
+ * ⚠️ Schema-qualify every name inside `stmt`. `search_path` is pinned to
+ * `pg_catalog` for this function, and `stmt` runs under that path.
+ */
+create or replace function merchant.with_append_only_writable(target text, stmt text)
+  returns void
+  language plpgsql
+  set search_path = pg_catalog as $$
+declare
+  trigger_name text;
+  was_enabled  "char";
+begin
+  -- The catalog decides, not a list. `tgisinternal` excludes the triggers
+  -- Postgres creates for a constraint, which nobody may touch.
+  select t.tgname, t.tgenabled into trigger_name, was_enabled
+    from pg_trigger t
+   where t.tgrelid = target::regclass
+     and t.tgfoid = 'merchant.tg_append_only'::regproc
+     and not t.tgisinternal
+   limit 1;
+
+  if trigger_name is null then
+    raise exception
+      'with_append_only_writable: % carries no append-only trigger. Write the statement directly.', target;
+  end if;
+
+  execute format('alter table %s disable trigger %I', target, trigger_name);
+  begin
+    execute stmt;
+  exception when others then
+    if was_enabled <> 'D' then
+      execute format('alter table %s enable trigger %I', target, trigger_name);
+    end if;
+    raise;
+  end;
+  -- Restore, do not enable. A nested call must give back what it found.
+  if was_enabled <> 'D' then
+    execute format('alter table %s enable trigger %I', target, trigger_name);
+  end if;
+end $$;
+
+comment on function merchant.with_append_only_writable(text, text) is
+  'Run one statement against an append-only table with its guard lifted, inside the caller transaction. Restores the previous trigger state on every path.';
+
 -- ----------------------------------------------------------------------------
 -- ROOT
 -- ----------------------------------------------------------------------------

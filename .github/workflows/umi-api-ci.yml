@@ -200,6 +200,78 @@ jobs:
             src/modules/wallet/wallet-carry.integration.ts \
             src/shared/loyalty/loyalty-stamps.integration.ts
 
+      # THE RE-RUNNABLE RULE, proven rather than written down.
+      #
+      # After the cutover a schema change arrives as a file in migrations/, and it
+      # runs by hand against the database that holds the customers. A file that
+      # half-applies leaves a person reading a failed transcript.
+      #
+      # `90_rls.sql` is why this step exists. It carried 21 `create policy` and no
+      # `drop policy`, so a second apply died with `policy "merchant_isolation"
+      # for table "merchant" already exists`. Nothing tested a second apply.
+      #
+      # This runs as the DDL owner, which is why it is a CI step and not an
+      # integration test: the harness roles are least-privileged and cannot
+      # create a function in `umi`.
+      # The DDL freeze. Silent before the cutover, when there is no stamp and the
+      # numbered files are edited freely. After `freeze.sh freeze` it fails on any
+      # edit to a numbered file and names it. See `freeze.sh`.
+      - name: DDL freeze
+        run: docs/migration/build-v3/freeze.sh check
+
+      - name: Migrations and 90_rls apply TWICE (the re-runnable rule)
+        run: |
+          set -euo pipefail
+          before=$(psql -At -d "$GATE_DB" -c "select count(*) from pg_policies")
+
+          # ROWS. An empty database accepts a `not null` column with no default,
+          # and a populated one does not — so a migration tested only against an
+          # empty target passes here and fails in production. These are the
+          # smallest rows that exercise a merchant, a card and a money ledger.
+          psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" <<'SEED'
+          insert into merchant.merchant (id, name, handle)
+            values ('11111111-1111-1111-1111-111111111111','CI Rehearsal','ci-rehearsal')
+            on conflict (id) do nothing;
+          insert into merchant.customer (id, merchant_id, name)
+            values ('33333333-3333-3333-3333-333333333333','11111111-1111-1111-1111-111111111111','CI')
+            on conflict (id) do nothing;
+          insert into merchant.loyalty_card (id, merchant_id, customer_id)
+            values ('44444444-4444-4444-4444-444444444444','11111111-1111-1111-1111-111111111111','33333333-3333-3333-3333-333333333333')
+            on conflict (id) do nothing;
+          insert into merchant.loyalty_stored_value_ledger (merchant_id, card_id, delta, reason)
+            values ('11111111-1111-1111-1111-111111111111','44444444-4444-4444-4444-444444444444',500,'topup');
+          SEED
+
+          echo "== 90_rls.sql, second apply =="
+          psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f docs/migration/build-v3/90_rls.sql
+
+          # No --single-transaction: every statement in a migration is guarded, so
+          # the file does not need one, and `create index concurrently` cannot run
+          # inside a transaction.
+          for f in docs/migration/build-v3/migrations/*.sql; do
+            [ -e "$f" ] || { echo "no forward migrations yet"; break; }
+            echo "== $(basename "$f") =="
+            psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f "$f"
+            psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f "$f"
+          done
+
+          # A guarded re-apply REPLACES every policy and LOSES none.
+          #
+          # ⚠️ Count the policies; do not look for duplicates. `pg_policy` is
+          # unique on (polrelid, polname), so a duplicate cannot exist and a
+          # duplicate check can never fail. The real risk points the other way: a
+          # drop that names the wrong table removes a LIVE policy, and the count
+          # falls. That is a silent hole in merchant isolation.
+          after=$(psql -At -d "$GATE_DB" -c "select count(*) from pg_policies")
+          test "$after" = "$before" || {
+            echo "policy count changed across the re-apply: $before -> $after"
+            psql -d "$GATE_DB" -c "select schemaname, tablename, policyname from pg_policies order by 1,2,3"
+            exit 1
+          }
+          echo "policies stable across the re-apply: $after"
+
+          psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f docs/migration/build-v3/99_verify.sql
+
       # Runs LAST and unconditionally: one CI round should report every problem,
       # not stop at the first. A structural FAIL raises and exits non-zero; the
       # behavioral half prints SKIPPED with its reason and does not abort the file.
