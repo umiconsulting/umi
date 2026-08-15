@@ -1,10 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiUrl, withCreds, errMessage } from '@/lib/config.js';
-import { signIn } from '@/lib/auth.jsx';
+import { signIn, isMfaChallenge, verifyMfaCode } from '@/lib/auth.jsx';
 import '@/styles.css';
 
 const REMEMBER_KEY = 'umi.login.rememberedEmail';
+
+/**
+ * What to tell the person, for the method the server named.
+ *
+ * TWO methods ship. `10_umi.sql:75` permits `email_otp` and `totp`, and
+ * `email_otp` ships FIRST, because it needs no enrolment ceremony. A screen that
+ * names the authenticator application sends an email-code user to look in the
+ * wrong place.
+ *
+ * An unknown method gets neutral words rather than a guess.
+ */
+function mfaInstruction(method) {
+  if (method === 'email_otp') return 'Te enviamos un código de seis dígitos a tu correo.';
+  if (method === 'totp')
+    return 'Escribe el código de seis dígitos de tu aplicación de autenticación.';
+  return 'Escribe tu código de seis dígitos.';
+}
 
 /* ---- icons (match login-elegant.html) ---- */
 const WaveGlyph = () => (
@@ -119,10 +136,15 @@ const MailIcon = () => (
 
 export default function LoginScreen() {
   const navigate = useNavigate();
-  const [view, setView] = useState('login'); // 'login' | 'forgot' | 'sent'
+  const [view, setView] = useState('login'); // 'login' | 'mfa' | 'forgot' | 'sent'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [forgot, setForgot] = useState('');
+  // The half-authenticated challenge from the first login step. It is NOT a
+  // session: it opens no screen and carries no cookie. It lives in state only,
+  // so a reload throws it away and the person starts again.
+  const [challenge, setChallenge] = useState(null);
+  const [code, setCode] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
@@ -142,6 +164,23 @@ export default function LoginScreen() {
     }
   }, []);
 
+  // The challenge dies on the server after `expiresInSeconds`. Return to the
+  // login view at that moment and say so. Without this the field stays open over
+  // a dead token, every code is refused, and the message blames the code.
+  useEffect(() => {
+    if (view !== 'mfa' || !challenge) return undefined;
+    const ms = Number(challenge.expiresInSeconds) * 1000;
+    if (!isFinite(ms) || ms <= 0) return undefined;
+    const timer = setTimeout(() => {
+      setChallenge(null);
+      setCode('');
+      setPassword('');
+      setView('login');
+      setError('Tu código venció. Inicia sesión otra vez.');
+    }, ms);
+    return () => clearTimeout(timer);
+  }, [view, challenge]);
+
   const persistRemember = (addr) => {
     try {
       if (remember && addr) localStorage.setItem(REMEMBER_KEY, addr);
@@ -158,10 +197,33 @@ export default function LoginScreen() {
     try {
       const addr = email.trim();
       persistRemember(addr);
-      await signIn(addr, password, remember);
+      const outcome = await signIn(addr, password, remember);
+      // The account holds a second factor. There is no session yet, so do NOT
+      // navigate — ask for the code.
+      if (isMfaChallenge(outcome)) {
+        setChallenge(outcome);
+        setCode('');
+        setView('mfa');
+        return;
+      }
       navigate('/', { replace: true });
     } catch (err) {
       setError(err.message || 'Correo o contraseña incorrectos. Revísalos e inténtalo otra vez.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMfa = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      await verifyMfaCode(challenge.challengeToken, code.trim(), remember);
+      navigate('/', { replace: true });
+    } catch (err) {
+      setError(err.message || 'Código incorrecto o vencido.');
+      setCode('');
     } finally {
       setLoading(false);
     }
@@ -311,6 +373,47 @@ export default function LoginScreen() {
                 {alertBox}
                 {submitBtn('Entrar', 'Entrando…')}
               </form>
+            </section>
+          )}
+
+          {view === 'mfa' && (
+            <section className="login-view" key="mfa">
+              <h2>Verifica que eres tú</h2>
+              <p className="sub">{mfaInstruction(challenge && challenge.method)}</p>
+              <form onSubmit={handleMfa} noValidate>
+                <div className="field">
+                  <label htmlFor="login-mfa">Código</label>
+                  <input
+                    id="login-mfa"
+                    className="input tall"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="\d{6}"
+                    maxLength={6}
+                    placeholder="000000"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                    required
+                    autoFocus
+                  />
+                </div>
+                {alertBox}
+                {submitBtn('Verificar', 'Verificando…')}
+              </form>
+              <button
+                type="button"
+                className="btn btn-ghost login-back"
+                onClick={() => {
+                  // Drop the challenge. It is a credential, however short-lived.
+                  setChallenge(null);
+                  setCode('');
+                  setPassword('');
+                  go('login');
+                }}
+              >
+                <BackIcon /> Volver a iniciar sesión
+              </button>
             </section>
           )}
 

@@ -17,6 +17,8 @@ export { merchantBase };
 export const routes = {
   auth: {
     login: routePath('auth.login'),
+    /** Second half of the two-step login, when `login` answers `mfaRequired`. */
+    mfaVerify: routePath('auth.mfaVerify'),
     refresh: routePath('auth.refresh'),
     logout: routePath('auth.logout'),
     globalLogout: routePath('auth.globalLogout'),

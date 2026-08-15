@@ -105,7 +105,33 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     dart: null,
     contract: {
       request: 'LoginRequest',
+      // TWO shapes: `SessionResponse`, or `MfaChallengeResponse` when the account
+      // holds a second factor. `mfaChallenged()` tells them apart. This said
+      // `SessionResponse` and hid the second branch from every client.
+      response: 'LoginResponse',
+      auth: 'public',
+      permission: null,
+      idempotent: false,
+      merchantContext: false,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'AUTHENTICATION_REQUIRED', 'RATE_LIMITED'],
+    },
+  },
+  {
+    // The second half of the two-step login. The server has carried this route
+    // since the MFA port; the table never declared it, so no client could see it.
+    id: 'auth.mfaVerify',
+    method: 'POST',
+    path: '/api/auth/local/mfa/verify',
+    params: E,
+    dart: null,
+    contract: {
+      request: 'VerifyMfaRequest',
       response: 'SessionResponse',
+      // The challenge token IS the credential, and it travels in the body.
       auth: 'public',
       permission: null,
       idempotent: false,

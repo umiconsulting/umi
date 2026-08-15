@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "76109b14503bbfd423459e7172bdaf3ba5b2eb24d255f690152d36b71f90264f",
+  "contentHash": "3d2c368f2f6104ae808b152b5ddda7521f12d7a73c55dbfee6f2177faf942038",
   "contractVersion": "2.0.0",
   "definitions": {
     "AcknowledgeReconciliationRequest": {
@@ -6297,6 +6297,119 @@
       ],
       "type": "object"
     },
+    "LoginResponse": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "session": {
+              "additionalProperties": false,
+              "properties": {
+                "accessExpiresIn": {
+                  "type": "number"
+                },
+                "merchants": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "handle": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "roles": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "handle",
+                      "name",
+                      "roles"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "provider": {
+                  "const": "local",
+                  "type": "string"
+                },
+                "user": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "displayName": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "email",
+                    "displayName"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "user",
+                "merchants",
+                "provider",
+                "accessExpiresIn"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "session"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "challengeToken": {
+              "type": "string"
+            },
+            "expiresInSeconds": {
+              "type": "number"
+            },
+            "method": {
+              "type": "string"
+            },
+            "mfaRequired": {
+              "const": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "mfaRequired",
+            "method",
+            "challengeToken",
+            "expiresInSeconds"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "ManagerApprovalRequest": {
       "additionalProperties": false,
       "properties": {
@@ -6656,6 +6769,31 @@
         "timezone",
         "locale",
         "currency"
+      ],
+      "type": "object"
+    },
+    "MfaChallengeResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "challengeToken": {
+          "type": "string"
+        },
+        "expiresInSeconds": {
+          "type": "number"
+        },
+        "method": {
+          "type": "string"
+        },
+        "mfaRequired": {
+          "const": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "mfaRequired",
+        "method",
+        "challengeToken",
+        "expiresInSeconds"
       ],
       "type": "object"
     },
@@ -15070,6 +15208,27 @@
       ],
       "type": "object"
     },
+    "VerifyMfaRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "challengeToken": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "code": {
+          "pattern": "^\\d{6}$",
+          "type": "string"
+        },
+        "remember": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "challengeToken",
+        "code"
+      ],
+      "type": "object"
+    },
     "VerifyOperatorPinRequest": {
       "additionalProperties": false,
       "properties": {
@@ -15743,7 +15902,7 @@
       "permission": null,
       "pin": false,
       "request": "LoginRequest",
-      "response": "SessionResponse"
+      "response": "LoginResponse"
     },
     "POST /api/auth/local/logout": {
       "approval": false,
@@ -15757,6 +15916,23 @@
       "pin": false,
       "request": null,
       "response": "OkResponse"
+    },
+    "POST /api/auth/local/mfa/verify": {
+      "approval": false,
+      "auth": "public",
+      "errors": [
+        "VALIDATION_FAILED",
+        "AUTHENTICATION_REQUIRED",
+        "RATE_LIMITED"
+      ],
+      "idempotent": false,
+      "locationContext": false,
+      "merchantContext": false,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "VerifyMfaRequest",
+      "response": "SessionResponse"
     },
     "POST /api/auth/local/refresh": {
       "approval": false,

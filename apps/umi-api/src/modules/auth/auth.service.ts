@@ -37,7 +37,14 @@ export interface MfaChallengeResult {
 
 export type LoginOutcome = LoginResult | MfaChallengeResult;
 
-/** Narrow a login outcome without reaching for `in` at every call site. */
+/**
+ * Narrow a login outcome, before it becomes a response body.
+ *
+ * This one tests only for the KEY, because it reads a value this process built
+ * and the type set the literal. `mfaChallenged` in `@umi/contract` reads a parsed
+ * HTTP body, which nothing here produced, so it compares against `true`. Keep
+ * that difference: a wire predicate must not trust a key alone.
+ */
 export function isMfaChallenge(outcome: LoginOutcome): outcome is MfaChallengeResult {
   return 'mfaRequired' in outcome;
 }

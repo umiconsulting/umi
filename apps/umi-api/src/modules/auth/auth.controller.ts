@@ -26,7 +26,11 @@ import {
   REMEMBER_COOKIE,
   type AuthUser,
 } from './auth.types';
-import type { SessionEnvelope, SessionResponse } from '@umi/contract';
+import type {
+  SessionEnvelope,
+  SessionResponse,
+  MfaChallengeResponse as MfaChallenge,
+} from '@umi/contract';
 import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -46,18 +50,6 @@ import { VerifyMfaDto } from './dto/verify-mfa.dto';
 const AUTH_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_MAX_PER_WINDOW = 20;
 const MFA_VERIFY_MAX_PER_WINDOW = 20;
-
-/**
- * Login's other outcome. Not in `@umi/contract` yet on purpose — the dashboard has to
- * learn this shape before an enrolment can safely exist, and promoting it to the
- * shared contract is the change that pairs with the client work.
- */
-export interface MfaChallengeResponse {
-  mfaRequired: true;
-  method: string;
-  challengeToken: string;
-  expiresInSeconds: number;
-}
 
 /**
  * Auth ingress (D9). Issues/clears the httpOnly JWT cookies and returns the
@@ -89,10 +81,12 @@ export class AuthController {
    *   - A second factor enrolled → NO cookies, no session. The body carries
    *     `mfaRequired: true` and a challenge token to post back to `mfa/verify`.
    *
-   * This is a shape change for the dashboard, and it is inert until somebody enrols:
-   * `umi.user.mfa_method` is NULL for every row today, so the second branch is
-   * unreachable until an enrolment writes it. Enrol only after the client can read
-   * `mfaRequired`, or that account is locked out of the dashboard.
+   * The shape lives in `@umi/contract` as `MfaChallengeResponse`, and the dashboard
+   * reads it. `umi.user.mfa_method` is NULL for every row today, so the second
+   * branch is unreachable until an enrolment writes it.
+   *
+   * ⚠️ Check that a client reads `mfaRequired` before you enrol its users. A client
+   * that reads only `session` stores nothing, and that account cannot sign in.
    */
   @Public()
   @Post('local/login')
@@ -100,7 +94,7 @@ export class AuthController {
     @Body() dto: LoginDto,
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
-  ): Promise<SessionResponse | MfaChallengeResponse> {
+  ): Promise<SessionResponse | MfaChallenge> {
     this.throttle(reply, `auth:login:${clientIp(req)}`, LOGIN_MAX_PER_WINDOW);
     const result = await this.auth.login(dto.username, dto.password);
     if (isMfaChallenge(result)) {
