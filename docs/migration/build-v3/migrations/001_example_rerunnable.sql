@@ -2,9 +2,8 @@
 -- 001 · The shape every forward migration takes.
 --
 -- This one changes nothing. It exists so the rule is executable rather than
--- written down: `migration-rerun.integration.ts` applies every file in this
--- directory twice, and an empty directory would let that suite report green
--- while it tested nothing.
+-- written down: CI applies every file in this directory twice, and an empty
+-- directory would let that step report green while it ran nothing.
 --
 -- Copy this file to start a real migration. Keep the four properties below.
 -- ============================================================================
@@ -21,21 +20,25 @@ create schema if not exists merchant;
 --     here: `create index concurrently` cannot run inside a transaction, and a
 --     file that opens one takes that option away from its own author.
 --
---     Run it as:  psql -v ON_ERROR_STOP=1 --single-transaction -f 001_....sql
+--     Run it as:  psql -v ON_ERROR_STOP=1 -f 001_....sql
+--
+--     No `--single-transaction`. Every statement here is guarded, so a partial
+--     apply is safe to repeat, and `create index concurrently` stays available.
 -- ---------------------------------------------------------------------------
 
 -- ---------------------------------------------------------------------------
--- 3 · THE APPEND-ONLY LEDGERS. `merchant.loyalty_stored_value_ledger` and
---     `merchant.loyalty_gift_card_ledger` refuse every UPDATE and DELETE.
+-- 3 · THE APPEND-ONLY TABLES. Nine tables refuse every UPDATE and DELETE, and
+--     two of them hold money. Read the list from the catalog; see the README.
 --
---     ⚠️ Use `merchant.with_ledger_writable` to rewrite a ledger row. Do not
---     write a bare `alter table ... disable trigger`: a failure after it leaves
---     the ledger open, and `balance = SUM(delta)`, so a rewritten row changes a
---     customer's money and leaves no record.
+--     ⚠️ Use `merchant.with_append_only_writable` to rewrite a protected row. Do
+--     not write a bare `alter table ... disable trigger`, and do not set
+--     `session_replication_role`: a failure after either one leaves the table
+--     open. `balance = SUM(delta)`, so a rewritten ledger row changes a customer
+--     balance and leaves no record.
 --
 --     The form, which this file does not run because it changes nothing:
 --
---       select merchant.with_ledger_writable(
+--       select merchant.with_append_only_writable(
 --         'merchant.loyalty_stored_value_ledger',
 --         $sql$ update merchant.loyalty_stored_value_ledger
 --                  set note = 'corrected' where id = '...' $sql$);

@@ -47,32 +47,50 @@ drop it first, then create it. That file used to fail on a second apply with
 accepts a `not null` column with no default. A populated one does not. Test
 against a copy that holds rows.
 
-**3 · Handle the append-only ledgers.** Two tables refuse every UPDATE and DELETE:
+**3 · Handle the append-only tables.** **NINE** tables refuse every UPDATE and
+DELETE. Read the list from the database, because the list here would rot:
 
-| Table                                  | Trigger                           | Where                 |
-| -------------------------------------- | --------------------------------- | --------------------- |
-| `merchant.loyalty_stored_value_ledger` | `stored_value_ledger_append_only` | `20_merchant.sql:597` |
-| `merchant.loyalty_gift_card_ledger`    | `gift_card_ledger_append_only`    | `20_merchant.sql:740` |
+```sql
+select c.relname, t.tgname
+  from pg_trigger t
+  join pg_class c on c.oid = t.tgrelid
+ where t.tgfoid = 'merchant.tg_append_only'::regproc and not t.tgisinternal
+ order by 1;
+```
 
-A migration that rewrites rows in either one must disable the trigger and enable
-it again IN THE SAME TRANSACTION. Use the helper:
+Today: the two money ledgers (`loyalty_stored_value_ledger`,
+`loyalty_gift_card_ledger`), plus `audit_event`, `audit_event_internal`,
+`financial_event`, `receipt_snapshot`, `pos_committed_sale`,
+`offline_replay_command`, and `offline_provisional_mapping`.
+
+A migration that rewrites a row in any of them must disable the trigger and
+enable it again IN THE SAME TRANSACTION. Use the helper:
 
 ```sql
 begin;
-select merchant.with_ledger_writable(
+select merchant.with_append_only_writable(
   'merchant.loyalty_stored_value_ledger',
   $sql$ update merchant.loyalty_stored_value_ledger set ... $sql$
 );
 commit;
 ```
 
-⚠️ Do not disable a trigger with a bare `alter table ... disable trigger`. If the
-statement after it fails, and you are not in a transaction, the ledger stays
-writable. `with_ledger_writable` runs inside one transaction, so a failure rolls
-the disable back with everything else.
+⚠️ Do not disable a trigger with a bare `alter table ... disable trigger`, and do
+not set `session_replication_role = replica`. The statement after either one can
+fail, and the table then stays writable with nothing to say so. The second is
+worse: it silences EVERY trigger in the session.
 
-The money is in these two tables. `balance = SUM(delta)`, so a rewritten row
-changes a customer's balance and leaves no record that it changed.
+`with_append_only_writable` restores the previous trigger state on every path,
+including the path where the caller traps the error and commits. It accepts only
+a table that carries an append-only trigger, and it reads that from the catalog,
+so a table added later is covered without an edit here.
+
+Two of the nine hold money. `balance = SUM(delta)`, so a rewritten ledger row
+changes a customer balance and leaves no record of the change.
+
+**4 · Carry your own backfill.** A `not null` column needs a value for every row
+that already exists. Add the column, fill it, then add the constraint — three
+statements, all guarded, in one file.
 
 ## What to run before you commit a migration
 
@@ -84,6 +102,8 @@ createdb umi_mig_test && docs/migration/build-v3/00_run.sh umi_mig_test
 psql -d umi_mig_test -f <a seed or a production-shaped sample>
 
 # 3. The migration, TWICE. Both must succeed.
+#    No --single-transaction: every statement is guarded, so the file does not
+#    need one, and `create index concurrently` cannot run inside a transaction.
 psql -v ON_ERROR_STOP=1 -d umi_mig_test -f docs/migration/build-v3/migrations/NNN_*.sql
 psql -v ON_ERROR_STOP=1 -d umi_mig_test -f docs/migration/build-v3/migrations/NNN_*.sql
 
@@ -92,6 +112,11 @@ psql -v ON_ERROR_STOP=1 -d umi_mig_test -f docs/migration/build-v3/99_verify.sql
 psql -v ON_ERROR_STOP=1 -d umi_mig_test -f docs/migration/build-v3/security_gate.sql
 ```
 
-`migration-rerun.integration.ts` runs steps 3 and 4 for every file in this
-directory, in the `gate` CI job. A migration that is not re-runnable fails the
-build.
+**What CI does for you, and what it does not.**
+
+The `gate` job applies every file here TWICE, against a database that carries
+rows, then runs `99_verify.sql` and `security_gate.sql`. `migration-shape.spec.ts`
+checks the shape with no database, on every pull request.
+
+⚠️ Rehearse against a copy of PRODUCTION anyway. The CI database holds a few
+seeded rows, not your data, and a migration meets its real cases only there.

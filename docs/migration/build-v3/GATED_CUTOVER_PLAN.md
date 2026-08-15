@@ -705,14 +705,15 @@ written after the file that broke them:
    zero `drop policy`, so a second apply died with `policy "merchant_isolation"
 for table "merchant" already exists`. Every policy is now guarded, and CI
    applies `90_rls.sql` and every migration **twice** on each round.
-2. **The append-only ledgers stay closed.** `merchant.loyalty_stored_value_ledger`
-   and `merchant.loyalty_gift_card_ledger` refuse every UPDATE and DELETE. A
-   migration that must rewrite a row calls `merchant.with_ledger_writable`, which
-   re-enables the guard on the failure path as well as the success path. A bare
-   `alter table … disable trigger` leaves the ledger open when the next statement
-   fails, and `balance = SUM(delta)` — so a rewritten row changes a customer's
-   money and leaves no record of the change. `migration-shape.spec.ts` fails a
-   migration that writes the bare form.
+2. **The append-only tables stay closed.** NINE tables refuse every UPDATE and
+   DELETE, and two of them hold money. A migration that must rewrite a row calls
+   `merchant.with_append_only_writable`, which restores the previous trigger state
+   on every path — including the path where the caller traps the error and
+   commits. A bare `alter table … disable trigger` leaves the table open when the
+   next statement fails, and `balance = SUM(delta)`, so a rewritten ledger row
+   changes a customer balance and leaves no record of the change.
+   `migration-shape.spec.ts` fails a migration that writes the bare form, or that
+   sets `session_replication_role`.
 
 **What is NOT proven by CI.** Each migration applies to the gate database, which
 holds the DDL and the RBAC seed and no customer rows. A migration that adds a

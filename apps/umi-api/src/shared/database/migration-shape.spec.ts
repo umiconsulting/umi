@@ -40,10 +40,20 @@ const MIGRATIONS_DIR = join(BUILD_V3, 'migrations');
  * SQL has two comment forms and no backtick string.
  */
 function sqlCode(text: string): string {
-  return text
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+  const noBlocks = text.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  return noBlocks
     .split('\n')
-    .map((line) => line.replace(/--.*$/, ''))
+    .map((line) => {
+      // A `--` inside a string is text, not a comment. Walk the line and track
+      // the quote instead of cutting at the first `--`, which would truncate a
+      // statement and hide whatever followed.
+      let quoted = false;
+      for (let i = 0; i < line.length; i++) {
+        if (line[i] === "'") quoted = !quoted;
+        else if (!quoted && line[i] === '-' && line[i + 1] === '-') return line.slice(0, i);
+      }
+      return line;
+    })
     .join('\n');
 }
 
@@ -58,31 +68,45 @@ function migrationFiles(): string[] {
   }
 }
 
-/** Statements that create something, paired with the guard each one needs. */
-const GUARDS: ReadonlyArray<{ what: RegExp; needs: RegExp; fix: string }> = [
-  {
-    what: /create policy (\w+) on/gi,
-    needs: /drop policy if exists \w+ on/gi,
-    fix: '`create policy` has no `if not exists`. Write `drop policy if exists NAME on TABLE;` first.',
-  },
-];
+/**
+ * Every `create policy` in the text, with the policy name and the table.
+ *
+ * ⚠️ Match across a line break. A statement written as `create policy\n  name on
+ * table` is the same statement, and a pattern anchored to one line does not see
+ * it. An unguarded policy would then keep the counts equal and pass.
+ */
+const CREATE_POLICY = /create\s+policy\s+(\w+)\s+on\s+([\w.%]+)/gi;
+const DROP_POLICY = /drop\s+policy\s+if\s+exists\s+(\w+)\s+on\s+([\w.%]+)/gi;
+
+/** The (policy, table) pairs a pattern finds, as `name@table`. */
+function pairs(sql: string, re: RegExp): string[] {
+  return [...sql.matchAll(re)].map((m) => `${m[1].toLowerCase()}@${m[2].toLowerCase()}`);
+}
 
 describe('90_rls.sql · re-runnable by construction', () => {
   const sql = readFileSync(join(BUILD_V3, '90_rls.sql'), 'utf8');
 
-  it('guards every `create policy` with a drop', () => {
-    for (const guard of GUARDS) {
-      const creates = sql.match(guard.what) ?? [];
-      const drops = sql.match(guard.needs) ?? [];
-      expect(creates.length, 'the file must still create policies').toBeGreaterThan(0);
-      expect(drops.length, guard.fix).toBe(creates.length);
-    }
+  it('guards every `create policy` with a drop OF THE SAME POLICY ON THE SAME TABLE', () => {
+    // Counting is not enough. 21 drops that all name the wrong table would keep
+    // the totals equal, remove live policies, and still let the second apply
+    // fail. Bind each create to a drop by name AND table.
+    const creates = pairs(sql, CREATE_POLICY);
+    const drops = new Set(pairs(sql, DROP_POLICY));
+    expect(creates.length, 'the file must still create policies').toBe(21);
+    const unguarded = creates.filter((c) => !drops.has(c));
+    expect(
+      unguarded,
+      '`create policy` has no `if not exists`. Write `drop policy if exists NAME on TABLE;` first.',
+    ).toEqual([]);
   });
 
   it('guards the DYNAMIC policies too, the ones built inside `execute format`', () => {
-    // Four policies are built by a loop over a table list. A guard written only
-    // for the statements a reader can see would leave those four unprotected,
-    // and they cover every merchant table with a `merchant_id`.
+    // Four policies are built by a loop, so a reader does not see them as
+    // statements. A guard written only for the visible ones leaves these four
+    // unprotected. They are the broadest policies in the file: two sweep the
+    // merchant tables (by `merchant_id`, and by parent for the child tables),
+    // one sweeps every table with a `location_id`, and one covers the named
+    // device tables.
     const dynamicCreates = sql.match(/execute format\(\$f\$create policy/g) ?? [];
     const dynamicDrops = sql.match(/execute format\('drop policy if exists/g) ?? [];
     expect(dynamicCreates.length).toBeGreaterThan(0);
@@ -155,14 +179,20 @@ describe('forward migrations · the shape every file must take', () => {
       });
 
       it('does NOT disable an append-only trigger by hand', () => {
-        // `merchant.with_ledger_writable` is the safe form: it re-enables the
+        // `merchant.with_append_only_writable` is the safe form. It restores the
         // trigger on the failure path as well as the success path. A bare
-        // `disable trigger` leaves the ledger open when the next statement
-        // fails, and the money lives in those two tables.
-        const bare = sql.match(/alter table[^;]*disable trigger/gi) ?? [];
+        // `disable trigger` leaves the table open when the next statement fails,
+        // and two of the nine protected tables hold money.
+        // `session_replication_role = replica` is the OTHER way to silence a
+        // trigger, and it silences EVERY trigger in the session at once. It is
+        // worse than the bare disable, not better.
+        const bypasses = [
+          ...(sql.match(/alter\s+table[^;]*disable\s+trigger/gi) ?? []),
+          ...(sql.match(/session_replication_role\s*=\s*'?replica/gi) ?? []),
+        ];
         expect(
-          bare,
-          'use merchant.with_ledger_writable — see docs/migration/build-v3/migrations/README.md',
+          bypasses,
+          'use merchant.with_append_only_writable — see docs/migration/build-v3/migrations/README.md',
         ).toEqual([]);
       });
     });
