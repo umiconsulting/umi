@@ -56,7 +56,11 @@ export class ApplePushService {
    */
   async pushCard(cardId: string): Promise<{ sent: number; failed: number }> {
     if (!this.isConfigured()) {
-      this.logger.debug(`apn_not_configured card=${cardId}`);
+      // WARN, not debug. A production log level does not print debug, so an
+      // unconfigured APNs was invisible: every push returned "sent 0" and
+      // nothing anywhere said why. The pass stays installed and stops updating,
+      // which is the one failure mode of this module that no gate can see.
+      this.logger.warn(`apn_not_configured card=${cardId}`);
       return { sent: 0, failed: 0 };
     }
     const token = await this.providerToken();

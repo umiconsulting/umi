@@ -48,7 +48,9 @@ export default tseslint.config(
         // `tsconfig.json` includes only `src/**/*`, so the root-level vitest
         // config has no project to be type-checked against. Lint it against the
         // default project rather than excluding it — it is real code.
-        projectService: { allowDefaultProject: ['vitest.integration.config.ts'] },
+        projectService: {
+          allowDefaultProject: ['vitest.config.ts', 'vitest.integration.config.ts'],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },

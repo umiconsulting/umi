@@ -265,6 +265,55 @@ export class WalletPassRepository {
   }
 
   /**
+   * PASS HEALTH — the standing detector for the silent failure.
+   *
+   * An Apple pass that stops updating never reports an error. It stays
+   * installed, it opens, and its barcode scans; only the number goes stale.
+   * Four failure paths log and none of them counts, so the only way to see the
+   * class is to ask the database how many passes look abandoned.
+   *
+   * Two different questions, deliberately kept apart:
+   *
+   *   `unregistered` — a pass that exists with NO device registration. The
+   *     phone never completed the handshake, so no push can ever reach it.
+   *
+   *   `stale` — a pass whose device IS registered, but whose card has not
+   *     changed in `staleDays`. On its own this is not a fault: a customer who
+   *     has not visited has nothing to update. It is a TREND to read, not an
+   *     alarm to fire, and it is the number that moves when a token breaks.
+   *
+   * Scoped to Apple: Google needs no registration and its update is a PATCH.
+   */
+  async passHealth(
+    staleDays = 30,
+  ): Promise<{ total: number; unregistered: number; stale: number }> {
+    const { rows } = await this.pg.query<{
+      total: string;
+      unregistered: string;
+      stale: string;
+    }>(
+      `SELECT count(*)                                              AS total,
+              count(*) FILTER (WHERE d.wallet_pass_id IS NULL)      AS unregistered,
+              count(*) FILTER (WHERE d.wallet_pass_id IS NOT NULL
+                                 AND c.updated_at < now() - ($1 || ' days')::interval) AS stale
+         FROM merchant.loyalty_wallet_pass AS wp
+         JOIN merchant.loyalty_card AS c ON c.id = wp.card_id
+         LEFT JOIN LATERAL (
+           SELECT 1 AS wallet_pass_id FROM runtime.pass_device pd
+            WHERE pd.wallet_pass_id = wp.id LIMIT 1
+         ) AS d ON true
+        WHERE wp.platform = 'apple' AND wp.status = 'active'`,
+      [String(staleDays)],
+    );
+    const r = rows[0];
+    return {
+      total: Number(r.total),
+      unregistered: Number(r.unregistered),
+      stale: Number(r.stale),
+    };
+  }
+
+  /**
    * Everything the pass builder needs, for one card.
    *
    * The geofences are the part that fails silently. `locations` is rebuilt on
@@ -295,6 +344,10 @@ export class WalletPassRepository {
                 p.promo_ends_at           AS promo_ends_at,
                 p.promo_days              AS promo_days,
                 p.topup_enabled           AS topup_enabled,
+                -- Both builders read this (google-pass.service.ts:249,
+                -- apple-pass.builder.ts:265). Omitting it here is why the
+                -- Android reward line was empty after the port.
+                p.birthday_reward_name    AS birthday_reward_name,
                 r.name                    AS reward_name
          FROM merchant.loyalty_card AS c
          JOIN merchant.merchant AS m ON m.id = c.merchant_id
@@ -339,6 +392,7 @@ export class WalletPassRepository {
       promoMessage: activePromo(h),
       topupEnabled: h.topup_enabled ?? true,
       rewardName: h.reward_name,
+      birthdayRewardName: h.birthday_reward_name,
       state: s,
       locations: locations.rows.map((l) => ({
         latitude: Number(l.lat),
@@ -360,6 +414,15 @@ export interface AuthenticatedPass {
   cardUpdatedAt: Date;
 }
 
+/** What `passHealth` counts. Two questions, never added together. */
+export interface PassHealth {
+  total: number;
+  /** Passes with NO device registration. No push can ever reach them. */
+  unregistered: number;
+  /** Registered passes whose card has not changed in `staleDays`. A trend, not an alarm. */
+  stale: number;
+}
+
 export interface PassRenderData {
   merchantName: string;
   merchantHandle: string | null;
@@ -378,6 +441,7 @@ export interface PassRenderData {
   promoMessage: string | null;
   topupEnabled: boolean;
   rewardName: string | null;
+  birthdayRewardName: string | null;
   state: LoyaltyCardState;
   locations: { latitude: number; longitude: number }[];
 }
@@ -412,6 +476,7 @@ interface PassHeadRow {
   promo_days: string | null;
   topup_enabled: boolean | null;
   reward_name: string | null;
+  birthday_reward_name: string | null;
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────

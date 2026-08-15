@@ -130,6 +130,9 @@ export class WalletPassService {
       pendingRewards: d.state.pending_rewards,
       totalVisits: d.state.total_visits,
       rewardName: d.rewardName ?? DEFAULT_REWARD_NAME,
+      // Both builders read this. Drop it here and the reward line
+      // disappears from the pass, with no error anywhere.
+      birthdayRewardName: d.birthdayRewardName,
       memberSince: d.memberSince,
       topupEnabled: d.topupEnabled,
       lifecycleMessage: d.lifecycleMessage,
@@ -163,6 +166,7 @@ export class WalletPassService {
       visitsRequired: data.state.visits_required,
       totalVisits: data.state.total_visits,
       rewardName: data.rewardName ?? DEFAULT_REWARD_NAME,
+      birthdayRewardName: data.birthdayRewardName,
       passStyle: data.passStyle,
       primaryColor: data.primaryColor,
       secondaryColor: data.secondaryColor,

@@ -41,6 +41,7 @@ const RENDER: PassRenderData = {
   promoMessage: null,
   topupEnabled: true,
   rewardName: 'Café gratis',
+  birthdayRewardName: 'Rebanada de pastel',
   state: {
     card_number: 'KLC-4076462081',
     total_visits: 23,
@@ -115,5 +116,34 @@ describe('WalletPassService.renderPass', () => {
     const { service, build } = makeService(null);
     await expect(service.renderPass(PASS)).rejects.toThrow();
     expect(build).not.toHaveBeenCalled();
+  });
+});
+
+describe('WalletPassService · the birthday reward line', () => {
+  /**
+   * THE SEAM THAT MATTERS. The bug this guards was NOT in the repository and not
+   * in the builder — both were correct. It was the WIRING between them: the
+   * service read the render data and rebuilt the builder input field by field,
+   * and it simply never copied this one across.
+   *
+   * A repository test goes green on that bug, because the repository returns the
+   * value. A builder test goes green too, because the builder renders whatever
+   * it is handed. Only a test at the service sees the field fall on the floor.
+   */
+  it('passes the birthday reward name from the render data to the builder', async () => {
+    const { service, build } = makeService();
+    await service.renderPass(PASS);
+    const passed: ApplePassData = build.mock.calls[0][0];
+    expect(passed.birthdayRewardName).toBe(RENDER.birthdayRewardName);
+  });
+
+  it('passes null through rather than inventing a default', async () => {
+    // A cafe with no birthday reward must render NO reward row. A default here
+    // would put a line on every pass for a reward that does not exist.
+    const { service, build, repo } = makeService();
+    repo.renderData.mockResolvedValueOnce({ ...RENDER, birthdayRewardName: null });
+    await service.renderPass(PASS);
+    const passed: ApplePassData = build.mock.calls[0][0];
+    expect(passed.birthdayRewardName).toBeNull();
   });
 });

@@ -39,6 +39,16 @@ ENV NODE_ENV=production
 COPY --from=build /out/dist ./dist
 COPY --from=build /out/node_modules ./node_modules
 COPY --from=build /out/package.json ./package.json
+# The Apple pass template.
+# PKPass.from() reads it at render time. apple-pass.builder.ts resolves
+# TEMPLATE_ROOT from process.cwd(), which is /app here.
+# Without this line, /app/passes/apple/template.pass does not exist.
+# Every Apple pass render then throws, at issue time and at each refresh.
+# No test finds this, because no test signs a real pass.
+#
+# Keep this line and the "files" list in package.json together.
+# The list puts passes/ into /out. This line puts it into the image.
+COPY --from=build /out/passes ./passes
 RUN chown -R node:node /app
 USER node
 # docker-compose overrides this for the worker process (node dist/worker.js).

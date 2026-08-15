@@ -1,4 +1,5 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig, mergeConfig } from 'vitest/config';
+import base from './vitest.config';
 
 /**
  * Live-DB integration suite (closes gate item H1). Separate from the default
@@ -14,14 +15,17 @@ import { defineConfig } from 'vitest/config';
  * The default `vitest run` ignores these files (`.integration.ts` matches neither
  * the `.spec.` nor `.test.` default globs), so mocked units stay DB-free.
  */
-export default defineConfig({
-  test: {
-    include: ['src/**/*.integration.ts'],
-    testTimeout: 20_000,
-    hookTimeout: 30_000,
-    // One shared database — serialize so RLS/GUC state never overlaps across files.
-    fileParallelism: false,
-    pool: 'forks',
-    poolOptions: { forks: { singleFork: true } },
-  },
-});
+export default mergeConfig(
+  base,
+  defineConfig({
+    test: {
+      include: ['src/**/*.integration.ts'],
+      testTimeout: 20_000,
+      hookTimeout: 30_000,
+      // One shared database — serialize so RLS/GUC state never overlaps across files.
+      fileParallelism: false,
+      pool: 'forks',
+      poolOptions: { forks: { singleFork: true } },
+    },
+  }),
+);
