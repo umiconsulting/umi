@@ -347,8 +347,10 @@ export class CashScanService {
     });
 
     // Rewards THIS action minted: how many thresholds the credit crossed from
-    // where the cycle stood. max(1) guards a mis-set config from dividing by zero.
-    const required = Math.max(1, credited.visitsRequired);
+    // where the cycle stood. No divide-by-zero guard, because there is nothing
+    // left to guard — the threshold arrives from the derived-state query, which
+    // took the same modulo first and would have raised before returning.
+    const required = credited.visitsRequired;
     const rewardsEarned = credited.replayed
       ? 0
       : Math.floor((credited.cycleBefore + input.seals) / required);
@@ -370,10 +372,17 @@ export class CashScanService {
   }
 
   private composeSealsMessage(seals: number, rewardsEarned: number, replayed: boolean): string {
-    const sealWord = seals === 1 ? 'sello' : 'sellos';
-    if (replayed) return `Estos ${sealWord} ya se habían registrado`;
+    const one = seals === 1;
+    const sealWord = one ? 'sello' : 'sellos';
+    // umi-cash says "Estos sello ya se habían registrado" for a credit of one.
+    // The determiner and the verb have to agree with the noun, so they do here.
+    if (replayed) {
+      return one
+        ? 'Este sello ya se había registrado'
+        : `Estos ${sealWord} ya se habían registrado`;
+    }
 
-    let message = `${seals} ${sealWord} agregado${seals === 1 ? '' : 's'}`;
+    let message = `${seals} ${sealWord} agregado${one ? '' : 's'}`;
     if (rewardsEarned > 0) {
       const plural = rewardsEarned === 1 ? '' : 's';
       message += ` · ¡${rewardsEarned} recompensa${plural} ganada${plural}!`;

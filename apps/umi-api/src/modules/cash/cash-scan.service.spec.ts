@@ -447,6 +447,27 @@ describe('CashScanService.seals', () => {
     expect(r.message).toBe('Estos sellos ya se habían registrado');
   });
 
+  it('agrees with the noun when a replayed credit was one seal', async () => {
+    h.repo.creditSeals.mockResolvedValue({
+      replayed: true,
+      cycleBefore: 1,
+      visitsRequired: 10,
+      card: {
+        total_visits: 4,
+        visits_this_cycle: 4,
+        pending_rewards: 0,
+        balance_cents: 0,
+        visits_required: 10,
+        card_number: 'KAL-1',
+      },
+    });
+
+    const r = await h.svc.seals('t1', 'u1', { cardId: 'card-uuid', seals: 1, idempotencyKey: 'k' });
+
+    // umi-cash says "Estos sello", which is not Spanish.
+    expect(r.message).toBe('Este sello ya se había registrado');
+  });
+
   it('refreshes the wallet pass so the customer sees the new stamps', async () => {
     await h.svc.seals('t1', 'u1', { cardId: 'card-uuid', seals: 8 });
 
