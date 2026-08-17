@@ -15,6 +15,9 @@ import { CashCustomerController } from './cash-customer.controller';
 import { CashRegisterService } from './cash-register.service';
 import { CashRegisterRepository } from './cash-register.repository';
 import { CustomerSessionService } from './customer-session.service';
+import { CashCardController } from './cash-card.controller';
+import { CashCardService } from './cash-card.service';
+import { CashCardRepository } from './cash-card.repository';
 
 /**
  * Cash domain — reads (analytics, customers, gift-cards) + live customer-facing
@@ -32,6 +35,7 @@ import { CustomerSessionService } from './customer-session.service';
     CashWriteController,
     CashScanController,
     CashCustomerController,
+    CashCardController,
   ],
   providers: [
     CashReadService,
@@ -43,6 +47,8 @@ import { CustomerSessionService } from './customer-session.service';
     CashRegisterService,
     CashRegisterRepository,
     CustomerSessionService,
+    CashCardService,
+    CashCardRepository,
   ],
 })
 export class CashModule {}

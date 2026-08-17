@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { jwtVerify } from 'jose';
+import { jwtVerify, SignJWT } from 'jose';
 import type { AppConfig } from '../config/config.schema';
 
 export interface QrResult {
@@ -41,6 +41,27 @@ export class QrService {
   /** crypto.randomBytes(bytes).toString('hex') — the qr_token nonce generator. */
   generateRandomToken(bytes = 16): string {
     return randomBytes(bytes).toString('hex');
+  }
+
+  /**
+   * The in-app QR the customer shows at the counter — the inverse of the JWT
+   * branch of `verifyQRPayload`, and the claim names must stay exactly these:
+   * `sub` is read back as the card id and `tok` as the rotating nonce.
+   *
+   * FIVE MINUTES, and it is the token's own expiry that enforces it. The card
+   * page counts down from 300s and refetches, but a customer who screenshots the
+   * code is holding a JWT that stops verifying — not a picture that keeps working.
+   *
+   * Keyed on the UTF-8 bytes of `APP_QR_SECRET` (`jwtKey`), never the raw string
+   * used for wallet barcodes. See the dual-derivation warning on the class.
+   */
+  async signQRPayload(cardId: string, qrToken: string): Promise<string> {
+    if (!this.jwtKey) throw new Error('APP_QR_SECRET is not set');
+    return new SignJWT({ sub: cardId, tok: qrToken, type: 'SCAN' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('5m')
+      .sign(this.jwtKey);
   }
 
   async verifyQRPayload(payload: string): Promise<QrResult | null> {
