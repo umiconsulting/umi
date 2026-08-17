@@ -8,6 +8,28 @@ type Row = Record<string, any>;
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
+const EXPORT_HEADERS = [
+  'Nombre',
+  'Teléfono',
+  'Email',
+  'Tarjeta',
+  'Saldo MXN',
+  'Visitas totales',
+  'Visitas ciclo',
+  'Recompensas pendientes',
+  'Registrado',
+];
+
+/**
+ * One CSV field. Quote when the value carries a comma, a quote or a newline,
+ * and double an embedded quote — RFC 4180, and the reason a customer named
+ * "Ana, la del 5" does not silently become two columns.
+ */
+function csvField(value: string | null | undefined): string {
+  const str = value ?? '';
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
 /** How much history the customer detail screen shows. */
 const DETAIL_LIMIT = 10;
 
@@ -343,5 +365,34 @@ export class CashReadService {
         createdAt: t.created_at.toISOString(),
       })),
     };
+  }
+
+  /**
+   * Every customer, as the CSV a cafe downloads.
+   *
+   * "Visitas totales" is SUM(stamps), not a row count. umi-cash counts
+   * `visit_events` rows here, which reads a 16-stamp catch-up credit as one
+   * visit — the same undercount that cost a real customer 20 stamps down to 5,
+   * exported into a file the cafe keeps. The list and the detail already report
+   * the summed figure; the export now agrees with them.
+   *
+   * The dates arrive already rendered in the cafe's timezone (see the repository).
+   */
+  async exportCustomersCsv(merchantId: string, timezone: string): Promise<string> {
+    const rows = await this.repo.adminExportRows(merchantId, timezone);
+    const lines = rows.map((r) =>
+      [
+        csvField(r.name),
+        csvField(r.phone),
+        csvField(r.email),
+        csvField(r.cardNumber),
+        csvField(formatMxn2(Number(r.balanceCentavos ?? 0))),
+        String(Number(r.totalVisits ?? 0)),
+        String(Number(r.visitsThisCycle ?? 0)),
+        String(Number(r.pendingRewards ?? 0)),
+        csvField(r.registeredOn),
+      ].join(','),
+    );
+    return [EXPORT_HEADERS.join(','), ...lines].join('\n');
   }
 }

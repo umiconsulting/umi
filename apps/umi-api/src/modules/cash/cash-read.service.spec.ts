@@ -15,6 +15,7 @@ function make() {
     giftCards: vi.fn(),
     adminCustomerDetail: vi.fn(),
     cardMoneyTotals: vi.fn().mockResolvedValue({ ltvCentavos: 0, topupCentavos: 0 }),
+    adminExportRows: vi.fn().mockResolvedValue([]),
   };
   const cards = {
     cardState: vi.fn(),
@@ -258,5 +259,85 @@ describe('CashReadService.getCustomer', () => {
 
     await expect(h.svc.getCustomer('t1', 'nope')).rejects.toThrow(NotFoundException);
     expect(h.cards.cardState).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The customers CSV. It is the one surface a café takes away with it, so what
+ * matters is that the file is well formed and that the numbers in it match the
+ * screen it was downloaded from.
+ */
+describe('CashReadService.exportCustomersCsv', () => {
+  let h: ReturnType<typeof make>;
+
+  const ROW = {
+    name: 'Ana',
+    phone: '+5215512345678',
+    email: 'ana@example.com',
+    cardNumber: 'KAL-1',
+    balanceCentavos: 12550,
+    totalVisits: 13,
+    visitsThisCycle: 3,
+    pendingRewards: 1,
+    registeredOn: '5/1/2026',
+  };
+
+  beforeEach(() => {
+    h = make();
+    h.repo.adminExportRows.mockResolvedValue([ROW]);
+  });
+
+  it('writes the header row the café expects, then one line per customer', async () => {
+    const csv = await h.svc.exportCustomersCsv('t1', 'America/Mexico_City');
+    const lines = csv.split('\n');
+
+    expect(lines[0]).toBe(
+      'Nombre,Teléfono,Email,Tarjeta,Saldo MXN,Visitas totales,Visitas ciclo,Recompensas pendientes,Registrado',
+    );
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toBe('Ana,+5215512345678,ana@example.com,KAL-1,$125.50,13,3,1,5/1/2026');
+  });
+
+  it('quotes a field containing a comma, and doubles an embedded quote', async () => {
+    h.repo.adminExportRows.mockResolvedValue([
+      { ...ROW, name: 'Ana, la del 5', email: 'a"b@example.com' },
+    ]);
+
+    const line = (await h.svc.exportCustomersCsv('t1', 'America/Mexico_City')).split('\n')[1];
+
+    expect(line).toContain('"Ana, la del 5"');
+    expect(line).toContain('"a""b@example.com"');
+  });
+
+  it('quotes a field containing a newline, so one customer stays one line', async () => {
+    h.repo.adminExportRows.mockResolvedValue([{ ...ROW, name: 'Ana\nGómez' }]);
+
+    const csv = await h.svc.exportCustomersCsv('t1', 'America/Mexico_City');
+
+    expect(csv.split('\n')).toHaveLength(3); // header + the wrapped field's two lines
+    expect(csv).toContain('"Ana\nGómez"');
+  });
+
+  it('writes an empty field rather than the word null', async () => {
+    h.repo.adminExportRows.mockResolvedValue([{ ...ROW, phone: null, email: null, name: null }]);
+
+    const line = (await h.svc.exportCustomersCsv('t1', 'America/Mexico_City')).split('\n')[1];
+
+    expect(line.startsWith(',,,KAL-1,')).toBe(true);
+  });
+
+  it('asks for the dates in the café’s own timezone', async () => {
+    await h.svc.exportCustomersCsv('t1', 'America/Mexico_City');
+
+    expect(h.repo.adminExportRows).toHaveBeenCalledWith('t1', 'America/Mexico_City');
+  });
+
+  it('still produces a usable file when the café has no customers', async () => {
+    h.repo.adminExportRows.mockResolvedValue([]);
+
+    const csv = await h.svc.exportCustomersCsv('t1', 'America/Mexico_City');
+
+    expect(csv.split('\n')).toHaveLength(1);
+    expect(csv.startsWith('Nombre,')).toBe(true);
   });
 });

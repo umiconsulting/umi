@@ -21,6 +21,51 @@ export interface AnalyticsWindows {
  * one reward threshold in `merchant.loyalty_reward`). Identity phone/email come from
  * `merchant.contact` (flat: channel_id + normalized_value -> customer).
  */
+/**
+ * The per-customer derived projection: balance / stamps / cycle / pending / LTV
+ * from the ledgers, phone and email from the identity spine. One active card per
+ * customer.
+ *
+ * SHARED by the customer LIST and the CSV EXPORT, because they are the same
+ * report at two sizes. Two copies would let the file a cafe downloads disagree
+ * with the screen it was downloaded from.
+ */
+const CUST_CTE = `
+      vr AS (
+        SELECT COALESCE((SELECT stamps_required FROM merchant.loyalty_reward
+          WHERE merchant_id = $1::uuid AND active AND type = 'stamps_free_item'
+          ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
+      ),
+      cust AS (
+        SELECT
+          cu.id, cu.name, cu.created_at,
+          c.id AS card_id, c.card_number,
+          COALESCE((SELECT sum(l.delta) FROM merchant.loyalty_stored_value_ledger l
+            WHERE l.merchant_id = cu.merchant_id AND l.card_id = c.id), 0)::bigint          AS balance_cents,
+          (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v
+            WHERE v.merchant_id = cu.merchant_id AND v.card_id = c.id)::int                 AS total_visits,
+          (SELECT count(*) FROM merchant.loyalty_redemption r
+            WHERE r.merchant_id = cu.merchant_id AND r.card_id = c.id)::int                 AS redemptions,
+          (SELECT max(v.occurred_at) FROM merchant.loyalty_visit v
+            WHERE v.merchant_id = cu.merchant_id AND v.card_id = c.id)                       AS last_visit,
+          COALESCE((SELECT sum(abs(l.delta)) FROM merchant.loyalty_stored_value_ledger l
+            WHERE l.merchant_id = cu.merchant_id AND l.card_id = c.id AND l.reason = 'purchase'), 0)::bigint AS ltv_centavos,
+          (SELECT ct.normalized_value FROM merchant.contact ct
+             JOIN umi.channel_type ch ON ch.id = ct.channel_id
+            WHERE ct.merchant_id = cu.merchant_id AND ct.customer_id = cu.id
+              AND ch.key IN ('phone', 'whatsapp', 'sms')
+            ORDER BY ct.is_primary DESC, ct.updated_at DESC LIMIT 1)                     AS phone,
+          (SELECT ct.normalized_value FROM merchant.contact ct
+             JOIN umi.channel_type ch ON ch.id = ct.channel_id
+            WHERE ct.merchant_id = cu.merchant_id AND ct.customer_id = cu.id
+              AND ch.key = 'email'
+            ORDER BY ct.is_primary DESC, ct.updated_at DESC LIMIT 1)                     AS email
+        FROM merchant.customer cu
+        LEFT JOIN merchant.loyalty_card c
+          ON c.merchant_id = cu.merchant_id AND c.customer_id = cu.id AND c.status = 'active'
+        WHERE cu.merchant_id = $1::uuid
+      )`;
+
 @Injectable()
 export class CashRepository {
   constructor(private readonly pg: PgService) {}
@@ -263,43 +308,6 @@ export class CashRepository {
             : opts.sort === 'ltv'
               ? 'ltv_centavos DESC NULLS LAST'
               : 'created_at DESC';
-    // The per-customer derived projection (balance/visits/cycle/pending/ltv from the
-    // ledgers; phone/email from the identity spine). One active card per customer.
-    const CUST_CTE = `
-      vr AS (
-        SELECT COALESCE((SELECT stamps_required FROM merchant.loyalty_reward
-          WHERE merchant_id = $1::uuid AND active AND type = 'stamps_free_item'
-          ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
-      ),
-      cust AS (
-        SELECT
-          cu.id, cu.name, cu.created_at,
-          c.id AS card_id, c.card_number,
-          COALESCE((SELECT sum(l.delta) FROM merchant.loyalty_stored_value_ledger l
-            WHERE l.merchant_id = cu.merchant_id AND l.card_id = c.id), 0)::bigint          AS balance_cents,
-          (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v
-            WHERE v.merchant_id = cu.merchant_id AND v.card_id = c.id)::int                 AS total_visits,
-          (SELECT count(*) FROM merchant.loyalty_redemption r
-            WHERE r.merchant_id = cu.merchant_id AND r.card_id = c.id)::int                 AS redemptions,
-          (SELECT max(v.occurred_at) FROM merchant.loyalty_visit v
-            WHERE v.merchant_id = cu.merchant_id AND v.card_id = c.id)                       AS last_visit,
-          COALESCE((SELECT sum(abs(l.delta)) FROM merchant.loyalty_stored_value_ledger l
-            WHERE l.merchant_id = cu.merchant_id AND l.card_id = c.id AND l.reason = 'purchase'), 0)::bigint AS ltv_centavos,
-          (SELECT ct.normalized_value FROM merchant.contact ct
-             JOIN umi.channel_type ch ON ch.id = ct.channel_id
-            WHERE ct.merchant_id = cu.merchant_id AND ct.customer_id = cu.id
-              AND ch.key IN ('phone', 'whatsapp', 'sms')
-            ORDER BY ct.is_primary DESC, ct.updated_at DESC LIMIT 1)                     AS phone,
-          (SELECT ct.normalized_value FROM merchant.contact ct
-             JOIN umi.channel_type ch ON ch.id = ct.channel_id
-            WHERE ct.merchant_id = cu.merchant_id AND ct.customer_id = cu.id
-              AND ch.key = 'email'
-            ORDER BY ct.is_primary DESC, ct.updated_at DESC LIMIT 1)                     AS email
-        FROM merchant.customer cu
-        LEFT JOIN merchant.loyalty_card c
-          ON c.merchant_id = cu.merchant_id AND c.customer_id = cu.id AND c.status = 'active'
-        WHERE cu.merchant_id = $1::uuid
-      )`;
     const filter = `($2 = '' OR name ILIKE $3 OR phone ILIKE $3 OR email ILIKE $3 OR card_number ILIKE $3)`;
     return this.pg.withMerchant(async (c) => {
       const rows = (
@@ -481,5 +489,34 @@ export class CashRepository {
       ),
     );
     return rows[0] ?? { ltvCentavos: 0, topupCentavos: 0 };
+  }
+
+  /**
+   * Every customer at this cafe, for the CSV. Same projection as the list — no
+   * paging, no search, and the registration date already rendered in the cafe's
+   * own timezone.
+   *
+   * FORMATTED IN SQL on purpose. `toLocaleDateString('es-MX')` in Node renders
+   * against the SERVER's clock, so a card created late in the evening in Mexico
+   * City exports with the next day's date. `AT TIME ZONE` puts the date in the
+   * zone the cafe actually keeps, and `FMDD/FMMM/YYYY` is the unpadded d/m/yyyy
+   * that es-MX produces.
+   */
+  async adminExportRows(merchantId: string, timezone: string): Promise<Row[]> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<Row>(
+        `WITH ${CUST_CTE}, vr_n AS (SELECT n FROM vr)
+         SELECT name, phone, email, card_number AS "cardNumber",
+                balance_cents AS "balanceCentavos",
+                total_visits AS "totalVisits",
+                (total_visits % (SELECT n FROM vr_n))::int               AS "visitsThisCycle",
+                (total_visits / (SELECT n FROM vr_n) - redemptions)::int AS "pendingRewards",
+                to_char(created_at AT TIME ZONE $2, 'FMDD/FMMM/YYYY')    AS "registeredOn"
+           FROM cust
+          ORDER BY created_at DESC`,
+        [merchantId, timezone],
+      ),
+    );
+    return rows;
   }
 }
