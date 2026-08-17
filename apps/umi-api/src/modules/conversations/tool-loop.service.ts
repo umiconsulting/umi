@@ -134,29 +134,156 @@ function isHumanHandoffIntent(text: string): boolean {
   );
 }
 
+/**
+ * Recognizing a "yes" — used ONLY to route a reply against a pending clarification.
+ * It no longer guards the confirmation write: that gate asks the model to quote the
+ * customer instead (see `turnTextContains`), because deciding what counts as a yes is
+ * a semantic judgement and any list we write here is a classifier we cannot finish.
+ * A list is tolerable for routing, where being wrong costs a re-ask; it was not
+ * tolerable on the write, where being wrong cost the order and the customer.
+ *
+ * Kept as a stem match rather than the literal alternation it replaces
+ * (`confirmo|confirmalo|confirmala|confirmar`), which did not list `confirmado` — the
+ * past participle, and the most natural answer to "¿confirmas tu pedido?".
+ */
+const CONFIRM_VERB = /\bconfirm(?:o|a|as|ado|ada|amos|alo|ala|arlo|arla|ar)\b/;
+
+/**
+ * A bare "yes" — matched against the WHOLE message on purpose. As a substring these
+ * are far too weak to authorize a write ("no si va" would confirm).
+ * `normalizeTurnText` strips accents, so every alternative here is unaccented.
+ */
+const BARE_AFFIRMATIVE =
+  /^(?:si+|sip|sipi|va|va pues|vale|sale|ok|okay|oka|listo|dale|simon|claro|andale|orale|perfecto|correcto|de una|jalo|adelante|asi es|asi esta bien|esta bien|todo bien|si porfa|si por favor|si gracias)$/;
+
+/**
+ * A leading negation cancels an otherwise-strong yes ("no confirmo", "todavía no").
+ * Anchored at the START so it does not swallow a real confirmation that merely
+ * carries an instruction — "si confirmo, no le pongas azúcar" is still a yes.
+ */
+const NEGATED_CONFIRMATION = /^(?:no|nel|nop|aun no|todavia no|espera|esperame)\b/;
+
 function isStrongConfirmation(text: string): boolean {
   const normalized = normalizeTurnText(text).replace(/\?+$/g, '').trim();
-  if (
-    /\b(confirmo|confirmalo|confirmala|confirmar|va confirmalo|si confirmo|sí confirmo)\b/.test(
-      normalized,
-    )
-  ) {
-    return true;
-  }
-  return /^(si|va|sale|ok|okay|listo|dale|simon|claro|andale)$/.test(normalized);
+  if (NEGATED_CONFIRMATION.test(normalized)) return false;
+  return CONFIRM_VERB.test(normalized) || BARE_AFFIRMATIVE.test(normalized);
 }
 
 function isReadyForSummary(text: string): boolean {
-  return /\b(seria todo|sería todo|es todo|nada mas|nada más|asi esta bien|así esta bien)\b/.test(
+  // "eso sería todo" is covered by `seria todo`; the accented twins are covered by
+  // `normalizeTurnText`, which strips diacritics before this runs.
+  return /\b(seria todo|es todo|nada mas|asi esta bien|asi lo dejamos)\b/.test(
     normalizeTurnText(text),
   );
 }
 
+/**
+ * A message that reads as a QUESTION rather than an answer, so it can never stand in
+ * for a confirmation.
+ *
+ * The bare tokens `seria` and `quedo` used to live in this alternation, and `seria`
+ * matched the customer's own end-of-order signal: "sería todo" is `isReadyForSummary`
+ * AND was flagged a question, so the one phrase that means "I'm done" could never
+ * lead anywhere. Only the interrogative PHRASES stay.
+ */
 function isQuestionLike(text: string): boolean {
   const normalized = normalizeTurnText(text);
-  return (
-    text.includes('?') || /\b(ya quedo|quedo|entonces seria|seria|verdad|cierto)\b/.test(normalized)
+  return text.includes('?') || /\b(ya quedo|entonces seria|verdad|cierto)\b/.test(normalized);
+}
+
+/**
+ * The confirmation gate's evidence test: are the words the model reports as the
+ * customer's confirmation actually IN the customer's message?
+ *
+ * This replaces a word list, and the difference is the whole point. Deciding whether
+ * "confirmado", "yeah go ahead" or "👍" means yes is a semantic judgement, and the
+ * model is better at it than any regex we can finish — a list that does not know a
+ * phrase refuses a real customer, re-asks, and loses the order. What a deterministic
+ * check CAN do, which the model cannot do for itself, is prove the customer said
+ * something at all. So the model owns the meaning and this owns the existence: it
+ * cannot confirm an order out of thin air, in any language or register.
+ *
+ * Matching is case-, accent- and punctuation-insensitive, so a model that quotes
+ * "Confirmado." against a message reading "confirmado" still passes.
+ *
+ * It deliberately does NOT reuse `normalizeTurnText`, which strips everything that is
+ * not a letter or a number: that is right for word matching and wrong here, because it
+ * reduces a bare "👍" to the empty string and the gate then refuses a customer who
+ * confirmed perfectly clearly. An emoji IS the evidence when it is what they sent.
+ */
+const EVIDENCE_PUNCTUATION = /[.,;:!¡¿?"'«»“”‘’()\-–—]/g;
+
+function normalizeEvidence(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(EVIDENCE_PUNCTUATION, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function turnTextContains(evidence: unknown, turnText: string): boolean {
+  if (typeof evidence !== 'string') return false;
+  const quoted = normalizeEvidence(evidence).split(' ').filter(Boolean);
+  if (!quoted.length) return false;
+  const spoken = normalizeEvidence(turnText).split(' ').filter(Boolean);
+  // Whole-token match, not raw substring. A plain `includes` let a two-letter quote
+  // ride inside an unrelated word — "si" matched "siempre lo mismo", "a" matched
+  // "todavía lo estoy pensando" — so the gate proved nothing at all for exactly the
+  // short quotes a confirmation is most likely to be.
+  return spoken.some(
+    (_, i) =>
+      i + quoted.length <= spoken.length && quoted.every((word, j) => spoken[i + j] === word),
   );
+}
+
+/**
+ * The reading frame for a reply that lands on an open order.
+ *
+ * Each turn the model receives a RECONSTRUCTION, not a conversation: the customer's
+ * reply arrives under `MENSAJE ACTUAL`, and the question it answers sits several lines
+ * above under `CONTEXTO RECIENTE`, related only by adjacency. That is why "confirmado"
+ * was fragile — nothing bound the answer to the question, so the meaning of a short
+ * reply had to be guessed from the words alone. This binds them explicitly.
+ *
+ * Two properties are deliberate:
+ *
+ *  - It is NEUTRAL. It never says "the customer is confirming". It names three
+ *    readings and makes the unclear one as easy to take as the yes — a frame that
+ *    presupposes its own answer is a rubber stamp, not a judgement.
+ *  - It interpolates only OUR OWN last message, never the customer's text. The
+ *    customer's words stay in `MENSAJE ACTUAL` where they always were, so this frame
+ *    cannot become a way to forge an authorization.
+ */
+function buildConfirmationFrame(params: {
+  draftCart: unknown;
+  lastAssistantMessage: string | null;
+}): string | null {
+  if (!hasDraftCart(params.draftCart)) return null;
+  const presentedAt = (params.draftCart as { presented_at?: string | null })?.presented_at;
+  const lines = ['CÓMO LEER EL MENSAJE ACTUAL'];
+  lines.push(
+    presentedAt
+      ? 'Hay un pedido en curso y ya le mostraste al cliente el resumen con su total.'
+      : 'Hay un pedido en curso, pero todavía no le has mostrado el resumen con su total.',
+  );
+  if (params.lastAssistantMessage) {
+    lines.push(`Tu último mensaje fue: "${params.lastAssistantMessage}"`);
+    lines.push('El mensaje actual del cliente responde a eso. Decide qué significa:');
+  } else {
+    lines.push('Decide qué significa el mensaje actual del cliente:');
+  }
+  lines.push(
+    '- Confirma el pedido → llama `confirm_order` y copia sus palabras EXACTAS en `customer_confirmation`.',
+    '- Lo rechaza o pide cambios → atiéndelo; NO confirmes.',
+    '- No queda claro → pregunta UNA sola vez, en la voz del negocio. Ante la duda NO confirmes.',
+    'Una respuesta corta ("ya", "va", "ok", "sale", "yes", "👍") puede confirmar si responde a tu pregunta. Júzgalo por el contexto, no por la palabra.',
+  );
+  if (!presentedAt) {
+    lines.push('Como todavía no le mostraste el total, muéstraselo antes de pedirle que confirme.');
+  }
+  return lines.join('\n');
 }
 
 function isResetIntent(text: string): boolean {
@@ -487,6 +614,13 @@ export class ToolLoopService {
           : `<asistente>${message.content}</asistente>`,
       )
       .join('\n');
+    const lastAssistantMessage =
+      [...params.recentMessages].reverse().find((message) => message.role === 'assistant')
+        ?.content ?? null;
+    const confirmationFrame = buildConfirmationFrame({
+      draftCart: params.draftCart,
+      lastAssistantMessage,
+    });
     const messages: LoopMessage[] = [
       {
         role: 'user',
@@ -496,6 +630,9 @@ export class ToolLoopService {
             ? `ACLARACION PENDIENTE:\n${JSON.stringify(activePendingClarification)}`
             : null,
           params.draftCart ? `CARRITO BORRADOR:\n${JSON.stringify(params.draftCart)}` : null,
+          // Immediately before the customer's words, so the instruction is the last
+          // thing read before the thing it applies to.
+          confirmationFrame,
           `MENSAJE ACTUAL:\n${params.userTurnText}`,
         ]
           .filter(Boolean)
@@ -669,14 +806,13 @@ export class ToolLoopService {
         let toolUse = rawToolUse;
 
         // ── Rewrite layer ──
+        // NOTE: the `add_to_cart` → `confirm_order` rewrite that used to open this
+        // chain is gone. It existed to compensate for the old gate: the word list was
+        // so narrow that the model's own `confirm_order` kept being refused, so a
+        // regex had to force the call instead. Now that the gate no longer judges
+        // wording, a regex that OVERRIDES the model's choice is strictly worse than
+        // one that vetoes it — the model can simply call `confirm_order` itself.
         if (
-          toolUse.name === 'add_to_cart' &&
-          isStrongConfirmation(params.userTurnText) &&
-          hasDraftCart(params.draftCart) &&
-          params.currentState === 'awaiting_confirmation'
-        ) {
-          toolUse = { ...toolUse, name: 'confirm_order', input: {} };
-        } else if (
           toolUse.name === 'add_to_cart' &&
           isReadyForSummary(params.userTurnText) &&
           hasDraftCart(params.draftCart)
@@ -759,24 +895,24 @@ export class ToolLoopService {
         }
 
         // ── confirm_order / confirm_order_changes safety gate ──
+        // Two STRUCTURAL preconditions, no semantic ones. There must be a cart to
+        // confirm, and the model must quote the customer's own confirming words back
+        // — words that have to be present in the message the customer actually sent.
+        // Whether those words MEAN yes is the model's call: it reads context, register
+        // and language, and a customer who answers "yeah" or "va que va" is confirming
+        // just as much as one who writes "confirmo".
         if (
           (toolUse.name === 'confirm_order' || toolUse.name === 'confirm_order_changes') &&
           (!hasDraftCart(params.draftCart) ||
-            params.currentState !== 'awaiting_confirmation' ||
-            !isStrongConfirmation(params.userTurnText) ||
-            isQuestionLike(params.userTurnText))
+            !turnTextContains(toolUse.input?.customer_confirmation, params.userTurnText))
         ) {
           guardFireCount++;
           const reason = !hasDraftCart(params.draftCart)
             ? 'no_draft_cart_to_confirm'
-            : params.currentState !== 'awaiting_confirmation'
-              ? 'cart_not_yet_summarized'
-              : isQuestionLike(params.userTurnText)
-                ? 'user_message_is_a_question_not_a_confirmation'
-                : 'no_explicit_affirmation_in_user_message';
+            : 'confirmation_not_found_in_customer_message';
           const guidance = !hasDraftCart(params.draftCart)
             ? 'No hay un carrito listo para confirmar. Pregúntale al cliente qué quiere pedir.'
-            : 'El cliente todavía no confirmó claramente. Pídele una confirmación explícita en una sola línea, en la voz del negocio.';
+            : 'Solo puedes confirmar si el cliente ya lo dijo. Pasa en `customer_confirmation` las palabras EXACTAS de su último mensaje que confirman el pedido. Si no las dijo, pídele una confirmación en una sola línea, en la voz del negocio.';
           toolResultBlocks.push({
             type: 'tool_result',
             tool_use_id: toolUse.id,

@@ -114,16 +114,32 @@ export const TOOL_DEFINITIONS: ToolDefinitions = [
     input_schema: {
       type: 'object',
       properties: {
+        customer_confirmation: {
+          type: 'string',
+          description:
+            'Las palabras EXACTAS del último mensaje del cliente que confirman el pedido, copiadas tal cual (cualquier idioma o registro: "confirmado", "sale", "yeah go ahead", "👍"). Tú decides si confirman; esto solo comprueba que el cliente sí las escribió. No inventes ni parafrasees. Una pregunta NUNCA es una confirmación: si el cliente pregunta "¿sale más caro?", la palabra "sale" ahí no confirma nada. Si el cliente no confirmó, pídele la confirmación en vez de llamar esta herramienta.',
+        },
         pickup_person: { type: 'string' },
         customer_note: { type: 'string' },
       },
+      required: ['customer_confirmation'],
     },
   },
   {
     name: 'confirm_order_changes',
     description:
       'Confirma los cambios de una cancelación parcial activa para que el pedido actualizado siga en cocina. Úsala solo cuando existe una cancelación parcial pendiente y el cliente acepta esos cambios. No la uses para confirmaciones normales.',
-    input_schema: { type: 'object', properties: {} },
+    input_schema: {
+      type: 'object',
+      properties: {
+        customer_confirmation: {
+          type: 'string',
+          description:
+            'Las palabras EXACTAS del último mensaje del cliente que aceptan los cambios, copiadas tal cual. No inventes ni parafrasees.',
+        },
+      },
+      required: ['customer_confirmation'],
+    },
   },
   {
     name: 'cancel_order',

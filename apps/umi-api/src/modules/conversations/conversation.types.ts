@@ -20,6 +20,20 @@ export interface DraftCart {
   items: DraftCartItem[];
   updated_at: string;
   customer_note?: string | null;
+  /**
+   * When the customer was last shown this cart PRICED — the read-back that
+   * `formatCartSummary` produces, with each line and the total.
+   *
+   * This is the one thing about a confirmation that cannot be derived. "A cart
+   * exists" does not mean the customer ever saw what they are agreeing to, and the
+   * model cannot report it because each turn it receives a reconstruction rather
+   * than a continuous conversation. So the turn that shows the total records it, and
+   * the next turn can read a bare "ya" as a yes to a KNOWN order instead of guessing.
+   *
+   * It rides inside the cart jsonb (`runtime.conversation_cart.cart`) on purpose: it
+   * is a fact about THIS cart, it dies with the cart, and it needs no migration.
+   */
+  presented_at?: string | null;
 }
 
 /**
