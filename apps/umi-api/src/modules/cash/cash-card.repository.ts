@@ -23,10 +23,16 @@ export interface RecentLedgerEntry {
 }
 
 /**
- * The customer's view of her own card. Every read is scoped by BOTH the merchant
- * and the customer id from her session: RLS already confines the query to the
- * café, and the customer predicate is what stops one customer reading another's
- * card inside it.
+ * Card reads, scoped to one merchant and one card.
+ *
+ * TWO AUDIENCES, ONE SET OF NUMBERS. The customer's own page reads these, and so
+ * does the staff customer-detail screen — the same visits and the same ledger,
+ * shown to the barista instead of to her. Two copies would let the two screens
+ * disagree about the same customer while she is standing at the counter.
+ *
+ * `cardForCustomer` is the exception and is customer-scoped on purpose: RLS
+ * confines the query to the café, and the customer predicate is what stops one
+ * customer reading another's card inside it.
  */
 @Injectable()
 export class CashCardRepository {

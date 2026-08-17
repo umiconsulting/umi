@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Patch, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { MerchantAccessGuard } from '../auth/merchant-access.guard';
 import { EntitlementGuard } from '../auth/entitlement.guard';
@@ -51,6 +61,15 @@ export class CashController {
   @Get('customers')
   getCustomers(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
     return this.cash.getCustomers(t.merchantId, query);
+  }
+
+  /**
+   * One customer. Same guards as the list beside it, which already exposes her
+   * phone, email and balance — the detail adds history, not a new class of data.
+   */
+  @Get('customers/:id')
+  getCustomer(@Merchant() t: MerchantAccess, @Param('id', ParseUUIDPipe) id: string) {
+    return this.cash.getCustomer(t.merchantId, id);
   }
 
   @Get('reward-config')

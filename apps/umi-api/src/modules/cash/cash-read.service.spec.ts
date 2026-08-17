@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CashReadService } from './cash-read.service';
 
 function make() {
@@ -13,8 +13,15 @@ function make() {
     rewardConfig: vi.fn(),
     upsertRewardConfig: vi.fn(),
     giftCards: vi.fn(),
+    adminCustomerDetail: vi.fn(),
+    cardMoneyTotals: vi.fn().mockResolvedValue({ ltvCentavos: 0, topupCentavos: 0 }),
   };
-  return { svc: new CashReadService(repo as never), repo };
+  const cards = {
+    cardState: vi.fn(),
+    recentVisits: vi.fn().mockResolvedValue([]),
+    recentLedger: vi.fn().mockResolvedValue([]),
+  };
+  return { svc: new CashReadService(repo as never, cards as never), repo, cards };
 }
 
 describe('CashReadService.getStats', () => {
@@ -107,5 +114,149 @@ describe('CashReadService.updateSettings', () => {
     const h = make();
     await h.svc.updateSettings('t1', { name: 'Only Name' });
     expect(h.repo.updateProgram).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The staff view of one customer. Everything on this screen is either PII or
+ * money, so the tests are about reading the right person's numbers — and about
+ * what build-v3 no longer keeps.
+ */
+describe('CashReadService.getCustomer', () => {
+  let h: ReturnType<typeof make>;
+
+  const DETAIL = {
+    id: 'cust-1',
+    name: 'Ana',
+    phone: '+5215512345678',
+    email: 'ana@example.com',
+    birthday: new Date('1990-04-12T00:00:00.000Z'),
+    createdAt: new Date('2026-01-05T18:00:00.000Z'),
+    cardId: 'card-1',
+    cardNumber: 'KAL-1',
+    cardCreatedAt: new Date('2026-01-06T18:00:00.000Z'),
+  };
+
+  beforeEach(() => {
+    h = make();
+    h.repo.adminCustomerDetail.mockResolvedValue(DETAIL);
+    h.cards.cardState.mockResolvedValue({
+      card_number: 'KAL-1',
+      total_visits: 13,
+      visits_this_cycle: 3,
+      pending_rewards: 1,
+      balance_cents: 12550,
+      visits_required: 10,
+    });
+  });
+
+  it('reports her identity, her card and her derived state', async () => {
+    const r = await h.svc.getCustomer('t1', 'cust-1');
+
+    expect(r.id).toBe('cust-1');
+    expect(r.name).toBe('Ana');
+    expect(r.phone).toBe('+5215512345678');
+    expect(r.email).toBe('ana@example.com');
+    expect(r.cardId).toBe('card-1');
+    expect(r.cardNumber).toBe('KAL-1');
+    expect(r.totalVisits).toBe(13);
+    expect(r.visitsThisCycle).toBe(3);
+    expect(r.visitsRequired).toBe(10);
+    expect(r.pendingRewards).toBe(1);
+    expect(r.balanceCentavos).toBe(12550);
+    expect(r.balanceMXN).toBe('$125.50');
+  });
+
+  it('renders the birthday as a plain date, not a timestamp', async () => {
+    const r = await h.svc.getCustomer('t1', 'cust-1');
+
+    expect(r.birthDate).toBe('1990-04-12');
+  });
+
+  it('reports no birthday when she gave none', async () => {
+    h.repo.adminCustomerDetail.mockResolvedValue({ ...DETAIL, birthday: null });
+
+    const r = await h.svc.getCustomer('t1', 'cust-1');
+
+    expect(r.birthDate).toBeNull();
+  });
+
+  it('sums what she spent and what she loaded, spend as a positive figure', async () => {
+    // Spend is stored negative; the screen says "lifetime value", not "drawdown".
+    h.repo.cardMoneyTotals.mockResolvedValue({ ltvCentavos: 48000, topupCentavos: 60000 });
+
+    const r = await h.svc.getCustomer('t1', 'cust-1');
+
+    expect(r.ltvCentavos).toBe(48000);
+    expect(r.ltvMXN).toBe('$480.00');
+    expect(r.totalTopupCentavos).toBe(60000);
+    expect(r.totalTopupMXN).toBe('$600.00');
+  });
+
+  it('takes the last visit from the most recent one, and null when there are none', async () => {
+    h.cards.recentVisits.mockResolvedValue([
+      { id: 'v1', occurred_at: new Date('2026-08-10T18:00:00.000Z') },
+      { id: 'v2', occurred_at: new Date('2026-08-03T18:00:00.000Z') },
+    ]);
+
+    const r = await h.svc.getCustomer('t1', 'cust-1');
+
+    expect(r.lastVisit).toBe('2026-08-10T18:00:00.000Z');
+    expect(r.recentVisits).toHaveLength(2);
+
+    h.cards.recentVisits.mockResolvedValue([]);
+    expect((await h.svc.getCustomer('t1', 'cust-1')).lastVisit).toBeNull();
+  });
+
+  it('falls back to the card date when the customer row carries none', async () => {
+    h.repo.adminCustomerDetail.mockResolvedValue({ ...DETAIL, createdAt: null });
+
+    const r = await h.svc.getCustomer('t1', 'cust-1');
+
+    expect(r.createdAt).toBe('2026-01-06T18:00:00.000Z');
+  });
+
+  it('maps a ledger entry to the shape the screen already reads', async () => {
+    h.cards.recentLedger.mockResolvedValue([
+      {
+        id: 'l1',
+        reason: 'purchase',
+        delta: -4500,
+        note: 'Latte',
+        created_at: new Date('2026-08-10T18:00:00.000Z'),
+      },
+    ]);
+
+    const r = await h.svc.getCustomer('t1', 'cust-1');
+
+    expect(r.recentTransactions).toEqual([
+      {
+        id: 'l1',
+        type: 'purchase',
+        amountCentavos: -4500,
+        description: 'Latte',
+        createdAt: '2026-08-10T18:00:00.000Z',
+      },
+    ]);
+  });
+
+  /**
+   * umi-cash reads `device` and `os` off `people.metadata`, written from the
+   * User-Agent at sign-up. build-v3 drops that column and umi-api's registration
+   * already discards the header, so there is nothing left to report. Null is the
+   * honest answer; inventing one would be worse.
+   */
+  it('reports no device or OS, because build-v3 keeps neither', async () => {
+    const r = await h.svc.getCustomer('t1', 'cust-1');
+
+    expect(r.device).toBeNull();
+    expect(r.os).toBeNull();
+  });
+
+  it('404s a customer this café does not have', async () => {
+    h.repo.adminCustomerDetail.mockResolvedValue(null);
+
+    await expect(h.svc.getCustomer('t1', 'nope')).rejects.toThrow(NotFoundException);
+    expect(h.cards.cardState).not.toHaveBeenCalled();
   });
 });

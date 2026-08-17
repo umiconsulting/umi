@@ -426,4 +426,60 @@ export class CashRepository {
       return { rows, total: Number(total ?? 0) };
     });
   }
+
+  /**
+   * One customer, for the staff detail screen. The identity spine holds the
+   * phone and the email — `merchant.customer` carries neither — and the same
+   * primary-then-newest rule the list uses picks which one to show.
+   *
+   * The card is the customer's ACTIVE card, newest first. A customer with no
+   * card reads as not found: umi-cash answers `Cliente no encontrado` for both,
+   * because a customer without a card has nothing this screen can show.
+   */
+  async adminCustomerDetail(merchantId: string, customerId: string): Promise<Row | null> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<Row>(
+        `SELECT cu.id::text AS id, cu.name, cu.birthday, cu.created_at AS "createdAt",
+                c.id::text AS "cardId", c.card_number AS "cardNumber",
+                c.created_at AS "cardCreatedAt",
+                (SELECT ct.normalized_value FROM merchant.contact ct
+                   JOIN umi.channel_type ch ON ch.id = ct.channel_id
+                  WHERE ct.merchant_id = cu.merchant_id AND ct.customer_id = cu.id
+                    AND ch.key IN ('phone', 'whatsapp', 'sms')
+                  ORDER BY ct.is_primary DESC, ct.updated_at DESC LIMIT 1) AS phone,
+                (SELECT ct.normalized_value FROM merchant.contact ct
+                   JOIN umi.channel_type ch ON ch.id = ct.channel_id
+                  WHERE ct.merchant_id = cu.merchant_id AND ct.customer_id = cu.id
+                    AND ch.key = 'email'
+                  ORDER BY ct.is_primary DESC, ct.updated_at DESC LIMIT 1) AS email
+           FROM merchant.customer cu
+           JOIN merchant.loyalty_card c
+             ON c.merchant_id = cu.merchant_id AND c.customer_id = cu.id AND c.status = 'active'
+          WHERE cu.merchant_id = $1::uuid AND cu.id = $2::uuid
+          ORDER BY c.created_at DESC
+          LIMIT 1`,
+        [merchantId, customerId],
+      ),
+    );
+    return rows[0] ?? null;
+  }
+
+  /**
+   * What she has spent here, and what she has loaded.
+   *
+   * Spend is stored as a NEGATIVE delta, so it is summed as an absolute value —
+   * the screen shows "lifetime value", not "how far the balance fell".
+   */
+  async cardMoneyTotals(merchantId: string, cardId: string): Promise<Row> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<Row>(
+        `SELECT COALESCE(sum(abs(delta)) FILTER (WHERE reason = 'purchase'), 0)::bigint AS "ltvCentavos",
+                COALESCE(sum(delta)      FILTER (WHERE reason = 'topup'),    0)::bigint AS "topupCentavos"
+           FROM merchant.loyalty_stored_value_ledger
+          WHERE merchant_id = $1::uuid AND card_id = $2::uuid`,
+        [merchantId, cardId],
+      ),
+    );
+    return rows[0] ?? { ltvCentavos: 0, topupCentavos: 0 };
+  }
 }
