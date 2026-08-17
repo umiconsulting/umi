@@ -2,11 +2,13 @@ import {
   Body,
   Controller,
   Get,
+  HttpException,
   Param,
   ParseUUIDPipe,
   Patch,
   Put,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
@@ -15,8 +17,17 @@ import { EntitlementGuard } from '../auth/entitlement.guard';
 import { RequireProduct } from '../auth/require-product.decorator';
 import { Merchant } from '../auth/current-user.decorator';
 import type { MerchantAccess } from '../auth/auth.types';
+import type { FastifyReply } from 'fastify';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { AuthUser } from '../auth/auth.types';
+import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 import { CashReadService } from './cash-read.service';
 import { WalletPassAdapter } from '../../shared/adapters/wallet-pass.adapter';
+
+const HOUR = 60 * 60 * 1000;
+/** umi-cash allows ten customer exports an hour per staff member. */
+const EXPORT_MAX_PER_HOUR = 10;
+const DEFAULT_TZ = 'America/Mexico_City';
 
 /**
  * Cash READ side (D11 — always live) + admin-config writes (settings branding,
@@ -31,6 +42,7 @@ export class CashController {
   constructor(
     private readonly cash: CashReadService,
     private readonly walletPass: WalletPassAdapter,
+    private readonly rateLimit: RateLimitService,
   ) {}
 
   @Get('settings')
@@ -70,6 +82,36 @@ export class CashController {
   @Get('customers/:id')
   getCustomer(@Merchant() t: MerchantAccess, @Param('id', ParseUUIDPipe) id: string) {
     return this.cash.getCustomer(t.merchantId, id);
+  }
+
+  /**
+   * The customers CSV.
+   *
+   * Rate limited per staff member, not per café: the export is every customer's
+   * name, phone and email in one file, so the bucket has to follow the person
+   * who can download it. Ten an hour, as umi-cash allows.
+   */
+  @Get('export')
+  async exportCustomers(
+    @Merchant() t: MerchantAccess,
+    @CurrentUser() user: AuthUser,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<string> {
+    const rl = this.rateLimit.hit(`export:${user.id}`, EXPORT_MAX_PER_HOUR, HOUR);
+    if (!rl.allowed) {
+      void reply.header('Retry-After', String(Math.ceil((rl.resetAt - Date.now()) / 1000)));
+      throw new HttpException({ error: 'Demasiados intentos. Intenta de nuevo más tarde.' }, 429);
+    }
+
+    const csv = await this.cash.exportCustomersCsv(t.merchantId, t.timezone || DEFAULT_TZ);
+    // The café's own key in the filename, never the raw :merchantRef — that
+    // segment may be an opaque uuid, and the café would download `clientes-
+    // 9f00…-2026-08-17.csv`.
+    const name = t.handle ?? t.merchantId;
+    const date = new Date().toISOString().slice(0, 10);
+    void reply.header('Content-Type', 'text/csv; charset=utf-8');
+    void reply.header('Content-Disposition', `attachment; filename="clientes-${name}-${date}.csv"`);
+    return csv;
   }
 
   @Get('reward-config')
