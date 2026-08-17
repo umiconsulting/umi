@@ -603,9 +603,11 @@ create table merchant.loyalty_program (
   -- catch-up path, and its migrated cards are the cards that need a correction.
   -- The default is false, because OFF is the safe direction.
   --
-  -- 🔴 NO READER EXISTS YET. Do not read this column as proof that the gate works.
-  -- umi-cash reads the branding key, and umi-cash is frozen. umi-api has no
-  -- bulk-seal endpoint. This carry keeps the DATA. The endpoint is separate work.
+  -- READ BY umi-api since 2026-08-17: `cash-scan.repository.merchantConfig` selects
+  -- it and `CashScanService.seals` refuses the credit when it is false. A café that
+  -- arrives with the flag OFF loses the catch-up path — so the backfill carrying
+  -- `loyalty.programs.branding` still decides whether the gate opens for the cafés
+  -- that had it. (umi-cash reads the branding key and stays frozen until cutover.)
   multi_seal_enabled      boolean not null default false,
   birthday_reward_enabled boolean not null default false,
   birthday_reward_name    text,

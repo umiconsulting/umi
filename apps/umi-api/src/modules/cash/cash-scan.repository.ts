@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { PoolClient } from 'pg';
 import { PgService } from '../../shared/database/pg.service';
 import { isOpenAt, parseOpenHours } from '../business-hours/open-hours';
 import { WEEKDAY_INDEX } from '../../shared/format/weekday';
@@ -18,6 +19,26 @@ export interface ScanMerchantConfig {
   timezone: string | null;
   lifecycleCopy: unknown;
   birthdayRewardName: string | null;
+  /** May staff credit more than one stamp in one action? See `seals()`. */
+  multiSealEnabled: boolean;
+}
+
+export interface CreditSealsInput {
+  merchantId: string;
+  cardId: string;
+  staffMemberId: string;
+  seals: number;
+  note: string | null;
+  idempotencyKey: string | null;
+}
+
+export interface CreditSealsResult {
+  /** The key had already been used: nothing was written this time. */
+  replayed: boolean;
+  /** Cycle position BEFORE the credit — the only input the reward maths needs. */
+  cycleBefore: number;
+  visitsRequired: number;
+  card: ScannedCard;
 }
 
 export interface PerformScanInput {
@@ -80,7 +101,8 @@ export class CashScanRepository {
       c.query<Row>(
         `SELECT t.name, t.timezone,
                 s.lifecycle_copy AS lifecycle_copy,
-                s.birthday_reward_name AS birthday_reward_name
+                s.birthday_reward_name AS birthday_reward_name,
+                s.multi_seal_enabled AS multi_seal_enabled
          FROM merchant.merchant AS t
          LEFT JOIN merchant.loyalty_program AS s ON s.merchant_id = t.id
          WHERE t.id = $1::uuid LIMIT 1`,
@@ -94,6 +116,9 @@ export class CashScanRepository {
       timezone: r.timezone,
       lifecycleCopy: r.lifecycle_copy,
       birthdayRewardName: r.birthday_reward_name,
+      // The LEFT JOIN misses for a café with no loyalty program row at all, and
+      // a missing program is not permission to bulk-credit. OFF is the safe read.
+      multiSealEnabled: r.multi_seal_enabled === true,
     };
   }
 
@@ -142,6 +167,79 @@ export class CashScanRepository {
       ),
     );
     return rows[0]?.occurred_at ?? null;
+  }
+
+  /**
+   * Credit N stamps in ONE interaction ("Agregar sellos"): the catch-up for a
+   * customer who arrived from an external loyalty system, whose old stamps we
+   * cannot import.
+   *
+   * ONE ROW, not N. `merchant.loyalty_visit.stamps` carries the magnitude, and
+   * the derived state reads `SUM(stamps)` — so a single row worth 8 is worth 8
+   * stamps and still one visit. Writing 8 rows would fabricate 8 visits at the
+   * same microsecond, which is the history-destroying shape the backfill was
+   * corrected away from (20_merchant.sql:697).
+   *
+   * There is no cache to bump: pending rewards fall out of the same SUM.
+   *
+   * IDEMPOTENT BY INDEX, not by read-then-write. `loyalty_visit_idem_uq` is a
+   * partial unique index on (merchant_id, idempotency_key), so the database — not
+   * a prior SELECT — is what makes a double-tap land once. `DO NOTHING` returns
+   * no row, and that absence IS the replay signal.
+   *
+   * The card row is locked first so two concurrent credits on the same card read
+   * their cycle position one after the other; otherwise both could read the same
+   * "before" and both claim the reward it crossed.
+   */
+  async creditSeals(input: CreditSealsInput): Promise<CreditSealsResult> {
+    return this.pg.withMerchant(async (c) => {
+      const locked = await c.query(
+        `SELECT id FROM merchant.loyalty_card
+         WHERE merchant_id = $1::uuid AND id = $2::uuid
+         FOR UPDATE`,
+        [input.merchantId, input.cardId],
+      );
+      // No row → the card is not this merchant's, or RLS hides it. Same answer.
+      if (!locked.rows[0]) throw new NotFoundException({ error: 'Tarjeta no encontrada' });
+
+      const before = await this.cardState(c, input.merchantId, input.cardId);
+
+      const inserted = await c.query<{ id: string }>(
+        `INSERT INTO merchant.loyalty_visit
+           (merchant_id, card_id, staff_id, source, stamps, note, idempotency_key)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, 'manual_bulk', $4, $5, $6)
+         ON CONFLICT (merchant_id, idempotency_key) WHERE idempotency_key IS NOT NULL
+           DO NOTHING
+         RETURNING id`,
+        [
+          input.merchantId,
+          input.cardId,
+          input.staffMemberId,
+          input.seals,
+          input.note,
+          input.idempotencyKey,
+        ],
+      );
+      const replayed = inserted.rows.length === 0;
+
+      return {
+        replayed,
+        cycleBefore: before.visits_this_cycle,
+        visitsRequired: before.visits_required,
+        card: replayed ? before : await this.cardState(c, input.merchantId, input.cardId),
+      };
+    });
+  }
+
+  /** The shared derived state, on a client already inside a transaction. */
+  private async cardState(
+    c: PoolClient,
+    merchantId: string,
+    cardId: string,
+  ): Promise<ScannedCard> {
+    const { rows } = await c.query<LoyaltyCardState>(LOYALTY_CARD_STATE_SQL, [merchantId, cardId]);
+    if (!rows[0]) throw new NotFoundException({ error: 'Tarjeta no encontrada' });
+    return rows[0];
   }
 
   async recentRedemptionWithin(
