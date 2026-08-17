@@ -232,11 +232,7 @@ export class CashScanRepository {
   }
 
   /** The shared derived state, on a client already inside a transaction. */
-  private async cardState(
-    c: PoolClient,
-    merchantId: string,
-    cardId: string,
-  ): Promise<ScannedCard> {
+  private async cardState(c: PoolClient, merchantId: string, cardId: string): Promise<ScannedCard> {
     const { rows } = await c.query<LoyaltyCardState>(LOYALTY_CARD_STATE_SQL, [merchantId, cardId]);
     if (!rows[0]) throw new NotFoundException({ error: 'Tarjeta no encontrada' });
     return rows[0];
