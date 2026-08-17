@@ -1,11 +1,20 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { formatMxn } from '../../shared/format/money';
+import { formatMxn, formatMxn2, iso } from '../../shared/format/money';
 import { CashRepository } from './cash.repository';
+import { CashCardRepository } from './cash-card.repository';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>;
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+/** How much history the customer detail screen shows. */
+const DETAIL_LIMIT = 10;
+
+/** `YYYY-MM-DD` from a DATE column, without going through a timezone. */
+function isoDate(value: Date | string): string {
+  return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
+}
 
 /**
  * Cash analytics/reads for the dashboard (D11 read side — always live). All
@@ -15,7 +24,12 @@ const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', '
  */
 @Injectable()
 export class CashReadService {
-  constructor(private readonly repo: CashRepository) {}
+  constructor(
+    private readonly repo: CashRepository,
+    // The card reads are shared with the customer's own page: the same visits and
+    // the same ledger, shown to the barista instead of to her.
+    private readonly cards: CashCardRepository,
+  ) {}
 
   async getSettings(merchantId: string): Promise<Row> {
     const t = await this.repo.branding(merchantId);
@@ -267,5 +281,67 @@ export class CashReadService {
   async programId(merchantId: string): Promise<string | null> {
     const t = await this.repo.branding(merchantId);
     return (t?.programId as string) ?? null;
+  }
+
+  /**
+   * One customer, for the staff detail screen.
+   *
+   * NOT FOUND covers two cases and answers them the same way, exactly as
+   * umi-cash does: no such customer, and a customer holding no card. The screen
+   * is a card screen — there is nothing to show for the second.
+   *
+   * `device` and `os` are always null. umi-cash reads them off
+   * `people.metadata`, written from the User-Agent at sign-up; build-v3 drops
+   * that column and umi-api's registration already discards the header. Null is
+   * the honest answer, and the gap is tracked rather than papered over.
+   */
+  async getCustomer(merchantId: string, customerId: string): Promise<Row> {
+    const detail = await this.repo.adminCustomerDetail(merchantId, customerId);
+    if (!detail) throw new NotFoundException({ error: 'Cliente no encontrado' });
+
+    const [state, totals, visits, ledger] = await Promise.all([
+      this.cards.cardState(merchantId, detail.cardId),
+      this.repo.cardMoneyTotals(merchantId, detail.cardId),
+      this.cards.recentVisits(merchantId, detail.cardId, DETAIL_LIMIT),
+      this.cards.recentLedger(merchantId, detail.cardId, DETAIL_LIMIT),
+    ]);
+    if (!state) throw new NotFoundException({ error: 'Cliente no encontrado' });
+
+    const ltvCentavos = Number(totals.ltvCentavos ?? 0);
+    const totalTopupCentavos = Number(totals.topupCentavos ?? 0);
+
+    return {
+      id: detail.id,
+      name: detail.name,
+      phone: detail.phone,
+      email: detail.email,
+      device: null,
+      os: null,
+      // A date, not an instant. `merchant.customer.birthday` is a DATE, and
+      // rendering it through an ISO timestamp would move it a day in some zones.
+      birthDate: detail.birthday ? isoDate(detail.birthday) : null,
+      cardNumber: detail.cardNumber,
+      cardId: detail.cardId,
+      balanceMXN: formatMxn2(state.balance_cents),
+      balanceCentavos: state.balance_cents,
+      totalVisits: state.total_visits,
+      visitsThisCycle: state.visits_this_cycle,
+      visitsRequired: state.visits_required,
+      pendingRewards: state.pending_rewards,
+      lastVisit: visits[0] ? visits[0].occurred_at.toISOString() : null,
+      createdAt: iso(detail.createdAt ?? detail.cardCreatedAt),
+      ltvCentavos,
+      ltvMXN: formatMxn2(ltvCentavos),
+      totalTopupCentavos,
+      totalTopupMXN: formatMxn2(totalTopupCentavos),
+      recentVisits: visits.map((v) => ({ id: v.id, scannedAt: v.occurred_at.toISOString() })),
+      recentTransactions: ledger.map((t) => ({
+        id: t.id,
+        type: t.reason,
+        amountCentavos: t.delta,
+        description: t.note,
+        createdAt: t.created_at.toISOString(),
+      })),
+    };
   }
 }
