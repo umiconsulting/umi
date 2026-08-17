@@ -51,13 +51,25 @@ export class CartTools {
   }
 
   /** Last-write-wins cart write. There is no CAS, so the write always lands
-   *  (the retry loop at call sites now runs a single iteration). */
+   *  (the retry loop at call sites now runs a single iteration).
+   *
+   *  `presented` records that THIS write is the one the customer sees priced, via the
+   *  `formatCartSummary` read-back the caller is about to return. It is a parameter
+   *  rather than something inferred here because the two are not the same event: an
+   *  edit that still needs a variant answers with a QUESTION, not a total, and
+   *  stamping `presented_at` there would have the confirmation frame claim the
+   *  customer saw a price they were never shown. */
   private async writeDraftCart(
     conversationId: string,
     cart: DraftCart | null,
     _expectedVersion: number,
+    presented: boolean,
   ): Promise<boolean> {
-    await this.conversations.setDraftCart(conversationId, cart);
+    const next =
+      presented && cart && cart.items.length > 0
+        ? { ...cart, presented_at: new Date().toISOString() }
+        : cart;
+    await this.conversations.setDraftCart(conversationId, next);
     return true;
   }
 
@@ -167,7 +179,7 @@ export class CartTools {
         });
       }
       const cart = buildDraftCart(items, input.customer_note ?? seedCart?.customer_note ?? null);
-      const wrote = await this.writeDraftCart(ctx.conversationId, cart, version);
+      const wrote = await this.writeDraftCart(ctx.conversationId, cart, version, true);
       if (!wrote) continue;
       return {
         success: true,
@@ -205,7 +217,7 @@ export class CartTools {
       }
 
       if (input.action === 'clear') {
-        const wrote = await this.writeDraftCart(ctx.conversationId, null, version);
+        const wrote = await this.writeDraftCart(ctx.conversationId, null, version, false);
         if (!wrote) continue;
         return {
           success: true,
@@ -267,7 +279,7 @@ export class CartTools {
             : item,
         );
         const nextCart = buildDraftCart(items, cart.customer_note ?? null);
-        const wrote = await this.writeDraftCart(ctx.conversationId, nextCart, version);
+        const wrote = await this.writeDraftCart(ctx.conversationId, nextCart, version, true);
         if (!wrote) continue;
         return {
           success: true,
@@ -288,7 +300,12 @@ export class CartTools {
         );
       }
       const nextCart = edit.cart.items.length > 0 ? edit.cart : null;
-      const wrote = await this.writeDraftCart(ctx.conversationId, nextCart, version);
+      const wrote = await this.writeDraftCart(
+        ctx.conversationId,
+        nextCart,
+        version,
+        !edit.keptMissing,
+      );
       if (!wrote) continue;
 
       const removedText =

@@ -48,6 +48,67 @@ describe('CartTools.addToCart', () => {
       unit_price: 60,
     });
   });
+
+  // `presented_at` is what lets the next turn read a bare "ya" as a yes to a KNOWN
+  // order, so it must mean "the customer saw this priced" and nothing looser.
+  it('stamps presented_at when the write is followed by the priced summary', async () => {
+    const products = {
+      searchByQuery: vi.fn().mockResolvedValue([latte]),
+      categorySuggestions: vi.fn().mockResolvedValue([]),
+    };
+    const conversations = {
+      loadById: vi.fn().mockResolvedValue({ draftCart: null, draftCartVersion: 0 }),
+      setDraftCart: vi.fn().mockResolvedValue(1),
+    };
+    const cart = new CartTools(products as never, conversations as never);
+
+    const r = await cart.addToCart(CTX, { query: 'latte grande', quantity: 1 });
+    expect(r.summary_text).toContain('Total');
+    expect(conversations.setDraftCart.mock.calls[0][1].presented_at).toEqual(expect.any(String));
+  });
+
+  it('does NOT stamp presented_at when the edit answers with a question, not a total', async () => {
+    // editCart with an unresolved "keep only X" writes the cart and then replies with
+    // a clarification. Stamping there would have the confirmation frame tell the model
+    // the customer saw a price they were never shown.
+    const products = {
+      searchByQuery: vi.fn().mockResolvedValue([latte]),
+      categorySuggestions: vi.fn().mockResolvedValue([]),
+    };
+    const conversations = {
+      loadById: vi.fn().mockResolvedValue({
+        draftCart: {
+          items: [
+            {
+              product_id: 'p-latte',
+              product_name: 'Latte',
+              variant_name: null,
+              quantity: 1,
+              unit_price: 50,
+            },
+            {
+              product_id: 'p-tea',
+              product_name: 'Té',
+              variant_name: null,
+              quantity: 1,
+              unit_price: 40,
+            },
+          ],
+          updated_at: '2026-08-15T00:00:00Z',
+        },
+        draftCartVersion: 0,
+      }),
+      setDraftCart: vi.fn().mockResolvedValue(1),
+    };
+    const cart = new CartTools(products as never, conversations as never);
+
+    const r = await cart.editCart(CTX, { keep_query: 'capuchino' });
+
+    // The branch must actually be the clarification one, or this proves nothing.
+    expect(r.needs_clarification).toContain('capuchino');
+    expect(conversations.setDraftCart).toHaveBeenCalledTimes(1);
+    expect(conversations.setDraftCart.mock.calls[0][1]?.presented_at).toBeUndefined();
+  });
 });
 
 describe('CheckoutTools.confirmOrder', () => {

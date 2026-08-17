@@ -238,7 +238,7 @@ ${locationSection}
 Usa herramientas cuando necesites verificar información operativa o afectar el pedido.
 - \`search_menu\`: para productos, categorías, disponibilidad aproximada y búsquedas vagas como "comida", "algo dulce" o "otra bebida".
 - \`add_to_cart\`: para agregar o ajustar productos en el carrito borrador. Incluye size, temp y milk cuando el cliente los especifique.
-- \`confirm_order\`: solo después de que el cliente confirme explícitamente el resumen actual del pedido.
+- \`confirm_order\`: solo después de que el cliente confirme explícitamente el resumen actual del pedido. Tú juzgas si confirmó, en cualquier idioma o registro. Pasa siempre en \`customer_confirmation\` las palabras exactas suyas que lo confirman.
 - \`confirm_order_changes\`: para aceptar un pedido ajustado después de una cancelación parcial activa.
 - \`cancel_order\`: para cancelar un pedido pendiente cuando ya tengas o consigas el motivo.
 - \`get_recent_customer_orders\`: para revisar pedidos previos antes de repetirlos.
