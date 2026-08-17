@@ -33,6 +33,13 @@ export interface PreviewInput {
   qrPayload: string;
 }
 
+export interface SealsInput {
+  cardId: string;
+  seals: number;
+  note?: string;
+  idempotencyKey?: string;
+}
+
 export interface ScanInput {
   qrPayload: string;
   action?: string;
@@ -284,6 +291,103 @@ export class CashScanService {
         ? { id: activeBirthday.id, rewardName: cfg?.birthdayRewardName ?? null }
         : null,
     };
+  }
+
+  /**
+   * "Agregar sellos" — credit several stamps in one action.
+   *
+   * WHY THIS EXISTS. Kalala migrated from an external loyalty provider whose
+   * stamps we cannot import. Staff read the count off the customer's old card on
+   * site and enter it here, once. Without it every migrated customer silently
+   * restarts at zero, and the customer sees that on her own phone.
+   *
+   * It is a manual, value-bearing credit, so every guard below is a refusal:
+   * the café must have the path enabled, the card must be the café's, and the
+   * operator must be a real staff member — an unattributable bulk credit is not
+   * written at all.
+   *
+   * It deliberately does NOT observe the once-per-day visit cap. That cap stops a
+   * customer being stamped twice for one coffee; this is a correction for coffees
+   * already bought elsewhere, and it is the whole point that it lands today.
+   */
+  async seals(merchantId: string, userId: string, input: SealsInput) {
+    const cfg = await this.repo.merchantConfig(merchantId);
+    // Defence in depth — the register already hides the control when it is off.
+    if (!cfg?.multiSealEnabled) {
+      throw new ForbiddenException({ error: 'Función no habilitada' });
+    }
+
+    const card = await this.cards.findCard(merchantId, input.cardId);
+    if (!card) throw new NotFoundException({ error: 'Tarjeta no encontrada' });
+
+    const [staffMemberId, userPersonId] = await Promise.all([
+      this.cards.getStaffMemberId(merchantId, userId),
+      this.cards.getUserPersonId(userId),
+    ]);
+    // Fail closed on attribution: a bulk credit is the most abusable write in the
+    // register, so it must name the staff member who made it.
+    if (!staffMemberId) {
+      throw new ForbiddenException({ error: 'Tu usuario no está registrado como personal' });
+    }
+    // Same refusal the scan makes, and it matters more here: a scan credits one
+    // stamp to yourself, this credits fifty. umi-cash checks it on the scan only.
+    if (userPersonId && userPersonId === card.person_id) {
+      throw new ForbiddenException({ error: 'No puedes escanear tu propia tarjeta' });
+    }
+
+    const credited = await this.repo.creditSeals({
+      merchantId,
+      cardId: card.id,
+      staffMemberId,
+      seals: input.seals,
+      note: input.note ?? null,
+      // Kept NULL when the register sends none. Minting one here would look like
+      // idempotency and provide none — a fresh key can never match a retry.
+      idempotencyKey: input.idempotencyKey ?? null,
+    });
+
+    // Rewards THIS action minted: how many thresholds the credit crossed from
+    // where the cycle stood. No divide-by-zero guard, because there is nothing
+    // left to guard — the threshold arrives from the derived-state query, which
+    // took the same modulo first and would have raised before returning.
+    const required = credited.visitsRequired;
+    const rewardsEarned = credited.replayed
+      ? 0
+      : Math.floor((credited.cycleBefore + input.seals) / required);
+
+    void this.walletPass.refreshCard(card.id);
+
+    return {
+      success: true,
+      seals: input.seals,
+      rewardsEarned,
+      message: this.composeSealsMessage(input.seals, rewardsEarned, credited.replayed),
+      card: {
+        visitsThisCycle: credited.card.visits_this_cycle,
+        visitsRequired: required,
+        pendingRewards: credited.card.pending_rewards,
+        balanceMXN: formatMxn2(credited.card.balance_cents),
+      },
+    };
+  }
+
+  private composeSealsMessage(seals: number, rewardsEarned: number, replayed: boolean): string {
+    const one = seals === 1;
+    const sealWord = one ? 'sello' : 'sellos';
+    // umi-cash says "Estos sello ya se habían registrado" for a credit of one.
+    // The determiner and the verb have to agree with the noun, so they do here.
+    if (replayed) {
+      return one
+        ? 'Este sello ya se había registrado'
+        : `Estos ${sealWord} ya se habían registrado`;
+    }
+
+    let message = `${seals} ${sealWord} agregado${one ? '' : 's'}`;
+    if (rewardsEarned > 0) {
+      const plural = rewardsEarned === 1 ? '' : 's';
+      message += ` · ¡${rewardsEarned} recompensa${plural} ganada${plural}!`;
+    }
+    return message;
   }
 
   private composeMessage(

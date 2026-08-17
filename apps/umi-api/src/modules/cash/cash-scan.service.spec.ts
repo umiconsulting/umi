@@ -21,6 +21,7 @@ function make() {
       timezone: 'America/Mexico_City',
       lifecycleCopy: {},
       birthdayRewardName: 'Café gratis',
+      multiSealEnabled: true,
     }),
     activeRewardConfig: vi
       .fn()
@@ -37,6 +38,19 @@ function make() {
       pending_rewards: 0,
       balance_cents: 0,
       card_number: 'KAL-1',
+    }),
+    creditSeals: vi.fn().mockResolvedValue({
+      replayed: false,
+      cycleBefore: 3,
+      visitsRequired: 10,
+      card: {
+        total_visits: 11,
+        visits_this_cycle: 1,
+        pending_rewards: 1,
+        balance_cents: 0,
+        visits_required: 10,
+        card_number: 'KAL-1',
+      },
     }),
   };
   const walletPass = { refreshCard: vi.fn().mockResolvedValue(undefined) };
@@ -289,5 +303,183 @@ describe('CashScanService — preview and commit resolve the same input', () => 
     h.cards.findCard.mockResolvedValue({ ...CARD, qr_token: 'something-else' });
 
     await expect(h.svc.preview('t1', 'u1', { qrPayload: 'KAL-1' })).resolves.toBeTruthy();
+  });
+});
+
+/**
+ * "Agregar sellos" — the catch-up credit for a customer who arrived from an
+ * external loyalty system. It is value-bearing and abuse-prone, so most of what
+ * is asserted here is a refusal.
+ */
+describe('CashScanService.seals', () => {
+  let h: ReturnType<typeof make>;
+  beforeEach(() => {
+    h = make();
+    h.cards.findCard.mockResolvedValue(CARD);
+  });
+
+  it('refuses when the café does not have the catch-up path enabled', async () => {
+    h.repo.merchantConfig.mockResolvedValue({
+      name: 'Kala',
+      timezone: 'America/Mexico_City',
+      lifecycleCopy: {},
+      birthdayRewardName: null,
+      multiSealEnabled: false,
+    });
+
+    await expect(h.svc.seals('t1', 'u1', { cardId: 'card-uuid', seals: 8 })).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(h.repo.creditSeals).not.toHaveBeenCalled();
+  });
+
+  it('refuses a card that is not this merchant’s', async () => {
+    h.cards.findCard.mockResolvedValue(null);
+
+    await expect(h.svc.seals('t1', 'u1', { cardId: 'card-uuid', seals: 8 })).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(h.repo.creditSeals).not.toHaveBeenCalled();
+  });
+
+  it('refuses an operator who is not registered staff (credit must be attributable)', async () => {
+    h.cards.getStaffMemberId.mockResolvedValue(null);
+
+    await expect(h.svc.seals('t1', 'u1', { cardId: 'card-uuid', seals: 8 })).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(h.repo.creditSeals).not.toHaveBeenCalled();
+  });
+
+  it('refuses staff crediting their own card', async () => {
+    h.cards.getUserPersonId.mockResolvedValue('p1'); // CARD.person_id
+
+    await expect(h.svc.seals('t1', 'u1', { cardId: 'card-uuid', seals: 8 })).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(h.repo.creditSeals).not.toHaveBeenCalled();
+  });
+
+  it('credits one interaction worth N stamps, attributed to the staff member', async () => {
+    await h.svc.seals('t1', 'u1', { cardId: 'card-uuid', seals: 8, idempotencyKey: 'key-1' });
+
+    expect(h.repo.creditSeals).toHaveBeenCalledWith({
+      merchantId: 't1',
+      cardId: 'card-uuid',
+      staffMemberId: 'staff-1',
+      seals: 8,
+      note: null,
+      idempotencyKey: 'key-1',
+    });
+  });
+
+  it('keeps a client-supplied note and stores none when there is none', async () => {
+    await h.svc.seals('t1', 'u1', { cardId: 'card-uuid', seals: 2, note: 'Cartilla anterior' });
+
+    expect(h.repo.creditSeals.mock.calls[0][0].note).toBe('Cartilla anterior');
+    expect(h.repo.creditSeals.mock.calls[0][0].idempotencyKey).toBeNull();
+  });
+
+  it('reports the rewards the credit itself minted', async () => {
+    // cycle 3 of 10, +8 stamps -> crosses the threshold once, 1 left over.
+    const r = await h.svc.seals('t1', 'u1', { cardId: 'card-uuid', seals: 8 });
+
+    expect(r.rewardsEarned).toBe(1);
+    expect(r.message).toContain('8 sellos agregados');
+    expect(r.message).toContain('1 recompensa ganada');
+    expect(r.card.visitsThisCycle).toBe(1);
+    expect(r.card.pendingRewards).toBe(1);
+  });
+
+  it('reports no reward when the credit does not cross the threshold', async () => {
+    h.repo.creditSeals.mockResolvedValue({
+      replayed: false,
+      cycleBefore: 3,
+      visitsRequired: 10,
+      card: {
+        total_visits: 7,
+        visits_this_cycle: 5,
+        pending_rewards: 0,
+        balance_cents: 0,
+        visits_required: 10,
+        card_number: 'KAL-1',
+      },
+    });
+
+    const r = await h.svc.seals('t1', 'u1', { cardId: 'card-uuid', seals: 2 });
+
+    expect(r.rewardsEarned).toBe(0);
+    expect(r.message).toBe('2 sellos agregados');
+  });
+
+  it('counts every threshold a large credit crosses', async () => {
+    // cycle 3 of 10, +25 stamps -> 2 full cards plus change.
+    const r = await h.svc.seals('t1', 'u1', { cardId: 'card-uuid', seals: 25 });
+
+    expect(r.rewardsEarned).toBe(2);
+    expect(r.message).toContain('2 recompensas ganadas');
+  });
+
+  it('says "sello" in the singular for a credit of one', async () => {
+    const r = await h.svc.seals('t1', 'u1', { cardId: 'card-uuid', seals: 1 });
+
+    expect(r.message).toContain('1 sello agregado');
+  });
+
+  it('mints no reward on a replay and says the seals already landed', async () => {
+    h.repo.creditSeals.mockResolvedValue({
+      replayed: true,
+      cycleBefore: 1,
+      visitsRequired: 10,
+      card: {
+        total_visits: 11,
+        visits_this_cycle: 1,
+        pending_rewards: 1,
+        balance_cents: 0,
+        visits_required: 10,
+        card_number: 'KAL-1',
+      },
+    });
+
+    const r = await h.svc.seals('t1', 'u1', { cardId: 'card-uuid', seals: 8, idempotencyKey: 'k' });
+
+    expect(r.rewardsEarned).toBe(0);
+    expect(r.message).toBe('Estos sellos ya se habían registrado');
+  });
+
+  it('agrees with the noun when a replayed credit was one seal', async () => {
+    h.repo.creditSeals.mockResolvedValue({
+      replayed: true,
+      cycleBefore: 1,
+      visitsRequired: 10,
+      card: {
+        total_visits: 4,
+        visits_this_cycle: 4,
+        pending_rewards: 0,
+        balance_cents: 0,
+        visits_required: 10,
+        card_number: 'KAL-1',
+      },
+    });
+
+    const r = await h.svc.seals('t1', 'u1', { cardId: 'card-uuid', seals: 1, idempotencyKey: 'k' });
+
+    // umi-cash says "Estos sello", which is not Spanish.
+    expect(r.message).toBe('Este sello ya se había registrado');
+  });
+
+  it('refreshes the wallet pass so the customer sees the new stamps', async () => {
+    await h.svc.seals('t1', 'u1', { cardId: 'card-uuid', seals: 8 });
+
+    expect(h.walletPass.refreshCard).toHaveBeenCalledWith('card-uuid');
+  });
+
+  it('credits even when the card was already stamped today (the daily cap is a scan rule)', async () => {
+    h.repo.visitedToday.mockResolvedValue(true);
+
+    const r = await h.svc.seals('t1', 'u1', { cardId: 'card-uuid', seals: 8 });
+
+    expect(r.success).toBe(true);
+    expect(h.repo.creditSeals).toHaveBeenCalled();
   });
 });

@@ -8,7 +8,7 @@ import { Roles } from '../auth/roles.decorator';
 import { CurrentUser, Merchant } from '../auth/current-user.decorator';
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
 import { CashScanService } from './cash-scan.service';
-import { ScanDto, ScanPreviewDto } from './dto/scan.dto';
+import { ScanDto, ScanPreviewDto, ScanSealsDto } from './dto/scan.dto';
 
 const STAFF_ROLES = ['super_admin', 'owner', 'admin', 'staff'];
 
@@ -41,5 +41,15 @@ export class CashScanController {
     @Body() dto: ScanPreviewDto,
   ) {
     return this.scan.preview(t.merchantId, user.id, dto);
+  }
+
+  /**
+   * Credit several stamps at once (catch-up for a customer who came from another
+   * loyalty system). Gated per café by `merchant.loyalty_program.multi_seal_enabled`,
+   * checked in the service — a role that may scan may not automatically bulk-credit.
+   */
+  @Post('seals')
+  seals(@Merchant() t: MerchantAccess, @CurrentUser() user: AuthUser, @Body() dto: ScanSealsDto) {
+    return this.scan.seals(t.merchantId, user.id, dto);
   }
 }
