@@ -125,6 +125,25 @@ export class CashScanRepository {
     return rows.length > 0;
   }
 
+  /**
+   * The most recent visit today, or null. `visitedToday` answers the same
+   * question with a boolean and gates the write; preview shows staff WHEN the
+   * card was last stamped, so it needs the timestamp too.
+   */
+  async lastVisitToday(merchantId: string, cardId: string, tz: string): Promise<Date | null> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<{ occurred_at: Date }>(
+        `SELECT occurred_at FROM merchant.loyalty_visit
+         WHERE merchant_id=$1::uuid AND card_id=$2::uuid
+           AND occurred_at >= (date_trunc('day', now() AT TIME ZONE $3) AT TIME ZONE $3)
+         ORDER BY occurred_at DESC
+         LIMIT 1`,
+        [merchantId, cardId, tz],
+      ),
+    );
+    return rows[0]?.occurred_at ?? null;
+  }
+
   async recentRedemptionWithin(
     merchantId: string,
     cardId: string,

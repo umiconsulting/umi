@@ -17,3 +17,12 @@ export class ScanDto {
   @IsIn(ACTIONS, { each: true })
   actions?: string[];
 }
+
+/**
+ * Preview takes only the identifier. It performs no action, so it carries none:
+ * the register decides what to commit AFTER staff read what came back.
+ */
+export class ScanPreviewDto {
+  @IsString()
+  qrPayload!: string;
+}
