@@ -12,6 +12,8 @@ export interface RewardConfig {
   id: string;
   visits_required: number;
   reward_name: string | null;
+  /** Café-authored copy, shown to the customer on her own card page. */
+  reward_description: string | null;
 }
 
 export interface ScanMerchantConfig {
@@ -86,7 +88,8 @@ export class CashScanRepository {
   async activeRewardConfig(merchantId: string): Promise<RewardConfig | null> {
     const { rows } = await this.pg.withMerchant((c) =>
       c.query<RewardConfig>(
-        `SELECT id::text, stamps_required AS visits_required, name AS reward_name
+        `SELECT id::text, stamps_required AS visits_required, name AS reward_name,
+                description AS reward_description
          FROM merchant.loyalty_reward
          WHERE merchant_id = $1::uuid AND active = true AND type = 'stamps_free_item'
          ORDER BY created_at DESC NULLS LAST LIMIT 1`,
