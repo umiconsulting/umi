@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useId } from 'react';
 import { I } from '@/icons.jsx';
-import { XSep } from '@/shell.jsx';
+import { RegionHead, XSep } from '@/shell.jsx';
 import {
   approveDevicePairing,
   createKdsStation,
@@ -100,43 +100,33 @@ const DevicesScreen = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Header */}
-      <div className="ed-head fade-up d1">
-        <div className="titles">
-          <div className="sec-index">
-            <span className="nn">A</span>
-            <span>/</span>
-            <span>
-              EN VIVO <XSep /> {devices.length} DEVICES <XSep /> {liveCount} LIVE
-              {loading && (
-                <span style={{ marginLeft: 8, fontSize: 10, opacity: 0.6 }}>· actualizando…</span>
-              )}
-            </span>
-          </div>
-          <h2>Dispositivos pareados</h2>
-          <div className="en">Dispositivos KDS vinculados</div>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            className="btn btn-ghost btn-sm focusable"
-            onClick={() => {
-              setRefresh((r) => r + 1);
-              setCountdown(POLL_INTERVAL);
-            }}
-          >
-            <I.Refresh size={14} /> Actualizar
-          </button>
-          <button className="btn btn-secondary focusable" onClick={() => setStationOpen(true)}>
-            <I.Layout size={16} /> Estaciones
-          </button>
-          <button className="btn btn-primary focusable" onClick={() => setAddOpen(true)}>
-            <I.Plus size={16} /> Añadir dispositivo
-          </button>
-        </div>
-      </div>
+      <RegionHead
+        title="Dispositivos pareados"
+        note={loading ? 'Actualizando…' : `${liveCount} en vivo ahora mismo.`}
+        count={{ value: devices.length, label: 'dispositivos' }}
+        actions={
+          <>
+            <button
+              className="btn btn-ghost btn-sm focusable"
+              onClick={() => {
+                setRefresh((r) => r + 1);
+                setCountdown(POLL_INTERVAL);
+              }}
+            >
+              <I.Refresh size={14} /> Actualizar
+            </button>
+            <button className="btn btn-secondary focusable" onClick={() => setStationOpen(true)}>
+              <I.Layout size={16} /> Estaciones
+            </button>
+            <button className="btn btn-primary focusable" onClick={() => setAddOpen(true)}>
+              <I.Plus size={16} /> Añadir dispositivo
+            </button>
+          </>
+        }
+      />
 
       {/* Devices grid */}
-      <div className="grid grid-2 fade-up d2" style={{ gap: 12 }}>
+      <div className="grid grid-2" style={{ gap: 12 }}>
         {devices.map(function (d) {
           return (
             <div
@@ -246,10 +236,12 @@ const DevicesScreen = () => {
                         'Offline'
                       )}
                     </span>
-                    <span style={{ color: 'var(--ink-4)' }}>·</span>
+                    <span style={{ color: 'var(--ink-3)' }} aria-hidden="true">
+                      ·
+                    </span>
                     <span style={{ whiteSpace: 'nowrap' }}>Visto {d.last}</span>
                     {d.status === 'offline' && !loading && (
-                      <span style={{ color: 'var(--ink-4)', fontSize: 11 }}>· en {countdown}s</span>
+                      <span style={{ color: 'var(--ink-3)', fontSize: 11 }}>· en {countdown}s</span>
                     )}
                   </div>
                 </div>
@@ -297,7 +289,7 @@ const DevicesScreen = () => {
 
       {/* Connection legend */}
       <div
-        className="card fade-up d3"
+        className="card"
         style={{
           padding: '18px 22px',
           display: 'flex',
@@ -306,19 +298,15 @@ const DevicesScreen = () => {
           flexWrap: 'wrap',
         }}
       >
-        <div className="eyebrow">Connection legend</div>
+        <div className="eyebrow">Estados</div>
         <span className="legend">
-          <span className="s-dot live" /> Live · responding under 10 s
+          <span className="s-dot live" /> En vivo · responde en menos de 10 s
         </span>
         <span className="legend">
-          <span className="s-dot slow" /> Slow · responding 10–20 s
+          <span className="s-dot slow" /> Lento · responde entre 10 y 20 s
         </span>
         <span className="legend">
-          <span className="s-dot offline" /> Offline · no heartbeat 20 s+
-        </span>
-        <span style={{ marginLeft: 'auto', fontSize: 12.5, color: 'var(--ink-3)' }}>
-          Source · <span style={{ fontFamily: 'var(--font-mono)' }}>local heartbeat</span> +{' '}
-          <span style={{ fontFamily: 'var(--font-mono)' }}>kds.device_sessions</span>
+          <span className="s-dot offline" /> Sin conexión · sin señal por más de 20 s
         </span>
       </div>
 
@@ -405,7 +393,7 @@ const PairingRequestsCard = ({ pairings, stations, onChanged }) => {
 
   return (
     <div
-      className="card fade-up d3"
+      className="card"
       style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 12 }}
     >
       <div

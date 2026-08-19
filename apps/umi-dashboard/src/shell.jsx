@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { I, UmiX } from './icons.jsx';
 
 /** Section keys as an operator reads them. The key itself is the storage form. */
@@ -81,20 +81,12 @@ const Sidebar = ({
         )}
       </div>
 
-      {sections.map((sec, si) => (
+      {sections.map((sec) => (
         <React.Fragment key={sec.name}>
-          {!collapsed && (
-            <div
-              className="side-section"
-              style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}
-            >
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--umi-blue)' }}>
-                0{si + 1}
-              </span>
-              <span>/</span>
-              <span>{SECTION_LABELS[sec.name] || sec.name}</span>
-            </div>
-          )}
+          {/* No `0{si+1} /`. The groups are not a sequence — Configuración does not
+              follow Crecimiento, and reordering the nav would not renumber
+              anything. The number was there to look considered. */}
+          {!collapsed && <div className="side-section">{SECTION_LABELS[sec.name] || sec.name}</div>}
           {sec.items.map((item) => {
             const Ic = I[item.icon] || I.Settings;
             return (
@@ -127,9 +119,7 @@ const Sidebar = ({
           {!collapsed && (
             <div className="uname" style={{ flex: 1 }}>
               <div>Owner</div>
-              <div className="sm">
-                Admin <XSep dark /> {merchantName || '—'}
-              </div>
+              <div className="sm">Admin · {merchantName || '—'}</div>
             </div>
           )}
           {!collapsed && onSignOut && (
@@ -185,92 +175,22 @@ const Sidebar = ({
 };
 
 // Network connectivity indicator — shows API health and allows manual retry.
-const NetIndicator = ({ status, latency, onRetry }) => {
-  const [spinning, setSpinning] = useState(false);
-  const timerRef = useRef(null);
 
-  // Brief spin animation when retrying
-  function handleRetry() {
-    setSpinning(true);
-    clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setSpinning(false), 1200);
-    onRetry?.();
-  }
-
-  useEffect(() => () => clearTimeout(timerRef.current), []);
-
-  const isOnline = status === 'online';
-  const isChecking = status === 'connecting';
-
-  const bg = isOnline
-    ? 'var(--success-soft)'
-    : isChecking
-      ? 'var(--canvas-2)'
-      : 'var(--danger-soft)';
-  const color = isOnline ? 'var(--success)' : isChecking ? 'var(--ink-3)' : 'var(--danger)';
-  const label = isOnline
-    ? latency != null
-      ? `${latency} ms`
-      : 'Online'
-    : isChecking
-      ? 'Conectando…'
-      : 'Sin conexión';
-  const title = isOnline
-    ? `API responde en ${latency} ms`
-    : isChecking
-      ? 'Verificando conexión con el servidor…'
-      : 'Sin conexión al servidor — click para reintentar';
-
-  return (
-    <button
-      onClick={!isOnline ? handleRetry : undefined}
-      title={title}
-      aria-label={title}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 5,
-        padding: '4px 10px',
-        borderRadius: 20,
-        fontSize: 11.5,
-        fontWeight: 500,
-        letterSpacing: '0.01em',
-        background: bg,
-        color,
-        border: 'none',
-        cursor: isOnline ? 'default' : 'pointer',
-        transition: 'background 0.2s, color 0.2s',
-        flexShrink: 0,
-      }}
-    >
-      {isChecking || spinning ? (
-        <span
-          style={{
-            width: 7,
-            height: 7,
-            borderRadius: '50%',
-            background: color,
-            opacity: 0.55,
-            animation: 'pulse-kds-check 1s ease-in-out infinite',
-          }}
-        />
-      ) : (
-        <span className={'s-dot ' + (isOnline ? 'live' : 'offline')} style={{ flexShrink: 0 }} />
-      )}
-      {label}
-      {!isOnline && !isChecking && (
-        <I.Refresh
-          size={11}
-          style={{ marginLeft: 1, opacity: spinning ? 0.4 : 0.8, transition: 'opacity 0.2s' }}
-        />
-      )}
-    </button>
-  );
-};
-
+/**
+ * The masthead.
+ *
+ * One shape for every screen: the page's name, its actions, and — between two
+ * hairlines beneath — THE DATELINE. Which café, which branch, whether the till
+ * is answering, today's date, the clock. Every field is live.
+ *
+ * It replaces three separate devices: the `01 / OPERACIONES` ordinal that opened
+ * every screen without ever being a sequence, the uppercase English gloss under
+ * every Spanish title, and the status chips that floated loose in the bar. The
+ * operator now reads their whole context on one line, in one place, always the
+ * same place.
+ */
 const Topbar = ({
   merchant,
-  status,
   onMenu,
   screen,
   merchantName,
@@ -282,147 +202,180 @@ const Topbar = ({
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches';
   const greetingName = formatMerchantGreetingName(merchantName);
+
+  // Titles only. The ordinal and the English gloss are gone: neither told the
+  // operator anything the title did not already say.
   const titles = {
-    overview: { eyebrow: '01 / OPERACIONES', title: 'Panorama', en: 'Overview' },
-    orders: { eyebrow: '02 / OPERACIONES', title: 'Pedidos WhatsApp', en: 'KDS tickets' },
-    devices: { eyebrow: '03 / OPERACIONES', title: 'Dispositivos KDS', en: 'Kitchen displays' },
-    staff: { eyebrow: '04 / OPERACIONES', title: 'Equipo y permisos', en: 'Staff & Access' },
-    customers: { eyebrow: '05 / OPERACIONES', title: 'Clientes', en: 'Customer platform' },
-    members: { eyebrow: '06 / CRECIMIENTO', title: 'Lealtad', en: 'Umi Cash members' },
-    'gift-cards': {
-      eyebrow: '07 / CRECIMIENTO',
-      title: 'Tarjetas de regalo',
-      en: 'Umi Cash cards',
-    },
-    hours: {
-      eyebrow: '08 / CONFIGURACIÓN',
-      title: 'Horario y disponibilidad',
-      en: 'Hours & Availability',
-    },
-    settings: { eyebrow: '09 / CONFIGURACIÓN', title: 'Ajustes', en: 'Settings' },
-    'products-billing': {
-      eyebrow: '10 / CONFIGURACIÓN',
-      title: 'Productos y facturación',
-      en: 'Subscription',
-    },
-    cafes: { eyebrow: '11 / PLATAFORMA', title: 'Cafés', en: 'Platform' },
+    overview: 'Panorama',
+    orders: 'Pedidos WhatsApp',
+    devices: 'Dispositivos KDS',
+    staff: 'Equipo y permisos',
+    customers: 'Clientes',
+    members: 'Lealtad',
+    'gift-cards': 'Tarjetas de regalo',
+    hours: 'Horario y disponibilidad',
+    settings: 'Ajustes',
+    'products-billing': 'Productos y facturación',
+    cafes: 'Cafés',
   };
-
-  const locationScoped = ['orders', 'devices', 'hours'].includes(screen);
-  const showLocationSelect = locationScoped && locations.length > 1;
-  const LocationSelect = () =>
-    showLocationSelect ? (
-      <select
-        className="select"
-        value={selectedLocationId || ''}
-        onChange={(e) => onLocationChange?.(e.target.value)}
-        aria-label="Sucursal"
-        style={{ height: 42, borderRadius: 10, minWidth: 170, fontSize: 13 }}
-      >
-        {locations
-          .filter((l) => l.status === 'active')
-          .map((location) => (
-            <option key={location.id} value={location.id}>
-              {location.name}
-            </option>
-          ))}
-      </select>
-    ) : null;
-
-  if (screen === 'overview') {
-    return (
-      <header
-        className="topbar fade-up"
-        style={{
-          alignItems: 'flex-end',
-          paddingBottom: 12,
-          borderBottom: '1px solid var(--ink-1)',
-        }}
-      >
-        <div className="greet">
-          <div className="sec-index" style={{ marginBottom: 14 }}>
-            <span className="nn">01</span>
-            <span>/</span>
-            <span>
-              OPERACIONES <XSep /> PANORAMA <XSep />{' '}
-              {new Date()
-                .toLocaleDateString('es-MX', {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                })
-                .toUpperCase()}
-            </span>
-          </div>
-          <h1 className="edit-display" style={{ fontSize: 54 }}>
-            {greet}
-            {greetingName ? (
-              <>
-                , <b title={merchantName}>{greetingName}</b>
-              </>
-            ) : (
-              ''
-            )}
-            .
-          </h1>
-          <div className="meta" style={{ marginTop: 14, fontSize: 13.5 }}>
-            <span>{merchant}</span>
-            <XSep />
-            <span className="sub-pill">
-              <span className="sd"></span> {status}
-            </span>
-            <XSep />
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)' }}>
-              {new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })} CST
-            </span>
-          </div>
-        </div>
-        <div className="top-actions">
-          <LocationSelect />
-          <NetIndicator
-            status={connection.status || 'connecting'}
-            latency={connection.latency}
-            onRetry={connection.retry}
-          />
-        </div>
-      </header>
-    );
-  }
 
   // ⚠️ FALLS BACK, and it did not before. A route with no entry here read
   // `undefined.eyebrow` and took the WHOLE shell down — sidebar, topbar and
   // screen — not merely its own header. A missing title is a small omission;
   // a white page is not.
-  const t = titles[screen] || { eyebrow: '— / UMI', title: screen, en: screen };
+  const title = titles[screen] || screen;
+
+  const locationScoped = ['orders', 'devices', 'hours'].includes(screen);
+  const activeLocations = locations.filter((l) => l.status === 'active');
+  const showLocationSelect = locationScoped && activeLocations.length > 1;
+  const branchName =
+    activeLocations.find((l) => l.id === selectedLocationId)?.name ||
+    (activeLocations.length === 1 ? activeLocations[0].name : null);
+
+  const netStatus = connection.status || 'connecting';
+  const isOnline = netStatus === 'online';
+  const isChecking = netStatus === 'connecting';
+  const netWord = isOnline ? 'En línea' : isChecking ? 'Conectando' : 'Sin conexión';
+  const netTone = isOnline ? 'ok' : isChecking ? 'warn' : 'bad';
+
+  const today = new Date();
+  const dateWord = today.toLocaleDateString('es-MX', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+  const clock = today.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+
   return (
-    <header
-      className="topbar fade-up"
-      style={{ alignItems: 'flex-end', paddingBottom: 12, borderBottom: '1px solid var(--ink-1)' }}
-    >
-      <div className="greet">
-        <div className="sec-index" style={{ marginBottom: 10 }}>
-          <span className="nn">{t.eyebrow.split(' / ')[0]}</span>
-          <span>/</span>
-          <span>
-            {t.eyebrow.split(' / ')[1]} <XSep /> {t.en.toUpperCase()}
-          </span>
+    <header className="topbar">
+      <div className="masthead">
+        <div className="masthead-row">
+          <h1 className="h-page">
+            {screen === 'overview' ? (
+              <>
+                {greet}
+                {greetingName ? (
+                  <>
+                    , <b title={merchantName}>{greetingName}</b>
+                  </>
+                ) : (
+                  ''
+                )}
+                .
+              </>
+            ) : (
+              title
+            )}
+          </h1>
+          <div className="top-actions">
+            {onMenu ? (
+              <button className="btn btn-ghost btn-sm focusable nav-toggle" onClick={onMenu}>
+                Menú
+              </button>
+            ) : null}
+            {showLocationSelect ? (
+              <select
+                className="select"
+                value={selectedLocationId || ''}
+                onChange={(e) => onLocationChange?.(e.target.value)}
+                aria-label="Sucursal"
+                style={{ height: 38, borderRadius: 10, minWidth: 160, fontSize: 13 }}
+              >
+                {activeLocations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.name}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+          </div>
         </div>
-        <h1 className="edit-display" style={{ fontSize: 44 }}>
-          {t.title}
-        </h1>
-      </div>
-      <div className="top-actions">
-        <LocationSelect />
-        <NetIndicator
-          status={connection.status || 'connecting'}
-          latency={connection.latency}
-          onRetry={connection.retry}
-        />
+
+        {/* The dateline. */}
+        <div className="dateline">
+          {/* The state is a button only when there is something to do about it,
+              so the operator never clicks a control that cannot act. */}
+          {isOnline || isChecking ? (
+            <span
+              title={
+                isOnline && connection.latency != null ? `${connection.latency} ms` : undefined
+              }
+            >
+              <span className={'dot ' + netTone} />
+              {netWord}
+            </span>
+          ) : (
+            <button
+              className="as-text focusable"
+              onClick={connection.retry}
+              title="Reintentar la conexión"
+            >
+              <span className={'dot ' + netTone} />
+              {netWord} · reintentar
+            </button>
+          )}
+          <span className="sep" aria-hidden="true">
+            ·
+          </span>
+          <span className="live" title={merchantName || merchant}>
+            {merchantName || merchant}
+          </span>
+          {branchName ? (
+            <>
+              <span className="sep" aria-hidden="true">
+                ·
+              </span>
+              <span>{branchName}</span>
+            </>
+          ) : null}
+          <span className="sep" aria-hidden="true">
+            ·
+          </span>
+          <span>{dateWord}</span>
+          <span className="clock">{clock}</span>
+        </div>
       </div>
     </header>
   );
 };
+
+/**
+ * The head of a region inside a screen.
+ *
+ * Every region used to open with an ordinal — `A /`, `B /`, `E /` — above its
+ * title, and an English gloss beneath. Twenty-one of them, and the ordinals were
+ * never a sequence: nothing followed A to B, and reordering the page would not
+ * have changed a letter. A label that appears on everything ranks nothing.
+ *
+ * So this component has no slot for one. What a region gets is its name, one
+ * plain line when the name is not enough, the live figure that region is about,
+ * and its actions. If a caller wants an ordinal back, it has to add the slot —
+ * which is the point.
+ *
+ *   title    the region's name
+ *   note     one sentence, only when it says something the title does not
+ *   count    { value, label } — a live figure, set in mono on the figure axis
+ *   actions  the region's controls
+ */
+const RegionHead = ({ title, note, count, actions, children }) => (
+  <div className="ed-head">
+    <div className="titles">
+      <h2>{title}</h2>
+      {note ? <div className="en">{note}</div> : null}
+      {children}
+    </div>
+    {count || actions ? (
+      <div className="actions">
+        {count ? (
+          <span className="head-count">
+            <b>{count.value}</b> {count.label}
+          </span>
+        ) : null}
+        {actions}
+      </div>
+    ) : null}
+  </div>
+);
 
 // Tiny sparkline component
 const Spark = ({ data, up = true, width = 96, height = 28 }) => {
@@ -480,4 +433,4 @@ const MiniBars = ({ data, accent = 'var(--info)' }) => {
   );
 };
 
-export { Sidebar, Topbar, Spark, MiniBars, XSep };
+export { Sidebar, Topbar, RegionHead, Spark, MiniBars, XSep };

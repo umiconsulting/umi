@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { I } from '@/icons.jsx';
-import { XSep } from '@/shell.jsx';
+import { RegionHead, XSep } from '@/shell.jsx';
 import { useConversationsData } from '@/data.jsx';
 
 const ConversationsScreen = () => {
@@ -13,22 +13,17 @@ const ConversationsScreen = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div className="ed-head fade-up d1">
-        <div className="titles">
-          <div className="sec-index">
-            <span className="nn">A</span>
-            <span>/</span>
-            <span>
-              CONVERSAFLOW <XSep /> {total.toLocaleString('es-MX')} THREADS <XSep /> {active} ACTIVE
-            </span>
-          </div>
-          <h2>Conversaciones WhatsApp</h2>
-          <div className="en">Conversaciones recientes</div>
-        </div>
-        {loading && <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>Cargando…</span>}
-      </div>
+      <RegionHead
+        title="Conversaciones WhatsApp"
+        note={
+          loading
+            ? 'Cargando…'
+            : `${active} conversación${active === 1 ? '' : 'es'} activa${active === 1 ? '' : 's'} ahora mismo.`
+        }
+        count={{ value: total.toLocaleString('es-MX'), label: 'en total' }}
+      />
 
-      <div className="log-list fade-up d2">
+      <div className="log-list">
         {conversations.length === 0 && !loading && (
           <div
             className="card"

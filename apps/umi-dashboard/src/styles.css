@@ -23,7 +23,12 @@ body {
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  min-width: 1280px; /* design width — pane scrolls below this */
+  /* No `min-width: 1280px`. The console is read behind a counter on a laptop AND
+     on an iPad on the floor, and the fixed floor turned the second case into a
+     pinch-and-scroll exercise. Below 1080 the sidebar becomes a drawer and the
+     dense regions stack; wide tables scroll inside their own container rather
+     than pushing the page sideways. */
+  min-width: 0;
 }
 button {
   font-family: inherit;
@@ -48,41 +53,83 @@ button:focus {
   box-shadow: 0 0 0 3px rgba(118, 146, 203, 0.32);
 }
 
-/* Eyebrow / display / body */
-.eyebrow {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
-.eyebrow.on-warm {
-  color: var(--ink-warm-mute);
-}
-.eyebrow.on-dark {
-  color: rgba(240, 244, 255, 0.5);
-}
+/* ============================================================
+   TYPE — three voices, deployed by role, never by mood
+   ------------------------------------------------------------
+   display (Fraunces)  page titles and figures ≥ 26px. Roman always;
+                       an italicised word in a heading is the most
+                       reliable tell there is.
+   body (Source Sans)  every other word on the screen.
+   mono (JetBrains)    codes, ids, clock times, and any COLUMN of
+                       figures — always with tabular-nums, so the
+                       digits stack on a shared axis.
 
+   `opsz` is what lets one family carry a 44px title and a 28px
+   figure: the face redraws for the size instead of being scaled.
+   ============================================================ */
 .display {
   font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-variation-settings:
+    'opsz' 96,
+    'SOFT' 0,
+    'WONK' 0;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: -0.014em;
   line-height: 1;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 .h-page {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 30px;
+  font-variation-settings:
+    'opsz' 144,
+    'SOFT' 0,
+    'WONK' 0;
+  font-style: normal;
+  font-weight: 400;
+  font-size: clamp(28px, 2.6vw, 38px);
   letter-spacing: -0.018em;
-  line-height: 1.1;
+  line-height: 1.06;
   margin: 0;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 .h-section {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 18px;
-  letter-spacing: -0.01em;
+  font-variation-settings:
+    'opsz' 36,
+    'SOFT' 0,
+    'WONK' 0;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 19px;
+  letter-spacing: -0.006em;
+  line-height: 1.2;
   margin: 0;
+}
+/* A caption in the body face — the console's ONE small-caps device. It is used
+   for column heads and the dateline, and nowhere else, so it keeps meaning. */
+.eyebrow {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.eyebrow.on-warm {
+  color: var(--ink-warm-soft);
+}
+.eyebrow.on-dark {
+  color: rgba(240, 244, 255, 0.62);
+}
+/* Any run of figures the eye has to compare down a column. */
+.figures,
+table td,
+table th {
+  font-variant-numeric: tabular-nums lining-nums;
 }
 .muted {
   color: var(--ink-3);
@@ -285,6 +332,7 @@ button:focus {
    ============================================================ */
 .main {
   padding: 28px 36px 56px;
+  overflow-x: clip;
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -292,42 +340,54 @@ button:focus {
   min-width: 0;
   width: 100%;
 }
+/* The masthead block: title row, then the dateline. One shape on every screen. */
 .topbar {
+  display: block;
+}
+.masthead {
+  display: flex;
+  flex-direction: column;
+}
+.masthead-row {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 24px;
+  gap: 20px;
   flex-wrap: wrap;
+  min-width: 0;
 }
-.greet .hello {
-  font-family: var(--font-display);
-  font-weight: 300;
-  font-size: 36px;
-  letter-spacing: -0.022em;
-  line-height: 1.04;
-  margin: 0 0 6px;
-}
-.greet .hello b {
+/* The café's own name is the one word set in the display weight — the greeting
+   around it stays light, so the eye lands on whose console this is. */
+.masthead-row .h-page b {
   font-weight: 600;
 }
-.greet .meta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--ink-2);
-  font-size: 14px;
-}
-.greet .meta .dot {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: var(--ink-4);
-}
-
 .top-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
+  flex-shrink: 0;
+}
+/* A control that reads as running text: used where a status word is also the
+   way to act on that status. It keeps the affordance without adding a chip. */
+.as-text {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  padding: 0;
+  border: none;
+  background: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  text-underline-offset: 3px;
+  text-decoration: underline;
+  text-decoration-color: var(--ink-4);
+  text-decoration-thickness: 1px;
+}
+.as-text:hover {
+  text-decoration-color: currentColor;
 }
 
 /* Buttons */
@@ -611,6 +671,12 @@ button:focus {
 .delta.up {
   color: var(--success);
   background: var(--success-soft);
+}
+/* No movement measured. Not growth, not decline — so neither colour. */
+.delta.none {
+  color: var(--ink-3);
+  background: var(--canvas-2);
+  font-weight: 400;
 }
 .delta.down {
   color: var(--danger);
@@ -1108,34 +1174,45 @@ textarea.input {
     transform: translateY(0);
   }
 }
+/* ------------------------------------------------------------
+   ARRIVAL — one orchestrated move, not forty-eight
+   ------------------------------------------------------------
+   Every card carried `fade-up d1..d4`, so each screen staggered itself in
+   piece by piece and never settled. The screen now arrives ONCE, as a whole,
+   keyed on the route — which is the only moment where motion tells the
+   operator something true: this is a different page than the last one.
+
+   `.fade-up` survives as a no-op so no screen has to be edited to remove a
+   class that no longer means anything; the delay variants are gone.
+   ------------------------------------------------------------ */
+.screen-body {
+  /* OPACITY ONLY, and that is load-bearing. A transform on this element would make
+     it the containing block for every `position: fixed` descendant — and every
+     sheet in the console is one. `animation-fill-mode: both` keeps the final
+     keyframe applied, so even `translateY(0)` would hold that containing block
+     open forever and lay each sheet out against the screen body instead of the
+     viewport: a clipped panel with its fields cut off. `filter` and `perspective`
+     do the same thing. The rise is not worth the bug. */
+  animation: screen-arrive var(--dur-2) var(--ease-out) both;
+}
+@keyframes screen-arrive {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 .fade-up {
-  animation: fade-up 0.4s var(--ease) both;
-  animation-fill-mode: forwards;
+  animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
+  .screen-body,
   .fade-up {
     animation: none;
     opacity: 1;
     transform: none;
   }
-}
-.fade-up.d1 {
-  animation-delay: 0.04s;
-}
-.fade-up.d2 {
-  animation-delay: 0.08s;
-}
-.fade-up.d3 {
-  animation-delay: 0.12s;
-}
-.fade-up.d4 {
-  animation-delay: 0.16s;
-}
-.fade-up.d5 {
-  animation-delay: 0.2s;
-}
-.fade-up.d6 {
-  animation-delay: 0.24s;
 }
 
 /* ============================================================
@@ -1519,21 +1596,6 @@ time,
 }
 
 /* Section index numerals (broadsheet style) */
-.sec-index {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 10px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
-.sec-index .nn {
-  color: var(--umi-navy);
-  font-weight: 600;
-}
-
 /* Editorial display — super-tight, super-large, light weight */
 .edit-display {
   font-family: var(--font-display);
@@ -1593,13 +1655,16 @@ time,
   color: var(--ink-warm);
   line-height: 1.1;
 }
+/* Sentence case, at reading size. It was uppercase-tracked, which made it a
+   second eyebrow under a heading that already said what the card holds. */
 .hero-metric .lbl-en {
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-warm-mute);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-warm-soft);
   margin-top: 4px;
-  font-weight: 600;
+  font-weight: 400;
+  line-height: 1.4;
 }
 .hero-metric .big {
   font-family: var(--font-display);
@@ -1649,26 +1714,26 @@ time,
   position: relative;
 }
 .strip-metric .lbl {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-weight: 600;
-  font-size: 14px;
-  color: var(--ink-1);
-  letter-spacing: -0.008em;
-  line-height: 1.15;
+  font-size: 13.5px;
+  color: var(--ink-2);
+  letter-spacing: 0;
+  line-height: 1.3;
 }
-.strip-metric .en {
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  font-weight: 600;
-  margin-top: 3px;
-}
+/* The figure is the point of the row, so it takes the display face and the
+   whole optical-size range. `slashed-zero` because a café reads these as
+   amounts, and a zero must never be mistaken for an O. */
 .strip-metric .val {
   font-family: var(--font-display);
-  font-weight: 300;
-  font-size: 34px;
-  letter-spacing: -0.03em;
+  font-variation-settings:
+    'opsz' 72,
+    'SOFT' 0,
+    'WONK' 0;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 32px;
+  letter-spacing: -0.02em;
   line-height: 1;
   color: var(--ink-1);
   font-variant-numeric: tabular-nums slashed-zero;
@@ -1697,6 +1762,16 @@ time,
 .strip-metric .delta-mini.down {
   color: var(--danger);
   background: var(--danger-soft);
+}
+/* No comparison available. It says so in words rather than wearing a coloured
+   pill that implies a movement nobody measured. */
+.strip-metric .delta-mini.none {
+  color: var(--ink-3);
+  background: none;
+  padding: 3px 0;
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0.04em;
 }
 
 /* Live event ticker */
@@ -1850,34 +1925,163 @@ time,
 }
 
 /* Editorial section header — broadsheet rule */
+/* ============================================================
+   REGION HEAD
+   ------------------------------------------------------------
+   The console used to open every card with `01 /`, `A /`, `E /` above the
+   title, and an English gloss beneath it. Twenty-one of them. A label that
+   appears on everything ranks nothing — and the numbers were never a
+   sequence, so they encoded nothing either. Both are gone.
+
+   What remains is what a region actually needs: its name, one line of
+   explanation when the name is not enough, and its actions. Single column,
+   one hairline underneath.
+   ============================================================ */
 .ed-head {
   display: flex;
-  align-items: baseline;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 24px;
-  padding-bottom: 14px;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
   margin-bottom: 18px;
-  border-bottom: 1px solid var(--ink-1);
+  border-bottom: 1px solid var(--line);
 }
 .ed-head .titles {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
+  min-width: 0;
 }
 .ed-head h2 {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 22px;
-  letter-spacing: -0.014em;
+  font-variation-settings:
+    'opsz' 40,
+    'SOFT' 0,
+    'WONK' 0;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 20px;
+  letter-spacing: -0.008em;
   margin: 0;
-  line-height: 1.05;
+  line-height: 1.15;
 }
+/* One line of plain explanation, in the body face at reading size. It replaces
+   the uppercase English gloss, which said the same thing in another language
+   and set it as decoration. */
 .ed-head .titles .en {
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-3);
+  font-weight: 400;
+  line-height: 1.4;
+  max-width: 62ch;
+}
+.ed-head .actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* A dot legend beside a region's actions: the dot and its word together, so the
+   state never depends on telling the hues apart. */
+.dot-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
   font-size: 11px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-3);
-  font-weight: 600;
+  white-space: nowrap;
+}
+.dot-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The live figure a region is about, set on the figure axis so the eye can
+   compare it across regions without reading the label twice. */
+.head-count {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.head-count b {
+  font-weight: 500;
+  color: var(--ink-1);
+}
+
+/* ============================================================
+   THE DATELINE — this console's one signature device
+   ------------------------------------------------------------
+   A single typeset line between two hairlines, directly under the page
+   title: which café, which branch, whether the till is answering, and the
+   local clock. It is a masthead dateline, and it earns its place the way a
+   newspaper's does — every field is live, none is decoration.
+
+   It absorbs three things that used to be scattered: the ordinal eyebrow,
+   the English gloss, and the loose status chips in the top bar.
+   ============================================================ */
+.dateline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 14px;
+  padding: 7px 0;
+  margin-top: 12px;
+  border-top: 1px solid var(--ink-1);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.dateline > * {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.dateline .sep {
+  color: var(--ink-4);
+  letter-spacing: 0;
+}
+.dateline .live {
+  color: var(--ink-1);
+}
+/* The state dot is the only place the console uses colour to mean status in
+   the dateline; the word beside it carries the same meaning for anyone who
+   cannot separate the hues. */
+.dateline .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ink-4);
+  flex-shrink: 0;
+}
+.dateline .dot.ok {
+  background: var(--success);
+}
+.dateline .dot.warn {
+  background: var(--warning);
+}
+.dateline .dot.bad {
+  background: var(--danger);
+}
+.dateline .clock {
+  margin-left: auto;
+  color: var(--ink-3);
 }
 
 /* Sidebar — X-mark active instead of left bar */
@@ -2869,5 +3073,129 @@ time,
   }
   .login-form-pane {
     padding: 44px 28px;
+  }
+}
+
+/* An em-dash standing in for a value the console does not have. It was drawn in
+   --ink-4 inline, which failed the text-contrast bar, and a screen reader
+   announced it as nothing at all — the cell simply went silent. It now carries
+   its own reading. */
+.no-value {
+  color: var(--ink-3);
+}
+.no-value::after {
+  content: '—';
+}
+
+/* ------------------------------------------------------------
+   SPLIT — the console's one two-pane layout
+   ------------------------------------------------------------
+   A main column and a narrower companion beside it. It was written inline in
+   six places with six slightly different ratios, which is also why none of them
+   could respond: an inline `gridTemplateColumns` beats any media query, so at
+   390px the hero column was crushed to 110px and clipped its own figure.
+   ------------------------------------------------------------ */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.split.even {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.split.wide-gap {
+  gap: 24px;
+}
+.split.tight {
+  gap: 12px;
+}
+
+/* ============================================================
+   NARROW — tablet and phone
+   ------------------------------------------------------------
+   The console keeps its density on a laptop. Below 1080 the sidebar leaves the
+   grid and becomes a drawer, the masthead stacks, and every wide table scrolls
+   inside its own container so the PAGE never scrolls sideways.
+   ============================================================ */
+.nav-toggle {
+  display: none;
+}
+.side-scrim {
+  display: none;
+}
+
+@media (max-width: 1080px) {
+  .app {
+    grid-template-columns: 1fr;
+  }
+  .side {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 268px;
+    z-index: 60;
+    transform: translateX(-100%);
+    transition: transform var(--dur-2) var(--ease-out);
+    box-shadow: var(--shadow-pop);
+  }
+  .app.nav-open .side {
+    transform: translateX(0);
+  }
+  .app.nav-open .side-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(19, 31, 68, 0.34);
+  }
+  .nav-toggle {
+    display: inline-flex;
+  }
+  .main {
+    padding: 20px 20px 48px;
+  }
+  /* A table is the one thing that legitimately exceeds the pane. Its own card
+     carries the scroll, so the page never inherits one. `:has` is supported by
+     every browser this console targets; without it the table would simply be
+     clipped, which is the pre-existing behaviour, not a new failure. */
+  .card:has(> table),
+  .card:has(> .matrix),
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  table {
+    min-width: 640px;
+  }
+  .grid-3,
+  .grid-2,
+  .split,
+  .split.even {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .main {
+    padding: 16px 14px 40px;
+  }
+  .masthead-row {
+    align-items: flex-start;
+  }
+  .dateline {
+    font-size: 10px;
+    gap: 0 10px;
+  }
+  .dateline .clock {
+    margin-left: 0;
+  }
+  .ed-head {
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side {
+    transition: none;
   }
 }

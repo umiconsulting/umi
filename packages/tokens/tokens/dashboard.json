@@ -24,8 +24,8 @@
     "$description": "Ink",
     "ink-1": { "$type": "color", "$value": "#131f44" },
     "ink-2": { "$type": "color", "$value": "#4a5680" },
-    "ink-3": { "$type": "color", "$value": "#8892b3" },
-    "ink-4": { "$type": "color", "$value": "#b9c0d3" },
+    "ink-3": { "$type": "color", "$value": "#5C678F" },
+    "ink-4": { "$type": "color", "$value": "#7D8AAE" },
     "ink-warm": { "$type": "color", "$value": "#1F1410" },
     "ink-warm-soft": { "$type": "color", "$value": "#6e5a4a" },
     "ink-warm-mute": { "$type": "color", "$value": "#C4A882" }
@@ -45,11 +45,11 @@
   },
   "status": {
     "$description": "Status",
-    "success": { "$type": "color", "$value": "#4F8A4F" },
+    "success": { "$type": "color", "$value": "#447644" },
     "success-soft": { "$type": "color", "$value": "#E4F0E1" },
     "danger": { "$type": "color", "$value": "#B33A35" },
     "danger-soft": { "$type": "color", "$value": "#F4DEDB" },
-    "warning": { "$type": "color", "$value": "#B5812A" },
+    "warning": { "$type": "color", "$value": "#8F6621" },
     "warning-soft": { "$type": "color", "$value": "#F6E9D0" },
     "info": { "$type": "color", "$value": "{color.blue}" },
     "info-soft": { "$type": "color", "$value": "#DEE6F4" }
@@ -68,18 +68,18 @@
   },
   "shadow": {
     "$description": "Shadows",
-    "shadow-card": {
+    "shadow-card": { "$type": "shadow", "$value": "0 1px 2px rgba(19, 31, 68, 0.04)" },
+    "shadow-pop": {
       "$type": "shadow",
-      "$value": "0 1px 0 rgba(19, 31, 68, 0.04), 0 8px 32px -16px rgba(19, 31, 68, 0.18)"
+      "$value": "0 24px 60px -24px rgba(19, 31, 68, 0.32), 0 2px 8px rgba(19, 31, 68, 0.06)"
     },
-    "shadow-pop": { "$type": "shadow", "$value": "0 12px 40px -12px rgba(19, 31, 68, 0.25)" },
     "shadow-inner": { "$type": "shadow", "$value": "inset 0 0 0 1px rgba(19, 31, 68, 0.05)" }
   },
   "typography": {
     "$description": "Typography",
     "font-display": {
       "$type": "fontFamily",
-      "$value": "\"Source Sans 3\", \"Domus\", Georgia, serif"
+      "$value": "\"Fraunces\", \"Source Serif 4\", Georgia, serif"
     },
     "font-body": {
       "$type": "fontFamily",
@@ -92,6 +92,10 @@
   },
   "motion": {
     "$description": "Motion",
-    "ease": { "$type": "cubicBezier", "$value": "cubic-bezier(.2,.7,.2,1)" }
+    "ease": { "$type": "cubicBezier", "$value": "cubic-bezier(.2,.7,.2,1)" },
+    "ease-out": { "$type": "cubicBezier", "$value": "cubic-bezier(.16,1,.3,1)" },
+    "dur-1": { "$type": "duration", "$value": "120ms" },
+    "dur-2": { "$type": "duration", "$value": "220ms" },
+    "dur-3": { "$type": "duration", "$value": "320ms" }
   }
 }

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { I } from '@/icons.jsx';
-import { XSep } from '@/shell.jsx';
 import { useBusinessHours, saveBusinessHours } from '@/data.jsx';
 
 // Screen 4 — Business Hours & Availability
@@ -185,7 +184,7 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Pause banner */}
       <div
-        className={'card fade-up d1'}
+        className={'card '}
         style={{
           padding: 0,
           background: ordersPaused ? 'linear-gradient(90deg, #fef3eb, #fceae0)' : undefined,
@@ -259,22 +258,14 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
       </div>
 
       {/* Hours grid */}
-      <div className="grid fade-up d2" style={{ gridTemplateColumns: '1.4fr 1fr', gap: 18 }}>
+      <div className="split">
         <div className="card" style={{ padding: '22px 22px 14px' }}>
           <div className="ed-head" style={{ marginBottom: 14 }}>
             <div className="titles">
-              <div className="sec-index">
-                <span className="nn">A</span>
-                <span>/</span>
-                <span>
-                  HORARIO SEMANAL
-                  {hoursLoading && (
-                    <span style={{ marginLeft: 6, fontSize: 10, opacity: 0.5 }}>· cargando…</span>
-                  )}
-                </span>
-              </div>
               <h2>Horas de apertura</h2>
-              <div className="en">Horario de atención</div>
+              <div className="en">
+                {hoursLoading ? 'Cargando…' : 'Cuándo abre y cierra cada día de la semana.'}
+              </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <I.Clock size={14} style={{ color: 'var(--ink-3)' }} />
@@ -365,7 +356,9 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                       disabled={!h.open}
                       onChange={(e) => update(d.id, 'from', e.target.value)}
                     />
-                    <span style={{ color: 'var(--ink-4)' }}>→</span>
+                    <span style={{ color: 'var(--ink-3)' }} aria-hidden="true">
+                      →
+                    </span>
                     <input
                       type="time"
                       aria-label={`${d.label} · cierra`}
@@ -498,19 +491,13 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
       </div>
 
       {/* Bypass phones */}
-      <div className="card fade-up d3" style={{ padding: '22px' }}>
+      <div className="card" style={{ padding: '22px' }}>
         <div className="ed-head" style={{ marginBottom: 14, paddingBottom: 12 }}>
           <div className="titles">
-            <div className="sec-index">
-              <span className="nn">C</span>
-              <span>/</span>
-              <span>
-                INTERNO <XSep /> BYPASS
-              </span>
-            </div>
+            {' '}
             <h2>Teléfonos exentos</h2>
             <div className="en">
-              Bypass phones <XSep /> can place test orders when closed or paused
+              Pueden hacer pedidos de prueba aunque el negocio esté cerrado o en pausa.
             </div>
           </div>
         </div>

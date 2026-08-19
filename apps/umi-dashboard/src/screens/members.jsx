@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { I } from '@/icons.jsx';
-import { XSep } from '@/shell.jsx';
+import { RegionHead } from '@/shell.jsx';
 import { useMembersData } from '@/data.jsx';
 
 // Screen 7 — Miembros / Loyalty Members
@@ -53,47 +53,40 @@ const MembersScreen = () => {
     { value: 'recent', label: 'Más recientes' },
     { value: 'visits', label: 'Más visitas' },
     { value: 'balance', label: 'Mayor saldo' },
-    { value: 'ltv', label: 'Mayor LTV' },
+    { value: 'ltv', label: 'Mayor gasto' },
     { value: 'inactive', label: 'Más inactivos' },
   ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Header */}
-      <div className="ed-head fade-up d1">
-        <div className="titles">
-          <div className="sec-index">
-            <span className="nn">A</span>
-            <span>/</span>
-            <span>
-              UMI CASH <XSep /> {total.toLocaleString('es-MX')} MIEMBROS
-            </span>
-          </div>
-          <h2>Miembros activos</h2>
-          <div className="en">Clientes del programa · Umi Cash</div>
-        </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <select
-            aria-label="Ordenar clientes"
-            className="select"
-            style={{ height: 38, fontSize: 13, padding: '0 32px 0 12px' }}
-            value={sort}
-            onChange={(e) => {
-              setSort(e.target.value);
-              setPage(1);
-            }}
-          >
-            {SORT_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      <RegionHead
+        title="Miembros activos"
+        note="Clientes inscritos en el programa de lealtad."
+        count={{ value: total.toLocaleString('es-MX'), label: 'miembros' }}
+        actions={
+          <>
+            <select
+              aria-label="Ordenar clientes"
+              className="select"
+              style={{ height: 38, fontSize: 13, padding: '0 32px 0 12px' }}
+              value={sort}
+              onChange={(e) => {
+                setSort(e.target.value);
+                setPage(1);
+              }}
+            >
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </>
+        }
+      />
 
       {/* Search + summary strip */}
-      <div className="fade-up d2" style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
           <I.Search
             size={15}
@@ -146,7 +139,7 @@ const MembersScreen = () => {
       </div>
 
       {/* Members table */}
-      <div className="card fade-up d3" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <table className="matrix">
           <thead>
             <tr>
@@ -157,7 +150,7 @@ const MembersScreen = () => {
               <th style={{ textAlign: 'center' }}>Progreso</th>
               <th style={{ textAlign: 'center' }}>Pendientes</th>
               <th>Última visita</th>
-              <th style={{ textAlign: 'right' }}>LTV</th>
+              <th style={{ textAlign: 'right' }}>Gasto total</th>
               <th style={{ width: 44 }}></th>
             </tr>
           </thead>
@@ -189,10 +182,7 @@ const MembersScreen = () => {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div
-          className="fade-up d4"
-          style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10 }}
-        >
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
           <button
             className="btn btn-ghost btn-sm focusable"
             disabled={page <= 1}
@@ -214,38 +204,6 @@ const MembersScreen = () => {
           </button>
         </div>
       )}
-
-      {/* Data source note */}
-      <div
-        className="card fade-up d5"
-        style={{
-          padding: '14px 20px',
-          display: 'flex',
-          gap: 18,
-          alignItems: 'center',
-          flexWrap: 'wrap',
-        }}
-      >
-        <div className="eyebrow">Umi Cash</div>
-        <span className="legend">
-          <I.CreditCard size={12} style={{ verticalAlign: '-2px', marginRight: 4 }} /> LoyaltyCard ·
-          balanceCentavos en centavos
-        </span>
-        <span className="legend">
-          <I.Activity size={12} style={{ verticalAlign: '-2px', marginRight: 4 }} /> totalVisits ·
-          visitsThisCycle · pendingRewards
-        </span>
-        <span
-          style={{
-            marginLeft: 'auto',
-            fontSize: 12,
-            color: 'var(--ink-3)',
-            fontFamily: 'var(--font-mono)',
-          }}
-        >
-          GET /api/:merchantRef/admin/customers
-        </span>
-      </div>
 
       {/* Member detail slide-out */}
       {detailMember && (
@@ -351,7 +309,7 @@ const MemberRow = ({ customer: c, fmtBalance, fmtDate, fmtAgo, onDetail, isSelec
             {c.pendingRewards} 🎁
           </span>
         ) : (
-          <span style={{ color: 'var(--ink-4)', fontSize: 12 }}>—</span>
+          <span className="no-value" style={{ fontSize: 12 }} aria-label="Sin dato" />
         )}
       </td>
       {/* Last visit */}
@@ -418,7 +376,7 @@ const MemberDetail = ({ member: c, fmtBalance, fmtDate, onClose }) => {
 
         <div className="sheet-body">
           {/* Key stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="split even tight">
             <StatCard
               label="Saldo · monedero"
               value={fmtBalance(c.balanceCentavos)}

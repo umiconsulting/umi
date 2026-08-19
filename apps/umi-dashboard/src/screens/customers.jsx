@@ -5,10 +5,10 @@ import { XSep } from '@/shell.jsx';
 import { useCustomerDetail, useCustomerInsights, useCustomersData } from '@/data.jsx';
 
 const FILTERS = [
-  { id: '', label: 'All' },
+  { id: '', label: 'Todos' },
   { id: 'whatsapp', label: 'WhatsApp' },
   { id: 'cash', label: 'Lealtad' },
-  { id: 'memory', label: 'Memory' },
+  { id: 'memory', label: 'Notas' },
   { id: 'review', label: 'Review' },
 ];
 
@@ -178,7 +178,7 @@ function CustomersList({ selectedId }) {
       </div>
 
       <div className="customer-list-head">
-        <span>{loading ? 'Loading' : total.toLocaleString('en-US')} customers</span>
+        <span>{loading ? 'Cargando…' : `${total.toLocaleString('es-MX')} clientes`}</span>
         <span>{data?.source || 'customer platform'}</span>
       </div>
 
@@ -470,10 +470,10 @@ function CustomerProfile({ customerId }) {
     return (
       <section className="customer-profile placeholder">
         <I.Users2 size={34} />
-        <strong>Select a customer</strong>
+        <strong>Elige un cliente</strong>
         <span>
-          Customer timeline, WhatsApp conversations, orders, loyalty, notes, and identity review are
-          shown together.
+          Aquí verás su historial, sus conversaciones de WhatsApp, sus pedidos, su lealtad y tus
+          notas, todo junto.
         </span>
       </section>
     );
@@ -509,11 +509,7 @@ function CustomerProfile({ customerId }) {
         <div className="profile-title">
           <span className="avatar-lg customer-avatar large">{initials(customer.displayName)}</span>
           <div>
-            <div className="sec-index">
-              <span className="nn">C</span>
-              <span>/</span>
-              <span>CUSTOMER 360</span>
-            </div>
+            {' '}
             <h2>{customer.displayName || 'Unknown customer'}</h2>
             <p>
               {customer.normalizedPhone || customer.phone || '-'}
@@ -610,18 +606,12 @@ export default function CustomersScreen() {
 
   return (
     <div className="customers-screen">
-      <div className="ed-head fade-up d1">
+      <div className="ed-head">
         <div className="titles">
-          <div className="sec-index">
-            <span className="nn">A</span>
-            <span>/</span>
-            <span>
-              CUSTOMERS <XSep /> WHATSAPP INSIDE CUSTOMER PROFILES
-            </span>
-          </div>
+          {' '}
           <h2>Clientes</h2>
           <div className="en">
-            Unified customer profiles across WhatsApp, orders, loyalty, wallet, and memory.
+            Un perfil por cliente: WhatsApp, pedidos, lealtad, monedero y notas.
           </div>
         </div>
         <div className="customer-head-stats">
@@ -637,7 +627,7 @@ export default function CustomersScreen() {
         </div>
       </div>
 
-      <div className="customers-layout fade-up d2">
+      <div className="customers-layout">
         <CustomersList selectedId={customerId} />
         <CustomerProfile customerId={customerId} />
       </div>
