@@ -376,6 +376,16 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     },
   },
   {
+    // Opening a café. In the table because the dashboard's onboarding form calls
+    // it by path (AB#108), which is the scope rule this file states: a route a
+    // SHARED CLIENT imports belongs here, and umi-api's internal handlers do not.
+    id: 'merchants.provision',
+    method: 'POST',
+    path: '/api/merchants',
+    params: E,
+    dart: null,
+  },
+  {
     id: 'merchants.capabilities',
     method: 'GET',
     path: '/api/merchants/:merchantId/capabilities',
