@@ -7,7 +7,7 @@ import type { AppConfig } from '../../shared/config/config.schema';
 
 /**
  * Cash CUSTOMER session — ported from umi-cash `createSession`. Signs the
- * customer access (24h, {sub, role, merchantId}) + refresh (30d, {sub}) JWTs with
+ * customer access (15m, {sub, role, merchantId}) + refresh (30d, {sub}) JWTs with
  * the SAME `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET` umi-cash uses (so the token
  * works on umi-cash's customer endpoints during coexistence) and persists the
  * refresh token's SHA-256 HASH to `runtime.session` (build-v2 stores `token_hash`,
@@ -72,12 +72,25 @@ export class CustomerSessionService {
    */
   async signAccessToken(subjectId: string, role: string, merchantId: string): Promise<string> {
     if (!this.accessKey) throw new Error('JWT_ACCESS_SECRET not configured.');
-    return new SignJWT({ sub: subjectId, role, merchantId })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setJti(randomUUID())
-      .setIssuedAt()
-      .setExpirationTime('24h')
-      .sign(this.accessKey);
+    return (
+      new SignJWT({ sub: subjectId, role, merchantId })
+        .setProtectedHeader({ alg: 'HS256' })
+        .setJti(randomUUID())
+        .setIssuedAt()
+        // ⚠️ FIFTEEN MINUTES, and it must stay that. This is umi-cash's number
+        // (`lib/auth.ts:40`) and it is load-bearing: the access token is a BEARER
+        // that no route re-checks against `runtime.session`, so nothing can revoke
+        // one before it expires. `/auth/refresh` re-derives the role and the
+        // membership from the database, which makes the refresh — not the logout —
+        // the effective revocation point.
+        //
+        // The port shipped 24h here while the comment above `refresh()` claimed
+        // "losing a role takes effect in minutes". A fired barista would have kept
+        // the register for a day. `authedFetch` refreshes on 401 transparently, so
+        // the short life costs an operator nothing.
+        .setExpirationTime('15m')
+        .sign(this.accessKey)
+    );
   }
 
   /**
