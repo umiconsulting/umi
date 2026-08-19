@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuthRepository } from '../auth/auth.repository';
+import { upgradeCredentialIfLegacy } from '../auth/credential-upgrade';
 import { PasswordService } from '../../shared/auth/password.service';
 import { CustomerSessionService } from './customer-session.service';
 import { legacyRole, type LegacyRole } from './cash-roles';
@@ -36,12 +37,11 @@ export interface CashLoginResult {
  * `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET`, because that is what the frozen
  * umi-cash client sends and stores.
  *
- * SCRYPT ONLY, and that is not an omission. umi-cash accepted a bare `salt:hash`
- * sha256 as well, and porting that branch would carry a crackable scheme into
- * build-v3. It is unnecessary: `backfill_identity.sql` force-resets every
- * `legacy-sha256-v1` credential (and every shared hash) to null with
- * `status='invited'`, so no legacy hash survives the cutover. Two accounts reset
- * their password once — see AB#109.
+ * BOTH SCHEMES, because production still holds both and nobody should be made to
+ * reset a password they still remember. `PasswordService` dispatches on the row's
+ * `password_algorithm`, and a `legacy-sha256-v1` row is re-hashed to scrypt the
+ * moment its owner signs in — so the weak scheme drains away by itself rather
+ * than by a cutover-morning reset. See AB#109.
  *
  * ⚠️ NO SECOND FACTOR HERE, matching umi-cash. A user who enrolled MFA for the
  * dashboard is not challenged for it at the register, so the register is the
@@ -73,11 +73,16 @@ export class CashAuthService {
         input.password,
         credential.passwordSalt,
         credential.passwordHash,
+        credential.passwordAlgorithm,
       );
     } else {
-      this.passwords.verify(input.password, DECOY_SALT, DECOY_HASH);
+      this.passwords.verify(input.password, DECOY_SALT, DECOY_HASH, 'scrypt-sha256-v1');
     }
     if (!credential || !passwordOk) throw new UnauthorizedException(REFUSED);
+
+    // Verified — so a legacy row can be re-hashed with the password just
+    // confirmed. Never reached on the decoy path: there is no row to upgrade.
+    upgradeCredentialIfLegacy(this.repo, this.passwords, credential, input.password);
 
     const role = await this.registerRole(merchantId, credential.userId);
     const { accessToken, refreshToken } = await this.sessions.createSession(

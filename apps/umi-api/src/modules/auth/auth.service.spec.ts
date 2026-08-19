@@ -5,6 +5,7 @@ import { AuthService, isMfaChallenge, type LoginOutcome } from './auth.service';
 function make() {
   const repo = {
     findCredentialByEmail: vi.fn(),
+    upgradeCredential: vi.fn().mockResolvedValue(undefined),
     findUserById: vi.fn(),
     findMerchantsForUser: vi.fn().mockResolvedValue([]),
     insertResetToken: vi.fn().mockResolvedValue(undefined),
@@ -12,7 +13,11 @@ function make() {
     updatePassword: vi.fn().mockResolvedValue(undefined),
     markResetTokenUsed: vi.fn().mockResolvedValue(undefined),
   };
-  const passwords = { verify: vi.fn(), hash: vi.fn() };
+  const passwords = {
+    verify: vi.fn(),
+    hash: vi.fn().mockReturnValue({ salt: 'new-salt', hash: 'new-hash' }),
+    needsUpgrade: vi.fn().mockReturnValue(false),
+  };
   const jwt = {
     signAccess: vi.fn().mockResolvedValue('access-tok'),
     signRefresh: vi.fn().mockResolvedValue('refresh-tok'),
@@ -245,5 +250,87 @@ describe('AuthService.resetPassword', () => {
     await expect(h.svc.resetPassword('x', 'newpassword')).rejects.toBeInstanceOf(
       BadRequestException,
     );
+  });
+});
+
+describe('AuthService · legacy credentials upgrade themselves', () => {
+  const LEGACY = {
+    userId: 'u1',
+    email: 'barista@kala.co',
+    displayName: 'Ana',
+    passwordSalt: 'old-salt',
+    passwordHash: 'old-hash',
+    passwordAlgorithm: 'legacy-sha256-v1',
+    mfaMethod: null,
+  };
+
+  it('passes the row’s scheme to the verifier', async () => {
+    // Without this the verifier assumes scrypt and a legacy account cannot log
+    // in at all — a silent lockout, since the refusal looks like a bad password.
+    const h = make();
+    h.repo.findCredentialByEmail.mockResolvedValue(LEGACY);
+    h.passwords.verify.mockReturnValue(true);
+
+    await h.svc.login(LEGACY.email, 'pw').catch(() => null);
+
+    expect(h.passwords.verify).toHaveBeenCalledWith(
+      'pw',
+      'old-salt',
+      'old-hash',
+      'legacy-sha256-v1',
+    );
+  });
+
+  it('re-hashes the row after a successful legacy login', async () => {
+    const h = make();
+    h.repo.findCredentialByEmail.mockResolvedValue(LEGACY);
+    h.passwords.verify.mockReturnValue(true);
+    h.passwords.needsUpgrade.mockReturnValue(true);
+
+    await h.svc.login(LEGACY.email, 'pw').catch(() => null);
+    await new Promise((r) => setImmediate(r));
+
+    expect(h.repo.upgradeCredential).toHaveBeenCalledWith('u1', 'new-salt', 'new-hash');
+  });
+
+  it('does NOT re-hash a credential that is already scrypt', async () => {
+    const h = make();
+    h.repo.findCredentialByEmail.mockResolvedValue({
+      ...LEGACY,
+      passwordAlgorithm: 'scrypt-sha256-v1',
+    });
+    h.passwords.verify.mockReturnValue(true);
+    h.passwords.needsUpgrade.mockReturnValue(false);
+
+    await h.svc.login(LEGACY.email, 'pw').catch(() => null);
+    await new Promise((r) => setImmediate(r));
+
+    expect(h.repo.upgradeCredential).not.toHaveBeenCalled();
+  });
+
+  it('never re-hashes after a FAILED login', async () => {
+    // Otherwise a wrong password would rewrite the credential — and with the
+    // wrong password's hash, locking the owner out permanently.
+    const h = make();
+    h.repo.findCredentialByEmail.mockResolvedValue(LEGACY);
+    h.passwords.verify.mockReturnValue(false);
+    h.passwords.needsUpgrade.mockReturnValue(true);
+
+    await h.svc.login(LEGACY.email, 'wrong').catch(() => null);
+    await new Promise((r) => setImmediate(r));
+
+    expect(h.repo.upgradeCredential).not.toHaveBeenCalled();
+  });
+
+  it('a failing upgrade does not fail the login', async () => {
+    // The user is already authenticated. A database hiccup during a background
+    // re-hash must not turn a good login into a 500.
+    const h = make();
+    h.repo.findCredentialByEmail.mockResolvedValue(LEGACY);
+    h.passwords.verify.mockReturnValue(true);
+    h.passwords.needsUpgrade.mockReturnValue(true);
+    h.repo.upgradeCredential.mockRejectedValue(new Error('pg down'));
+
+    await expect(h.svc.login(LEGACY.email, 'pw')).resolves.toBeTruthy();
   });
 });

@@ -8,6 +8,13 @@ export interface UserCredential {
   displayName: string | null;
   passwordSalt: string;
   passwordHash: string;
+  /**
+   * Which scheme hashed this row: `scrypt-sha256-v1` (what we write) or
+   * `legacy-sha256-v1` (inherited from umi-cash). NULL is treated as legacy.
+   * The verifier dispatches on it, and a non-scrypt row is re-hashed on the next
+   * successful login — see `PasswordService.needsUpgrade`.
+   */
+  passwordAlgorithm: string | null;
   /** null = no second factor enrolled. 'email_otp' | 'totp'. */
   mfaMethod: string | null;
 }
@@ -105,6 +112,7 @@ export class AuthRepository {
          u.full_name         AS "displayName",
          u.password_salt     AS "passwordSalt",
          u.password_hash     AS "passwordHash",
+         u.password_algorithm AS "passwordAlgorithm",
          u.mfa_method        AS "mfaMethod"
        FROM umi.user AS u
        WHERE lower(u.email) = $1
@@ -113,6 +121,34 @@ export class AuthRepository {
       [email],
     );
     return rows[0] ?? null;
+  }
+
+  /**
+   * Replace a credential in place, keeping the SAME password.
+   *
+   * Called after a legacy row verifies, so the weak `sha256(password + salt)` hash
+   * is gone from the moment its owner next signs in. The owner is never told and
+   * never has to act, which is the whole reason the backfill can carry the legacy
+   * hashes forward instead of forcing a reset.
+   *
+   * ⚠️ THE SCHEME MOVES WITH THE HASH. Writing a scrypt hash while leaving
+   * `password_algorithm` on its old value would send the next login down the
+   * sha256 branch against a scrypt hash — locking the account out with no error
+   * anywhere. All three columns or none.
+   *
+   * Best-effort by contract: the caller has already authenticated. A failure here
+   * must never turn a good login into a bad one, so the caller does not await it.
+   */
+  async upgradeCredential(userId: string, salt: string, hash: string): Promise<void> {
+    await this.pg.query(
+      `UPDATE umi."user"
+          SET password_salt = $2,
+              password_hash = $3,
+              password_algorithm = 'scrypt-sha256-v1',
+              updated_at = now()
+        WHERE id = $1::uuid`,
+      [userId, salt, hash],
+    );
   }
 
   // ── Second factor ──────────────────────────────────────────────────────────
@@ -410,10 +446,23 @@ export class AuthRepository {
     return rows[0] ?? null;
   }
 
+  /**
+   * Set a NEW password (reset flow). Always writes scrypt, so it must say so.
+   *
+   * ⚠️ `password_algorithm` IS NOT OPTIONAL HERE. `this.passwords.hash()` produces
+   * scrypt; leaving the column on a row that still reads `legacy-sha256-v1` sends
+   * the next login down the sha256 branch against a scrypt hash, which can never
+   * match. The owner is then locked out permanently and resetting again does not
+   * help, because the reset reproduces the same mismatch.
+   *
+   * This was latent until the verifier began dispatching on the column. All three
+   * columns move together — same rule as {@link upgradeCredential}.
+   */
   async updatePassword(userId: string, salt: string, hash: string): Promise<void> {
     await this.pg.query(
       `UPDATE umi.user
-       SET password_salt = $2, password_hash = $3, updated_at = now()
+       SET password_salt = $2, password_hash = $3,
+           password_algorithm = 'scrypt-sha256-v1', updated_at = now()
        WHERE id = $1::uuid`,
       [userId, salt, hash],
     );
