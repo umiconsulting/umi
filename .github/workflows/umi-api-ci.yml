@@ -195,21 +195,19 @@ jobs:
         env:
           DATABASE_URL_APP: postgresql://api_login:harness_api@localhost:5432/umi_build_v3_ci
           DATABASE_URL_WORKER: postgresql://worker_login:harness_worker@localhost:5432/umi_build_v3_ci
-          # Declared because the config schema requires it. Nothing in these four
-          # suites opens a Redis connection — verified by running them with no
-          # Redis process at all.
+          # Declared because the config schema requires it. No suite in this
+          # family opens a Redis connection — verified by running them all with
+          # no Redis process at all.
           REDIS_URL: redis://localhost:6379
-        run: |
-          npx vitest run --config vitest.integration.config.ts \
-            src/shared/database/sql-preflight.integration.ts \
-            src/shared/database/check-values.integration.ts \
-            src/shared/database/schema-parity.integration.ts \
-            src/modules/wallet/wallet-carry.integration.ts \
-            src/shared/loyalty/loyalty-stamps.integration.ts \
-            src/modules/cash/cash-seals.integration.ts \
-            src/modules/cash/cash-logout.integration.ts \
-            src/modules/cash/cash-login.integration.ts \
-            src/modules/auth/credential-upgrade.integration.ts
+        # The file list lives in ONE place — `test:integration:schema` in
+        # package.json — so a new schema-family suite is added once and runs
+        # both here and on a laptop. It used to be written out twice, and a
+        # suite that CI does not name runs nowhere at all.
+        #
+        # The MIGRATION family (`test:integration:migration`) is deliberately
+        # absent: it needs a backfilled clone of production, which CI has not
+        # got and must never have. It belongs to the P7 rehearsal.
+        run: pnpm run test:integration:schema
 
       # THE RE-RUNNABLE RULE, proven rather than written down.
       #

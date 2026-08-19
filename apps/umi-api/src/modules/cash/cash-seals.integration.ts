@@ -103,9 +103,16 @@ describe('cash bulk seals · the credit lands once', () => {
       [MERCHANT, STAMPS_PER_REWARD],
     );
     // Attribution: the credit names a staff member, so the harness needs a real one.
-    await pg.query(`INSERT INTO umi.role (id, key, name) VALUES ($1::uuid, 'staff', 'Staff')`, [
-      ROLE,
-    ]);
+    //
+    // ⚠️ THE KEY IS HARNESS-SCOPED, not 'staff'. `umi.role.key` is UNIQUE, and a
+    // backfilled target already carries a real 'staff' row under a different id —
+    // so the delete-by-id above cleared nothing and this insert died on
+    // `role_key_key`, which reads like a broken migration and is a name clash.
+    // Nothing here depends on the key's value; only the foreign key matters.
+    await pg.query(
+      `INSERT INTO umi.role (id, key, name) VALUES ($1::uuid, 'seals_harness_staff', 'Staff')`,
+      [ROLE],
+    );
     await pg.query(`INSERT INTO umi."user" (id, full_name) VALUES ($1::uuid, 'Barista')`, [USER]);
     await pg.query(
       `INSERT INTO merchant.staff (id, merchant_id, user_id, role_id, name) VALUES

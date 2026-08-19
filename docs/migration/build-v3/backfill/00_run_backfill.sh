@@ -48,6 +48,36 @@ done
 echo "== seed: RBAC role -> permission grants (source had none) =="
 psql -v ON_ERROR_STOP=1 -q -d "$DB" -v bootstrap_email="$BOOTSTRAP_EMAIL" -f "$BF/seed_rbac.sql"
 
+# ----------------------------------------------------------------------------
+# DID THE MIGRATION PRODUCE AN ADMINISTRATOR? Ask, rather than assume.
+#
+# `seed_rbac.sql` grants `super_admin` to the address it is handed, and matches it
+# against `umi.user` BY EMAIL. An address that matches nobody — the local-only
+# default, or a typo at 04:00 — grants nothing, raises nothing, and the run still
+# reports success. `umi.user_role` comes out EMPTY, and then every merchant-scoped
+# route answers 404 because `MerchantAccessGuard` finds no membership.
+#
+# Found on 2026-08-18 by the endpoint smoke: 38 routes 404'd against a clone that
+# had backfilled without a single SQL error.
+#
+# An unset BOOTSTRAP_EMAIL is a throwaway rehearsal and only warns. An address
+# that WAS given and did not land is a failure: the operator asked for an
+# administrator and did not get one.
+# ----------------------------------------------------------------------------
+GRANTS=$(psql -tAq -d "$DB" -c "select count(*) from umi.user_role where is_platform and revoked_at is null")
+if [ "$GRANTS" -eq 0 ]; then
+  if [ "${BOOTSTRAP_EMAIL}" = "bootstrap@localhost.invalid" ]; then
+    echo "   ⚠ no platform administrator: BOOTSTRAP_EMAIL was not set."
+    echo "     Fine for a throwaway. NOT fine for the cutover — nobody can administer this platform."
+  else
+    echo "   ✗ BOOTSTRAP_EMAIL='$BOOTSTRAP_EMAIL' granted nothing." >&2
+    echo "     No umi.user carries that address, so the platform has NO administrator." >&2
+    exit 1
+  fi
+else
+  echo "   platform administrator(s): $GRANTS"
+fi
+
 echo "== cross-schema FKs + RLS (data now present) =="
 for f in 50_cross_schema_fk 90_rls; do
   psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$DDL/$f.sql"
