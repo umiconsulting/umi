@@ -197,14 +197,33 @@ describe('a café adding, editing and closing its own branches', () => {
     expect(patched.longitude).toBeCloseTo(-103.3, 4);
   });
 
-  it('refuses to add a branch to a café that is not yours', async () => {
-    // The repository carries an explicit merchant predicate as well as RLS. A
-    // location created under someone else's id must not appear anywhere.
-    const other = '00000000-0000-0000-0000-000000000000';
+  it('refuses a branch whose café is not the one the request is scoped to', async () => {
+    // THE TENANCY ASSERTION, and it names its mechanism.
+    //
+    // The policy on `merchant.location` is `merchant_id = umi.current_merchant()`,
+    // taken from `app.current_merchant`, which the AuthGuard sets from the resolved
+    // membership. So the row's café must be the REQUEST's café. Here the request is
+    // scoped to a merchant that is not the one being written to, which is the shape
+    // a confused-deputy bug would take, and the database refuses it: 42501.
+    //
+    // The code is asserted rather than "it threw". A foreign key or a NOT NULL would
+    // also throw, and would keep throwing if the policy were dropped tomorrow.
+    const elsewhere = '11111111-1111-1111-1111-111111111111';
     await expect(
-      asMerchant(other, () => service.createLocation(other, { name: 'Ajena' })),
-    ).rejects.toThrow();
+      asMerchant(elsewhere, () => service.createLocation(merchantId, { name: 'Ajena' })),
+    ).rejects.toMatchObject({ code: '42501' });
     const profiles = await asMerchant(merchantId, () => service.listLocationProfiles(merchantId));
     expect(profiles.map((l) => l.name)).not.toContain('Ajena');
+  });
+
+  it('refuses a branch for a café that does not exist', async () => {
+    // Distinct from the case above and distinct in its answer: here the request and
+    // the row agree, so RLS is satisfied and the FOREIGN KEY is what refuses (23503).
+    // Worth pinning separately — reading one 'it throws' for both would hide the day
+    // the policy stopped participating.
+    const missing = '00000000-0000-0000-0000-000000000000';
+    await expect(
+      asMerchant(missing, () => service.createLocation(missing, { name: 'Fantasma' })),
+    ).rejects.toMatchObject({ code: '23503' });
   });
 });

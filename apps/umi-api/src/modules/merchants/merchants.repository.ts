@@ -560,10 +560,14 @@ export class MerchantsRepository {
    * A café's second branch, and its third.
    *
    * `merchant_id` is written from the guard-resolved access, never from the body,
-   * and the insert runs under RLS on the umi_app pool — so a merchant id the caller
-   * has no membership for inserts zero rows rather than someone else's branch. The
-   * `RETURNING` is what tells the two apart: no row back means the café was not
-   * this caller's to add to.
+   * so a caller cannot name a café at all — that is the real guarantee. RLS on the
+   * umi_app pool is the second one, and it RAISES: an insert whose merchant the
+   * request context does not own comes back `42501 new row violates row-level
+   * security policy`, not a quiet zero-row write. `locations.integration.ts` pins
+   * that code, so the test cannot start passing for some other reason.
+   *
+   * The `rows[0] ?? null` below is therefore a belt, not the mechanism. It is kept
+   * because a write that returns nothing must never be reported as a success.
    */
   async createLocation(merchantId: string, input: NewLocation): Promise<LocationProfileRow | null> {
     const { rows } = await this.pg.withMerchant((c) =>

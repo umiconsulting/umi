@@ -165,10 +165,12 @@ export class MerchantsService {
   /**
    * Open a branch.
    *
-   * The 404 is the same shape `updateLocation` throws, and it means the same thing:
-   * this café is not yours. The insert runs under RLS, so a merchant id the caller
-   * has no membership for writes nothing and returns nothing — the error is
-   * reported here, not decided here.
+   * The 404 is the same shape `updateLocation` throws. It is a backstop rather than
+   * the tenancy check: a café the caller does not own is already refused twice
+   * before this — by `MerchantAccessGuard`, which is where `merchantId` comes from,
+   * and then by RLS, which raises rather than returning nothing. This only fires if
+   * the INSERT returned no row for some other reason, and a write that returned
+   * nothing must not be reported as a success.
    */
   async createLocation(merchantId: string, input: NewLocation): Promise<LocationProfileRow> {
     const created = await this.repo.createLocation(merchantId, input);

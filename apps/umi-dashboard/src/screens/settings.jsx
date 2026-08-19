@@ -1030,6 +1030,11 @@ function NewLocationSheet({ onClose, onCreated }) {
   const valid = form.name.trim().length > 0;
 
   async function create() {
+    const problem = coordProblem(form);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -1219,6 +1224,32 @@ function coordOrNull(v) {
 }
 
 /**
+ * Why this form cannot be saved, or null.
+ *
+ * A coordinate box holding something that is not a number used to save as `null`,
+ * which CLEARS the pin — so a typo silently deleted the branch's location and
+ * reported success. Refusing the save is the honest answer: the operator can see
+ * what they typed and fix it.
+ *
+ * The ranges are the ones the schema and `@IsLatitude`/`@IsLongitude` enforce, so a
+ * number that would come back 400 is caught here with a sentence instead.
+ */
+function coordProblem(form) {
+  const pairs = [
+    ['latitude', 'La latitud', 90],
+    ['longitude', 'La longitud', 180],
+  ];
+  for (const [key, label, limit] of pairs) {
+    const t = String(form[key] ?? '').trim();
+    if (!t) continue;
+    const n = Number(t);
+    if (!Number.isFinite(n)) return `${label} debe ser un número.`;
+    if (Math.abs(n) > limit) return `${label} debe estar entre -${limit} y ${limit}.`;
+  }
+  return null;
+}
+
+/**
  * One branch, editable in place.
  *
  * WHAT IS SENT IS WHAT CHANGED. The patch below carries only the fields this row
@@ -1278,6 +1309,11 @@ function LocationProfileRow({ profile, showAliases }) {
   }
 
   async function save() {
+    const problem = coordProblem(form);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     setSaving(true);
     setSaved(false);
     setError(null);
