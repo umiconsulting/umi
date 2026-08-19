@@ -20,6 +20,7 @@ import { EntitlementGuard } from '../auth/entitlement.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RequireProduct } from '../auth/require-product.decorator';
+import { AcceptRegisterToken } from '../auth/register-token.decorator';
 import { Merchant } from '../auth/current-user.decorator';
 import type { MerchantAccess } from '../auth/auth.types';
 import type { FastifyReply } from 'fastify';
@@ -45,6 +46,7 @@ const STAFF_ROLES = ['super_admin', 'owner', 'admin', 'staff'];
  */
 @UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard)
 @RequireProduct('cash')
+@AcceptRegisterToken()
 @Controller('api/:merchantRef/admin')
 export class CashController {
   private readonly logger = new Logger(CashController.name);

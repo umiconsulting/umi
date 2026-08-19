@@ -35,6 +35,15 @@ export class MerchantAccessGuard implements CanActivate {
     const merchantId = await this.resolveMerchantId(req.params ?? {});
     if (!merchantId) throw new NotFoundException({ error: 'merchant_not_found' });
 
+    // A TILL SESSION BELONGS TO ONE CAFÉ. `createSession` writes the merchant
+    // into `runtime.session` and into the token, so a token minted at café A is
+    // not a session at café B — even when the same person legitimately works at
+    // both and membership would allow it. The dashboard cookie carries no
+    // merchant by design and is unaffected.
+    if (req.registerMerchantId && req.registerMerchantId !== merchantId) {
+      throw new NotFoundException({ error: 'merchant_not_found' });
+    }
+
     const access = await this.repo.findMembershipAccess(user.id, merchantId);
     if (!access) throw new NotFoundException({ error: 'merchant_not_found' });
 

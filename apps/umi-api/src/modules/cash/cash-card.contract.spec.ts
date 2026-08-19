@@ -49,8 +49,12 @@ describe('CashCardController · the customer card contract', () => {
   // session at a DIFFERENT café — the case the guard exists to refuse.
   const customerToken = {
     fromHeader: vi.fn(async (header?: string) => {
-      if (header === 'Bearer mine') return { subjectId: 'cust-1', merchantId: MERCHANT };
-      if (header === 'Bearer theirs') return { subjectId: 'cust-9', merchantId: 'other-cafe' };
+      // `role` is not decoration: `CustomerAuthGuard` refuses anything that is not
+      // a CUSTOMER, because the same key signs the barista's token too.
+      if (header === 'Bearer mine')
+        return { subjectId: 'cust-1', merchantId: MERCHANT, role: 'CUSTOMER' };
+      if (header === 'Bearer theirs')
+        return { subjectId: 'cust-9', merchantId: 'other-cafe', role: 'CUSTOMER' };
       return null;
     }),
   };

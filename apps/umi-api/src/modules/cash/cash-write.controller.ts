@@ -4,6 +4,7 @@ import { MerchantAccessGuard } from '../auth/merchant-access.guard';
 import { EntitlementGuard } from '../auth/entitlement.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { RequireProduct } from '../auth/require-product.decorator';
+import { AcceptRegisterToken } from '../auth/register-token.decorator';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser, Merchant } from '../auth/current-user.decorator';
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
@@ -21,6 +22,7 @@ const STAFF_ROLES = ['super_admin', 'owner', 'admin', 'staff'];
  */
 @UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard, RolesGuard)
 @RequireProduct('cash')
+@AcceptRegisterToken()
 @Roles(...STAFF_ROLES)
 @Controller('api/:merchantRef/admin')
 export class CashWriteController {

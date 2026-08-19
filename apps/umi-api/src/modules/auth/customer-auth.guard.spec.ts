@@ -8,8 +8,13 @@ function ctx(req: Req) {
   return { switchToHttp: () => ({ getRequest: () => req }) } as never;
 }
 
-function guard(claims: { subjectId: string; merchantId: string } | null) {
-  const tokens = { fromHeader: vi.fn().mockResolvedValue(claims) };
+function guard(claims: { subjectId: string; merchantId: string; role?: string } | null) {
+  // Every real customer token carries `role: 'CUSTOMER'` — both issuers stamp it
+  // (`CustomerSessionService`, and umi-cash `createSession`). A stub that omits it
+  // is a token no issuer mints, and the guard now says so.
+  const tokens = {
+    fromHeader: vi.fn().mockResolvedValue(claims && { role: 'CUSTOMER', ...claims }),
+  };
   return { g: new CustomerAuthGuard(tokens as never), tokens };
 }
 
