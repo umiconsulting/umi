@@ -102,14 +102,6 @@
       "count": 2
     }
   },
-  "src/shell.jsx": {
-    "no-unused-vars": {
-      "count": 1
-    },
-    "react-hooks/static-components": {
-      "count": 2
-    }
-  },
   "src/tweaks-panel.jsx": {
     "no-unused-vars": {
       "count": 1

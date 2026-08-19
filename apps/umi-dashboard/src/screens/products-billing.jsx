@@ -6,29 +6,39 @@ import { useMerchant } from '@/lib/merchant-context.jsx';
 const PRODUCT_COPY = {
   dashboard: {
     title: 'Umi Dashboard',
-    body: 'Owner console, merchant switching, location context, and account settings.',
+    body: 'La consola del dueño: cambiar de café, elegir sucursal y administrar la cuenta.',
     icon: 'Home',
   },
   conversaflow: {
     title: 'ConversaFlow',
-    body: 'WhatsApp conversations, ordering automation, hours, and operational workflow.',
+    body: 'Conversaciones de WhatsApp, pedidos automáticos, horarios y flujo de trabajo.',
     icon: 'WhatsApp',
   },
   kds: {
     title: 'KDS',
-    body: 'Kitchen tickets, stations, device provisioning, and status transitions.',
+    body: 'Comandas de cocina, estaciones, alta de dispositivos y cambios de estado.',
     icon: 'Tablet',
   },
   cash: {
     title: 'Umi Cash',
-    body: 'Wallet passes, loyalty members, stamp rewards, top-ups, and gift cards.',
+    body: 'Pases en Wallet, clientes del programa, sellos, abonos y tarjetas de regalo.',
     icon: 'CreditCard',
   },
   observability: {
-    title: 'Observability',
-    body: 'Operational logs, traces, diagnostics, and support review surfaces.',
+    title: 'Observabilidad',
+    body: 'Registros de operación, trazas, diagnóstico y revisión de soporte.',
     icon: 'Activity',
   },
+};
+
+/** Entitlement statuses as the owner reads them, not as the table stores them. */
+const STATUS_WORDS = {
+  active: 'Activo',
+  trialing: 'En prueba',
+  past_due: 'Pago pendiente',
+  canceled: 'Cancelado',
+  paused: 'En pausa',
+  missing: 'Sin contratar',
 };
 
 function ProductCard({ productKey, product }) {
@@ -37,7 +47,7 @@ function ProductCard({ productKey, product }) {
   const active = isProductStatusActive(product?.status);
   return (
     <div
-      className="card fade-up"
+      className="card"
       style={{ padding: '22px 24px', display: 'flex', gap: 18, alignItems: 'flex-start' }}
     >
       <div
@@ -66,7 +76,7 @@ function ProductCard({ productKey, product }) {
           <h3 style={{ margin: 0, fontSize: 18 }}>{copy.title}</h3>
           <span className={'sub-pill' + (active ? '' : ' muted')}>
             <span className="sd" />
-            {(product?.status || 'missing').toUpperCase()}
+            {STATUS_WORDS[product?.status] || STATUS_WORDS.missing}
           </span>
         </div>
         <div style={{ fontSize: 13.5, color: 'var(--ink-3)', marginTop: 7, lineHeight: 1.45 }}>
@@ -74,7 +84,7 @@ function ProductCard({ productKey, product }) {
         </div>
         {!active && (
           <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 12 }}>
-            No operational controls are exposed while this product is inactive.
+            Sin este producto activo, la consola no muestra controles para operarlo.
           </div>
         )}
       </div>
@@ -89,18 +99,14 @@ export default function ProductsBillingScreen() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div className="card fade-up" style={{ padding: '24px 26px' }}>
-        <div className="sec-index" style={{ marginBottom: 12 }}>
-          <span className="nn">PB</span>
-          <span>/</span>
-          <span>PRODUCTS & BILLING</span>
-        </div>
+      <div className="card" style={{ padding: '24px 26px' }}>
+        {' '}
         <h2 style={{ margin: '0 0 8px', fontSize: 26 }}>
-          Product contract for {merchantState?.selectedMerchant?.name || 'merchant'}
+          Productos de {merchantState?.selectedMerchant?.name || 'este café'}
         </h2>
-        <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 760 }}>
-          Product status controls which modules exist in the dashboard. Roles decide actions inside
-          active modules, but they do not activate missing products.
+        <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 68 * 1 + 'ch' }}>
+          Un producto activo decide qué secciones existen en la consola. El rol de cada persona
+          decide qué puede hacer dentro de ellas — pero un rol no activa un producto que falta.
         </div>
       </div>
 

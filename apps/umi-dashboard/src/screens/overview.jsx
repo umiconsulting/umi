@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { I, UmiX } from '@/icons.jsx';
-import { XSep, Spark } from '@/shell.jsx';
+import { RegionHead, Spark, XSep } from '@/shell.jsx';
 import { useOverviewData } from '@/data.jsx';
 
 // Screen 1 — Overview / Panorama
@@ -19,7 +19,6 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
   const supportMetrics = [
     {
       lbl: 'Ingresos del mes',
-      en: 'Revenue',
       val: ov.revenueThisMonth || '–',
       delta:
         ov.revenueDeltaPct != null
@@ -29,7 +28,6 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
     },
     {
       lbl: 'Visitas hoy',
-      en: 'Visits today',
       val: ov.visitsToday != null ? String(ov.visitsToday) : '–',
       delta:
         ov.visitsDeltaPct != null
@@ -38,8 +36,7 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
       up: ov.visitsDeltaPct == null || ov.visitsDeltaPct >= 0,
     },
     {
-      lbl: 'Gift cards abiertas',
-      en: 'Open gift cards',
+      lbl: 'Tarjetas de regalo abiertas',
       val: ov.openGiftCards != null ? String(ov.openGiftCards) : '–',
       delta:
         ov.openGiftCardsDelta != null
@@ -49,7 +46,6 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
     },
     {
       lbl: 'Recompensas canjeadas · 7d',
-      en: 'Rewards redeemed',
       val: ov.rewardsRedeemed7d != null ? String(ov.rewardsRedeemed7d) : '–',
       delta:
         ov.rewardsDelta7d != null ? (ov.rewardsDelta7d > 0 ? '+' : '') + ov.rewardsDelta7d : '–',
@@ -71,25 +67,19 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Live ticker */}
-      <div className="fade-up d1">
-        <LiveTicker events={ticker || []} />
-      </div>
+      {/* An empty ticker rendered as a full-width bar with a lone EN VIVO tag and
+          nothing running past it — a container advertising that it has nothing to
+          say. It appears when there is something to report, and not before. */}
+      {ticker?.length ? <LiveTicker events={ticker} /> : null}
 
       {/* Hero metric + supporting strip */}
-      <section
-        className="fade-up d2"
-        style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: 18 }}
-      >
+      <section className="split">
         {/* Hero — Active Members */}
         <div className="hero-metric">
-          <UmiX size={320} color="#1F1410" strokeWidth={10} className="x-mark" />
           <div className="h-head">
             <div>
               <div className="lbl-es">Miembros activos</div>
-              <div className="lbl-en">
-                Active members <XSep /> Umi Cash
-              </div>
+              <div className="lbl-en">Inscritos en el programa de lealtad</div>
             </div>
             {ov.memberHistory?.length > 1 && (
               <Spark data={ov.memberHistory} up={true} width={140} height={36} />
@@ -100,7 +90,13 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
             <span className="unit">total</span>
           </div>
           <div className="h-foot">
-            <span className="delta up" style={{ padding: '4px 10px', fontSize: 13 }}>
+            {/* `delta up` is the GREEN pill. "Sin cambio calculado" is not good news
+                — it is the absence of news — so it does not get to wear the colour
+                that means growth. */}
+            <span
+              className={'delta ' + (ov.memberDeltaPct == null ? 'none' : 'up')}
+              style={{ padding: '4px 10px', fontSize: 13 }}
+            >
               {ov.memberDeltaPct != null ? `↑ ${ov.memberDeltaPct}%` : 'Sin cambio calculado'}
               <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: 4 }}>· 28 días</span>
             </span>
@@ -108,11 +104,11 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
               {ov.newThisWeek != null
                 ? '+' + ov.newThisWeek.toLocaleString('es-MX') + ' nuevos esta semana'
                 : 'Nuevos sin calcular'}
-              <XSep />
+              {' · '}
               {ov.birthdayActivatable != null
                 ? ov.birthdayActivatable + ' cumpleaños activables'
                 : 'Cumpleaños sin calcular'}
-              <XSep />
+              {' · '}
               {ov.highBalanceCount != null
                 ? ov.highBalanceCount + ' con saldo > $1,000'
                 : 'Saldos altos sin calcular'}
@@ -124,69 +120,55 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {supportMetrics.map((m) => (
             <div className="strip-metric" key={m.lbl}>
-              <div>
-                <div className="lbl">{m.lbl}</div>
-                <div className="en">{m.en}</div>
-              </div>
+              <div className="lbl">{m.lbl}</div>
               <div className="val">{m.val}</div>
-              <span className={'delta-mini ' + (m.up ? 'up' : 'down')}>
-                {m.up ? '↑' : '↓'} {m.delta}
-              </span>
+              {/* An arrow next to an unknown delta claims a direction the data does
+                  not have. When there is no comparison, the slot stays empty. */}
+              {m.delta === '–' ? (
+                <span className="delta-mini none">sin comparar</span>
+              ) : (
+                <span className={'delta-mini ' + (m.up ? 'up' : 'down')}>
+                  {m.up ? '↑' : '↓'} {m.delta}
+                </span>
+              )}
             </div>
           ))}
         </div>
       </section>
 
       {/* KDS station rail */}
-      <section className="fade-up d3">
-        <div className="ed-head">
-          <div className="titles">
-            <div className="sec-index">
-              <span className="nn">A</span>
-              <span>/</span>
-              <span>
-                EN VIVO <XSep /> {stations.length} ESTACIONES
+      <section>
+        <RegionHead
+          title="Estaciones de cocina"
+          note={loading ? 'Actualizando…' : 'Cada estación del KDS y cómo responde ahora.'}
+          count={{ value: stations.length, label: 'estaciones' }}
+          actions={
+            <>
+              {/* The legend for the dots the rail below uses. Each pairs the dot
+                  with its word, so the state does not depend on telling the hues
+                  apart. */}
+              <span className="dot-legend">
+                <span>
+                  <span className="s-dot live" /> En vivo
+                </span>
+                <span>
+                  <span className="s-dot slow" /> Lento
+                </span>
+                <span>
+                  <span className="s-dot offline" /> Sin conexión
+                </span>
               </span>
-            </div>
-            <h2>
-              Estaciones de cocina{' '}
-              <span style={{ color: 'var(--ink-3)', fontWeight: 300 }}>· KDS</span>
-            </h2>
-            <div className="en">Estaciones de cocina en vivo</div>
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              gap: 16,
-              fontSize: 11,
-              color: 'var(--ink-3)',
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              alignItems: 'center',
-            }}
-          >
-            <span>
-              <span className="s-dot live" style={{ verticalAlign: 'middle', marginRight: 6 }} />{' '}
-              Live
-            </span>
-            <span>
-              <span className="s-dot slow" style={{ verticalAlign: 'middle', marginRight: 6 }} />{' '}
-              Slow
-            </span>
-            <span>
-              <span className="s-dot offline" style={{ verticalAlign: 'middle', marginRight: 6 }} />{' '}
-              Offline
-            </span>
-            {loading && <span style={{ fontSize: 10, opacity: 0.6 }}>actualizando…</span>}
-            <button
-              className="btn-icon"
-              onClick={() => setRefresh((r) => r + 1)}
-              aria-label="Refresh"
-            >
-              <I.Refresh size={13} />
-            </button>
-          </div>
-        </div>
+              <button
+                className="btn-icon focusable"
+                onClick={() => setRefresh((r) => r + 1)}
+                aria-label="Actualizar las estaciones"
+                title="Actualizar"
+              >
+                <I.Refresh size={13} />
+              </button>
+            </>
+          }
+        />
         <div className="station-rail">
           {(stations.length ? stations : []).map((s) => (
             <div className={'station-cell ' + s.status} key={s.station_id}>
@@ -208,21 +190,15 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
       </section>
 
       {/* Action center + context panels */}
-      <section
-        className="fade-up d4"
-        style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 24 }}
-      >
+      <section className="split wide-gap">
         <div>
           <div className="ed-head">
             <div className="titles">
-              <div className="sec-index">
-                <span className="nn">B</span>
-                <span>/</span>
-                <span>NEXT BEST ACTION</span>
-              </div>
               <h2>Centro de acción</h2>
               <div className="en">
-                Action center <XSep /> {alerts.length} pendientes
+                {alerts.length === 0
+                  ? 'Nada pendiente ahora mismo.'
+                  : `${alerts.length} pendiente${alerts.length === 1 ? '' : 's'}.`}
               </div>
             </div>
             <button className="btn btn-ghost btn-sm" onClick={() => onNavigate('orders')}>
@@ -286,7 +262,7 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
                 gap: 8,
               }}
             >
-              Escaneo cada 60 s <XSep /> última verificación{' '}
+              Escaneo cada 60 s · última verificación{' '}
               {new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
             </div>
             <button className="btn btn-ghost btn-sm" onClick={() => setRefresh((r) => r + 1)}>
@@ -298,7 +274,6 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
         {/* Context panels */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <ContextPanel
-            section="C"
             eyebrow="Hoy · ConversaFlow"
             title="Pedidos WhatsApp"
             primary={ov.ordersToday != null ? String(ov.ordersToday) : '–'}
@@ -324,7 +299,6 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
             ]}
           />
           <ContextPanel
-            section="D"
             eyebrow="Hoy · Umi Cash"
             title="Actividad del monedero"
             primary={ov.walletProcessedToday || '–'}
@@ -379,21 +353,10 @@ const LiveTicker = ({ events }) => {
   );
 };
 
-const ContextPanel = ({ section, eyebrow, title, primary, sub, rows }) => (
+const ContextPanel = ({ eyebrow, title, primary, sub, rows }) => (
   <div className="card" style={{ padding: 18 }}>
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'baseline',
-        justifyContent: 'space-between',
-        marginBottom: 10,
-      }}
-    >
-      <div className="sec-index">
-        <span className="nn">{section}</span>
-        <span>/</span>
-        <span>{eyebrow.toUpperCase()}</span>
-      </div>
+    <div className="eyebrow" style={{ marginBottom: 10 }}>
+      {eyebrow}
     </div>
     <div
       style={{

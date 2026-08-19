@@ -44,7 +44,7 @@ const PRODUCT_LABELS = {
 function ProductUnavailable({ moduleName = 'Modulo', product = 'producto' }) {
   return (
     <div
-      className="card fade-up"
+      className="card"
       style={{
         padding: '38px 34px',
         display: 'flex',
@@ -54,11 +54,6 @@ function ProductUnavailable({ moduleName = 'Modulo', product = 'producto' }) {
       }}
     >
       <div>
-        <div className="sec-index" style={{ marginBottom: 12 }}>
-          <span className="nn">OFF</span>
-          <span>/</span>
-          <span>PRODUCTO NO ACTIVO</span>
-        </div>
         <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>
           {moduleName} no está activo en este café
         </h2>
@@ -113,6 +108,7 @@ function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
   const [ordersPaused, setOrdersPaused] = useState(false);
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const merchantState = useMerchant();
@@ -136,7 +132,10 @@ function DashboardLayout() {
     );
   }, [tweaks.density]);
 
-  const nav = (id) => navigate('/' + (id === 'overview' ? '' : id));
+  const nav = (id) => {
+    setNavOpen(false);
+    navigate('/' + (id === 'overview' ? '' : id));
+  };
 
   if (merchantState?.loading && !merchantState?.capabilities) {
     return (
@@ -156,7 +155,17 @@ function DashboardLayout() {
   }
 
   return (
-    <div className={'app' + (collapsed ? ' collapsed' : '')}>
+    <div className={'app' + (collapsed ? ' collapsed' : '') + (navOpen ? ' nav-open' : '')}>
+      {/* Below 1080 the sidebar leaves the grid and becomes a drawer. The scrim
+          both dims the page and gives the drawer a dismiss target — a drawer you
+          can only close from its own button is a trap on a touch screen. */}
+      <div
+        className="side-scrim"
+        onClick={() => setNavOpen(false)}
+        role="button"
+        tabIndex={-1}
+        aria-label="Cerrar el menú"
+      />
       <Sidebar
         active={screen}
         onChange={nav}
@@ -172,7 +181,7 @@ function DashboardLayout() {
       <main className="main">
         <Topbar
           merchant={merchantName || 'Umi Dash'}
-          status="ACTIVE"
+          onMenu={() => setNavOpen(true)}
           screen={screen}
           merchantName={merchantName}
           locations={merchantState?.capabilities?.locations || []}

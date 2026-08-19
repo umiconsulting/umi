@@ -1,18 +1,18 @@
 import { useState, useId } from 'react';
 import { I } from '@/icons.jsx';
-import { XSep } from '@/shell.jsx';
+import { RegionHead } from '@/shell.jsx';
 import { createStaffMember, deleteStaffMember, useStaffData } from '@/data.jsx';
 
 // Screen 4 — Staff & Access
 // Data: useStaffData() → merchant.staff scoped by merchant
 
 const PERMS = [
-  { id: 'scan', label: 'Scan customer QR', sub: 'Register visits and redeem' },
-  { id: 'topup', label: 'Top-up monedero', sub: 'Add balance to a wallet' },
-  { id: 'analytics', label: 'View analytics', sub: 'KPI dashboard and reports' },
-  { id: 'settings', label: 'Manage merchant settings', sub: 'Hours, branding, promos' },
-  { id: 'staff', label: 'Manage staff', sub: 'Invite, remove, change roles' },
-  { id: 'giftcards', label: 'View gift cards', sub: 'Issued cards and balances' },
+  { id: 'scan', label: 'Escanear el QR del cliente', sub: 'Registrar visitas y canjear premios' },
+  { id: 'topup', label: 'Abonar al monedero', sub: 'Agregar saldo a una tarjeta' },
+  { id: 'analytics', label: 'Ver analítica', sub: 'Panel de métricas e informes' },
+  { id: 'settings', label: 'Cambiar los ajustes del negocio', sub: 'Horarios, marca, promociones' },
+  { id: 'staff', label: 'Administrar el equipo', sub: 'Invitar, quitar y cambiar roles' },
+  { id: 'giftcards', label: 'Ver tarjetas de regalo', sub: 'Tarjetas emitidas y sus saldos' },
 ];
 
 const DEFAULT_MATRIX = {
@@ -62,39 +62,32 @@ const StaffScreen = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Header */}
-      <div className="ed-head fade-up d1">
-        <div className="titles">
-          <div className="sec-index">
-            <span className="nn">A</span>
-            <span>/</span>
-            <span>
-              EQUIPO <XSep /> {activeStaff.length} PERSONAS <XSep />{' '}
-              {activeStaff.filter((s) => s.role === 'ADMIN').length} ADMINS
-              {loading && (
-                <span style={{ marginLeft: 8, fontSize: 10, opacity: 0.6 }}>· cargando…</span>
-              )}
-            </span>
-          </div>
-          <h2>Equipo activo</h2>
-          <div className="en">Personas con acceso al negocio</div>
-        </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <div className="seg" role="tablist">
-            {['ALL', 'ADMIN', 'STAFF'].map((f) => (
-              <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>
-                {f === 'ALL' ? 'Todos' : f.charAt(0) + f.slice(1).toLowerCase()}
-              </button>
-            ))}
-          </div>
-          <button className="btn btn-primary focusable" onClick={() => setInviteOpen(true)}>
-            <I.Plus size={16} /> Invitar
-          </button>
-        </div>
-      </div>
+      <RegionHead
+        title="Equipo activo"
+        note={
+          loading
+            ? 'Cargando…'
+            : `${activeStaff.filter((s) => s.role === 'ADMIN').length} con acceso de administrador.`
+        }
+        count={{ value: activeStaff.length, label: 'personas' }}
+        actions={
+          <>
+            <div className="seg" role="tablist">
+              {['ALL', 'ADMIN', 'STAFF'].map((f) => (
+                <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>
+                  {f === 'ALL' ? 'Todos' : f.charAt(0) + f.slice(1).toLowerCase()}
+                </button>
+              ))}
+            </div>
+            <button className="btn btn-primary focusable" onClick={() => setInviteOpen(true)}>
+              <I.Plus size={16} /> Invitar
+            </button>
+          </>
+        }
+      />
 
       {/* Roster table */}
-      <div className="card fade-up d2" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {/* Disabling a member used to fail in silence — the row simply stayed. */}
         {rosterError ? (
           <div
@@ -180,7 +173,7 @@ const StaffScreen = () => {
                         color: 'var(--ink-2)',
                       }}
                     >
-                      {s.phone || <span style={{ color: 'var(--ink-4)' }}>—</span>}
+                      {s.phone || <span className="no-value" aria-label="Sin teléfono" />}
                     </td>
                     <td style={{ color: 'var(--ink-2)', fontSize: 13 }}>
                       {fmtRelative(s.createdAt)}
@@ -211,25 +204,18 @@ const StaffScreen = () => {
       </div>
 
       {/* Permission matrix */}
-      <div className="ed-head fade-up d3" style={{ marginTop: 8 }}>
+      <div className="ed-head" style={{ marginTop: 8 }}>
         <div className="titles">
-          <div className="sec-index">
-            <span className="nn">B</span>
-            <span>/</span>
-            <span>ROLE-BASED ACCESS</span>
-          </div>
           <h2>Matriz de permisos</h2>
-          <div className="en">
-            Permission matrix <XSep /> Umi Cash <XSep /> KDS <XSep /> ConversaFlow
-          </div>
+          <div className="en">Qué puede hacer cada rol en Umi Cash, KDS y ConversaFlow.</div>
         </div>
       </div>
 
-      <div className="card fade-up d4" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <table className="matrix">
           <thead>
             <tr>
-              <th style={{ width: '40%' }}>Action</th>
+              <th style={{ width: '40%' }}>Acción</th>
               <th style={{ textAlign: 'center' }}>
                 <span className="badge badge-admin" style={{ padding: '4px 10px' }}>
                   <I.Lock size={10} /> ADMIN

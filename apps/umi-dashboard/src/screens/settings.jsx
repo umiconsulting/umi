@@ -56,6 +56,38 @@ const MAX_REWARD_NAME_LENGTH = 30;
 const clampStampTarget = (value) =>
   Math.max(MIN_STAMP_TARGET, Math.min(MAX_STAMP_TARGET, parseInt(value, 10) || MIN_STAMP_TARGET));
 
+/** `merchant.subscription` holds a storage token; the owner reads a word. */
+/**
+ * WCAG relative-luminance contrast between a hex colour and white.
+ *
+ * The pass prints the café's name, its balance and its visit count in WHITE on
+ * this colour. A brand colour the owner likes on screen can leave that text at
+ * 2:1 on the card in their customer's hand, and nothing in the console said so —
+ * the preview simply drew it, faithfully, unreadable.
+ */
+function contrastWithWhite(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+  if (!m) return null;
+  const channel = (v) => {
+    const c = parseInt(v, 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  const h = m[1];
+  const l =
+    0.2126 * channel(h.slice(0, 2)) +
+    0.7152 * channel(h.slice(2, 4)) +
+    0.0722 * channel(h.slice(4, 6));
+  return 1.05 / (l + 0.05);
+}
+
+const SUBSCRIPTION_WORDS = {
+  active: 'Activa',
+  trialing: 'En periodo de prueba',
+  past_due: 'Con pago pendiente',
+  canceled: 'Cancelada',
+  paused: 'En pausa',
+};
+
 const SettingsScreen = () => {
   const uid = useId();
   const [copied, setCopied] = useState(false);
@@ -236,7 +268,7 @@ const SettingsScreen = () => {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         <div
-          className="card fade-up d1"
+          className="card"
           style={{ padding: '40px 26px', textAlign: 'center', color: 'var(--ink-3)' }}
         >
           {loading ? 'Cargando ajustes…' : 'Sin datos de configuración.'}
@@ -249,7 +281,7 @@ const SettingsScreen = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Save bar */}
       <div
-        className="card fade-up"
+        className="card"
         style={{
           padding: '12px 20px',
           display: 'flex',
@@ -289,16 +321,11 @@ const SettingsScreen = () => {
       <LocationProfilesCard conversaflowActive={conversaflowActive} />
 
       {/* Merchant info */}
-      <div className="card fade-up d1" style={{ padding: '24px 26px' }}>
+      <div className="card" style={{ padding: '24px 26px' }}>
         <div className="ed-head" style={{ marginBottom: 18 }}>
           <div className="titles">
-            <div className="sec-index">
-              <span className="nn">A</span>
-              <span>/</span>
-              <span>NEGOCIO</span>
-            </div>
+            {' '}
             <h2>Información del negocio</h2>
-            <div className="en">Información del negocio</div>
           </div>
           <span className="sub-pill">
             <span className="sd" />
@@ -335,8 +362,8 @@ const SettingsScreen = () => {
                 justifyContent: 'flex-start',
               }}
             >
-              {(biz.subscription || 'ACTIVE').toUpperCase()} · Se administra en Productos y
-              facturación
+              {SUBSCRIPTION_WORDS[biz.subscription] || SUBSCRIPTION_WORDS.active} · Se administra en
+              Productos y facturación
             </span>
           </div>
           <div className="field">
@@ -382,18 +409,12 @@ const SettingsScreen = () => {
 
       {/* Voice & tone — WhatsApp assistant (ConversaFlow) */}
       {conversaflowActive && voice && (
-        <div className="card fade-up d2" style={{ padding: '24px 26px' }}>
+        <div className="card" style={{ padding: '24px 26px' }}>
           <div className="ed-head" style={{ marginBottom: 18 }}>
             <div className="titles">
-              <div className="sec-index">
-                <span className="nn">V</span>
-                <span>/</span>
-                <span>
-                  VOZ <XSep /> CONVERSAFLOW
-                </span>
-              </div>
+              {' '}
               <h2>Voz y tono del asistente</h2>
-              <div className="en">Voz y tono del asistente de WhatsApp</div>
+              <div className="en">Cómo saluda y responde el asistente en WhatsApp.</div>
             </div>
           </div>
 
@@ -475,23 +496,17 @@ const SettingsScreen = () => {
       )}
 
       {!cashActive && (
-        <div className="card fade-up d2" style={{ padding: '24px 26px' }}>
+        <div className="card" style={{ padding: '24px 26px' }}>
           <div className="ed-head" style={{ marginBottom: 14 }}>
             <div className="titles">
-              <div className="sec-index">
-                <span className="nn">B</span>
-                <span>/</span>
-                <span>
-                  PRODUCTOS <XSep /> BILLING
-                </span>
-              </div>
+              {' '}
               <h2>Umi Cash no está activo</h2>
               <div className="en">
-                Wallet, loyalty, gift cards, and pass personalization are unavailable
+                Sin Umi Cash no hay monedero, lealtad, tarjetas de regalo ni pase en Wallet.
               </div>
             </div>
             <span className="sub-pill">
-              <span className="sd" /> NOT ACTIVE
+              <span className="sd" /> Sin activar
             </span>
           </div>
           <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 760 }}>
@@ -503,19 +518,15 @@ const SettingsScreen = () => {
 
       {/* Branding + wallet preview */}
       {cashActive && (
-        <div className="grid fade-up d2" style={{ gridTemplateColumns: '1fr 0.85fr', gap: 24 }}>
+        <div className="split wide-gap">
           <div className="card" style={{ padding: '24px 26px' }}>
             <div className="ed-head" style={{ marginBottom: 18 }}>
               <div className="titles">
-                <div className="sec-index">
-                  <span className="nn">B</span>
-                  <span>/</span>
-                  <span>
-                    MARCA <XSep /> WALLET PASS
-                  </span>
-                </div>
+                {' '}
                 <h2>Apariencia de la tarjeta</h2>
-                <div className="en">Apariencia del pase en Wallet</div>
+                <div className="en">
+                  Cómo se ve la tarjeta del cliente en Apple Wallet y Google Wallet.
+                </div>
               </div>
             </div>
 
@@ -557,6 +568,23 @@ const SettingsScreen = () => {
                   ))}
                 </div>
               </div>
+              {/* Says it; does not override it. The colour is the café's decision. */}
+              {(() => {
+                const c = contrastWithWhite(brand.primary);
+                if (c == null || c >= 4.5) return null;
+                return (
+                  <div
+                    className="field-warning"
+                    role="status"
+                    style={{ fontSize: 12.5, color: 'var(--warning)', marginTop: 2 }}
+                  >
+                    El texto blanco de la tarjeta queda en {c.toFixed(1)}:1 sobre este color.
+                    {c < 3
+                      ? ' Tu cliente casi no podrá leer su saldo.'
+                      : ' Un color más oscuro se lee mejor en la mano.'}
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="field" style={{ marginBottom: 18 }}>
@@ -594,13 +622,7 @@ const SettingsScreen = () => {
             </div>
 
             <div style={{ borderTop: '1px solid var(--line)', paddingTop: 18, marginTop: 4 }}>
-              <div className="sec-index" style={{ marginBottom: 12 }}>
-                <span className="nn">C</span>
-                <span>/</span>
-                <span>
-                  SELLOS <XSep /> REWARDCONFIG
-                </span>
-              </div>
+              {' '}
               <div style={{ marginBottom: 14 }}>
                 <h3 style={{ margin: '0 0 4px', fontSize: 16, lineHeight: 1.1 }}>
                   Recompensas por sellos
@@ -615,7 +637,7 @@ const SettingsScreen = () => {
                     fontWeight: 600,
                   }}
                 >
-                  Stamp rewards · RewardConfig
+                  Premios por sellos
                 </div>
               </div>
               <div className="grid grid-2" style={{ gap: 14 }}>
@@ -681,11 +703,11 @@ const SettingsScreen = () => {
             }}
           >
             <div style={{ position: 'absolute', top: 18, left: 22 }}>
-              <div className="eyebrow on-warm">Live preview</div>
+              <div className="eyebrow on-warm">Vista previa</div>
               <div
                 style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink-warm)', marginTop: 2 }}
               >
-                iOS wallet pass
+                Pase de Apple Wallet
               </div>
             </div>
             <div style={{ paddingTop: 28 }} />
@@ -726,18 +748,14 @@ const SettingsScreen = () => {
 
       {/* Birthday config */}
       {cashActive && (
-        <div className="card fade-up d3" style={{ padding: '24px 26px' }}>
+        <div className="card" style={{ padding: '24px 26px' }}>
           <div className="ed-head" style={{ marginBottom: 18 }}>
             <div className="titles">
-              <div className="sec-index">
-                <span className="nn">D</span>
-                <span>/</span>
-                <span>
-                  CUMPLEAÑOS <XSep /> AUTO
-                </span>
-              </div>
+              {' '}
               <h2>Boost de cumpleaños</h2>
-              <div className="en">Birthday rewards</div>
+              <div className="en">
+                Un premio que se emite solo el día del cumpleaños del cliente.
+              </div>
             </div>
             <div
               className={'switch lg ' + (birthday.on ? 'on' : '')}
@@ -764,21 +782,14 @@ const SettingsScreen = () => {
       )}
 
       {/* Promotions */}
-      <div className="card fade-up d4" style={{ padding: '24px 26px' }}>
+      <div className="card" style={{ padding: '24px 26px' }}>
         <div className="ed-head" style={{ marginBottom: 18 }}>
           <div className="titles">
-            <div className="sec-index">
-              <span className="nn">E</span>
-              <span>/</span>
-              <span>
-                PROMOCIONES <XSep /> ACTIVA
-              </span>
-            </div>
+            {' '}
             <h2>Promoción del momento</h2>
-            <div className="en">Promoción activa</div>
           </div>
         </div>
-        <div className="grid" style={{ gridTemplateColumns: '1.4fr 1fr', gap: 18 }}>
+        <div className="split">
           <div className="field">
             <label htmlFor={`${uid}-message-sent-on`}>
               Mensaje · se envía por WhatsApp · máx. 200 caracteres
@@ -810,7 +821,9 @@ const SettingsScreen = () => {
                   value={promo.from}
                   onChange={(e) => setPromo((p) => ({ ...p, from: e.target.value }))}
                 />
-                <span style={{ color: 'var(--ink-4)' }}>→</span>
+                <span style={{ color: 'var(--ink-3)' }} aria-hidden="true">
+                  →
+                </span>
                 <input
                   type="date"
                   aria-label="Fin de la vigencia"
@@ -842,7 +855,7 @@ const SettingsScreen = () => {
       {/* Self-registration */}
       {cashActive && (
         <div
-          className="card fade-up d5"
+          className="card"
           style={{ padding: '22px 26px', display: 'flex', alignItems: 'center', gap: 20 }}
         >
           <div
@@ -1024,22 +1037,19 @@ function LocationProfilesCard({ conversaflowActive }) {
 
   return (
     // FRAGMENT, and the sheet is OUTSIDE the card on purpose. `.sheet` is
-    // `position: fixed`, and `.fade-up` animates a transform — a transformed
-    // ancestor becomes the containing block for a fixed descendant, so a sheet
-    // rendered inside this card is laid out against the CARD instead of the
-    // viewport: a clipped panel a few hundred pixels wide, with its own fields cut
-    // off. Staff and Cafés both mount their sheet at screen level; this matches.
+    // `position: fixed`, and a transformed ancestor becomes the containing block
+    // for a fixed descendant — so a sheet rendered inside this card is laid out
+    // against the CARD instead of the viewport: a clipped panel a few hundred
+    // pixels wide, with its own fields cut off. Staff and Cafés both mount their
+    // sheet at screen level; this matches. (The screen's arrival animation is
+    // opacity-only for the same reason — see `.screen-body` in styles.css.)
     <>
-      <div className="card fade-up d2" style={{ padding: '24px 26px' }}>
+      <div className="card" style={{ padding: '24px 26px' }}>
         <div className="ed-head" style={{ marginBottom: 18 }}>
           <div className="titles">
-            <div className="sec-index">
-              <span className="nn">S</span>
-              <span>/</span>
-              <span>SUCURSALES</span>
-            </div>
+            {' '}
             <h2>Sucursales</h2>
-            <div className="en">Branches</div>
+            <div className="en">Los locales de este café. Cada uno tiene su propio horario.</div>
           </div>
           <button className="btn btn-secondary btn-sm focusable" onClick={() => setAdding(true)}>
             + Agregar sucursal

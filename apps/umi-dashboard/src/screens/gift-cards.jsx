@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { I } from '@/icons.jsx';
-import { XSep } from '@/shell.jsx';
+import { RegionHead } from '@/shell.jsx';
 import { useGiftCardsData } from '@/data.jsx';
 
 const GiftCardsScreen = () => {
@@ -15,22 +15,13 @@ const GiftCardsScreen = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div className="ed-head fade-up d1">
-        <div className="titles">
-          <div className="sec-index">
-            <span className="nn">A</span>
-            <span>/</span>
-            <span>
-              UMI CASH <XSep /> {total.toLocaleString('es-MX')} GIFT CARDS
-            </span>
-          </div>
-          <h2>Gift cards</h2>
-          <div className="en">Tarjetas de regalo emitidas</div>
-        </div>
-        {loading && <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>Cargando…</span>}
-      </div>
+      <RegionHead
+        title="Tarjetas de regalo"
+        note={loading ? 'Cargando…' : 'Emitidas desde Umi Cash.'}
+        count={{ value: total.toLocaleString('es-MX'), label: 'emitidas' }}
+      />
 
-      <div className="grid grid-2 fade-up d2" style={{ gap: 14 }}>
+      <div className="grid grid-2" style={{ gap: 14 }}>
         <div className="strip-metric">
           <div>
             <div className="lbl">Abiertas</div>
@@ -49,14 +40,14 @@ const GiftCardsScreen = () => {
         </div>
       </div>
 
-      <div className="card fade-up d3" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <table className="matrix">
           <thead>
             <tr>
               <th>Code</th>
               <th>Recipient</th>
               <th style={{ textAlign: 'right' }}>Amount</th>
-              <th>Status</th>
+              <th>Estado</th>
               <th>Created</th>
             </tr>
           </thead>
@@ -64,7 +55,7 @@ const GiftCardsScreen = () => {
             {cards.length === 0 && !loading && (
               <tr>
                 <td colSpan={5} style={{ textAlign: 'center', padding: 40, color: 'var(--ink-3)' }}>
-                  No gift cards found.
+                  No hay tarjetas de regalo emitidas.
                 </td>
               </tr>
             )}

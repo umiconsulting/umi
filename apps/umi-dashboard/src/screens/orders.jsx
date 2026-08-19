@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { I } from '@/icons.jsx';
-import { XSep } from '@/shell.jsx';
+import { RegionHead, XSep } from '@/shell.jsx';
 import { transitionOrder, useOrdersData } from '@/data.jsx';
 
 // Screen 6 — Pedidos / KDS Tickets
@@ -50,28 +50,22 @@ const OrdersScreen = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Header */}
-      <div className="ed-head fade-up d1">
-        <div className="titles">
-          <div className="sec-index">
-            <span className="nn">A</span>
-            <span>/</span>
-            <span>
-              EN VIVO <XSep /> {totalToday} HOY <XSep /> {displayed.length} MOSTRADOS
-            </span>
-          </div>
-          <h2>Pedidos WhatsApp</h2>
-          <div className="en">Pedidos en cocina · KDS</div>
-        </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <button className="btn btn-ghost btn-sm" onClick={() => setRefresh((r) => r + 1)}>
+      <RegionHead
+        title="Pedidos WhatsApp"
+        note={`${displayed.length} de ${totalToday} mostrados.`}
+        count={{ value: totalToday, label: 'hoy' }}
+        actions={
+          <button
+            className="btn btn-ghost btn-sm focusable"
+            onClick={() => setRefresh((r) => r + 1)}
+          >
             <I.Refresh size={14} /> Actualizar
           </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Status summary rail */}
-      <div className="fade-up d2" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         {[
           { status: 'new', label: 'Nuevos' },
           { status: 'accepted', label: 'Aceptados' },
@@ -163,10 +157,7 @@ const OrdersScreen = () => {
       </div>
 
       {/* Filter tabs */}
-      <div
-        className="fade-up d3"
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-      >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div className="seg" role="tablist">
           {[
             { id: 'active', label: 'Activos' },
@@ -213,7 +204,7 @@ const OrdersScreen = () => {
       {/* Tickets list */}
       {displayed.length === 0 ? (
         <div
-          className="card fade-up d4"
+          className="card"
           style={{ padding: '48px 32px', textAlign: 'center', color: 'var(--ink-3)' }}
         >
           <I.Receipt size={32} style={{ opacity: 0.3, marginBottom: 12 }} />
@@ -221,7 +212,7 @@ const OrdersScreen = () => {
           <div style={{ fontSize: 13 }}>No hay tickets en este filtro.</div>
         </div>
       ) : (
-        <div className="fade-up d4" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {displayed.map(function (ticket) {
             return (
               <TicketRow
@@ -240,7 +231,7 @@ const OrdersScreen = () => {
 
       {/* Legend */}
       <div
-        className="card fade-up d5"
+        className="card"
         style={{
           padding: '14px 20px',
           display: 'flex',

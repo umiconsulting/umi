@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { I } from '@/icons.jsx';
-import { XSep } from '@/shell.jsx';
+import { RegionHead } from '@/shell.jsx';
 import { useCafes, provisionCafe } from '@/data.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 
@@ -123,11 +123,7 @@ function NewCafeSheet({ onClose, onCreated }) {
       >
         <div className="sheet-head">
           <div className="titles">
-            <div className="sec-index">
-              <span className="nn">+</span>
-              <span>/</span>
-              <span>PLATAFORMA</span>
-            </div>
+            {' '}
             <h2 id="new-cafe-title" style={{ margin: '6px 0 0' }}>
               Abrir café
             </h2>
@@ -340,25 +336,16 @@ const CafesScreen = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div className="ed-head fade-up d1">
-        <div className="titles">
-          <div className="sec-index">
-            <span className="nn">P</span>
-            <span>/</span>
-            <span>
-              PLATAFORMA <XSep /> {cafes.length} CAFÉS
-              {loading ? (
-                <span style={{ marginLeft: 8, fontSize: 10, opacity: 0.6 }}>· cargando…</span>
-              ) : null}
-            </span>
-          </div>
-          <h2>Cafés en la plataforma</h2>
-          <div className="en">Todos los cafés que opera Umi</div>
-        </div>
-        <button className="btn btn-primary focusable" onClick={() => setSheetOpen(true)}>
-          <I.Plus size={16} /> Abrir café
-        </button>
-      </div>
+      <RegionHead
+        title="Cafés en la plataforma"
+        note={loading ? 'Cargando…' : 'Todos los cafés que opera Umi.'}
+        count={{ value: cafes.length, label: 'cafés' }}
+        actions={
+          <button className="btn btn-primary focusable" onClick={() => setSheetOpen(true)}>
+            <I.Plus size={16} /> Abrir café
+          </button>
+        }
+      />
 
       {error ? (
         <div className="alert danger">
@@ -371,7 +358,7 @@ const CafesScreen = () => {
         </div>
       ) : null}
 
-      <div className="card fade-up d2" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {!cafes.length && !loading ? (
           // An empty state with one clear next action, not a shrug.
           <div style={{ padding: '48px 32px', textAlign: 'center', color: 'var(--ink-3)' }}>
