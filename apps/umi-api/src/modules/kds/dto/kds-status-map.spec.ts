@@ -1,29 +1,32 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ORDER_STATUSES,
   mapKitchenToOrderStatus,
   mapOrderToKitchenStatus,
   type KitchenStatus,
-  type OrderStatus,
 } from './kds-contract';
 
 /**
- * The KDS status vocabulary guard.
+ * The KDS status vocabulary guard — the middle link of a three-sided chain.
  *
- * These two lists are TRANSCRIBED from things this test cannot import:
- *   ORDER_STATUSES   = the CHECK on merchant.customer_order.status (20_merchant.sql)
- *   KITCHEN_STATUSES = the Swift enum KitchenStatus (apps/umi-kds KitchenModels.swift)
+ *   merchant.customer_order.status  (Postgres CHECK)
+ *          ↕  check-values.integration.ts · "$table · $column … exact"
+ *   ORDER_STATUSES                  (TypeScript)
+ *          ↕  THIS FILE
+ *   KitchenStatus                   (Swift enum, apps/umi-kds KitchenModels.swift)
  *
- * That is the whole point. A Postgres CHECK and a Swift enum have no common type
- * system, no shared build, and no gate that reads both — sql-preflight happily
- * resolves `o.status` while the value inside it is one the iPad cannot decode. The
- * only place the two vocabularies can be held against each other is here.
+ * `ORDER_STATUSES` is now IMPORTED rather than transcribed. It used to be copied here
+ * with a comment saying this test could not reach the CHECK — true then, and the
+ * copy's cost was that adding a status to the database left both the constant and this
+ * list untouched and every test green. The integration gate closed that: it holds the
+ * constant against the live CHECK on every CI round, so importing it makes this file's
+ * claims transitive to the database instead of parallel to it.
  *
- * If either side changes, a test here must fail. If someone adds a status to the
- * CHECK and not to this list, the DB-side test below is the one that will not catch
- * it — so the list is duplicated deliberately, with its source named.
+ * `KITCHEN_STATUSES` stays transcribed, and must. A Swift enum has no representation
+ * this process can import — no shared type system, no shared build. That side is
+ * checked by a person reading two files, which is exactly why the frozen client's
+ * vocabulary is the one written out longhand here.
  */
-const ORDER_STATUSES: OrderStatus[] = ['placed', 'preparing', 'ready', 'completed', 'canceled'];
-
 const KITCHEN_STATUSES: KitchenStatus[] = [
   'new',
   'accepted',

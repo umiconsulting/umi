@@ -95,8 +95,16 @@ export const STATUS_TRANSITIONS: Record<KitchenStatus, KitchenStatus[]> = {
  * mapping is pinned here, in one typed bidirectional place, and unit-tested.
  */
 
-/** Statuses `merchant.customer_order.status` may hold (the CHECK, in code). */
-export type OrderStatus = 'placed' | 'preparing' | 'ready' | 'completed' | 'canceled';
+/**
+ * Statuses `merchant.customer_order.status` may hold — the CHECK, in code.
+ *
+ * An ARRAY with the type derived from it, not a bare union, because a union has no
+ * runtime form and a claim about the database that cannot be read at run time cannot
+ * be checked against the database. `check-values.integration.ts` compares this list
+ * to the live CHECK on every CI round.
+ */
+export const ORDER_STATUSES = ['placed', 'preparing', 'ready', 'completed', 'canceled'] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 /**
  * KDS → build-v3, for the write path.

@@ -6,6 +6,13 @@ import type { AppConfig } from '../config/config.schema';
 import { PgService } from './pg.service';
 import { blankComments, sourceFiles } from './sql-scan';
 import { LOCATION_STATUSES } from '../../modules/merchants/dto/update-location.dto';
+import {
+  ORDER_STATUSES,
+  mapKitchenToOrderStatus,
+  mapOrderToKitchenStatus,
+} from '../../modules/kds/dto/kds-contract';
+import { STAFF_STATUSES } from '../../modules/staff/staff.service';
+import { ACTIVE_STATUSES } from '../../modules/leads/leads.repository';
 
 /**
  * CHECK-VALUE GATE — the gate `sql-preflight` structurally cannot be.
@@ -203,33 +210,140 @@ describe('build-v3 CHECK values · every compared literal is one the schema admi
   /**
    * THE OTHER HALF OF THE SAME DEFECT, which the scan above structurally cannot see.
    *
-   * That scan reads SQL literals. A DTO's `@IsIn([...])` is not SQL — it is a
-   * TypeScript array — so when `UpdateLocationDto` said ('active','inactive',
-   * 'archived') while `merchant.location.status` said ('active','closed'), nothing
-   * anywhere disagreed. The result was a control that could not be operated at all:
-   * the one legal value was refused by the validator as a 400, and the two the
-   * validator accepted reached Postgres and came back 23514, which the operator saw
-   * as a 500.
+   * That scan reads SQL literals. A vocabulary declared in TypeScript is not SQL — it
+   * is an array, a union, or an `@IsIn` — so when `UpdateLocationDto` said
+   * ('active','inactive','archived') while `merchant.location.status` said
+   * ('active','closed'), nothing anywhere disagreed. The result was a control that
+   * could not be operated at all: the one legal value was refused by the validator as
+   * a 400, and the two the validator accepted reached Postgres and came back 23514,
+   * which the operator saw as a 500.
    *
-   * This is an EXACT pin rather than a heuristic, deliberately. The gate's own rule
-   * is that it must never invent a finding, and mapping arbitrary DTO fields to
-   * columns would be guesswork. One constant, one column, named on both sides.
+   * Several places in this codebase carry a hand-written copy of a CHECK and SAY SO in
+   * a comment — "matching the CHECK", "the CHECK, in code". Every one of those comments
+   * was a claim that nothing tested. This turns each into an assertion.
+   *
+   * EXACT vs SUBSET is the whole design. A mirror that claims to BE the vocabulary
+   * fails if the database gains or loses a value; a mirror that is a deliberate
+   * SELECTION from it fails only if it names a value the database would refuse. Both
+   * catch drift; neither invents a finding, which is this gate's standing rule.
    */
-  it('the location-status DTO admits exactly what the CHECK admits', async () => {
+  interface Mirror {
+    table: string;
+    column: string;
+    values: readonly string[];
+    relation: 'exact' | 'subset';
+    where: string;
+  }
+
+  const MIRRORS: Mirror[] = [
+    {
+      table: 'location',
+      column: 'status',
+      values: LOCATION_STATUSES,
+      relation: 'exact',
+      where: 'merchants/dto/update-location.dto.ts — the branch editor opens and closes on it',
+    },
+    {
+      table: 'customer_order',
+      column: 'status',
+      values: ORDER_STATUSES,
+      relation: 'exact',
+      where: 'kds/dto/kds-contract.ts — one side of the frozen-iPad vocabulary bridge',
+    },
+    {
+      table: 'staff',
+      column: 'status',
+      values: STAFF_STATUSES,
+      relation: 'exact',
+      where: 'staff/staff.service.ts — the only values an edit may set',
+    },
+    {
+      table: 'prospect',
+      column: 'status',
+      values: ACTIVE_STATUSES,
+      relation: 'subset',
+      where: 'leads/leads.repository.ts — the statuses the partial-unique email index covers',
+    },
+  ];
+
+  it.each(MIRRORS)(
+    // NOT `$table.$column` — vitest reads `$a.$b` as a nested property lookup, so the
+    // title rendered "the undefined vocabulary" and named nothing on failure.
+    '$table · $column — the vocabulary in code is $relation against the live CHECK',
+    async ({ table, column, values, relation, where }) => {
+      const { rows } = await pg.query<{ def: string }>(
+        `SELECT pg_get_constraintdef(k.oid) AS def
+           FROM pg_constraint k
+           JOIN pg_class     c ON c.oid = k.conrelid
+           JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE k.contype = 'c'
+            AND n.nspname IN ('umi','merchant','runtime')
+            AND c.relname = $1
+            AND pg_get_constraintdef(k.oid) ~ ('^CHECK \\(\\(' || $2 || ' = ANY')`,
+        [table, column],
+      );
+      const allowed = new Set(
+        rows.flatMap((r) => [...r.def.matchAll(/'([^']*)'::text/g)].map((m) => m[1])),
+      );
+      expect(
+        allowed.size,
+        `no enumerated CHECK found on ${table}.${column} — either the constraint moved ` +
+          `or this entry names a column that no longer exists (${where})`,
+      ).toBeGreaterThan(0);
+
+      if (relation === 'exact') {
+        expect(
+          [...values].sort(),
+          `${where}\nclaims to BE ${table}.${column}, and no longer is`,
+        ).toEqual([...allowed].sort());
+      } else {
+        const stray = values.filter((v) => !allowed.has(v));
+        expect(
+          stray,
+          `${where}\nnames ${stray.length} value(s) ${table}.${column} would refuse as 23514`,
+        ).toEqual([]);
+      }
+    },
+  );
+
+  /**
+   * THE MAPPING MUST BE TOTAL, and this is the one place that can prove it.
+   *
+   * `mapOrderToKitchenStatus` translates build-v3's vocabulary into the frozen Swift
+   * enum on the iPad. Its own comment explains the stake: `asKitchenOrder()` throws on
+   * a value it cannot decode, and the call site is `try rows.map { … }`, so ONE
+   * unmappable ticket blanks the whole kitchen board. The function has a `default`, so
+   * a value it does not know fails silently rather than loudly — it returns `new`, and
+   * a ready order reappears as if it had just arrived.
+   *
+   * A unit test cannot check this: it would feed the function the same list the author
+   * thought of. Only the database knows the real one.
+   */
+  it('every status the order CHECK admits maps to something the frozen iPad can decode', async () => {
     const { rows } = await pg.query<{ def: string }>(
       `SELECT pg_get_constraintdef(k.oid) AS def
          FROM pg_constraint k
          JOIN pg_class     c ON c.oid = k.conrelid
          JOIN pg_namespace n ON n.oid = c.relnamespace
-        WHERE k.contype = 'c' AND n.nspname = 'merchant' AND c.relname = 'location'
-          AND pg_get_constraintdef(k.oid) LIKE '%status%'`,
+        WHERE k.contype = 'c' AND n.nspname = 'merchant' AND c.relname = 'customer_order'
+          AND pg_get_constraintdef(k.oid) ~ '^CHECK \\(\\(status = ANY'`,
     );
-    const allowed = new Set(
-      rows.flatMap((r) => [...r.def.matchAll(/'([^']*)'::text/g)].map((m) => m[1])),
+    const allowed = [
+      ...new Set(rows.flatMap((r) => [...r.def.matchAll(/'([^']*)'::text/g)].map((m) => m[1]))),
+    ];
+    expect(allowed.length).toBeGreaterThan(0);
+
+    // Round-trip rather than "it returned something": the fallback also returns
+    // something. A status that maps to a kitchen status which maps back to a DIFFERENT
+    // order status is a status this bridge silently rewrites.
+    const rewritten = allowed.filter(
+      (s) => mapKitchenToOrderStatus(mapOrderToKitchenStatus(s)) !== s,
     );
-    expect(allowed.size, 'no enumerated CHECK found on merchant.location.status').toBeGreaterThan(
-      0,
-    );
-    expect([...allowed].sort()).toEqual([...LOCATION_STATUSES].sort());
+    expect(
+      rewritten,
+      `${rewritten.length} order status(es) do not survive the KDS bridge intact. ` +
+        `mapOrderToKitchenStatus falls back to 'new' for anything it does not know, so ` +
+        `these reach the iPad mislabelled as newly-placed tickets.`,
+    ).toEqual([]);
   });
 });
