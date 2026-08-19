@@ -17,6 +17,7 @@ import { CashRegisterRepository } from './cash-register.repository';
 import { CustomerSessionService } from './customer-session.service';
 import { CashCardController } from './cash-card.controller';
 import { CashAuthController } from './cash-auth.controller';
+import { CashAuthService } from './cash-auth.service';
 import { CashCardService } from './cash-card.service';
 import { CashCardRepository } from './cash-card.repository';
 
@@ -49,6 +50,7 @@ import { CashCardRepository } from './cash-card.repository';
     CashRegisterService,
     CashRegisterRepository,
     CustomerSessionService,
+    CashAuthService,
     CashCardService,
     CashCardRepository,
   ],
