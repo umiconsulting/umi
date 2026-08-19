@@ -11,22 +11,28 @@ const CREDENTIAL = {
   displayName: 'Ana',
   passwordSalt: 'salt',
   passwordHash: 'hash',
+  passwordAlgorithm: 'scrypt-sha256-v1',
   mfaMethod: null,
 };
 
 function harness(over: Partial<Record<string, unknown>> = {}) {
   const repo = {
     findCredentialByEmail: vi.fn().mockResolvedValue(CREDENTIAL),
+    upgradeCredential: vi.fn().mockResolvedValue(undefined),
     findMembershipAccess: vi.fn().mockResolvedValue({ roles: ['owner'] }),
     ...over,
   };
-  const passwords = { verify: vi.fn().mockReturnValue(true) };
+  const passwords = {
+    verify: vi.fn().mockReturnValue(true),
+    hash: vi.fn().mockReturnValue({ salt: 'new-salt', hash: 'new-hash' }),
+    needsUpgrade: vi.fn().mockReturnValue(false),
+  };
   const sessions = {
     createSession: vi.fn().mockResolvedValue({ accessToken: 'a', refreshToken: 'r' }),
     staffSessionByRefreshToken: vi.fn().mockResolvedValue({ userId: USER }),
     signAccessToken: vi.fn().mockResolvedValue('a'),
   };
-  const service = new CashAuthService(repo as never, passwords as never, sessions as never);
+  const service = new CashAuthService(repo as never, passwords, sessions as never);
   return { service, repo, passwords, sessions };
 }
 
@@ -138,5 +144,56 @@ describe('cash staff refresh', () => {
     const h = harness();
     await h.service.refresh(MERCHANT, 'tok');
     expect(h.sessions.createSession).not.toHaveBeenCalled();
+  });
+});
+
+describe('cash login · legacy credentials upgrade themselves', () => {
+  it('passes the row’s scheme to the verifier', async () => {
+    // A barista whose row is still `legacy-sha256-v1` must be able to open the
+    // till. Assuming scrypt here refuses her with "Credenciales inválidas" and
+    // nothing anywhere says why.
+    const h = harness();
+    await h.service.login(MERCHANT, CREDS);
+    expect(h.passwords.verify).toHaveBeenCalledWith(
+      'correct horse',
+      'salt',
+      'hash',
+      'scrypt-sha256-v1',
+    );
+  });
+
+  it('re-hashes a legacy row after a successful login', async () => {
+    const h = harness();
+    h.passwords.needsUpgrade.mockReturnValue(true);
+
+    await h.service.login(MERCHANT, CREDS);
+    await new Promise((r) => setImmediate(r));
+
+    expect(h.repo.upgradeCredential).toHaveBeenCalledWith(USER, 'new-salt', 'new-hash');
+  });
+
+  it('never re-hashes after a failed login', async () => {
+    // Re-hashing a wrong password would overwrite the right one and lock the
+    // barista out for good.
+    const h = harness();
+    h.passwords.verify.mockReturnValue(false);
+    h.passwords.needsUpgrade.mockReturnValue(true);
+
+    await h.service.login(MERCHANT, CREDS).catch(() => null);
+    await new Promise((r) => setImmediate(r));
+
+    expect(h.repo.upgradeCredential).not.toHaveBeenCalled();
+  });
+
+  it('never re-hashes when the decoy path ran (no such account)', async () => {
+    // The no-account path still hashes to keep the timing flat. It must not also
+    // write a credential for a user that does not exist.
+    const h = harness({ findCredentialByEmail: vi.fn().mockResolvedValue(null) });
+    h.passwords.needsUpgrade.mockReturnValue(true);
+
+    await h.service.login(MERCHANT, CREDS).catch(() => null);
+    await new Promise((r) => setImmediate(r));
+
+    expect(h.repo.upgradeCredential).not.toHaveBeenCalled();
   });
 });

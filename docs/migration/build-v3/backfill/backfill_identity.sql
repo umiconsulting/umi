@@ -26,17 +26,31 @@
 -- 1. umi.user  <- core.users            (MAP, 9 rows)
 --   DROP columns: auth_subject (legacy cash/CF login subject — login is email+hash
 --     phone (all empty; no target col), person_id (all null).
---   CREDENTIAL HYGIENE (security audit 2026-07-12) — reasoned per row:
+--   CREDENTIAL CARRY — REVERSES the 2026-07-12 force-reset, by owner decision
+--   2026-08-18. Read this before "restoring" the old rule:
 --     * carry password_salt (source HAS it; scrypt is unverifiable without it — the
 --       original backfill dropping it was a bug, and umi.user now has the column).
---     * carry hash+salt+algorithm ONLY for UNIQUE strong scrypt-sha256-v1 creds ->
---       those staff keep working logins, and the columns are unreadable by api/readonly
---       (column-locked in 90_rls.sql).
---     * FORCE-RESET (null creds, status='invited') weak legacy-sha256-v1 hashes AND any
---       hash SHARED across accounts (a seed/default password) -> eliminates the crackable
---       + shared-secret material rather than carrying it into prod.
+--     * carry hash+salt+algorithm for EVERY account that has a hash, weak schemes
+--       included. The columns stay unreadable by api/readonly (column-locked in
+--       90_rls.sql).
+--     * WHY THE REVERSAL. The old rule force-reset 7 of 9 accounts — both live cafés
+--       lost admin AND barista on cutover morning. Nobody had planned that, and a
+--       migration that logs every operator out of their own till is not a migration
+--       anyone would sign off at 04:00.
+--     * WHAT REPLACES THE HYGIENE. `legacy-sha256-v1` rows are re-hashed to scrypt on
+--       their next successful login (umi-api `upgradeCredentialIfLegacy`), so the weak
+--       scheme still leaves production — one login at a time, asking nobody to do
+--       anything. The old rule deleted the credential; this one replaces it.
+--     * ⚠️ WHAT IS **NOT** SOLVED HERE. Four ACTIVE accounts share one password
+--       (AB#116) — admin+barista at BOTH live cafés, one salt, one hash. Carrying
+--       them forward preserves that, and the re-hash gives each a fresh random salt,
+--       so the hashes stop matching and the sharing becomes UNDETECTABLE. It is
+--       visible today only because the hashes are byte-identical. Fix it in
+--       production BEFORE the cutover snapshot is taken; after that no audit finds it.
 --     * no-login / ghost accounts (null hash, e.g. the emailless CF user 2973fcd6 that
 --       also holds a stale admin grant) -> status='suspended' so the account is inert.
+--       Verified 2026-08-18: it is the ONLY account with no email, and it has no hash,
+--       so `user_login_ck` (password_hash is null or email is not null) still holds.
 -- ----------------------------------------------------------------------------
 with src as (
   select u.*,
@@ -44,7 +58,10 @@ with src as (
            over (partition by u.password_hash) as hash_shared_by
   from core.users u
 ), classified as (
-  select *, (password_algorithm='scrypt-sha256-v1' and hash_shared_by <= 1) as keep_cred
+  -- A credential is carried whenever there IS one. `hash_shared_by` is kept in the
+  -- projection deliberately: it is the only surviving evidence of AB#116, and it is
+  -- what the reconcile counts.
+  select *, (password_hash is not null) as keep_cred
   from src
 )
 insert into umi.user (id, email, password_hash, password_salt, password_algorithm,
@@ -62,7 +79,9 @@ select id,
        case when keep_cred then password_algorithm  end,
        coalesce(nullif(display_name,''), 'Unknown'),
        case when password_hash is null then 'suspended'      -- ghost / no-login
-            when not keep_cred          then 'invited'        -- weak or shared -> reset
+            -- No 'invited' branch any more: an account with a credential arrives
+            -- able to use it. The weak scheme is fixed by re-hash-on-login, not by
+            -- taking the password away.
             when status='active'        then 'active'
             when status='invited'       then 'invited'
             else 'suspended' end,

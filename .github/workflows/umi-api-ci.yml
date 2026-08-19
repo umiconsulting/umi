@@ -72,7 +72,7 @@ jobs:
   #
   #   SCHEMA instruments — provable against DDL alone, and run here:
   #     sql-preflight · check-values · schema-parity · wallet-carry
-  #     loyalty-stamps · cash-seals · cash-logout · cash-login
+  #     loyalty-stamps · cash-seals · cash-logout · cash-login · credential-upgrade
   #     security_gate.sql (structural half — 43 checks)
   #
   #   A suite belongs in this family when it SEEDS ITS OWN ROWS and removes them.
@@ -190,7 +190,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -d "$GATE_DB" \
             -f apps/umi-api/db/roles/004_buildv3_login_roles.sql
 
-      - name: Schema instruments (preflight · check-values · parity · carry · stamps · seals · logout · login)
+      - name: Schema instruments (preflight · check-values · parity · carry · stamps · seals · logout · login · creds)
         working-directory: apps/umi-api
         env:
           DATABASE_URL_APP: postgresql://api_login:harness_api@localhost:5432/umi_build_v3_ci
@@ -208,7 +208,8 @@ jobs:
             src/shared/loyalty/loyalty-stamps.integration.ts \
             src/modules/cash/cash-seals.integration.ts \
             src/modules/cash/cash-logout.integration.ts \
-            src/modules/cash/cash-login.integration.ts
+            src/modules/cash/cash-login.integration.ts \
+            src/modules/auth/credential-upgrade.integration.ts
 
       # THE RE-RUNNABLE RULE, proven rather than written down.
       #

@@ -5,6 +5,7 @@ import { PasswordService } from '../../shared/auth/password.service';
 import { JwtService } from '../../shared/auth/jwt.service';
 import { EmailAdapter } from '../../shared/adapters/email.adapter';
 import type { AppConfig } from '../../shared/config/config.schema';
+import { upgradeCredentialIfLegacy } from './credential-upgrade';
 import { AuthRepository, type MerchantMembershipSummary } from './auth.repository';
 import { MfaService } from './mfa.service';
 
@@ -79,10 +80,19 @@ export class AuthService {
     // Same generic 401 whether the user is missing or the password is wrong.
     if (
       !credential ||
-      !this.passwords.verify(password, credential.passwordSalt, credential.passwordHash)
+      !this.passwords.verify(
+        password,
+        credential.passwordSalt,
+        credential.passwordHash,
+        credential.passwordAlgorithm,
+      )
     ) {
       throw new UnauthorizedException('Credenciales incorrectas');
     }
+
+    // Verified — so a legacy row can now be re-hashed with the password we just
+    // confirmed. Not awaited; see the helper.
+    upgradeCredentialIfLegacy(this.repo, this.passwords, credential, password);
 
     const user: SessionUser = {
       id: credential.userId,

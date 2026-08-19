@@ -76,14 +76,23 @@ describe('cash auth · login, refresh, logout as one flow', () => {
             displayName: 'Ana',
             passwordSalt: 'salt',
             passwordHash: 'hash',
+            passwordAlgorithm: 'scrypt-sha256-v1',
             mfaMethod: null,
           }
         : null,
     ),
     findMembershipAccess: vi.fn(async () => ({ roles: ['owner'] })),
+    upgradeCredential: vi.fn(async () => undefined),
   };
 
-  const passwords = { verify: (pw: string) => pw === 'correct' };
+  const passwords = {
+    verify: (pw: string) => pw === 'correct',
+    // The row this harness serves is already scrypt, so no upgrade is expected.
+    // Both methods must exist regardless: a login must never 500 because the
+    // credential-upgrade path was not wired.
+    needsUpgrade: () => false,
+    hash: () => ({ salt: 'new-salt', hash: 'new-hash' }),
+  };
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
