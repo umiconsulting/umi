@@ -26,6 +26,7 @@ import CustomersScreen from '@/screens/customers.jsx';
 import HoursScreen from '@/screens/hours.jsx';
 import SettingsScreen from '@/screens/settings.jsx';
 import ProductsBillingScreen from '@/screens/products-billing.jsx';
+import CafesScreen from '@/screens/cafes.jsx';
 
 const TWEAK_DEFAULTS = { merchantHue: '#1A5632', density: 'comfy', lang: 'es' };
 
@@ -206,6 +207,9 @@ function DashboardLayout() {
             />
             <Route path="settings" element={<SettingsScreen />} />
             <Route path="products-billing" element={<ProductsBillingScreen />} />
+            {/* Platform, not café: the screen re-checks the grant itself, because a
+                route is reachable by URL whether or not the sidebar offers it. */}
+            <Route path="cafes" element={<CafesScreen />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

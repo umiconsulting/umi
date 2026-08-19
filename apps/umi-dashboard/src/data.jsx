@@ -92,7 +92,16 @@ async function _apiFetch(path, opts, _retried) {
     // HTTP status so callers can map to friendly copy and log the raw detail.
     const err = new Error(errMessage(payload, `${res.status} ${path}`));
     err.status = res.status;
-    err.code = payload && typeof payload.error === 'string' ? payload.error : null;
+    // ⚠️ THE CODE CAN BE NESTED. The umi-api filter wraps a thrown payload as
+    // `{ statusCode, error: <payload> }`, so a route that throws
+    // `{ error: 'email_taken', message }` arrives as `payload.error.error`.
+    // Reading only the top level left every structured umi-api refusal with a
+    // null code, and the caller with nothing to branch on.
+    err.code =
+      (payload && typeof payload.error === 'string' && payload.error) ||
+      (payload && payload.error && typeof payload.error.error === 'string'
+        ? payload.error.error
+        : null);
     err.path = path;
     throw err;
   }
@@ -849,7 +858,38 @@ async function saveLocationProfile(locationId, patch) {
   return res?.location || null;
 }
 
+// ── Platform: the cafés themselves ──────────────────────────────────────────
+// `GET /api/me/merchants` already answers this: for a login holding a platform
+// grant it lists EVERY active café, not only the ones she is staff at. No second
+// endpoint, and no way for the list to disagree with the merchant switcher.
+const EMPTY_CAFES = { cafes: [] };
+
+async function _loadCafes() {
+  const res = await _apiFetch(routes.me.merchants, { method: 'GET' });
+  return { cafes: (res && res.merchants) || [] };
+}
+
+function useCafes(refresh) {
+  return _useAsync(_loadCafes, [refresh || 0], EMPTY_CAFES);
+}
+
+/**
+ * Open a café. `POST /api/merchants`, platform administrators only.
+ *
+ * Errors arrive as `{ error: <code>, message }` and `_apiFetch` puts the code on
+ * `err.code` and the sentence on `err.message`, so a caller branches on the code
+ * and shows the sentence.
+ */
+async function provisionCafe(payload) {
+  return _apiFetch(routes.merchants.provision, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export {
+  useCafes,
+  provisionCafe,
   useOverviewData,
   useDevicesData,
   useMerchantData,

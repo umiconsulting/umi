@@ -55,16 +55,36 @@ export class MerchantsController {
     try {
       return await this.merchants.provision(dto);
     } catch (err) {
+      // ⚠️ EVERY ONE OF THESE CARRIES A `message`, and it is not decoration. The
+      // filter wraps a thrown payload as `{ statusCode, error: <payload> }`, and
+      // the dashboard's `errMessage()` reads `error.message` — so a payload with
+      // only a machine code renders as the fallback, which is the literal string
+      // "409 /api/merchants". A café owner would have read that.
+      //
+      // The code stays for the client to branch on; the message is what a person
+      // sees when nothing branches.
+      //
       // A duplicate admin address is the one collision a caller can fix, and the
       // only unique constraint this route can trip. `umi.user.email` is UNIQUE.
       if ((err as { code?: string }).code === '23505') {
-        throw new ConflictException({ error: 'email_taken', email: dto.adminEmail });
+        throw new ConflictException({
+          error: 'email_taken',
+          message: 'Ya existe una cuenta con ese correo.',
+          email: dto.adminEmail,
+        });
       }
       if (err instanceof UnknownPlanError) {
-        throw new BadRequestException({ error: 'unknown_plan', plan: dto.plan });
+        throw new BadRequestException({
+          error: 'unknown_plan',
+          message: `El plan '${dto.plan}' no existe.`,
+          plan: dto.plan,
+        });
       }
       if (err instanceof MissingRoleCatalogError) {
-        throw new BadRequestException({ error: 'role_catalog_missing' });
+        throw new BadRequestException({
+          error: 'role_catalog_missing',
+          message: 'La plataforma no tiene catálogo de roles. Ejecuta seed_rbac.sql.',
+        });
       }
       throw err;
     }

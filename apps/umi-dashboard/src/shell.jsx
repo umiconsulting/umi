@@ -307,6 +307,7 @@ const Topbar = ({
       title: 'Products & Billing',
       en: 'Subscription',
     },
+    cafes: { eyebrow: '11 / PLATAFORMA', title: 'Cafés', en: 'Platform' },
   };
 
   const locationScoped = ['orders', 'devices', 'hours'].includes(screen);
@@ -412,7 +413,11 @@ const Topbar = ({
     );
   }
 
-  const t = titles[screen];
+  // ⚠️ FALLS BACK, and it did not before. A route with no entry here read
+  // `undefined.eyebrow` and took the WHOLE shell down — sidebar, topbar and
+  // screen — not merely its own header. A missing title is a small omission;
+  // a white page is not.
+  const t = titles[screen] || { eyebrow: '— / UMI', title: screen, en: screen };
   return (
     <header
       className="topbar fade-up"
