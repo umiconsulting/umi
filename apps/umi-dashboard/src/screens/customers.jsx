@@ -7,16 +7,16 @@ import { useCustomerDetail, useCustomerInsights, useCustomersData } from '@/data
 const FILTERS = [
   { id: '', label: 'All' },
   { id: 'whatsapp', label: 'WhatsApp' },
-  { id: 'cash', label: 'Loyalty' },
+  { id: 'cash', label: 'Lealtad' },
   { id: 'memory', label: 'Memory' },
   { id: 'review', label: 'Review' },
 ];
 
 const TABS = [
-  { id: 'overview', label: 'Overview' },
+  { id: 'overview', label: 'Resumen' },
   { id: 'whatsapp', label: 'WhatsApp' },
   { id: 'orders', label: 'Orders' },
-  { id: 'loyalty', label: 'Loyalty' },
+  { id: 'loyalty', label: 'Lealtad' },
   { id: 'notes', label: 'Notes' },
   { id: 'data', label: 'Data' },
 ];
@@ -341,7 +341,7 @@ function LoyaltyPanel({ cash }) {
       <EmptyState
         icon={<I.Lock size={24} />}
         title="Umi Cash not active"
-        detail="Loyalty and wallet details are hidden until the product is active."
+        detail="Los datos de lealtad y monedero se ocultan hasta activar el producto."
       />
     );
   const account = cash?.account;
@@ -538,7 +538,7 @@ function CustomerProfile({ customerId }) {
         <ProductChip
           product={customer.products?.cash}
           icon={<I.Wallet size={14} />}
-          label="Loyalty"
+          label="Lealtad"
         />
         <ProductChip
           product={customer.products?.orders}
@@ -619,7 +619,7 @@ export default function CustomersScreen() {
               CUSTOMERS <XSep /> WHATSAPP INSIDE CUSTOMER PROFILES
             </span>
           </div>
-          <h2>Customers</h2>
+          <h2>Clientes</h2>
           <div className="en">
             Unified customer profiles across WhatsApp, orders, loyalty, wallet, and memory.
           </div>

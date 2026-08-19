@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { MerchantsModule } from '../merchants/merchants.module';
 import { StaffController } from './staff.controller';
+import { StaffMerchantController } from './staff-merchant.controller';
 import { StaffService } from './staff.service';
 import { StaffRepository } from './staff.repository';
 
@@ -11,7 +12,7 @@ import { StaffRepository } from './staff.repository';
  */
 @Module({
   imports: [AuthModule, MerchantsModule],
-  controllers: [StaffController],
+  controllers: [StaffController, StaffMerchantController],
   providers: [StaffService, StaffRepository],
 })
 export class StaffModule {}

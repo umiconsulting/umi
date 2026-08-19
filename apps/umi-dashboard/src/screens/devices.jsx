@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { I } from '@/icons.jsx';
 import { XSep } from '@/shell.jsx';
 import {
@@ -114,7 +114,7 @@ const DevicesScreen = () => {
             </span>
           </div>
           <h2>Dispositivos pareados</h2>
-          <div className="en">Paired KDS devices · kds.device_sessions</div>
+          <div className="en">Dispositivos KDS vinculados</div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button
@@ -516,6 +516,7 @@ const PairingRequestsCard = ({ pairings, stations, onChanged }) => {
 };
 
 const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
+  const uid = useId();
   const [name, setName] = useState(device.name);
   const [station, setStation] = useState(device.stationId || '');
   const [reveal, setReveal] = useState(false);
@@ -615,8 +616,9 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
           </div>
 
           <div className="field">
-            <label>Nombre del dispositivo</label>
+            <label htmlFor={`${uid}-nombre-del-dispositivo`}>Nombre del dispositivo</label>
             <input
+              id={`${uid}-nombre-del-dispositivo`}
               className="input tall"
               placeholder="e.g. Cocina Caliente 1"
               value={name}
@@ -625,8 +627,9 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
           </div>
 
           <div className="field">
-            <label>Estación asignada</label>
+            <label htmlFor={`${uid}-estacion-asignada`}>Estación asignada</label>
             <select
+              id={`${uid}-estacion-asignada`}
               className="select"
               style={{ height: 52, borderRadius: 14 }}
               value={station}
@@ -642,7 +645,7 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
           </div>
 
           <div className="field">
-            <label>Session ID</label>
+            <span className="field-label">ID de sesión</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span
                 className="pin-box"
@@ -895,6 +898,7 @@ const StationRow = ({ station, count, onChanged, onError }) => {
 };
 
 const StationPanel = ({ onClose, devices, stations, onChanged }) => {
+  const uid = useId();
   const [error, setError] = useState(null);
   const list = stations || [];
   const {
@@ -964,9 +968,10 @@ const StationPanel = ({ onClose, devices, stations, onChanged }) => {
             </div>
           )}
           <div className="field">
-            <label>Nueva estación</label>
+            <label htmlFor={`${uid}-nueva-estacion`}>Nueva estación</label>
             <div style={{ display: 'flex', gap: 8 }}>
               <input
+                id={`${uid}-nueva-estacion`}
                 className="input"
                 placeholder="e.g. Cocina Caliente"
                 value={newName}
@@ -999,6 +1004,7 @@ const StationPanel = ({ onClose, devices, stations, onChanged }) => {
 };
 
 const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
+  const uid = useId();
   const [name, setName] = useState('');
   const [station, setStation] = useState('');
   const [pairing, setPairing] = useState(null);
@@ -1056,7 +1062,7 @@ const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
           <div>
             <div className="eyebrow">KDS</div>
             <h2 className="h-section" style={{ marginTop: 4 }}>
-              Pair a new iPad
+              Vincular un iPad nuevo
             </h2>
           </div>
           <button className="btn-icon" onClick={onClose} aria-label="Close">
@@ -1065,8 +1071,9 @@ const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
         </div>
         <div className="sheet-body">
           <div className="field">
-            <label>Device name</label>
+            <label htmlFor={`${uid}-device-name`}>Nombre del dispositivo</label>
             <input
+              id={`${uid}-device-name`}
               className="input tall"
               placeholder="e.g. Cocina Caliente 2"
               value={name}
@@ -1076,9 +1083,10 @@ const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
             />
           </div>
           <div className="field">
-            <label>Assign to station</label>
+            <label htmlFor={`${uid}-assign-to-station`}>Estación asignada</label>
             {hasStations ? (
               <select
+                id={`${uid}-assign-to-station`}
                 className="select"
                 style={{ height: 52, borderRadius: 14 }}
                 value={station}
@@ -1138,7 +1146,7 @@ const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
           )}
           {pairing && (
             <div className="field">
-              <label>PIN de primer pareo</label>
+              <span className="field-label">PIN de primer pareo</span>
               <div
                 className="card-warm"
                 style={{
@@ -1190,7 +1198,7 @@ const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
           )}
           {activePairings.length > 0 && (
             <div className="field">
-              <label>Solicitudes activas</label>
+              <span className="field-label">Solicitudes activas</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {activePairings.map(function (p) {
                   return (

@@ -404,7 +404,9 @@ async function _loadCustomerInsights(ctx) {
 }
 
 async function _loadStaff(ctx) {
-  return _apiFetch(_merchantPath(ctx, '/staff'));
+  const merchantId = _merchantId(ctx);
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(routes.staff.list(merchantId));
 }
 
 async function _loadGiftCards(ctx, opts) {
@@ -486,7 +488,7 @@ async function saveMerchantVoice(patch) {
 async function createStaffMember(staff) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
   if (!merchantId) throw new Error('No active merchant selected');
-  return _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/staff`, {
+  return _apiFetch(routes.staff.create(merchantId), {
     method: 'POST',
     body: JSON.stringify(staff),
   });
@@ -495,24 +497,16 @@ async function createStaffMember(staff) {
 async function updateStaffMember(id, patch) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
   if (!merchantId) throw new Error('No active merchant selected');
-  return _apiFetch(
-    `/api/merchants/${encodeURIComponent(merchantId)}/staff/${encodeURIComponent(id)}`,
-    {
-      method: 'PATCH',
-      body: JSON.stringify(patch),
-    },
-  );
+  return _apiFetch(routes.staff.update(merchantId, id), {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
 }
 
 async function deleteStaffMember(id) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
   if (!merchantId) throw new Error('No active merchant selected');
-  return _apiFetch(
-    `/api/merchants/${encodeURIComponent(merchantId)}/staff/${encodeURIComponent(id)}`,
-    {
-      method: 'DELETE',
-    },
-  );
+  return _apiFetch(routes.staff.remove(merchantId, id), { method: 'DELETE' });
 }
 
 // Build a merchant-scoped API path with the active location as `?locationId`.

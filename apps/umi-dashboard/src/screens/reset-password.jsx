@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase.js';
 import { useAuth } from '@/lib/auth.jsx';
@@ -6,6 +6,7 @@ import { apiUrl, withCreds, errMessage } from '@/lib/config.js';
 import '@/styles.css';
 
 export default function ResetPasswordScreen() {
+  const uid = useId();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { setNeedsPasswordReset } = useAuth();
@@ -146,8 +147,9 @@ export default function ResetPasswordScreen() {
             style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
           >
             <div className="field">
-              <label>Nueva contraseña</label>
+              <label htmlFor={`${uid}-nueva-contrasena`}>Nueva contraseña</label>
               <input
+                id={`${uid}-nueva-contrasena`}
                 className="input tall"
                 type="password"
                 placeholder="Mínimo 8 caracteres"
@@ -158,8 +160,9 @@ export default function ResetPasswordScreen() {
               />
             </div>
             <div className="field">
-              <label>Confirmar contraseña</label>
+              <label htmlFor={`${uid}-confirmar-contrasena`}>Confirmar contraseña</label>
               <input
+                id={`${uid}-confirmar-contrasena`}
                 className="input tall"
                 type="password"
                 placeholder="Repite la contraseña"

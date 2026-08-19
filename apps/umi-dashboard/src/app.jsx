@@ -3,6 +3,8 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 
 import { useAuth, signOut } from '@/lib/auth.jsx';
 import { MerchantProvider, useMerchant } from '@/lib/merchant-context.jsx';
+import { MODULES } from '@/lib/module-registry.js';
+import { I } from '@/icons.jsx';
 import {
   useTweaks,
   TweaksPanel,
@@ -30,6 +32,15 @@ import CafesScreen from '@/screens/cafes.jsx';
 
 const TWEAK_DEFAULTS = { merchantHue: '#1A5632', density: 'comfy', lang: 'es' };
 
+/** Product keys as an operator reads them, not as the entitlement table stores them. */
+const PRODUCT_LABELS = {
+  dashboard: 'Umi Dashboard',
+  kds: 'KDS',
+  cash: 'Umi Cash',
+  conversaflow: 'ConversaFlow',
+};
+
+/** Refusal for a screen the café does not own the product for. */
 function ProductUnavailable({ moduleName = 'Modulo', product = 'producto' }) {
   return (
     <div
@@ -49,21 +60,51 @@ function ProductUnavailable({ moduleName = 'Modulo', product = 'producto' }) {
           <span>PRODUCTO NO ACTIVO</span>
         </div>
         <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>
-          {moduleName} no esta activo para este merchant
+          {moduleName} no está activo en este café
         </h2>
         <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 620 }}>
-          Este modulo depende de {product}. El super admin puede revisarlo en Products & Billing,
-          pero no hay controles operativos hasta activar el producto.
+          Esta sección necesita {product}. El super admin lo puede revisar en Productos y
+          facturación; no hay controles hasta activar el producto.
         </div>
       </div>
     </div>
   );
 }
 
-function GuardedScreen({ moduleKey, moduleName, product, children }) {
+/** Refusal for a screen that needs a platform grant — an axis cafés do not carry. */
+function PlatformOnly({ moduleName = 'Esta pantalla' }) {
+  return (
+    <div className="alert danger">
+      <span className="strip" />
+      <I.AlertTriangle className="ico" size={18} />
+      <div className="body">
+        <div className="ttl">Acceso de plataforma requerido</div>
+        <div className="sub">{moduleName} es para operadores de Umi.</div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Refuses a screen the selected café is not entitled to.
+ *
+ * The label and the product name come from MODULES, not from the route: they were
+ * hand-copied at each call site, which is a second place for them to drift from the
+ * registry that actually decides. A route now names only its module key.
+ */
+function GuardedScreen({ moduleKey, children }) {
   const merchantState = useMerchant();
   if (!merchantState?.canShowModule?.(moduleKey)) {
-    return <ProductUnavailable moduleName={moduleName} product={product} />;
+    const mod = MODULES[moduleKey] || {};
+    const label = mod.label || moduleKey;
+    return mod.platform && !mod.product ? (
+      <PlatformOnly moduleName={label} />
+    ) : (
+      <ProductUnavailable
+        moduleName={label}
+        product={PRODUCT_LABELS[mod.product] || mod.product || 'este producto'}
+      />
+    );
   }
   return children;
 }
@@ -141,20 +182,26 @@ function DashboardLayout() {
         />
         <div className="screen-body" key={screen}>
           <Routes>
+            {/* `index` was the ONE route with no guard. An un-entitled café landed
+                on a live-looking Overview — "EN VIVO · UMI CASH" over empty dashes —
+                which reads as "no activity today" rather than "you do not have this
+                product". `staff` and `settings` had the same hole. */}
             <Route
               index
               element={
-                <OverviewScreen
-                  onNavigate={nav}
-                  ordersPaused={ordersPaused}
-                  setOrdersPaused={setOrdersPaused}
-                />
+                <GuardedScreen moduleKey="overview">
+                  <OverviewScreen
+                    onNavigate={nav}
+                    ordersPaused={ordersPaused}
+                    setOrdersPaused={setOrdersPaused}
+                  />
+                </GuardedScreen>
               }
             />
             <Route
               path="orders"
               element={
-                <GuardedScreen moduleKey="orders" moduleName="Pedidos" product="KDS">
+                <GuardedScreen moduleKey="orders">
                   <OrdersScreen />
                 </GuardedScreen>
               }
@@ -162,16 +209,23 @@ function DashboardLayout() {
             <Route
               path="devices"
               element={
-                <GuardedScreen moduleKey="devices" moduleName="Devices" product="KDS">
+                <GuardedScreen moduleKey="devices">
                   <DevicesScreen />
                 </GuardedScreen>
               }
             />
-            <Route path="staff" element={<StaffScreen />} />
+            <Route
+              path="staff"
+              element={
+                <GuardedScreen moduleKey="staff">
+                  <StaffScreen />
+                </GuardedScreen>
+              }
+            />
             <Route
               path="customers/*"
               element={
-                <GuardedScreen moduleKey="customers" moduleName="Customers" product="Dashboard">
+                <GuardedScreen moduleKey="customers">
                   <CustomersScreen />
                 </GuardedScreen>
               }
@@ -179,7 +233,7 @@ function DashboardLayout() {
             <Route
               path="members"
               element={
-                <GuardedScreen moduleKey="members" moduleName="Loyalty" product="Umi Cash">
+                <GuardedScreen moduleKey="members">
                   <MembersScreen />
                 </GuardedScreen>
               }
@@ -187,7 +241,7 @@ function DashboardLayout() {
             <Route
               path="gift-cards"
               element={
-                <GuardedScreen moduleKey="gift-cards" moduleName="Gift Cards" product="Umi Cash">
+                <GuardedScreen moduleKey="gift-cards">
                   <GiftCardsScreen />
                 </GuardedScreen>
               }
@@ -200,16 +254,38 @@ function DashboardLayout() {
             <Route
               path="hours"
               element={
-                <GuardedScreen moduleKey="hours" moduleName="Hours" product="ConversaFlow">
+                <GuardedScreen moduleKey="hours">
                   <HoursScreen ordersPaused={ordersPaused} setOrdersPaused={setOrdersPaused} />
                 </GuardedScreen>
               }
             />
-            <Route path="settings" element={<SettingsScreen />} />
-            <Route path="products-billing" element={<ProductsBillingScreen />} />
-            {/* Platform, not café: the screen re-checks the grant itself, because a
-                route is reachable by URL whether or not the sidebar offers it. */}
-            <Route path="cafes" element={<CafesScreen />} />
+            <Route
+              path="settings"
+              element={
+                <GuardedScreen moduleKey="settings">
+                  <SettingsScreen />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="products-billing"
+              element={
+                <GuardedScreen moduleKey="products-billing">
+                  <ProductsBillingScreen />
+                </GuardedScreen>
+              }
+            />
+            {/* Platform, not café. The screen also re-checks the grant itself: a route
+                is reachable by URL whether or not the sidebar offers it, and the two
+                checks read the same `platformRole`. */}
+            <Route
+              path="cafes"
+              element={
+                <GuardedScreen moduleKey="cafes">
+                  <CafesScreen />
+                </GuardedScreen>
+              }
+            />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

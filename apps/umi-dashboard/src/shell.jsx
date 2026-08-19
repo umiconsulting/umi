@@ -1,19 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { I, UmiX } from './icons.jsx';
 
-const NAV = [
-  { id: 'overview', label: 'Overview', icon: 'Home', section: 'OPERATIONS' },
-  { id: 'orders', label: 'Pedidos', icon: 'Receipt', section: 'OPERATIONS' },
-  { id: 'devices', label: 'Devices', icon: 'Tablet', section: 'OPERATIONS', badge: '4' },
-  { id: 'staff', label: 'Staff & Access', icon: 'Users', section: 'OPERATIONS' },
-  { id: 'customers', label: 'Customers', icon: 'Users2', section: 'OPERATIONS' },
-  { id: 'members', label: 'Loyalty', icon: 'CreditCard', section: 'GROWTH' },
-  { id: 'gift-cards', label: 'Gift Cards', icon: 'Gift', section: 'GROWTH' },
-  // No badge: 'PAUSED' was hardcoded here, so the nav told every operator of every
-  // café that ordering was paused, permanently and regardless of the actual flag.
-  { id: 'hours', label: 'Hours & Availability', icon: 'Clock', section: 'CONFIGURATION' },
-  { id: 'settings', label: 'Settings', icon: 'Settings', section: 'CONFIGURATION' },
-];
+/** Section keys as an operator reads them. The key itself is the storage form. */
+const SECTION_LABELS = {
+  OPERATIONS: 'OPERACIÓN',
+  GROWTH: 'CRECIMIENTO',
+  CONFIGURATION: 'CONFIGURACIÓN',
+  PLATFORM: 'PLATAFORMA',
+};
 
 // Tiny X separator — the brand glyph as connective tissue between metadata bits
 const XSep = ({ dark = false, size = 7 }) => (
@@ -56,7 +50,7 @@ const Sidebar = ({
 }) => {
   const sections = [];
   let current = null;
-  const items = navItems?.length ? navItems : NAV;
+  const items = navItems || [];
   items.forEach((item) => {
     if (item.section !== current) {
       current = item.section;
@@ -98,7 +92,7 @@ const Sidebar = ({
                 0{si + 1}
               </span>
               <span>/</span>
-              <span>{sec.name}</span>
+              <span>{SECTION_LABELS[sec.name] || sec.name}</span>
             </div>
           )}
           {sec.items.map((item) => {
@@ -293,9 +287,13 @@ const Topbar = ({
     orders: { eyebrow: '02 / OPERACIONES', title: 'Pedidos WhatsApp', en: 'KDS tickets' },
     devices: { eyebrow: '03 / OPERACIONES', title: 'Dispositivos KDS', en: 'Kitchen displays' },
     staff: { eyebrow: '04 / OPERACIONES', title: 'Equipo y permisos', en: 'Staff & Access' },
-    customers: { eyebrow: '05 / OPERACIONES', title: 'Customers', en: 'Customer platform' },
-    members: { eyebrow: '06 / GROWTH', title: 'Loyalty', en: 'Umi Cash members' },
-    'gift-cards': { eyebrow: '07 / GROWTH', title: 'Gift cards', en: 'Umi Cash cards' },
+    customers: { eyebrow: '05 / OPERACIONES', title: 'Clientes', en: 'Customer platform' },
+    members: { eyebrow: '06 / CRECIMIENTO', title: 'Lealtad', en: 'Umi Cash members' },
+    'gift-cards': {
+      eyebrow: '07 / CRECIMIENTO',
+      title: 'Tarjetas de regalo',
+      en: 'Umi Cash cards',
+    },
     hours: {
       eyebrow: '08 / CONFIGURACIÓN',
       title: 'Horario y disponibilidad',
@@ -304,7 +302,7 @@ const Topbar = ({
     settings: { eyebrow: '09 / CONFIGURACIÓN', title: 'Ajustes', en: 'Settings' },
     'products-billing': {
       eyebrow: '10 / CONFIGURACIÓN',
-      title: 'Products & Billing',
+      title: 'Productos y facturación',
       en: 'Subscription',
     },
     cafes: { eyebrow: '11 / PLATAFORMA', title: 'Cafés', en: 'Platform' },
@@ -318,7 +316,7 @@ const Topbar = ({
         className="select"
         value={selectedLocationId || ''}
         onChange={(e) => onLocationChange?.(e.target.value)}
-        aria-label="Location"
+        aria-label="Sucursal"
         style={{ height: 42, borderRadius: 10, minWidth: 170, fontSize: 13 }}
       >
         {locations
@@ -387,27 +385,6 @@ const Topbar = ({
             latency={connection.latency}
             onRetry={connection.retry}
           />
-          <button className="btn-icon focusable" aria-label="Search">
-            <I.Search size={18} />
-          </button>
-          <button
-            className="btn-icon focusable"
-            aria-label="Notifications"
-            style={{ position: 'relative' }}
-          >
-            <I.Bell size={18} />
-            <span
-              style={{
-                position: 'absolute',
-                top: 6,
-                right: 6,
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: 'var(--danger)',
-              }}
-            ></span>
-          </button>
         </div>
       </header>
     );
@@ -442,12 +419,6 @@ const Topbar = ({
           latency={connection.latency}
           onRetry={connection.retry}
         />
-        <button className="btn-icon focusable" aria-label="Search">
-          <I.Search size={18} />
-        </button>
-        <button className="btn-icon focusable" aria-label="Notifications">
-          <I.Bell size={18} />
-        </button>
       </div>
     </header>
   );
