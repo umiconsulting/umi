@@ -6,6 +6,21 @@ import { JwtService } from '../../shared/auth/jwt.service';
 import { EmailAdapter } from '../../shared/adapters/email.adapter';
 import type { AppConfig } from '../../shared/config/config.schema';
 import { upgradeCredentialIfLegacy } from './credential-upgrade';
+
+/** The two platform grants `umi.role` carries. Null for everyone else. */
+type PlatformRole = 'super_admin' | 'developer' | null;
+
+/**
+ * Narrow whatever the catalogue holds to the two roles the CONTRACT names.
+ *
+ * An unrecognised key is reported as NO grant rather than passed through. A
+ * client gating a platform screen on an enum it does not know fails open, and a
+ * role added to `umi.role` should reach a client only when the contract says
+ * what it means.
+ */
+function narrowPlatformRole(role: string | null): PlatformRole {
+  return role === 'super_admin' || role === 'developer' ? role : null;
+}
 import { AuthRepository, type MerchantMembershipSummary } from './auth.repository';
 import { MfaService } from './mfa.service';
 
@@ -23,6 +38,7 @@ export interface TokenPair {
 export interface LoginResult extends TokenPair {
   user: SessionUser;
   merchants: MerchantMembershipSummary[];
+  platformRole: PlatformRole;
 }
 
 /**
@@ -119,11 +135,7 @@ export class AuthService {
       };
     }
 
-    const [merchants, tokens] = await Promise.all([
-      this.repo.findMerchantsForUser(user.id),
-      this.issueTokens(user),
-    ]);
-    return { user, merchants, ...tokens };
+    return this.loginResultFor(user);
   }
 
   /**
@@ -145,11 +157,7 @@ export class AuthService {
       email: summary.email,
       displayName: summary.displayName,
     };
-    const [merchants, tokens] = await Promise.all([
-      this.repo.findMerchantsForUser(user.id),
-      this.issueTokens(user),
-    ]);
-    return { user, merchants, ...tokens };
+    return this.loginResultFor(user);
   }
 
   /** Rotate the access token from a valid refresh token. */
@@ -162,20 +170,22 @@ export class AuthService {
       email: summary.email,
       displayName: summary.displayName,
     };
-    const [merchants, tokens] = await Promise.all([
-      this.repo.findMerchantsForUser(user.id),
-      this.issueTokens(user),
-    ]);
-    return { user, merchants, ...tokens };
+    return this.loginResultFor(user);
   }
 
   /** Rehydrate the session for `/me` from a verified access cookie. */
-  async session(
-    userId: string,
-  ): Promise<{ user: SessionUser; merchants: MerchantMembershipSummary[] }> {
+  async session(userId: string): Promise<{
+    user: SessionUser;
+    merchants: MerchantMembershipSummary[];
+    platformRole: PlatformRole;
+  }> {
     const summary = await this.repo.findUserById(userId);
     if (!summary) throw new UnauthorizedException('invalid_token');
-    const [merchants] = await Promise.all([this.repo.findMerchantsForUser(userId)]);
+    // Both reads are independent, and the platform grant is one indexed row.
+    const [merchants, platformRole] = await Promise.all([
+      this.repo.findMerchantsForUser(userId),
+      this.repo.platformRole(userId),
+    ]);
     return {
       user: {
         id: summary.userId,
@@ -183,7 +193,23 @@ export class AuthService {
         displayName: summary.displayName,
       },
       merchants,
+      platformRole: narrowPlatformRole(platformRole),
     };
+  }
+
+  /**
+   * The three ways a session begins — password, second factor, refresh — return
+   * the same envelope, so they build it in one place. They had drifted before:
+   * `platformRole` reached `/me` and none of the three, which would have shown a
+   * platform screen only after a page reload.
+   */
+  private async loginResultFor(user: SessionUser): Promise<LoginResult> {
+    const [merchants, platformRole, tokens] = await Promise.all([
+      this.repo.findMerchantsForUser(user.id),
+      this.repo.platformRole(user.id),
+      this.issueTokens(user),
+    ]);
+    return { user, merchants, platformRole: narrowPlatformRole(platformRole), ...tokens };
   }
 
   private async issueTokens(user: SessionUser): Promise<TokenPair> {

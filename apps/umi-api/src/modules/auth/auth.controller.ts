@@ -239,6 +239,7 @@ function toSession(result: LoginResult, accessExpiresIn: number): SessionEnvelop
   return {
     user: result.user,
     merchants: result.merchants,
+    platformRole: result.platformRole,
     provider: 'local',
     accessExpiresIn,
   };

@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "3d2c368f2f6104ae808b152b5ddda7521f12d7a73c55dbfee6f2177faf942038",
+  "contentHash": "61de00478c2c0530e628fd9285f8b3355b0a86cfe125230cba265af09101c6c0",
   "contractVersion": "2.0.0",
   "definitions": {
     "AcknowledgeReconciliationRequest": {
@@ -6341,6 +6341,20 @@
                   },
                   "type": "array"
                 },
+                "platformRole": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "super_admin",
+                        "developer"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "provider": {
                   "const": "local",
                   "type": "string"
@@ -6373,7 +6387,8 @@
                 "user",
                 "merchants",
                 "provider",
-                "accessExpiresIn"
+                "accessExpiresIn",
+                "platformRole"
               ],
               "type": "object"
             }
@@ -9659,6 +9674,20 @@
           },
           "type": "array"
         },
+        "platformRole": {
+          "anyOf": [
+            {
+              "enum": [
+                "super_admin",
+                "developer"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "provider": {
           "const": "local",
           "type": "string"
@@ -9696,6 +9725,7 @@
         "merchants",
         "provider",
         "accessExpiresIn",
+        "platformRole",
         "sessionId",
         "deviceId"
       ],
@@ -9754,6 +9784,20 @@
               },
               "type": "array"
             },
+            "platformRole": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "super_admin",
+                    "developer"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "provider": {
               "const": "local",
               "type": "string"
@@ -9791,6 +9835,7 @@
             "merchants",
             "provider",
             "accessExpiresIn",
+            "platformRole",
             "sessionId",
             "deviceId"
           ],
@@ -14294,6 +14339,20 @@
           },
           "type": "array"
         },
+        "platformRole": {
+          "anyOf": [
+            {
+              "enum": [
+                "super_admin",
+                "developer"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "provider": {
           "const": "local",
           "type": "string"
@@ -14326,7 +14385,8 @@
         "user",
         "merchants",
         "provider",
-        "accessExpiresIn"
+        "accessExpiresIn",
+        "platformRole"
       ],
       "type": "object"
     },
@@ -14372,6 +14432,20 @@
               },
               "type": "array"
             },
+            "platformRole": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "super_admin",
+                    "developer"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "provider": {
               "const": "local",
               "type": "string"
@@ -14404,7 +14478,8 @@
             "user",
             "merchants",
             "provider",
-            "accessExpiresIn"
+            "accessExpiresIn",
+            "platformRole"
           ],
           "type": "object"
         }

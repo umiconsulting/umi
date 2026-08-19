@@ -43,6 +43,10 @@ const USER = {
 const SESSION_RESULT = {
   user: USER,
   merchants: [],
+  // Every session envelope carries it, including the ones with no grant. The
+  // contract makes it nullable, not optional, so a client never has to tell
+  // "no grant" from "this build does not say".
+  platformRole: null,
   accessToken: 'access-token',
   refreshToken: 'refresh-token',
   csrfToken: 'csrf-token',

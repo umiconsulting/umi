@@ -65,6 +65,20 @@ export const SessionEnvelope = z.object({
   merchants: z.array(MerchantMembership),
   provider: z.literal('local'),
   accessExpiresIn: z.number(),
+  /**
+   * The platform grant this login holds, or null for the great majority who hold
+   * none. `'super_admin'` may act across every café; `'developer'` may REACH
+   * every café and change nothing.
+   *
+   * ⚠️ SAID OUTRIGHT, because it could only be inferred before, and the inference
+   * was wrong. `merchants[].roles` carries the platform role only as a FALLBACK,
+   * for cafés where the user has no `merchant.staff` row — so a platform operator
+   * who also works at one café appeared as ordinary staff there, and a
+   * `developer` was indistinguishable from a `super_admin` without knowing which
+   * keys are platform keys. A client gating a platform-only screen needs the
+   * fact, not a reconstruction of it.
+   */
+  platformRole: z.enum(['super_admin', 'developer']).nullable(),
 });
 export type SessionEnvelope = z.infer<typeof SessionEnvelope>;
 

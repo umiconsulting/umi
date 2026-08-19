@@ -130,8 +130,37 @@ test('session schemas (auth surface) — representative parse', () => {
         merchants: [{ id: 't', handle: 's', name: 'n', roles: ['owner'] }],
         provider: 'local',
         accessExpiresIn: 1800,
+        platformRole: null,
       },
     }).success,
+  );
+  // The two grants the contract names, and nothing else. A key that reaches a
+  // client before the contract says what it means is a key the client cannot gate on.
+  for (const role of ['super_admin', 'developer', null]) {
+    assert.ok(
+      SessionResponse.safeParse({
+        session: {
+          user: { id: '1', email: 'a@b.co', displayName: null },
+          merchants: [],
+          provider: 'local',
+          accessExpiresIn: 1800,
+          platformRole: role,
+        },
+      }).success,
+      `platformRole ${role} must parse`,
+    );
+  }
+  assert.equal(
+    SessionResponse.safeParse({
+      session: {
+        user: { id: '1', email: 'a@b.co', displayName: null },
+        merchants: [],
+        provider: 'local',
+        accessExpiresIn: 1800,
+        platformRole: 'tech_assist',
+      },
+    }).success,
+    false,
   );
 });
 
@@ -181,6 +210,9 @@ const SESSION = {
     merchants: [],
     provider: 'local',
     accessExpiresIn: 1800,
+    // Nullable, not optional: every envelope says what platform grant the login
+    // holds, so a client never has to tell "no grant" from "this build is older".
+    platformRole: null,
   },
 };
 

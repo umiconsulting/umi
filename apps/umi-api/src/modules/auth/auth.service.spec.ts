@@ -8,6 +8,8 @@ function make() {
     upgradeCredential: vi.fn().mockResolvedValue(undefined),
     findUserById: vi.fn(),
     findMerchantsForUser: vi.fn().mockResolvedValue([]),
+    // Most logins hold no platform grant, which is the default worth testing.
+    platformRole: vi.fn().mockResolvedValue(null),
     insertResetToken: vi.fn().mockResolvedValue(undefined),
     findResetToken: vi.fn(),
     updatePassword: vi.fn().mockResolvedValue(undefined),
@@ -332,5 +334,50 @@ describe('AuthService · legacy credentials upgrade themselves', () => {
     h.repo.upgradeCredential.mockRejectedValue(new Error('pg down'));
 
     await expect(h.svc.login(LEGACY.email, 'pw')).resolves.toBeTruthy();
+  });
+});
+
+describe('the session says what platform grant the login holds', () => {
+  function grantHolder(role: string) {
+    const h = make();
+    h.repo.findUserById.mockResolvedValue({
+      userId: 'u1',
+      email: 'ops@umiconsulting.co',
+      displayName: 'Ops',
+    });
+    h.repo.platformRole.mockResolvedValue(role);
+    return h;
+  }
+
+  /**
+   * ⚠️ IT COULD ONLY BE INFERRED BEFORE, AND THE INFERENCE WAS WRONG.
+   * `merchants[].roles` carries the platform role only as a FALLBACK — for cafés
+   * where the user has no `merchant.staff` row. So a platform operator who also
+   * works at one café appeared as ordinary staff THERE, and a client reading the
+   * array could not tell a `developer` from a `super_admin` without knowing
+   * which keys are platform keys.
+   */
+  it('reports super_admin on every entry point, not only /me', async () => {
+    const h = grantHolder('super_admin');
+    // The ways a session begins must agree; they build one envelope now.
+    expect((await h.svc.session('u1')).platformRole).toBe('super_admin');
+    // `verifyMfa` is the other entry point that used to build the envelope by
+    // hand. Both go through `loginResultFor` now.
+    expect((await h.svc.verifyMfa('challenge-tok', '123456')).platformRole).toBe('super_admin');
+  });
+
+  it('keeps developer distinct from super_admin', async () => {
+    // Reach and authority are two axes. A client that collapses them shows a
+    // read-only operator the buttons that change things.
+    const h = grantHolder('developer');
+    expect((await h.svc.session('u1')).platformRole).toBe('developer');
+  });
+
+  it('reports a role the contract does not name as NO grant', async () => {
+    // Fail closed. A key added to `umi.role` reaches a client only once the
+    // contract says what it means; until then a client gating on an unknown
+    // enum would fall through to its default, which is the permissive branch.
+    const h = grantHolder('tech_assist');
+    expect((await h.svc.session('u1')).platformRole).toBeNull();
   });
 });
