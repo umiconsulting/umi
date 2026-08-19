@@ -76,9 +76,19 @@ export const routes = {
     },
   },
   staff: {
-    create: (ref: string): string => buildPath('staff.create', { merchantRef: ref }),
-    update: (ref: string, staffId: string): string =>
-      buildPath('staff.update', { merchantRef: ref, staffId }),
+    /** Merchant-scoped, by id — what the dashboard calls. */
+    list: (merchantId: string): string => buildPath('staff.list', { merchantId }),
+    create: (merchantId: string): string => buildPath('staff.create', { merchantId }),
+    update: (merchantId: string, staffId: string): string =>
+      buildPath('staff.update', { merchantId, staffId }),
+    remove: (merchantId: string, staffId: string): string =>
+      buildPath('staff.remove', { merchantId, staffId }),
+    /** Reference-addressed — what the register calls. */
+    byRef: {
+      create: (ref: string): string => buildPath('staff.byRef.create', { merchantRef: ref }),
+      update: (ref: string, staffId: string): string =>
+        buildPath('staff.byRef.update', { merchantRef: ref, staffId }),
+    },
   },
   devices: {
     beginEnrollment: (merchantId: string): string =>

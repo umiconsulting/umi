@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useId } from 'react';
 import { I } from '@/icons.jsx';
 import { XSep } from '@/shell.jsx';
 import {
@@ -57,6 +57,21 @@ const clampStampTarget = (value) =>
   Math.max(MIN_STAMP_TARGET, Math.min(MAX_STAMP_TARGET, parseInt(value, 10) || MIN_STAMP_TARGET));
 
 const SettingsScreen = () => {
+  const uid = useId();
+  const [copied, setCopied] = useState(false);
+
+  // Clipboard access can be refused (insecure origin, denied permission). The tick
+  // is the receipt: it only appears when the write actually resolved.
+  const copyHandle = useCallback(async (handle) => {
+    if (!handle) return;
+    try {
+      await navigator.clipboard.writeText(`umi.app/${handle}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  }, []);
   const { data: merchant, loading } = useMerchantData();
   const { data: voiceData } = useVoiceConfig();
   const merchantState = useMerchant();
@@ -283,7 +298,7 @@ const SettingsScreen = () => {
               <span>NEGOCIO</span>
             </div>
             <h2>Información del negocio</h2>
-            <div className="en">Business information</div>
+            <div className="en">Información del negocio</div>
           </div>
           <span className="sub-pill">
             <span className="sd" />
@@ -292,23 +307,25 @@ const SettingsScreen = () => {
         </div>
         <div className="grid grid-3" style={{ gap: 18 }}>
           <div className="field">
-            <label>Business name</label>
+            <label htmlFor={`${uid}-business-name`}>Nombre del negocio</label>
             <input
+              id={`${uid}-business-name`}
               className="input tall"
               value={biz.name}
               onChange={(e) => setBiz((b) => ({ ...b, name: e.target.value }))}
             />
           </div>
           <div className="field">
-            <label>City</label>
+            <label htmlFor={`${uid}-city`}>Ciudad</label>
             <input
+              id={`${uid}-city`}
               className="input tall"
               value={biz.city || ''}
               onChange={(e) => setBiz((b) => ({ ...b, city: e.target.value }))}
             />
           </div>
           <div className="field">
-            <label>Account status</label>
+            <span className="field-label">Estado de la cuenta</span>
             <span
               className="chip read"
               style={{
@@ -318,28 +335,35 @@ const SettingsScreen = () => {
                 justifyContent: 'flex-start',
               }}
             >
-              {(biz.subscription || 'ACTIVE').toUpperCase()} · Managed from Products & Billing
+              {(biz.subscription || 'ACTIVE').toUpperCase()} · Se administra en Productos y
+              facturación
             </span>
           </div>
           <div className="field">
-            <label>Handle</label>
+            <span className="field-label">Handle</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span className="chip read" style={{ height: 44, fontSize: 13 }}>
                 {biz.handle ? `umi.app/${biz.handle}` : 'Sin dirección publicada'}
               </span>
-              <button className="btn-icon" aria-label="Copy">
-                <I.Refresh size={14} />
+              <button
+                className="btn-icon focusable"
+                aria-label="Copiar dirección"
+                title="Copiar dirección"
+                disabled={!biz.handle}
+                onClick={() => copyHandle(biz.handle)}
+              >
+                {copied ? <I.Check size={14} /> : <I.Receipt size={14} />}
               </button>
             </div>
           </div>
           <div className="field">
-            <label>Card prefix</label>
+            <span className="field-label">Prefijo de tarjeta</span>
             <span className="chip read" style={{ height: 44, fontSize: 13 }}>
-              {cashActive ? `${biz.cardPrefix} · • • • •` : 'Unavailable without Umi Cash'}
+              {cashActive ? `${biz.cardPrefix} · • • • •` : 'No disponible sin Umi Cash'}
             </span>
           </div>
           <div className="field">
-            <label>Account ID</label>
+            <span className="field-label">ID de cuenta</span>
             <span
               className="chip read"
               style={{
@@ -369,13 +393,13 @@ const SettingsScreen = () => {
                 </span>
               </div>
               <h2>Voz y tono del asistente</h2>
-              <div className="en">WhatsApp assistant voice &amp; tone</div>
+              <div className="en">Voz y tono del asistente de WhatsApp</div>
             </div>
           </div>
 
           {/* Tone chips — single select */}
           <div className="field" style={{ marginBottom: 18 }}>
-            <label>Tono · cómo le habla el asistente a tus clientes</label>
+            <span className="field-label">Tono · cómo le habla el asistente a tus clientes</span>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {(voiceData?.presets?.length ? voiceData.presets : VOICE_PRESET_FALLBACK).map((p) => (
                 <button
@@ -409,8 +433,9 @@ const SettingsScreen = () => {
           {/* Advanced */}
           <div className="grid grid-2" style={{ gap: 14 }}>
             <div className="field">
-              <label>Nombre del asistente · opcional</label>
+              <label htmlFor={`${uid}-nombre-del-asistente`}>Nombre del asistente · opcional</label>
               <input
+                id={`${uid}-nombre-del-asistente`}
                 className="input tall"
                 value={voice.assistantName}
                 placeholder={bizName || 'Asistente'}
@@ -420,8 +445,11 @@ const SettingsScreen = () => {
               />
             </div>
             <div className="field">
-              <label>Tono personalizado · opcional (anula el chip)</label>
+              <label htmlFor={`${uid}-tono-personalizado-opcional`}>
+                Tono personalizado · opcional (anula el chip)
+              </label>
               <input
+                id={`${uid}-tono-personalizado-opcional`}
                 className="input tall"
                 value={voice.customTone}
                 placeholder="Ej. relajado, con modismos del norte"
@@ -431,8 +459,11 @@ const SettingsScreen = () => {
               />
             </div>
             <div className="field" style={{ gridColumn: '1 / -1' }}>
-              <label>Notas de estilo · una por línea (máx. 8)</label>
+              <label htmlFor={`${uid}-notas-de-estilo`}>
+                Notas de estilo · una por línea (máx. 8)
+              </label>
               <textarea
+                id={`${uid}-notas-de-estilo`}
                 className="input"
                 value={voice.styleNotes}
                 onChange={(e) => setVoice((v) => ({ ...v, styleNotes: e.target.value }))}
@@ -484,14 +515,17 @@ const SettingsScreen = () => {
                   </span>
                 </div>
                 <h2>Apariencia de la tarjeta</h2>
-                <div className="en">Wallet pass appearance</div>
+                <div className="en">Apariencia del pase en Wallet</div>
               </div>
             </div>
 
             <div className="field" style={{ marginBottom: 18 }}>
-              <label>Primary color · card background</label>
+              <label htmlFor={`${uid}-primary-color-card`}>
+                Color principal · fondo de la tarjeta
+              </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <input
+                  id={`${uid}-primary-color-card`}
                   type="color"
                   value={brand.primary}
                   onChange={(e) => {
@@ -526,9 +560,12 @@ const SettingsScreen = () => {
             </div>
 
             <div className="field" style={{ marginBottom: 18 }}>
-              <label>Secondary color · accents & details</label>
+              <label htmlFor={`${uid}-secondary-color-accents`}>
+                Color secundario · acentos y detalles
+              </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <input
+                  id={`${uid}-secondary-color-accents`}
                   type="color"
                   value={brand.secondary}
                   onChange={(e) => setBrand((b) => ({ ...b, secondary: e.target.value }))}
@@ -583,8 +620,11 @@ const SettingsScreen = () => {
               </div>
               <div className="grid grid-2" style={{ gap: 14 }}>
                 <div className="field" style={{ gridColumn: '1 / -1' }}>
-                  <label>Reward name · shown to the customer</label>
+                  <label htmlFor={`${uid}-reward-name-shown`}>
+                    Nombre del premio · lo ve el cliente
+                  </label>
                   <input
+                    id={`${uid}-reward-name-shown`}
                     className="input tall"
                     value={loyalty.rewardName}
                     maxLength={MAX_REWARD_NAME_LENGTH}
@@ -600,8 +640,9 @@ const SettingsScreen = () => {
                   </div>
                 </div>
                 <div className="field">
-                  <label>Visits required</label>
+                  <label htmlFor={`${uid}-visits-required`}>Visitas necesarias</label>
                   <input
+                    id={`${uid}-visits-required`}
                     type="number"
                     min={MIN_STAMP_TARGET}
                     max={MAX_STAMP_TARGET}
@@ -611,8 +652,9 @@ const SettingsScreen = () => {
                   />
                 </div>
                 <div className="field">
-                  <label>Reward cost · MXN</label>
+                  <label htmlFor={`${uid}-reward-cost-mxn`}>Costo del premio · MXN</label>
                   <input
+                    id={`${uid}-reward-cost-mxn`}
                     type="number"
                     min={0}
                     className="input tall"
@@ -656,9 +698,10 @@ const SettingsScreen = () => {
               topupEnabled={merchant.topupEnabled !== false}
             />
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
-              <span style={{ fontSize: 12, color: 'var(--ink-warm-soft)' }}>Max stamps</span>
+              <span style={{ fontSize: 12, color: 'var(--ink-warm-soft)' }}>Sellos máximos</span>
               <input
                 type="range"
+                aria-label="Sellos máximos en la tarjeta"
                 min={MIN_STAMP_TARGET}
                 max={MAX_STAMP_TARGET}
                 step={1}
@@ -702,8 +745,11 @@ const SettingsScreen = () => {
             />
           </div>
           <div className="field">
-            <label>Reward name · auto-issued on the customer's birthday</label>
+            <label htmlFor={`${uid}-reward-name-auto`}>
+              Nombre del premio · se emite solo en el cumpleaños
+            </label>
             <input
+              id={`${uid}-reward-name-auto`}
               className="input tall"
               value={birthday.rewardName}
               onChange={(e) => setBirthday((b) => ({ ...b, rewardName: e.target.value }))}
@@ -711,7 +757,7 @@ const SettingsScreen = () => {
             />
           </div>
           <p style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 10, marginBottom: 0 }}>
-            Sent automatically at 09:00 (local). Valid 7 days. Customers see a notification in
+            Se envía solo a las 09:00 (hora local) y vale 7 días. El cliente recibe un aviso por
             WhatsApp.
           </p>
         </div>
@@ -729,16 +775,16 @@ const SettingsScreen = () => {
               </span>
             </div>
             <h2>Promoción del momento</h2>
-            <div className="en">Active promo · Business.promoMessage</div>
+            <div className="en">Promoción activa</div>
           </div>
-          <button className="btn btn-secondary btn-sm focusable">
-            <I.Plus size={14} /> Nueva
-          </button>
         </div>
         <div className="grid" style={{ gridTemplateColumns: '1.4fr 1fr', gap: 18 }}>
           <div className="field">
-            <label>Message · sent on WhatsApp · max 200 chars</label>
+            <label htmlFor={`${uid}-message-sent-on`}>
+              Mensaje · se envía por WhatsApp · máx. 200 caracteres
+            </label>
             <textarea
+              id={`${uid}-message-sent-on`}
               className="input"
               value={promo.message}
               onChange={(e) => setPromo((p) => ({ ...p, message: e.target.value.slice(0, 200) }))}
@@ -753,10 +799,12 @@ const SettingsScreen = () => {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div className="field">
-              <label>Active range · Business.promoStartsAt → promoEndsAt</label>
+              <label htmlFor={`${uid}-active-range-business`}>Vigencia · desde / hasta</label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input
+                  id={`${uid}-active-range-business`}
                   type="date"
+                  aria-label="Inicio de la vigencia"
                   className="input"
                   style={{ flex: 1 }}
                   value={promo.from}
@@ -765,6 +813,7 @@ const SettingsScreen = () => {
                 <span style={{ color: 'var(--ink-4)' }}>→</span>
                 <input
                   type="date"
+                  aria-label="Fin de la vigencia"
                   className="input"
                   style={{ flex: 1 }}
                   value={promo.to}
@@ -773,7 +822,7 @@ const SettingsScreen = () => {
               </div>
             </div>
             <div className="field">
-              <label>Days of week · Business.promoDays</label>
+              <span className="field-label">Días de la semana</span>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {DOW.map((d) => (
                   <button
@@ -811,11 +860,11 @@ const SettingsScreen = () => {
             <I.Users size={20} />
           </div>
           <div style={{ flex: 1 }}>
-            <div className="eyebrow">Customer onboarding · Business.selfRegistration</div>
+            <div className="eyebrow">Alta de clientes</div>
             <div style={{ fontWeight: 600, fontSize: 16, marginTop: 4 }}>Self-registration</div>
             <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 2 }}>
-              Customers can join the loyalty program by scanning a QR code at the table, without
-              staff assistance.
+              El cliente entra al programa de lealtad escaneando un código QR en la mesa, sin ayuda
+              del personal.
             </div>
           </div>
           <div
@@ -1016,6 +1065,7 @@ function LocationProfilesCard({ conversaflowActive }) {
 }
 
 function NewLocationSheet({ onClose, onCreated }) {
+  const uid = useId();
   const [form, setForm] = useState({ name: '', address: '', latitude: '', longitude: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -1070,8 +1120,9 @@ function NewLocationSheet({ onClose, onCreated }) {
         </div>
         <div className="sheet-body">
           <div className="field">
-            <label>Nombre</label>
+            <label htmlFor={`${uid}-nombre`}>Nombre</label>
             <input
+              id={`${uid}-nombre`}
               className="input tall"
               placeholder="Chapultepec"
               value={form.name}
@@ -1114,13 +1165,15 @@ function NewLocationSheet({ onClose, onCreated }) {
  * must always be able to correct it by hand.
  */
 function AddressFields({ form, update, setForm, geo }) {
+  const uid = useId();
   const hasPin = Boolean(form.latitude || form.longitude);
   return (
     <>
       <div className="field" style={{ margin: 0 }}>
-        <label>Dirección</label>
+        <label htmlFor={`${uid}-direccion`}>Dirección</label>
         <div style={{ display: 'flex', gap: 8 }}>
           <input
+            id={`${uid}-direccion`}
             className="input tall"
             style={{ flex: 1 }}
             placeholder="Av. Chapultepec 1, Guadalajara"
@@ -1258,6 +1311,7 @@ function coordProblem(form) {
  * a row that posted every field on every save would clear the ones it never showed.
  */
 function LocationProfileRow({ profile, showAliases }) {
+  const uid = useId();
   const [open, setOpen] = useState(false);
   /**
    * WHAT IS ON THE SERVER, as far as this row knows.
@@ -1431,7 +1485,7 @@ function LocationProfileRow({ profile, showAliases }) {
           {showAliases && (
             <>
               <div className="field" style={{ margin: 0 }}>
-                <label>Apodos (cómo la llaman los clientes)</label>
+                <span className="field-label">Apodos (cómo la llaman los clientes)</span>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                   {aliases.map((a, i) => (
                     <span
@@ -1475,8 +1529,11 @@ function LocationProfileRow({ profile, showAliases }) {
                 </div>
               </div>
               <div className="field" style={{ margin: 0 }}>
-                <label>Descripción (zona / referencia)</label>
+                <label htmlFor={`${uid}-descripcion-zona-referencia`}>
+                  Descripción (zona / referencia)
+                </label>
                 <input
+                  id={`${uid}-descripcion-zona-referencia`}
                   className="input tall"
                   value={descriptor}
                   onChange={(e) => setDescriptor(e.target.value.slice(0, 160))}

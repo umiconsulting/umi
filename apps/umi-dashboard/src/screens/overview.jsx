@@ -152,7 +152,7 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
               Estaciones de cocina{' '}
               <span style={{ color: 'var(--ink-3)', fontWeight: 300 }}>· KDS</span>
             </h2>
-            <div className="en">Live kitchen stations</div>
+            <div className="en">Estaciones de cocina en vivo</div>
           </div>
           <div
             style={{

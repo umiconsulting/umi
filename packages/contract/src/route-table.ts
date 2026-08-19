@@ -427,6 +427,41 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     },
   },
 
+  // ── Staff & access, merchant-scoped (dashboard) ──────────────────────────────
+  // The register reaches the same service through `/api/:merchantRef/admin/staff`.
+  // The dashboard addresses merchants by id everywhere, so it gets its own paths —
+  // and they live here, where the drift test proves a controller answers them. The
+  // dashboard used to compose `/staff` onto the merchant base by hand and every one
+  // of these four calls 404'd.
+  {
+    id: 'staff.list',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/staff',
+    params: ['merchantId'],
+    dart: null,
+  },
+  {
+    id: 'staff.create',
+    method: 'POST',
+    path: '/api/merchants/:merchantId/staff',
+    params: ['merchantId'],
+    dart: null,
+  },
+  {
+    id: 'staff.update',
+    method: 'PATCH',
+    path: '/api/merchants/:merchantId/staff/:staffId',
+    params: ['merchantId', 'staffId'],
+    dart: null,
+  },
+  {
+    id: 'staff.remove',
+    method: 'DELETE',
+    path: '/api/merchants/:merchantId/staff/:staffId',
+    params: ['merchantId', 'staffId'],
+    dart: null,
+  },
+
   // ── Cash / loyalty, merchant-scoped (dashboard) ──────────────────────────────
   {
     id: 'cash.stats',
@@ -621,9 +656,9 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     },
   },
 
-  // ── Staff ──────────────────────────────────────────────────────────────────
+  // ── Staff, reference-addressed (register) ──────────────────────────────────
   {
-    id: 'staff.create',
+    id: 'staff.byRef.create',
     method: 'POST',
     path: '/api/:merchantRef/admin/staff',
     params: ['merchantRef'],
@@ -643,7 +678,7 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     },
   },
   {
-    id: 'staff.update',
+    id: 'staff.byRef.update',
     method: 'PATCH',
     path: '/api/:merchantRef/admin/staff/:staffId',
     params: ['merchantRef', 'staffId'],

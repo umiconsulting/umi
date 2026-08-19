@@ -70,10 +70,11 @@ const MembersScreen = () => {
             </span>
           </div>
           <h2>Miembros activos</h2>
-          <div className="en">Loyalty members · Umi Cash</div>
+          <div className="en">Clientes del programa · Umi Cash</div>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <select
+            aria-label="Ordenar clientes"
             className="select"
             style={{ height: 38, fontSize: 13, padding: '0 32px 0 12px' }}
             value={sort}
@@ -513,9 +514,6 @@ const MemberDetail = ({ member: c, fmtBalance, fmtDate, onClose }) => {
         <div className="sheet-foot">
           <button className="btn btn-ghost" onClick={onClose}>
             Cerrar
-          </button>
-          <button className="btn btn-secondary focusable">
-            <I.Wallet size={15} /> Top-up monedero
           </button>
         </div>
       </aside>

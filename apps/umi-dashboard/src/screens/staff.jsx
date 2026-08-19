@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import { useState, useId } from 'react';
 import { I } from '@/icons.jsx';
 import { XSep } from '@/shell.jsx';
 import { createStaffMember, deleteStaffMember, useStaffData } from '@/data.jsx';
 
 // Screen 4 — Staff & Access
-// Data: useStaffData() → conversaflow.staff_members scoped by merchant
+// Data: useStaffData() → merchant.staff scoped by merchant
 
 const PERMS = [
   { id: 'scan', label: 'Scan customer QR', sub: 'Register visits and redeem' },
@@ -45,11 +45,11 @@ function fmtRelative(iso) {
 }
 
 const StaffScreen = () => {
-  const [reveal, setReveal] = useState({});
   const [inviteOpen, setInviteOpen] = useState(false);
   const [matrix, setMatrix] = useState(DEFAULT_MATRIX);
   const [filter, setFilter] = useState('ALL');
   const [refresh, setRefresh] = useState(0);
+  const [rosterError, setRosterError] = useState(null);
 
   const { data: staffData, loading } = useStaffData(refresh);
   const staff = (staffData && staffData.staff) || [];
@@ -69,7 +69,7 @@ const StaffScreen = () => {
             <span className="nn">A</span>
             <span>/</span>
             <span>
-              CONVERSAFLOW <XSep /> {activeStaff.length} MEMBERS <XSep />{' '}
+              EQUIPO <XSep /> {activeStaff.length} PERSONAS <XSep />{' '}
               {activeStaff.filter((s) => s.role === 'ADMIN').length} ADMINS
               {loading && (
                 <span style={{ marginLeft: 8, fontSize: 10, opacity: 0.6 }}>· cargando…</span>
@@ -77,7 +77,7 @@ const StaffScreen = () => {
             </span>
           </div>
           <h2>Equipo activo</h2>
-          <div className="en">Staff roster · conversaflow.staff_members</div>
+          <div className="en">Personas con acceso al negocio</div>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <div className="seg" role="tablist">
@@ -95,6 +95,20 @@ const StaffScreen = () => {
 
       {/* Roster table */}
       <div className="card fade-up d2" style={{ padding: 0, overflow: 'hidden' }}>
+        {/* Disabling a member used to fail in silence — the row simply stayed. */}
+        {rosterError ? (
+          <div
+            role="alert"
+            style={{
+              padding: '12px 20px',
+              fontSize: 12.5,
+              color: 'var(--danger)',
+              borderBottom: '1px solid var(--line)',
+            }}
+          >
+            {rosterError}
+          </div>
+        ) : null}
         {filtered.length === 0 && !loading ? (
           <div style={{ padding: '48px 32px', textAlign: 'center', color: 'var(--ink-3)' }}>
             {filter === 'ALL'
@@ -105,10 +119,10 @@ const StaffScreen = () => {
           <table className="matrix">
             <thead>
               <tr>
-                <th style={{ width: '35%' }}>Member</th>
-                <th>Role</th>
-                <th>Phone / Email</th>
-                <th>Joined</th>
+                <th style={{ width: '35%' }}>Persona</th>
+                <th>Rol</th>
+                <th>Teléfono / correo</th>
+                <th>Desde</th>
                 <th style={{ width: 64 }}></th>
               </tr>
             </thead>
@@ -177,8 +191,12 @@ const StaffScreen = () => {
                         aria-label="Disable staff"
                         title="Disable staff"
                         onClick={async () => {
-                          await deleteStaffMember(s.id);
-                          setRefresh((r) => r + 1);
+                          try {
+                            await deleteStaffMember(s.id);
+                            setRefresh((r) => r + 1);
+                          } catch (err) {
+                            setRosterError(err.message || 'No se pudo desactivar.');
+                          }
                         }}
                       >
                         <I.Trash size={15} />
@@ -266,9 +284,28 @@ const StaffScreen = () => {
 };
 
 const InvitePanel = ({ onClose, onCreate }) => {
+  const uid = useId();
   const [form, setForm] = useState({ name: '', phone: '', role: 'STAFF' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
   const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const valid = form.name.trim() && form.phone.trim();
+
+  // The sheet stays open on refusal. It used to close on success only by luck —
+  // a rejected create skipped the close AND said nothing, so the operator saw an
+  // untouched form and no reason.
+  const submit = async () => {
+    if (!valid || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onCreate({ name: form.name, role: form.role, phone: form.phone });
+    } catch (err) {
+      setError(err.message || 'No se pudo enviar la invitación.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <>
@@ -276,9 +313,9 @@ const InvitePanel = ({ onClose, onCreate }) => {
       <aside className="sheet">
         <div className="sheet-head">
           <div>
-            <div className="eyebrow">Staff & Access</div>
+            <div className="eyebrow">Equipo y accesos</div>
             <h2 className="h-section" style={{ marginTop: 4 }}>
-              Invite a team member
+              Invitar a alguien del equipo
             </h2>
           </div>
           <button className="btn-icon" onClick={onClose} aria-label="Close">
@@ -287,8 +324,9 @@ const InvitePanel = ({ onClose, onCreate }) => {
         </div>
         <div className="sheet-body">
           <div className="field">
-            <label>Full name</label>
+            <label htmlFor={`${uid}-full-name`}>Nombre completo</label>
             <input
+              id={`${uid}-full-name`}
               className="input tall"
               placeholder="María García"
               value={form.name}
@@ -296,19 +334,20 @@ const InvitePanel = ({ onClose, onCreate }) => {
             />
           </div>
           <div className="field">
-            <label>Phone number</label>
+            <label htmlFor={`${uid}-phone-number`}>Teléfono</label>
             <input
+              id={`${uid}-phone-number`}
               className="input tall"
               placeholder="+52 ..."
               value={form.phone}
               onChange={update('phone')}
             />
             <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-              An invite link will be sent via WhatsApp.
+              Se enviará una invitación por WhatsApp.
             </div>
           </div>
           <div className="field">
-            <label>Role</label>
+            <span className="field-label">Rol</span>
             <div className="seg" style={{ width: '100%' }}>
               <button
                 className={form.role === 'STAFF' ? 'on' : ''}
@@ -327,22 +366,37 @@ const InvitePanel = ({ onClose, onCreate }) => {
             </div>
             <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
               {form.role === 'ADMIN'
-                ? 'Full access including staff and settings.'
-                : 'Can scan QR and top-up wallets.'}
+                ? 'Acceso completo, incluidos equipo y ajustes.'
+                : 'Puede escanear QR y abonar al monedero.'}
             </div>
           </div>
         </div>
         <div className="sheet-foot">
-          <button className="btn btn-ghost" onClick={onClose}>
-            Cancel
+          {/* The refusal sits where the action is, not in a corner toast. */}
+          {error ? (
+            <span
+              role="alert"
+              style={{
+                flex: 1,
+                fontSize: 12.5,
+                color: 'var(--danger)',
+                textAlign: 'left',
+                alignSelf: 'center',
+              }}
+            >
+              {error}
+            </span>
+          ) : null}
+          <button className="btn btn-ghost" onClick={onClose} disabled={saving}>
+            Cancelar
           </button>
           <button
             className="btn btn-primary focusable"
-            disabled={!valid}
-            style={{ opacity: valid ? 1 : 0.5 }}
-            onClick={() => onCreate({ name: form.name, role: form.role, phone: form.phone })}
+            disabled={!valid || saving}
+            style={{ opacity: valid && !saving ? 1 : 0.5 }}
+            onClick={submit}
           >
-            <I.WhatsApp size={15} /> Send invite
+            <I.WhatsApp size={15} /> {saving ? 'Enviando…' : 'Enviar invitación'}
           </button>
         </div>
       </aside>

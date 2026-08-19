@@ -102,11 +102,6 @@
       "count": 2
     }
   },
-  "src/screens/staff.jsx": {
-    "no-unused-vars": {
-      "count": 3
-    }
-  },
   "src/shell.jsx": {
     "no-unused-vars": {
       "count": 1

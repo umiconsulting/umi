@@ -161,7 +161,7 @@ function NewCafeSheet({ onClose, onCreated }) {
 
           <div className="grid grid-2">
             <div className="field">
-              <label htmlFor="cafe-city">City · optional</label>
+              <label htmlFor="cafe-city">Ciudad · opcional</label>
               <input
                 id="cafe-city"
                 className="input"
@@ -206,7 +206,7 @@ function NewCafeSheet({ onClose, onCreated }) {
           </div>
 
           <div className="field">
-            <label htmlFor="cafe-prefix">Card prefix · letters only</label>
+            <label htmlFor="cafe-prefix">Prefijo de tarjeta · solo letras</label>
             <input
               id="cafe-prefix"
               className="input"
@@ -221,14 +221,14 @@ function NewCafeSheet({ onClose, onCreated }) {
           </div>
 
           <div className="field">
-            <label>Primary color · card background</label>
+            <span className="field-label">Color principal · fondo de la tarjeta</span>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {PRESET_COLORS.map((c) => (
                 <button
                   type="button"
                   key={c}
                   className="focusable"
-                  aria-label={'Primary color ' + c}
+                  aria-label={'Color principal ' + c}
                   aria-pressed={form.primaryColor === c}
                   onClick={() => setForm((f) => ({ ...f, primaryColor: c }))}
                   style={{
@@ -353,7 +353,7 @@ const CafesScreen = () => {
             </span>
           </div>
           <h2>Cafés en la plataforma</h2>
-          <div className="en">Every café Umi operates · merchant.merchant</div>
+          <div className="en">Todos los cafés que opera Umi</div>
         </div>
         <button className="btn btn-primary focusable" onClick={() => setSheetOpen(true)}>
           <I.Plus size={16} /> Abrir café

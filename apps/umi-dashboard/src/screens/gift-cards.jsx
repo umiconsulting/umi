@@ -25,7 +25,7 @@ const GiftCardsScreen = () => {
             </span>
           </div>
           <h2>Gift cards</h2>
-          <div className="en">Issued gift cards · umi_cash.GiftCard</div>
+          <div className="en">Tarjetas de regalo emitidas</div>
         </div>
         {loading && <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>Cargando…</span>}
       </div>
@@ -34,7 +34,7 @@ const GiftCardsScreen = () => {
         <div className="strip-metric">
           <div>
             <div className="lbl">Abiertas</div>
-            <div className="en">Open balance on this page</div>
+            <div className="en">Saldo abierto en esta página</div>
           </div>
           <div className="val">$ {(openTotal / 100).toLocaleString('es-MX')}</div>
           <span className="delta-mini up">{cards.filter((c) => !c.isRedeemed).length}</span>
@@ -42,7 +42,7 @@ const GiftCardsScreen = () => {
         <div className="strip-metric">
           <div>
             <div className="lbl">Canjeadas</div>
-            <div className="en">Redeemed on this page</div>
+            <div className="en">Canjeado en esta página</div>
           </div>
           <div className="val">{cards.filter((c) => c.isRedeemed).length}</div>
           <span className="delta-mini">{cards.length} shown</span>

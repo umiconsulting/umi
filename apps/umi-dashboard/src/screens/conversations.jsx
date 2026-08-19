@@ -23,7 +23,7 @@ const ConversationsScreen = () => {
             </span>
           </div>
           <h2>Conversaciones WhatsApp</h2>
-          <div className="en">Recent operational conversations · conversaflow.conversations</div>
+          <div className="en">Conversaciones recientes</div>
         </div>
         {loading && <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>Cargando…</span>}
       </div>

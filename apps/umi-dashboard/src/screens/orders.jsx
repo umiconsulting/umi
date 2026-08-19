@@ -61,7 +61,7 @@ const OrdersScreen = () => {
             </span>
           </div>
           <h2>Pedidos WhatsApp</h2>
-          <div className="en">KDS tickets · ConversaFlow</div>
+          <div className="en">Pedidos en cocina · KDS</div>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <button className="btn btn-ghost btn-sm" onClick={() => setRefresh((r) => r + 1)}>

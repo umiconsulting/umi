@@ -144,6 +144,21 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
   const update = (d, k, v) =>
     setHours((h) => ({ ...h, [d]: { ...(h[d] || DEFAULT_HOURS[d]), [k]: v } }));
 
+  // Only OPEN days receive the copied span. A closed day that silently gained
+  // hours would read as open on the next save.
+  const copyToAll = (sourceId) =>
+    setHours((h) => {
+      const src = h[sourceId] || DEFAULT_HOURS[sourceId];
+      const next = { ...h };
+      for (const d of DAYS) {
+        if (d.id === sourceId) continue;
+        const day = next[d.id] || DEFAULT_HOURS[d.id];
+        if (!day.open) continue;
+        next[d.id] = { ...day, from: src.from, to: src.to };
+      }
+      return next;
+    });
+
   const handlePauseToggle = () => {
     setConfirmPause({ to: !ordersPaused });
   };
@@ -259,11 +274,12 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                 </span>
               </div>
               <h2>Horas de apertura</h2>
-              <div className="en">Opening hours</div>
+              <div className="en">Horario de atención</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <I.Clock size={14} style={{ color: 'var(--ink-3)' }} />
               <select
+                aria-label="Zona horaria"
                 className="select"
                 style={{ height: 36, fontSize: 13, padding: '0 32px 0 12px' }}
                 value={tz}
@@ -337,6 +353,7 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <input
                       type="time"
+                      aria-label={`${d.label} · abre`}
                       className="input"
                       style={{
                         height: 38,
@@ -351,6 +368,7 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                     <span style={{ color: 'var(--ink-4)' }}>→</span>
                     <input
                       type="time"
+                      aria-label={`${d.label} · cierra`}
                       className="input"
                       style={{
                         height: 38,
@@ -364,7 +382,13 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                     />
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <button className="btn-icon" aria-label="Copy to all">
+                    <button
+                      className="btn-icon focusable"
+                      aria-label={`Copiar el horario de ${d.label} a los demás días`}
+                      title="Copiar a los demás días"
+                      disabled={!h.open}
+                      onClick={() => copyToAll(d.id)}
+                    >
                       <I.Refresh size={14} />
                     </button>
                   </div>
@@ -383,7 +407,7 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
               Order cutoff
             </h3>
             <p style={{ fontSize: 13.5, color: 'var(--ink-2)', marginTop: 0, marginBottom: 18 }}>
-              Stop accepting WhatsApp orders this many minutes before closing time.
+              Deja de aceptar pedidos por WhatsApp estos minutos antes de cerrar.
             </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <div
@@ -403,6 +427,7 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
               </div>
               <input
                 type="range"
+                aria-label="Minutos antes del cierre para dejar de aceptar pedidos"
                 min={0}
                 max={120}
                 step={5}
@@ -460,8 +485,12 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
               <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
                 Sent on next customer interaction · {notice.length} / 280
               </span>
-              <button className="btn-sm btn btn-ghost">
-                <I.Refresh size={13} /> Clear
+              <button
+                className="btn-sm btn btn-ghost focusable"
+                disabled={!notice}
+                onClick={() => setNotice('')}
+              >
+                <I.X size={13} /> Borrar
               </button>
             </div>
           </div>
