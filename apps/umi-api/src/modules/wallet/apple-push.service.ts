@@ -113,6 +113,35 @@ export class ApplePushService {
     return { cards: cardIds.length, sent };
   }
 
+  /**
+   * Push a NAMED set of cards. The operator's escape hatch, and the port of
+   * umi-cash `POST /api/umi/push-passes`.
+   *
+   * ⚠️ THE TOUCH IS PART OF THE PUSH, and `pushCard` alone does not do it. Apple's
+   * web service answers `passesUpdatedSince` by comparing the card row; a push
+   * without a newer row makes the phone ask what changed, hear "nothing", and
+   * download nothing. `pushMerchant` touches for the same reason, and umi-cash's
+   * `push-passes` was one of the two callers that got this right.
+   *
+   * Batched like `pushMerchant`: one café has more than 500 cards and each push
+   * carries its own timeout, so a series would be an hour and a fan-out would open
+   * 500 connections to Apple.
+   */
+  async pushCards(cardIds: string[]): Promise<{ cards: number; sent: number }> {
+    if (!this.isConfigured() || cardIds.length === 0) return { cards: 0, sent: 0 };
+
+    await this.repo.touchCards(cardIds);
+
+    let sent = 0;
+    for (let i = 0; i < cardIds.length; i += PUSH_BATCH) {
+      const batch = cardIds.slice(i, i + PUSH_BATCH);
+      const results = await Promise.all(batch.map((id) => this.pushCard(id)));
+      sent += results.reduce((n, r) => n + r.sent, 0);
+    }
+    this.logger.log(`wallet_card_push cards=${cardIds.length} sent=${sent}`);
+    return { cards: cardIds.length, sent };
+  }
+
   /** The ES256 provider token Apple wants in `authorization`. Cached ~50 min. */
   private async providerToken(): Promise<string | null> {
     if (this.cached && this.cached.expiresAt > Date.now()) return this.cached.jwt;

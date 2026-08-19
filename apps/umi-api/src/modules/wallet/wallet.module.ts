@@ -37,6 +37,8 @@ import { WalletPassService } from './wallet-pass.service';
     ApplePushService,
     GooglePassService,
   ],
-  exports: [WalletPassService, ApplePushService],
+  // `WalletPassRepository` is exported for the PLATFORM ops surface, which reads
+  // `passHealth` — a counter that had no caller at all until then.
+  exports: [WalletPassService, ApplePushService, WalletPassRepository],
 })
 export class WalletModule {}
