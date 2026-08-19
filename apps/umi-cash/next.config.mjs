@@ -1,3 +1,62 @@
+/**
+ * THE ROUTES THE REGISTER CALLS, forwarded to umi-api when `CASH_API_ORIGIN` is
+ * set. Every one is ported and answering; the omissions below are deliberate.
+ *
+ * ⚠️ umi-api MUST ALREADY BE DEPLOYED with `@AcceptRegisterToken()` (PR #115)
+ * before this variable is set anywhere. The till sends `Authorization: Bearer`
+ * from localStorage — `src/lib/authed-fetch.ts`, and that client is frozen —
+ * while every ported route was cookie-only until then. Set this against an older
+ * umi-api and all thirteen staff routes answer `authentication_required`.
+ *
+ * EXPLICIT, ONE BY ONE, for the same reason the wallet list is: a prefix would
+ * silently forward a route umi-api does not serve, and the answer would be a 404
+ * from an origin the operator is not looking at.
+ *
+ * NOT FORWARDED, each for a reason:
+ *
+ *   `/admin/gift-cards` and `/gift/:code` — umi-api 500s on both.
+ *   `merchant.loyalty_gift_card` has six columns and the Cash repositories read
+ *   ten, which is AB#13, deferred whole to PR #94 by decision D-1. Forwarding
+ *   them would trade a working screen for a broken one. ⚠️ After the cutover they
+ *   break on THIS side too — `loyalty.gift_cards` stops existing — so PR #94 is a
+ *   cutover blocker for gifting either way, not something this list can defer.
+ *
+ *   `/admin/messages` — never ported. The lifecycle bodies live in
+ *   `merchant.message` now and the screen is rebuilt from there (AB#107). The
+ *   route is deleted, not moved.
+ *
+ * The `/umi/*` panel is absent for the same reason: AB#108 replaces it with a
+ * form in umi-dashboard.
+ */
+const REGISTER_ROUTES = [
+  // The till signs in. `login` and `refresh` set the `refreshToken` cookie, and
+  // both apps write it under the same name at the same path — so a session
+  // opened on one side is refreshable by the other.
+  '/api/:handle/auth/login',
+  '/api/:handle/auth/refresh',
+  '/api/:handle/auth/logout',
+  // The register's screens.
+  '/api/:handle/admin/analytics',
+  '/api/:handle/admin/client-error',
+  '/api/:handle/admin/customers',
+  '/api/:handle/admin/customers/:id',
+  '/api/:handle/admin/export',
+  '/api/:handle/admin/purchase',
+  '/api/:handle/admin/reward-config',
+  '/api/:handle/admin/settings',
+  '/api/:handle/admin/stats',
+  '/api/:handle/admin/topup',
+  // Scanning. The bare route and its two children are listed separately: Next
+  // matches segment counts, so the parent never catches the children.
+  '/api/:handle/admin/scan',
+  '/api/:handle/admin/scan/preview',
+  '/api/:handle/admin/scan/seals',
+  // The customer's own side: registration, her card, and the code she shows.
+  '/api/:handle/customers',
+  '/api/:handle/card',
+  '/api/:handle/card/qr',
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
@@ -85,8 +144,16 @@ const nextConfig = {
    */
   async rewrites() {
     const origin = process.env.WALLET_API_ORIGIN?.replace(/\/$/, '');
-    if (!origin) return [];
+    // THE REGISTER, flipped separately from the wallet and revertible separately.
+    //
+    // Two variables, not one, because the two surfaces carry different stakes.
+    // The wallet must answer for every issued pass and has been forwarding for
+    // weeks. The register is the till: if it breaks, a café cannot take a stamp.
+    // One switch would mean no way to retreat from one without dropping the other.
+    const cash = process.env.CASH_API_ORIGIN?.replace(/\/$/, '');
+    if (!origin && !cash) return [];
     const passthrough = (source) => ({ source, destination: `${origin}${source}` });
+    const toCash = (source) => ({ source, destination: `${cash}${source}` });
     return {
       beforeFiles: [
         // Apple calls these five. The path shape is frozen inside every pass.
@@ -103,7 +170,9 @@ const nextConfig = {
         // servers, so this host must answer it too. The url holds the stamp
         // state, so a new stamp gives a new url and Google reads the new image.
         passthrough('/api/:handle/stamp-strip/:state'),
-      ],
+      ]
+        .filter(() => origin)
+        .concat(cash ? REGISTER_ROUTES.map(toCash) : []),
     };
   },
 };

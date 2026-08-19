@@ -210,6 +210,8 @@ describe('build-v3 smoke · every read endpoint', () => {
   let fx: Fixtures;
   let expected: readonly Expectation[];
   const routes: string[] = [];
+  /** `METHOD /url` for every route the app registers, in Fastify's own form. */
+  const served = new Set<string>();
   const results: Result[] = [];
   let staffCookie = '';
   let customerBearer = '';
@@ -275,7 +277,12 @@ describe('build-v3 smoke · every read endpoint', () => {
     const fastify = app.getHttpAdapter().getInstance();
     fastify.addHook('onRoute', (r: { method: string | string[]; url: string }) => {
       const methods = Array.isArray(r.method) ? r.method : [r.method];
-      for (const m of methods) if (m === 'GET') routes.push(r.url);
+      for (const m of methods) {
+        // Every method, so the rewrite-list check below can see the POSTs; the
+        // request matrix itself still only drives GETs.
+        served.add(`${m} ${r.url}`);
+        if (m === 'GET') routes.push(r.url);
+      }
     });
     await app.init();
     await fastify.ready();
