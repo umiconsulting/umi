@@ -94,7 +94,12 @@ export const MODULES: Record<string, ModuleConfig> = {
     icon: 'Sparkles',
     section: 'CONFIGURATION',
     product: 'dashboard',
-    role: 'super_admin',
+    // NO `role` HERE, deliberately. This screen is for a PLATFORM operator, and a
+    // platform grant is not a café role — `umi.role` marks super_admin `is_platform`
+    // and no membership carries it. Gating it here read the café axis for a value
+    // that only appears on the platform one, so the screen hid from the person it is
+    // for. The client decides it, from `SessionEnvelope.platformRole`; this map has
+    // no platform-role input and must not pretend to answer.
   },
 };
 
@@ -120,6 +125,15 @@ function isProductActive(productKey: string, cap: CapabilitiesShape): boolean {
   return isProductStatusActive(status);
 }
 
+/**
+ * The CAFÉ-role gate. Correct, and currently unused — `products-billing` was its only
+ * caller and named a PLATFORM grant, which is a different axis (see that entry).
+ *
+ * Kept rather than deleted because a café-role gate is a real thing a module may want
+ * (only an owner sees payroll, say). ⚠️ If you reach for it, the value belongs to
+ * owner/admin/staff/viewer. A platform grant does not go here, however much the word
+ * "role" invites it.
+ */
 function hasRequiredRole(moduleConfig: ModuleConfig, cap: CapabilitiesShape): boolean {
   if (!moduleConfig.role) return true;
   const membership = cap.membership;
