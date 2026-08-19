@@ -24,6 +24,15 @@ function ctxFor(req: Record<string, unknown>): ExecutionContext {
 
 const ACCESS = '00000000-0000-4000-8000-000000000000';
 
+/**
+ * The till-token verifier, wired to nothing. These cases are about the DASHBOARD
+ * cookie; the register credential has its own file, `register-token.guard.spec`,
+ * where the escalation cases live.
+ */
+function noRegisterToken() {
+  return { fromHeader: vi.fn().mockResolvedValue(null) } as never;
+}
+
 describe('AuthGuard', () => {
   const reflector = { getAllAndOverride: vi.fn() } as unknown as Reflector;
 
@@ -31,13 +40,13 @@ describe('AuthGuard', () => {
     (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation(
       (k: string) => k === IS_PUBLIC,
     );
-    const guard = new AuthGuard({ verifyAccess: vi.fn() } as never, reflector);
+    const guard = new AuthGuard({ verifyAccess: vi.fn() } as never, reflector, noRegisterToken());
     expect(await guard.canActivate(ctxFor({}))).toBe(true);
   });
 
   it('401s when no access cookie is present', async () => {
     (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
-    const guard = new AuthGuard({ verifyAccess: vi.fn() } as never, reflector);
+    const guard = new AuthGuard({ verifyAccess: vi.fn() } as never, reflector, noRegisterToken());
     await expect(guard.canActivate(ctxFor({ cookies: {} }))).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
@@ -48,7 +57,7 @@ describe('AuthGuard', () => {
     const jwt = {
       verifyAccess: vi.fn().mockResolvedValue({ sub: 'u1', email: 'a@b.co' }),
     };
-    const guard = new AuthGuard(jwt as never, reflector);
+    const guard = new AuthGuard(jwt as never, reflector, noRegisterToken());
     const req: Record<string, unknown> = { cookies: { umi_access: 'tok' } };
     expect(await guard.canActivate(ctxFor(req))).toBe(true);
     expect(req.authUser).toEqual({ id: 'u1', email: 'a@b.co' });

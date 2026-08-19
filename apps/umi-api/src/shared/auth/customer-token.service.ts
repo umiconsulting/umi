@@ -4,10 +4,21 @@ import { jwtVerify } from 'jose';
 import type { AppConfig } from '../config/config.schema';
 
 export interface CustomerClaims {
-  /** The customer this token speaks for. */
+  /** The subject this token speaks for — a customer id, or a user id for staff. */
   subjectId: string;
   /** The café the session belongs to. */
   merchantId: string;
+  /**
+   * What the register calls this session: 'CUSTOMER', or 'ADMIN' / 'STAFF'.
+   *
+   * ⚠️ READ THIS BEFORE TRUSTING `subjectId`. One key signs both audiences, so a
+   * customer's token and a barista's token are equally valid signatures and
+   * differ ONLY here. The `subjectId` is a `merchant.customer.id` when the role
+   * is CUSTOMER and a `umi.user.id` otherwise — two different tables. A caller
+   * that reads the subject without reading the role is asking one table a
+   * question about the other.
+   */
+  role: string | null;
 }
 
 /**
@@ -46,11 +57,13 @@ export class CustomerTokenService {
         sub?: unknown;
         merchantId?: unknown;
         tenantId?: unknown;
+        role?: unknown;
       };
       const subjectId = String(claims.sub ?? '');
       const merchantId = String(claims.merchantId ?? claims.tenantId ?? '');
       if (!subjectId || !merchantId) return null;
-      return { subjectId, merchantId };
+      const role = typeof claims.role === 'string' ? claims.role : null;
+      return { subjectId, merchantId, role };
     } catch {
       return null;
     }
