@@ -24,10 +24,43 @@ export interface LocationRow {
   status: string;
 }
 
-/** LocationRow + the location-resolution profile fields (Phase 2). */
+/**
+ * LocationRow + the location-resolution profile fields (Phase 2) + the physical
+ * place: where the branch is and where its pin sits.
+ *
+ * `lat`/`lng` are `numeric` in the schema, which node-postgres hands back as a
+ * STRING to protect precision it cannot know is unneeded. Every read below casts
+ * to `float8` so this interface can honestly say `number` — a coordinate that
+ * arrives as "20.673600" renders in an input as text and compares wrong against
+ * a geocoder's answer.
+ */
 export interface LocationProfileRow extends LocationRow {
   aliases: string[];
   descriptor: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+/** What `updateLocation` accepts. Absent = untouched; null = cleared. */
+export interface LocationPatch {
+  name?: string;
+  timezone?: string;
+  status?: string;
+  aliases?: string[];
+  descriptor?: string | null;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+/** What a new branch needs. Only the name is required; a café may not have a pin yet. */
+export interface NewLocation {
+  name: string;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  timezone?: string | null;
 }
 
 /**
@@ -467,18 +500,26 @@ export class MerchantsRepository {
   async updateLocation(
     merchantId: string,
     locationId: string,
-    patch: {
-      name?: string;
-      timezone?: string;
-      status?: string;
-      aliases?: string[];
-      descriptor?: string;
-    },
+    patch: LocationPatch,
   ): Promise<LocationProfileRow | null> {
-    // descriptor uses a presence flag so an explicit empty value can CLEAR it
-    // (COALESCE alone could never null it out); aliases pass through COALESCE so
-    // an omitted field is untouched while an explicit [] clears the list.
-    const setDescriptor = Object.prototype.hasOwnProperty.call(patch, 'descriptor');
+    // Four of these fields are CLEARABLE — a café can stop recording an address,
+    // and a pin dropped on the wrong corner has to be removable rather than only
+    // moveable. COALESCE cannot express that: it reads null as "not sent". So each
+    // clearable field carries a presence flag, and `undefined` is the only thing
+    // that leaves a column alone.
+    //
+    // ⚠️ THE FLAG TESTS FOR `undefined`, NOT FOR THE KEY. It used to be
+    // `hasOwnProperty`, and that was wrong in a way nothing failed on: this project
+    // compiles at ES2023, so `useDefineForClassFields` is on and every field
+    // DECLARED on a DTO becomes an own property whether or not the request carried
+    // it. Under that rule a patch of `{aliases}` owns `descriptor` too — set to
+    // undefined — and saving a nickname erased the branch's human hint. `undefined`
+    // means absent no matter how the object was built, which is the only test that
+    // holds for both a DTO and a plain object.
+    //
+    // `name`, `timezone` and `status` stay on COALESCE deliberately: none of the
+    // three has a meaningful empty. A branch with no name is not a branch.
+    const has = (k: keyof LocationPatch) => patch[k] !== undefined;
     const { rows } = await this.pg.withMerchant((c) =>
       c.query<LocationProfileRow>(
         `UPDATE merchant.location
@@ -487,9 +528,13 @@ export class MerchantsRepository {
              status = COALESCE($5, status),
              aliases = COALESCE($6::text[], aliases),
              descriptor = CASE WHEN $7::boolean THEN $8 ELSE descriptor END,
+             address = CASE WHEN $9::boolean THEN $10 ELSE address END,
+             lat = CASE WHEN $11::boolean THEN $12::numeric ELSE lat END,
+             lng = CASE WHEN $13::boolean THEN $14::numeric ELSE lng END,
              updated_at = now()
          WHERE id = $2::uuid AND merchant_id = $1::uuid
-         RETURNING id::text, name, timezone, status, aliases, descriptor`,
+         RETURNING id::text, name, timezone, status, aliases, descriptor,
+                   address, lat::float8 AS latitude, lng::float8 AS longitude`,
         [
           merchantId,
           locationId,
@@ -497,8 +542,43 @@ export class MerchantsRepository {
           patch.timezone ?? null,
           patch.status ?? null,
           patch.aliases ?? null,
-          setDescriptor,
+          has('descriptor'),
           patch.descriptor ?? null,
+          has('address'),
+          patch.address ?? null,
+          has('latitude'),
+          patch.latitude ?? null,
+          has('longitude'),
+          patch.longitude ?? null,
+        ],
+      ),
+    );
+    return rows[0] ?? null;
+  }
+
+  /**
+   * A café's second branch, and its third.
+   *
+   * `merchant_id` is written from the guard-resolved access, never from the body,
+   * and the insert runs under RLS on the umi_app pool — so a merchant id the caller
+   * has no membership for inserts zero rows rather than someone else's branch. The
+   * `RETURNING` is what tells the two apart: no row back means the café was not
+   * this caller's to add to.
+   */
+  async createLocation(merchantId: string, input: NewLocation): Promise<LocationProfileRow | null> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<LocationProfileRow>(
+        `INSERT INTO merchant.location (merchant_id, name, address, lat, lng, timezone)
+         VALUES ($1::uuid, $2, $3, $4::numeric, $5::numeric, $6)
+         RETURNING id::text, name, timezone, status, aliases, descriptor,
+                   address, lat::float8 AS latitude, lng::float8 AS longitude`,
+        [
+          merchantId,
+          input.name,
+          input.address ?? null,
+          input.latitude ?? null,
+          input.longitude ?? null,
+          input.timezone ?? null,
         ],
       ),
     );
@@ -526,7 +606,8 @@ export class MerchantsRepository {
   async listLocationProfiles(merchantId: string): Promise<LocationProfileRow[]> {
     const { rows } = await this.pg.withMerchant((c) =>
       c.query<LocationProfileRow>(
-        `SELECT id::text, name, NULL::text AS timezone, status, aliases, descriptor
+        `SELECT id::text, name, NULL::text AS timezone, status, aliases, descriptor,
+                address, lat::float8 AS latitude, lng::float8 AS longitude
          FROM merchant.location
          WHERE merchant_id = $1::uuid
          ORDER BY created_at ASC, id ASC`,

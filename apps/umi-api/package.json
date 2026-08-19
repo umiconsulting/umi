@@ -20,7 +20,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "test:integration:schema": "vitest run --config vitest.integration.config.ts src/shared/database/sql-preflight.integration.ts src/shared/database/check-values.integration.ts src/shared/database/schema-parity.integration.ts src/modules/wallet/wallet-carry.integration.ts src/shared/loyalty/loyalty-stamps.integration.ts src/modules/cash/cash-seals.integration.ts src/modules/cash/cash-logout.integration.ts src/modules/cash/cash-login.integration.ts src/modules/auth/credential-upgrade.integration.ts src/modules/cash/register-flip.integration.ts src/modules/merchants/provision.integration.ts",
+    "test:integration:schema": "vitest run --config vitest.integration.config.ts src/shared/database/sql-preflight.integration.ts src/shared/database/check-values.integration.ts src/shared/database/schema-parity.integration.ts src/modules/wallet/wallet-carry.integration.ts src/shared/loyalty/loyalty-stamps.integration.ts src/modules/cash/cash-seals.integration.ts src/modules/cash/cash-logout.integration.ts src/modules/cash/cash-login.integration.ts src/modules/auth/credential-upgrade.integration.ts src/modules/cash/register-flip.integration.ts src/modules/merchants/provision.integration.ts src/modules/merchants/locations.integration.ts",
     "test:integration:migration": "vitest run --config vitest.integration.config.ts src/shared/database/rls.integration.ts src/shared/database/pooler-isolation.integration.ts src/shared/database/identity-normalization.integration.ts src/smoke.integration.ts"
   },
   "dependencies": {

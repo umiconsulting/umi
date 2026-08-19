@@ -21,6 +21,8 @@ import type { MeMerchantsResponse } from '@umi/contract';
 import { MerchantsService } from './merchants.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
+import { CreateLocationDto } from './dto/create-location.dto';
+import { GeocodeAdapter } from '../../shared/adapters/geocode.adapter';
 import { ProvisionMerchantDto } from './dto/provision-merchant.dto';
 import { PlatformAdminGuard } from '../auth/platform-admin.guard';
 import { MissingRoleCatalogError, UnknownPlanError } from './merchants.repository';
@@ -33,7 +35,10 @@ import { MissingRoleCatalogError, UnknownPlanError } from './merchants.repositor
 @UseGuards(AuthGuard)
 @Controller('api')
 export class MerchantsController {
-  constructor(private readonly merchants: MerchantsService) {}
+  constructor(
+    private readonly merchants: MerchantsService,
+    private readonly geocoder: GeocodeAdapter,
+  ) {}
 
   @Get('me/merchants')
   async myMerchants(@CurrentUser() user: AuthUser): Promise<MeMerchantsResponse> {
@@ -134,6 +139,43 @@ export class MerchantsController {
   @RequireProduct('dashboard')
   async getLocationProfiles(@Merchant() merchant: MerchantAccess) {
     return { locations: await this.merchants.listLocationProfiles(merchant.merchantId) };
+  }
+
+  /**
+   * Open a branch. Same guards as every other location write on this controller —
+   * membership plus the dashboard product — because a branch is the café's own data
+   * and the screen that edits it is the café's own settings screen.
+   */
+  @Post('merchants/:merchantId/locations')
+  @UseGuards(MerchantAccessGuard, EntitlementGuard)
+  @RequireProduct('dashboard')
+  async createLocation(@Merchant() merchant: MerchantAccess, @Body() dto: CreateLocationDto) {
+    const location = await this.merchants.createLocation(merchant.merchantId, dto);
+    return { location };
+  }
+
+  /**
+   * Address → coordinates, for the branch editor's "find it" button.
+   *
+   * NOT merchant-scoped and deliberately so: it reads nothing and writes nothing,
+   * so there is no café to scope it to. `AuthGuard` at the class level is the whole
+   * gate — a signed-in operator may look up an address. It is not a search over our
+   * data; it is a proxy to a public gazetteer, and the proxy exists only so the
+   * browser is not the one identifying itself to Nominatim.
+   *
+   * 200 with `{location: null}` when nothing matched. A 404 would say "this endpoint
+   * is not here", which is a different and less useful thing to tell an operator
+   * mid-form.
+   */
+  @Get('geocode')
+  async geocode(@Query('address') address?: string) {
+    if (!address || address.trim().length < 3) {
+      throw new BadRequestException({
+        error: 'address_too_short',
+        message: 'Escribe una dirección de al menos 3 caracteres.',
+      });
+    }
+    return { location: await this.geocoder.lookup(address) };
   }
 
   @Patch('merchants/:merchantId/locations/:locationId')

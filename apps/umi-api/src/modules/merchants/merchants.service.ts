@@ -4,6 +4,8 @@ import {
   MerchantsRepository,
   type LocationRow,
   type LocationProfileRow,
+  type LocationPatch,
+  type NewLocation,
   type ProductInstance,
   type MerchantSummary,
 } from './merchants.repository';
@@ -150,13 +152,7 @@ export class MerchantsService {
   async updateLocation(
     merchantId: string,
     locationId: string,
-    patch: {
-      name?: string;
-      timezone?: string;
-      status?: string;
-      aliases?: string[];
-      descriptor?: string;
-    },
+    patch: LocationPatch,
   ): Promise<LocationProfileRow> {
     // Don't pre-filter on status: updateLocation already scopes by merchant+id and
     // returns null when absent, and gating on `active` would 404 any patch to an
@@ -166,7 +162,21 @@ export class MerchantsService {
     return updated;
   }
 
-  /** Per-location profiles (aliases + descriptor) for the dashboard location editor. */
+  /**
+   * Open a branch.
+   *
+   * The 404 is the same shape `updateLocation` throws, and it means the same thing:
+   * this café is not yours. The insert runs under RLS, so a merchant id the caller
+   * has no membership for writes nothing and returns nothing — the error is
+   * reported here, not decided here.
+   */
+  async createLocation(merchantId: string, input: NewLocation): Promise<LocationProfileRow> {
+    const created = await this.repo.createLocation(merchantId, input);
+    if (!created) throw new NotFoundException({ error: 'merchant_not_found' });
+    return created;
+  }
+
+  /** Per-location profiles (address, pin, aliases, descriptor) for the branch editor. */
   async listLocationProfiles(merchantId: string): Promise<LocationProfileRow[]> {
     return this.repo.listLocationProfiles(merchantId);
   }
