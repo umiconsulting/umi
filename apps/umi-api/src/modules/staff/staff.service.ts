@@ -144,8 +144,23 @@ export class StaffService {
   }
 }
 
-function has(obj: object, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(obj, key);
+/**
+ * Was this field SENT?
+ *
+ * ⚠️ Tests the value, not the key, and the difference is data loss. `update`
+ * receives an `UpdateStaffDto` — a class instance — and this project compiles at
+ * ES2023, where `useDefineForClassFields` gives an instance every DECLARED field as
+ * an own property whether or not the request carried it. Under `hasOwnProperty` a
+ * request of `{status:'disabled'}` therefore looked like it also carried name,
+ * phone and email; the coercion in `update` turns those into '' and null, and the
+ * UPDATE writes them. Disabling an account blanked the person's name and dropped
+ * their contact details.
+ *
+ * `undefined` means absent however the object was built — a DTO, a JSON body, a
+ * literal in a test — so this holds no matter who calls.
+ */
+function has<T extends object>(obj: T, key: keyof T): boolean {
+  return obj[key] !== undefined;
 }
 
 function isUniqueViolation(err: unknown): boolean {

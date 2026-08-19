@@ -5,6 +5,7 @@ import type { ConfigService } from '@nestjs/config';
 import type { AppConfig } from '../config/config.schema';
 import { PgService } from './pg.service';
 import { blankComments, sourceFiles } from './sql-scan';
+import { LOCATION_STATUSES } from '../../modules/merchants/dto/update-location.dto';
 
 /**
  * CHECK-VALUE GATE — the gate `sql-preflight` structurally cannot be.
@@ -197,5 +198,38 @@ describe('build-v3 CHECK values · every compared literal is one the schema admi
         `match. Postgres tests a CHECK at run time, so sql-preflight cannot see this.\n\n` +
         `${detail}\n`,
     ).toBe(0);
+  });
+
+  /**
+   * THE OTHER HALF OF THE SAME DEFECT, which the scan above structurally cannot see.
+   *
+   * That scan reads SQL literals. A DTO's `@IsIn([...])` is not SQL — it is a
+   * TypeScript array — so when `UpdateLocationDto` said ('active','inactive',
+   * 'archived') while `merchant.location.status` said ('active','closed'), nothing
+   * anywhere disagreed. The result was a control that could not be operated at all:
+   * the one legal value was refused by the validator as a 400, and the two the
+   * validator accepted reached Postgres and came back 23514, which the operator saw
+   * as a 500.
+   *
+   * This is an EXACT pin rather than a heuristic, deliberately. The gate's own rule
+   * is that it must never invent a finding, and mapping arbitrary DTO fields to
+   * columns would be guesswork. One constant, one column, named on both sides.
+   */
+  it('the location-status DTO admits exactly what the CHECK admits', async () => {
+    const { rows } = await pg.query<{ def: string }>(
+      `SELECT pg_get_constraintdef(k.oid) AS def
+         FROM pg_constraint k
+         JOIN pg_class     c ON c.oid = k.conrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE k.contype = 'c' AND n.nspname = 'merchant' AND c.relname = 'location'
+          AND pg_get_constraintdef(k.oid) LIKE '%status%'`,
+    );
+    const allowed = new Set(
+      rows.flatMap((r) => [...r.def.matchAll(/'([^']*)'::text/g)].map((m) => m[1])),
+    );
+    expect(allowed.size, 'no enumerated CHECK found on merchant.location.status').toBeGreaterThan(
+      0,
+    );
+    expect([...allowed].sort()).toEqual([...LOCATION_STATUSES].sort());
   });
 });

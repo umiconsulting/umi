@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { I } from '@/icons.jsx';
 import { XSep } from '@/shell.jsx';
 import {
@@ -9,6 +9,8 @@ import {
   saveMerchantVoice,
   getLocationProfiles,
   saveLocationProfile,
+  createLocation,
+  geocodeAddress,
 } from '@/data.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 
@@ -269,7 +271,7 @@ const SettingsScreen = () => {
       </div>
 
       {/* Sucursales — location aliases/descriptor (multi-location, ConversaFlow only) */}
-      {conversaflowActive && <LocationProfilesCard />}
+      <LocationProfilesCard conversaflowActive={conversaflowActive} />
 
       {/* Merchant info */}
       <div className="card fade-up d1" style={{ padding: '24px 26px' }}>
@@ -935,58 +937,366 @@ function hideBrokenImage(e) {
   e.currentTarget.style.display = 'none';
 }
 
-function LocationProfilesCard() {
+/**
+ * A café's branches: where each one is, whether it is open, and what customers
+ * call it.
+ *
+ * ALWAYS RENDERED, and it did not used to be. This card was gated on ConversaFlow
+ * and hidden below two locations, because it only held bot nicknames and neither is
+ * worth showing for a single café with no bot. It now holds the address, the pin and
+ * whether the branch is open — facts a café has whether or not it runs a bot, and a
+ * café with one branch is exactly the café that needs to add a second. The old
+ * conditions survive where they still apply: the nickname fields.
+ */
+function LocationProfilesCard({ conversaflowActive }) {
   const [profiles, setProfiles] = useState(null);
+  const [adding, setAdding] = useState(false);
+
+  const load = useCallback(() => {
+    return getLocationProfiles()
+      .then(setProfiles)
+      .catch(() => setProfiles([]));
+  }, []);
+
   useEffect(() => {
     let active = true;
     getLocationProfiles()
-      .then((rows) => {
-        if (active) setProfiles(rows);
-      })
-      .catch(() => {
-        if (active) setProfiles([]);
-      });
+      .then((rows) => active && setProfiles(rows))
+      .catch(() => active && setProfiles([]));
     return () => {
       active = false;
     };
   }, []);
-  // Aliases only matter when there is more than one location to disambiguate.
-  if (!profiles || profiles.length <= 1) return null;
+
+  if (!profiles) return null;
+  // Nicknames disambiguate one branch from another, so they need another branch to
+  // disambiguate from — and a bot to read them.
+  const showAliases = conversaflowActive && profiles.length > 1;
+
   return (
-    <div className="card fade-up d2" style={{ padding: '24px 26px' }}>
-      <div className="ed-head" style={{ marginBottom: 18 }}>
-        <div className="titles">
-          <div className="sec-index">
-            <span className="nn">S</span>
-            <span>/</span>
-            <span>SUCURSALES</span>
+    // FRAGMENT, and the sheet is OUTSIDE the card on purpose. `.sheet` is
+    // `position: fixed`, and `.fade-up` animates a transform — a transformed
+    // ancestor becomes the containing block for a fixed descendant, so a sheet
+    // rendered inside this card is laid out against the CARD instead of the
+    // viewport: a clipped panel a few hundred pixels wide, with its own fields cut
+    // off. Staff and Cafés both mount their sheet at screen level; this matches.
+    <>
+      <div className="card fade-up d2" style={{ padding: '24px 26px' }}>
+        <div className="ed-head" style={{ marginBottom: 18 }}>
+          <div className="titles">
+            <div className="sec-index">
+              <span className="nn">S</span>
+              <span>/</span>
+              <span>SUCURSALES</span>
+            </div>
+            <h2>Sucursales</h2>
+            <div className="en">Branches</div>
           </div>
-          <h2>Sucursales y apodos</h2>
-          <div className="en">
-            Cómo el bot reconoce a qué sucursal se refiere el cliente por WhatsApp
-          </div>
+          <button className="btn btn-secondary btn-sm focusable" onClick={() => setAdding(true)}>
+            + Agregar sucursal
+          </button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {profiles.map((p) => (
+            <LocationProfileRow key={p.id} profile={p} showAliases={showAliases} />
+          ))}
         </div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {profiles.map((p) => (
-          <LocationProfileRow key={p.id} profile={p} />
-        ))}
-      </div>
-    </div>
+      {adding && (
+        <NewLocationSheet
+          onClose={() => setAdding(false)}
+          onCreated={() => {
+            setAdding(false);
+            load();
+          }}
+        />
+      )}
+    </>
   );
 }
 
-function LocationProfileRow({ profile }) {
+function NewLocationSheet({ onClose, onCreated }) {
+  const [form, setForm] = useState({ name: '', address: '', latitude: '', longitude: '' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const geo = useGeocoder(form.address, (hit) =>
+    setForm((f) => ({
+      ...f,
+      latitude: String(hit.latitude),
+      longitude: String(hit.longitude),
+    })),
+  );
+  const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const valid = form.name.trim().length > 0;
+
+  async function create() {
+    const problem = coordProblem(form);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await createLocation({
+        name: form.name.trim(),
+        address: form.address.trim() || null,
+        latitude: coordOrNull(form.latitude),
+        longitude: coordOrNull(form.longitude),
+      });
+      onCreated();
+    } catch (e) {
+      console.error('location create failed', e);
+      setError(e.message || 'No se pudo agregar la sucursal.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="sheet-backdrop" onClick={onClose}></div>
+      <aside className="sheet">
+        <div className="sheet-head">
+          <div>
+            <div className="eyebrow">Sucursales</div>
+            <h2 className="h-section" style={{ marginTop: 4 }}>
+              Agregar una sucursal
+            </h2>
+          </div>
+          <button className="btn-icon" onClick={onClose} aria-label="Cerrar">
+            <I.X size={16} />
+          </button>
+        </div>
+        <div className="sheet-body">
+          <div className="field">
+            <label>Nombre</label>
+            <input
+              className="input tall"
+              placeholder="Chapultepec"
+              value={form.name}
+              onChange={update('name')}
+              maxLength={100}
+            />
+          </div>
+          <AddressFields form={form} update={update} setForm={setForm} geo={geo} />
+          {error && (
+            <div role="alert" style={{ color: '#c0392b', fontSize: 13 }}>
+              {error}
+            </div>
+          )}
+        </div>
+        <div className="sheet-foot">
+          <button className="btn btn-ghost" onClick={onClose}>
+            Cancelar
+          </button>
+          <button
+            className="btn btn-primary focusable"
+            disabled={!valid || saving}
+            style={{ opacity: valid && !saving ? 1 : 0.5 }}
+            onClick={create}
+          >
+            {saving ? 'Agregando…' : 'Agregar sucursal'}
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+/**
+ * Address, and the pin it resolves to. Shared by the new-branch sheet and the row
+ * editor so the two cannot drift — a café should not meet two different address
+ * forms in one card.
+ *
+ * The coordinates are editable text, not a read-out. The geocoder is a donated
+ * public gazetteer that does not know every corner in Guadalajara, so the operator
+ * must always be able to correct it by hand.
+ */
+function AddressFields({ form, update, setForm, geo }) {
+  const hasPin = Boolean(form.latitude || form.longitude);
+  return (
+    <>
+      <div className="field" style={{ margin: 0 }}>
+        <label>Dirección</label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            className="input tall"
+            style={{ flex: 1 }}
+            placeholder="Av. Chapultepec 1, Guadalajara"
+            value={form.address}
+            onChange={update('address')}
+            maxLength={200}
+          />
+          <button
+            className="btn btn-secondary"
+            onClick={geo.run}
+            disabled={geo.busy || form.address.trim().length < 3}
+          >
+            {geo.busy ? 'Buscando…' : 'Buscar'}
+          </button>
+        </div>
+        {geo.message && (
+          <div style={{ fontSize: 12, color: 'var(--ink-3)' }} role="status">
+            {geo.message}
+          </div>
+        )}
+      </div>
+      {/* The pin is subordinate to the address, and sized to say so: one short line
+          of two small fields, not a second full-width form. An operator types an
+          address; the coordinates are what the address resolved to, and are here to
+          be corrected rather than composed. */}
+      <div
+        className="field"
+        style={{ margin: 0, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+      >
+        <label style={{ margin: 0, minWidth: 26 }}>Pin</label>
+        <input
+          className="input"
+          inputMode="decimal"
+          aria-label="Latitud"
+          placeholder="20.6736"
+          value={form.latitude}
+          onChange={update('latitude')}
+          style={{ width: 118, height: 32, fontSize: 12.5 }}
+        />
+        <input
+          className="input"
+          inputMode="decimal"
+          aria-label="Longitud"
+          placeholder="-103.3440"
+          value={form.longitude}
+          onChange={update('longitude')}
+          style={{ width: 118, height: 32, fontSize: 12.5 }}
+        />
+        {hasPin && (
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => setForm((f) => ({ ...f, latitude: '', longitude: '' }))}
+          >
+            Quitar
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+/**
+ * The "Buscar" button's state machine, in one place.
+ *
+ * A miss is reported as a sentence, not an error: the endpoint answers 200 with a
+ * null body when the gazetteer has nothing, because not finding an address is an
+ * answer and the operator can type the pin regardless.
+ */
+function useGeocoder(address, onHit) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState(null);
+
+  async function run() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const hit = await geocodeAddress(address.trim());
+      if (hit) {
+        onHit(hit);
+        setMessage(hit.formattedAddress);
+      } else {
+        setMessage('No encontramos esa dirección. Puedes escribir el pin a mano.');
+      }
+    } catch (e) {
+      console.error('geocode failed', e);
+      setMessage('No se pudo buscar ahora. Puedes escribir el pin a mano.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return { busy, message, run };
+}
+
+/** '' → null, so an empty coordinate clears the pin instead of writing 0. */
+function coordOrNull(v) {
+  const t = String(v ?? '').trim();
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Why this form cannot be saved, or null.
+ *
+ * A coordinate box holding something that is not a number used to save as `null`,
+ * which CLEARS the pin — so a typo silently deleted the branch's location and
+ * reported success. Refusing the save is the honest answer: the operator can see
+ * what they typed and fix it.
+ *
+ * The ranges are the ones the schema and `@IsLatitude`/`@IsLongitude` enforce, so a
+ * number that would come back 400 is caught here with a sentence instead.
+ */
+function coordProblem(form) {
+  const pairs = [
+    ['latitude', 'La latitud', 90],
+    ['longitude', 'La longitud', 180],
+  ];
+  for (const [key, label, limit] of pairs) {
+    const t = String(form[key] ?? '').trim();
+    if (!t) continue;
+    const n = Number(t);
+    if (!Number.isFinite(n)) return `${label} debe ser un número.`;
+    if (Math.abs(n) > limit) return `${label} debe estar entre -${limit} y ${limit}.`;
+  }
+  return null;
+}
+
+/**
+ * One branch, editable in place.
+ *
+ * WHAT IS SENT IS WHAT CHANGED. The patch below carries only the fields this row
+ * actually edited, and that is load-bearing rather than tidy: `PATCH .../locations`
+ * reads an absent field as "leave it alone" and an explicit null as "clear it", so
+ * a row that posted every field on every save would clear the ones it never showed.
+ */
+function LocationProfileRow({ profile, showAliases }) {
+  const [open, setOpen] = useState(false);
+  /**
+   * WHAT IS ON THE SERVER, as far as this row knows.
+   *
+   * Not `profile`, which is the list's last fetch and never changes again. `dirty`
+   * is measured against this, so a saved row stops reporting itself unsaved — it
+   * used to keep saying "Sin guardar" about a change that had just landed, because
+   * the only thing it could compare against was the value it started with. The PATCH
+   * returns the stored row, so this is the server's answer, not an assumption.
+   */
+  const [base, setBase] = useState(profile);
+  const [form, setForm] = useState({
+    name: profile.name || '',
+    address: profile.address || '',
+    latitude: profile.latitude == null ? '' : String(profile.latitude),
+    longitude: profile.longitude == null ? '' : String(profile.longitude),
+  });
+  const [status, setStatus] = useState(profile.status || 'active');
   const [aliases, setAliases] = useState(profile.aliases || []);
   const [descriptor, setDescriptor] = useState(profile.descriptor || '');
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
+  const geo = useGeocoder(form.address, (hit) =>
+    setForm((f) => ({ ...f, latitude: String(hit.latitude), longitude: String(hit.longitude) })),
+  );
+  const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  const baseLat = base.latitude == null ? '' : String(base.latitude);
+  const baseLng = base.longitude == null ? '' : String(base.longitude);
   const dirty =
-    JSON.stringify(aliases) !== JSON.stringify(profile.aliases || []) ||
-    descriptor !== (profile.descriptor || '');
+    form.name.trim() !== (base.name || '') ||
+    form.address.trim() !== (base.address || '') ||
+    form.latitude.trim() !== baseLat ||
+    form.longitude.trim() !== baseLng ||
+    status !== (base.status || 'active') ||
+    JSON.stringify(aliases) !== JSON.stringify(base.aliases || []) ||
+    descriptor !== (base.descriptor || '');
 
   function addAlias(v) {
     const t = (v || '').trim();
@@ -999,100 +1309,184 @@ function LocationProfileRow({ profile }) {
   }
 
   async function save() {
+    const problem = coordProblem(form);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     setSaving(true);
     setSaved(false);
     setError(null);
     try {
-      await saveLocationProfile(profile.id, { aliases, descriptor: descriptor.trim() });
+      const patch = {
+        name: form.name.trim(),
+        address: form.address.trim() || null,
+        latitude: coordOrNull(form.latitude),
+        longitude: coordOrNull(form.longitude),
+        status,
+      };
+      // Only when this row is showing them. Sending [] and '' from a row that never
+      // rendered the fields would erase nicknames a bot depends on.
+      if (showAliases) {
+        patch.aliases = aliases;
+        patch.descriptor = descriptor.trim() || null;
+      }
+      const stored = await saveLocationProfile(profile.id, patch);
+      // The row it actually stored, so `dirty` measures against the server from here.
+      if (stored) setBase(stored);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
-      console.error('location profile save failed', e);
-      setError('No se pudo guardar. Reintenta.');
+      console.error('location save failed', e);
+      setError(e.message || 'No se pudo guardar. Reintenta.');
     } finally {
       setSaving(false);
     }
   }
+
+  const closed = status === 'closed';
 
   return (
     <div
       style={{
         border: '1px solid var(--line)',
         borderRadius: 12,
-        padding: 16,
+        padding: open ? 16 : '12px 16px',
         display: 'flex',
         flexDirection: 'column',
-        gap: 12,
+        gap: open ? 12 : 0,
       }}
     >
-      <div
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}
-      >
-        <div style={{ fontWeight: 600, fontSize: 14 }}>{profile.name}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {error && (
-            <span role="alert" style={{ color: '#c0392b', fontSize: 12 }}>
-              {error}
+      {/* CLOSED BY DEFAULT, and that is the point. A branch is read far more often
+          than it is edited, so the resting state is one line that answers where it
+          is and whether it is open. A café with five branches gets a list; the old
+          card gave it five stacked forms.
+
+          The SAME line carries the editor when open — the name becomes the field
+          that edits it, rather than a heading repeating what the field below says. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {open ? (
+          <input
+            className="input"
+            aria-label="Nombre de la sucursal"
+            value={form.name}
+            onChange={update('name')}
+            maxLength={100}
+            style={{ width: 240, height: 34, fontWeight: 600 }}
+          />
+        ) : (
+          <div style={{ fontWeight: 600, fontSize: 14, opacity: closed ? 0.6 : 1 }}>
+            {form.name || profile.name}
+          </div>
+        )}
+        {open ? (
+          <div className="seg">
+            <button className={!closed ? 'on' : ''} onClick={() => setStatus('active')}>
+              Abierta
+            </button>
+            <button className={closed ? 'on' : ''} onClick={() => setStatus('closed')}>
+              Cerrada
+            </button>
+          </div>
+        ) : (
+          closed && (
+            <span className="chip read" style={{ fontSize: 11 }}>
+              Cerrada
             </span>
-          )}
+          )
+        )}
+        <div
+          style={{
+            flex: 1,
+            fontSize: 12.5,
+            color: 'var(--ink-3)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {open ? '' : form.address || 'Sin dirección'}
+        </div>
+        {!open && dirty && (
+          <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Sin guardar</span>
+        )}
+        {open && error && (
+          <span role="alert" style={{ color: '#c0392b', fontSize: 12 }}>
+            {error}
+          </span>
+        )}
+        {open && (
           <button className="btn btn-secondary btn-sm" onClick={save} disabled={!dirty || saving}>
             {saving ? 'Guardando…' : saved ? '✓ Guardado' : error ? 'Reintentar' : 'Guardar'}
           </button>
-        </div>
+        )}
+        <button className="btn btn-ghost btn-sm" onClick={() => setOpen((o) => !o)}>
+          {open ? 'Cerrar' : 'Editar'}
+        </button>
       </div>
-      <div className="field" style={{ margin: 0 }}>
-        <label>Apodos (cómo la llaman los clientes)</label>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-          {aliases.map((a, i) => (
-            <span
-              key={i}
-              className="chip"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-            >
-              {a}
-              <button
-                onClick={() => removeAlias(i)}
-                aria-label={'Quitar ' + a}
-                style={{
-                  border: 'none',
-                  background: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--ink-3)',
-                  fontSize: 15,
-                  lineHeight: 1,
-                  padding: 0,
-                }}
-              >
-                ×
-              </button>
-            </span>
-          ))}
-          <input
-            className="input"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ',') {
-                e.preventDefault();
-                addAlias(draft);
-              }
-            }}
-            onBlur={() => addAlias(draft)}
-            placeholder="+ apodo"
-            maxLength={40}
-            style={{ width: 150, height: 32, fontSize: 12.5 }}
-          />
-        </div>
-      </div>
-      <div className="field" style={{ margin: 0 }}>
-        <label>Descripción (zona / referencia)</label>
-        <input
-          className="input tall"
-          value={descriptor}
-          onChange={(e) => setDescriptor(e.target.value.slice(0, 160))}
-          placeholder="p. ej. la del centro, junto al parque"
-        />
-      </div>
+
+      {open && (
+        <>
+          <AddressFields form={form} update={update} setForm={setForm} geo={geo} />
+          {showAliases && (
+            <>
+              <div className="field" style={{ margin: 0 }}>
+                <label>Apodos (cómo la llaman los clientes)</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                  {aliases.map((a, i) => (
+                    <span
+                      key={i}
+                      className="chip"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                    >
+                      {a}
+                      <button
+                        onClick={() => removeAlias(i)}
+                        aria-label={'Quitar ' + a}
+                        style={{
+                          border: 'none',
+                          background: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--ink-3)',
+                          fontSize: 15,
+                          lineHeight: 1,
+                          padding: 0,
+                        }}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    className="input"
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ',') {
+                        e.preventDefault();
+                        addAlias(draft);
+                      }
+                    }}
+                    onBlur={() => addAlias(draft)}
+                    placeholder="+ apodo"
+                    maxLength={40}
+                    style={{ width: 150, height: 32, fontSize: 12.5 }}
+                  />
+                </div>
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label>Descripción (zona / referencia)</label>
+                <input
+                  className="input tall"
+                  value={descriptor}
+                  onChange={(e) => setDescriptor(e.target.value.slice(0, 160))}
+                  placeholder="p. ej. la del centro, junto al parque"
+                />
+              </div>
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }

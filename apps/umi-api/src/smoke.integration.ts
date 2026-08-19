@@ -57,6 +57,18 @@ const GIFT_CARDS_AB13 =
   'allowlists the same 7 statements. DELETE THIS when that lands.';
 
 const EXPECTED: readonly Expectation[] = [
+  {
+    match: /\/api\/geocode$/,
+    status: 400,
+    why:
+      'NOT a defect, and listed for the same reason a defect is: this suite calls ' +
+      'every GET route with no query string, and `?address=` is required. 400 is ' +
+      'the correct answer to the call being made. The entry is a PIN — the day ' +
+      'geocode answers an addressless call it will be because the validation was ' +
+      'dropped, and this line will say so. It is not exercised with a real address ' +
+      'anywhere: that would call OpenStreetMap Nominatim, a donated service, once ' +
+      'per CI round.',
+  },
   { match: /\/admin\/gift-cards$/, status: 500, why: GIFT_CARDS_AB13 },
   { match: /\/cash\/gift-cards$/, status: 500, why: GIFT_CARDS_AB13 },
   { match: /\/gift\/[^/]+$/, status: 500, why: GIFT_CARDS_AB13 },

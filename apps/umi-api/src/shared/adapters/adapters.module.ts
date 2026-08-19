@@ -5,6 +5,7 @@ import { VoyageAdapter } from './voyage.adapter';
 import { TwilioAdapter } from './twilio.adapter';
 import { EmailAdapter } from './email.adapter';
 import { ZettleAdapter } from './zettle.adapter';
+import { GeocodeAdapter } from './geocode.adapter';
 import { WalletPassAdapter } from './wallet-pass.adapter';
 
 /**
@@ -23,6 +24,7 @@ import { WalletPassAdapter } from './wallet-pass.adapter';
     EmailAdapter,
     ZettleAdapter,
     WalletPassAdapter,
+    GeocodeAdapter,
   ],
   exports: [
     AnthropicAdapter,
@@ -31,6 +33,7 @@ import { WalletPassAdapter } from './wallet-pass.adapter';
     EmailAdapter,
     ZettleAdapter,
     WalletPassAdapter,
+    GeocodeAdapter,
   ],
 })
 export class AdaptersModule {}

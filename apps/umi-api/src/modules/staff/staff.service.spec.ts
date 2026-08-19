@@ -89,3 +89,46 @@ describe('StaffService.update / remove', () => {
     await expect(h.svc.remove('t1', 'sX')).rejects.toBeInstanceOf(NotFoundException);
   });
 });
+
+describe('StaffService.update presence', () => {
+  let h: ReturnType<typeof make>;
+  beforeEach(() => (h = make()));
+
+  /**
+   * DISABLING SOMEONE MUST NOT ERASE THEM.
+   *
+   * The service decided "was this field sent?" with hasOwnProperty. The controller
+   * hands it an UpdateStaffDto, and at ES2023 `useDefineForClassFields` gives a
+   * class instance every DECLARED field as an own property — so a request carrying
+   * only `{status}` looked like it carried name, phone and email as well. The
+   * coercion below them turns undefined into '' and null, and the repository writes
+   * exactly what it is given: the person's name blanked and their contact details
+   * dropped, from a click that only meant to disable an account.
+   *
+   * The patch the repository receives is the assertion. Anything absent from it is
+   * a column the UPDATE leaves alone.
+   */
+  it('a status-only patch built from a DTO touches nothing else', async () => {
+    h.repo.update.mockResolvedValue({ ...ROW, status: 'disabled' });
+    // What the controller actually passes: a class instance, not an object literal.
+    class UpdateStaffDtoLike {
+      name?: string;
+      phone?: string;
+      email?: string;
+      role?: string;
+      status?: string;
+    }
+    const dto = new UpdateStaffDtoLike();
+    dto.status = 'disabled';
+
+    await h.svc.update('t1', 's1', dto);
+
+    expect(h.repo.update).toHaveBeenCalledWith('t1', 's1', { status: 'disabled' });
+  });
+
+  it('still applies the fields a patch does carry, including clearing a phone', async () => {
+    h.repo.update.mockResolvedValue(ROW);
+    await h.svc.update('t1', 's1', { name: '  Ana  ', phone: '' });
+    expect(h.repo.update).toHaveBeenCalledWith('t1', 's1', { name: 'Ana', phone: null });
+  });
+});

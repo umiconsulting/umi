@@ -858,6 +858,28 @@ async function saveLocationProfile(locationId, patch) {
   return res?.location || null;
 }
 
+async function createLocation(input) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  const res = await _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/locations`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return res?.location || null;
+}
+
+/**
+ * Address → coordinates, for the branch editor's "find it" button.
+ *
+ * Returns null when nothing matched — which the endpoint reports as a 200 with a
+ * null body, not a 404, so this reads the body rather than catching. A geocode is
+ * a convenience: the operator can always type the pin, so a miss is an answer.
+ */
+async function geocodeAddress(address) {
+  const res = await _apiFetch(`/api/geocode?address=${encodeURIComponent(address)}`);
+  return res?.location || null;
+}
+
 // ── Platform: the cafés themselves ──────────────────────────────────────────
 // `GET /api/me/merchants` already answers this: for a login holding a platform
 // grant it lists EVERY active café, not only the ones she is staff at. No second
@@ -911,6 +933,8 @@ export {
   saveMerchantVoice,
   getLocationProfiles,
   saveLocationProfile,
+  createLocation,
+  geocodeAddress,
   createStaffMember,
   updateStaffMember,
   deleteStaffMember,
