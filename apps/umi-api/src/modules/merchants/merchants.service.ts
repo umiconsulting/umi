@@ -8,6 +8,8 @@ import {
   type MerchantSummary,
 } from './merchants.repository';
 import { buildModuleAvailability, type ModuleAvailability } from './module-registry';
+import { PasswordService } from '../../shared/auth/password.service';
+import type { ProvisionMerchantDto } from './dto/provision-merchant.dto';
 
 export interface Capabilities {
   merchant: {
@@ -40,7 +42,39 @@ export interface Capabilities {
  */
 @Injectable()
 export class MerchantsService {
-  constructor(private readonly repo: MerchantsRepository) {}
+  constructor(
+    private readonly repo: MerchantsRepository,
+    private readonly passwords: PasswordService,
+  ) {}
+
+  /**
+   * Open a café, with the defaults umi-cash's form carried.
+   *
+   * The owner's password is hashed HERE and the plaintext never reaches the
+   * repository — the same rule `auth.service` follows, so no query ever holds a
+   * password in a bind parameter that could be logged.
+   */
+  async provision(dto: ProvisionMerchantDto): Promise<{ merchantId: string; userId: string }> {
+    const { salt, hash } = this.passwords.hash(dto.adminPassword);
+    return this.repo.provisionMerchant({
+      name: dto.name,
+      city: dto.city,
+      timezone: dto.timezone,
+      plan: dto.plan,
+      trialEndsAt: dto.trialEndsAt,
+      cardPrefix: dto.cardPrefix,
+      primaryColor: dto.primaryColor,
+      secondaryColor: dto.secondaryColor,
+      adminEmail: dto.adminEmail,
+      adminName: dto.adminName ?? 'Admin',
+      passwordSalt: salt,
+      passwordHash: hash,
+      // umi-cash's defaults, carried: ten stamps for a free drink.
+      stampsRequired: dto.stampsRequired ?? 10,
+      rewardName: dto.rewardName ?? 'Bebida gratis',
+      locations: dto.locations,
+    });
+  }
 
   listUserMerchants(userId: string): Promise<MerchantSummary[]> {
     return this.repo.merchantsForUser(userId);

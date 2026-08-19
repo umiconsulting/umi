@@ -45,9 +45,152 @@ export interface LocationProfileRow extends LocationRow {
  * employment per (user, merchant), so one role — roles still come back as an array,
  * because a super_admin is tagged from a different source.
  */
+/** The plan key named at provisioning does not exist, or is not sellable. */
+export class UnknownPlanError extends Error {
+  constructor(readonly plan: string) {
+    super(`No active plan with key '${plan}'.`);
+  }
+}
+
+/** `seed_rbac.sql` never ran, so there is no café role to make anyone a member. */
+export class MissingRoleCatalogError extends Error {
+  constructor() {
+    super('The café role catalogue is empty — run seed_rbac.sql.');
+  }
+}
+
+export interface ProvisionInput {
+  name: string;
+  city?: string;
+  timezone?: string;
+  plan: string;
+  trialEndsAt?: string;
+  cardPrefix: string;
+  primaryColor: string;
+  secondaryColor?: string;
+  adminEmail: string;
+  adminName: string;
+  passwordSalt: string;
+  passwordHash: string;
+  stampsRequired: number;
+  rewardName: string;
+  locations?: { name: string; address?: string; latitude?: number; longitude?: number }[];
+}
+
 @Injectable()
 export class MerchantsRepository {
   constructor(private readonly pg: PgService) {}
+
+  /**
+   * OPEN A CAFÉ — nine rows, one transaction, or none of them.
+   *
+   * Replaces umi-cash `POST /api/umi/tenants`, which wrote the same shape across
+   * nine legacy tables. Two of those tables are gone: `tenant_memberships` and
+   * `membership_roles` collapsed into `merchant.staff`, which IS the membership
+   * in build-v3 — `findMembershipAccess` reads exactly that row.
+   *
+   * THE WORKER POOL, deliberately. Every RLS policy keys on
+   * `app.current_merchant`, and the merchant being created does not exist yet, so
+   * there is no scope to set. Isolation here is the `PlatformAdminGuard`, not the
+   * database.
+   *
+   * ⚠️ ENTITLEMENTS ARE NOT WRITTEN. `umi.effective_entitlement` is a VIEW over
+   * `subscription → plan_feature → feature`; the plan decides the products. A row
+   * inserted "to grant a product" would be invisible to every read.
+   */
+  async provisionMerchant(input: ProvisionInput): Promise<{ merchantId: string; userId: string }> {
+    return this.pg.workerTx(async (c) => {
+      const plan = await c.query<{ id: string }>(
+        `SELECT id::text FROM umi.plan WHERE key = $1 AND status = 'active'`,
+        [input.plan],
+      );
+      if (!plan.rows[0]) throw new UnknownPlanError(input.plan);
+
+      // The café role the owner gets. It is a CATALOGUE row, not something this
+      // route creates: `seed_rbac.sql` seeds owner/admin/staff/viewer. A build
+      // that skipped the seed has none, and a café with no role is a café nobody
+      // can administer — so say that rather than failing on a foreign key.
+      const role = await c.query<{ id: string }>(
+        `SELECT id::text FROM umi.role WHERE key = 'admin' AND NOT is_platform`,
+      );
+      if (!role.rows[0]) throw new MissingRoleCatalogError();
+
+      const merchant = await c.query<{ id: string }>(
+        `INSERT INTO merchant.merchant (name, city, timezone, brand_color, secondary_color, status)
+         VALUES ($1, $2, coalesce($3, 'America/Mexico_City'), $4, $5, 'active')
+         RETURNING id::text`,
+        [
+          input.name,
+          input.city ?? null,
+          input.timezone ?? null,
+          input.primaryColor,
+          input.secondaryColor ?? null,
+        ],
+      );
+      const merchantId = merchant.rows[0].id;
+
+      await c.query(
+        `INSERT INTO merchant.loyalty_program
+           (merchant_id, card_prefix, self_registration, stamps_per_reward,
+            primary_color, secondary_color)
+         VALUES ($1::uuid, $2, true, $3, $4, $5)`,
+        [
+          merchantId,
+          input.cardPrefix,
+          input.stampsRequired,
+          input.primaryColor,
+          input.secondaryColor ?? null,
+        ],
+      );
+
+      await c.query(
+        `INSERT INTO merchant.loyalty_reward (merchant_id, name, type, stamps_required, active)
+         VALUES ($1::uuid, $2, 'stamps_free_item', $3, true)`,
+        [merchantId, input.rewardName, input.stampsRequired],
+      );
+
+      // `trialing` until the date given, `active` with no end otherwise. The
+      // status is what `effective_entitlement` filters on, so a café whose trial
+      // is recorded any other way silently owns no products.
+      await c.query(
+        `INSERT INTO umi.subscription (merchant_id, plan_id, status, current_period_end)
+         VALUES ($1::uuid, $2::uuid, $3, $4)`,
+        [
+          merchantId,
+          plan.rows[0].id,
+          input.trialEndsAt ? 'trialing' : 'active',
+          input.trialEndsAt ?? null,
+        ],
+      );
+
+      for (const loc of input.locations ?? []) {
+        await c.query(
+          `INSERT INTO merchant.location (merchant_id, name, address, lat, lng, status)
+           VALUES ($1::uuid, $2, $3, $4, $5, 'active')`,
+          [merchantId, loc.name, loc.address ?? null, loc.latitude ?? null, loc.longitude ?? null],
+        );
+      }
+
+      const user = await c.query<{ id: string }>(
+        `INSERT INTO umi."user"
+           (email, full_name, password_salt, password_hash, password_algorithm, status)
+         VALUES ($1, $2, $3, $4, 'scrypt-sha256-v1', 'active')
+         RETURNING id::text`,
+        [input.adminEmail, input.adminName, input.passwordSalt, input.passwordHash],
+      );
+      const userId = user.rows[0].id;
+
+      // THE MEMBERSHIP. `merchant.staff` is what makes this person a member of
+      // this café — `findMembershipAccess` joins it and nothing else.
+      await c.query(
+        `INSERT INTO merchant.staff (merchant_id, user_id, role_id, name, email, status)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, 'active')`,
+        [merchantId, userId, role.rows[0].id, input.adminName, input.adminEmail],
+      );
+
+      return { merchantId, userId };
+    });
+  }
 
   /**
    * Active memberships for the authed user (the `/me/merchants` list). Single role

@@ -560,6 +560,59 @@ on conflict (key) do update set description = excluded.description;
 -- against an empty umi.role and silently inserts nothing. The POS grants live in
 -- backfill/seed_rbac.sql, which runs after the roles do.
 
+-- ----------------------------------------------------------------------------
+-- THE PRODUCT CATALOGUE — what Umi sells, and what each tier includes.
+--
+-- ⚠️ MOVED HERE 2026-08-19 from `backfill/backfill_growth.sql`, and the move is
+-- the fix. A catalogue that only a MIGRATION writes leaves a platform built from
+-- `00_run.sh` with nothing to sell: zero plans, so `umi.subscription.plan_id`
+-- (NOT NULL) has nothing to point at, so no café can be opened at all. build-v3
+-- was viable only as a migration target and nothing said so — `provision.
+-- integration.ts` is the test that could not pass.
+--
+-- It belongs in the DDL for the same reason the permission catalogue above does:
+-- both paths run this file first, and neither depends on a role existing. The
+-- ROLE catalogue cannot move here — see the note above — because
+-- `backfill_identity` carries the source rows WITH THEIR IDS, and a row seeded
+-- first would collide on `role_key_key`. Roles stay in `seed_rbac.sql`, which
+-- runs after it.
+--
+-- `on conflict do nothing` throughout, so a migrated platform that already holds
+-- these keys is untouched.
+-- ----------------------------------------------------------------------------
+
+-- 5 product-module features (the "doors"). `pos` (UmiPOS) is in the catalogue so
+-- it can be entitlement-gated and billed, but is bundled into NO plan below — a
+-- café gains it only when POS is explicitly sold (a plan_feature grant or an
+-- entitlement_override). Pricing and bundling are an owner decision; catalogue
+-- presence is the prerequisite (H-4/H-8).
+insert into umi.feature (key, module, name, kind) values
+  ('cash',        'cash',        'Loyalty & Stored Value (umi-cash)', 'flag'),
+  ('dashboard',   'dashboard',   'Owner Dashboard',                   'flag'),
+  ('conversaflow','conversaflow','WhatsApp Agent (ConversaFlow)',     'flag'),
+  ('kds',         'kds',         'Kitchen Display (KDS)',             'flag'),
+  ('pos',         'pos',         'Point of Sale (UmiPOS)',            'flag')
+on conflict (key) do nothing;
+
+-- 3 public tiers
+insert into umi.plan (key, name, description, is_public, status) values
+  ('starter','Starter','Loyalty & stored value only.',                        true,'active'),
+  ('growth', 'Growth', 'Loyalty plus the owner dashboard.',                    true,'active'),
+  ('pro',    'Pro',    'Full stack: loyalty, dashboard, WhatsApp agent, KDS.', true,'active')
+on conflict (key) do nothing;
+
+-- plan_feature bundles (flag features -> limit_value NULL; row presence = granted)
+insert into umi.plan_feature (plan_id, feature_id, limit_value)
+select p.id, f.id, null::bigint
+from (values
+  ('starter','cash'),
+  ('growth','cash'), ('growth','dashboard'),
+  ('pro','cash'), ('pro','dashboard'), ('pro','conversaflow'), ('pro','kds')
+) as b(plan_key, feature_key)
+join umi.plan p    on p.key = b.plan_key
+join umi.feature f on f.key = b.feature_key
+on conflict do nothing;
+
 -- The POS offline-cash flag. Off until a merchant is explicitly certified for it;
 -- `merchant.pos_offline_cash_policy` then carries the limits.
 insert into umi.feature (key, module, name, description, kind) values

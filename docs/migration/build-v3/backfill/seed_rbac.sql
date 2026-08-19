@@ -127,14 +127,59 @@ where lower(u.email) = lower(:'bootstrap_email')
      where a.entity = 'user_role' and a.entity_id = ur.id and a.action = 'grant'
   );
 
+-- ---------------------------------------------------------------------------
+-- THE CAFÉ CATALOGUE. Roles and permissions a café needs, seeded here rather
+-- than inherited from the database we are leaving.
+--
+-- ⚠️ ADDED 2026-08-19, and the reason is that build-v3 was only ever a MIGRATION
+-- TARGET. `backfill_identity.sql` copies `core.roles` and `core.permissions`
+-- across, so a migrated platform has these four roles because production had
+-- them. A platform built from `00_run.sh` alone has NONE — and `merchant.staff.
+-- role_id` is NOT NULL against `umi.role`, so on a fresh install no user can be
+-- a member of any café, and no café can be created at all. The wiring below
+-- inner-joins `umi.role`, so it silently granted nothing there too.
+--
+-- Guarded by KEY, so a migrated platform is untouched: the backfill runs first
+-- and its rows keep the source ids. Only a fresh build reaches these inserts.
+--
+-- Keys, not names, are the contract: `cash-roles.ts` maps owner/admin → ADMIN
+-- and staff/cashier → STAFF, and `roles.ts` orders them by precedence.
+-- ---------------------------------------------------------------------------
+insert into umi.role (key, name, description, is_platform)
+select v.key, v.name, v.description, false
+from (values
+  ('owner',  'Owner',  'Full merchant administration'),
+  ('admin',  'Admin',  'Merchant administration'),
+  ('staff',  'Staff',  'Operational staff'),
+  ('viewer', 'Viewer', 'Read-only dashboard access')
+) as v(key, name, description)
+where not exists (select 1 from umi.role r where r.key = v.key);
+
+insert into umi.permission (key, description)
+select v.key, v.description
+from (values
+  ('insights.read',   'Read merchant insights and reports'),
+  ('loyalty.operate', 'Operate the loyalty register'),
+  ('orders.operate',  'Operate orders and the kitchen board'),
+  ('tenant.manage',   'Change merchant settings, staff and locations')
+) as v(key, description)
+where not exists (select 1 from umi.permission p where p.key = v.key);
+
 -- role -> permission grants.
 insert into umi.role_permission (role_id, permission_id)
 select r.id, p.id
 from (values
   ('owner',  'insights.read'), ('owner',  'loyalty.operate'),
-  ('owner',  'orders.operate'), ('owner',  'merchant.manage'),
+  -- `tenant.manage`, NOT `merchant.manage`. This list said the latter from the
+  -- day it was written and `umi.permission` has only ever held the former, so
+  -- these two rows joined nothing and granted nothing: no café role held any
+  -- merchant-management permission, only the platform super_admin did. Latent
+  -- rather than live — no route carries `@RequirePermission` yet — which is
+  -- exactly how it survived. Measured on the 2026-08-18 snapshot: `tenant.manage`
+  -- was held by one role out of six.
+  ('owner',  'orders.operate'), ('owner',  'tenant.manage'),
   ('admin',  'insights.read'), ('admin',  'loyalty.operate'),
-  ('admin',  'orders.operate'), ('admin',  'merchant.manage'),
+  ('admin',  'orders.operate'), ('admin',  'tenant.manage'),
   ('staff',  'loyalty.operate'), ('staff',  'orders.operate'),
   ('viewer', 'insights.read')
 ) as m(role_key, perm_key)

@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  ConflictException,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { MerchantAccessGuard } from '../auth/merchant-access.guard';
 import { EntitlementGuard } from '../auth/entitlement.guard';
@@ -9,6 +21,9 @@ import type { MeMerchantsResponse } from '@umi/contract';
 import { MerchantsService } from './merchants.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
+import { ProvisionMerchantDto } from './dto/provision-merchant.dto';
+import { PlatformAdminGuard } from '../auth/platform-admin.guard';
+import { MissingRoleCatalogError, UnknownPlanError } from './merchants.repository';
 
 /**
  * Merchant shell routes. All require a valid session (AuthGuard); the
@@ -23,6 +38,36 @@ export class MerchantsController {
   @Get('me/merchants')
   async myMerchants(@CurrentUser() user: AuthUser): Promise<MeMerchantsResponse> {
     return { merchants: await this.merchants.listUserMerchants(user.id) };
+  }
+
+  /**
+   * Open a café. Platform administrators only — see `PlatformAdminGuard`.
+   *
+   * Replaces umi-cash `POST /api/umi/tenants` and the `/umi/admin` panel around
+   * it (AB#108, AB#112). The panel's own login goes with it: this route reuses
+   * the existing superadmin session, so `UMI_ADMIN_PASSWORD` and
+   * `UMI_ADMIN_JWT_SECRET` have nothing left to protect.
+   */
+  @Post('merchants')
+  @HttpCode(201)
+  @UseGuards(PlatformAdminGuard)
+  async provision(@Body() dto: ProvisionMerchantDto) {
+    try {
+      return await this.merchants.provision(dto);
+    } catch (err) {
+      // A duplicate admin address is the one collision a caller can fix, and the
+      // only unique constraint this route can trip. `umi.user.email` is UNIQUE.
+      if ((err as { code?: string }).code === '23505') {
+        throw new ConflictException({ error: 'email_taken', email: dto.adminEmail });
+      }
+      if (err instanceof UnknownPlanError) {
+        throw new BadRequestException({ error: 'unknown_plan', plan: dto.plan });
+      }
+      if (err instanceof MissingRoleCatalogError) {
+        throw new BadRequestException({ error: 'role_catalog_missing' });
+      }
+      throw err;
+    }
   }
 
   @Get('merchants/:merchantId/capabilities')

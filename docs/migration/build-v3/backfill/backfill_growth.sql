@@ -30,39 +30,11 @@
 -- until a real pricing reason appears). feature.module = the product module itself.
 -- ----------------------------------------------------------------------------
 
--- 5 product-module features (the "doors"). `pos` (UmiPOS) is in the catalog so it
--- can be entitlement-gated + billed, but is bundled into NO plan below — a café
--- gains it only when POS is explicitly sold (a plan_feature grant or an
--- entitlement_override). Pricing/bundling is an owner decision; catalog presence
--- is the prerequisite (H-4/H-8). No existing café is entitled to pos, so the
--- per-café gate counts and effective_entitlement stay unchanged.
-insert into umi.feature (key, module, name, kind) values
-  ('cash',        'cash',        'Loyalty & Stored Value (umi-cash)', 'flag'),
-  ('dashboard',   'dashboard',   'Owner Dashboard',                   'flag'),
-  ('conversaflow','conversaflow','WhatsApp Agent (ConversaFlow)',     'flag'),
-  ('kds',         'kds',         'Kitchen Display (KDS)',             'flag'),
-  ('pos',         'pos',         'Point of Sale (UmiPOS)',            'flag')
-on conflict (key) do nothing;
-
--- 3 public tiers
-insert into umi.plan (key, name, description, is_public, status) values
-  ('starter','Starter','Loyalty & stored value only.',                         true,'active'),
-  ('growth', 'Growth', 'Loyalty plus the owner dashboard.',                     true,'active'),
-  ('pro',    'Pro',    'Full stack: loyalty, dashboard, WhatsApp agent, KDS.',  true,'active')
-on conflict (key) do nothing;
-
--- plan_feature bundles (flag features -> limit_value NULL; row presence = granted)
-insert into umi.plan_feature (plan_id, feature_id, limit_value)
-select p.id, f.id, null::bigint
-from (values
-  ('starter','cash'),
-  ('growth','cash'), ('growth','dashboard'),
-  ('pro','cash'), ('pro','dashboard'), ('pro','conversaflow'), ('pro','kds')
-) as b(plan_key, feature_key)
-join umi.plan p    on p.key = b.plan_key
-join umi.feature f on f.key = b.feature_key
-on conflict do nothing;
-
+-- THE CATALOGUE MOVED. Features, plans and their bundles are seeded by
+-- `10_umi.sql` as of 2026-08-19 — both this path and a from-scratch build run
+-- that file first, and a catalogue only a migration wrote left a fresh platform
+-- with no plan to subscribe anyone to. Nothing is inserted here any more; the
+-- subscription mapping below reads the catalogue rather than creating it.
 
 -- ----------------------------------------------------------------------------
 -- 1) grow.subscriptions -> umi.subscription
