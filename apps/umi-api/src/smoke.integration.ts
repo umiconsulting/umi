@@ -216,27 +216,29 @@ describe('build-v3 smoke · every read endpoint', () => {
 
   /** Real ids substituted for every path parameter Fastify declares. */
   function fill(url: string): string {
-    return url
-      .replace(/:merchantRef/g, fx.handle)
-      .replace(/:handle/g, fx.handle)
-      .replace(/:merchantId/g, fx.merchantId)
-      // `:contactId` is named for the old identity spine. build-v3 collapsed it:
-      // every Customer 360 read keys on `merchant.customer.id`.
-      .replace(/:contactId/g, fx.customerId)
-      .replace(/:customerId/g, fx.customerId)
-      .replace(/:cardId/g, fx.cardId)
-      .replace(/:staffId/g, fx.userId)
-      .replace(/:locationId/g, fx.locationId ?? fx.merchantId)
-      .replace(/:stationId/g, fx.locationId ?? fx.merchantId)
-      .replace(/:ticketId/g, '00000000-0000-4000-8000-000000000000')
-      .replace(/:deviceId/g, '00000000-0000-4000-8000-000000000000')
-      .replace(/:passTypeId/g, 'pass.co.umicash.loyalty')
-      .replace(/:serial/g, fx.serial)
-      // `{filled}-{required}.png`, content-addressed. Anything else is a 400,
-      // correctly — the route parses the state out of its own url.
-      .replace(/:state/g, '3-10.png')
-      .replace(/:code/g, 'SMOKECODE')
-      .replace(/:id\b/g, fx.customerId);
+    return (
+      url
+        .replace(/:merchantRef/g, fx.handle)
+        .replace(/:handle/g, fx.handle)
+        .replace(/:merchantId/g, fx.merchantId)
+        // `:contactId` is named for the old identity spine. build-v3 collapsed it:
+        // every Customer 360 read keys on `merchant.customer.id`.
+        .replace(/:contactId/g, fx.customerId)
+        .replace(/:customerId/g, fx.customerId)
+        .replace(/:cardId/g, fx.cardId)
+        .replace(/:staffId/g, fx.userId)
+        .replace(/:locationId/g, fx.locationId ?? fx.merchantId)
+        .replace(/:stationId/g, fx.locationId ?? fx.merchantId)
+        .replace(/:ticketId/g, '00000000-0000-4000-8000-000000000000')
+        .replace(/:deviceId/g, '00000000-0000-4000-8000-000000000000')
+        .replace(/:passTypeId/g, 'pass.co.umicash.loyalty')
+        .replace(/:serial/g, fx.serial)
+        // `{filled}-{required}.png`, content-addressed. Anything else is a 400,
+        // correctly — the route parses the state out of its own url.
+        .replace(/:state/g, '3-10.png')
+        .replace(/:code/g, 'SMOKECODE')
+        .replace(/:id\b/g, fx.customerId)
+    );
   }
 
   /**
