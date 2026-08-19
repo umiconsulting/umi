@@ -21,7 +21,7 @@ import { PgService } from '../../shared/database/pg.service';
 // Statuses the partial-unique index `umi_prospect_email_active_uidx` protects —
 // only one live lead per email may sit in these. Once a lead is converted/lost/
 // unsubscribed it leaves the set and the email can appear again.
-const ACTIVE_STATUSES = ['new', 'nurturing', 'qualified'] as const;
+export const ACTIVE_STATUSES = ['new', 'nurturing', 'qualified'] as const;
 
 export interface LeadDiagnosticData {
   score: number;

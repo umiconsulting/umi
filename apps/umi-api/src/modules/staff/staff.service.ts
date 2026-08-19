@@ -44,6 +44,13 @@ export interface StaffDto {
   disabledAt: string | null;
 }
 
+/**
+ * The two states `merchant.staff.status` admits. 'invited' is gone for the reason in
+ * create(). Pinned to the live CHECK by `check-values.integration.ts` — the comment
+ * that used to say "matching the CHECK" was a claim nothing tested.
+ */
+export const STAFF_STATUSES = ['active', 'disabled'] as const;
+
 export interface StaffInput {
   name?: unknown;
   phone?: unknown;
@@ -128,8 +135,7 @@ export class StaffService {
     if (has(body, 'phone')) patch.phone = String(body.phone ?? '').trim() || null;
     if (has(body, 'email')) patch.email = String(body.email ?? '').trim() || null;
     if (has(body, 'status')) {
-      // Two states, matching the CHECK. 'invited' is gone for the reason in create().
-      patch.status = ['active', 'disabled'].includes(body.status as string)
+      patch.status = (STAFF_STATUSES as readonly string[]).includes(body.status as string)
         ? (body.status as string)
         : null;
     }
