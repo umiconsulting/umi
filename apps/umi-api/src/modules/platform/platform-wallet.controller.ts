@@ -43,7 +43,11 @@ export class PlatformWalletController {
   async passHealth(@Query('staleDays') staleDays?: string) {
     const days = staleDays === undefined ? DEFAULT_STALE_DAYS : Number(staleDays);
     if (!Number.isInteger(days) || days < 0 || days > MAX_STALE_DAYS) {
-      throw new BadRequestException({ error: 'invalid_stale_days', max: MAX_STALE_DAYS });
+      throw new BadRequestException({
+        error: 'invalid_stale_days',
+        message: `staleDays must be a whole number between 0 and ${MAX_STALE_DAYS}.`,
+        max: MAX_STALE_DAYS,
+      });
     }
     const health = await this.repo.passHealth(days);
     return {
@@ -67,7 +71,10 @@ export class PlatformWalletController {
     const cardIds = dto.cardIds ?? [];
     const merchantIds = dto.merchantIds ?? [];
     if (cardIds.length === 0 && merchantIds.length === 0) {
-      throw new BadRequestException({ error: 'nothing_to_push' });
+      throw new BadRequestException({
+        error: 'nothing_to_push',
+        message: 'Name at least one card or one merchant.',
+      });
     }
 
     let cards = 0;

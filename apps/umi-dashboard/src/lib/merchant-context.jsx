@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { getAuthHeaders } from './auth.jsx';
+import { getAuthHeaders, getStoredSession } from './auth.jsx';
 import { apiUrl, withCreds, errMessage } from './config.js';
 import {
   buildModuleAvailability,
@@ -129,6 +129,12 @@ export function MerchantProvider({ children }) {
     [selectedMerchantId],
   );
 
+  // THE PLATFORM GRANT, read from the session the API already sends. Not
+  // inferred from `merchants[].roles`: that array carries the platform role only
+  // as a fallback for cafés where the user has no staff row, so an operator who
+  // also works at one café reads as ordinary staff there.
+  const platformRole = getStoredSession()?.platformRole ?? null;
+
   const value = useMemo(
     () => ({
       merchants,
@@ -146,8 +152,9 @@ export function MerchantProvider({ children }) {
       setSelectedLocationId,
       updateSelectedMerchant,
       isProductActive: (productKey) => isProductActive(productKey, capabilities),
-      canShowModule: (moduleKey) => canShowModule(moduleKey, capabilities),
-      visibleModules: getVisibleModules(capabilities),
+      canShowModule: (moduleKey) => canShowModule(moduleKey, capabilities, platformRole),
+      visibleModules: getVisibleModules(capabilities, platformRole),
+      platformRole,
     }),
     [
       merchants,
@@ -157,6 +164,7 @@ export function MerchantProvider({ children }) {
       loading,
       error,
       updateSelectedMerchant,
+      platformRole,
     ],
   );
 

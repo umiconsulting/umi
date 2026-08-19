@@ -39,6 +39,8 @@ export const routes = {
   merchants: {
     /** `/api/merchants/:merchantId` — compose ad-hoc sub-paths onto this. */
     base: merchantBase,
+    /** `POST` — open a café. Platform administrators only. */
+    provision: routePath('merchants.provision'),
     capabilities: (merchantId: string): string =>
       buildPath('merchants.capabilities', { merchantId }),
     settings: (merchantId: string): string => buildPath('merchants.settings', { merchantId }),
