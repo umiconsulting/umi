@@ -63,6 +63,9 @@ describe('wallet carry list · the five values the cutover must move intact', ()
   let pg: PgService;
   let repo: WalletPassRepository;
   let walletPassId: string;
+  /** `passHealth` before this suite's own pass exists. See test 8. */
+  let baseline: { total: number; unregistered: number; stale: number };
+  let baselineAllStale: number;
 
   beforeAll(async () => {
     pg = new PgService(makeConfig());
@@ -70,6 +73,10 @@ describe('wallet carry list · the five values the cutover must move intact', ()
     repo = new WalletPassRepository(pg);
 
     await pg.query(`DELETE FROM merchant.merchant WHERE id = $1::uuid`, [MERCHANT]);
+    // Taken BEFORE the fixture is written, so test 8 can measure what this suite
+    // adds rather than what the whole table happens to hold.
+    baseline = await repo.passHealth(30);
+    baselineAllStale = (await repo.passHealth(0)).stale;
     await pg.query(
       `INSERT INTO merchant.merchant (id, name, handle) VALUES ($1::uuid, 'Carry Test', $2)`,
       [MERCHANT, HANDLE],
@@ -220,16 +227,28 @@ describe('wallet carry list · the five values the cutover must move intact', ()
    * log and nothing counts them. This proves the counter exists and separates
    * the two questions. The seeded pass HAS a device, so it is registered; the
    * card was touched during setup, so it is not stale.
+   *
+   * ⚠️ MEASURED AS A DELTA, and it has to be. `passHealth` counts the WHOLE
+   * table. Asserting `unregistered === 0` only holds on an empty build, and this
+   * suite says at the top that it runs against any database with build-v3
+   * applied — against the rehearsal clone it read 89 and reported a defect that
+   * was really 89 real customers who never installed their pass.
+   *
+   * The delta says the thing the absolute number was reaching for, and says it
+   * on any target: THIS pass is counted, and it is counted as registered.
    */
   it('8 · pass health counts registered and stale passes apart', async () => {
     const health = await repo.passHealth(30);
-    expect(health.total).toBeGreaterThanOrEqual(1);
-    expect(health.unregistered).toBe(0);
-    expect(health.stale).toBe(0);
+    // The seeded pass is counted...
+    expect(health.total).toBe(baseline.total + 1);
+    // ...and it has a device, so it does not join the unregistered.
+    expect(health.unregistered).toBe(baseline.unregistered);
+    // ...and its card was touched during setup, so it is not stale either.
+    expect(health.stale).toBe(baseline.stale);
 
     // A threshold of 0 days makes every pass stale by definition — the counter
     // moves, so a green result above is a measurement and not a constant.
     const allStale = await repo.passHealth(0);
-    expect(allStale.stale).toBeGreaterThanOrEqual(1);
+    expect(allStale.stale).toBeGreaterThanOrEqual(baselineAllStale + 1);
   });
 });

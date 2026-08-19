@@ -419,9 +419,55 @@ select * from (values
   ('0 active users with an email but NULL password hash',
     (select case when count(*)=0 then 'PASS' else 'FAIL' end from umi."user"
        where status='active' and email is not null and password_hash is null)),
-  ('0 legacy-sha256 hashes retained',
+  -- ⚠️ CHANGED 2026-08-18 from `count(*) = 0`, and the reason matters more than
+  -- the assertion.
+  --
+  -- The old check could not pass and could not be satisfied. A credential that
+  -- carries only a legacy hash belongs to somebody who still has to sign in;
+  -- deleting the hash locks them out, and no scrypt hash can be derived from a
+  -- sha256 one. PR #113 therefore CARRIES every credential and heals it on the
+  -- next successful login, which is the only moment the plaintext exists. A gate
+  -- that demands an impossible state is a gate somebody eventually deletes.
+  --
+  -- What replaces it asserts the two things that are true AND protective:
+  --   1. Every retained legacy hash CAN heal — an active account with an email,
+  --      so a login is possible at all. A legacy hash on a disabled or
+  --      address-less row can never be upgraded, and that is a real defect.
+  --   2. The retained set never GROWS. Nothing in umi-api writes a legacy hash:
+  --      `auth.repository.updatePassword` stamps `scrypt-sha256-v1` on every
+  --      write. A rising count means some writer started producing weak hashes
+  --      again, which is the regression worth blocking on.
+  ('every retained legacy hash can still heal on login',
     (select case when count(*)=0 then 'PASS' else 'FAIL' end from umi."user"
+       where password_algorithm='legacy-sha256-v1'
+         and (status <> 'active' or email is null))),
+  ('legacy-sha256 hashes do not grow (<=2: admin+barista @nectarcafe)',
+    (select case when count(*)<=2 then 'PASS' else 'FAIL' end from umi."user"
        where password_algorithm='legacy-sha256-v1')),
+  -- AB#116 · P1, filed 2026-08-18. FOUR ACTIVE ACCOUNTS SHARE ONE PASSWORD:
+  -- `admin@` and `barista@` at BOTH elgranribera.mx and kalalacafe.mx, one salt
+  -- and one hash between the four. Two live cafés cannot tell their own staff
+  -- apart, and no audit trail can either.
+  --
+  -- Pinned rather than asserted to zero because the fix belongs in PRODUCTION,
+  -- before the cutover snapshot is taken, and not in this file. The pin is what
+  -- makes the gate useful meanwhile: a FIFTH account joining the shared password
+  -- fails it, and so does a second, separate shared group.
+  --
+  -- ⚠️ THIS GOES UNDETECTABLE AFTER THE CUTOVER. PR #113 rehashes on login and
+  -- gives each account a fresh salt, so the stored hashes stop matching each
+  -- other while the shared PASSWORD lives on unchanged. Reset the four in
+  -- production FIRST, then drop both allowances here to zero.
+  ('at most one shared-password group survives (AB#116)',
+    (select case when count(*)<=1 then 'PASS' else 'FAIL' end from (
+       select 1 from umi."user"
+        where password_hash is not null and status='active'
+        group by password_hash, password_salt having count(*) > 1) s)),
+  ('no shared-password group is larger than AB#116''s four accounts',
+    (select case when coalesce(max(n),0)<=4 then 'PASS' else 'FAIL' end from (
+       select count(*) n from umi."user"
+        where password_hash is not null and status='active'
+        group by password_hash, password_salt having count(*) > 1) s)),
   -- ⚠ A BACKFILL-FIDELITY check, not a schema one — its own label says
   -- "(functional)". It asserts that the migration preserved strong password
   -- hashes, so it can only pass on a target the backfill has loaded. On a
@@ -456,8 +502,8 @@ select status, label from gate order by (status='FAIL') desc, label;
 -- BEHAVIORAL GATE — requires a BACKFILLED target, and is SKIPPED on a pristine one.
 --
 -- The checks below assert production-derived facts: two merchants BY NAME, and
--- exact row counts (11 conversations, 4 entitlements, 2 entitlements). None of
--- that exists in a schema built from 00_run.sh alone.
+-- their conversation and entitlement rows. None of that exists in a schema built
+-- from 00_run.sh alone.
 --
 -- Before this guard, a pristine run died HERE. `\gset` on a query returning no
 -- rows is an error, and under ON_ERROR_STOP=1 it killed the file after the
@@ -478,6 +524,33 @@ select case when count(*) = 2 then 'true' else 'false' end as have_fixtures
 select id as kalala from merchant.merchant where name='Kalala Café' \gset
 select id as egr    from merchant.merchant where name='El Gran Ribera' \gset
 
+-- THE TRUE COUNTS, read as superuser (RLS bypassed) BEFORE the role switch.
+--
+-- ⚠️ CHANGED 2026-08-18. These were typed in as literals — 11 conversations, 4
+-- entitlements, 2 entitlements — which pinned a SECURITY gate to one afternoon's
+-- dump. The 2026-08-18 snapshot holds 12 Kalala conversations where the
+-- 2026-07-09 one held 11, and the gate failed because a café had kept trading.
+--
+-- The gate is not about how many rows exist. It is about ISOLATION: `api`, under
+-- one café's GUC, sees that café's rows and nobody else's. Comparing against the
+-- truth proves exactly that on any snapshot, and a literal never could.
+--
+-- The zero-floor below is what keeps the comparison honest. A policy that denies
+-- everything makes both sides zero and would otherwise read as perfect isolation.
+select count(*) as kalala_convs from merchant.conversation_analytics where merchant_id = :'kalala' \gset
+select count(*) as kalala_ents  from umi.effective_entitlement    where merchant_id = :'kalala' \gset
+select count(*) as egr_ents     from umi.effective_entitlement    where merchant_id = :'egr'    \gset
+--
+-- ⚠️ `:vars` DO NOT INTERPOLATE INSIDE `$$ … $$`. psql treats a dollar-quoted body
+-- as a literal and substitutes nothing, so every comparison against a captured
+-- count is made in plain SQL and reported through `\if`, never inside a `do`
+-- block. A `do $$ … :var … $$` is a syntax error, not a silent pass.
+select (:kalala_convs > 0 and :kalala_ents > 0 and :egr_ents > 0) as fixtures_nonzero \gset
+\if :fixtures_nonzero
+\else
+do $$ begin raise exception 'FAIL: a fixture count is zero, so the isolation comparison would pass vacuously'; end $$;
+\endif
+
 \echo ''
 \echo '================= BEHAVIORAL GATE (as role api) ================='
 set role api;
@@ -495,16 +568,22 @@ do $$ begin
   if (select count(*) from merchant.merchant)               <> 1 then raise exception 'FAIL: EGR sees <>1 merchant'; end if;
   if (select count(*) from merchant.conversation)           <> 0 then raise exception 'FAIL: EGR sees foreign conversations'; end if;
   if (select count(*) from merchant.conversation_analytics) <> 0 then raise exception 'FAIL: conversation_analytics VIEW leaks cross-merchant to EGR'; end if;
-  if (select count(*) from umi.effective_entitlement)     <> 2 then raise exception 'FAIL: EGR effective_entitlement <>2 (leak or wrong scope)'; end if;
 end $$;
+select (select count(*) from umi.effective_entitlement) = :egr_ents as egr_ent_ok \gset
+\if :egr_ent_ok
+\else
+do $$ begin raise exception 'FAIL: EGR effective_entitlement <> the rows it owns (leak or wrong scope)'; end $$;
+\endif
 \echo 'PASS: EGR scope isolated; conversation_analytics + effective_entitlement do NOT leak cross-merchant'
 
--- scoped to Kalala: sees its own 11 conversations and 4 entitlements
+-- scoped to Kalala: sees exactly its own conversations and entitlements, no more
 select set_config('app.current_merchant', :'kalala', false);
-do $$ begin
-  if (select count(*) from merchant.conversation_analytics) <> 11 then raise exception 'FAIL: Kalala analytics <>11'; end if;
-  if (select count(*) from umi.effective_entitlement)     <> 4  then raise exception 'FAIL: Kalala entitlements <>4'; end if;
-end $$;
+select (select count(*) from merchant.conversation_analytics) = :kalala_convs
+   and (select count(*) from umi.effective_entitlement)     = :kalala_ents as kalala_ok \gset
+\if :kalala_ok
+\else
+do $$ begin raise exception 'FAIL: Kalala sees a different row count than it owns (leak or wrong scope)'; end $$;
+\endif
 \echo 'PASS: Kalala scope sees exactly its own rows'
 
 reset role;

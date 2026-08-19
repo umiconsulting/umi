@@ -17,14 +17,50 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * OUTCOMES the ruling specifies (how many rows change, how many go NULL, and which
  * exact numbers survive), not internal agreement.
  *
- * L15 pins one number above all: `umi.e164()` must NULL exactly ONE row. A stricter
- * prose-following reading NULLs five and strands four customers who each hold a live
- * wallet pass.
+ * L15 pins one rule above all: `umi.e164()` NULLs a row ONLY when the number cannot
+ * be dialled at all. A stricter prose-following reading NULLs every row the old
+ * function had touched and strands the customers who each hold a live wallet pass.
+ * The counts below are pinned to a named snapshot; the SHAPE of the change is
+ * pinned structurally, so a newer dump moves the counts without loosening the rule.
  */
 
 const DSN =
   process.env.DATABASE_URL_WORKER ??
   'postgresql://worker_login:harness_worker@127.0.0.1:5233/umi_backfill_v3';
+
+/**
+ * WHAT THE PRODUCTION SNAPSHOT HOLDS, and the date it was measured.
+ *
+ * Re-pinned on 2026-08-18 against `umi_prod_snapshot_20260818`. The previous pin
+ * was taken against the 2026-07-09 dump, and every number moved for a reason
+ * worth writing down rather than editing away:
+ *
+ *   phoneContacts 458 → 794  Forty days of new customers. The count tracks the
+ *                            café's growth and carries no judgement.
+ *   repaired        4 → 7    Five DISTINCT NANP numbers across seven rows (two
+ *                            are held by two customers each). Every one keeps
+ *                            its declared '+1'.
+ *   nulled          1 → 2    Paloma R Mendia joined Mayela. Both are a declared
+ *                            '+52' carrying only EIGHT national digits, so
+ *                            neither string is a number anyone can dial. The
+ *                            owner ruled on 2026-08-18 that these stay NULL:
+ *                            `raw_phone_number` still holds what the customer
+ *                            typed, so the café can correct it on a visit.
+ *
+ * ⚠️ Rising `nulled` is the number to be suspicious of. It moved from 1 to 2
+ * because a SECOND customer was entered with the same eight-digit defect, not
+ * because the function became stricter — the three assertions below prove that
+ * distinction structurally, so a future dump cannot hide a regression inside a
+ * count that merely grew.
+ */
+const SNAPSHOT = {
+  /** Rows in `merchant.contact` that came from `core.contact_methods`. */
+  phoneContacts: 794,
+  /** Rows whose declared country code the old function had overwritten. */
+  repaired: 7,
+  /** Rows that are not dialable at all, so NULL is the truthful answer. */
+  nulled: 2,
+} as const;
 
 let pool: Pool;
 let hasSnapshot = false;
@@ -98,7 +134,7 @@ describe('umi.e164 — phone normalization pinned to real data', () => {
     expect(rows[0].junk).toBeNull();
   });
 
-  it('repairs exactly the NANP rows and NULLs exactly ONE, across all prod rows', async () => {
+  it('repairs the NANP rows and NULLs only the un-dialable ones, across all prod rows', async () => {
     if (!hasSnapshot) return; // pristine build (no coexisting prod snapshot) — nothing to pin
     const { rows } = await pool.query(`
       select count(*)::int AS total,
@@ -109,11 +145,9 @@ describe('umi.e164 — phone normalization pinned to real data', () => {
         join core.contact_methods cm on cm.id = c.id`);
     const { total, changed, now_null } = rows[0];
 
-    expect(total).toBe(458);
-    // 4 NANP rows repaired to their true +1 numbers + Mayela to NULL.
-    expect(changed).toBe(5);
-    // THE pinned invariant: one, not five. Five would strand four wallet-pass customers.
-    expect(now_null).toBe(1);
+    expect(total).toBe(SNAPSHOT.phoneContacts);
+    expect(changed).toBe(SNAPSHOT.repaired + SNAPSHOT.nulled);
+    expect(now_null).toBe(SNAPSHOT.nulled);
   });
 
   it('leaves the repaired rows holding their TRUE numbers', async () => {
@@ -124,16 +158,39 @@ describe('umi.e164 — phone normalization pinned to real data', () => {
         join core.contact_methods cm on cm.id = c.id
        where c.normalized_value is distinct from cm.normalized_value
        order by 1`);
-    // Every repair either preserves the declared country code, or is the honest NULL.
+
+    // THE INVARIANT, and it holds on any snapshot: every changed row is either a
+    // number whose DECLARED country code survives verbatim, or an honest NULL.
+    // There is no third outcome — a rewritten country code is the fatal bug.
     for (const r of rows) {
-      if (r.now === null) {
-        expect(r.raw).toBe('+5266748626');
-      } else {
-        expect(r.now).toBe(r.raw);
-        expect(r.now.startsWith('+52')).toBe(false);
-      }
+      if (r.now === null) continue;
+      expect(r.now).toBe(r.raw);
+      expect(r.now.startsWith('+52')).toBe(false);
     }
-    expect(rows.length).toBe(5);
+    expect(rows.filter((r: { now: string | null }) => r.now !== null)).toHaveLength(
+      SNAPSHOT.repaired,
+    );
+  });
+
+  it('NULLs a row only when the number is nobody’s number', async () => {
+    if (!hasSnapshot) return;
+    const { rows } = await pool.query(`
+      select cm.display_value AS raw
+        from merchant.contact c
+        join core.contact_methods cm on cm.id = c.id
+       where c.normalized_value is null and cm.normalized_value is not null`);
+
+    // The other half of the invariant, and the one L15 exists to protect. A NULL
+    // is only ever allowed for a number that CANNOT be dialled: a declared '+52'
+    // carrying fewer than the ten national digits Mexico requires. Any other NULL
+    // means the function threw away a reachable customer, which is the failure
+    // this whole file was written after.
+    for (const r of rows) {
+      const digits = String(r.raw).replace(/\D/g, '');
+      expect(String(r.raw).startsWith('+52')).toBe(true);
+      expect(digits.length - 2).toBeLessThan(10);
+    }
+    expect(rows).toHaveLength(SNAPSHOT.nulled);
   });
 
   it('makes normalized_value unforgeable — the trigger re-derives a hand-written value', async () => {
