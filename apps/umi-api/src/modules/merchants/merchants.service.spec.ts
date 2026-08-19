@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotFoundException } from '@nestjs/common';
 import { MerchantsService } from './merchants.service';
 import type { MerchantAccess } from '../auth/auth.types';
+import { PasswordService } from '../../shared/auth/password.service';
 
 function make() {
   const repo = {
@@ -13,7 +14,9 @@ function make() {
     updateMerchantSettings: vi.fn().mockResolvedValue(undefined),
     updateLocation: vi.fn(),
   };
-  return { svc: new MerchantsService(repo as never), repo };
+  // Real hashing, not a stub: these cases never provision, and a real
+  // PasswordService needs no configuration.
+  return { svc: new MerchantsService(repo as never, new PasswordService()), repo };
 }
 
 const ACCESS: MerchantAccess = {

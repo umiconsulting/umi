@@ -6,6 +6,7 @@ import { AuthGuard } from './auth.guard';
 import { MerchantAccessGuard } from './merchant-access.guard';
 import { PublicMerchantGuard } from './public-merchant.guard';
 import { CustomerAuthGuard } from './customer-auth.guard';
+import { PlatformAdminGuard } from './platform-admin.guard';
 import { EntitlementGuard } from './entitlement.guard';
 import { RolesGuard } from './roles.guard';
 import { MfaService } from './mfa.service';
@@ -26,6 +27,7 @@ import { MfaService } from './mfa.service';
     MerchantAccessGuard,
     PublicMerchantGuard,
     CustomerAuthGuard,
+    PlatformAdminGuard,
     EntitlementGuard,
     RolesGuard,
   ],
@@ -35,6 +37,7 @@ import { MfaService } from './mfa.service';
     MerchantAccessGuard,
     PublicMerchantGuard,
     CustomerAuthGuard,
+    PlatformAdminGuard,
     EntitlementGuard,
     RolesGuard,
   ],

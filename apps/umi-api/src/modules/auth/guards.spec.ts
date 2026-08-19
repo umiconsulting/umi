@@ -8,6 +8,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from './auth.guard';
 import { MerchantAccessGuard } from './merchant-access.guard';
+import { PlatformAdminGuard } from './platform-admin.guard';
 import { EntitlementGuard } from './entitlement.guard';
 import { RolesGuard } from './roles.guard';
 import { REQUIRE_PRODUCT } from './require-product.decorator';
@@ -147,5 +148,35 @@ describe('RolesGuard', () => {
     const guard = new RolesGuard(reflector);
     const req = { merchantAccess: { roles: ['admin'], permissions: [] } };
     expect(guard.canActivate(ctxFor(req))).toBe(true);
+  });
+});
+
+describe('PlatformAdminGuard', () => {
+  const guard = (platformRole: string | null) =>
+    new PlatformAdminGuard({ platformRole: vi.fn().mockResolvedValue(platformRole) } as never);
+  const req = { authUser: { id: 'u1', email: 'a@b.co' } };
+
+  it('admits a super_admin — the only role that may open a café', async () => {
+    expect(await guard('super_admin').canActivate(ctxFor(req))).toBe(true);
+  });
+
+  it('REFUSES a developer, whose reach is wide and whose authority is read-only', async () => {
+    // The distinction `PLATFORM_GRANT_CTE` exists to preserve. `developer` reaches
+    // every café so debugging is quick, and changes nothing. Treating "holds a
+    // platform grant" as "may create merchants" would erase that on the one route
+    // where no membership check can catch it afterwards.
+    await expect(guard('developer').canActivate(ctxFor(req))).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('refuses a login with no platform grant at all', async () => {
+    await expect(guard(null).canActivate(ctxFor(req))).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('401s rather than 403s when nothing authenticated the request', async () => {
+    await expect(guard('super_admin').canActivate(ctxFor({}))).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
   });
 });

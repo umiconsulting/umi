@@ -321,6 +321,21 @@ export class AuthRepository {
    * A platform operator with no employment here still gets access (never 404 Umi's own
    * operator) and is tagged with their platform role.
    */
+  /**
+   * The platform role this user holds, or null. Drives `PlatformAdminGuard`.
+   *
+   * Reads through `PLATFORM_GRANT_CTE` rather than asking `umi.user_role`
+   * directly — the expiry and revocation predicates live in that fragment and
+   * nowhere else, and a second copy is how one of them goes missing.
+   */
+  async platformRole(userId: string): Promise<string | null> {
+    const { rows } = await this.pg.query<{ platform_role: string | null }>(
+      `WITH ${PLATFORM_GRANT_CTE} SELECT platform_role FROM sa`,
+      [userId],
+    );
+    return rows[0]?.platform_role ?? null;
+  }
+
   async findMembershipAccess(userId: string, merchantId: string): Promise<MembershipAccess | null> {
     const { rows } = await this.pg.query<MembershipAccess>(
       `WITH ${PLATFORM_GRANT_CTE},
