@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CashAuthController } from './cash-auth.controller';
+import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 import type { CustomerSessionService } from './customer-session.service';
 import type { PublicMerchant } from '../auth/public-merchant.guard';
 
@@ -11,7 +12,12 @@ const MERCHANT: PublicMerchant = {
 
 function harness(revoke = vi.fn().mockResolvedValue(true)) {
   const sessions = { revokeByRefreshToken: revoke } as unknown as CustomerSessionService;
-  const controller = new CashAuthController(sessions);
+  const controller = new CashAuthController(
+    sessions,
+    { login: vi.fn(), refresh: vi.fn() } as never,
+    new RateLimitService(),
+    { get: () => undefined } as never,
+  );
   const cleared: { name: string; path?: string }[] = [];
   const reply = {
     clearCookie: (name: string, opts?: { path?: string }) => {

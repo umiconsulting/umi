@@ -41,12 +41,7 @@ export class CustomerSessionService {
     // jti makes each token unique even for the same subject within the same
     // second — without it two sessions collide on runtime.session.token_hash's
     // UNIQUE index (e.g. a double-submitted registration), 500ing instead of 409ing.
-    const accessToken = await new SignJWT({ sub: subjectId, role, merchantId })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setJti(randomUUID())
-      .setIssuedAt()
-      .setExpirationTime('24h')
-      .sign(this.accessKey);
+    const accessToken = await this.signAccessToken(subjectId, role, merchantId);
     const refreshToken = await new SignJWT({ sub: subjectId })
       .setProtectedHeader({ alg: 'HS256' })
       .setJti(randomUUID())
@@ -64,6 +59,67 @@ export class CustomerSessionService {
       [merchantId, isCustomer ? 'person' : 'user', subjectId, tokenHash, expiresAt],
     );
     return { accessToken, refreshToken };
+  }
+
+  /**
+   * A cash ACCESS token on its own — what a refresh returns.
+   *
+   * No session row is written. `runtime.session` keys on the hash of the REFRESH
+   * token, which is the thing that can be revoked; the access token is the
+   * short-lived derivative and is deliberately not tracked. Refreshing therefore
+   * extends a session rather than creating one, and the row's `revoked_at` still
+   * ends every token descended from it.
+   */
+  async signAccessToken(subjectId: string, role: string, merchantId: string): Promise<string> {
+    if (!this.accessKey) throw new Error('JWT_ACCESS_SECRET not configured.');
+    return new SignJWT({ sub: subjectId, role, merchantId })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setJti(randomUUID())
+      .setIssuedAt()
+      .setExpirationTime('24h')
+      .sign(this.accessKey);
+  }
+
+  /**
+   * The live STAFF session a refresh token names, or null.
+   *
+   * A refresh must ask the database, not only the signature. A JWT stays
+   * cryptographically valid until its own `exp`, so a signature check alone would
+   * let a token that was logged out mint fresh access tokens for the rest of its
+   * 30 days — and `revokeByRefreshToken` would be clearing a cookie and nothing
+   * more. Every condition below is a reason a still-valid signature must be
+   * refused:
+   *
+   *   `is_active`            the session was logged out or revoked
+   *   `expires_at`           the session aged out on its own
+   *   `principal_type`       a CUSTOMER token must not become a cashier
+   *   `merchant_id`          a token minted at one café is not a login at another
+   *
+   * `principal_type` is not defensive noise. Both kinds of session live in this
+   * one table and are signed with the SAME `JWT_REFRESH_SECRET`, so the claim set
+   * cannot tell them apart — the row is the only place the distinction exists.
+   *
+   * The worker pool owns this: `runtime.session` is the auth substrate, carries no
+   * RLS, and grants nothing to the `api` group.
+   */
+  async staffSessionByRefreshToken(
+    merchantId: string,
+    refreshToken: string,
+  ): Promise<{ userId: string } | null> {
+    const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
+    const { rows } = await this.pg.query<{ user_id: string }>(
+      `SELECT principal_id::text AS user_id
+         FROM runtime.session
+        WHERE merchant_id = $1::uuid
+          AND token_hash = $2
+          AND principal_type = 'user'
+          AND is_active
+          AND (expires_at IS NULL OR expires_at > now())
+        LIMIT 1`,
+      [merchantId, tokenHash],
+    );
+    const row = rows[0];
+    return row ? { userId: row.user_id } : null;
   }
 
   /**
