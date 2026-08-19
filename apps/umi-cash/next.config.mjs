@@ -63,10 +63,17 @@ const nextConfig = {
    * `beforeFiles` is necessary. It runs before the filesystem routes, so it takes
    * the request from the `src/app/api/[slug]/passes/apple/**` handlers on disk.
    *
-   * EACH ROUTE IS LISTED ONE BY ONE, and not as one prefix. A prefix also catches
-   * `{serial}/push-token` and `{serial}`, which umi-api does not serve. Those two
-   * handlers have no caller today, but a prefix would change them from a reply
-   * into a 404 in this app, which is a change nobody asked for.
+   * EACH ROUTE IS LISTED ONE BY ONE, and not as one prefix. The reason used to be
+   * that a prefix would also catch `{serial}` and `{serial}/push-token`, which
+   * umi-api does not serve. Those two handlers are now DELETED — nothing in this
+   * repository called either one, and both read `loyalty.passes` and `core.tenants`
+   * through Prisma, so after the cutover they answered 500 rather than anything a
+   * phone could use. Apple never asked for them: a pass carries this directory as
+   * its `webServiceURL` and appends its own `v1/*` paths, which are listed below.
+   *
+   * The list stays explicit anyway. It is the record of which paths umi-api
+   * actually implements, and a prefix would silently forward some later addition
+   * here to an origin that has no route for it.
    *
    * ⚠️ ROLLBACK IS ONLY AVAILABLE BEFORE THE build-v3 CUTOVER. With
    * `WALLET_API_ORIGIN` unset this returns no rewrites and the local handlers

@@ -2,10 +2,13 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   HttpException,
+  Logger,
   Param,
   ParseUUIDPipe,
   Patch,
+  Post,
   Put,
   Query,
   Res,
@@ -14,6 +17,8 @@ import {
 import { AuthGuard } from '../auth/auth.guard';
 import { MerchantAccessGuard } from '../auth/merchant-access.guard';
 import { EntitlementGuard } from '../auth/entitlement.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 import { RequireProduct } from '../auth/require-product.decorator';
 import { Merchant } from '../auth/current-user.decorator';
 import type { MerchantAccess } from '../auth/auth.types';
@@ -22,12 +27,15 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthUser } from '../auth/auth.types';
 import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 import { CashReadService } from './cash-read.service';
+import { ClientErrorDto } from './dto/client-error.dto';
 import { WalletPassAdapter } from '../../shared/adapters/wallet-pass.adapter';
 
 const HOUR = 60 * 60 * 1000;
 /** umi-cash allows ten customer exports an hour per staff member. */
 const EXPORT_MAX_PER_HOUR = 10;
 const DEFAULT_TZ = 'America/Mexico_City';
+/** Roles that operate the register, and so can report its failures. */
+const STAFF_ROLES = ['super_admin', 'owner', 'admin', 'staff'];
 
 /**
  * Cash READ side (D11 — always live) + admin-config writes (settings branding,
@@ -39,11 +47,47 @@ const DEFAULT_TZ = 'America/Mexico_City';
 @RequireProduct('cash')
 @Controller('api/:merchantRef/admin')
 export class CashController {
+  private readonly logger = new Logger(CashController.name);
+
   constructor(
     private readonly cash: CashReadService,
     private readonly walletPass: WalletPassAdapter,
     private readonly rateLimit: RateLimitService,
   ) {}
+
+  /**
+   * The sink for a failure that only the register's screen can see.
+   *
+   * A scan that commits and then loses its response leaves nothing here to find —
+   * on this side the request succeeded. The screen is the only witness, so it
+   * reports here and the line lands next to the request it belongs to.
+   *
+   * AUTHENTICATED ON PURPOSE, and role-checked like the register itself. An open
+   * log endpoint is an unmetered write to our logs by anyone who finds the URL.
+   *
+   * `error` level, matching umi-cash: it has to surface in a log search that
+   * nobody had to know to run.
+   */
+  @Post('client-error')
+  @UseGuards(RolesGuard)
+  @Roles(...STAFF_ROLES)
+  @HttpCode(204)
+  reportClientError(
+    @Merchant() t: MerchantAccess,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: ClientErrorDto,
+  ): void {
+    this.logger.error(
+      `client_error ${JSON.stringify({
+        merchant: t.merchantId,
+        staff: user.id,
+        action: dto.action,
+        kind: dto.kind,
+        online: dto.online ?? null,
+        detail: dto.detail,
+      })}`,
+    );
+  }
 
   @Get('settings')
   getSettings(@Merchant() t: MerchantAccess) {

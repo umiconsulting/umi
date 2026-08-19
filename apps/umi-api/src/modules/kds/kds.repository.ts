@@ -645,11 +645,27 @@ export class KdsRepository {
     return rows;
   }
 
-  /** Deactivate the session and archive its registry device row (one tx). */
+  /**
+   * Deactivate the session and archive its registry device row (one tx).
+   *
+   * ⚠️ `revoked_at` IS NOT OPTIONAL. `session_revocation_ck` asserts
+   * `is_active = (revoked_at is null)`, so clearing `is_active` alone raises 23514
+   * and the device keeps its live session. The DDL trigger
+   * `runtime.revoke_device_sessions` writes all three columns; this statement did
+   * not, and no test reached it. The trigger does not cover this path either — it
+   * fires on status `revoked`/`replaced`/`rotated`, and a retire is none of those.
+   *
+   * `coalesce` keeps a second revoke idempotent, exactly as the trigger does: the
+   * row stays revoked, the original timestamp and reason survive, and the caller
+   * still gets a row back — so re-revoking answers `ok`, not `device_not_found`.
+   */
   async revokeSession(merchantId: string, deviceId: string): Promise<boolean> {
     return this.pg.workerTx(async (client) => {
       const sess = await client.query(
-        `UPDATE runtime.session SET is_active = false
+        `UPDATE runtime.session
+            SET is_active = false,
+                revoked_at = coalesce(revoked_at, now()),
+                revoked_reason = coalesce(revoked_reason, 'device_retired')
           WHERE id = $1 AND merchant_id = $2
         RETURNING principal_id`,
         [deviceId, merchantId],

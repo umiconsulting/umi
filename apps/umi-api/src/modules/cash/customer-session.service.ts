@@ -65,4 +65,40 @@ export class CustomerSessionService {
     );
     return { accessToken, refreshToken };
   }
+
+  /**
+   * End one session, on presentation of its refresh token.
+   *
+   * REVOKE, DO NOT DELETE. umi-cash deleted the row, which erased the only record
+   * that the session ever existed. build-v3 keeps the row and marks it: `is_active`
+   * stays the single authority on whether the token works, and `revoked_at` plus
+   * `revoked_reason` say when it ended and why.
+   *
+   * ⚠️ ALL THREE COLUMNS OR NONE. `session_revocation_ck` asserts
+   * `is_active = (revoked_at is null)`, so an UPDATE that clears `is_active` and
+   * leaves `revoked_at` null does not write a half-revoked row — it raises 23514
+   * and the session stays live.
+   *
+   * The worker pool owns this. `runtime.session` is the auth substrate: it carries
+   * no RLS and grants nothing to the `api` group, so the app pool cannot reach it.
+   *
+   * `AND is_active` makes a repeat logout a no-op instead of moving `revoked_at`
+   * forward, and the merchant predicate stops a token minted at one café from
+   * ending a session at another.
+   */
+  async revokeByRefreshToken(merchantId: string, refreshToken: string): Promise<boolean> {
+    const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
+    const { rows } = await this.pg.query<{ id: string }>(
+      `UPDATE runtime.session
+          SET is_active = false,
+              revoked_at = now(),
+              revoked_reason = 'logout'
+        WHERE merchant_id = $1::uuid
+          AND token_hash = $2
+          AND is_active
+      RETURNING id::text`,
+      [merchantId, tokenHash],
+    );
+    return rows.length > 0;
+  }
 }
