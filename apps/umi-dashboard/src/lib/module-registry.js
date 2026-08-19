@@ -77,7 +77,21 @@ export const MODULES = {
     icon: 'Sparkles',
     section: 'CONFIGURATION',
     product: 'dashboard',
-    role: 'super_admin',
+    // PLATFORM, not café. This said `role: 'super_admin'`, which asks
+    // `hasRequiredRole` — and that reads `capabilities.membership.role`, a CAFÉ role
+    // of owner/admin/staff/viewer. `umi.role` marks super_admin `is_platform` and no
+    // membership carries it, so the check could only ever pass through the
+    // `permissions.includes('*')` escape hatch, and nothing produces '*' any more.
+    //
+    // REACHABLE, and today MASKED — worth stating both ways round. The one platform
+    // operator is also `staff` at Umi Cafe, and `findMembershipAccess` COALESCEs, so a
+    // café grant REPLACES the platform role in `roles`: selecting that café left her
+    // normalized role as `staff` and this screen refused her. It did not SHOW as this
+    // bug only because Umi Cafe holds no entitlements, so the product gate above
+    // refused her first. Give that café a subscription — or give any operator a job at
+    // an entitled one — and the screen starts appearing and disappearing with the
+    // switcher.
+    platform: 'super_admin',
   },
   cafes: {
     id: 'cafes',
@@ -127,6 +141,14 @@ export function hasPlatformGrant(moduleConfig, platformRole) {
   return platformRole === moduleConfig.platform;
 }
 
+/**
+ * The CAFÉ-role gate. Correct, and currently unused — `products-billing` was its only
+ * caller and named a PLATFORM grant, which `hasPlatformGrant` above answers instead.
+ *
+ * Kept because a café-role gate is a real thing a module may want. ⚠️ The value
+ * belongs to owner/admin/staff/viewer. A platform grant does not go here, however much
+ * the word "role" invites it.
+ */
 export function hasRequiredRole(moduleConfig, capabilities) {
   if (!moduleConfig?.role) return true;
   const membership = capabilities?.membership;
