@@ -308,12 +308,11 @@ Customer 360). `GET /hours` off `merchant.open_hours` jsonb; **order repos** rew
   was **10 statements nobody had counted** until the rollup stopped truncating.
 - ✅ **hours** (#74) — see the P1 entry above for the shape and for what the fold was losing.
 
-✅ **Gift cards (2026-08-19, `fix/build-v3-gift-card-convergence`).** The model decision is now
-explicit. A gift card is a one-use bearer value. The clear code is returned at issue time and is
-never stored. The database keeps its SHA-256 hash and a masked suffix. `amount_cents` is the face
-value. The current value is always `SUM(loyalty_gift_card_ledger.delta)`. The ledger is append-only.
-Redemption claims `redeemed_at` only when it is NULL. It then appends both money movements in one
-transaction.
+✅ **Gift cards (2026-08-20, PR #127, merge `c773d62`).** The model decision is now explicit. A
+gift card is a one-use bearer value. The clear code is returned at issue time and is never stored.
+The database keeps its SHA-256 hash and a masked suffix. `amount_cents` is the face value. The
+current value is always `SUM(loyalty_gift_card_ledger.delta)`. The ledger is append-only. Redemption
+claims `redeemed_at` only when it is NULL. It then appends both money movements in one transaction.
 
 **Decision basis.** PostgreSQL documents that `digest(data, type)` returns a binary message digest
 and supports `sha256` ([pgcrypto](https://www.postgresql.org/docs/current/pgcrypto.html)). A digest
@@ -487,10 +486,8 @@ updates on a real device after the flip.**
 
 > **Next, in order.**
 >
-> 1. **Merge P4 gift-card PR #127** after its green review and CI evidence. Azure Boards #9 and
->    #13 are Resolved; Tasks #10–#12 remain Active because their workflow has no Resolved state.
-> 2. **P6 deployment gates D3–D10**, which nothing else blocks and which P7 cannot start without.
-> 3. **P7 cutover rehearsal**, including production routing, signer credentials, APNs, Google, and
+> 1. **P6 deployment gates D3–D10**, which nothing else blocks and which P7 cannot start without.
+> 2. **P7 cutover rehearsal**, including production routing, signer credentials, APNs, Google, and
 >    the pre-cutover-pass update on real phones.
 >
 > Two items have no phase and must not be lost:
@@ -501,10 +498,10 @@ updates on a real device after the flip.**
 >   Requirements 7, 8 and 10 from scope entirely, so the answer changes how much of the access work
 >   above is obligatory rather than merely correct. Ask at contract time, not after.
 
-- **Evaluated base:** `origin/build-v3` at `43b186a92ef630495ad8271011103bbacaf06683`;
-  verified implementation head `0b3e561db0ec84715a2b1e86b8f8adbe97cb5582` in GitHub PR **#127**. The gift-card
-  convergence is not yet merged. Azure Boards #9–#13 carry dated candidate evidence and must be
-  closed against the merged commit. The merge sequence since #65 starts with **#66** cash
+- **Evaluated base:** `origin/build-v3` at `c773d626dd2d4c8f74bb5c8451aa40102fff5895`,
+  the merge of Gift Card PR **#127**. Verified implementation head
+  `0b3e561db0ec84715a2b1e86b8f8adbe97cb5582` is its feature parent. Azure Boards #9–#13 carry the
+  dated evidence and are closed against the merge. The merge sequence since #65 starts with **#66** cash
   loyalty convergence and **#67** birthday grants. **#68** added the conversation pipeline. **#69**
   removed cash-rename residue. **#70** added Customer 360, and **#71** moved leads to `umi.prospect`.
   **#73** folded the UmiPOS schema and contract. **#74** unified open hours. **#75** renamed merchant
