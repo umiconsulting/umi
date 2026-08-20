@@ -262,13 +262,15 @@ export class CashWriteRepository {
     recipientName: string | null;
   }): Promise<{ id: string; code: string; amount_cents: number }> {
     return this.pg.withMerchant(async (c) => {
-      const { rows } = await c.query<{ id: string; code: string; amount_cents: number }>(
-        // balance_cents cache DROPPED — remaining value = SUM(gift_card_ledger.delta).
+      const { rows } = await c.query<{ id: string; amount_cents: number }>(
+        // The code is bearer value. Store only its digest and a display-safe suffix.
+        // Remaining value = SUM(gift_card_ledger.delta); amount_cents is face value.
         `INSERT INTO merchant.loyalty_gift_card
-           (merchant_id, code, amount_cents, created_by_staff_id,
+           (merchant_id, code_hash, masked_code, amount_cents, created_by_staff_id,
             sender_name, message, recipient_email, recipient_phone, recipient_name)
-         VALUES ($1::uuid, $2, $3, $4::uuid, $5, $6, $7, $8, $9)
-         RETURNING id::text, code, amount_cents`,
+         VALUES ($1::uuid, extensions.digest($2, 'sha256'), '••••-' || right($2, 4),
+                 $3, $4::uuid, $5, $6, $7, $8, $9)
+         RETURNING id::text, amount_cents`,
         [
           input.merchantId,
           input.code,
@@ -281,10 +283,10 @@ export class CashWriteRepository {
           input.recipientName,
         ],
       );
-      const gc = rows[0];
+      const gc = { ...rows[0], code: input.code };
       await c.query(
-        // gift_card_ledger reason CHECK is (migration_initial_load/load/redeem/
-        // adjustment/expire) — 'load' is the issuance reason.
+        // 'load' is the Build v3 issue event. The runtime integration test executes
+        // this INSERT because PREPARE cannot evaluate a CHECK constraint.
         `INSERT INTO merchant.loyalty_gift_card_ledger
            (merchant_id, gift_card_id, delta, reason, source_type, source_id, idempotency_key)
          VALUES ($1::uuid, $2::uuid, $3, 'load', 'gift_card', $2::text, $4)`,
@@ -301,9 +303,11 @@ export class CashWriteRepository {
   ): Promise<{ code: string; isRedeemed: boolean; hasMessage: boolean } | null> {
     const { rows } = await this.pg.workerTx((c) =>
       c.query<Row>(
-        `SELECT code, (redeemed_at IS NOT NULL) AS is_redeemed, (message IS NOT NULL) AS has_message
+        `SELECT masked_code AS code,
+                (redeemed_at IS NOT NULL) AS is_redeemed,
+                (message IS NOT NULL) AS has_message
          FROM merchant.loyalty_gift_card
-         WHERE merchant_id=$1::uuid AND code=$2 LIMIT 1`,
+         WHERE merchant_id=$1::uuid AND code_hash=extensions.digest($2, 'sha256') LIMIT 1`,
         [merchantId, code],
       ),
     );
@@ -315,9 +319,15 @@ export class CashWriteRepository {
   async findGiftCardByCode(merchantId: string, code: string): Promise<Row | null> {
     const { rows } = await this.pg.workerTx((c) =>
       c.query<Row>(
-        `SELECT id::text, amount_cents, sender_name, redeemed_at, expires_at
-         FROM merchant.loyalty_gift_card
-         WHERE merchant_id=$1::uuid AND code=$2 LIMIT 1`,
+        `SELECT g.id::text, g.amount_cents, g.sender_name, g.redeemed_at, g.expires_at,
+                COALESCE(SUM(l.delta), 0)::bigint AS balance_cents
+         FROM merchant.loyalty_gift_card g
+         LEFT JOIN merchant.loyalty_gift_card_ledger l
+           ON l.merchant_id=g.merchant_id AND l.gift_card_id=g.id
+         WHERE g.merchant_id=$1::uuid
+           AND g.code_hash=extensions.digest($2, 'sha256')
+         GROUP BY g.id
+         LIMIT 1`,
         [merchantId, code],
       ),
     );

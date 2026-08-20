@@ -69,6 +69,7 @@ export class CashCustomerController {
   }
 
   @Post('gift/:code')
+  @HttpCode(200)
   async giftRedeem(
     @PubMerchant() t: PublicMerchant,
     @Param('code') code: string,

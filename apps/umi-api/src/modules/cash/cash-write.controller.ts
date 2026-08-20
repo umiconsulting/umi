@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { MerchantAccessGuard } from '../auth/merchant-access.guard';
 import { EntitlementGuard } from '../auth/entitlement.guard';
@@ -39,6 +39,7 @@ export class CashWriteController {
   }
 
   @Post('gift-cards')
+  @HttpCode(200)
   issueGiftCard(
     @Merchant() t: MerchantAccess,
     @CurrentUser() user: AuthUser,

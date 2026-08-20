@@ -50,12 +50,6 @@ interface Expectation {
   why: string;
 }
 
-const GIFT_CARDS_AB13 =
-  'AB#13 · merchant.loyalty_gift_card has 6 columns and the Cash repositories ' +
-  'read ten. Deferred by owner decision D-1 of 2026-08-14: the gifting model ' +
-  'arrives whole with PR #94, not as a hand-made delta. `sql-preflight` ' +
-  'allowlists the same 7 statements. DELETE THIS when that lands.';
-
 const EXPECTED: readonly Expectation[] = [
   {
     match: /\/api\/geocode$/,
@@ -69,9 +63,11 @@ const EXPECTED: readonly Expectation[] = [
       'anywhere: that would call OpenStreetMap Nominatim, a donated service, once ' +
       'per CI round.',
   },
-  { match: /\/admin\/gift-cards$/, status: 500, why: GIFT_CARDS_AB13 },
-  { match: /\/cash\/gift-cards$/, status: 500, why: GIFT_CARDS_AB13 },
-  { match: /\/gift\/[^/]+$/, status: 500, why: GIFT_CARDS_AB13 },
+  {
+    match: /\/gift\/[^/]+$/,
+    status: 404,
+    why: 'The read matrix supplies SMOKECODE. The database has no matching bearer code.',
+  },
 ];
 
 /**
@@ -337,9 +333,8 @@ describe('build-v3 smoke · every read endpoint', () => {
   }, 300_000);
 
   it('no declared exception has quietly started working', () => {
-    // The half of the contract that keeps the list honest. When the gift-card
-    // model lands these routes answer, this assertion fails, and the entry is
-    // deleted by the same pull request rather than by somebody remembering.
+    // The half of the contract that keeps the list honest. A stale exception
+    // fails here, so the same change that fixes a route must remove its entry.
     const stale = expected
       .filter((e) => {
         const hit = results.filter((r) => e.match.test(r.url));

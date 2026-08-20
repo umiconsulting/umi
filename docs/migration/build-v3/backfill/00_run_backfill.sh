@@ -84,5 +84,5 @@ for f in 50_cross_schema_fk 90_rls; do
 done
 
 echo "== reconcile =="
-psql -q -d "$DB" -f "$BF/reconcile_v3.sql"
+psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$BF/reconcile_v3.sql"
 echo "done: $DB"

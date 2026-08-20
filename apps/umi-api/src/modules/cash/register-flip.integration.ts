@@ -61,14 +61,10 @@ describe('the register flip forwards only routes this app serves', () => {
     expect(missing).toEqual([]);
   });
 
-  it('does NOT forward the gift-card routes, which answer 500 (AB#13)', () => {
-    // Named rather than merely absent. `merchant.loyalty_gift_card` has six
-    // columns and the Cash repositories read ten; forwarding these would trade a
-    // working screen for a broken one. When PR #94 lands and they answer, this
-    // test is the reminder to add them — delete it then.
+  it('forwards both staff and customer gift-card routes', () => {
     const config = readFileSync(resolve(__dirname, '../../../../umi-cash/next.config.mjs'), 'utf8');
     const block = config.match(/const REGISTER_ROUTES = \[([\s\S]*?)\];/)![1];
-    expect(block).not.toContain('gift-cards');
-    expect(block).not.toContain('/gift/');
+    expect(block).toContain('/api/:handle/admin/gift-cards');
+    expect(block).toContain('/api/:handle/gift/:code');
   });
 });
