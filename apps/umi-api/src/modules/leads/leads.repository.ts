@@ -3,18 +3,18 @@ import { PgService } from '../../shared/database/pg.service';
 
 /**
  * Data access for landing-page leads (Phase 5, spec §9.3). Reads/writes the
- * canonical `grow.leads` + `grow.lead_events` tables — confirmed live on the
+ * canonical `umi.prospect` + `umi.prospect_event` tables — confirmed live on the
  * platform DB (2026-06-30) with every column §9.3 lists, so NO schema migration
  * is needed. `grow` is a service-role-only schema, so this repository always
  * uses the BYPASSRLS **worker pool** (`pg.query`) — leads have no tenant and no
  * authenticated user, exactly like the lifecycle reads. Isolation is not an
  * issue: prospects are Umi-internal, `tenant_id` is NULL by design.
  *
- * Event-sourced: every mutation appends a `grow.lead_events` row (email_sent,
+ * Event-sourced: every mutation appends a `umi.prospect_event` row (email_sent,
  * email_failed, sequence_paused/resumed, responded, diagnostic_completed, …).
  */
 
-// Statuses the partial-unique index `grow_leads_email_active_uidx` protects —
+// Statuses the partial-unique index `umi_prospect_email_active_uidx` protects —
 // only one live lead per email may sit in these. Once a lead is converted/lost/
 // unsubscribed it leaves the set and the email can appear again.
 const ACTIVE_STATUSES = ['new', 'nurturing', 'qualified'] as const;
@@ -103,7 +103,7 @@ export interface UpsertLeadInput {
   company?: string | null;
   phone?: string | null;
   diagnosticData: LeadDiagnosticData;
-  diagnosticDate: string; // ISO — required (grow.leads.diagnostic_date is NOT NULL, no default)
+  diagnosticDate: string; // ISO — required (umi.prospect.diagnostic_date is NOT NULL, no default)
   sourceApp?: string;
 }
 
@@ -114,7 +114,7 @@ export class LeadsRepository {
   /** The single active lead for an email (matches the partial-unique index). */
   async findActiveByEmail(email: string): Promise<LeadRecord | null> {
     const { rows } = await this.pg.query<LeadRow>(
-      `SELECT ${SELECT_COLS} FROM grow.leads
+      `SELECT ${SELECT_COLS} FROM umi.prospect
         WHERE email = $1 AND lifecycle_status = ANY($2::text[])
         ORDER BY created_at DESC LIMIT 1`,
       [email, ACTIVE_STATUSES as unknown as string[]],
@@ -124,7 +124,7 @@ export class LeadsRepository {
 
   async findById(id: string): Promise<LeadRecord | null> {
     const { rows } = await this.pg.query<LeadRow>(
-      `SELECT ${SELECT_COLS} FROM grow.leads WHERE id = $1`,
+      `SELECT ${SELECT_COLS} FROM umi.prospect WHERE id = $1`,
       [id],
     );
     return rows[0] ? toRecord(rows[0]) : null;
@@ -145,7 +145,7 @@ export class LeadsRepository {
 
     try {
       const { rows } = await this.pg.query<LeadRow>(
-        `INSERT INTO grow.leads
+        `INSERT INTO umi.prospect
            (email, name, company, phone, diagnostic_data, diagnostic_date, source_app, submitted_form)
          VALUES ($1, $2, $3, $4, $5::jsonb, $6, COALESCE($7, 'umi-landing-page'), 'diagnostic')
          RETURNING ${SELECT_COLS}`,
@@ -163,7 +163,7 @@ export class LeadsRepository {
     } catch (err) {
       // TOCTOU: a concurrent submission for the same email inserted the active
       // lead between our findActiveByEmail() and this INSERT, tripping the partial
-      // unique index grow_leads_email_active_uidx (23505). Re-read and update so
+      // unique index umi_prospect_email_active_uidx (23505). Re-read and update so
       // the flow stays idempotent instead of throwing.
       if ((err as { code?: string }).code === '23505') {
         const now = await this.findActiveByEmail(input.email);
@@ -181,7 +181,7 @@ export class LeadsRepository {
     input: UpsertLeadInput,
   ): Promise<LeadRecord> {
     const { rows } = await this.pg.query<LeadRow>(
-      `UPDATE grow.leads
+      `UPDATE umi.prospect
           SET name = $2,
               company = COALESCE($3, company),
               phone = COALESCE($4, phone),
@@ -207,7 +207,7 @@ export class LeadsRepository {
     eventData?: Record<string, unknown>,
   ): Promise<void> {
     await this.pg.query(
-      `INSERT INTO grow.lead_events (lead_id, event_type, event_data)
+      `INSERT INTO umi.prospect_event (prospect_id, event_type, event_data)
        VALUES ($1, $2, $3::jsonb)`,
       [leadId, eventType, eventData ? JSON.stringify(eventData) : null],
     );
@@ -223,7 +223,7 @@ export class LeadsRepository {
    */
   async reserveEmailStep(leadId: string, emailKey: string): Promise<boolean> {
     const { rowCount } = await this.pg.query(
-      `UPDATE grow.leads
+      `UPDATE umi.prospect
           SET emails_sent = array_append(emails_sent, $2), updated_at = now()
         WHERE id = $1 AND NOT ($2 = ANY(emails_sent))`,
       [leadId, emailKey],
@@ -241,7 +241,7 @@ export class LeadsRepository {
     sentAt?: string;
   }): Promise<void> {
     await this.pg.query(
-      `UPDATE grow.leads
+      `UPDATE umi.prospect
           SET last_email_sent_at = COALESCE($2, now()), updated_at = now()
         WHERE id = $1`,
       [params.leadId, params.sentAt ?? null],
@@ -266,7 +266,7 @@ export class LeadsRepository {
     subject: string;
   }): Promise<void> {
     await this.pg.query(
-      `UPDATE grow.leads
+      `UPDATE umi.prospect
           SET emails_sent = array_remove(emails_sent, $2), updated_at = now()
         WHERE id = $1`,
       [params.leadId, params.emailKey],
@@ -282,7 +282,7 @@ export class LeadsRepository {
   /** Active (non-paused) leads still inside a live lifecycle status. */
   async listActive(): Promise<LeadRecord[]> {
     const { rows } = await this.pg.query<LeadRow>(
-      `SELECT ${SELECT_COLS} FROM grow.leads
+      `SELECT ${SELECT_COLS} FROM umi.prospect
         WHERE sequence_paused = false AND lifecycle_status = ANY($1::text[])
         ORDER BY diagnostic_date ASC`,
       [ACTIVE_STATUSES as unknown as string[]],
@@ -299,7 +299,7 @@ export class LeadsRepository {
     eventData?: Record<string, unknown>,
   ): Promise<boolean> {
     const { rowCount } = await this.pg.query(
-      `UPDATE grow.leads
+      `UPDATE umi.prospect
           SET sequence_paused = $2,
               pause_reason = $3,
               updated_at = now()

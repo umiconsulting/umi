@@ -16,6 +16,7 @@ import { RateLimitModule } from './shared/ratelimit/rate-limit.module';
 import { QueueModule } from './jobs/queue.module';
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { IdentityModule } from './modules/identity/identity.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { HoursModule } from './modules/hours/hours.module';
@@ -42,6 +43,7 @@ import { LeadsModule } from './modules/leads/leads.module';
     QueueModule,
     HealthModule,
     AuthModule,
+    IdentityModule,
     TenantsModule,
     StaffModule,
     HoursModule,

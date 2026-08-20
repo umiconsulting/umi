@@ -16,7 +16,7 @@ import {
  * The diagnostic-followup email sequence engine (Phase 5). Unifies the landing
  * page's two overlapping senders (`diagnosticTrigger` logged-but-didn't-send +
  * `sequenceManager` sent-but-didn't-persist) into ONE idempotent engine backed
- * by `grow.leads.emails_sent`. A step is sent at most once per lead: membership
+ * by `umi.prospect.emails_sent`. A step is sent at most once per lead: membership
  * of its `diagnostic_followup_day_N` key in `emails_sent` is the dedup gate, so
  * a retry/re-tick never double-mails.
  *

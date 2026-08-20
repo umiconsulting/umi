@@ -8,10 +8,11 @@ import { createHash, randomBytes, randomInt } from 'node:crypto';
  * and are contract-tested (`kds-contract.spec.ts`). Do NOT paraphrase — the app
  * keys off these strings (e.g. it clears Keychain on `device_revoked`).
  *
- * Underneath the frozen JSON the module reads/writes the CANONICAL model
- * (`ops.*` via `v_kds_tickets`, `device.*`, `kitchen.stations`) — there is no
- * `kds.*` schema and no canonical transition RPC, so the logic lives in
- * `KdsService`/`KdsRepository`, not in the database.
+ * Underneath the frozen JSON the module reads/writes the build-v2 model
+ * (`runtime.v_kds_tickets` over `tenant."order"`, `tenant.station`,
+ * `tenant.device` + `runtime.session`) — there is no `kds.*` schema and no
+ * canonical transition RPC, so the logic lives in `KdsService`/`KdsRepository`,
+ * not in the database.
  */
 
 // ── Device auth (frozen) ───────────────────────────────────────────────────
@@ -38,7 +39,7 @@ export const PIN_SCAN_LIMIT = 50;
 /** kds_pairing admin_list page size. */
 export const PAIRING_LIST_LIMIT = 20;
 
-// ── Device liveness thresholds (heartbeat folded into device.sessions) ──────
+// ── Device liveness thresholds (heartbeat folded into runtime.session) ──────
 
 export const DEVICE_LIVE_MS = 10_000; // < 10s since last_used_at → live
 export const DEVICE_OFFLINE_MS = 20_000; // < 20s → slow; else offline
@@ -87,7 +88,7 @@ export const STATUS_TRANSITIONS: Record<KitchenStatus, KitchenStatus[]> = {
   cancelled: [],
 };
 
-/** Map a KDS `kitchen_status` to the `ops.orders.status` lifecycle value. */
+/** Map a KDS `kitchen_status` to the `tenant."order".status` lifecycle value. */
 export function mapKitchenToOrderStatus(k: KitchenStatus): string {
   switch (k) {
     case 'new':
@@ -132,7 +133,7 @@ export function validateTransition(
   return null;
 }
 
-// ── Device session (normalized from device.sessions) ───────────────────────
+// ── Device session (normalized from runtime.session) ───────────────────────
 
 export interface KdsDeviceSession {
   deviceId: string;

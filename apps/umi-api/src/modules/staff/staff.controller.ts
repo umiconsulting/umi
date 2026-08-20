@@ -18,7 +18,7 @@ import { StaffService } from './staff.service';
 import { CreateStaffDto, UpdateStaffDto } from './dto/staff.dto';
 
 /**
- * Staff CRUD over `core.staff_members`. Slug-routed; TenantAccessGuard resolves
+ * Staff CRUD over `tenant.staff`. Slug-routed; TenantAccessGuard resolves
  * the slug → tenant and verifies membership (no membership check existed in
  * server.js — hardened here). No product entitlement gate, matching server.js.
  */

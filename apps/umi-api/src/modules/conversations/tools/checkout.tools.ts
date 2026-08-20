@@ -17,7 +17,7 @@ import { needsInputToolError, retryableToolError, terminalToolError } from './to
 /**
  * Checkout tools: confirm_order, reorder_last_order, cancel_order. Ported from
  * `tools.ts`; orders rebound from the legacy `transactions` table to
- * `ops.orders`+`ops.order_items` (OrdersRepository). Idempotent on
+ * `tenant."order"`+`tenant.order_item` (OrdersRepository). Idempotent on
  * `conversaflow:turn:<turn_id>` (the bug fix — a retried turn never duplicates an
  * order). Partial-cancellation (`confirm_order_changes`, the partial cancel
  * branch) is KDS-owned → deferred to Phase 4 (inert here).
@@ -233,9 +233,9 @@ export class CheckoutTools {
   }
 
   async cancelOrder(ctx: ToolContext, reason: string): Promise<ToolResult> {
-    // A draft cart (an order still being ASSEMBLED, not yet placed in ops.orders)
+    // A draft cart (an order still being ASSEMBLED, not yet placed in tenant."order")
     // is what "cancel" means while the customer is still building their order.
-    // Clear it FIRST: cancel_order used to only touch confirmed ops.orders, so a
+    // Clear it FIRST: cancel_order used to only touch confirmed tenant."order", so a
     // cancel left the in-progress cart intact and it reappeared on the next add.
     const conv = await this.conversations.loadById(ctx.conversationId);
     const draftCart = (conv?.draftCart as DraftCart | null) ?? null;

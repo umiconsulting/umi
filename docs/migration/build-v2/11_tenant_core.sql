@@ -44,6 +44,22 @@ begin;
 
 set search_path = tenant, public, extensions;
 
+-- ---------------------------------------------------------------------------
+-- tenant.f_branch_search_text(name, aliases) — the branch-name trigram target
+--   as ONE immutable boundary. IMMUTABILITY NOTE (from 2026-07-03 apply):
+--   array_to_string(anyarray, text) is only STABLE, so inlining it into a
+--   generated-column expression fails 42P17. A LANGUAGE plpgsql function is
+--   never inlined, so its DECLARED immutability is trusted. Body stays fully
+--   qualified; do NOT add SET search_path (would defeat immutability). f_unaccent
+--   is intentionally DROPPED per the PR2 decision (lowercase + pg_trgm only).
+-- ---------------------------------------------------------------------------
+create or replace function tenant.f_branch_search_text(p_name text, p_aliases text[])
+  returns text language plpgsql immutable parallel safe as $$
+begin
+  return lower(coalesce(p_name, '') || ' ' || coalesce(array_to_string(p_aliases, ' '), ''));
+end;
+$$;
+
 -- ===========================================================================
 -- tenant.tenant  <- core.tenants
 --   The RLS ROOT. It IS the tenant, so it keys on `id` (NO tenant_id column);
@@ -81,6 +97,24 @@ create table if not exists tenant.channel (
   metadata               jsonb not null default '{}'::jsonb,
   created_at             timestamptz not null default now()
 );
+
+-- Seed the GLOBAL channel catalog (idempotent). REQUIRED: normalize_identity +
+-- every contact_identity dedup are unusable without it, and build-v2 shipped no
+-- seed. normalization_rule mirrors tenant.normalize_identity's dispatch; only the
+-- value-keyed channels (phone/whatsapp/sms/email) are deterministically matchable
+-- — Meta PSIDs (instagram/messenger) + pos/web/manual match by external_id, not
+-- value. The app's identity resolver may re-upsert this same set at bootstrap.
+insert into tenant.channel (key, namespace, normalization_rule, deterministic_matchable, default_trust) values
+  ('phone',     null,   'e164',  true,  0.90),
+  ('whatsapp',  'meta', 'e164',  true,  0.85),
+  ('sms',       null,   'e164',  true,  0.85),
+  ('email',     null,   'lower', true,  0.80),
+  ('instagram', 'meta', 'none',  false, 0.60),
+  ('messenger', 'meta', 'none',  false, 0.60),
+  ('pos',       null,   'none',  false, 0.50),
+  ('web',       null,   'none',  false, 0.50),
+  ('manual',    null,   'none',  false, 0.50)
+on conflict (key) do nothing;
 
 -- ===========================================================================
 -- tenant.business  <- ops.businesses
@@ -122,6 +156,13 @@ create table if not exists tenant.branch (
   business_id uuid,
   slug        text,
   name        text not null,
+  -- Branch-resolution profile (was core.locations.aliases/descriptor/search_text).
+  -- search_text is the trigram match target; f_unaccent is DROPPED per the PR2
+  -- decision (rely on lower() + pg_trgm word_similarity).
+  aliases     text[] not null default '{}',
+  descriptor  text,
+  search_text text generated always as
+    (tenant.f_branch_search_text(name, aliases)) stored,
   address     text,
   lat         double precision,
   lng         double precision,
@@ -142,6 +183,9 @@ create index if not exists tenant_branch_tenant_idx
   on tenant.branch (tenant_id, status);
 create index if not exists tenant_branch_business_idx
   on tenant.branch (tenant_id, business_id) where business_id is not null;
+-- trigram target for branch-name/alias fuzzy matching (set_branch resolution).
+create index if not exists tenant_branch_search_trgm_idx
+  on tenant.branch using gin (search_text extensions.gin_trgm_ops);
 
 -- ===========================================================================
 -- tenant.contact  (NEW — thin identity ANCHOR)
@@ -317,7 +361,11 @@ create table if not exists tenant.tenant_access (
   tenant_id   uuid not null references tenant.tenant(id) on delete cascade,
   login_id    uuid not null references tenant.login(id) on delete cascade,
   role        text not null default 'staff'
-    check (role in ('owner', 'admin', 'staff', 'viewer')),
+    -- super_admin = Umi's cross-tenant operator (hola@umiconsulting.co): wildcard
+    -- permissions + can_access_tenant bypass (see 00_foundation, 18_umi). One
+    -- active super_admin edge anywhere flags a GLOBAL super_admin. 'developer' /
+    -- 'tech_assist' are deliberately PARKED (not admitted until wired end-to-end).
+    check (role in ('owner', 'admin', 'staff', 'viewer', 'super_admin')),
   status      text not null default 'active'
     check (status in ('active', 'invited', 'disabled', 'archived')),
   created_at  timestamptz not null default now(),

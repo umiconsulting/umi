@@ -3,8 +3,8 @@ import { PgService } from '../../shared/database/pg.service';
 import type { MessageRunItem } from './turn.types';
 
 /**
- * Queries for `comms.conversation_turns` (the turn-integrity / debounce machinery)
- * + the trailing-user-run read over `comms.messages`. Ported from `_shared/turns.ts`
+ * Queries for `runtime.conversation_turn` (the turn-integrity / debounce machinery)
+ * + the trailing-user-run read over `tenant.message`. Ported from `_shared/turns.ts`
  * and rebound to canonical columns (preflight §2). Worker pool — the WhatsApp path
  * is unauthenticated.
  *
@@ -101,8 +101,8 @@ export class ConversationTurnsRepository {
     limit = 20,
   ): Promise<MessageRunItem[]> {
     const { rows } = await this.pg.query<MessageRunItem>(
-      `SELECT id::text, role, content, created_at
-         FROM comms.messages
+      `SELECT id::text, sender AS role, COALESCE(body, '') AS content, created_at
+         FROM tenant.message
         WHERE conversation_id = $1
         ORDER BY created_at DESC
         LIMIT $2`,
@@ -125,15 +125,15 @@ export class ConversationTurnsRepository {
   ): Promise<boolean> {
     // `afterTimestamp` is the turn's last_message_at, which round-trips through a
     // JS Date and is truncated to MILLISECOND precision, while
-    // comms.messages.created_at keeps Postgres MICROSECOND precision. A strict
+    // tenant.message.created_at keeps Postgres MICROSECOND precision. A strict
     // `created_at > $2` then treats the turn's own newest message as "newer"
     // (e.g. .62592 > .625), so the turn supersedes + re-queues forever. Excluding
     // the turn's source message ids makes the check precision-immune: a genuinely
     // newer message is one that is not already part of this turn.
     const { rows } = await this.pg.query(
       `SELECT 1
-         FROM comms.messages
-        WHERE conversation_id = $1 AND role = 'user' AND created_at > $2
+         FROM tenant.message
+        WHERE conversation_id = $1 AND sender = 'user' AND created_at > $2
           AND id <> ALL ($3::uuid[])
         LIMIT 1`,
       [conversationId, afterTimestamp, excludeMessageIds],
@@ -145,7 +145,7 @@ export class ConversationTurnsRepository {
   async findActiveTurn(conversationId: string): Promise<TurnRecord | null> {
     const { rows } = await this.pg.query<TurnRow>(
       `SELECT ${TURN_COLUMNS}
-         FROM comms.conversation_turns
+         FROM runtime.conversation_turn
         WHERE conversation_id = $1 AND status IN ('pending', 'processing')
         ORDER BY created_at DESC
         LIMIT 1`,
@@ -156,7 +156,7 @@ export class ConversationTurnsRepository {
 
   async loadTurn(turnId: string): Promise<TurnRecord | null> {
     const { rows } = await this.pg.query<TurnRow>(
-      `SELECT ${TURN_COLUMNS} FROM comms.conversation_turns WHERE id = $1`,
+      `SELECT ${TURN_COLUMNS} FROM runtime.conversation_turn WHERE id = $1`,
       [turnId],
     );
     return rows[0] ? mapTurn(rows[0]) : null;
@@ -186,7 +186,7 @@ export class ConversationTurnsRepository {
 
     if (params.existingTurnId) {
       const { rows } = await this.pg.query<TurnRow>(
-        `UPDATE comms.conversation_turns SET
+        `UPDATE runtime.conversation_turn SET
             tenant_id = $1::uuid, conversation_id = $2::uuid, person_id = $3::uuid,
             status = $4, source_message_ids = $5::uuid[], merged_user_text = $6,
             integrity_decision = $7, integrity_reason = $8, base_state_version = $9,
@@ -203,7 +203,7 @@ export class ConversationTurnsRepository {
     }
 
     const { rows } = await this.pg.query<TurnRow>(
-      `INSERT INTO comms.conversation_turns
+      `INSERT INTO runtime.conversation_turn
          (tenant_id, conversation_id, person_id, status, source_message_ids,
           merged_user_text, integrity_decision, integrity_reason, base_state_version,
           first_message_at, last_message_at, hold_until, released_at, extracted_intent,
@@ -220,7 +220,7 @@ export class ConversationTurnsRepository {
   /** Supersede every OTHER active turn for the conversation. */
   async supersedeOtherTurns(conversationId: string, keepTurnId: string): Promise<void> {
     await this.pg.query(
-      `UPDATE comms.conversation_turns
+      `UPDATE runtime.conversation_turn
           SET status = 'superseded',
               integrity_decision = 'cancel',
               integrity_reason = 'superseded_by_newer_turn',

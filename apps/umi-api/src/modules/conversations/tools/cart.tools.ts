@@ -24,7 +24,7 @@ import { needsInputToolError, retryableToolError, terminalToolError } from './to
 /**
  * Cart tools: add_to_cart + edit_cart. Ported from `tools.ts`; product reads
  * rebound to ProductsRepository, draft cart to ConversationsRepository
- * (`comms.conversations.draft_cart` + CAS on `draft_cart_version`). The legacy
+ * (`runtime.conversation_state.draft_cart` + CAS on `draft_cart_version`). The legacy
  * partial-order seed (kds.tickets) is deferred to Phase 4 → no seed here.
  * Money is PESOS (tool unit).
  */

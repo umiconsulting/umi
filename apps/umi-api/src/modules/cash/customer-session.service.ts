@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SignJWT } from 'jose';
@@ -10,7 +10,10 @@ import type { AppConfig } from '../../shared/config/config.schema';
  * customer access (24h, {sub, role, tenantId}) + refresh (30d, {sub}) JWTs with
  * the SAME `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET` umi-cash uses (so the token
  * works on umi-cash's customer endpoints during coexistence) and persists the
- * refresh token to `core.sessions`. Distinct from the dashboard staff JWT.
+ * refresh token's SHA-256 HASH to `runtime.session` (build-v2 stores `token_hash`,
+ * not the raw token — readers hash-on-lookup). A CUSTOMER session's principal is
+ * `principal_type='person'` + `principal_id` = the `tenant.customer.id`; a staff
+ * session is `principal_type='user'`. Distinct from the dashboard staff JWT.
  */
 @Injectable()
 export class CustomerSessionService {
@@ -36,8 +39,8 @@ export class CustomerSessionService {
       throw new Error('JWT_ACCESS_SECRET/JWT_REFRESH_SECRET not configured.');
     }
     // jti makes each token unique even for the same subject within the same
-    // second — without it two sessions collide on core.sessions.token's UNIQUE
-    // index (e.g. a double-submitted registration), 500ing instead of 409ing.
+    // second — without it two sessions collide on runtime.session.token_hash's
+    // UNIQUE index (e.g. a double-submitted registration), 500ing instead of 409ing.
     const accessToken = await new SignJWT({ sub: subjectId, role, tenantId })
       .setProtectedHeader({ alg: 'HS256' })
       .setJti(randomUUID())
@@ -53,15 +56,17 @@ export class CustomerSessionService {
 
     const isCustomer = role === 'CUSTOMER';
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
     await this.pg.query(
-      `INSERT INTO core.sessions (tenant_id, token, expires_at, user_id, person_id)
-       VALUES ($1::uuid, $2, $3, $4::uuid, $5::uuid)`,
+      `INSERT INTO runtime.session
+         (tenant_id, principal_type, principal_id, token_hash, expires_at, is_active)
+       VALUES ($1::uuid, $2, $3::uuid, $4, $5, true)`,
       [
         tenantId,
-        refreshToken,
+        isCustomer ? 'person' : 'user',
+        subjectId,
+        tokenHash,
         expiresAt,
-        isCustomer ? null : subjectId,
-        isCustomer ? subjectId : null,
       ],
     );
     return { accessToken, refreshToken };

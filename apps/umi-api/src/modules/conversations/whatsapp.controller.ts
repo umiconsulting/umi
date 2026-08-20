@@ -24,7 +24,7 @@ import { MessagesRepository, DUPLICATE_MESSAGE } from './messages.repository';
  * Twilio WhatsApp webhook ingress (spec §8.2). Port of `whatsapp-handler/index.ts`.
  * Validates the HMAC-SHA1 signature against the RAW form body (Fastify
  * form-urlencoded raw-body parser, registered in main.ts), resolves tenant +
- * identity, gates duplicates via `queue.inbound_events`, persists the user
+ * identity, gates duplicates via `runtime.inbound_events`, persists the user
  * message, enqueues `turn.integrity` (MessageSid = deterministic jobId), and
  * returns empty TwiML fast — the real reply arrives async via the outbound
  * processor. All heavy work is off the request path.
@@ -101,7 +101,7 @@ export class WhatsappController {
     }
     const { tenantId, locationId } = resolved;
 
-    // ── Identity (creates core.people + contact_methods idempotently) ──
+    // ── Identity: resolve-or-create tenant.customer (federated graph) ──
     const personId = await this.identity.resolveContact({
       tenantId,
       kind: 'whatsapp',
@@ -143,11 +143,11 @@ export class WhatsappController {
 
     const message = sanitizeInput(rawMessage);
 
-    // ── Ingress observability gate (queue.inbound_events UNIQUE(provider, event id)) ──
+    // ── Ingress observability gate (runtime.inbound_events UNIQUE(provider, event id)) ──
     // NOTE: this is NOT the authoritative dedup. It commits before the message
     // insert + enqueue, so hard-dropping on its `duplicate` flag would strand a
     // first attempt that crashed mid-flight (gate written, work not done). The
-    // durable, idempotent guards are below: comms.messages.twilio_message_sid
+    // durable, idempotent guards are below: tenant.message.twilio_message_sid
     // (UNIQUE) → DUPLICATE_MESSAGE, and the enqueue jobId=messageSid (BullMQ drops
     // a re-add). So we log a duplicate here and continue; the message-level dedup
     // is what actually prevents a double turn.

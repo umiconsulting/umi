@@ -9,7 +9,7 @@ import {
 } from './tools/product-search';
 
 /**
- * `ops.products` catalog access for the bot. Rebound from the legacy Supabase
+ * `tenant.product` catalog access for the bot. Rebound from the legacy Supabase
  * RPCs (`search_products_text`/`search_products_by_embedding`, which don't exist
  * canonically) to direct SQL: ILIKE waterfall (ranked in TS) → pgvector cosine
  * fallback (preflight §3/§4). Worker pool (unauthenticated WhatsApp path).
@@ -29,8 +29,8 @@ interface ProductRow {
 
 const SELECT = `p.id::text, p.name, p.price_cents, p.description,
   pc.name AS category_name, p.variants`;
-const FROM = `FROM ops.products p
-  LEFT JOIN ops.product_categories pc ON pc.id = p.category_id`;
+const FROM = `FROM tenant.product p
+  LEFT JOIN tenant.product_category pc ON pc.id = p.category_id`;
 
 function mapRow(r: ProductRow): ProductRecord {
   return {
@@ -160,8 +160,8 @@ export class ProductsRepository {
   async categorySuggestions(tenantId: string): Promise<string[]> {
     const { rows } = await this.pg.query<{ name: string | null }>(
       `SELECT DISTINCT pc.name
-         FROM ops.products p
-         JOIN ops.product_categories pc ON pc.id = p.category_id
+         FROM tenant.product p
+         JOIN tenant.product_category pc ON pc.id = p.category_id
         WHERE p.tenant_id = $1::uuid AND p.is_available = true`,
       [tenantId],
     );
@@ -202,7 +202,7 @@ export class ProductsRepository {
 
   async updateNameEmbedding(id: string, embedding: number[], model: string): Promise<void> {
     await this.pg.query(
-      `UPDATE ops.products SET name_embedding = $2::vector, embedding_model = $3, updated_at = now()
+      `UPDATE tenant.product SET name_embedding = $2::vector, embedding_model = $3, updated_at = now()
         WHERE id = $1::uuid`,
       [id, JSON.stringify(embedding), model],
     );
@@ -215,7 +215,7 @@ export class ProductsRepository {
     if (!name || !name.trim()) return null;
     const key = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'uncategorized';
     const { rows } = await this.pg.query<{ id: string }>(
-      `INSERT INTO ops.product_categories (tenant_id, key, name, sort_order, metadata)
+      `INSERT INTO tenant.product_category (tenant_id, key, name, sort_order, metadata)
        VALUES ($1::uuid, $2, $3, 0, '{}'::jsonb)
        ON CONFLICT (tenant_id, key) DO UPDATE SET name = EXCLUDED.name, updated_at = now()
        RETURNING id::text`,
@@ -244,13 +244,13 @@ export class ProductsRepository {
   ): Promise<void> {
     const variantsJson = JSON.stringify(p.variants);
     const existing = await this.pg.query<{ id: string }>(
-      `SELECT id::text FROM ops.products
+      `SELECT id::text FROM tenant.product
         WHERE tenant_id = $1::uuid AND metadata->>'zettle_uuid' = $2 LIMIT 1`,
       [tenantId, p.zettleUuid],
     );
     if (existing.rows[0]) {
       await this.pg.query(
-        `UPDATE ops.products SET
+        `UPDATE tenant.product SET
             name = $3, description = $4, category_id = $5::uuid, price_cents = $6,
             variants = $7::jsonb, is_available = $8, synced_at = now(), updated_at = now(),
             name_embedding = CASE
@@ -263,7 +263,7 @@ export class ProductsRepository {
       return;
     }
     await this.pg.query(
-      `INSERT INTO ops.products
+      `INSERT INTO tenant.product
          (tenant_id, category_id, name, description, price_cents, is_available, variants, synced_at, metadata)
        VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7::jsonb, now(),
                jsonb_build_object('zettle_uuid', $8, 'source', 'zettle'))`,
@@ -274,7 +274,7 @@ export class ProductsRepository {
   /** Mark Zettle-sourced products absent from the latest sync as unavailable. */
   async markUnavailableExcept(tenantId: string, zettleUuids: string[]): Promise<void> {
     await this.pg.query(
-      `UPDATE ops.products SET is_available = false, updated_at = now()
+      `UPDATE tenant.product SET is_available = false, updated_at = now()
         WHERE tenant_id = $1::uuid
           AND metadata->>'zettle_uuid' IS NOT NULL
           AND NOT (metadata->>'zettle_uuid' = ANY($2::text[]))`,

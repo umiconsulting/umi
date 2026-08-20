@@ -34,7 +34,7 @@ export interface JourneySummary {
  * Scheduled lifecycle journeys (3d-lifecycle) — the WhatsApp half of the legacy
  * `cash-cron.ts`. Each journey iterates active tenants, finds eligible cards on
  * the canonical loyalty schema, renders the tenant's copy, claims the send in
- * `loyalty.lifecycle_sends` (durable dedup), then enqueues `whatsapp.lifecycle`
+ * `runtime.nudge_sent` (durable dedup), then enqueues `whatsapp.lifecycle`
  * to the outbound queue for delivery. WhatsApp-only — the wallet-push journeys
  * (birthday issuance, expire, goal-proximity) stay in umi-cash.
  */

@@ -3,8 +3,8 @@ import { PgService } from '../../shared/database/pg.service';
 
 /**
  * Per-business voice + operating config. Ported from `_shared/business-config.ts`
- * and rebound to the canonical `ops.businesses` row (`config` jsonb), per the
- * preflight §3 — legacy `businesses.config.voice` is the same shape. Read on the
+ * and rebound to the `tenant.business` row (`config` jsonb) — legacy
+ * `businesses.config.voice` is the same shape. Read on the
  * worker pool: the WhatsApp path is unauthenticated (no member user → no RLS
  * tenant context), and every query carries an explicit `tenant_id` predicate.
  *
@@ -150,7 +150,7 @@ export class BusinessConfigService {
 
   /**
    * Load the tenant's business config row (the single business per tenant in the
-   * current model). Returns null when the tenant has no `ops.businesses` row.
+   * current model). Returns null when the tenant has no `tenant.business` row.
    */
   async fetchConfigRow(tenantId: string): Promise<BusinessConfigRow | null> {
     const { rows } = await this.pg.query<{
@@ -159,7 +159,7 @@ export class BusinessConfigService {
       config: BusinessConfig | null;
     }>(
       `SELECT id::text, name, config
-         FROM ops.businesses
+         FROM tenant.business
         WHERE tenant_id = $1
         ORDER BY created_at ASC
         LIMIT 1`,

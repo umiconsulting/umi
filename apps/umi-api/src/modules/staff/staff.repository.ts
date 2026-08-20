@@ -16,7 +16,7 @@ export interface StaffRow {
 }
 
 // The role/permissions/invited/disabled columns aren't stored on
-// core.staff_members — role is derived from name, the rest are DTO-synthesized.
+// tenant.staff — role is derived from name, the rest are DTO-synthesized.
 // Kept identical to server.js so the dashboard renders unchanged.
 const PROJECTION = `
   id::text,
@@ -38,7 +38,7 @@ export class StaffRepository {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<StaffRow>(
         `SELECT ${PROJECTION}, NULL::timestamptz AS "disabledAt"
-         FROM core.staff_members
+         FROM tenant.staff
          WHERE tenant_id = $1::uuid
          ORDER BY
            CASE WHEN lower(name) = 'admin' THEN 0 ELSE 1 END,
@@ -57,7 +57,7 @@ export class StaffRepository {
   ): Promise<StaffRow> {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<StaffRow>(
-        `INSERT INTO core.staff_members (tenant_id, location_id, name, phone, email, status)
+        `INSERT INTO tenant.staff (tenant_id, branch_id, name, phone, email, status)
          VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6)
          RETURNING ${PROJECTION}, NULL::timestamptz AS "disabledAt"`,
         [tenantId, locationId, data.name, data.phone, data.email, data.status],
@@ -78,7 +78,7 @@ export class StaffRepository {
   ): Promise<StaffRow | null> {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<StaffRow>(
-        `UPDATE core.staff_members
+        `UPDATE tenant.staff
          SET name = COALESCE($3, name),
              phone = CASE WHEN $4::boolean THEN $5 ELSE phone END,
              email = CASE WHEN $6::boolean THEN $7 ELSE email END,
@@ -105,7 +105,7 @@ export class StaffRepository {
   async softDelete(tenantId: string, staffId: string): Promise<boolean> {
     const { rows } = await this.pg.withTenant((c) =>
       c.query<{ id: string }>(
-        `UPDATE core.staff_members
+        `UPDATE tenant.staff
          SET status = 'disabled', updated_at = now()
          WHERE id = $2::uuid AND tenant_id = $1::uuid
          RETURNING id::text`,

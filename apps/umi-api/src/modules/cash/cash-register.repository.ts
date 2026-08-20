@@ -1,35 +1,43 @@
 import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
+import { IdentityResolver } from '../identity/identity.resolver';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>;
 
 export interface RegisterTenantConfig {
   name: string;
-  programId: string | null;
   cardPrefix: string | null;
   selfRegistration: boolean | null;
+  /** build-v2 is program-less — loyalty is "configured" iff a settings row exists. */
+  loyaltyConfigured: boolean;
 }
 
 /**
- * Customer registration reads/writes. Person identity goes through the canonical
- * `core.resolve_contact`/`normalize_phone` RPCs (single normalizer shared with
- * the migration); account/card creation is one tenant transaction. Ported from
- * umi-cash customers/route.ts.
+ * Customer registration reads/writes (build-v2). Identity goes through the
+ * canonical {@link IdentityResolver} (deterministic contact/contact_identity/
+ * customer graph, replacing `core.resolve_contact`). Loyalty is PROGRAM-LESS:
+ * `loyalty.accounts`/`loyalty.programs` are gone — a card keys directly on
+ * `tenant.customer.id`, and per-tenant loyalty config lives in
+ * `tenant.loyalty_settings`. The returned `personId` is the `tenant.customer.id`
+ * (also the customer session principal). Ported from umi-cash customers/route.ts.
  */
 @Injectable()
 export class CashRegisterRepository {
-  constructor(private readonly pg: PgService) {}
+  constructor(
+    private readonly pg: PgService,
+    private readonly resolver: IdentityResolver,
+  ) {}
 
   async tenantConfig(tenantId: string): Promise<RegisterTenantConfig | null> {
     const { rows } = await this.pg.workerTx((c) =>
       c.query<Row>(
         `SELECT t.name,
-                p.id::text         AS program_id,
-                p.card_prefix      AS card_prefix,
-                p.self_registration AS self_registration
-         FROM core.tenants AS t
-         LEFT JOIN loyalty.programs AS p ON p.tenant_id = t.id
+                ls.card_prefix       AS card_prefix,
+                ls.self_registration AS self_registration,
+                (ls.id IS NOT NULL)  AS loyalty_configured
+         FROM tenant.tenant AS t
+         LEFT JOIN tenant.loyalty_settings AS ls ON ls.tenant_id = t.id
          WHERE t.id = $1::uuid LIMIT 1`,
         [tenantId],
       ),
@@ -38,60 +46,67 @@ export class CashRegisterRepository {
     if (!r) return null;
     return {
       name: r.name,
-      programId: r.program_id,
       cardPrefix: r.card_prefix,
       selfRegistration: r.self_registration,
+      loyaltyConfigured: !!r.loyalty_configured,
     };
   }
 
   async normalizePhone(raw: string): Promise<string | null> {
     const { rows } = await this.pg.workerTx((c) =>
-      c.query<{ n: string | null }>(`SELECT core.normalize_phone($1) AS n`, [raw]),
+      c.query<{ n: string | null }>(`SELECT tenant.normalize_phone($1) AS n`, [raw]),
     );
     return rows[0]?.n ?? null;
   }
 
-  /** Existing person + whether they already hold a card in this program. */
+  /**
+   * Existing customer + whether they already hold an active card. Looks the
+   * customer up by the phone-family (e164) normalized value across the identity
+   * spine, so a WhatsApp-only contact and a cash-phone contact resolve to the same
+   * customer (the resolver's cross-channel unification).
+   */
   async findExisting(
     tenantId: string,
     normalizedPhone: string,
-    programId: string,
   ): Promise<{ personId: string; displayName: string | null; hasCard: boolean } | null> {
-    return this.pg.workerTx(async (c) => {
-      const person = (
-        await c.query<Row>(
-          `SELECT id::text, display_name FROM core.people
-           WHERE tenant_id=$1::uuid AND normalized_phone=$2 LIMIT 1`,
-          [tenantId, normalizedPhone],
-        )
-      ).rows[0];
-      if (!person) return null;
-      const card = (
-        await c.query<Row>(
-          `SELECT c.id FROM loyalty.cards c
-           JOIN loyalty.accounts a ON a.id=c.account_id
-           WHERE c.tenant_id=$1::uuid AND a.person_id=$2::uuid AND a.program_id=$3::uuid
-           LIMIT 1`,
-          [tenantId, person.id, programId],
-        )
-      ).rows[0];
-      return { personId: person.id, displayName: person.display_name, hasCard: !!card };
-    });
+    const { rows } = await this.pg.query<Row>(
+      `SELECT cu.id::text  AS person_id,
+              cu.name      AS display_name,
+              EXISTS (
+                SELECT 1 FROM tenant.card ca
+                 WHERE ca.tenant_id = cu.tenant_id
+                   AND ca.customer_id = cu.id
+                   AND ca.status = 'active'
+              )            AS has_card
+         FROM tenant.contact_identity ci
+         JOIN tenant.channel ch  ON ch.id = ci.channel_id
+         JOIN tenant.customer cu ON cu.tenant_id = ci.tenant_id AND cu.contact_id = ci.contact_id
+        WHERE ci.tenant_id = $1::uuid
+          AND ci.normalized_value = $2
+          AND ch.normalization_rule = 'e164'
+        ORDER BY ci.is_primary DESC, ci.last_seen_at DESC
+        LIMIT 1`,
+      [tenantId, normalizedPhone],
+    );
+    const r = rows[0];
+    if (!r) return null;
+    return { personId: r.person_id, displayName: r.display_name, hasCard: !!r.has_card };
   }
 
-  /** Find-or-create the person via core.resolve_contact (raw phone in). */
+  /** Find-or-create the customer via the identity resolver (raw phone in). */
   async resolveContact(
     tenantId: string,
     rawPhone: string,
     displayName: string,
   ): Promise<string> {
-    const { rows } = await this.pg.workerTx((c) =>
-      c.query<{ person_id: string }>(
-        `SELECT core.resolve_contact($1::uuid, 'phone', $2, $3, 'umi-cash', NULL) AS person_id`,
-        [tenantId, rawPhone, displayName],
-      ),
-    );
-    return rows[0].person_id;
+    const resolved = await this.resolver.resolveIdentity({
+      tenantId,
+      channelKey: 'phone',
+      rawValue: rawPhone,
+      displayName,
+      collectedVia: 'umi-cash',
+    });
+    return resolved.customerId;
   }
 
   async updatePerson(
@@ -100,54 +115,38 @@ export class CashRegisterRepository {
     birthDate: string,
     metadata: Record<string, unknown>,
   ): Promise<void> {
-    await this.pg.workerTx((c) =>
-      c.query(
-        `UPDATE core.people
-         SET display_name=$2, birth_date=$3::date, metadata=$4::jsonb, updated_at=now()
-         WHERE id=$1::uuid`,
-        [personId, name, birthDate, JSON.stringify(metadata)],
-      ),
+    await this.pg.query(
+      `UPDATE tenant.customer
+          SET name = $2, born_at = $3::date, metadata = $4::jsonb, updated_at = now()
+        WHERE id = $1::uuid`,
+      [personId, name, birthDate, JSON.stringify(metadata)],
     );
   }
 
-  /** Account find-or-create + a fresh card, in one transaction. */
-  async createAccountCard(input: {
+  /**
+   * Find-or-create a fresh loyalty card for the customer, in one transaction. No
+   * account/program layer any more — the card keys straight on `customer_id`.
+   * Idempotent: a customer already holding an active card gets it back rather than
+   * a second card (re-registration with the same phone).
+   */
+  async createCard(input: {
     tenantId: string;
     personId: string;
-    programId: string;
     cardNumber: string;
     qrToken: string;
   }): Promise<{ cardId: string; cardNumber: string }> {
     return this.pg.workerTx(async (c) => {
-      // Serialize concurrent/duplicate registrations for the same identity so the
-      // find-or-create below can't race into duplicate accounts or cards.
+      // Serialize concurrent/duplicate registrations for the same customer so the
+      // find-or-create below can't race into duplicate cards.
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
-        `register:${input.tenantId}:${input.personId}:${input.programId}`,
+        `register:${input.tenantId}:${input.personId}`,
       ]);
-      let accountId = (
-        await c.query<{ id: string }>(
-          `SELECT id::text FROM loyalty.accounts
-           WHERE tenant_id=$1::uuid AND person_id=$2::uuid AND program_id=$3::uuid LIMIT 1`,
-          [input.tenantId, input.personId, input.programId],
-        )
-      ).rows[0]?.id;
-      if (!accountId) {
-        accountId = (
-          await c.query<{ id: string }>(
-            `INSERT INTO loyalty.accounts (tenant_id, person_id, program_id, status)
-             VALUES ($1::uuid, $2::uuid, $3::uuid, 'active') RETURNING id::text`,
-            [input.tenantId, input.personId, input.programId],
-          )
-        ).rows[0].id;
-      }
-      // Idempotent: a person already holding an active card on this account gets
-      // it back rather than a second card (re-registration with the same phone).
       const existing = (
         await c.query<{ id: string; card_number: string }>(
-          `SELECT id::text, card_number FROM loyalty.cards
-           WHERE tenant_id=$1::uuid AND account_id=$2::uuid AND status='active'
+          `SELECT id::text, card_number FROM tenant.card
+           WHERE tenant_id=$1::uuid AND customer_id=$2::uuid AND status='active'
            ORDER BY created_at LIMIT 1`,
-          [input.tenantId, accountId],
+          [input.tenantId, input.personId],
         )
       ).rows[0];
       if (existing) {
@@ -155,11 +154,11 @@ export class CashRegisterRepository {
       }
       const card = (
         await c.query<{ id: string; card_number: string }>(
-          `INSERT INTO loyalty.cards
-             (tenant_id, account_id, card_number, qr_token, qr_issued_at, status, visits_this_cycle, total_visits)
-           VALUES ($1::uuid, $2::uuid, $3, $4, now(), 'active', 0, 0)
+          `INSERT INTO tenant.card
+             (tenant_id, customer_id, card_number, qr_token, qr_issued_at, status)
+           VALUES ($1::uuid, $2::uuid, $3, $4, now(), 'active')
            RETURNING id::text, card_number`,
-          [input.tenantId, accountId, input.cardNumber, input.qrToken],
+          [input.tenantId, input.personId, input.cardNumber, input.qrToken],
         )
       ).rows[0];
       return { cardId: card.id, cardNumber: card.card_number };

@@ -10,7 +10,7 @@ import { toWhatsAppMarkdown } from '../shared/format/whatsapp';
 
 /**
  * Outbound queue consumer (Phase 3d) — the delivery side of the transactional
- * outbox. The relay drains `queue.outbox_events` into this queue; each job is a
+ * outbox. The relay drains `runtime.outbox_events` into this queue; each job is a
  * WhatsApp send via the Twilio adapter. `toWhatsAppMarkdown` is re-applied here
  * (it was dropped in the Phase-1 adapter port; preflight §8). A null adapter
  * result throws → BullMQ retries (outbound attempts=5) → dead-letter.

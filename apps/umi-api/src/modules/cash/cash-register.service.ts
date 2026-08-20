@@ -24,8 +24,8 @@ export interface RegisterInput {
 }
 
 /**
- * Customer self-registration → creates the person (core.resolve_contact),
- * loyalty account + card, and a CUSTOMER session. Ported from umi-cash
+ * Customer self-registration → resolves the customer (identity resolver),
+ * mints a loyalty card, and a CUSTOMER session. Ported from umi-cash
  * customers/route.ts including the "already registered" 409-with-session path.
  */
 @Injectable()
@@ -42,7 +42,7 @@ export class CashRegisterService {
     if (!cfg.selfRegistration) {
       throw new ForbiddenException({ error: 'El registro no está disponible' });
     }
-    if (!cfg.programId) {
+    if (!cfg.loyaltyConfigured) {
       throw new HttpException({ error: 'Programa de lealtad no configurado' }, 500);
     }
 
@@ -51,7 +51,7 @@ export class CashRegisterService {
       throw new BadRequestException({ error: 'Número de teléfono no válido' });
     }
 
-    const existing = await this.repo.findExisting(tenantId, normalized, cfg.programId);
+    const existing = await this.repo.findExisting(tenantId, normalized);
     if (existing && existing.hasCard) {
       const { accessToken } = await this.session.createSession(
         existing.personId,
@@ -75,10 +75,9 @@ export class CashRegisterService {
     let created: { cardId: string; cardNumber: string } | null = null;
     for (let attempt = 0; attempt < 5 && !created; attempt++) {
       try {
-        created = await this.repo.createAccountCard({
+        created = await this.repo.createCard({
           tenantId,
           personId,
-          programId: cfg.programId,
           cardNumber: generateCardNumber(cfg.cardPrefix),
           qrToken: this.qr.generateRandomToken(),
         });

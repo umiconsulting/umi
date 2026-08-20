@@ -22,7 +22,7 @@ function serviceWithRepo() {
 }
 
 describe('DeadLetterService', () => {
-  it('persists a tenant-scoped job to queue.dead_letters', async () => {
+  it('persists a tenant-scoped job to runtime.dead_letters', async () => {
     const { svc, repo } = serviceWithRepo();
     await svc.recordTerminalFailure(
       makeJob({ data: { tenant_id: 't1', foo: 1 }, attemptsMade: 3 }),

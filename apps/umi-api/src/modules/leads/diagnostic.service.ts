@@ -7,7 +7,7 @@ import { SequencesService } from './sequences.service';
  *   - `calculateDiagnostic` (the landing `/api/diagnostic` route) → `score()`
  *   - `DiagnosticTrigger.processDiagnostic` → `process()`
  *
- * On submission we score the answers, upsert the prospect into `grow.leads`,
+ * On submission we score the answers, upsert the prospect into `umi.prospect`,
  * append a `diagnostic_completed` event, and fire the day-0 welcome (idempotent,
  * flag-gated in SequencesService).
  */

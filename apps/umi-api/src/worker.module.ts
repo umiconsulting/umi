@@ -16,6 +16,7 @@ import { LeadsScheduler } from './jobs/leads.scheduler';
 import { OutboxRoutesRegistrar } from './jobs/outbox-routes';
 import { DeadLetterService } from './jobs/dead-letter.service';
 import { OutboxRelayService } from './jobs/outbox-relay.service';
+import { IdentityModule } from './modules/identity/identity.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { LifecycleModule } from './modules/lifecycle/lifecycle.module';
 import { LeadsModule } from './modules/leads/leads.module';
@@ -36,6 +37,7 @@ import { LeadsModule } from './modules/leads/leads.module';
     // engine transitively needs PasswordService from this layer.
     SharedAuthModule,
     QueueModule,
+    IdentityModule,
     ConversationsModule,
     LifecycleModule,
     LeadsModule,

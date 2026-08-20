@@ -12,8 +12,8 @@ export interface EnqueueOptions {
    * turn_id for a reply, `cardId:journey:date` for a lifecycle nudge). Any ':' is
    * sanitized to '_' before enqueue (BullMQ forbids it in custom ids). BullMQ
    * drops a duplicate enqueue while a job with this id still exists. For durable
-   * cross-restart idempotency, pair this with the `queue.inbound_events` gate or
-   * a `queue.outbox_events` UNIQUE(idempotency_key) row (see QueueRepository).
+   * cross-restart idempotency, pair this with the `runtime.inbound_events` gate or
+   * a `runtime.outbox_events` UNIQUE(idempotency_key) row (see QueueRepository).
    */
   jobId?: string;
   /** Delay before the job becomes eligible (ms). Used for debounce/backoff. */

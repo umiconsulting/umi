@@ -7,7 +7,7 @@
  * `business_id → tenant_id`, `body → content`.
  */
 
-/** A single line item in the conversation's draft cart (`comms.conversations.draft_cart`). */
+/** A single line item in the conversation's draft cart (`runtime.conversation_state.draft_cart`). */
 export interface DraftCartItem {
   product_id: string;
   product_name: string;

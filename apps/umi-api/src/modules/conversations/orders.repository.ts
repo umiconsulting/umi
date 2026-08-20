@@ -3,8 +3,16 @@ import { PgService } from '../../shared/database/pg.service';
 import type { DraftCartItem } from './conversation.types';
 
 /**
- * `ops.orders` + `ops.order_items` writes/reads for the bot checkout. Replaces
- * the legacy `transactions` table. Worker pool (unauthenticated WhatsApp path).
+ * `tenant."order"` + `tenant.order_item` writes/reads for the bot checkout
+ * (build-v2; was `ops.orders`/`ops.order_items`). Worker pool (unauthenticated
+ * WhatsApp path).
+ *
+ * De-overload: the order's former `kitchen_status` and cancellation columns MOVED
+ * to the `tenant.order_event` lifecycle journal. Creating an order therefore also
+ * appends a `kitchen`/`new` event (so the KDS projection surfaces the ticket), and
+ * cancelling appends a `cancellation` event; per-line `kitchen_status` stays on
+ * `order_item`. `person_id → customer_id`, `location_id → branch_id`, and the
+ * free-form `channel`/`source` collapse onto `channel_id → tenant.channel`.
  *
  * Money boundary: the tool layer is in PESOS; this is where it converts to
  * CENTAVOS (`total_cents`, `unit_price_cents`). The `details` jsonb keeps a
@@ -61,14 +69,14 @@ export class OrdersRepository {
   constructor(private readonly pg: PgService) {}
 
   /**
-   * Create a confirmed WhatsApp order: `ops.orders` (status='pending',
-   * kitchen_status='new' → surfaces in v_kds_tickets) + `ops.order_items`, in one
-   * transaction. Idempotent on `source_transaction_id`: a retried turn returns the
-   * existing order (no duplicate items).
+   * Create a confirmed WhatsApp order: `tenant."order"` (status='pending') +
+   * `tenant.order_item` + a `tenant.order_event` (`kitchen`/`new` → surfaces in the
+   * KDS projection), in one transaction. Idempotent on `source_transaction_id`: a
+   * retried turn returns the existing order (no duplicate items or events).
    */
   async createOrder(params: CreateOrderParams): Promise<CreateOrderResult> {
     // Compute each line's cents ONCE, then sum for the header total — so
-    // ops.orders.total_cents always equals SUM(quantity * order_items.unit_price_cents)
+    // "order".total_cents always equals SUM(quantity * order_item.unit_price_cents)
     // (deriving the header from rounded pesos could drift by a centavo).
     const itemCents = params.items.map((it) => round(it.unit_price * 100));
     const totalCents = params.items.reduce((s, it, i) => s + it.quantity * itemCents[i], 0);
@@ -81,10 +89,12 @@ export class OrdersRepository {
 
     return this.pg.workerTx(async (client) => {
       const ins = await client.query<{ id: string }>(
-        `INSERT INTO ops.orders
-           (tenant_id, person_id, location_id, source, channel, status, kitchen_status,
+        `INSERT INTO tenant."order"
+           (tenant_id, customer_id, branch_id, channel_id, order_type, status,
             total_cents, details, pickup_person, notes, source_transaction_id, placed_at)
-         VALUES ($1::uuid, $2::uuid, $3::uuid, 'whatsapp', 'whatsapp', 'pending', 'new',
+         VALUES ($1::uuid, $2::uuid, $3::uuid,
+                 (SELECT id FROM tenant.channel WHERE key = 'whatsapp'),
+                 'whatsapp', 'pending',
                  $4, $5::jsonb, $6, $7, $8, now())
          ON CONFLICT (tenant_id, source_transaction_id) WHERE source_transaction_id IS NOT NULL
            DO NOTHING
@@ -104,7 +114,7 @@ export class OrdersRepository {
       if (!ins.rows.length) {
         // Idempotent hit: the order already exists for this turn.
         const existing = await client.query<{ id: string; total_cents: number }>(
-          `SELECT id::text, total_cents FROM ops.orders
+          `SELECT id::text, total_cents FROM tenant."order"
             WHERE tenant_id = $1::uuid AND source_transaction_id = $2`,
           [params.tenantId, params.sourceTransactionId],
         );
@@ -116,7 +126,7 @@ export class OrdersRepository {
       for (let i = 0; i < params.items.length; i++) {
         const it = params.items[i];
         await client.query(
-          `INSERT INTO ops.order_items
+          `INSERT INTO tenant.order_item
              (tenant_id, order_id, product_id, display_order, name, variant_name,
               quantity, unit_price_cents, kitchen_status)
            VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, 'new')`,
@@ -132,11 +142,23 @@ export class OrdersRepository {
           ],
         );
       }
+
+      // Open the kitchen lifecycle in the journal (the former ops.orders.kitchen_status
+      // = 'new'). idempotency_key makes a partial-commit replay a no-op.
+      await client.query(
+        `INSERT INTO tenant.order_event
+           (tenant_id, order_id, event_kind, new_status, kitchen_status, source, idempotency_key)
+         VALUES ($1::uuid, $2::uuid, 'kitchen', 'pending', 'new', 'conversaflow', $3)
+         ON CONFLICT (tenant_id, idempotency_key) WHERE idempotency_key IS NOT NULL
+           DO NOTHING`,
+        [params.tenantId, orderId, `${params.sourceTransactionId}:new`],
+      );
+
       return { orderId, total: totalCents / 100, created: true };
     });
   }
 
-  /** Recent orders for a person (newest first), with the PESOS items snapshot. */
+  /** Recent orders for a customer (newest first), with the PESOS items snapshot. */
   async recentOrders(tenantId: string, personId: string, limit: number): Promise<OrderSummary[]> {
     const safeLimit = Math.max(1, Math.min(Number(limit) || 3, 10));
     const { rows } = await this.pg.query<{
@@ -147,10 +169,16 @@ export class OrdersRepository {
       details: Record<string, unknown> | null;
       created_at: string;
     }>(
-      `SELECT id::text, status, kitchen_status, total_cents, details, created_at
-         FROM ops.orders
-        WHERE tenant_id = $1::uuid AND person_id = $2::uuid
-        ORDER BY COALESCE(placed_at, created_at) DESC
+      `SELECT o.id::text, o.status, o.total_cents, o.details, o.created_at,
+              (SELECT oe.kitchen_status
+                 FROM tenant.order_event oe
+                WHERE oe.tenant_id = o.tenant_id AND oe.order_id = o.id
+                  AND oe.kitchen_status IS NOT NULL
+                ORDER BY oe.occurred_at DESC
+                LIMIT 1) AS kitchen_status
+         FROM tenant."order" o
+        WHERE o.tenant_id = $1::uuid AND o.customer_id = $2::uuid
+        ORDER BY COALESCE(o.placed_at, o.created_at) DESC
         LIMIT $3`,
       [tenantId, personId, safeLimit],
     );
@@ -184,15 +212,27 @@ export class OrdersRepository {
     });
   }
 
-  /** Cancel an order (status + kitchen_status → cancelled, reason recorded). */
+  /**
+   * Cancel an order: flip `tenant."order".status` and append a `cancellation`
+   * event (`kitchen_status='cancelled'` + reason) to the journal. One transaction.
+   */
   async markCancelled(tenantId: string, orderId: string, reason: string): Promise<boolean> {
-    const res = await this.pg.query(
-      `UPDATE ops.orders
-          SET status = 'cancelled', kitchen_status = 'cancelled',
-              cancellation_reason = $3, updated_at = now()
-        WHERE tenant_id = $1::uuid AND id = $2::uuid`,
-      [tenantId, orderId, reason],
-    );
-    return (res.rowCount ?? 0) > 0;
+    return this.pg.workerTx(async (client) => {
+      const res = await client.query(
+        `UPDATE tenant."order"
+            SET status = 'cancelled', updated_at = now()
+          WHERE tenant_id = $1::uuid AND id = $2::uuid`,
+        [tenantId, orderId],
+      );
+      if ((res.rowCount ?? 0) === 0) return false;
+
+      await client.query(
+        `INSERT INTO tenant.order_event
+           (tenant_id, order_id, event_kind, new_status, kitchen_status, reason, source)
+         VALUES ($1::uuid, $2::uuid, 'cancellation', 'cancelled', 'cancelled', $3, 'conversaflow')`,
+        [tenantId, orderId, reason],
+      );
+      return true;
+    });
   }
 }

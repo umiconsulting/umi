@@ -4,7 +4,7 @@ import type { ToolContext, ToolResult } from '../turn.types';
 
 /**
  * Customer tools: get_recent_customer_orders. Ported from `tools.ts`; rebound
- * from the legacy `transactions` read to `ops.orders` (OrdersRepository). Money
+ * from the legacy `transactions` read to `tenant."order"` (OrdersRepository). Money
  * surfaced to the LLM in pesos (the `details` items snapshot unit).
  */
 @Injectable()

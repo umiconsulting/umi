@@ -10,8 +10,8 @@ import { TenantsRepository } from '../tenants/tenants.repository';
 /**
  * Business hours + ordering-window settings — the SINGLE source of truth shared
  * by the dashboard Hours screen and the WhatsApp bot. Weekly hours live in
- * `ops.business_hours` (HoursRepository), timezone in `core.tenants.timezone`
- * (TenantsRepository), ordering scalars in `ops.businesses.config`
+ * `tenant.open_hours` (HoursRepository), timezone in `tenant.tenant.timezone`
+ * (TenantsRepository), ordering scalars in `tenant.business.config`
  * (OrderingSettingsRepository). Nothing here is café-specific or hardcoded.
  */
 
@@ -49,7 +49,7 @@ export interface UpdateAllInput {
   ordering?: OrderingPatch;
 }
 
-/** Per-day window for the bot, sourced from ops.business_hours (dow 0=Sun..6=Sat). */
+/** Per-day window for the bot, sourced from tenant.open_hours (dow 0=Sun..6=Sat). */
 export interface BotDayWindow {
   dow: number;
   isClosed: boolean;
@@ -155,7 +155,7 @@ export class HoursService {
       await this.writeHours(tenantId, locationId, input.hours);
     }
     if (input.timezone) {
-      // Reuse the existing tenant-settings writer (core.tenants.timezone) — DRY.
+      // Reuse the existing tenant-settings writer (tenant.tenant.timezone) — DRY.
       await this.tenants.updateTenantSettings(tenantId, {
         timezone: input.timezone,
       });

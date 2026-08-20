@@ -6,7 +6,7 @@ import { PgService } from '../../shared/database/pg.service';
  * worker-pool transaction it:
  *   1. CAS-updates the conversation state (guards against a concurrent writer),
  *   2. inserts the assistant message,
- *   3. inserts the `queue.outbox_events` reply row (the OutboxRelay drains it to
+ *   3. inserts the `runtime.outbox_events` reply row (the OutboxRelay drains it to
  *      the outbound queue → Twilio send in Phase 3d).
  * If the CAS loses (another writer advanced state_version), the whole tx rolls
  * back and `committed=false` is returned — the caller supersedes + requeues. So a
@@ -47,7 +47,7 @@ export class TurnCommitRepository {
       //    committed row exists, and the relay drains every row, so the reply is
       //    (or will be) delivered exactly once.
       const ob = await client.query<{ id: string }>(
-        `INSERT INTO queue.outbox_events
+        `INSERT INTO runtime.outbox_events
            (tenant_id, event_type, aggregate_id, idempotency_key, payload)
          VALUES ($1, $2, $3, $4, $5::jsonb)
          ON CONFLICT (idempotency_key) DO NOTHING
@@ -64,16 +64,18 @@ export class TurnCommitRepository {
         return { committed: true, assistantMessageId: null, outboxId: null };
       }
 
-      // 2. CAS the conversation state. If a concurrent writer advanced it, the
-      //    whole tx (including the outbox claim above) rolls back and the caller
-      //    supersedes + requeues — never a half-commit.
+      // 2. CAS the conversation LIVE state (runtime.conversation_state). If a
+      //    concurrent writer advanced state_version, the whole tx (including the
+      //    outbox claim above) rolls back and the caller supersedes + requeues —
+      //    never a half-commit. The durable thread (tenant.conversation) is
+      //    touched separately below once the CAS holds.
       const cas = await client.query<{ id: string }>(
-        `UPDATE comms.conversations
+        `UPDATE runtime.conversation_state
             SET current_state = $2,
                 pending_clarification = $3::jsonb,
                 state_version = state_version + 1,
-                last_message_at = now()
-          WHERE id = $1 AND state_version = $4
+                updated_at = now()
+          WHERE conversation_id = $1 AND state_version = $4
           RETURNING id`,
         [
           params.conversationId,
@@ -84,13 +86,19 @@ export class TurnCommitRepository {
       );
       if (!cas.rows.length) return { committed: false };
 
+      // Touch the durable thread so listing/ordering by last_message_at stays fresh.
+      await client.query(
+        `UPDATE tenant.conversation SET last_message_at = now() WHERE id = $1`,
+        [params.conversationId],
+      );
+
       // 3. Persist the assistant message. Only now is the turn truly committed.
       const msg = await client.query<{ id: string }>(
-        `INSERT INTO comms.messages
-           (tenant_id, conversation_id, role, content, message_index)
+        `INSERT INTO tenant.message
+           (tenant_id, conversation_id, sender, body, message_index)
          VALUES ($1, $2, 'assistant', $3,
            (SELECT COALESCE(MAX(message_index) + 1, 0)
-              FROM comms.messages WHERE conversation_id = $2))
+              FROM tenant.message WHERE conversation_id = $2))
          RETURNING id`,
         [params.tenantId, params.conversationId, params.replyBody],
       );

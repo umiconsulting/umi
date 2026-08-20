@@ -11,7 +11,7 @@ import type { ProductVariant } from '../modules/conversations/tools/product-sear
 
 /**
  * Integrations queue consumer (Phase 3d) — `zettle.sync`. Pulls the Zettle
- * catalog via the adapter and upserts `ops.products` (rebound from the legacy
+ * catalog via the adapter and upserts `tenant.product` (rebound from the legacy
  * `transactions`/`products` columns): price_cents = Zettle minor units (centavos)
  * direct; variant prices = amount/100 (pesos, Zettle-native jsonb); category
  * get-or-create; absent products marked unavailable. Then enqueues `product.embed`

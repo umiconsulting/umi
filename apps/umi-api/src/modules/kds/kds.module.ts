@@ -18,7 +18,7 @@ import { KdsRepository } from './kds.repository';
  *     `KdsAdminController`: device management, board orders, transitions).
  *
  * Web-process only — transitions run on the request path and write
- * `queue.outbox_events`, which the existing OutboxRelay/OutboundProcessor (worker)
+ * `runtime.outbox_events`, which the existing OutboxRelay/OutboundProcessor (worker)
  * already deliver as `twilio.status_notification` / `twilio.cancel_notification`.
  */
 @Module({
