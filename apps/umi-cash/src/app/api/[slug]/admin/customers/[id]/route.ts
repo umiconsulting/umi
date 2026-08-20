@@ -44,7 +44,7 @@ export async function GET(
 
   const { visitsRequired } = rewardConfigDefaults(rewardConfig);
 
-  const [recentVisits, recentTransactions, ltvAgg, topupAgg, rewardsRedeemed] = await Promise.all([
+  const [recentVisits, recentTransactions, ltvAgg, topupAgg, rewardsRedeemed, recentRedemptions] = await Promise.all([
     prisma.visit_events.findMany({
       where: { tenant_id: tenant.id, loyalty_card_id: card.id },
       orderBy: { occurred_at: 'desc' },
@@ -71,6 +71,14 @@ export async function GET(
     prisma.reward_redemptions.count({
       where: { tenant_id: tenant.id, loyalty_card_id: card.id },
     }),
+    // The last redemptions themselves, so the count above can be read back as
+    // events. Same ledger as the count — the two can never disagree.
+    prisma.reward_redemptions.findMany({
+      where: { tenant_id: tenant.id, loyalty_card_id: card.id },
+      orderBy: { redeemed_at: 'desc' },
+      take: 10,
+      include: { staff_members: { select: { name: true } } },
+    }),
   ]);
 
   const ltvCentavos = Math.abs(ltvAgg._sum.amount_cents ?? 0);
@@ -94,6 +102,10 @@ export async function GET(
     ltvCentavos, ltvMXN: formatMXN(ltvCentavos),
     totalTopupCentavos, totalTopupMXN: formatMXN(totalTopupCentavos),
     recentVisits: recentVisits.map((v) => ({ id: v.id, scannedAt: v.occurred_at.toISOString() })),
+    recentRedemptions: recentRedemptions.map((r) => ({
+      id: r.id, redeemedAt: r.redeemed_at.toISOString(),
+      staffName: r.staff_members?.name ?? null, note: r.note,
+    })),
     recentTransactions: recentTransactions.map((t) => ({
       id: t.id, type: t.type, amountCentavos: t.amount_cents,
       description: t.description, createdAt: t.created_at.toISOString(),

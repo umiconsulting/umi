@@ -15,6 +15,7 @@ interface CustomerDetail {
   ltvCentavos: number; ltvMXN: string;
   totalTopupCentavos: number; totalTopupMXN: string;
   recentVisits: { id: string; scannedAt: string }[];
+  recentRedemptions: { id: string; redeemedAt: string; staffName: string | null; note: string | null }[];
   recentTransactions: { id: string; type: string; amountCentavos: number; description: string | null; createdAt: string }[];
 }
 
@@ -302,6 +303,43 @@ export default function CustomerDetailPage() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {customer.recentRedemptions?.length > 0 && (
+        <div className="u-surface p-5 mb-4">
+          <div className="u-eyebrow mb-3">Recompensas canjeadas</div>
+          <div className="space-y-2">
+            {customer.recentRedemptions.map((r) => (
+              <div key={r.id} className="flex items-center justify-between text-sm gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0"
+                    style={{
+                      background: 'color-mix(in oklab, var(--color-brand) 15%, white)',
+                      color: 'var(--color-brand-dark)',
+                    }}
+                  >
+                    ★
+                  </span>
+                  <span className="truncate" style={{ color: 'var(--color-ink)' }}>
+                    {r.note || 'Recompensa canjeada'}
+                    {r.staffName && (
+                      <span style={{ color: 'var(--color-ink-light)' }}> · {r.staffName}</span>
+                    )}
+                  </span>
+                </div>
+                <span className="shrink-0" style={{ color: 'var(--color-ink-light)' }}>
+                  {formatDateTimeMX(new Date(r.redeemedAt))}
+                </span>
+              </div>
+            ))}
+          </div>
+          {customer.rewardsRedeemed > customer.recentRedemptions.length && (
+            <p className="text-xs mt-3" style={{ color: 'var(--color-ink-light)' }}>
+              Se muestran las últimas {customer.recentRedemptions.length} de {customer.rewardsRedeemed}.
+            </p>
+          )}
         </div>
       )}
 
