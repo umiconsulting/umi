@@ -30,8 +30,8 @@
 --        a "was it sent / how recently" guard must not understate recency post-cutover.
 --   [C2] passes.status mapped defensively (disabled/archived → 'removed'); data is 100% 'active'
 --        today, but the raw copy would violate the target CHECK if that ever changes.
---   [C3] gift_card_ledger.reason else-location mapped defensively onto the target CHECK
---        (load→issue, expire→adjustment); only 'migration_initial_load' exists today.
+--   [C3] gift_card_ledger.reason now carries exactly. The target admits the source
+--        vocabulary plus the runtime writers (`load` and `redeem`).
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -145,43 +145,50 @@ from loyalty.birthday_rewards b;
 
 -- ----------------------------------------------------------------------------
 -- 4. gift_cards → merchant.loyalty_gift_card   (PRESERVE id; ledger FKs to it)
---    status: derived (redeemed_at null → 'active', else 'redeemed').
---    DROP: amount_cents/balance_cents (money → ledger; balance = SUM(delta)),
---    sender_name/message/recipient_* (1-row personalization, no build-v3 column),
---    expires_at/redeemed_loyalty_card_id (no column, all null).
+--    The clear code is bearer value. Carry only its digest and display-safe suffix.
+--    amount_cents is face value. Current value remains SUM(ledger.delta).
 -- ----------------------------------------------------------------------------
 insert into merchant.loyalty_gift_card
-  (id, merchant_id, code, status, issued_at, created_at)
+  (id, merchant_id, code_hash, masked_code, amount_cents,
+   created_by_staff_id, sender_name, message,
+   recipient_email, recipient_phone, recipient_name,
+   redeemed_at, redeemed_card_id, expires_at, issued_at, created_at)
 select
   g.id,
   g.tenant_id                                  as merchant_id,
-  g.code,
-  case when g.redeemed_at is not null then 'redeemed' else 'active' end as status,
+  extensions.digest(g.code, 'sha256')          as code_hash,
+  '••••-' || right(g.code, 4)                  as masked_code,
+  g.amount_cents,
+  g.created_by_staff_member_id,
+  g.sender_name,
+  g.message,
+  g.recipient_email,
+  g.recipient_phone,
+  g.recipient_name,
+  g.redeemed_at,
+  g.redeemed_loyalty_card_id,
+  g.expires_at,
   g.created_at                                 as issued_at,
   g.created_at
 from loyalty.gift_cards g;
 
 -- ----------------------------------------------------------------------------
 -- 5. gift_card_ledger → merchant.loyalty_gift_card_ledger
---    reason CHECK: source (migration_initial_load,load,redeem,adjustment,expire)
---    → target (issue,redeem,adjustment). [C3] defensive full mapping.
---    DROP: source_type/source_id/idempotency_key (no columns),
---    metadata {source_amount_centavos == delta, redundant}.
+--    Preserve each audit field. The target CHECK admits the source and Build v3 writers.
+--    DROP: metadata {source_amount_centavos == delta, redundant}.
 -- ----------------------------------------------------------------------------
 insert into merchant.loyalty_gift_card_ledger
-  (id, merchant_id, gift_card_id, delta, reason, occurred_at, created_at)
+  (id, merchant_id, gift_card_id, delta, reason,
+   source_type, source_id, idempotency_key, occurred_at, created_at)
 select
   gl.id,
   gl.tenant_id                                 as merchant_id,
   gl.gift_card_id,
   gl.delta::bigint,
-  case gl.reason
-    when 'migration_initial_load' then 'issue'
-    when 'load'                   then 'issue'
-    when 'redeem'                 then 'redeem'
-    when 'expire'                 then 'adjustment'
-    else 'adjustment'
-  end                                          as reason,
+  gl.reason,
+  gl.source_type,
+  gl.source_id,
+  gl.idempotency_key,
   gl.created_at                                as occurred_at,
   gl.created_at
 from loyalty.gift_card_ledger gl;

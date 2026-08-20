@@ -645,6 +645,9 @@ create table merchant.loyalty_card (
   issued_at            timestamptz not null default now(),
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now(),
+  -- Target for merchant-scoped child FKs. The UUID PK alone cannot prove that
+  -- the card and the child row belong to the same café.
+  unique (merchant_id, id),
   unique (merchant_id, card_number),
   unique (merchant_id, qr_token)
 );
@@ -803,24 +806,68 @@ create index loyalty_birthday_grant_active_idx
   where status = 'active';
 
 create table merchant.loyalty_gift_card (
-  id           uuid primary key default gen_random_uuid(),
-  merchant_id  uuid not null references merchant.merchant(id) on delete cascade,
-  code         text not null,
-  status       text not null default 'active' check (status in ('active','redeemed','void')),
-  issued_at    timestamptz not null default now(),
-  created_at   timestamptz not null default now(),
-  unique (merchant_id, code)
+  id                    uuid primary key default gen_random_uuid(),
+  merchant_id           uuid not null references merchant.merchant(id) on delete cascade,
+  -- The code is bearer value. Store its SHA-256 digest and a display-safe suffix.
+  -- The clear code exists only in the issue response and in the customer's URL.
+  code_hash             bytea not null,
+  masked_code           text not null check (masked_code ~ '^.{4}-[A-Z0-9]{4}$'),
+  -- Face value, not current value. Current value = SUM(gift-card ledger delta).
+  amount_cents          bigint not null check (amount_cents > 0),
+  created_by_staff_id   uuid,
+  sender_name           text,
+  message               text,
+  recipient_email       text,
+  recipient_phone       text,
+  recipient_name        text,
+  redeemed_at           timestamptz,
+  redeemed_card_id      uuid,
+  expires_at            timestamptz,
+  issued_at             timestamptz not null default now(),
+  created_at            timestamptz not null default now(),
+  unique (merchant_id, id),
+  unique (merchant_id, code_hash),
+  constraint loyalty_gift_card_staff_fk
+    foreign key (merchant_id, created_by_staff_id)
+    references merchant.staff (merchant_id, id),
+  constraint loyalty_gift_card_redeemed_card_fk
+    foreign key (merchant_id, redeemed_card_id)
+    references merchant.loyalty_card (merchant_id, id),
+  check (expires_at is null or expires_at > issued_at)
 );
+comment on table merchant.loyalty_gift_card is
+  'One-use bearer value. The clear code is never stored; remaining value derives from the ledger.';
+create index loyalty_gift_card_staff_idx
+  on merchant.loyalty_gift_card (merchant_id, created_by_staff_id)
+  where created_by_staff_id is not null;
+create index loyalty_gift_card_redeemed_card_idx
+  on merchant.loyalty_gift_card (merchant_id, redeemed_card_id)
+  where redeemed_card_id is not null;
+create index loyalty_gift_card_merchant_redeemed_idx
+  on merchant.loyalty_gift_card (merchant_id, redeemed_at);
 
 create table merchant.loyalty_gift_card_ledger (
-  id            uuid primary key default gen_random_uuid(),
-  merchant_id   uuid not null references merchant.merchant(id) on delete cascade,
-  gift_card_id  uuid not null references merchant.loyalty_gift_card(id) on delete cascade,
-  delta         bigint not null,   -- centavos
-  reason        text not null check (reason in ('issue','redeem','adjustment')),
-  occurred_at   timestamptz not null default now(),
-  created_at    timestamptz not null default now()
+  id               uuid primary key default gen_random_uuid(),
+  merchant_id      uuid not null references merchant.merchant(id) on delete cascade,
+  gift_card_id     uuid not null,
+  delta            bigint not null,   -- centavos
+  -- Preserve the two legacy writer values during the final source replay.
+  -- Build v3 writes load/redeem; the frozen source writes issue/gift_card_redeem.
+  reason           text not null check (reason in
+                     ('migration_initial_load','issue','load','gift_card_redeem',
+                      'redeem','adjustment','expire')),
+  source_type      text,
+  source_id        text,
+  idempotency_key  text not null,
+  occurred_at      timestamptz not null default now(),
+  created_at       timestamptz not null default now(),
+  constraint loyalty_gift_card_ledger_card_fk
+    foreign key (merchant_id, gift_card_id)
+    references merchant.loyalty_gift_card (merchant_id, id) on delete cascade,
+  unique (merchant_id, idempotency_key)
 );
+create index loyalty_gift_card_ledger_card_idx
+  on merchant.loyalty_gift_card_ledger (merchant_id, gift_card_id, occurred_at desc);
 create trigger gift_card_ledger_append_only
   before update or delete on merchant.loyalty_gift_card_ledger
   for each row execute function merchant.tg_append_only();

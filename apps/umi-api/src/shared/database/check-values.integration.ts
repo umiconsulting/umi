@@ -80,6 +80,82 @@ const TABLE_REF = /\b(?:FROM|JOIN|UPDATE|INTO)\s+(?:umi|merchant|runtime)\.("?)(
  * capital is prose or a message, not an enum member.
  */
 const LITERAL = /\b(?:\w+\.)?(\w+)\s*(=|<>|!=)\s*'([a-z][a-z_]*)'/g;
+const INSERT_HEAD = /\bINSERT\s+INTO\s+(?:umi|merchant|runtime)\.("?)(\w+)\1\s*/gi;
+const ENUM_LITERAL = /^'([a-z][a-z_]*)'(?:::\w+)?$/;
+
+/** Return one balanced parenthesis group and the index after it. */
+function groupAt(text: string, start: number): { body: string; end: number } | null {
+  if (text[start] !== '(') return null;
+  let depth = 0;
+  let quoted = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "'" && text[i - 1] !== '\\') quoted = !quoted;
+    if (quoted) continue;
+    if (ch === '(') depth++;
+    if (ch === ')' && --depth === 0) return { body: text.slice(start + 1, i), end: i + 1 };
+  }
+  return null;
+}
+
+/** Split a SQL list on top-level commas. Function arguments remain one value. */
+function sqlList(text: string): string[] {
+  const values: string[] = [];
+  let depth = 0;
+  let quoted = false;
+  let start = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "'" && text[i - 1] !== '\\') quoted = !quoted;
+    if (quoted) continue;
+    if (ch === '(') depth++;
+    if (ch === ')') depth--;
+    if (ch === ',' && depth === 0) {
+      values.push(text.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  values.push(text.slice(start).trim());
+  return values;
+}
+
+interface InsertLiteral {
+  table: string;
+  column: string;
+  value: string;
+  offset: number;
+}
+
+/** Match literal values to their INSERT column by position. */
+function insertLiterals(sql: string): InsertLiteral[] {
+  const found: InsertLiteral[] = [];
+  for (const head of sql.matchAll(INSERT_HEAD)) {
+    const table = head[2].toLowerCase();
+    const columnsStart = (head.index ?? 0) + head[0].length;
+    const columns = groupAt(sql, columnsStart);
+    if (!columns) continue;
+    const valuesHead = /^\s*VALUES\s*/i.exec(sql.slice(columns.end));
+    if (!valuesHead) continue;
+    const valuesStart = columns.end + valuesHead[0].length;
+    const values = groupAt(sql, valuesStart);
+    if (!values) continue;
+
+    const names = sqlList(columns.body).map((c) => c.replace(/"/g, '').trim().toLowerCase());
+    const expressions = sqlList(values.body);
+    if (names.length !== expressions.length) continue;
+    expressions.forEach((expression, index) => {
+      const literal = ENUM_LITERAL.exec(expression);
+      if (!literal) return;
+      found.push({
+        table,
+        column: names[index],
+        value: literal[1],
+        offset: valuesStart + values.body.indexOf(expression),
+      });
+    });
+  }
+  return found;
+}
 
 interface Finding {
   file: string;
@@ -96,6 +172,7 @@ describe('build-v3 CHECK values · every compared literal is one the schema admi
   const findings: Finding[] = [];
   let statementsScanned = 0;
   let comparisonsChecked = 0;
+  let insertsChecked = 0;
   let skippedNoTable = 0;
 
   beforeAll(async () => {
@@ -180,20 +257,37 @@ describe('build-v3 CHECK values · every compared literal is one the schema admi
             tables: [...new Set(tables)].sort(),
           });
         }
+
+        for (const insert of insertLiterals(sql)) {
+          const values = catalog.get(insert.table)?.get(insert.column);
+          if (!values) continue;
+          insertsChecked++;
+          if (values.has(insert.value)) continue;
+          findings.push({
+            file: file.replace(/.*\/src\//, ''),
+            line: text.slice(0, t.index + insert.offset).split('\n').length,
+            column: insert.column,
+            operator: 'INSERT',
+            value: insert.value,
+            allowed: [...values].sort(),
+            tables: [insert.table],
+          });
+        }
       }
     }
 
     const report =
       `\n══ CHECK-VALUE GATE\n` +
       `   ${statementsScanned} statement(s) scanned · ${comparisonsChecked} comparison(s) ` +
-      `checked · ${skippedNoTable} skipped (no CHECK on any referenced table)\n`;
+      `checked · ${insertsChecked} INSERT literal(s) checked · ` +
+      `${skippedNoTable} skipped (no CHECK on any referenced table)\n`;
     console.log(report);
 
     const detail = findings
       .map(
         (f) =>
           `   ${f.file}:${f.line}\n` +
-          `      ${f.column} ${f.operator} '${f.value}' — impossible.\n` +
+          `      ${f.operator === 'INSERT' ? `${f.column} INSERT '${f.value}'` : `${f.column} ${f.operator} '${f.value}'`} — impossible.\n` +
           `      ${f.tables.join(', ')} admit: ${f.allowed.join(', ')}`,
       )
       .join('\n');

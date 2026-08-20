@@ -21,6 +21,20 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-08-19 - Close the Build v3 gift-card convergence blocker
+- task type: cross-product schema, backfill, backend, and route convergence
+- request summary: Compare exact `build-v3` with the cutover plan, Azure Boards, and CodeGraph, then implement the next logical step.
+- filesystem slice inspected: `docs/migration/build-v3/**`, `apps/umi-api/src/modules/cash/**`, database gates and smoke tests, `apps/umi-cash/next.config.mjs`, UmiPOS PR #94
+- chosen owner: `apps/umi-api` for canonical Gift Card behavior; root `docs/migration/build-v3` for schema and data movement; `apps/umi-cash` only for proxy registration
+- chosen path: define the narrow one-use bearer-value model. Store only a code hash. Derive value from the ledger. Prove atomic redemption on PostgreSQL.
+- skill or subagent used: `task-router`, `domain-modeling`, `supabase`, `supabase-postgres-best-practices`, and `triage-work-items-with-codegraph`. `code-review` ran standards and specification agents.
+- files touched: Build v3 merchant DDL, loyalty backfill/reconciliation, Cash repositories/services/controllers/tests, SQL gates, route flip/smoke coverage, Cash proxy config, API context, and the living cutover plan
+- tools used: CodeGraph CLI, Azure DevOps MCP, Git/GitHub inspection, PostgreSQL disposable builds and snapshot backfills, pnpm/npm test and build gates
+- outcome: The candidate takes SQL preflight from 7 unresolved to 0. All 742 unit and 71 schema integration tests pass.
+- outcome: Gift-card counts are 1/1, and per-card drift is 0. The security gate passes 49 structural and 3 behavioral checks.
+- reusable pattern observed: a money model is not converged when the columns only resolve. The runtime proof must execute CHECK-constrained inserts, derive the transferred amount from the ledger, and race two claims against the real database.
+- promotion follow-up: none
+
 ### 2026-08-14 - Rewrite the work items themselves, and retire the ones with a dead premise
 - task type: tracker correction pass, no new triage
 - request summary: "Don't comment on the WI, just rewrite them according to the new CodeGraph findings; if some are already solved, erase them; if others are different, change them."

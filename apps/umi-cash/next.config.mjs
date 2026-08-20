@@ -1,6 +1,6 @@
 /**
  * THE ROUTES THE REGISTER CALLS, forwarded to umi-api when `CASH_API_ORIGIN` is
- * set. Every one is ported and answering; the omissions below are deliberate.
+ * set. Every listed route is ported and answers from umi-api.
  *
  * ⚠️ umi-api MUST ALREADY BE DEPLOYED with `@AcceptRegisterToken()` (PR #115)
  * before this variable is set anywhere. The till sends `Authorization: Bearer`
@@ -13,13 +13,6 @@
  * from an origin the operator is not looking at.
  *
  * NOT FORWARDED, each for a reason:
- *
- *   `/admin/gift-cards` and `/gift/:code` — umi-api 500s on both.
- *   `merchant.loyalty_gift_card` has six columns and the Cash repositories read
- *   ten, which is AB#13, deferred whole to PR #94 by decision D-1. Forwarding
- *   them would trade a working screen for a broken one. ⚠️ After the cutover they
- *   break on THIS side too — `loyalty.gift_cards` stops existing — so PR #94 is a
- *   cutover blocker for gifting either way, not something this list can defer.
  *
  *   `/admin/messages` — never ported. The lifecycle bodies live in
  *   `merchant.message` now and the screen is rebuilt from there (AB#107). The
@@ -41,6 +34,7 @@ const REGISTER_ROUTES = [
   '/api/:handle/admin/customers',
   '/api/:handle/admin/customers/:id',
   '/api/:handle/admin/export',
+  '/api/:handle/admin/gift-cards',
   '/api/:handle/admin/purchase',
   '/api/:handle/admin/reward-config',
   '/api/:handle/admin/settings',
@@ -51,10 +45,11 @@ const REGISTER_ROUTES = [
   '/api/:handle/admin/scan',
   '/api/:handle/admin/scan/preview',
   '/api/:handle/admin/scan/seals',
-  // The customer's own side: registration, her card, and the code she shows.
+  // The customer's own side: registration, her card, and bearer gift-card use.
   '/api/:handle/customers',
   '/api/:handle/card',
   '/api/:handle/card/qr',
+  '/api/:handle/gift/:code',
 ];
 
 /** @type {import('next').NextConfig} */

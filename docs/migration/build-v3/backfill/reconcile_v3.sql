@@ -1,3 +1,4 @@
+\set ON_ERROR_STOP on
 \pset footer off
 \echo '========== A. COUNTS: source vs target =========='
 select 'merchant'  t, (select count(*) from core.tenants)          src, (select count(*) from merchant.merchant) dst
@@ -5,6 +6,8 @@ union all select 'customer', (select count(*) from core.people),            (sel
 union all select 'contact',  (select count(*) from core.contact_methods),   (select count(*) from merchant.contact)
 union all select 'loyalty_card', (select count(*) from loyalty.cards),      (select count(*) from merchant.loyalty_card)
 union all select 'stored_value_ledger', (select count(*) from loyalty.points_ledger), (select count(*) from merchant.loyalty_stored_value_ledger)
+union all select 'gift_card', (select count(*) from loyalty.gift_cards), (select count(*) from merchant.loyalty_gift_card)
+union all select 'gift_card_ledger', (select count(*) from loyalty.gift_card_ledger), (select count(*) from merchant.loyalty_gift_card_ledger)
 union all select 'subscription', (select count(*) from grow.subscriptions), (select count(*) from umi.subscription)
 union all select 'conversation', (select count(*) from comms.conversations),(select count(*) from merchant.conversation)
 union all select 'message',   (select count(*) from comms.messages),        (select count(*) from merchant.message)
@@ -51,6 +54,109 @@ select count(*) as orders_total_mismatch
 from ops.orders o
 join merchant.order_total t on t.order_id = o.id
 where o.total_cents is distinct from t.total;
+
+\echo '-- GIFT CARD ROWS: every mapped field agrees. Final summary must be 0:'
+create temporary view reconcile_gift_card_row_mismatch as
+  select coalesce(s.tenant_id, d.merchant_id) as merchant_id,
+         coalesce(s.id, d.id) as gift_card_id
+    from loyalty.gift_cards s
+    full outer join merchant.loyalty_gift_card d
+      on d.merchant_id = s.tenant_id and d.id = s.id
+   where s.id is null
+      or d.id is null
+      or d.code_hash is distinct from extensions.digest(s.code, 'sha256')
+      or d.masked_code is distinct from ('••••-' || right(s.code, 4))
+      or d.amount_cents is distinct from s.amount_cents::bigint
+      or d.created_by_staff_id is distinct from s.created_by_staff_member_id
+      or d.sender_name is distinct from s.sender_name
+      or d.message is distinct from s.message
+      or d.recipient_email is distinct from s.recipient_email
+      or d.recipient_phone is distinct from s.recipient_phone
+      or d.recipient_name is distinct from s.recipient_name
+      or d.redeemed_at is distinct from s.redeemed_at
+      or d.redeemed_card_id is distinct from s.redeemed_loyalty_card_id
+      or d.expires_at is distinct from s.expires_at
+      or d.issued_at is distinct from s.created_at
+      or d.created_at is distinct from s.created_at;
+select 'detail' as result, merchant_id::text, gift_card_id::text,
+       null::bigint as mismatch_count
+  from reconcile_gift_card_row_mismatch
+union all
+select 'summary', null, null, count(*) from reconcile_gift_card_row_mismatch
+order by result, merchant_id, gift_card_id;
+
+\echo '-- GIFT CARD LEDGER ROWS: every source move agrees. Final summary must be 0:'
+create temporary view reconcile_gift_card_ledger_mismatch as
+  select coalesce(s.tenant_id, d.merchant_id) as merchant_id,
+         coalesce(s.id, d.id) as ledger_id
+    from loyalty.gift_card_ledger s
+    full outer join merchant.loyalty_gift_card_ledger d
+      on d.merchant_id = s.tenant_id and d.id = s.id
+   where s.id is null
+      or d.id is null
+      or d.gift_card_id is distinct from s.gift_card_id
+      or d.delta is distinct from s.delta::bigint
+      or d.reason is distinct from s.reason
+      or d.source_type is distinct from s.source_type
+      or d.source_id is distinct from s.source_id
+      or d.idempotency_key is distinct from s.idempotency_key
+      or d.occurred_at is distinct from s.created_at
+      or d.created_at is distinct from s.created_at;
+select 'detail' as result, merchant_id::text, ledger_id::text,
+       null::bigint as mismatch_count
+  from reconcile_gift_card_ledger_mismatch
+union all
+select 'summary', null, null, count(*) from reconcile_gift_card_ledger_mismatch
+order by result, merchant_id, ledger_id;
+
+\echo '-- GIFT CARD BALANCE PER CARD: each source balance equals its ledger sum.'
+\echo '   The final summary must be 0; detail rows show any drift:'
+create temporary view reconcile_gift_card_balance_mismatch as
+with src as (
+  select tenant_id as merchant_id, id as gift_card_id, balance_cents::bigint as balance
+    from loyalty.gift_cards
+), dst as (
+  select g.merchant_id, g.id as gift_card_id, coalesce(sum(l.delta),0)::bigint as balance
+    from merchant.loyalty_gift_card g
+    left join merchant.loyalty_gift_card_ledger l
+      on l.merchant_id = g.merchant_id and l.gift_card_id = g.id
+   group by g.merchant_id, g.id
+)
+  select coalesce(src.merchant_id, dst.merchant_id) as merchant_id,
+         coalesce(src.gift_card_id, dst.gift_card_id) as gift_card_id,
+         coalesce(src.balance,0) as src_balance,
+         coalesce(dst.balance,0) as dst_balance,
+         coalesce(dst.balance,0) - coalesce(src.balance,0) as drift
+    from src full outer join dst
+    on dst.merchant_id = src.merchant_id and dst.gift_card_id = src.gift_card_id
+   where coalesce(src.balance,0) <> coalesce(dst.balance,0);
+select *
+  from (
+    select 'detail' as result, merchant_id::text, gift_card_id::text,
+           src_balance, dst_balance, drift, null::bigint as mismatch_count
+      from reconcile_gift_card_balance_mismatch
+    union all
+    select 'summary', null, null, null, null, null,
+           count(*) from reconcile_gift_card_balance_mismatch
+  ) rows_and_summary
+ order by result, abs(drift) desc nulls last;
+
+do $$
+begin
+  if exists (select 1 from reconcile_gift_card_row_mismatch) then
+    raise exception 'gift-card reconciliation failed: mapped card fields differ';
+  end if;
+  if exists (select 1 from reconcile_gift_card_ledger_mismatch) then
+    raise exception 'gift-card reconciliation failed: ledger entries differ';
+  end if;
+  if exists (select 1 from reconcile_gift_card_balance_mismatch) then
+    raise exception 'gift-card reconciliation failed: per-card balances differ';
+  end if;
+end $$;
+
+drop view reconcile_gift_card_balance_mismatch;
+drop view reconcile_gift_card_ledger_mismatch;
+drop view reconcile_gift_card_row_mismatch;
 \echo '-- PER-ITEM: is_cancelled <-> voided_at agree for EVERY line (by id, NULL-safe) — expect 0:'
 select count(*) as items_void_flag_mismatch
 from ops.order_items s

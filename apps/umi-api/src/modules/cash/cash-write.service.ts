@@ -199,6 +199,10 @@ export class CashWriteService {
     if (gift.expires_at && new Date(gift.expires_at) < new Date()) {
       throw new BadRequestException({ error: 'Esta tarjeta de regalo ha expirado' });
     }
+    const redeemableCents = Number(gift.balance_cents);
+    if (redeemableCents <= 0) {
+      throw new BadRequestException({ error: 'Esta tarjeta de regalo ya no tiene saldo' });
+    }
 
     const found = await this.repo.findPersonCard(merchantId, by);
     if (!found) {
@@ -214,7 +218,7 @@ export class CashWriteService {
         merchantId,
         giftCardId: gift.id,
         cardId: found.cardId,
-        amountCents: gift.amount_cents,
+        amountCents: redeemableCents,
         senderName: gift.sender_name ?? null,
       });
     } catch (err) {
@@ -227,7 +231,7 @@ export class CashWriteService {
     await this.walletPass.refreshCard(found.cardId);
     return {
       success: true,
-      amountMXN: formatMxn2(gift.amount_cents),
+      amountMXN: formatMxn2(redeemableCents),
       newBalanceMXN: formatMxn2(balanceCents),
       customerName: found.displayName,
     };

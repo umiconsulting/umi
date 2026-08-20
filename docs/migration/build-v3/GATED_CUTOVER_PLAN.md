@@ -1,6 +1,6 @@
 # build-v3 Gated Cutover — Roadmap & Status
 
-**Status:** ACTIVE (living) · **Owner:** platform · **Last updated:** 2026-08-02 · **Scope:** internal-only
+**Status:** ACTIVE (living) · **Owner:** platform · **Last updated:** 2026-08-19 · **Scope:** internal-only
 **Companion docs:** [`SECURITY_GATE.md`](./SECURITY_GATE.md) (the gate) · [`ORDER_MODEL.md`](./ORDER_MODEL.md) · [`backend-convergence-map.md`](./backend-convergence-map.md)
 
 > **What this is.** The tracked roadmap for converging `apps/umi-api` **and** the data-migration
@@ -59,12 +59,12 @@ Two consequences shape this roadmap:
 
 ## 3 · The gate (four runnable instruments)
 
-| Instrument                         | What it proves                                                                                      | Command                                                                                                | Current                              |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------ |
-| **`sql-preflight.integration.ts`** | Every backend SQL statement resolves against live build-v3 (schema validity)                        | `cd apps/umi-api && npm run test:integration`                                                          | **7 unresolved** (as of P5)          |
-| **`check-values.integration.ts`**  | Every compared literal is a value the column's CHECK admits                                         | same command (runs in the same suite)                                                                  | **PASS** (256 stmts, 75 comparisons) |
-| **`security_gate.sql`**            | RLS+FORCE, least-privilege grants, credential lockdown, data hygiene (24 structural + 3 behavioral) | `PGPORT=5233 psql -v ON_ERROR_STOP=1 -d umi_backfill_v3 -f security_gate.sql` → `SECURITY GATE PASSED` | **PASS**                             |
-| **`reconcile_v3.sql`**             | Backfill fidelity — counts + money invariants + **per-order / per-item** field-level equality       | `PGPORT=5233 psql -v ON_ERROR_STOP=1 -d umi_backfill_v3 -f backfill/reconcile_v3.sql`                  | **PASS**                             |
+| Instrument                         | What it proves                                                                  | Command                                                                                                | Current                                                  |
+| ---------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------- |
+| **`sql-preflight.integration.ts`** | Every backend SQL statement resolves against live build-v3 (schema validity)    | `cd apps/umi-api && pnpm run test:integration:schema`                                                  | **0 unresolved**                                         |
+| **`check-values.integration.ts`**  | Every compared or inserted literal is a value the column's CHECK admits         | same command (runs in the same suite)                                                                  | **PASS** (293 stmts, 93 comparisons, 25 INSERT literals) |
+| **`security_gate.sql`**            | RLS+FORCE, least-privilege grants, credential lockdown, data hygiene            | `PGPORT=5233 psql -v ON_ERROR_STOP=1 -d umi_backfill_v3 -f security_gate.sql` → `SECURITY GATE PASSED` | **PASS** (49 structural + 3 behavioral)                  |
+| **`reconcile_v3.sql`**             | Backfill fidelity — counts + money invariants + per-record field-level equality | `PGPORT=5233 psql -v ON_ERROR_STOP=1 -d umi_backfill_v3 -f backfill/reconcile_v3.sql`                  | **PASS** (gift-card per-card drift 0)                    |
 
 > **Why the fourth instrument exists (added 2026-08-02).** Preflight PREPAREs, so it catches every
 > NAME the schema lacks. It cannot catch a VALUE the schema forbids — Postgres tests a CHECK at RUN
@@ -287,7 +287,7 @@ pipeline (#68). Both were genuinely P4-entangled, not P3 leftovers.
 permissions; the bot replies (add it to the smoke test — its failure is silent); preflight retires the
 identity/entitlement failures; gate stays green.
 
-### P4 — Conversation pipeline / hours / birthday / KDS / order repos ◑ ONE BUCKET LEFT
+### P4 — Conversation pipeline / hours / birthday / KDS / order repos ✅ DONE IN PR CANDIDATE
 
 **Goal.** The remaining domain rewrites onto the new shapes.
 **Scope.** **Conversation pipeline** — a deliberate retreat from the agentic-AI over-engineering,
@@ -308,10 +308,24 @@ Customer 360). `GET /hours` off `merchant.open_hours` jsonb; **order repos** rew
   was **10 statements nobody had counted** until the rollup stopped truncating.
 - ✅ **hours** (#74) — see the P1 entry above for the shape and for what the fold was losing.
 
-**Remaining: gift cards only** — 8 statements in `cash-write.repository.ts` / `cash.repository.ts`
-(`loyalty_gift_card.amount_cents`, `redeemed_at`, `loyalty_gift_card_ledger.source_type`). Deferred
-by decision, not blocked: the gifting MODEL is undecided, and writing the columns the old code reads
-would settle that question by accident.
+✅ **Gift cards (2026-08-19, `fix/build-v3-gift-card-convergence`).** The model decision is now
+explicit. A gift card is a one-use bearer value. The clear code is returned at issue time and is
+never stored. The database keeps its SHA-256 hash and a masked suffix. `amount_cents` is the face
+value. The current value is always `SUM(loyalty_gift_card_ledger.delta)`. The ledger is append-only.
+Redemption claims `redeemed_at` only when it is NULL. It then appends both money movements in one
+transaction.
+
+**Decision basis.** PostgreSQL documents that `digest(data, type)` returns a binary message digest
+and supports `sha256` ([pgcrypto](https://www.postgresql.org/docs/current/pgcrypto.html)). A digest
+supports indexed lookup without retaining the bearer code. Deterministic hashing would expose
+repeated inputs. Umi generates each code from 16 random bytes, so repeated inputs are not expected.
+This is a Umi-specific inference from the issue path and its 128-bit random input.
+
+This takes the narrow gift-card slice from UmiPOS PR #94's design, not that PR's full POS schema.
+The wider projection set is outside this blocker. The DDL, source backfill, per-card reconciliation,
+Cash API repositories, public/admin proxy routes, and a real-database race test now agree on the
+same model. The preflight moved **7 → 0**. A runtime `INSERT reason='load'` succeeds, and two
+simultaneous redemption attempts produce one success and one already-redeemed result.
 
 **DoD.** Preflight → **0 unresolved**; conversation/hours/order behavioral checks green; gate green.
 
@@ -400,10 +414,11 @@ tests, contract 33/33, dashboard builds.
 working survives the cutover — handle, serial, `web_service_token`, push token, and the card's
 `qr_token`. Zero `slug` references remain in the DDL, the contract, umi-api or the dashboard.
 
-**What P5 deliberately did NOT own.** No build-v3 code **serves** the Apple web service — it exists
-only in umi-cash, on Prisma against `core.tenants`. That is not a naming problem and was never in
-this phase's scope: it is a missing module, tracked as a named blocker in **P7** below. P5's job was
-to guarantee that when the module is built, the values it needs are still there. They are.
+**What P5 deliberately did NOT own.** P5 preserved the frozen pass identity but did not port the
+wallet service. That work is now complete on `build-v3`. Commit `ee99a4e` moved Apple and Google pass
+serving into umi-api. Commit `4672652` added production render checks. Commit `a069aa3` carried the
+reward name. Commit `652c51d` added pass-health reporting and push. These modules consume the values
+that P5 preserved.
 
 ### P6 — Deployment-gate provisioning (`SECURITY_GATE.md §4`) ◑ PARTIAL
 
@@ -426,44 +441,26 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
 `DATABASE_URL_APP/_WORKER` at the `api`/`worker` login roles (env change) and drops `app.tenant_id` from
 `runWithMerchant`.
 
-#### ⛔ BLOCKER — the wallet layer has no build-v3 home (from P5)
+#### ✅ Wallet layer ported; device proof remains
 
-**The gap.** ~1,470 lines of umi-cash serve every wallet pass, on Prisma against `core.tenants` /
-`loyalty.passes` — schemas build-v3 does not have. build-v3 has the DATA and none of the CODE.
-umi-api's only wallet file is `shared/adapters/wallet-pass.adapter.ts`, which is **outbound**: it
-POSTs a `cardId` at `WALLET_PASS_PUSH_URL` and lets umi-cash do the work. It is a caller, not an
-implementation, and it is unconfigured today.
+The wallet layer now has a build-v3 home in umi-api. Apple registration, change lists, pass
+download, pass generation, APNs push, Google issuance, health reporting, and push orchestration
+landed in commits `ee99a4e`, `4672652`, `a069aa3`, and `652c51d`. Umi Cash keeps the frozen
+`cash.umiconsulting.co` routes and forwards seven wallet surfaces to the new owner.
 
-| umi-cash surface                                                                    | Lines | What stops without it                                                                                                               |
-| ----------------------------------------------------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `passes/apple/v1/[...path]`                                                         | 231   | **Apple's web service.** Register/unregister a device, list changed serials, re-download the pass. This is what makes a pass UPDATE |
-| `passes/apple` (POST)                                                               | 100   | A new customer gets **no pass at all**                                                                                              |
-| `lib/pass-apple.ts`                                                                 | 320   | PKPass signing (WWDR + signer cert + passphrase)                                                                                    |
-| `lib/pass-google.ts`                                                                | 274   | Google object create/patch                                                                                                          |
-| `lib/push-apple.ts`                                                                 | 162   | The APNs push that tells a phone to re-fetch                                                                                        |
-| `passes/google`, `push-token`, `umi/push-passes`, `wallet.ts`, `strip-generator.ts` | ~380  | Google issuance, token capture, fan-out push, stamp-strip images                                                                    |
+**Measured on the local production-snapshot clone (2026-08-20).** The backfill carried 417/417
+wallet-pass rows. It carried 350/350 Apple rows, 67/67 Google rows, and 398/398 device rows. Identity
+and value mismatches are zero. All 350 Apple tokens and 398 push tokens are present. There are zero
+orphan pass cards or devices. The compiled repository authenticated a migrated Apple pass and
+rejected a wrong token. It resolved the frozen handle, push target, barcode identity, and change-list
+serial. `wallet-carry.integration.ts` passed 12/12. Wallet tests passed 44/44. All seven Umi Cash
+routes forwarded to the expected frozen paths.
 
-**Blast radius, stated honestly.** Nothing is destroyed and no customer loses loyalty. The pass
-stays installed, opens, and its barcode still scans — the register resolves the card by `qr_token`,
-which carries. What stops is the **update**: a customer at 6 stamps keeps earning in our system
-while their phone keeps saying 6. New customers get no pass. This is a **silent** failure on both
-sides; no gate can see it, which is why it is written here and not left to the day.
+**What remains for P7:**
 
-**What P7 must do — in this order:**
-
-1. **Port the layer onto build-v3.** `merchant.loyalty_wallet_pass` (+ `web_service_token`),
-   `runtime.pass_device`, `merchant.merchant.handle`, `merchant.loyalty_card.qr_token`. The
-   Apple web service authenticates by `(serial, token)` with **no session and no merchant** — Apple
-   knows neither — so it is a **worker-pool** path, like the auth substrate. It must not be reached
-   through `runWithMerchant`.
-2. **Keep `cash.umiconsulting.co` answering, permanently.** Both the host AND the path are signed
-   into 350 passes, so umi-cash **cannot be decommissioned** by this cutover. Either it keeps
-   serving `/api/{handle}/passes/apple/**` against build-v3, or it proxies that prefix to umi-api.
-   Decide which; do not leave it implied. (Google is push-based — no callback URL is frozen, so its
-   67 passes are unaffected by where the code lives.)
-3. **Move the certificates and secrets** — APNs cert, WWDR, signer key + `APPLE_KEY_PASSPHRASE`,
-   Google service-account key — to wherever step 2 lands them. Folds into **D9**.
-4. **Point `WALLET_PASS_PUSH_URL` at the new home** so `WalletPassAdapter` stops being a no-op.
+1. Move and validate the APNs, WWDR, Apple signer, and Google service-account secrets under D9.
+2. Exercise the frozen `cash.umiconsulting.co` host through the production routing layer.
+3. Install a rehearsal pass and update a pre-cutover pass on real phones.
 
 **Rehearsal must prove it on a real phone, not in a test.** Install a pass from the rehearsal
 clone, add a stamp, and confirm the lock screen changes. A green suite proves the row moved; only
@@ -475,61 +472,60 @@ updates on a real device after the flip.**
 
 ---
 
-## 5 · Current baseline (2026-08-02)
+## 5 · Current baseline (2026-08-20)
 
 > **Next, in order.**
 >
-> 1. **P4 gift cards** — the last 7 statements, waiting on one product decision about the
->    gifting model. Closing them takes preflight to **0**, which is P1's Definition of Done.
-> 2. **The P7 wallet-layer port.** The longest lead time of anything left, and the only item whose
->    failure mode is silent on both sides. Start it in parallel with the gates; do not let it
->    arrive at the rehearsal unbuilt.
-> 3. **P6 deployment gates D3–D10**, which nothing else blocks and which P7 cannot start without.
-> 4. **P7 cutover rehearsal.**
+> 1. **Review and merge the P4 gift-card candidate**, then update Azure Boards #9–#13 with the
+>    measured evidence below.
+> 2. **P6 deployment gates D3–D10**, which nothing else blocks and which P7 cannot start without.
+> 3. **P7 cutover rehearsal**, including production routing, signer credentials, APNs, Google, and
+>    the pre-cutover-pass update on real phones.
 >
 > Two items have no phase and must not be lost:
 >
-> - The **MFA WARN** must return to FAIL before cutover, which needs the dashboard to read
->   `mfaRequired` first.
+> - The production bootstrap holder needs recorded **MFA evidence**. The local snapshot has no
+>   platform holder, so its green row is vacuous even though the challenge contract now works.
 > - **Ask the acquirer in writing which PCI questionnaire applies to UmiPOS.** SAQ P2PE would drop
 >   Requirements 7, 8 and 10 from scope entirely, so the answer changes how much of the access work
 >   above is obligatory rather than merely correct. Ask at contract time, not after.
 
-- **`build-v3` HEAD:** `d5ac5a4` (PR #76). Merged since #65: **#66** P4 cash loyalty convergence →
-  **#67** the per-card birthday grant → **#68** the conversation pipeline on the slim state model →
-  **#69** the cash-rename residue in lifecycle + customers → **#70** Customer 360 → **#71** the
-  landing-page leads funnel onto `umi.prospect` → **#73** the UmiPOS schema and contract fold →
-  **#74** one source for open hours → **#75** the merchant / location rename → **#76** the principal
-  and what it may do.
+- **Evaluated base:** `origin/build-v3` at `43b186a92ef630495ad8271011103bbacaf06683`.
+  The gift-card convergence is on local PR candidate `fix/build-v3-gift-card-convergence`; it is not
+  yet merged or reflected in Azure Boards. The merge sequence since #65 starts with **#66** cash
+  loyalty convergence and **#67** birthday grants. **#68** added the conversation pipeline. **#69**
+  removed cash-rename residue. **#70** added Customer 360, and **#71** moved leads to `umi.prospect`.
+  **#73** folded the UmiPOS schema and contract. **#74** unified open hours. **#75** renamed merchant
+  and location concepts. **#76** defined the principal and its permissions.
 - **The last four PRs came in from a different direction.** #73 to #76 were not planned on this
   spine; they arrived with the UmiPOS integration and then with a design question the owner asked
   about it ("a staff member is not a user but still holds a PIN"). They land here because they moved
   the same numbers. #75 in particular renamed the model — `tenant` → `merchant`, `branch` →
   `location` — throughout this document and everything it points at.
-- **Preflight: 15 unresolved · 0 `42883`.** Measured on a PRISTINE build — `00→90` into a throwaway
+- **Preflight: 0 unresolved · 0 `42883` · 3 explicitly uncovered.** Measured on a PRISTINE build — `00→90` into a throwaway
   database — so the number reproduces on any machine with a Postgres and needs no prod snapshot. It
   is NOT comparable to the 81 recorded below, which was measured against `umi_backfill_v3` with the
   source schemas still present. Track: **26** (2026-07-29 pristine) → **18** (hours closed) →
-  **15** (staff closed). Two buckets left, each owned by a named phase:
+  **15** (staff closed) → **7** (slug closed) → **0** (gift cards closed). The last bucket is now closed:
 
-  | bucket     | n     | cause                                                                                    | owner              |
-  | ---------- | ----- | ---------------------------------------------------------------------------------------- | ------------------ |
-  | gift cards | 7     | `loyalty_gift_card.amount_cents` / `redeemed_at`, `loyalty_gift_card_ledger.source_type` | P4 (cash deferred) |
-  | ~~slug~~   | ~~8~~ | ~~`merchant.slug`, `location.slug` / `aliases`~~ — **closed 2026-08-01**                 | P5 ✅              |
-  | ~~staff~~  | ~~3~~ | ~~`staff.name` → `umi.user`~~ — **closed 2026-08-01 (#76)**                              | P1 ✅              |
-  | ~~hours~~  | ~~8~~ | ~~`merchant.open_hours` missing, `merchant.config`~~ — **closed 2026-07-29 (#74)**       | P1 ✅              |
+  | bucket         | n     | cause                                                                                                                | owner |
+  | -------------- | ----- | -------------------------------------------------------------------------------------------------------------------- | ----- |
+  | ~~gift cards~~ | ~~7~~ | ~~`loyalty_gift_card.amount_cents` / `redeemed_at`, `loyalty_gift_card_ledger.source_type`~~ — **closed 2026-08-19** | P4 ✅ |
+  | ~~slug~~       | ~~8~~ | ~~`merchant.slug`, `location.slug` / `aliases`~~ — **closed 2026-08-01**                                             | P5 ✅ |
+  | ~~staff~~      | ~~3~~ | ~~`staff.name` → `umi.user`~~ — **closed 2026-08-01 (#76)**                                                          | P1 ✅ |
+  | ~~hours~~      | ~~8~~ | ~~`merchant.open_hours` missing, `merchant.config`~~ — **closed 2026-07-29 (#74)**                                   | P1 ✅ |
 
-  **Every remaining statement is `42703 undefined_column`, never `42P01 undefined_table`.** No
-  backend module now addresses a relation the schema does not have. What is left is two named
-  decisions, not unexplored ground.
+  No measured backend statement now addresses a missing relation, column, function, or conflict
+  target. Three interpolated statements remain explicitly uncovered by the reconstruction gate:
+  two in `kds.repository.ts` and one in `cash.repository.ts`. They are unmeasured coverage debt,
+  not known schema failures.
 
-- **The gate has a WARN level now, and one WARN is open.** `security_gate.sql` prints every WARN
-  through `raise warning 'ACKNOWLEDGED GAP: %'` and only FAILs on a FAIL, so a known gap stays
-  visible instead of being deleted to keep the gate green. The open one: **platform grant holders
-  have no second factor.** `umi.user` carries `mfa_method` / `mfa_enrolled_at` and the OTP path
-  exists, but nobody is enrolled, because the dashboard does not read `mfaRequired` yet. **This WARN
-  must return to FAIL before cutover** — PCI DSS 8.4.1 binds once the POS takes a card. Do not
-  enrol anybody until the dashboard can complete the challenge, or the enrolled account locks out.
+- **The local gate has 0 acknowledged gaps, but its platform-MFA row is vacuous on the throwaway
+  snapshot.** The rehearsal deliberately used the local-only bootstrap address, so it created no
+  platform administrator. `umi.user` carries `mfa_method` and `mfa_enrolled_at`. The dashboard now
+  understands the MFA challenge contract. P7 must seed the real bootstrap holder and record its
+  second factor. A PASS over zero holders is structural evidence, not production enrollment
+  evidence.
 
   ⚠️ **The gate was over-reporting.** It scanned backtick spans over raw file text, so a doc
   comment that QUOTES SQL counted as a statement: `kds.repository.ts` explains a rewrite with
@@ -548,8 +544,9 @@ updates on a real device after the flip.**
   −13, checkout −7 (both files gone from the rollup), then **#63 retired the KDS read/write half and
   #65 the auth half — `kds/kds.repository.ts` is now absent from the rollup entirely (40 → 0).**
 
-- **Units:** 366 · **Gate:** `security_gate.sql` PASS (25 structural + 3 behavioral) ·
-  `reconcile_v3.sql` PASS on the snapshot backfill.
+- **Units:** 742/742. **Schema integration:** 71/71. **Typecheck/lint:** PASS.
+  `security_gate.sql` passes 49 structural and 3 behavioral checks. Snapshot reconciliation passes
+  exact card rows, exact ledger rows, and per-card balances with zero mismatches.
 - **Branch protection (2026-07-21):** `build-v3` requires a branch to be UP TO DATE with base before
   merging (`strict: true`), enforced for admins. Closes the stale-base hole: the tree CI tested is the
   tree that lands.
@@ -598,15 +595,15 @@ updates on a real device after the flip.**
   sequence engine is dormant behind `LEADS_SEQUENCE_ENABLED` — but it is unowned and invisible, because
   `lint` is the only gate covering that package. Fix or delete the test before the leads cutover.
 
-### The 7 remaining, BY FILE (the real worklist)
+### The former 7, now closed
 
-`npm run test:integration` prints this rollup untruncated. It replaced an earlier by-error-code
+`pnpm run test:integration:schema` prints this rollup untruncated. It replaced an earlier by-error-code
 table that was built from the capped detail report and therefore under-counted.
 
-| File                            | Unresolved | Owning track                     |
-| ------------------------------- | ---------: | -------------------------------- |
-| `cash/cash-write.repository.ts` |          6 | gift-card gifting (P4, deferred) |
-| `cash/cash.repository.ts`       |          1 | gift-card gifting (P4, deferred) |
+| File                            | Before | Now | Owning track     |
+| ------------------------------- | -----: | --: | ---------------- |
+| `cash/cash-write.repository.ts` |      6 |   0 | gift cards P4 ✅ |
+| `cash/cash.repository.ts`       |      1 |   0 | gift cards P4 ✅ |
 
 The slug bucket was **8, not the 7 the table above used to claim**. The eighth was
 `cash.repository.branding`, filed under gift cards because that file is mostly gift cards. It was
