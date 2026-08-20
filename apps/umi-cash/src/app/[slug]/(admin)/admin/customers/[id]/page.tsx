@@ -154,13 +154,10 @@ export default function CustomerDetailPage() {
 
       <div className="u-fade-up d1 u-surface p-5 mb-4">
         <div className="u-eyebrow mb-2">Progreso de visitas</div>
-        <div className="flex items-baseline justify-between mb-2">
+        <div className="mb-2">
           <span className="u-stat-num" style={{ color: 'var(--color-ink)' }}>
             {customer.visitsThisCycle}/{customer.visitsRequired}
           </span>
-          {customer.pendingRewards > 0 && (
-            <span className="u-badge u-badge-accent">{customer.pendingRewards} recompensa{customer.pendingRewards > 1 ? 's' : ''}</span>
-          )}
         </div>
         <div className="u-progress-track">
           <div className="u-progress-fill" style={{ width: `${progressPct}%` }} />
@@ -170,15 +167,15 @@ export default function CustomerDetailPage() {
       <div className={`u-fade-up d2 grid gap-3 mb-4 ${tenant.topupEnabled ? 'grid-cols-2' : 'grid-cols-3'}`}>
         <div className="u-surface p-4 text-center">
           <p className="u-stat-num" style={{ fontSize: 22, color: 'var(--color-ink)' }}>{customer.totalVisits}</p>
-          <p className="u-eyebrow mt-1">Visitas</p>
+          <p className="u-eyebrow mt-1">Visitas totales</p>
         </div>
         <div className="u-surface p-4 text-center">
           <p className="u-stat-num" style={{ fontSize: 22, color: 'var(--color-ink)' }}>{customer.pendingRewards}</p>
-          <p className="u-eyebrow mt-1">Pendientes</p>
+          <p className="u-eyebrow mt-1">Recompensas pendientes</p>
         </div>
         <div className="u-surface p-4 text-center">
           <p className="u-stat-num" style={{ fontSize: 22, color: 'var(--color-ink)' }}>{customer.rewardsRedeemed}</p>
-          <p className="u-eyebrow mt-1">Canjeadas</p>
+          <p className="u-eyebrow mt-1">Recompensas canjeadas</p>
         </div>
         {tenant.topupEnabled && (
           <div className="u-surface p-4 text-center">
