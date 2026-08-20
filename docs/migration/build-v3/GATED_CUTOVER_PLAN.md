@@ -441,7 +441,7 @@ smoke both clients (umi-cash register→scan→topup→redeem; dashboard; **and 
 `DATABASE_URL_APP/_WORKER` at the `api`/`worker` login roles (env change) and drops `app.tenant_id` from
 `runWithMerchant`.
 
-#### ✅ Wallet layer ported; device proof remains
+#### ✅ Wallet layer ported; local real-device proof complete
 
 The wallet layer now has a build-v3 home in umi-api. Apple registration, change lists, pass
 download, pass generation, APNs push, Google issuance, health reporting, and push orchestration
@@ -456,16 +456,27 @@ rejected a wrong token. It resolved the frozen handle, push target, barcode iden
 serial. `wallet-carry.integration.ts` passed 12/12. Wallet tests passed 44/44. All seven Umi Cash
 routes forwarded to the expected frozen paths.
 
+**Real-iPhone proof on the local production-snapshot clone (2026-08-20).** A newly issued,
+synthetic Apple pass was signed with the production Pass Type identity exported temporarily from
+Keychain and installed on a physical iPhone through a temporary HTTPS tunnel. The phone registered
+the pass (**201**), polled the change list (**200**), and downloaded the pass (**200**). After the
+test card changed, the Build v3 push path reported **1 card / 1 APNs send**; the phone polled and
+downloaded the changed pass, and the notification arrived on the device. The synthetic customer,
+card, pass, and device registration were then removed. Counts returned to **417 wallet passes** and
+**398 device registrations**, so no migrated row was changed. This proves the local signer,
+registration, APNs, change-list, and download mechanics for a new rehearsal pass. It does **not**
+prove the frozen production host or continuity for a pass issued before cutover.
+
 **What remains for P7:**
 
 1. Move and validate the APNs, WWDR, Apple signer, and Google service-account secrets under D9.
 2. Exercise the frozen `cash.umiconsulting.co` host through the production routing layer.
-3. Install a rehearsal pass and update a pre-cutover pass on real phones.
+3. Update a pass issued **before** cutover on a real phone after the production flip.
 
-**Rehearsal must prove it on a real phone, not in a test.** Install a pass from the rehearsal
-clone, add a stamp, and confirm the lock screen changes. A green suite proves the row moved; only
-the phone proves Apple accepted the token. Then re-run against a pass issued **before** cutover —
-that is the one carrying the old token, and it is the only case that can fail.
+**The formal rehearsal repeats this proof through production routing.** A green suite proves the row
+moved; the local phone run proves Apple accepted a newly generated token and notification. The
+remaining continuity gate is a pass issued **before** cutover — that is the one carrying the old
+token and frozen URL, and it is the only case that can prove the flip preserved existing devices.
 
 **DoD.** Prod `security_gate.sql` PASS; both clients live on build-v3; **a pre-cutover Apple pass
 updates on a real device after the flip.**
@@ -476,8 +487,8 @@ updates on a real device after the flip.**
 
 > **Next, in order.**
 >
-> 1. **Review and merge the P4 gift-card candidate**, then update Azure Boards #9–#13 with the
->    measured evidence below.
+> 1. **Merge P4 gift-card PR #127** after its green review and CI evidence. Azure Boards #9 and
+>    #13 are Resolved; Tasks #10–#12 remain Active because their workflow has no Resolved state.
 > 2. **P6 deployment gates D3–D10**, which nothing else blocks and which P7 cannot start without.
 > 3. **P7 cutover rehearsal**, including production routing, signer credentials, APNs, Google, and
 >    the pre-cutover-pass update on real phones.
@@ -490,9 +501,10 @@ updates on a real device after the flip.**
 >   Requirements 7, 8 and 10 from scope entirely, so the answer changes how much of the access work
 >   above is obligatory rather than merely correct. Ask at contract time, not after.
 
-- **Evaluated base:** `origin/build-v3` at `43b186a92ef630495ad8271011103bbacaf06683`.
-  The gift-card convergence is on local PR candidate `fix/build-v3-gift-card-convergence`; it is not
-  yet merged or reflected in Azure Boards. The merge sequence since #65 starts with **#66** cash
+- **Evaluated base:** `origin/build-v3` at `43b186a92ef630495ad8271011103bbacaf06683`;
+  verified implementation head `0b3e561db0ec84715a2b1e86b8f8adbe97cb5582` in GitHub PR **#127**. The gift-card
+  convergence is not yet merged. Azure Boards #9–#13 carry dated candidate evidence and must be
+  closed against the merged commit. The merge sequence since #65 starts with **#66** cash
   loyalty convergence and **#67** birthday grants. **#68** added the conversation pipeline. **#69**
   removed cash-rename residue. **#70** added Customer 360, and **#71** moved leads to `umi.prospect`.
   **#73** folded the UmiPOS schema and contract. **#74** unified open hours. **#75** renamed merchant
