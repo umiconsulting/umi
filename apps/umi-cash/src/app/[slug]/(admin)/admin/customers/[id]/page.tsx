@@ -10,7 +10,7 @@ import { authedFetch } from '@/lib/authed-fetch';
 interface CustomerDetail {
   id: string; name: string | null; phone: string | null; email: string | null; device: string | null; os: string | null; birthDate: string | null;
   cardNumber: string; cardId: string; balanceMXN: string; balanceCentavos: number;
-  totalVisits: number; visitsThisCycle: number; visitsRequired: number; pendingRewards: number;
+  totalVisits: number; visitsThisCycle: number; visitsRequired: number; pendingRewards: number; rewardsRedeemed: number;
   lastVisit: string | null; createdAt: string;
   ltvCentavos: number; ltvMXN: string;
   totalTopupCentavos: number; totalTopupMXN: string;
@@ -166,14 +166,18 @@ export default function CustomerDetailPage() {
         </div>
       </div>
 
-      <div className={`u-fade-up d2 grid gap-3 mb-4 ${tenant.topupEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
+      <div className={`u-fade-up d2 grid gap-3 mb-4 ${tenant.topupEnabled ? 'grid-cols-2' : 'grid-cols-3'}`}>
         <div className="u-surface p-4 text-center">
           <p className="u-stat-num" style={{ fontSize: 22, color: 'var(--color-ink)' }}>{customer.totalVisits}</p>
           <p className="u-eyebrow mt-1">Visitas</p>
         </div>
         <div className="u-surface p-4 text-center">
           <p className="u-stat-num" style={{ fontSize: 22, color: 'var(--color-ink)' }}>{customer.pendingRewards}</p>
-          <p className="u-eyebrow mt-1">Premios</p>
+          <p className="u-eyebrow mt-1">Pendientes</p>
+        </div>
+        <div className="u-surface p-4 text-center">
+          <p className="u-stat-num" style={{ fontSize: 22, color: 'var(--color-ink)' }}>{customer.rewardsRedeemed}</p>
+          <p className="u-eyebrow mt-1">Canjeadas</p>
         </div>
         {tenant.topupEnabled && (
           <div className="u-surface p-4 text-center">

@@ -44,7 +44,7 @@ export async function GET(
 
   const { visitsRequired } = rewardConfigDefaults(rewardConfig);
 
-  const [recentVisits, recentTransactions, ltvAgg, topupAgg] = await Promise.all([
+  const [recentVisits, recentTransactions, ltvAgg, topupAgg, rewardsRedeemed] = await Promise.all([
     prisma.visit_events.findMany({
       where: { tenant_id: tenant.id, loyalty_card_id: card.id },
       orderBy: { occurred_at: 'desc' },
@@ -65,6 +65,12 @@ export async function GET(
       where: { tenant_id: tenant.id, loyalty_card_id: card.id, type: 'topup' },
       _sum: { amount_cents: true },
     }),
+    // Rewards redeemed over the card's lifetime. Counts the loyalty redemption
+    // ledger only — the same source the analytics dashboard counts — so birthday
+    // gifts stay out of the loyalty-cycle number.
+    prisma.reward_redemptions.count({
+      where: { tenant_id: tenant.id, loyalty_card_id: card.id },
+    }),
   ]);
 
   const ltvCentavos = Math.abs(ltvAgg._sum.amount_cents ?? 0);
@@ -82,7 +88,7 @@ export async function GET(
     cardNumber: card.card_number, cardId: card.id,
     balanceMXN: formatMXN(card.balance_cents), balanceCentavos: card.balance_cents,
     totalVisits: card.total_visits, visitsThisCycle: card.visits_this_cycle,
-    visitsRequired, pendingRewards: card.pending_rewards,
+    visitsRequired, pendingRewards: card.pending_rewards, rewardsRedeemed,
     lastVisit: recentVisits[0]?.occurred_at?.toISOString() ?? null,
     createdAt: (person.created_at ?? card.created_at).toISOString(),
     ltvCentavos, ltvMXN: formatMXN(ltvCentavos),
