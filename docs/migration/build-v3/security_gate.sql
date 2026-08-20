@@ -470,13 +470,18 @@ select * from (values
         group by password_hash, password_salt having count(*) > 1) s)),
   -- ⚠ A BACKFILL-FIDELITY check, not a schema one — its own label says
   -- "(functional)". It asserts that the migration preserved strong password
-  -- hashes, so it can only pass on a target the backfill has loaded. On a
-  -- pristine build `umi."user"` is EMPTY, and a FAIL there would be a false
-  -- verdict: nothing regressed, nothing was measured. It reports SKIP instead,
-  -- and the summary names every SKIP. Unmeasured is never approved.
+  -- hashes, so it can only pass on a target the backfill has loaded. Detect that
+  -- target from source-schema provenance, independently of migrated target rows.
+  -- A target-row probe could SKIP after a partial backfill lost the very fixture
+  -- it was looking for, turning migration damage into missing coverage.
+  -- `umi."user"` is not a safe probe: schema integration suites seed users, and
+  -- the Gift Card suite deliberately retains its append-only ledger fixture and
+  -- referenced user. A FAIL on that CI data would be a false verdict: nothing
+  -- regressed, nothing was measured. It reports SKIP instead, and the summary
+  -- names every SKIP. Unmeasured is never approved.
   ('some strong scrypt logins survive (functional)',
     (select case
-       when (select count(*) from umi."user") = 0 then 'SKIP'
+       when to_regclass('core.tenants') is null then 'SKIP'
        when count(*) >= 1 then 'PASS'
        else 'FAIL' end
      from umi."user"
