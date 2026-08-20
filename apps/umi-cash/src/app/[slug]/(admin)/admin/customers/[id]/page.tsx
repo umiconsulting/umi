@@ -15,7 +15,7 @@ interface CustomerDetail {
   ltvCentavos: number; ltvMXN: string;
   totalTopupCentavos: number; totalTopupMXN: string;
   recentVisits: { id: string; scannedAt: string }[];
-  recentRedemptions: { id: string; redeemedAt: string; staffName: string | null; note: string | null }[];
+  recentRedemptions: { id: string; redeemedAt: string; note: string | null }[];
   recentTransactions: { id: string; type: string; amountCentavos: number; description: string | null; createdAt: string }[];
 }
 
@@ -305,7 +305,7 @@ export default function CustomerDetailPage() {
 
       {customer.recentRedemptions?.length > 0 && (
         <div className="u-surface p-5 mb-4">
-          <div className="u-eyebrow mb-3">Recompensas canjeadas</div>
+          <div className="u-eyebrow mb-3">Últimos canjes</div>
           <div className="space-y-2">
             {customer.recentRedemptions.map((r) => (
               <div key={r.id} className="flex items-center justify-between text-sm gap-3">
@@ -321,9 +321,6 @@ export default function CustomerDetailPage() {
                   </span>
                   <span className="truncate" style={{ color: 'var(--color-ink)' }}>
                     {r.note || 'Recompensa canjeada'}
-                    {r.staffName && (
-                      <span style={{ color: 'var(--color-ink-light)' }}> · {r.staffName}</span>
-                    )}
                   </span>
                 </div>
                 <span className="shrink-0" style={{ color: 'var(--color-ink-light)' }}>

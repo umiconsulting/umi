@@ -43,41 +43,41 @@ export async function GET(
   }
 
   const { visitsRequired } = rewardConfigDefaults(rewardConfig);
+  const cardScope = { tenant_id: tenant.id, loyalty_card_id: card.id };
 
   const [recentVisits, recentTransactions, ltvAgg, topupAgg, rewardsRedeemed, recentRedemptions] = await Promise.all([
     prisma.visit_events.findMany({
-      where: { tenant_id: tenant.id, loyalty_card_id: card.id },
+      where: cardScope,
       orderBy: { occurred_at: 'desc' },
       take: 10,
     }),
     prisma.wallet_transactions.findMany({
-      where: { tenant_id: tenant.id, loyalty_card_id: card.id },
+      where: cardScope,
       orderBy: { created_at: 'desc' },
       take: 10,
     }),
     // LTV = sum of all purchase transactions (negative amounts = money spent at the store)
     prisma.wallet_transactions.aggregate({
-      where: { tenant_id: tenant.id, loyalty_card_id: card.id, type: 'purchase' },
+      where: { ...cardScope, type: 'purchase' },
       _sum: { amount_cents: true },
     }),
     // Total topped up = sum of all topup transactions
     prisma.wallet_transactions.aggregate({
-      where: { tenant_id: tenant.id, loyalty_card_id: card.id, type: 'topup' },
+      where: { ...cardScope, type: 'topup' },
       _sum: { amount_cents: true },
     }),
-    // Rewards redeemed over the card's lifetime. Counts the loyalty redemption
-    // ledger only — the same source the analytics dashboard counts — so birthday
-    // gifts stay out of the loyalty-cycle number.
-    prisma.reward_redemptions.count({
-      where: { tenant_id: tenant.id, loyalty_card_id: card.id },
-    }),
-    // The last redemptions themselves, so the count above can be read back as
-    // events. Same ledger as the count — the two can never disagree.
+    // Count every reward this card redeemed. This reads the loyalty ledger.
+    // Birthday gifts are in a different table, so they stay out of the count.
+    // The number covers one card. The visit and balance numbers above use the
+    // same card scope, so the screen stays consistent.
+    prisma.reward_redemptions.count({ where: cardScope }),
+    // Read the most recent redemptions from that same ledger. The list stops at
+    // 10 rows, but the count above has no limit. The page shows a footer when
+    // the two numbers differ.
     prisma.reward_redemptions.findMany({
-      where: { tenant_id: tenant.id, loyalty_card_id: card.id },
+      where: cardScope,
       orderBy: { redeemed_at: 'desc' },
       take: 10,
-      include: { staff_members: { select: { name: true } } },
     }),
   ]);
 
@@ -103,8 +103,7 @@ export async function GET(
     totalTopupCentavos, totalTopupMXN: formatMXN(totalTopupCentavos),
     recentVisits: recentVisits.map((v) => ({ id: v.id, scannedAt: v.occurred_at.toISOString() })),
     recentRedemptions: recentRedemptions.map((r) => ({
-      id: r.id, redeemedAt: r.redeemed_at.toISOString(),
-      staffName: r.staff_members?.name ?? null, note: r.note,
+      id: r.id, redeemedAt: r.redeemed_at.toISOString(), note: r.note,
     })),
     recentTransactions: recentTransactions.map((t) => ({
       id: t.id, type: t.type, amountCentavos: t.amount_cents,
