@@ -21,6 +21,23 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-08-21 - Run the current Build v3 cutover rehearsal
+- task type: cross-product migration-gate validation
+- request summary: Merge the dashboard-session PR and continue with the next cutover step.
+- filesystem slice inspected: `docs/migration/build-v3/**`, `apps/umi-api/src/smoke.integration.ts`, and the current PostgreSQL snapshot of production
+- chosen owner: root Build v3 migration plan for the rehearsal; `apps/umi-api` for its endpoint smoke instrument
+- chosen path: Rebuild a clean target from the current snapshot. Run reconciliation and the migration family. Make each required runtime input explicit.
+- skill or subagent used: `task-router`, `diagnosing-bugs`, and `tdd`
+- files touched: endpoint smoke harness, Build v3 gated cutover plan, and this ledger
+- tools used: PostgreSQL, Vitest, Azure DevOps MCP, Git, and GitHub CLI
+- outcome: Reconciliation passed with zero drift for five merchants. The gate carried exactly 751 passes and 733 device registrations. All 24 migration tests passed.
+- reusable pattern observed: A smoke failure in a migration can show a missing runtime input. It does not always show a schema defect.
+- promotion follow-up: none; the requirement belongs in the existing smoke instrument for migration
+- decision basis:
+  - documented fact: the customer QR route signs an HS256 credential and cannot operate without `APP_QR_SECRET`.
+  - source-backed tradeoff: none; this change records and validates an existing application requirement.
+  - Umi-specific inference: Use the byte-identical production value for the formal cutover. Existing wallet barcodes depend on this value. A synthetic value proves only route mechanics.
+
 ### 2026-08-21 - Revoke and rotate dashboard refresh sessions
 - task type: authentication security and Build v3 schema fix
 - request summary: Continue the Build v3 cutover work after AB#111.
