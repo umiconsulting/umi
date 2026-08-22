@@ -1,4 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
+import type { CashAccessRole } from '../../shared/auth/customer-token.service';
 
 export const ACCEPT_REGISTER_TOKEN = 'accept_register_token';
 
@@ -25,4 +26,4 @@ export const ACCEPT_REGISTER_TOKEN = 'accept_register_token';
 export const AcceptRegisterToken = () => SetMetadata(ACCEPT_REGISTER_TOKEN, true);
 
 /** What the register calls a staff session. `cash-roles.ts` mints only these two. */
-export const REGISTER_STAFF_ROLES: ReadonlySet<string> = new Set(['ADMIN', 'STAFF']);
+export const REGISTER_STAFF_ROLES: ReadonlySet<CashAccessRole> = new Set(['ADMIN', 'STAFF']);

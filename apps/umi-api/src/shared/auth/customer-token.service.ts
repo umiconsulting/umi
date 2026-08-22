@@ -3,7 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import { jwtVerify } from 'jose';
 import type { AppConfig } from '../config/config.schema';
 
-export interface CustomerClaims {
+const CUSTOMER_ROLE = 'CUSTOMER' as const;
+const BEARER_PREFIX = 'Bearer ';
+
+export type CashAccessRole = typeof CUSTOMER_ROLE | 'ADMIN' | 'STAFF';
+
+export interface CashAccessClaims {
   /** The subject this token speaks for — a customer id, or a user id for staff. */
   subjectId: string;
   /** The café the session belongs to. */
@@ -18,7 +23,25 @@ export interface CustomerClaims {
    * that reads the subject without reading the role is asking one table a
    * question about the other.
    */
-  role: string | null;
+  role: CashAccessRole | null;
+}
+
+export interface CustomerClaims extends CashAccessClaims {
+  role: typeof CUSTOMER_ROLE;
+}
+
+function isCustomerClaims(claims: CashAccessClaims): claims is CustomerClaims {
+  return claims.role === CUSTOMER_ROLE;
+}
+
+function cashAccessRole(value: unknown): CashAccessRole | null {
+  if (value === CUSTOMER_ROLE || value === 'ADMIN' || value === 'STAFF') return value;
+  return null;
+}
+
+function bearerToken(header: string | undefined): string | null {
+  if (!header?.startsWith(BEARER_PREFIX)) return null;
+  return header.slice(BEARER_PREFIX.length) || null;
 }
 
 /**
@@ -50,6 +73,18 @@ export class CustomerTokenService {
   }
 
   async verify(token: string): Promise<CustomerClaims | null> {
+    const claims = await this.verifySharedAccess(token);
+    return claims && isCustomerClaims(claims) ? claims : null;
+  }
+
+  /**
+   * Verify either audience signed by Cash's shared access key.
+   *
+   * This wider seam exists only for the register opt-in guard, which must accept
+   * STAFF and ADMIN bearer tokens from the frozen umi-cash client. Customer
+   * routes use `verify`/`fromHeader`, where the audience check is mandatory.
+   */
+  async verifySharedAccess(token: string): Promise<CashAccessClaims | null> {
     if (!this.key) return null;
     try {
       const { payload } = await jwtVerify(token, this.key, { algorithms: ['HS256'] });
@@ -62,7 +97,7 @@ export class CustomerTokenService {
       const subjectId = String(claims.sub ?? '');
       const merchantId = String(claims.merchantId ?? claims.tenantId ?? '');
       if (!subjectId || !merchantId) return null;
-      const role = typeof claims.role === 'string' ? claims.role : null;
+      const role = cashAccessRole(claims.role);
       return { subjectId, merchantId, role };
     } catch {
       return null;
@@ -71,7 +106,13 @@ export class CustomerTokenService {
 
   /** Read `Authorization: Bearer <token>` and verify it. */
   async fromHeader(header: string | undefined): Promise<CustomerClaims | null> {
-    if (!header?.startsWith('Bearer ')) return null;
-    return this.verify(header.slice('Bearer '.length));
+    const token = bearerToken(header);
+    return token ? this.verify(token) : null;
+  }
+
+  /** Wider register-only counterpart to `fromHeader`; the caller must enforce its staff roles. */
+  async fromSharedAccessHeader(header: string | undefined): Promise<CashAccessClaims | null> {
+    const token = bearerToken(header);
+    return token ? this.verifySharedAccess(token) : null;
   }
 }
