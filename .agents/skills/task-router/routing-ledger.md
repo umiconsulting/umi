@@ -21,6 +21,23 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-08-21 - Revoke and rotate dashboard refresh sessions
+- task type: authentication security and Build v3 schema fix
+- request summary: Continue the Build v3 cutover work after AB#111.
+- filesystem slice inspected: `apps/umi-api/src/modules/auth/**`, shared JWT support, and `docs/migration/build-v3/**`
+- chosen owner: `apps/umi-api` authentication, with the shared session shape owned by the Build v3 DDL
+- chosen path: Persist a hashed dashboard refresh token. Rotate it on use. Detect replay by family. Revoke the family on logout.
+- skill or subagent used: `task-router`, `tdd`, `scientific-research-check`, and `code-review`
+- files touched: dashboard auth service, controller, repository, JWT support and tests; Build v3 runtime DDL, reconciliation, and cutover plan
+- tools used: Azure DevOps MCP, Git/GitHub CLI, pnpm gates, disposable PostgreSQL, a production-shaped snapshot clone, and OAuth RFCs
+- outcome: All 749 unit tests and 77 fresh-schema integration tests pass. The five-merchant rehearsal clone passes reconciliation, 49 structural security checks, and 3 behavioral checks.
+- reusable pattern observed: A refresh JWT is not a revocable session until the server stores a one-way token reference and controls its family lifecycle.
+- promotion follow-up: none; the session repository is the narrow existing owner
+- decision basis:
+  - documented fact: Dashboard login happens before merchant selection, and a platform user can have no merchant membership.
+  - source-backed tradeoff: RFC 9700 recommends refresh rotation with replay detection. RFC 7009 defines token revocation and notes that logout can revoke related tokens.
+  - Umi-specific inference: Reuse `runtime.session`. Allow a merchantless row only for a dashboard user marked in metadata. Keep device, Cash staff, and customer sessions merchant-scoped.
+
 ### 2026-08-21 - Enforce the Cash customer-token audience
 - task type: fix for an authentication boundary
 - request summary: Continue the Build v3 cutover path after PR #128 merged.

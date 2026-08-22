@@ -28,6 +28,12 @@ describe('JwtService', () => {
     const svc = jwtWith(FULL);
     const token = await svc.signRefresh('u9');
     expect(await svc.verifyRefresh(token)).toBe('u9');
+    expect(svc.refreshExpiresAt(token).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('makes two refresh tokens for one user distinct', async () => {
+    const svc = jwtWith(FULL);
+    expect(await svc.signRefresh('u9')).not.toBe(await svc.signRefresh('u9'));
   });
 
   it('rejects an access token presented as a refresh token (kind mismatch)', async () => {

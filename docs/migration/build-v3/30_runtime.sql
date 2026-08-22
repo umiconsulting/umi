@@ -25,10 +25,12 @@ create schema if not exists runtime;
 -- could represent neither a device nor a customer session. token_hash is UNIQUE:
 -- the cash path relies on it to 409 a double-submit instead of 500.
 --   Worker-only (90_rls): api gets NO grant, so no RLS policy is needed;
---   merchant_id is still carried, to scope the worker's own reads.
+--   every merchant-owned reader still carries an explicit merchant predicate.
 create table runtime.session (
   id             uuid primary key default gen_random_uuid(),
-  merchant_id    uuid not null references merchant.merchant(id) on delete cascade,
+  -- NULL only for a dashboard user session. Dashboard login happens before a café
+  -- is selected, and a platform operator may have no café employment at all.
+  merchant_id    uuid references merchant.merchant(id) on delete cascade,
   principal_type text not null check (principal_type in ('user','device','person')),
   principal_id   uuid not null,                        -- soft ref, resolved by principal_type
   token_hash     text not null,
@@ -51,7 +53,11 @@ create table runtime.session (
   revoked_at        timestamptz,
   revoked_reason    text,
   created_at     timestamptz not null default now(),
-  constraint session_revocation_ck check (is_active = (revoked_at is null))
+  constraint session_revocation_ck check (is_active = (revoked_at is null)),
+  constraint session_merchant_scope_ck check (
+    merchant_id is not null or
+    (principal_type = 'user' and coalesce(metadata->>'client' = 'dashboard', false))
+  )
 );
 create unique index session_token_hash_uidx on runtime.session (token_hash);
 create index session_live_idx on runtime.session (merchant_id, principal_type) where is_active;

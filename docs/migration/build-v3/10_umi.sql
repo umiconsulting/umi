@@ -201,12 +201,11 @@ comment on column umi.user_role.expires_at is
 --
 -- WHY NOT runtime.elevation_grant, which already models exactly this shape:
 --   1. its merchant_id is NOT NULL — a platform action has no café;
---   2. its session_id points at runtime.session, whose merchant_id is also NOT NULL;
---   3. its method CHECK admits only manager_approval / operator_pin — a till's two
+--   2. its method CHECK admits only manager_approval / operator_pin — a till's two
 --      answers, neither of which describes a platform approval;
---   4. its RLS policy keys on merchant_id, and a NULL merchant makes a USING clause
+--   3. its RLS policy keys on merchant_id, and a NULL merchant makes a USING clause
 --      return NULL, which silently hides the row, while WITH CHECK raises instead;
---   5. 90_rls grants it to `api`. THIS is the decisive one. An elevation record the
+--   4. 90_rls grants it to `api`. THIS is the decisive one. An elevation record the
 --      request path can write is not a control — the request path could elevate
 --      itself. `umi.user_role` is sealed from `api` for the same reason and
 --      security_gate.sql asserts it. This table joins that seal.
