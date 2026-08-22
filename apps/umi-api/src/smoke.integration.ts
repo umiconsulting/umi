@@ -26,6 +26,7 @@ import { WalletPassService } from './modules/wallet/wallet-pass.service';
  * bodies at this clone would mutate the rehearsal data and prove less.
  *
  *   DATABASE_URL_APP=…rehearsal DATABASE_URL_WORKER=…rehearsal \
+ *     APP_QR_SECRET='<byte-identical to umi-cash production>' \
  *     npx vitest run --config vitest.integration.config.ts smoke
  */
 
@@ -270,6 +271,14 @@ describe('build-v3 smoke · every read endpoint', () => {
   }
 
   beforeAll(async () => {
+    if (!process.env.APP_QR_SECRET) {
+      throw new Error(
+        'APP_QR_SECRET is required for the migration smoke. The customer QR route signs a ' +
+          'real five-minute credential, and the cutover value must be byte-identical to ' +
+          'umi-cash production so existing wallet barcodes continue to verify.',
+      );
+    }
+
     fx = await resolveFixtures(process.env.DATABASE_URL_WORKER!);
 
     // Wired like `main.ts`. Without `fastifyCookie` the AuthGuard sees no cookies

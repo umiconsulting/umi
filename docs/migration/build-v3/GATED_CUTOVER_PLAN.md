@@ -421,14 +421,15 @@ that P5 preserved.
 
 ### P6 — Deployment-gate provisioning (`SECURITY_GATE.md §4`) ◑ PARTIAL
 
-**Done:** D1 (boot-guard role reconciliation, `PR #51`) · D2 (dual-GUC expand/contract) · D11 (auth
-substrate worker-only + static AST gate, `PR #51`).
-**Pending:** D3 pooler SET-LOCAL isolation · D4 TLS verify-full (VPS→Supabase) · D5 SCRAM verifiers on
+**Done:** D1 (boot-guard role reconciliation, `PR #51`) · D2 (dual-GUC expand/contract) · D3
+(pooler SET-LOCAL isolation, 5/5 on the current rehearsal) · D11 (auth substrate worker-only +
+static AST gate, `PR #51`).
+**Pending:** D4 TLS verify-full (VPS→Supabase) · D5 SCRAM verifiers on
 login roles · D6 pg_hba/network · D7 extensions · D8 no FDW remnants · D9 secret rotation + history scrub
 ([[project_cred_exposure_2026_06_20]]) · D10 request-path log redaction.
 **DoD.** Every §4 row checked with recorded evidence.
 
-### P7 — Cutover rehearsal → production cutover ⏳ PENDING
+### P7 — Cutover rehearsal → production cutover 🔄 IN PROGRESS
 
 **Goal.** The coordinated one-shot flip (downtime OK, same DB, no split-brain).
 **Mechanism — FDW replay.** Port the 7-file backfill from local `INSERT…SELECT` to `postgres_fdw`
@@ -466,11 +467,36 @@ card, pass, and device registration were then removed. Counts returned to **417 
 registration, APNs, change-list, and download mechanics for a new rehearsal pass. It does **not**
 prove the frozen production host or continuity for a pass issued before cutover.
 
+**Current full rehearsal (2026-08-21).** The backfill runner rebuilt a clean target from
+`umi_prod_snapshot_20260818`. It selected the actual bootstrap holder. Reconciliation passes for
+all five merchants. It reports 794/794 contacts and 783/783 customers. The one gift card and its
+ledger have zero drift.
+
+The larger set of wallet rows also carries exactly:
+
+- **751 passes**: 637 Apple passes and 114 Google passes.
+- **637/637 Apple web-service tokens**.
+- **733/733 device push tokens**.
+
+The migration family passes 24/24. RLS passes 9/9, pooler isolation passes 5/5, identity
+normalization passes 8/8, and endpoint smoke passes 2/2. The smoke exercises 56 GET routes. Fifty
+routes answer below 400. The smoke expects six local exceptions for signer configuration or input.
+The customer QR route answers 200 when the command supplies `APP_QR_SECRET`.
+
+The rehearsal command now names `APP_QR_SECRET`. It fails early if the value is absent.
+
+The current security gate passes **48 structural and 3 behavioral checks** and reports one
+acknowledged gap. The holder of the bootstrap role has no enrolled MFA. This check now measures an
+active holder. AB#115 tracks this P7 decision.
+
 **What remains for P7:**
 
 1. Move and validate the APNs, WWDR, Apple signer, and Google service-account secrets under D9.
-2. Exercise the frozen `cash.umiconsulting.co` host through the production routing layer.
-3. Update a pass issued **before** cutover on a real phone after the production flip.
+2. Choose the MFA action under AB#115.
+   - Enroll the holder of the production bootstrap role.
+   - Approve a documented exception with a review date.
+3. Exercise the frozen `cash.umiconsulting.co` host through the production routing layer.
+4. Update a pass issued **before** cutover on a real phone after the production flip.
 
 **The formal rehearsal repeats this proof through production routing.** A green suite proves the row
 moved; the local phone run proves Apple accepted a newly generated token and notification. The
@@ -504,26 +530,25 @@ updates on a real device after the flip.**
 
 > **Next, in order.**
 >
-> 1. **P6 deployment gates D3–D10**, which nothing else blocks and which P7 cannot start without.
-> 2. **P7 cutover rehearsal**, including production routing, signer credentials, APNs, Google, and
->    the pre-cutover-pass update on real phones.
+> 1. **P6 production deployment evidence D4–D10.** D3 now passes 5/5 on the current rehearsal.
+> 2. **Finish P7**, including the bootstrap-holder MFA decision, production routing, signer
+>    credentials, APNs, Google, and the pre-cutover-pass update on a real phone.
 >
-> Two items have no phase and must not be lost:
+> Two cross-cutover items must not be lost:
 >
-> - The production bootstrap holder needs recorded **MFA evidence**. The local snapshot has no
->   platform holder, so its green row is vacuous even though the challenge contract now works.
+> - The production bootstrap holder needs recorded **MFA evidence**. The current rehearsal has one
+>   active platform holder and zero enrolled holders, so the gate reports an acknowledged gap.
 > - **Ask the acquirer in writing which PCI questionnaire applies to UmiPOS.** SAQ P2PE would drop
 >   Requirements 7, 8 and 10 from scope entirely, so the answer changes how much of the access work
 >   above is obligatory rather than merely correct. Ask at contract time, not after.
 
-- **Evaluated base:** `origin/build-v3` at `c773d626dd2d4c8f74bb5c8451aa40102fff5895`,
-  the merge of Gift Card PR **#127**. Verified implementation head
-  `0b3e561db0ec84715a2b1e86b8f8adbe97cb5582` is its feature parent. Azure Boards #9–#13 carry the
-  dated evidence and are closed against the merge. The merge sequence since #65 starts with **#66** cash
-  loyalty convergence and **#67** birthday grants. **#68** added the conversation pipeline. **#69**
-  removed cash-rename residue. **#70** added Customer 360, and **#71** moved leads to `umi.prospect`.
-  **#73** folded the UmiPOS schema and contract. **#74** unified open hours. **#75** renamed merchant
-  and location concepts. **#76** defined the principal and its permissions.
+- **Evaluated base:** `origin/build-v3` at `c9d4f6d4c1e796bfda1c4d6e1546f6c362f6d5af`,
+  which merged dashboard-session PR **#130**. PR **#128** closed Gift Card convergence. PR **#129**
+  enforced the customer-token audience. PR **#130** added dashboard refresh rotation, replay
+  detection, and logout revocation. Azure Boards marks #9–#13 as closed with dated evidence.
+- **Earlier merge sequence:** PR **#66** added Cash loyalty convergence. PR **#67** added birthday
+  grants. PR **#68** added the conversation pipeline. PR **#69** removed residue from the Cash
+  rename. PR **#70** added Customer 360. PR **#71** moved leads to `umi.prospect`.
 - **The last four PRs came in from a different direction.** #73 to #76 were not planned on this
   spine; they arrived with the UmiPOS integration and then with a design question the owner asked
   about it ("a staff member is not a user but still holds a PIN"). They land here because they moved
@@ -547,12 +572,14 @@ updates on a real device after the flip.**
   two in `kds.repository.ts` and one in `cash.repository.ts`. They are unmeasured coverage debt,
   not known schema failures.
 
-- **The local gate has 0 acknowledged gaps, but its platform-MFA row is vacuous on the throwaway
-  snapshot.** The rehearsal deliberately used the local-only bootstrap address, so it created no
-  platform administrator. `umi.user` carries `mfa_method` and `mfa_enrolled_at`. The dashboard now
-  understands the MFA challenge contract. P7 must seed the real bootstrap holder and record its
-  second factor. A PASS over zero holders is structural evidence, not production enrollment
-  evidence.
+- **The current local gate has one acknowledged gap, and its platform-MFA row is no longer
+  vacuous.** The clean rehearsal selected `hola@umiconsulting.co` as the bootstrap holder. The
+  target has one active platform holder and zero enrolled holders. Across all nine users, zero have
+  a non-null `mfa_method`; zero active staff memberships belong to an MFA-enrolled user. The Cash
+  bypass in AB#115 is therefore latent in this snapshot, while bootstrap-holder enrollment remains
+  a real P7 blocker. `umi.user` carries `mfa_method` and `mfa_enrolled_at`, and the dashboard
+  understands the MFA challenge contract; production still needs the factor enrolled or an explicit
+  owner-approved disposition.
 
   ⚠️ **The gate was over-reporting.** It scanned backtick spans over raw file text, so a doc
   comment that QUOTES SQL counted as a statement: `kds.repository.ts` explains a rewrite with
@@ -571,9 +598,10 @@ updates on a real device after the flip.**
   −13, checkout −7 (both files gone from the rollup), then **#63 retired the KDS read/write half and
   #65 the auth half — `kds/kds.repository.ts` is now absent from the rollup entirely (40 → 0).**
 
-- **Units:** 749/749. **Schema integration:** 77/77. **Typecheck/lint:** PASS.
-  `security_gate.sql` passes 49 structural and 3 behavioral checks. Snapshot reconciliation passes
-  exact card rows, exact ledger rows, and per-card balances with zero mismatches.
+- **Units:** 749/749. **Schema integration:** 77/77. **Migration integration:** 24/24.
+  **Typecheck/lint:** PASS. On the current bootstrap-holder rehearsal, `security_gate.sql` passes 48
+  structural and 3 behavioral checks and reports the one MFA gap above. Snapshot reconciliation
+  passes exact card rows, exact ledger rows, and per-card balances with zero mismatches.
 - **Branch protection (2026-07-21):** `build-v3` requires a branch to be UP TO DATE with base before
   merging (`strict: true`), enforced for admins. Closes the stale-base hole: the tree CI tested is the
   tree that lands.
