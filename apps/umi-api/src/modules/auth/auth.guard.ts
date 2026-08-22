@@ -73,7 +73,7 @@ export class AuthGuard implements CanActivate {
    */
   private async authenticateRegister(req: AuthedRequest): Promise<boolean> {
     const header = (req as { headers?: Record<string, string | undefined> }).headers?.authorization;
-    const claims = await this.registerTokens.fromHeader(header);
+    const claims = await this.registerTokens.fromSharedAccessHeader(header);
     if (!claims) return false;
     if (!claims.role || !REGISTER_STAFF_ROLES.has(claims.role)) return false;
 

@@ -21,6 +21,23 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-08-21 - Enforce the Cash customer-token audience
+- task type: fix for an authentication boundary
+- request summary: Continue the Build v3 cutover path after PR #128 merged.
+- filesystem slice inspected: `apps/umi-api/src/shared/auth/**`, `apps/umi-api/src/modules/auth/**`, and the two Cash session issuers
+- chosen owner: `apps/umi-api` shared authentication
+- chosen path: Keep shared-key checks for the register guard. Make the customer verifier reject all other roles.
+- skill or subagent used: `task-router`, `tdd`, and `code-review`
+- files touched: customer token service and regression test, register auth guard
+- tools used: Azure DevOps MCP, Git/GitHub CLI, pnpm unit/typecheck/lint/build/format gates
+- outcome: The test failed before the fix and passed after it. All 743 API unit tests pass.
+- reusable pattern observed: A signature check and an audience check need separate names when one key signs two token types.
+- promotion follow-up: none; the pattern is already local to the shared-auth module
+- decision basis:
+  - documented fact: Both Cash session issuers set `role` to `CUSTOMER` for a customer token.
+  - source-backed tradeoff: RFC 8725 section 3.12 requires separate validation rules for each JWT type.
+  - Umi-specific inference: The register needs the shared-key method until the frozen Cash client changes.
+
 ### 2026-08-19 - Close the Build v3 gift-card convergence blocker
 - task type: cross-product schema, backfill, backend, and route convergence
 - request summary: Compare exact `build-v3` with the cutover plan, Azure Boards, and CodeGraph, then implement the next logical step.
