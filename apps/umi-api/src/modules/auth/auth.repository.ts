@@ -274,6 +274,148 @@ export class AuthRepository {
     return rows[0] ?? null;
   }
 
+  /** Start one dashboard refresh-token family. Dashboard sessions have no café scope. */
+  async startDashboardSession(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
+    await this.pg.query(
+      `INSERT INTO runtime.session
+         (merchant_id, principal_type, principal_id, token_hash, expires_at, metadata)
+       VALUES (NULL, 'user', $1::uuid, $2, $3, '{"client":"dashboard"}'::jsonb)`,
+      [userId, tokenHash, expiresAt],
+    );
+  }
+
+  /**
+   * Replace one dashboard refresh token and keep its family link.
+   *
+   * The row lock makes two uses of one token serial. The first use rotates it.
+   * The second use sees a replaced token and revokes the live family as a replay.
+   */
+  async rotateDashboardSession(
+    userId: string,
+    currentTokenHash: string,
+    nextTokenHash: string,
+    nextExpiresAt: Date,
+  ): Promise<boolean> {
+    return this.pg.workerTx(async (client) => {
+      // Token rows change as the chain rotates, but the family id does not. A
+      // transaction-level family lock serializes A-replay with B→C rotation as
+      // well as two uses of the same token. Hash collisions only serialize two
+      // unrelated families; they cannot weaken the revocation guarantee.
+      const family = await client.query<{ refresh_family_id: string }>(
+        `SELECT refresh_family_id::text,
+                pg_advisory_xact_lock(hashtextextended(refresh_family_id::text, 0))
+           FROM runtime.session
+          WHERE merchant_id IS NULL
+            AND principal_type = 'user'
+            AND token_hash = $1`,
+        [currentTokenHash],
+      );
+      if (!family.rows[0]) return false;
+
+      const { rows } = await client.query<{
+        id: string;
+        principal_id: string;
+        refresh_family_id: string;
+        replaced_by_id: string | null;
+        is_active: boolean;
+        unexpired: boolean;
+      }>(
+        `SELECT id::text, principal_id::text, refresh_family_id::text,
+                replaced_by_id::text, is_active,
+                (expires_at IS NULL OR expires_at > now()) AS unexpired
+           FROM runtime.session
+          WHERE merchant_id IS NULL
+            AND principal_type = 'user'
+            AND token_hash = $1`,
+        [currentTokenHash],
+      );
+      const current = rows[0];
+      if (!current || current.principal_id !== userId) return false;
+
+      if (!current.is_active || current.replaced_by_id) {
+        if (current.replaced_by_id) {
+          await client.query(
+            `UPDATE runtime.session
+                SET is_active = false,
+                    revoked_at = now(),
+                    revoked_reason = 'refresh_reuse'
+              WHERE merchant_id IS NULL
+                AND principal_type = 'user'
+                AND refresh_family_id = $1::uuid
+                AND is_active`,
+            [current.refresh_family_id],
+          );
+        }
+        return false;
+      }
+
+      if (!current.unexpired) {
+        await client.query(
+          `UPDATE runtime.session
+              SET is_active = false,
+                  revoked_at = now(),
+                  revoked_reason = 'expired'
+            WHERE id = $1::uuid AND is_active`,
+          [current.id],
+        );
+        return false;
+      }
+
+      const next = await client.query<{ id: string }>(
+        `INSERT INTO runtime.session
+           (merchant_id, principal_type, principal_id, token_hash, expires_at,
+            refresh_family_id, metadata)
+         VALUES (NULL, 'user', $1::uuid, $2, $3, $4::uuid,
+                 '{"client":"dashboard"}'::jsonb)
+         RETURNING id::text`,
+        [userId, nextTokenHash, nextExpiresAt, current.refresh_family_id],
+      );
+      await client.query(
+        `UPDATE runtime.session
+            SET is_active = false,
+                revoked_at = now(),
+                revoked_reason = 'rotated',
+                replaced_by_id = $2::uuid
+          WHERE id = $1::uuid`,
+        [current.id, next.rows[0].id],
+      );
+      return true;
+    });
+  }
+
+  /** End every live token in the dashboard family named by this token. */
+  async revokeDashboardSession(tokenHash: string): Promise<boolean> {
+    return this.pg.workerTx(async (client) => {
+      // Use the same stable lock as rotation. A logout with stale token A must
+      // serialize with a concurrent refresh of its current replacement B.
+      const target = await client.query<{ refresh_family_id: string }>(
+        `SELECT refresh_family_id::text,
+                pg_advisory_xact_lock(hashtextextended(refresh_family_id::text, 0))
+           FROM runtime.session
+          WHERE merchant_id IS NULL
+            AND principal_type = 'user'
+            AND token_hash = $1`,
+        [tokenHash],
+      );
+      const familyId = target.rows[0]?.refresh_family_id;
+      if (!familyId) return false;
+
+      const { rows } = await client.query<{ id: string }>(
+        `UPDATE runtime.session
+            SET is_active = false,
+                revoked_at = now(),
+                revoked_reason = 'logout'
+          WHERE merchant_id IS NULL
+            AND principal_type = 'user'
+            AND refresh_family_id = $1::uuid
+            AND is_active
+        RETURNING id::text`,
+        [familyId],
+      );
+      return rows.length > 0;
+    });
+  }
+
   /**
    * Active merchant memberships + role for the login response body / merchant picker.
    * One employment per (login, merchant), so one café role. A platform operator sees

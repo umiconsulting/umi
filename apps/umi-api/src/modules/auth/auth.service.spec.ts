@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { AuthService, isMfaChallenge, type LoginOutcome } from './auth.service';
 
 function make() {
@@ -10,6 +11,9 @@ function make() {
     findMerchantsForUser: vi.fn().mockResolvedValue([]),
     // Most logins hold no platform grant, which is the default worth testing.
     platformRole: vi.fn().mockResolvedValue(null),
+    startDashboardSession: vi.fn().mockResolvedValue(undefined),
+    rotateDashboardSession: vi.fn().mockResolvedValue(true),
+    revokeDashboardSession: vi.fn().mockResolvedValue(true),
     insertResetToken: vi.fn().mockResolvedValue(undefined),
     findResetToken: vi.fn(),
     updatePassword: vi.fn().mockResolvedValue(undefined),
@@ -23,6 +27,8 @@ function make() {
   const jwt = {
     signAccess: vi.fn().mockResolvedValue('access-tok'),
     signRefresh: vi.fn().mockResolvedValue('refresh-tok'),
+    refreshExpiresAt: vi.fn().mockReturnValue(new Date('2026-09-20T00:00:00Z')),
+    verifyRefresh: vi.fn().mockResolvedValue('u1'),
     signMfaChallenge: vi.fn().mockResolvedValue('challenge-tok'),
     verifyMfaChallenge: vi.fn().mockResolvedValue('u1'),
   };
@@ -59,6 +65,8 @@ const CRED = {
   mfaMethod: null,
 };
 
+const hashOf = (token: string) => createHash('sha256').update(token).digest('hex');
+
 describe('AuthService.login', () => {
   let h: ReturnType<typeof make>;
   beforeEach(() => (h = make()));
@@ -77,6 +85,11 @@ describe('AuthService.login', () => {
       email: 'owner@kala.co',
       displayName: 'Owner',
     });
+    expect(h.repo.startDashboardSession).toHaveBeenCalledWith(
+      'u1',
+      hashOf('refresh-tok'),
+      new Date('2026-09-20T00:00:00Z'),
+    );
   });
 
   it('401s on wrong password', async () => {
@@ -88,6 +101,53 @@ describe('AuthService.login', () => {
   it('401s (no enumeration) on unknown user', async () => {
     h.repo.findCredentialByEmail.mockResolvedValue(null);
     await expect(h.svc.login('nobody@x.co', 'pw')).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+});
+
+describe('AuthService.refresh and logout · stateful dashboard session', () => {
+  let h: ReturnType<typeof make>;
+
+  beforeEach(() => {
+    h = make();
+    h.repo.findUserById.mockResolvedValue({
+      userId: 'u1',
+      email: 'owner@kala.co',
+      displayName: 'Owner',
+    });
+  });
+
+  it('rejects a signed refresh token that has no live session row', async () => {
+    h.repo.rotateDashboardSession.mockResolvedValue(false);
+
+    await expect(h.svc.refresh('signed-but-untracked')).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+  });
+
+  it('replaces the current refresh session before it returns new tokens', async () => {
+    await expect(h.svc.refresh('refresh-old')).resolves.toMatchObject({
+      accessToken: 'access-tok',
+      refreshToken: 'refresh-tok',
+    });
+
+    expect(h.repo.rotateDashboardSession).toHaveBeenCalledWith(
+      'u1',
+      hashOf('refresh-old'),
+      hashOf('refresh-tok'),
+      new Date('2026-09-20T00:00:00Z'),
+    );
+  });
+
+  it('revokes the session family when the user logs out', async () => {
+    await h.svc.logout('refresh-old');
+
+    expect(h.repo.revokeDashboardSession).toHaveBeenCalledWith(hashOf('refresh-old'));
+  });
+
+  it('does not report a successful logout when revocation fails', async () => {
+    h.repo.revokeDashboardSession.mockRejectedValue(new Error('database unavailable'));
+
+    await expect(h.svc.logout('refresh-old')).rejects.toThrow('database unavailable');
   });
 });
 

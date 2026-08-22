@@ -65,6 +65,7 @@ describe('POST /api/auth/local/login · the two-outcome contract', () => {
   const auth = {
     login: vi.fn(),
     verifyMfa: vi.fn(async () => SESSION_RESULT),
+    logout: vi.fn(async () => undefined),
   };
 
   beforeAll(async () => {
@@ -210,6 +211,19 @@ describe('POST /api/auth/local/login · the two-outcome contract', () => {
         payload: { challengeToken: 'tok', code: '012345' },
       });
       expect(auth.verifyMfa).toHaveBeenCalledWith('tok', '012345');
+    });
+  });
+
+  describe('POST /api/auth/local/logout', () => {
+    it('presents the refresh cookie for server-side revocation', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/auth/local/logout',
+        headers: { cookie: 'umi_refresh=refresh-token' },
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(auth.logout).toHaveBeenCalledWith('refresh-token');
     });
   });
 });

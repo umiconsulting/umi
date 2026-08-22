@@ -143,7 +143,11 @@ export class AuthController {
 
   @Public()
   @Post('local/logout')
-  logout(@Res({ passthrough: true }) reply: FastifyReply): { ok: true } {
+  async logout(
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<{ ok: true }> {
+    await this.auth.logout(req.cookies?.[REFRESH_COOKIE]);
     for (const name of [ACCESS_COOKIE, REFRESH_COOKIE, CSRF_COOKIE, REMEMBER_COOKIE]) {
       reply.clearCookie(name, { path: '/' });
     }

@@ -160,7 +160,7 @@ export class AuthService {
     return this.loginResultFor(user);
   }
 
-  /** Rotate the access token from a valid refresh token. */
+  /** Rotate a live dashboard session and return its new token pair. */
   async refresh(refreshToken: string): Promise<LoginResult> {
     const userId = await this.jwt.verifyRefresh(refreshToken);
     const summary = await this.repo.findUserById(userId);
@@ -170,7 +170,29 @@ export class AuthService {
       email: summary.email,
       displayName: summary.displayName,
     };
-    return this.loginResultFor(user);
+    // Complete response reads before rotation. An error after rotation would
+    // leave the client with the replaced token. Its retry would
+    // look like a replay attack.
+    const [merchants, platformRole] = await Promise.all([
+      this.repo.findMerchantsForUser(user.id),
+      this.repo.platformRole(user.id),
+    ]);
+    const tokens = await this.signTokens(user);
+    const rotated = await this.repo.rotateDashboardSession(
+      user.id,
+      hashToken(refreshToken),
+      hashToken(tokens.refreshToken),
+      this.jwt.refreshExpiresAt(tokens.refreshToken),
+    );
+    if (!rotated) throw new UnauthorizedException('invalid_token');
+
+    return { user, merchants, platformRole: narrowPlatformRole(platformRole), ...tokens };
+  }
+
+  /** End the dashboard refresh-token family. Cookie clearing stays in the controller. */
+  async logout(refreshToken: string | undefined): Promise<void> {
+    if (!refreshToken) return;
+    await this.repo.revokeDashboardSession(hashToken(refreshToken));
   }
 
   /** Rehydrate the session for `/me` from a verified access cookie. */
@@ -197,22 +219,27 @@ export class AuthService {
     };
   }
 
-  /**
-   * The three ways a session begins — password, second factor, refresh — return
-   * the same envelope, so they build it in one place. They had drifted before:
-   * `platformRole` reached `/me` and none of the three, which would have shown a
-   * platform screen only after a page reload.
-   */
+  /** Password and second-factor login start a new durable session. */
   private async loginResultFor(user: SessionUser): Promise<LoginResult> {
     const [merchants, platformRole, tokens] = await Promise.all([
       this.repo.findMerchantsForUser(user.id),
       this.repo.platformRole(user.id),
-      this.issueTokens(user),
+      this.issueSessionTokens(user),
     ]);
     return { user, merchants, platformRole: narrowPlatformRole(platformRole), ...tokens };
   }
 
-  private async issueTokens(user: SessionUser): Promise<TokenPair> {
+  private async issueSessionTokens(user: SessionUser): Promise<TokenPair> {
+    const tokens = await this.signTokens(user);
+    await this.repo.startDashboardSession(
+      user.id,
+      hashToken(tokens.refreshToken),
+      this.jwt.refreshExpiresAt(tokens.refreshToken),
+    );
+    return tokens;
+  }
+
+  private async signTokens(user: SessionUser): Promise<TokenPair> {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwt.signAccess({ sub: user.id, email: user.email }),
       this.jwt.signRefresh(user.id),
@@ -232,12 +259,12 @@ export class AuthService {
     if (!credential) {
       // Spend comparable CPU on the no-account path so response timing doesn't
       // leak which emails have local accounts (the real path hashes below).
-      createHash('sha256').update(randomBytes(32)).digest('hex');
+      hashToken(randomBytes(32).toString('hex'));
       return;
     }
 
     const token = randomBytes(32).toString('hex');
-    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const tokenHash = hashToken(token);
     const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
     await this.repo.insertResetToken(credential.userId, tokenHash, expiresAt);
 
@@ -267,7 +294,7 @@ export class AuthService {
   }
 
   async resetPassword(token: string, password: string): Promise<void> {
-    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const tokenHash = hashToken(token);
     const record = await this.repo.findResetToken(tokenHash);
     if (!record) throw new BadRequestException('Enlace inválido o expirado');
     if (record.usedAt) {
@@ -281,4 +308,8 @@ export class AuthService {
     await this.repo.updatePassword(record.userId, salt, hash);
     await this.repo.markResetTokenUsed(record.id);
   }
+}
+
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
 }

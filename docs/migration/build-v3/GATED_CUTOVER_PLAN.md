@@ -1,6 +1,6 @@
 # build-v3 Gated Cutover — Roadmap & Status
 
-**Status:** ACTIVE (living) · **Owner:** platform · **Last updated:** 2026-08-19 · **Scope:** internal-only
+**Status:** ACTIVE (living) · **Owner:** platform · **Last updated:** 2026-08-21 · **Scope:** internal-only
 **Companion docs:** [`SECURITY_GATE.md`](./SECURITY_GATE.md) (the gate) · [`ORDER_MODEL.md`](./ORDER_MODEL.md) · [`backend-convergence-map.md`](./backend-convergence-map.md)
 
 > **What this is.** The tracked roadmap for converging `apps/umi-api` **and** the data-migration
@@ -62,7 +62,7 @@ Two consequences shape this roadmap:
 | Instrument                         | What it proves                                                                  | Command                                                                                                | Current                                                  |
 | ---------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------- |
 | **`sql-preflight.integration.ts`** | Every backend SQL statement resolves against live build-v3 (schema validity)    | `cd apps/umi-api && pnpm run test:integration:schema`                                                  | **0 unresolved**                                         |
-| **`check-values.integration.ts`**  | Every compared or inserted literal is a value the column's CHECK admits         | same command (runs in the same suite)                                                                  | **PASS** (293 stmts, 93 comparisons, 25 INSERT literals) |
+| **`check-values.integration.ts`**  | Every compared or inserted literal is a value the column's CHECK admits         | same command (runs in the same suite)                                                                  | **PASS** (302 stmts, 98 comparisons, 27 INSERT literals) |
 | **`security_gate.sql`**            | RLS+FORCE, least-privilege grants, credential lockdown, data hygiene            | `PGPORT=5233 psql -v ON_ERROR_STOP=1 -d umi_backfill_v3 -f security_gate.sql` → `SECURITY GATE PASSED` | **PASS** (49 structural + 3 behavioral)                  |
 | **`reconcile_v3.sql`**             | Backfill fidelity — counts + money invariants + per-record field-level equality | `PGPORT=5233 psql -v ON_ERROR_STOP=1 -d umi_backfill_v3 -f backfill/reconcile_v3.sql`                  | **PASS** (gift-card per-card drift 0)                    |
 
@@ -477,12 +477,30 @@ moved; the local phone run proves Apple accepted a newly generated token and not
 remaining continuity gate is a pass issued **before** cutover — that is the one carrying the old
 token and frozen URL, and it is the only case that can prove the flip preserved existing devices.
 
+#### ✅ Dashboard refresh rotation and logout revocation complete
+
+AB#114 now gives dashboard refresh tokens a durable server-side session. Login stores only a
+SHA-256 token hash. Refresh rotates the token inside one family. Reuse of an old token revokes the
+live family, and logout revokes the family before it clears the cookie. `runtime.session` permits a
+NULL `merchant_id` only for a `user` row whose metadata identifies the dashboard.
+
+This is necessary because dashboard login happens before café selection. A platform operator can
+have no café membership. Cash customer, staff, and device sessions stay merchant-scoped.
+
+The behavior follows [RFC 9700 section 4.14.2](https://www.rfc-editor.org/rfc/rfc9700.html#section-4.14.2)
+for rotation and replay detection and [RFC 7009 section 2](https://www.rfc-editor.org/rfc/rfc7009.html#section-2)
+for revocation. A five-merchant production-shaped clone passes reconciliation and the full security
+gate. A fresh Build v3 database passes all 77 schema integration tests. Existing dashboard refresh
+cookies have no durable session row, so the deployment will require one new dashboard login. An
+access token already issued at logout can live until its 15-minute expiry; logout prevents any new
+access token from that refresh family.
+
 **DoD.** Prod `security_gate.sql` PASS; both clients live on build-v3; **a pre-cutover Apple pass
 updates on a real device after the flip.**
 
 ---
 
-## 5 · Current baseline (2026-08-20)
+## 5 · Current baseline (2026-08-21)
 
 > **Next, in order.**
 >
@@ -553,7 +571,7 @@ updates on a real device after the flip.**
   −13, checkout −7 (both files gone from the rollup), then **#63 retired the KDS read/write half and
   #65 the auth half — `kds/kds.repository.ts` is now absent from the rollup entirely (40 → 0).**
 
-- **Units:** 742/742. **Schema integration:** 71/71. **Typecheck/lint:** PASS.
+- **Units:** 749/749. **Schema integration:** 77/77. **Typecheck/lint:** PASS.
   `security_gate.sql` passes 49 structural and 3 behavioral checks. Snapshot reconciliation passes
   exact card rows, exact ledger rows, and per-card balances with zero mismatches.
 - **Branch protection (2026-07-21):** `build-v3` requires a branch to be UP TO DATE with base before

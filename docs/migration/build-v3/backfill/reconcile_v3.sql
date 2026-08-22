@@ -228,6 +228,11 @@ select coalesce(sum(gross),0) as gross, coalesce(sum(total),0) as total from mer
 \echo '   inactive session lacks one (session_revocation_ck; expect 0):'
 select count(*) as session_revocation_inconsistent
   from runtime.session where is_active <> (revoked_at is null);
+\echo '-- only a dashboard USER session may have no merchant (expect 0):'
+select count(*) as merchantless_non_dashboard_sessions
+  from runtime.session
+ where merchant_id is null
+   and (principal_type <> 'user' or metadata->>'client' is distinct from 'dashboard');
 \echo '-- every location reference belongs to the SAME merchant (the composite FK now'
 \echo '   enforces this; a nonzero here means the source carried cross-merchant rows):'
 select count(*) as cross_merchant_location_refs

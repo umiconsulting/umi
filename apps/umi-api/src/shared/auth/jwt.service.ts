@@ -1,6 +1,7 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
+import { randomUUID } from 'node:crypto';
+import { decodeJwt, SignJWT, jwtVerify, type JWTPayload } from 'jose';
 import type { AppConfig } from '../config/config.schema';
 
 /**
@@ -57,7 +58,14 @@ export class JwtService {
   }
 
   async signRefresh(userId: string): Promise<string> {
-    return this.sign({ sub: userId, typ: 'refresh' }, this.refreshTtl);
+    return this.sign({ sub: userId, typ: 'refresh', jti: randomUUID() }, this.refreshTtl);
+  }
+
+  /** Read the expiry from a refresh token this service has just signed. */
+  refreshExpiresAt(token: string): Date {
+    const { exp } = decodeJwt(token);
+    if (typeof exp !== 'number') throw new Error('signed refresh token has no expiry');
+    return new Date(exp * 1000);
   }
 
   /**
