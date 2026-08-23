@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { CashAuthService } from './cash-auth.service';
 
 const MERCHANT = '9f000000-0000-4000-8000-00000000f001';
@@ -20,6 +20,7 @@ function harness(over: Partial<Record<string, unknown>> = {}) {
     findCredentialByEmail: vi.fn().mockResolvedValue(CREDENTIAL),
     upgradeCredential: vi.fn().mockResolvedValue(undefined),
     findMembershipAccess: vi.fn().mockResolvedValue({ roles: ['owner'] }),
+    mfaMethodByUserId: vi.fn().mockResolvedValue(null),
     ...over,
   };
   const passwords = {
@@ -115,6 +116,90 @@ describe('cash staff login', () => {
       { error: 'Credenciales inválidas' },
       { error: 'Credenciales inválidas' },
     ]);
+  });
+});
+
+describe('cash staff login · AB#115 the register refuses an MFA-enrolled account', () => {
+  const ENROLLED = { ...CREDENTIAL, mfaMethod: 'totp' };
+
+  it('refuses an account that holds a second factor', async () => {
+    // The register cannot challenge — the frozen client has no screen for a code.
+    // So the account that enrolled one uses the dashboard, and the till stops
+    // being the weaker door into it.
+    const h = harness({ findCredentialByEmail: vi.fn().mockResolvedValue(ENROLLED) });
+    await expect(h.service.login(MERCHANT, CREDS)).rejects.toThrow(ForbiddenException);
+  });
+
+  it('refuses email_otp too, not only totp', async () => {
+    // The rule is "holds a second factor", not "holds a GOOD one". email_otp does
+    // not satisfy PCI DSS 8.4.1, but it still means the dashboard challenges and
+    // the register would not — which is the asymmetry being closed.
+    const h = harness({
+      findCredentialByEmail: vi.fn().mockResolvedValue({ ...CREDENTIAL, mfaMethod: 'email_otp' }),
+    });
+    await expect(h.service.login(MERCHANT, CREDS)).rejects.toThrow(ForbiddenException);
+  });
+
+  it('lets an UNENROLLED account through, so no barista is locked out today', async () => {
+    // Zero of nine accounts are enrolled on the cutover rehearsal. This refusal
+    // must cost nothing until someone deliberately enrols.
+    const h = harness();
+    await expect(h.service.login(MERCHANT, CREDS)).resolves.toMatchObject({ accessToken: 'a' });
+  });
+
+  it('checks the password FIRST, so it is not an enumeration oracle', async () => {
+    // Refusing on the enrolment flag before verifying would answer "does this
+    // address hold a second factor?" to anyone who asks. The wrong-password path
+    // must still return the uniform body.
+    const h = harness({ findCredentialByEmail: vi.fn().mockResolvedValue(ENROLLED) });
+    h.passwords.verify.mockReturnValue(false);
+    await expect(h.service.login(MERCHANT, CREDS)).rejects.toThrow(UnauthorizedException);
+    await h.service
+      .login(MERCHANT, CREDS)
+      .catch((e) => expect(e.getResponse()).toEqual({ error: 'Credenciales inválidas' }));
+  });
+
+  it('says something OTHER than "wrong credentials", for the logs and the next client', async () => {
+    // Safe to be distinct: it is only reachable with a proven password. The frozen
+    // client shows `Credenciales inválidas` regardless — it never reads the body.
+    const h = harness({ findCredentialByEmail: vi.fn().mockResolvedValue(ENROLLED) });
+    // `rejects` first: a bare `.catch(assert)` passes vacuously when login RESOLVES,
+    // so it would report green against a service that never refuses at all.
+    await expect(h.service.login(MERCHANT, CREDS)).rejects.toThrow(ForbiddenException);
+    const body = await h.service.login(MERCHANT, CREDS).then(
+      () => null,
+      (e) => e.getResponse(),
+    );
+    expect(body).toEqual({
+      error: 'Esta cuenta usa verificación en dos pasos. Inicia sesión en el panel.',
+      code: 'MFA_ENROLLED_USE_DASHBOARD',
+    });
+  });
+
+  it('does not re-hash a legacy credential on the way out', async () => {
+    // The refusal lands before the upgrade, so a refused login leaves the row
+    // exactly as it found it.
+    const h = harness({
+      findCredentialByEmail: vi
+        .fn()
+        .mockResolvedValue({ ...ENROLLED, passwordAlgorithm: 'legacy-sha256-v1' }),
+    });
+    h.passwords.needsUpgrade.mockReturnValue(true);
+    await h.service.login(MERCHANT, CREDS).catch(() => undefined);
+    expect(h.repo.upgradeCredential).not.toHaveBeenCalled();
+  });
+
+  it('closes a till that was already open when the account enrolled', async () => {
+    // A check only at login is a check with a hole in it: the session predates the
+    // enrolment, so refresh would keep it alive for the refresh token's whole life.
+    const h = harness({ mfaMethodByUserId: vi.fn().mockResolvedValue('totp') });
+    await expect(h.service.refresh(MERCHANT, 'tok')).rejects.toThrow(ForbiddenException);
+  });
+
+  it('still refreshes an unenrolled account', async () => {
+    const h = harness();
+    await expect(h.service.refresh(MERCHANT, 'tok')).resolves.toEqual({ accessToken: 'a' });
+    expect(h.repo.mfaMethodByUserId).toHaveBeenCalledWith(USER);
   });
 });
 

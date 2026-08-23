@@ -274,6 +274,24 @@ export class AuthRepository {
     return rows[0] ?? null;
   }
 
+  /**
+   * The enrolled second factor, by id. Its own method rather than a column on
+   * `findUserById`: the register's refresh path (AB#115) needs this and nothing
+   * else about the user, and `UserSummary` is returned to callers that have no
+   * business reading an account's MFA posture.
+   *
+   * No `password_hash IS NOT NULL` filter, unlike `findUserById`. A row that lost
+   * its password still holds `mfa_method`, and the safe reading of "enrolled" is
+   * the one that refuses.
+   */
+  async mfaMethodByUserId(userId: string): Promise<string | null> {
+    const { rows } = await this.pg.query<{ mfaMethod: string | null }>(
+      `SELECT u.mfa_method AS "mfaMethod" FROM umi.user AS u WHERE u.id = $1::uuid LIMIT 1`,
+      [userId],
+    );
+    return rows[0]?.mfaMethod ?? null;
+  }
+
   /** Start one dashboard refresh-token family. Dashboard sessions have no café scope. */
   async startDashboardSession(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
     await this.pg.query(

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuthRepository } from '../auth/auth.repository';
 import { upgradeCredentialIfLegacy } from '../auth/credential-upgrade';
 import { PasswordService } from '../../shared/auth/password.service';
@@ -7,6 +7,17 @@ import { legacyRole, type LegacyRole } from './cash-roles';
 
 /** umi-cash's exact refusal. One body for every reason, deliberately. */
 const REFUSED = { error: 'Credenciales inválidas' };
+
+/**
+ * AB#115. Distinct from `REFUSED` on purpose, and safe to be distinct: it is only
+ * ever returned AFTER the password has verified, so it tells an attacker nothing
+ * they did not already hold. `REFUSED` is uniform precisely to keep "no such
+ * account" and "wrong password" indistinguishable — this is neither.
+ */
+const MFA_ENROLLED = {
+  error: 'Esta cuenta usa verificación en dos pasos. Inicia sesión en el panel.',
+  code: 'MFA_ENROLLED_USE_DASHBOARD',
+};
 
 /**
  * A salt and hash that verify against nothing, used to spend scrypt time on the
@@ -43,11 +54,30 @@ export interface CashLoginResult {
  * moment its owner signs in — so the weak scheme drains away by itself rather
  * than by a cutover-morning reset. See AB#109.
  *
- * ⚠️ NO SECOND FACTOR HERE, matching umi-cash. A user who enrolled MFA for the
- * dashboard is not challenged for it at the register, so the register is the
- * weaker of the two doors into the same account. Adding the challenge needs a
- * client that can answer it, and the umi-cash front end is frozen. Tracked
- * separately — do not read this comment as approval.
+ * ⚠️ NO SECOND FACTOR HERE, matching umi-cash — so an MFA-ENROLLED ACCOUNT IS
+ * REFUSED INSTEAD (AB#115). A user who enrolled MFA for the dashboard cannot be
+ * challenged here: the frozen umi-cash client posts `{identifier, password}`,
+ * expects `{accessToken, user}` or an error, and has no screen for a code and no
+ * state for a half-authenticated session. Issuing a challenge it cannot answer
+ * would lock that user out with no way through.
+ *
+ * The remaining choice is which door an enrolled account uses, and the answer is
+ * the dashboard. Refusing here removes the bypass rather than papering over it:
+ * a second factor is worth nothing if the same password opens a till unchallenged.
+ * The till stays available to accounts that have NOT enrolled — every barista
+ * today — so this refuses nobody until an account deliberately enrols.
+ *
+ * ⚠️ WHAT THE OPERATOR ACTUALLY SEES. Nothing specific. The frozen client
+ * hardcodes `Credenciales inválidas` for every non-2xx and never reads the body
+ * (`apps/umi-cash/src/app/[slug]/(auth)/admin-login/page.tsx`). The distinct code
+ * and message below are for the API contract, the logs, and the next client — not
+ * for the screen. A café whose owner enrols will need telling out of band.
+ *
+ * This is a stopgap for the model `merchant.staff` already describes: the till is
+ * a PIN door (device authorises the terminal, PIN authorises the action and names
+ * the actor), and no password belongs at a register at all. Until that path
+ * exists, keeping password-holders with a second factor off the till is the
+ * cheapest thing that is not a lie.
  */
 @Injectable()
 export class CashAuthService {
@@ -79,6 +109,12 @@ export class CashAuthService {
       this.passwords.verify(input.password, DECOY_SALT, DECOY_HASH, 'scrypt-sha256-v1');
     }
     if (!credential || !passwordOk) throw new UnauthorizedException(REFUSED);
+
+    // AB#115 — AFTER the password check, never before. Refusing on the enrolment
+    // flag alone would answer "does this address hold a second factor?" to an
+    // anonymous caller, which is the enumeration `REFUSED` and the decoy hash
+    // exist to prevent. The account is proven before we tell it to use the panel.
+    if (credential.mfaMethod) throw new ForbiddenException(MFA_ENROLLED);
 
     // Verified — so a legacy row can be re-hashed with the password just
     // confirmed. Never reached on the decoy path: there is no row to upgrade.
@@ -113,6 +149,15 @@ export class CashAuthService {
   async refresh(merchantId: string, refreshToken: string): Promise<{ accessToken: string }> {
     const session = await this.sessions.staffSessionByRefreshToken(merchantId, refreshToken);
     if (!session) throw new UnauthorizedException(REFUSED);
+
+    // AB#115 — the same refusal as login, because a check only at login is a check
+    // with a hole in it. A till signed in BEFORE its owner enrolled would otherwise
+    // keep minting access tokens for the refresh token's whole life, and the
+    // bypass would outlive the enrolment that was supposed to end it. Enrolling
+    // must close the till on the next refresh, not eventually.
+    if (await this.repo.mfaMethodByUserId(session.userId)) {
+      throw new ForbiddenException(MFA_ENROLLED);
+    }
 
     const role = await this.registerRole(merchantId, session.userId);
     const accessToken = await this.sessions.signAccessToken(session.userId, role, merchantId);
