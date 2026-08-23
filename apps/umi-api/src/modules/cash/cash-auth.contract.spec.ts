@@ -83,6 +83,8 @@ describe('cash auth · login, refresh, logout as one flow', () => {
     ),
     findMembershipAccess: vi.fn(async () => ({ roles: ['owner'] })),
     upgradeCredential: vi.fn(async () => undefined),
+    // AB#115: refresh re-checks enrolment. Unenrolled here, so the flow still runs.
+    mfaMethodByUserId: vi.fn(async () => null),
   };
 
   const passwords = {
