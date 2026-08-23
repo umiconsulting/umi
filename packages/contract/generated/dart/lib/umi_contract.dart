@@ -8290,7 +8290,7 @@ typedef KitchenBoardRequest = Map<String, Object?>;
 
 final class KitchenBoardResponse {
   final bool ok;
-  final Map<String, Object?> data;
+  final List<Map<String, Object?>> data;
 
   const KitchenBoardResponse({
     required this.ok,
