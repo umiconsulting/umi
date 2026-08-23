@@ -78,8 +78,25 @@ else
   echo "   platform administrator(s): $GRANTS"
 fi
 
+echo "== UmiPOS schema: migrates the rows the backfill just landed =="
+# The UmiPOS files (architectureUMIposIntegration-v2) are written as migrations
+# over EXISTING rows — ALTER, then a one-time UPDATE backfill, then SET NOT NULL —
+# so they run after the data phase, and before the cross-schema FKs and RLS that
+# reference the tables they create (90_rls scopes cash_shift, pos_exception_*,
+# inventory_count, revokes DML on the value ledgers, …). Same relative order as
+# 00_run.sh. 47 and 48 follow 90_rls there too, and do here.
+for f in 30_device_pairing 31_pos_sale 32_pos_checkout 33_pos_cash 34_pos_exception \
+         35_pos_pilot_rbac 36_pos_inventory 37_pos_customer_value \
+         38_pos_customer_value_closeout 39_pos_customer_value_final_closeout \
+         40_pos_hardware_runtime 41_pos_hardware_pilot 42_pos_kitchen \
+         43_dashboard_administrative_commands 44_dashboard_operational_wiring \
+         45_pilot_runtime 46_platform_bootstrap; do
+  echo "   -> $f"
+  psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$DDL/$f.sql"
+done
+
 echo "== cross-schema FKs + RLS (data now present) =="
-for f in 50_cross_schema_fk 90_rls; do
+for f in 50_cross_schema_fk 90_rls 47_checkout_kitchen_projection 48_customer_value_worker_scope; do
   psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$DDL/$f.sql"
 done
 

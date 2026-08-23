@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { ExecutionContext, ValidationPipe } from '@nestjs/common';
+import { ExecutionContext } from '@nestjs/common';
+import { ClassValidationPipe } from '../../shared/http/class-validation.pipe';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
@@ -156,7 +157,7 @@ describe('cash Gift Card · one bearer value, one redemption', () => {
     app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
     const requestContext = new RequestContextMiddleware();
     app.use(requestContext.use.bind(requestContext));
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(new ClassValidationPipe({ whitelist: true, transform: true }));
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
   });
@@ -231,14 +232,20 @@ describe('cash Gift Card · one bearer value, one redemption', () => {
       merchantName: 'Gift Test',
     });
 
-    await pg.query(
-      `INSERT INTO merchant.loyalty_gift_card_ledger
-         (merchant_id, gift_card_id, delta, reason, source_type, source_id, idempotency_key)
-       SELECT merchant_id, id, -1000, 'adjustment', 'test', id::text, 'gift-adjustment-' || id::text
-         FROM merchant.loyalty_gift_card
-        WHERE merchant_id=$1::uuid AND code_hash=extensions.digest($2, 'sha256')`,
-      [MERCHANT, code],
-    );
+    // The value ledgers accept writes only through the fact functions (90_rls revokes
+    // api's AND worker's DML on them), and those functions assert a merchant context
+    // even on the worker pool — so the seed sets the scope, as a request would.
+    await pg.workerTx(async (client) => {
+      await client.query(`SELECT set_config('app.current_merchant', $1, true)`, [MERCHANT]);
+      await client.query(
+        `SELECT merchant.append_gift_card_fact(g.merchant_id, g.id, jsonb_build_object(
+           'delta', -1000, 'reason', 'adjustment', 'sourceType', 'test',
+           'sourceId', g.id::text, 'idempotencyKey', 'gift-adjustment-' || g.id::text))
+           FROM merchant.loyalty_gift_card g
+          WHERE g.merchant_id=$1::uuid AND g.code_hash=extensions.digest($2, 'sha256')`,
+        [MERCHANT, code],
+      );
+    });
 
     const redeemResponse = await app.inject({
       method: 'POST',

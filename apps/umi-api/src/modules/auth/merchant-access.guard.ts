@@ -32,7 +32,7 @@ export class MerchantAccessGuard implements CanActivate {
     const user = req.authUser;
     if (!user) throw new UnauthorizedException('authentication_required');
 
-    const merchantId = await this.resolveMerchantId(req.params ?? {});
+    const merchantId = await this.resolveMerchantId(req);
     if (!merchantId) throw new NotFoundException({ error: 'merchant_not_found' });
 
     // A TILL SESSION BELONGS TO ONE CAFÉ. `createSession` writes the merchant
@@ -57,22 +57,38 @@ export class MerchantAccessGuard implements CanActivate {
       role,
       roles: access.roles,
       permissions: effectivePermissions(role, access.permissions),
+      locationId: access.locationId,
     };
     req.merchantAccess = merchantAccess;
 
     const ctx = getRequestContext();
-    if (ctx) ctx.merchantId = access.merchantId;
+    if (ctx) {
+      ctx.merchantId = access.merchantId;
+      const locationId = this.resolveLocationId(req);
+      if (locationId) ctx.locationId = locationId;
+    }
 
     return true;
   }
 
-  private async resolveMerchantId(params: Record<string, string>): Promise<string | null> {
-    // An id always wins over a handle. `handle` is only CHECKed against
-    // `^[a-z0-9][a-z0-9-]{1,62}$`, which a lowercase uuid satisfies, so testing the uuid
-    // form first is what keeps the two from ever competing.
-    const raw = params.merchantId ?? params.merchantRef;
+  private async resolveMerchantId(req: AuthedRequest): Promise<string | null> {
+    const rawValues = [
+      req.params?.merchantId,
+      req.params?.merchantRef,
+      req.query?.merchantId,
+      req.body?.merchantId,
+    ];
+    const raw = rawValues.find((value): value is string => typeof value === 'string');
     if (raw && UUID_RE.test(raw)) return raw;
     if (raw) return this.repo.merchantIdForHandle(raw);
     return null;
+  }
+
+  private resolveLocationId(req: AuthedRequest): string | null {
+    const values = [req.params?.locationId, req.query?.locationId, req.body?.locationId];
+    return (
+      values.find((value): value is string => typeof value === 'string' && UUID_RE.test(value)) ??
+      null
+    );
   }
 }

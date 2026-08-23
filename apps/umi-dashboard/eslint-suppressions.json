@@ -41,9 +41,6 @@
     }
   },
   "src/screens/devices.jsx": {
-    "react-hooks/purity": {
-      "count": 1
-    },
     "react-hooks/set-state-in-effect": {
       "count": 3
     }
@@ -85,11 +82,6 @@
     }
   },
   "src/screens/products-billing.jsx": {
-    "no-unused-vars": {
-      "count": 1
-    }
-  },
-  "src/screens/reset-password.jsx": {
     "no-unused-vars": {
       "count": 1
     }

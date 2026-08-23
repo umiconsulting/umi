@@ -13,7 +13,8 @@ import {
   MinLength,
 } from 'class-validator';
 
-const ACTIONS = ['VISIT', 'REDEEM', 'BIRTHDAY_REDEEM'];
+const ACTIONS = ['VISIT', 'REDEEM', 'BIRTHDAY_REDEEM'] as const;
+type ScanAction = (typeof ACTIONS)[number];
 
 export class ScanDto {
   @IsString()
@@ -21,14 +22,14 @@ export class ScanDto {
 
   @IsOptional()
   @IsIn(ACTIONS)
-  action?: string;
+  action?: ScanAction;
 
   @IsOptional()
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(3)
   @IsIn(ACTIONS, { each: true })
-  actions?: string[];
+  actions?: ScanAction[];
 }
 
 /**

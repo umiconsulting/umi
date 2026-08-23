@@ -1,7 +1,5 @@
-import React, { useState, useEffect, useId } from 'react';
+import { useState, useId } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase } from '@/lib/supabase.js';
-import { useAuth } from '@/lib/auth.jsx';
 import { apiUrl, withCreds, errMessage } from '@/lib/config.js';
 import '@/styles.css';
 
@@ -9,31 +7,14 @@ export default function ResetPasswordScreen() {
   const uid = useId();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { setNeedsPasswordReset } = useAuth();
-
   const localToken = searchParams.get('token');
-  const isLocal = !!localToken;
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
-  // For Supabase flow: wait for PASSWORD_RECOVERY session
-  const [ready, setReady] = useState(isLocal);
-
-  useEffect(() => {
-    if (isLocal) return;
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') setReady(true);
-    });
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true);
-    });
-    return () => subscription.unsubscribe();
-  }, [isLocal]);
+  const ready = !!localToken;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -48,24 +29,18 @@ export default function ResetPasswordScreen() {
     setError(null);
     setLoading(true);
     try {
-      if (isLocal) {
-        const res = await fetch(
-          apiUrl('/api/auth/local/reset-password'),
-          withCreds({
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: localToken, password }),
-          }),
-        );
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(errMessage(data, 'Error al reestablecer la contraseña'));
-        setDone(true);
-      } else {
-        const { error: err } = await supabase.auth.updateUser({ password });
-        if (err) throw err;
-        setNeedsPasswordReset(false);
-        navigate('/', { replace: true });
-      }
+      if (!localToken) throw new Error('El enlace de recuperación no es válido');
+      const res = await fetch(
+        apiUrl('/api/auth/local/reset-password'),
+        withCreds({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: localToken, password }),
+        }),
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(errMessage(data, 'Error al reestablecer la contraseña'));
+      setDone(true);
     } catch (err) {
       setError(err.message);
     } finally {

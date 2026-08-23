@@ -9,14 +9,12 @@
 services:
   umi-api:
     # `image` is what the VPS pulls from GHCR; `build` is the local-dev fallback.
-    image: ghcr.io/umiconsulting/umi-api:${UMI_API_TAG:-latest}
+    image: ghcr.io/umiconsulting/umi-api:${UMI_API_TAG:?Set UMI_API_TAG to an immutable release tag}
     build:
       context: ../..
       dockerfile: apps/umi-api/Dockerfile
     command: node dist/main.js
     env_file: .env
-    environment:
-      - NODE_ENV=production
     volumes:
       # D4 (SECURITY_GATE.md §4) — the CA that verifies the Postgres endpoint.
       # Read-only, and mounted rather than baked into the image: a certificate
@@ -42,14 +40,12 @@ services:
 
   umi-worker:
     # Same image as umi-api — one build, two commands.
-    image: ghcr.io/umiconsulting/umi-api:${UMI_API_TAG:-latest}
+    image: ghcr.io/umiconsulting/umi-api:${UMI_API_TAG:?Set UMI_API_TAG to an immutable release tag}
     build:
       context: ../..
       dockerfile: apps/umi-api/Dockerfile
     command: node dist/worker.js
     env_file: .env
-    environment:
-      - NODE_ENV=production
     volumes:
       # Same CA. The worker opens its own pools from the same PGSSLROOTCERT, so
       # mounting it on only one service would boot the web container and fail the
@@ -61,7 +57,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4.10-alpine3.21
     command: ['redis-server', '--appendonly', 'yes']
     volumes:
       - redis-data:/data
@@ -73,7 +69,7 @@ services:
     restart: unless-stopped
 
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.10.2-alpine
     ports:
       - '80:80'
       - '443:443'

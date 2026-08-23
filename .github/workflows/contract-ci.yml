@@ -46,6 +46,23 @@ jobs:
       - name: Typecheck
         run: pnpm --filter @umi/contract typecheck
 
+      - name: Generated artifact drift
+        run: pnpm --filter @umi/contract generate:check
+
+      - name: Generated TypeScript SDK
+        run: >-
+          packages/contract/node_modules/.bin/tsc --noEmit --strict --skipLibCheck
+          --target ES2022 --module ESNext
+          packages/contract/generated/typescript/umi_contract.ts
+
+      - name: Generated Dart SDK
+        run: >-
+          docker run --rm
+          -v "$PWD/packages/contract/generated/dart:/contract:ro"
+          -w /contract
+          dart@sha256:13140e26d84f4fda57cea31942222112aeb2eec10e5e6874c1c0f70beed189ab
+          dart analyze --no-fatal-warnings lib/umi_contract.dart
+
       - name: Build (tsup dual CJS+ESM+dts)
         run: pnpm --filter @umi/contract build
 

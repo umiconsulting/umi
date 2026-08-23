@@ -14,6 +14,7 @@ import {
   TweakToggle,
 } from './tweaks-panel.jsx';
 import { useMerchantData, useKdsConnection } from './data.jsx';
+import { CFG } from './lib/config.js';
 import { Sidebar, Topbar } from './shell.jsx';
 
 import LoginScreen from '@/screens/login.jsx';
@@ -29,6 +30,7 @@ import HoursScreen from '@/screens/hours.jsx';
 import SettingsScreen from '@/screens/settings.jsx';
 import ProductsBillingScreen from '@/screens/products-billing.jsx';
 import CafesScreen from '@/screens/cafes.jsx';
+import OperationsScreen from '@/screens/operations.jsx';
 
 const TWEAK_DEFAULTS = { merchantHue: '#1A5632', density: 'comfy', lang: 'es' };
 
@@ -149,7 +151,7 @@ function DashboardLayout() {
           fontSize: 14,
         }}
       >
-        Cargando merchant...
+        Cargando negocio…
       </div>
     );
   }
@@ -204,6 +206,18 @@ function DashboardLayout() {
                     ordersPaused={ordersPaused}
                     setOrdersPaused={setOrdersPaused}
                   />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="operations"
+              element={
+                <GuardedScreen
+                  moduleKey="operations"
+                  moduleName="Centro operativo"
+                  product="Dashboard"
+                >
+                  <OperationsScreen />
                 </GuardedScreen>
               }
             />
@@ -300,55 +314,57 @@ function DashboardLayout() {
         </div>
       </main>
 
-      <TweaksPanel title="Tweaks">
-        <TweakSection title="Wallet card brand">
-          <TweakColor
-            label="Quick merchant"
-            value={tweaks.merchantHue}
-            options={['#B5605A', '#223979', '#5B7A4C', '#B5812A', '#7692CB', '#1F1410']}
-            onChange={(v) => {
-              setTweak('merchantHue', v);
-              document.documentElement.style.setProperty('--merchant-brand', v);
-            }}
-          />
-        </TweakSection>
-        <TweakSection title="Density">
-          <TweakRadio
-            label="Spacing"
-            value={tweaks.density}
-            options={['cozy', 'comfy']}
-            onChange={(v) => setTweak('density', v)}
-          />
-        </TweakSection>
-        <TweakSection title="Language">
-          <TweakRadio
-            label="Greeting"
-            value={tweaks.lang}
-            options={['es', 'en']}
-            onChange={(v) => setTweak('lang', v)}
-          />
-        </TweakSection>
-        <TweakSection title="Sidebar">
-          <TweakToggle
-            label="Collapsed"
-            value={collapsed}
-            onChange={() => setCollapsed((c) => !c)}
-          />
-        </TweakSection>
-        <TweakSection title="Operations">
-          <TweakToggle
-            label="WhatsApp orders paused"
-            value={ordersPaused}
-            onChange={() => setOrdersPaused((p) => !p)}
-          />
-        </TweakSection>
-      </TweaksPanel>
+      {CFG.environment === 'development' && (
+        <TweaksPanel title="Ajustes de desarrollo">
+          <TweakSection title="Wallet card brand">
+            <TweakColor
+              label="Quick merchant"
+              value={tweaks.merchantHue}
+              options={['#B5605A', '#223979', '#5B7A4C', '#B5812A', '#7692CB', '#1F1410']}
+              onChange={(v) => {
+                setTweak('merchantHue', v);
+                document.documentElement.style.setProperty('--merchant-brand', v);
+              }}
+            />
+          </TweakSection>
+          <TweakSection title="Density">
+            <TweakRadio
+              label="Spacing"
+              value={tweaks.density}
+              options={['cozy', 'comfy']}
+              onChange={(v) => setTweak('density', v)}
+            />
+          </TweakSection>
+          <TweakSection title="Language">
+            <TweakRadio
+              label="Greeting"
+              value={tweaks.lang}
+              options={['es', 'en']}
+              onChange={(v) => setTweak('lang', v)}
+            />
+          </TweakSection>
+          <TweakSection title="Sidebar">
+            <TweakToggle
+              label="Collapsed"
+              value={collapsed}
+              onChange={() => setCollapsed((c) => !c)}
+            />
+          </TweakSection>
+          <TweakSection title="Operations">
+            <TweakToggle
+              label="WhatsApp orders paused"
+              value={ordersPaused}
+              onChange={() => setOrdersPaused((p) => !p)}
+            />
+          </TweakSection>
+        </TweaksPanel>
+      )}
     </div>
   );
 }
 
 function RequireAuth({ children }) {
-  const { session, loading, needsPasswordReset } = useAuth();
+  const { session, loading } = useAuth();
   if (loading)
     return (
       <div
@@ -364,7 +380,6 @@ function RequireAuth({ children }) {
         Cargando…
       </div>
     );
-  if (needsPasswordReset) return <ResetPasswordScreen />;
   return session ? children : <Navigate to="/login" replace />;
 }
 

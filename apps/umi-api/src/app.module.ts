@@ -1,5 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AppConfigModule } from './shared/config/config.module';
 import { DatabaseModule } from './shared/database/database.module';
 import { RequestContextMiddleware } from './shared/database/request-context.middleware';
@@ -24,6 +24,27 @@ import { WalletModule } from './modules/wallet/wallet.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { LeadsModule } from './modules/leads/leads.module';
+import { IntegrityModule } from './modules/integrity/integrity.module';
+import { OperationsModule } from './shared/operations/operations.module';
+import { OperationalInterceptor } from './shared/operations/operational.interceptor';
+import { IpRateLimitGuard } from './shared/operations/ip-rate-limit.guard';
+import { DevicesModule } from './modules/devices/devices.module';
+import { PosEntryModule } from './modules/pos-entry/pos-entry.module';
+import { PosCatalogModule } from './modules/pos-catalog/pos-catalog.module';
+import { PosCartModule } from './modules/pos-cart/pos-cart.module';
+import { PosCheckoutModule } from './modules/pos-checkout/pos-checkout.module';
+import { PosOfflineModule } from './modules/pos-offline/pos-offline.module';
+import { PosSaleModule } from './modules/pos-sale/pos-sale.module';
+import { PosCashModule } from './modules/pos-cash/pos-cash.module';
+import { PosExceptionModule } from './modules/pos-exception/pos-exception.module';
+import { PosInventoryModule } from './modules/pos-inventory/pos-inventory.module';
+import { PosCustomerValueModule } from './modules/pos-customer-value/pos-customer-value.module';
+import { PosHardwareModule } from './modules/pos-hardware/pos-hardware.module';
+import { DashboardOperationsModule } from './modules/dashboard-operations/dashboard-operations.module';
+import { CsrfGuard } from './modules/auth/csrf.guard';
+import { AdministrativeCommandModule } from './modules/administrative-commands/administrative-command.module';
+import { ReleaseModule } from './shared/release/release.module';
+import { PlatformBootstrapModule } from './modules/platform-bootstrap/platform-bootstrap.module';
 
 /**
  * Root module for the WEB process. Imports shared infrastructure + domain
@@ -33,6 +54,7 @@ import { LeadsModule } from './modules/leads/leads.module';
 @Module({
   imports: [
     AppConfigModule,
+    ReleaseModule,
     DatabaseModule,
     AdaptersModule,
     SharedAuthModule,
@@ -53,10 +75,30 @@ import { LeadsModule } from './modules/leads/leads.module';
     PlatformModule,
     ConversationsModule,
     LeadsModule,
+    IntegrityModule,
+    OperationsModule,
+    DevicesModule,
+    PosEntryModule,
+    PosCatalogModule,
+    PosCartModule,
+    PosCheckoutModule,
+    PosOfflineModule,
+    PosSaleModule,
+    PosCashModule,
+    PosExceptionModule,
+    PosInventoryModule,
+    PosCustomerValueModule,
+    PosHardwareModule,
+    DashboardOperationsModule,
+    AdministrativeCommandModule,
+    PlatformBootstrapModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
+    { provide: APP_GUARD, useClass: IpRateLimitGuard },
+    { provide: APP_GUARD, useClass: CsrfGuard },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: OperationalInterceptor },
   ],
 })
 export class AppModule implements NestModule {

@@ -177,6 +177,23 @@ const UNCOVERED_EXPECTED: ReadonlyArray<{ file: string; count: number; why: stri
     // ACCEPTED, same reason: `${order}` is a sort direction chosen at run time.
     why: 'true run-time clause; accepted 2026-08-14',
   },
+  {
+    file: 'modules/dashboard-operations/dashboard-operations.repository.ts',
+    count: 1,
+    // ACCEPTED. The operations feed is assembled from a definition table —
+    // `${definition.source} WHERE ${definition.where} … ORDER BY ${order}` — so the
+    // statement the database sees is chosen per feed at run time. Arrived with the
+    // UmiPOS integration (architectureUMIposIntegration-v2).
+    why: 'true run-time clause; accepted 2026-08-22',
+  },
+  {
+    file: 'modules/pos-customer-value/pos-customer-value.repository.ts',
+    count: 1,
+    // ACCEPTED. One locking read over `merchant.${table}` joined to
+    // `merchant.${ledger}` on `${key}`: the value ACCOUNT (wallet vs gift card) is
+    // chosen per authorization at run time. Same integration.
+    why: 'true run-time clause; accepted 2026-08-22',
+  },
 ];
 
 describe('build-v3 SQL preflight · every backend statement parses against the real schema', () => {

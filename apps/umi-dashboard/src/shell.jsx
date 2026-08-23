@@ -90,13 +90,13 @@ const Sidebar = ({
           {sec.items.map((item) => {
             const Ic = I[item.icon] || I.Settings;
             return (
-              <div
+              <button
                 key={item.id}
+                type="button"
                 className={'side-item focusable x-active' + (active === item.id ? ' active' : '')}
                 onClick={() => onChange(item.id)}
-                tabIndex={0}
-                role="button"
                 aria-current={active === item.id ? 'page' : undefined}
+                title={collapsed ? item.label : undefined}
               >
                 <span className="ic">
                   <Ic />
@@ -107,7 +107,7 @@ const Sidebar = ({
                     {item.badge}
                   </span>
                 )}
-              </div>
+              </button>
             );
           })}
         </React.Fragment>
@@ -207,6 +207,7 @@ const Topbar = ({
   // operator anything the title did not already say.
   const titles = {
     overview: 'Panorama',
+    operations: 'Centro operativo',
     orders: 'Pedidos WhatsApp',
     devices: 'Dispositivos KDS',
     staff: 'Equipo y permisos',

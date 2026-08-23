@@ -330,3 +330,23 @@ test('a true union survives generation — both login outcomes reach the artifac
   assert.match(line, /"mfaRequired"/, 'the challenge branch must survive');
   assert.match(line, /\|/, 'the two branches must be a union, not one of them');
 });
+
+test('a union of two arrays reaches Dart as one list, and its decoder agrees', async () => {
+  // `KitchenBoardResponse.data` is `z.union([z.array(A), z.array(B)])`. The Dart
+  // renderer named every true union the open map while the decoder still cast
+  // the first member, so the field was a `Map` fed by a `List` — the published
+  // package did not analyze. Members that agree on one Dart type keep it.
+  const dart = await readFile(
+    new URL('../generated/dart/lib/umi_contract.dart', import.meta.url),
+    'utf8',
+  );
+  const start = dart.indexOf('final class KitchenBoardResponse {');
+  assert.ok(start >= 0, 'KitchenBoardResponse must be generated as a class');
+  const block = dart.slice(start, dart.indexOf('\n}\n', start));
+  assert.match(block, /final List<Map<String, Object\?>> data;/, 'the field is the list');
+  assert.match(
+    block,
+    /data: \(json\["data"\] as List<Object\?>\)\.cast<Map<String, Object\?>>\(\),/,
+    'the decoder produces the same list',
+  );
+});

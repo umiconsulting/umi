@@ -31,6 +31,10 @@ node_modules/
 dist/
 build/
 .next/
+**/.dart_tool/
+
+# Generated Dart SDK package metadata
+packages/contract/generated/dart/pubspec.lock
 
 # Exception: packages/tokens ships its generator (build/) AND its generated output
 # (dist/) in git. The frontends deploy as separate Vercel projects that run an
@@ -53,6 +57,7 @@ build/
 # project ref and a pooler URL. Machine-local state, not source — and umi-cash is
 # frozen, so nothing here should ever be committed.
 apps/*/supabase/.temp/
+supabase/.temp/
 
 # Python bytecode and test caches. Generated on import, version-stamped
 # (cpython-314), and useless on a machine with a different interpreter — the
@@ -60,6 +65,9 @@ apps/*/supabase/.temp/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+*.pyc
+# Pilot runtime secrets
+deploy/pilot/pilot.env
 
 # Claude Code per-developer settings. Contains machine-specific permission
 # allowlists that have historically included credentials in command strings.

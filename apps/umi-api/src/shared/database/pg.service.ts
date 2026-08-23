@@ -21,6 +21,26 @@ export interface PoolRoleAttributes {
   inheritsGroup: boolean;
 }
 
+export async function boundedStartupRetry<T>(
+  operation: () => Promise<T>,
+  attempts: number,
+  delayMs: number,
+  onRetry?: (attempt: number) => void,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts) break;
+      onRetry?.(attempt);
+      if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Pure D1 boot-guard decision (SECURITY_GATE.md §4). Given the role a pool
  * actually connected as, return a human-readable problem, or `null` when the
@@ -174,10 +194,14 @@ export function resolveSslOption(
 export class PgService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PgService.name);
   private readonly tlsEnforced: boolean;
+  private readonly startupRetryAttempts: number;
+  private readonly startupRetryDelayMs: number;
   readonly app: Pool;
   readonly worker: Pool;
 
   constructor(config: ConfigService<AppConfig, true>) {
+    this.startupRetryAttempts = config.get('STARTUP_RETRY_ATTEMPTS', { infer: true }) ?? 5;
+    this.startupRetryDelayMs = config.get('STARTUP_RETRY_DELAY_MS', { infer: true }) ?? 1000;
     // verify-full TLS when a CA is provisioned (prod/Supabase); plaintext otherwise
     // (local dev against localhost). A production boot without the CA is refused by
     // the config schema. Do not set sslmode in the URL; this option governs TLS.
@@ -204,7 +228,12 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit(): Promise<void> {
     // Fail fast if either pool can't reach Postgres (don't claim both are
     // ready when only one was verified).
-    await Promise.all([this.app.query('SELECT 1'), this.worker.query('SELECT 1')]);
+    await boundedStartupRetry(
+      () => Promise.all([this.app.query('SELECT 1'), this.worker.query('SELECT 1')]),
+      this.startupRetryAttempts,
+      this.startupRetryDelayMs,
+      (attempt) => this.logger.warn(`Postgres startup check failed at attempt ${attempt}.`),
+    );
 
     // D1 boot guard (SECURITY_GATE.md §4) — refuse to boot on a mis-wired
     // DATABASE_URL_*. Runs on every boot (independent of TLS): a role that is
@@ -363,7 +392,7 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
     if (!ctx?.merchantId) {
       throw new Error('withMerchant() requires a request merchant context (set by AuthGuard).');
     }
-    return this.runWithMerchant(ctx.merchantId, ctx.userId, work);
+    return this.runWithMerchant(ctx.merchantId, ctx.userId, work, ctx.locationId ?? null);
   }
 
   /** Explicit-merchant variant (for jobs/tests that aren't on the request path). */
@@ -371,6 +400,7 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
     merchantId: string,
     userId: string | null,
     work: (client: PoolClient) => Promise<T>,
+    locationId: string | null = null,
   ): Promise<T> {
     const client = await this.app.connect();
     try {
@@ -384,6 +414,10 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
       await client.query(
         "SELECT set_config('app.tenant_id', $1, true), set_config('app.current_merchant', $1, true)",
         [merchantId],
+      );
+      await client.query(
+        "SELECT set_config('app.current_location', $1, true), set_config('app.current_device', $2, true)",
+        [locationId ?? '', getRequestContext()?.deviceId ?? ''],
       );
       await client.query('SELECT set_config($1, $2, true)', ['app.user_id', userId ?? '']);
       const result = await work(client);
@@ -438,5 +472,16 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
   async healthCheck(): Promise<boolean> {
     const res = await this.worker.query<{ ok: number }>('SELECT 1 AS ok');
     return res.rows[0]?.ok === 1;
+  }
+
+  async schemaVersion(): Promise<string | null> {
+    const result = await this.worker.query<{ version: string }>(
+      `SELECT version
+         FROM runtime.schema_migration
+        WHERE status = 'applied'
+        ORDER BY applied_at DESC, version DESC
+        LIMIT 1`,
+    );
+    return result.rows[0]?.version ?? null;
   }
 }

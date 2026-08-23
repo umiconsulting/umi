@@ -18,6 +18,11 @@ function make() {
     findResetToken: vi.fn(),
     updatePassword: vi.fn().mockResolvedValue(undefined),
     markResetTokenUsed: vi.fn().mockResolvedValue(undefined),
+    validatePosSession: vi.fn(),
+    rotatePosSessionToken: vi.fn().mockResolvedValue(true),
+    revokePosSession: vi.fn().mockResolvedValue(undefined),
+    revokePosSessionsForOperator: vi.fn().mockResolvedValue(undefined),
+    revokeDashboardSessionsForUser: vi.fn().mockResolvedValue(undefined),
   };
   const passwords = {
     verify: vi.fn(),
@@ -28,9 +33,10 @@ function make() {
     signAccess: vi.fn().mockResolvedValue('access-tok'),
     signRefresh: vi.fn().mockResolvedValue('refresh-tok'),
     refreshExpiresAt: vi.fn().mockReturnValue(new Date('2026-09-20T00:00:00Z')),
-    verifyRefresh: vi.fn().mockResolvedValue('u1'),
     signMfaChallenge: vi.fn().mockResolvedValue('challenge-tok'),
     verifyMfaChallenge: vi.fn().mockResolvedValue('u1'),
+    // `sid` names the refresh family (dashboard) or the POS session; both read it.
+    verifyRefresh: vi.fn().mockResolvedValue({ sub: 'u1', sessionId: 'session-1' }),
   };
   const email = { send: vi.fn().mockResolvedValue({ messageId: 'm1' }) };
   const config = { get: vi.fn().mockReturnValue('https://app.test') };
@@ -39,6 +45,9 @@ function make() {
     issueChallenge: vi.fn().mockResolvedValue(undefined),
     verifyCode: vi.fn().mockResolvedValue(undefined),
   };
+  const rateLimit = {
+    hit: vi.fn().mockReturnValue({ allowed: true, resetAt: Date.now() + 1_000 }),
+  };
   const svc = new AuthService(
     repo as never,
     passwords,
@@ -46,6 +55,7 @@ function make() {
     email as never,
     config as never,
     mfa as never,
+    rateLimit as never,
   );
   return { svc, repo, passwords, jwt, email, mfa };
 }
@@ -89,7 +99,10 @@ describe('AuthService.login', () => {
       'u1',
       hashOf('refresh-tok'),
       new Date('2026-09-20T00:00:00Z'),
+      // The refresh-family id, minted here and carried as the token's `sid`.
+      expect.any(String),
     );
+    expect(r.sessionId).toBe(h.repo.startDashboardSession.mock.calls[0][3]);
   });
 
   it('401s on wrong password', async () => {
@@ -135,7 +148,16 @@ describe('AuthService.refresh and logout · stateful dashboard session', () => {
       hashOf('refresh-old'),
       hashOf('refresh-tok'),
       new Date('2026-09-20T00:00:00Z'),
+      // The family id the refresh token named; rotation stays inside it.
+      'session-1',
     );
+  });
+
+  it('keeps the same session id across a rotation', async () => {
+    // The id is the refresh FAMILY, not the token row, so a POS administrative
+    // command bound to it survives the dashboard's own refresh cycle.
+    const r = await h.svc.refresh('refresh-old');
+    expect(r.sessionId).toBe('session-1');
   });
 
   it('revokes the session family when the user logs out', async () => {
@@ -148,6 +170,45 @@ describe('AuthService.refresh and logout · stateful dashboard session', () => {
     h.repo.revokeDashboardSession.mockRejectedValue(new Error('database unavailable'));
 
     await expect(h.svc.logout('refresh-old')).rejects.toThrow('database unavailable');
+  });
+});
+
+describe('AuthService POS session lifecycle', () => {
+  let h: ReturnType<typeof make>;
+  beforeEach(() => {
+    h = make();
+    h.repo.findUserById.mockResolvedValue({
+      userId: 'u1',
+      email: 'owner@kala.co',
+      displayName: 'Owner',
+    });
+  });
+
+  it('rotates a device-bound POS session', async () => {
+    h.repo.validatePosSession.mockResolvedValue({ deviceId: 'device-1' });
+    const result = await h.svc.posRefresh({
+      refreshToken: 'old-refresh',
+      installationId: 'installation-1',
+      deviceCredential: 'credential-1',
+    });
+    expect(result.deviceId).toBe('device-1');
+    expect(h.repo.rotatePosSessionToken).toHaveBeenCalledWith('session-1', expect.any(String));
+  });
+
+  it('rejects refresh after device authority ends', async () => {
+    h.repo.validatePosSession.mockResolvedValue(null);
+    await expect(
+      h.svc.posRefresh({
+        refreshToken: 'old-refresh',
+        installationId: 'installation-1',
+        deviceCredential: 'credential-1',
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('revokes the original session on logout', async () => {
+    await h.svc.posLogout('refresh-token');
+    expect(h.repo.revokePosSession).toHaveBeenCalledWith('session-1', 'u1', expect.any(String));
   });
 });
 

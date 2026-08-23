@@ -56,10 +56,19 @@ function reflectorAccepting(accepts: boolean): Reflector {
   } as unknown as Reflector;
 }
 
-const jwtNeverCalled = { verifyAccess: vi.fn() };
+/**
+ * The app's own verifier, as it behaves on anything that is not its own access
+ * JWT: it throws. Since the POS arrived, a Bearer that the till path does not
+ * admit (wrong key, no role, a customer, a route that did not opt in) is tried
+ * as an app JWT before being refused — so the verifier IS reached, and must
+ * refuse like the real one rather than return nothing.
+ */
+const jwtRefusing = {
+  verifyAccess: vi.fn().mockRejectedValue(new UnauthorizedException('invalid_token')),
+};
 
 function guard(accepts: boolean, secret = SECRET): AuthGuard {
-  return new AuthGuard(jwtNeverCalled as never, reflectorAccepting(accepts), tokens(secret));
+  return new AuthGuard(jwtRefusing as never, reflectorAccepting(accepts), tokens(secret));
 }
 
 describe('the register signs in with the credential umi-cash actually sends', () => {
@@ -71,7 +80,8 @@ describe('the register signs in with the credential umi-cash actually sends', ()
       },
     };
     expect(await guard(true).canActivate(ctxFor(req))).toBe(true);
-    expect(req.authUser).toEqual({ id: USER, email: null });
+    // No address, no durable session id, no device: a till token names none of them.
+    expect(req.authUser).toEqual({ id: USER, email: null, sessionId: '', deviceId: null });
     expect(req.registerMerchantId).toBe(CAFE_A);
   });
 
@@ -137,7 +147,14 @@ describe('the register signs in with the credential umi-cash actually sends', ()
   });
 
   it('judges a request carrying BOTH credentials as the dashboard', async () => {
-    const jwt = { verifyAccess: vi.fn().mockResolvedValue({ sub: 'dash-user', email: 'a@b.co' }) };
+    const jwt = {
+      verifyAccess: vi.fn().mockResolvedValue({
+        sub: 'dash-user',
+        email: 'a@b.co',
+        sessionId: 'fam-1',
+        deviceId: null,
+      }),
+    };
     const g = new AuthGuard(jwt as never, reflectorAccepting(true), tokens());
     const req: Record<string, unknown> = {
       cookies: { umi_access: 'cookie-token' },
@@ -146,7 +163,13 @@ describe('the register signs in with the credential umi-cash actually sends', ()
       },
     };
     expect(await g.canActivate(ctxFor(req))).toBe(true);
-    expect(req.authUser).toEqual({ id: 'dash-user', email: 'a@b.co' });
+    expect(req.authUser).toEqual({
+      id: 'dash-user',
+      email: 'a@b.co',
+      sessionId: 'fam-1',
+      deviceId: null,
+      commandContextType: 'dashboard_administrative',
+    });
     // The till claim must not leak in and pin a dashboard request to one café.
     expect(req.registerMerchantId).toBeUndefined();
   });

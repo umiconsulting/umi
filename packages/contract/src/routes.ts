@@ -28,6 +28,7 @@ export const routes = {
     /** POS device authentication. Versioned — a field client depends on it. */
     pos: {
       login: routePath('auth.posLogin'),
+      pinLogin: routePath('auth.posPinLogin'),
       refresh: routePath('auth.posRefresh'),
       logout: routePath('auth.posLogout'),
       globalLogout: routePath('auth.posGlobalLogout'),
@@ -46,6 +47,9 @@ export const routes = {
     settings: (merchantId: string): string => buildPath('merchants.settings', { merchantId }),
     locations: (merchantId: string): string => buildPath('merchants.locations', { merchantId }),
     audit: (merchantId: string): string => buildPath('merchants.audit', { merchantId }),
+    operations: (merchantId: string): string => buildPath('merchants.operations', { merchantId }),
+    administrativeCommands: (merchantId: string): string =>
+      buildPath('merchants.administrativeCommands', { merchantId }),
   },
   cash: {
     // Merchant-scoped surface (dashboard, cookie auth).
@@ -123,6 +127,74 @@ export const routes = {
       base: (merchantId: string): string => buildPath('pos.checkout', { merchantId }),
       payment: (merchantId: string, paymentId: string): string =>
         buildPath('pos.checkoutPayment', { merchantId, paymentId }),
+      recovery: (merchantId: string, cartId: string): string =>
+        buildPath('pos.checkoutRecovery', { merchantId, cartId }),
+      cancel: (merchantId: string, cartId: string): string =>
+        buildPath('pos.checkoutCancel', { merchantId, cartId }),
+    },
+    cash: {
+      center: (merchantId: string): string => buildPath('pos.cashCenter', { merchantId }),
+      command: (merchantId: string, commandId: string): string =>
+        buildPath('pos.cashCommand', { merchantId, commandId }),
+      shifts: (merchantId: string): string => buildPath('pos.cashShifts', { merchantId }),
+      movement: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashMovement', { merchantId, shiftId }),
+      suspend: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashSuspend', { merchantId, shiftId }),
+      resume: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashResume', { merchantId, shiftId }),
+      handoff: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashHandoff', { merchantId, shiftId }),
+      count: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashCount', { merchantId, shiftId }),
+      recount: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashRecount', { merchantId, shiftId }),
+      variance: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashVariance', { merchantId, shiftId }),
+      reconcile: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashReconcile', { merchantId, shiftId }),
+      close: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashClose', { merchantId, shiftId }),
+      noSale: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashNoSale', { merchantId, shiftId }),
+    },
+    exceptions: {
+      eligibility: (merchantId: string, saleId: string): string =>
+        buildPath('pos.exceptionEligibility', { merchantId, saleId }),
+      preview: (merchantId: string, saleId: string): string =>
+        buildPath('pos.exceptionPreview', { merchantId, saleId }),
+      approval: (merchantId: string, saleId: string): string =>
+        buildPath('pos.exceptionApproval', { merchantId, saleId }),
+      commit: (merchantId: string, saleId: string): string =>
+        buildPath('pos.exceptionCommit', { merchantId, saleId }),
+      history: (merchantId: string, saleId: string): string =>
+        buildPath('pos.exceptionHistory', { merchantId, saleId }),
+      result: (merchantId: string, saleId: string, exceptionId: string): string =>
+        buildPath('pos.exceptionResult', { merchantId, saleId, exceptionId }),
+      terminalOutcome: (merchantId: string, saleId: string, previewId: string): string =>
+        buildPath('pos.exceptionTerminalOutcome', { merchantId, saleId, previewId }),
+      command: (merchantId: string, commandId: string): string =>
+        buildPath('pos.exceptionCommand', { merchantId, commandId }),
+    },
+    sales: {
+      create: (merchantId: string): string => buildPath('pos.salesCreate', { merchantId }),
+      current: (merchantId: string): string => buildPath('pos.salesCurrent', { merchantId }),
+      list: (merchantId: string): string => buildPath('pos.salesList', { merchantId }),
+      suspend: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleSuspend', { merchantId, saleId }),
+      resume: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleResume', { merchantId, saleId }),
+      rename: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleRename', { merchantId, saleId }),
+      cancel: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleCancel', { merchantId, saleId }),
+      attachCustomer: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleCustomerAttach', { merchantId, saleId }),
+      detachCustomer: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleCustomerDetach', { merchantId, saleId }),
+      receipt: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleReceipt', { merchantId, saleId }),
+      customers: (merchantId: string): string => buildPath('pos.saleCustomers', { merchantId }),
     },
     offline: {
       policy: (merchantId: string): string => buildPath('pos.offlinePolicy', { merchantId }),
@@ -141,6 +213,14 @@ export const routes = {
       diagnostics: (merchantId: string): string =>
         buildPath('pos.offlineDiagnostics', { merchantId }),
     },
+    kitchen: {
+      order: (merchantId: string, sourceOrderId: string): string =>
+        buildPath('pos.kitchenOrder', { merchantId, sourceOrderId }),
+    },
+  },
+  kds: {
+    board: routePath('kds.board'),
+    command: routePath('kds.command'),
   },
 } as const;
 

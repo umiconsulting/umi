@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { getRequestContext } from '../database/request-context';
+import { redactTelemetry } from '../operations/redaction';
+import { ReleaseIdentityService } from '../release/release-identity.service';
 
 type Meta = Record<string, unknown>;
 
@@ -19,6 +21,7 @@ type Meta = Record<string, unknown>;
  */
 @Injectable()
 export class LoggingService {
+  constructor(private readonly releaseIdentity: ReleaseIdentityService) {}
   log(message: string, meta: Meta = {}): void {
     this.write('info', message, meta);
   }
@@ -30,18 +33,36 @@ export class LoggingService {
   }
 
   private write(level: string, message: string, meta: Meta): void {
-    const requestId = getRequestContext()?.requestId;
-    const base = { ts: new Date().toISOString(), level, message };
+    const context = getRequestContext();
+    const requestId = context?.requestId;
+    const correlationId = context?.correlationId;
+    const release = this.releaseIdentity.current();
+    const base = {
+      timestamp: new Date().toISOString(),
+      service: release.application,
+      environment: release.environment,
+      release: release.version,
+      severity: level,
+      message,
+    };
     // requestId is spread LAST so caller-supplied meta can never override the
     // contextual request id. The whole thing is guarded so a circular/
     // unserializable meta can never crash the logger.
     let line: string;
     try {
-      line = JSON.stringify({ ...base, ...meta, ...(requestId ? { requestId } : {}) });
+      line = JSON.stringify(
+        redactTelemetry({
+          ...base,
+          ...meta,
+          ...(requestId ? { requestId } : {}),
+          ...(correlationId ? { correlationId } : {}),
+        }),
+      );
     } catch (err) {
       line = JSON.stringify({
         ...base,
         ...(requestId ? { requestId } : {}),
+        ...(correlationId ? { correlationId } : {}),
         metaError: err instanceof Error ? err.message : 'unserializable meta',
       });
     }

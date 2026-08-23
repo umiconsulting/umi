@@ -1,0 +1,263 @@
+{
+  "schemaVersion": 1,
+  "phases": [
+    {
+      "id": "0A",
+      "status": "complete",
+      "subject": "Architecture salvage inventory"
+    },
+    {
+      "id": "0B-1",
+      "status": "complete",
+      "subject": "Provenance, licensing, and archival preparation"
+    },
+    {
+      "id": "0B-2",
+      "status": "complete",
+      "subject": "Business knowledge extraction"
+    },
+    {
+      "id": "0C",
+      "status": "complete",
+      "subject": "Build-v3 dependency baseline"
+    },
+    {
+      "commit": "a65bed4025a1fc541ff0d098b6c3112c31fb1402",
+      "id": "1A",
+      "status": "complete",
+      "subject": "Authority, migration ownership, and RLS"
+    },
+    {
+      "commit": "01c7bff93630b4495ae053da8830a394c26671ba",
+      "id": "1B",
+      "status": "complete",
+      "subject": "Canonical contract authority"
+    },
+    {
+      "commit": "8d174f7eeb78c2fb901b9c48b2bc61201575220c",
+      "id": "1C",
+      "status": "complete",
+      "subject": "Identity, sessions, staff, permissions, and entitlements"
+    },
+    {
+      "id": "1D",
+      "status": "complete",
+      "subject": "Transaction integrity, audit, and platform data controls"
+    },
+    {
+      "id": "1E",
+      "status": "complete",
+      "subject": "Observability, resilience, and abuse resistance"
+    },
+    {
+      "certificationSourceCommit": "a1e794d8fe0e9883f5677147ab81c4342f1a3980",
+      "id": "1F",
+      "status": "complete",
+      "subject": "Build-v3 platform certification"
+    },
+    {
+      "commit": "HEAD (Gate 2A commit)",
+      "id": "2A",
+      "status": "complete",
+      "subject": "UmiPOS Flutter application foundation"
+    },
+    {
+      "commit": "HEAD (Gate 2B commit)",
+      "id": "2B",
+      "status": "complete",
+      "pairingMode": "administrator-approved setup code and polling credential",
+      "operatorAuthentication": "personal PIN after trusted-device verification",
+      "subject": "Device trust, authenticated context, and operator entry"
+    },
+    {
+      "commit": "HEAD (Gate 2C commit)",
+      "id": "2C",
+      "status": "complete",
+      "subject": "Branch-aware read-only catalog"
+    },
+    {
+      "commit": "HEAD (Gate 2D commit)",
+      "id": "2D",
+      "status": "complete",
+      "subject": "Authoritative shopping cart and sale preparation"
+    },
+    {
+      "commit": "HEAD (Gate 2E commit)",
+      "id": "2E",
+      "status": "complete",
+      "subject": "Authoritative online checkout, payment orchestration, and receipt"
+    },
+    {
+      "commit": "HEAD (Gate 2F final closeout commit)",
+      "id": "2F",
+      "status": "complete_with_documented_limitation",
+      "subject": "Encrypted offline checkout, serialized journal, ordered replay, recovery, and reconciliation"
+    },
+    {
+      "commit": "HEAD (Gate 3A commit)",
+      "id": "3A",
+      "status": "complete",
+      "stateMachineVersion": 1,
+      "subject": "Cashier sale lifecycle, suspension, recovery, customer attachment, and receipt navigation"
+    },
+    {
+      "commit": "HEAD (Gate 3B commit)",
+      "id": "3B",
+      "status": "complete",
+      "stateMachineVersion": 1,
+      "subject": "Advanced checkout, cash, manual terminal, mixed tender, policy actions, and payment recovery"
+    },
+    {
+      "commit": "HEAD (Gate 3C commit)",
+      "id": "3C",
+      "status": "complete",
+      "stateMachineVersion": 1,
+      "subject": "Physical register, cash shift, immutable ledger, blind count, reconciliation, and close"
+    },
+    {
+      "commit": "this PR #72 integration commit",
+      "id": "PR-72-SYNC",
+      "status": "complete",
+      "subject": "UmiPOS Gate 1 through Gate 3C synchronization with build-v3"
+    },
+    {
+      "commit": "HEAD (Gate 3D commit)",
+      "id": "3D",
+      "status": "complete",
+      "stateMachineVersion": 1,
+      "subject": "Refunds, voids, immutable compensation, exception receipts, and recovery"
+    },
+    {
+      "commit": "HEAD (Gate 3D.1 commit)",
+      "id": "3D.1",
+      "status": "complete",
+      "subject": "Pilot operational RBAC, deterministic role grants, seeds, and approval separation"
+    },
+    {
+      "commit": "HEAD (Gate 3E commit)",
+      "id": "3E",
+      "status": "complete",
+      "subject": "Inventory authority, stock ledger, reservations, sale and refund synchronization, operations, and counts"
+    },
+    {
+      "commit": "HEAD (Gate 3F closeout commit)",
+      "id": "3F",
+      "status": "complete",
+      "subject": "Merchant customers, consent, loyalty, rewards, wallet, gift cards, checkout, and refund synchronization"
+    },
+    {
+      "commit": "HEAD (Gate 3G-A commit)",
+      "id": "3G-A",
+      "status": "complete",
+      "stateMachineVersion": 1,
+      "subject": "Hardware registry, command runtime, printer queue, device simulators, diagnostics, and recovery"
+    },
+    {
+      "commit": "HEAD (Gate 3G-B commit)",
+      "id": "3G-B",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "Generic pilot printing, printer-attached drawer, keyboard-wedge scanner, configuration, and recovery"
+    },
+    {
+      "commit": "HEAD (Gate 4A commit)",
+      "id": "4A",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "Authoritative kitchen projection, station routing, existing KDS integration, reconnect, recovery, and POS visibility"
+    },
+    {
+      "commit": "HEAD (Gate 5A live certification commit)",
+      "id": "5A",
+      "status": "complete",
+      "stateMachineVersion": 1,
+      "subject": "Live Dashboard command execution with real sessions, API, PostgreSQL, RLS, and audit"
+    },
+    {
+      "commit": "HEAD (Gate 6A pilot deployment commit)",
+      "id": "6A",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "Pilot deployment, release artifacts, health, backup, restore, upgrade, rollback, and smoke certification"
+    },
+    {
+      "commit": "HEAD (Gate 6B final closeout commit)",
+      "id": "6B",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "Certified bootstrap, pilot operations, KDS and role walkthroughs, readiness, training, and support"
+    },
+    {
+      "commit": "HEAD (Gate 7A final certification commit)",
+      "id": "7A",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "Integrated sales, stored value, offline replay, refunds, shift close, reconciliation, recovery, and audit"
+    },
+    {
+      "commit": "HEAD (Gate 7B certification commit)",
+      "id": "7B",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "Service failure, security, concurrency, stress, reconciliation, backup, restore, recovery, and audit"
+    },
+    {
+      "commit": "HEAD (Gate 8A certification commit)",
+      "id": "8A",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "POS operator UX, accessibility, localization, responsive layouts, failure states, and Design Language V1"
+    },
+    {
+      "commit": "HEAD (Gate 8B certification commit)",
+      "id": "8B",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "Dashboard and KDS UX, accessibility, responsive layouts, failure states, and operator experience"
+    },
+    {
+      "commit": "HEAD (Gate 9A certification commit)",
+      "id": "9A",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "First pilot rehearsal, operational lifecycle, failure recovery, support, and readiness"
+    },
+    {
+      "commit": "HEAD (Gate 9B certification commit; RC source 9ea8560b6c0e7304834eae0cd960804132acac89)",
+      "id": "9B",
+      "status": "complete_with_observations",
+      "stateMachineVersion": 1,
+      "subject": "Pilot RC identity, release artifacts, migration, configuration, deployment, rollback, and readiness"
+    },
+    {
+      "commit": "HEAD (Gate 9C certification commit; RC2 source 1e885022b654dcecf943377ea2e1e3b739a9027a)",
+      "id": "9C",
+      "status": "certified_for_controlled_pilot_with_conditions",
+      "stateMachineVersion": 1,
+      "subject": "Controlled pilot certification, final operating boundaries, support, recovery, and activation conditions"
+    },
+    {
+      "commit": "HEAD (Gate 10 completion commit; RC2 executable artifacts unchanged)",
+      "id": "10",
+      "status": "software_product_complete_with_p2",
+      "subject": "Software product completion, documentation closure, scope decisions, and Gate 13 deferred validation"
+    },
+    {
+      "commit": "HEAD (commit de Gate 11; artefactos RC2 sin cambios)",
+      "id": "11",
+      "status": "owner_knowledge_base_complete_with_p2",
+      "subject": "Base de Conocimiento y entrega operativa al Owner"
+    },
+    {
+      "id": "12",
+      "commit": "HEAD (certificación final; RC3 source 5b852c5e8152ca3dc6f9070ae2d49a277406dc72)",
+      "status": "software_complete_with_p2",
+      "subject": "Cierre final de software, RC3 y documentación canónica"
+    },
+    {
+      "id": "13",
+      "status": "deferred_until_hardware_exists",
+      "subject": "Hardware and Real-World Certification"
+    }
+  ]
+}

@@ -31,11 +31,18 @@ import type {
   SessionResponse,
   MfaChallengeResponse as MfaChallenge,
 } from '@umi/contract';
+import {
+  GlobalLogoutRequest,
+  PosPinLoginRequest,
+  PosRefreshRequest,
+  type PosSessionResponse,
+} from '@umi/contract';
 import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyMfaDto } from './dto/verify-mfa.dto';
+import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 
 /**
  * Per-IP ceilings on the unauthenticated auth routes. The window matches the one
@@ -223,8 +230,7 @@ export class AuthController {
       result.refreshToken,
       buildCookieOptions(this.config, 'refresh', remember),
     );
-    // Double-submit CSRF token: readable cookie, echoed by the SPA in a header
-    // on mutations (CsrfGuard wiring is a follow-up; the token is issued now).
+    // Double-submit CSRF token. CsrfGuard validates the matching request header.
     reply.setCookie(
       CSRF_COOKIE,
       randomBytes(18).toString('hex'),
@@ -237,6 +243,83 @@ export class AuthController {
       buildCookieOptions(this.config, 'refresh', remember),
     );
   }
+}
+
+@Controller('api/v1/auth')
+export class PosAuthController {
+  constructor(private readonly auth: AuthService) {}
+
+  @Public()
+  @Post('pos/pin-login')
+  async pinLogin(
+    @Body(new ZodValidationPipe(PosPinLoginRequest)) dto: PosPinLoginRequest,
+    @Req() req: FastifyRequest,
+  ): Promise<PosSessionResponse> {
+    const deviceId = header(req, 'x-umi-device-id');
+    const deviceCredential = header(req, 'x-umi-device-credential');
+    const result = await this.auth.pinLogin({
+      pin: dto.pin,
+      merchantId: dto.merchantId,
+      locationId: dto.locationId,
+      installationId: dto.installationId,
+      deviceId,
+      deviceCredential,
+      ip: req.ip ?? null,
+    });
+    return {
+      session: {
+        ...toSession(result, 1800),
+        sessionId: result.sessionId,
+        deviceId: result.deviceId,
+      },
+      tokens: { accessToken: result.accessToken, refreshToken: result.refreshToken },
+    };
+  }
+
+  @Public()
+  @Post('pos/refresh')
+  async refresh(
+    @Body(new ZodValidationPipe(PosRefreshRequest)) dto: PosRefreshRequest,
+    @Req() req: FastifyRequest,
+  ): Promise<PosSessionResponse> {
+    const result = await this.auth.posRefresh({
+      refreshToken: dto.refreshToken,
+      installationId: dto.installationId,
+      deviceCredential: header(req, 'x-umi-device-credential'),
+    });
+    return {
+      session: {
+        ...toSession(result, 1800),
+        sessionId: result.sessionId,
+        deviceId: result.deviceId,
+      },
+      tokens: { accessToken: result.accessToken, refreshToken: result.refreshToken },
+    };
+  }
+
+  @Public()
+  @Post('pos/logout')
+  async logout(
+    @Body(new ZodValidationPipe(PosRefreshRequest)) dto: PosRefreshRequest,
+  ): Promise<{ ok: true }> {
+    await this.auth.posLogout(dto.refreshToken);
+    return { ok: true };
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('pos/global-logout')
+  async globalLogout(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodValidationPipe(GlobalLogoutRequest)) dto: GlobalLogoutRequest,
+  ): Promise<{ ok: true }> {
+    await this.auth.posGlobalLogout(user.id, user.sessionId, dto.exceptCurrent);
+    return { ok: true };
+  }
+}
+
+function header(req: FastifyRequest, name: string): string | null {
+  const value = req.headers[name];
+  return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
 function toSession(result: LoginResult, accessExpiresIn: number): SessionEnvelope {

@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { ConfigService } from '@nestjs/config';
 import type { AppConfig } from '../../shared/config/config.schema';
@@ -56,6 +56,15 @@ describe('dashboard session · rotate, detect replay, and revoke', () => {
     await pg.onModuleInit();
     repo = new AuthRepository(pg);
     jwt = new JwtService(config);
+    // `runtime.dashboard_session.user_id` is a hard FK to `umi.user` (the POS binds
+    // administrative work to it), so the fixture login must be a real row — the
+    // soft `principal_id` on `runtime.session` never needed one.
+    await pg.query(
+      `INSERT INTO umi.user (id, email, full_name, status)
+       VALUES ($1::uuid, 'dashboard-session@harness.invalid', 'Dashboard Session Harness', 'active')
+       ON CONFLICT (id) DO NOTHING`,
+      [USER],
+    );
   });
 
   afterAll(async () => {
@@ -64,6 +73,8 @@ describe('dashboard session · rotate, detect replay, and revoke', () => {
         WHERE merchant_id IS NULL AND principal_type = 'user' AND principal_id = $1::uuid`,
       [USER],
     );
+    // Cascades to runtime.dashboard_session.
+    await pg?.query(`DELETE FROM umi.user WHERE id = $1::uuid`, [USER]);
     await pg?.onModuleDestroy?.();
   });
 
@@ -86,9 +97,13 @@ describe('dashboard session · rotate, detect replay, and revoke', () => {
     return rows[0];
   };
 
+  // One refresh family per test. It is minted here, signed into every refresh
+  // token as `sid`, and is the `runtime.dashboard_session` row id the POS binds to.
+  let family = '';
   const start = async (): Promise<string> => {
-    const token = await jwt.signRefresh(USER);
-    await repo.startDashboardSession(USER, hashOf(token), jwt.refreshExpiresAt(token));
+    family = randomUUID();
+    const token = await jwt.signRefresh(USER, family);
+    await repo.startDashboardSession(USER, hashOf(token), jwt.refreshExpiresAt(token), family);
     return token;
   };
 
@@ -115,7 +130,7 @@ describe('dashboard session · rotate, detect replay, and revoke', () => {
 
   it('rotates once, then treats reuse of the old token as a family replay', async () => {
     const oldToken = await start();
-    const nextToken = await jwt.signRefresh(USER);
+    const nextToken = await jwt.signRefresh(USER, family);
 
     await expect(
       repo.rotateDashboardSession(
@@ -123,6 +138,7 @@ describe('dashboard session · rotate, detect replay, and revoke', () => {
         hashOf(oldToken),
         hashOf(nextToken),
         jwt.refreshExpiresAt(nextToken),
+        family,
       ),
     ).resolves.toBe(true);
 
@@ -137,8 +153,9 @@ describe('dashboard session · rotate, detect replay, and revoke', () => {
       repo.rotateDashboardSession(
         USER,
         hashOf(oldToken),
-        hashOf(await jwt.signRefresh(USER)),
+        hashOf(await jwt.signRefresh(USER, family)),
         new Date(Date.now() + 60_000),
+        family,
       ),
     ).resolves.toBe(false);
     expect(await rowFor(nextToken)).toMatchObject({
@@ -149,13 +166,14 @@ describe('dashboard session · rotate, detect replay, and revoke', () => {
 
   it('logout revokes every live token in the named family', async () => {
     const oldToken = await start();
-    const currentToken = await jwt.signRefresh(USER);
+    const currentToken = await jwt.signRefresh(USER, family);
     await expect(
       repo.rotateDashboardSession(
         USER,
         hashOf(oldToken),
         hashOf(currentToken),
         jwt.refreshExpiresAt(currentToken),
+        family,
       ),
     ).resolves.toBe(true);
 
@@ -183,22 +201,24 @@ describe('dashboard session · rotate, detect replay, and revoke', () => {
     'leaves no live replacement when stale-token %s races the current refresh',
     async (staleAction) => {
       const staleToken = await start();
-      const currentToken = await jwt.signRefresh(USER);
+      const currentToken = await jwt.signRefresh(USER, family);
       await repo.rotateDashboardSession(
         USER,
         hashOf(staleToken),
         hashOf(currentToken),
         jwt.refreshExpiresAt(currentToken),
+        family,
       );
 
-      const nextToken = await jwt.signRefresh(USER);
+      const nextToken = await jwt.signRefresh(USER, family);
       const staleOperation =
         staleAction === 'replay'
           ? repo.rotateDashboardSession(
               USER,
               hashOf(staleToken),
-              hashOf(await jwt.signRefresh(USER)),
+              hashOf(await jwt.signRefresh(USER, family)),
               new Date(Date.now() + 60_000),
+              family,
             )
           : repo.revokeDashboardSession(hashOf(staleToken));
       await Promise.all([
@@ -208,6 +228,7 @@ describe('dashboard session · rotate, detect replay, and revoke', () => {
           hashOf(currentToken),
           hashOf(nextToken),
           jwt.refreshExpiresAt(nextToken),
+          family,
         ),
       ]);
 

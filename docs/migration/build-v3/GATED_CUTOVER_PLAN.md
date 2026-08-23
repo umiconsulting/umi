@@ -479,9 +479,23 @@ The larger set of wallet rows also carries exactly:
 - **733/733 device push tokens**.
 
 The migration family passes 24/24. RLS passes 9/9, pooler isolation passes 5/5, identity
-normalization passes 8/8, and endpoint smoke passes 2/2. The smoke exercises 56 GET routes. Fifty
-routes answer below 400. The smoke expects six local exceptions for signer configuration or input.
-The customer QR route answers 200 when the command supplies `APP_QR_SECRET`.
+normalization passes 8/8, and endpoint smoke passes 2/2. **Since the UmiPOS merge (2026-08-22)
+the smoke exercises 100 GET routes** (the integration added 44). Fifty-five answer below 400 and
+45 are declared exceptions: the six local signer/input ones, plus the POS routes, which answer
+403 because no rehearsal café holds the `pos` product (the snapshot predates UmiPOS), the two
+device routes, which answer 401 without an enrolled-device credential, `health/diagnostics`
+(403 without the operations token) and `kds/routes` (400 without a location). Each is a PIN
+that fails the day its reason stops being true. The customer QR route answers 200 when the
+command supplies `APP_QR_SECRET`.
+
+**The rehearsal command grew with the merge.** The runtime now refuses to boot without an
+explicit `UMI_ENVIRONMENT` (the integration harness sets `test` itself), and `/health` answers
+503 until `EXPECTED_SCHEMA_VERSION` names the applied schema (`build-v3-48` today) — a new
+deployment input, alongside `RELEASE_VERSION` / `RELEASE_GIT_COMMIT` / `CONTRACT_VERSION`. The
+migration family also needs `REDIS_URL` and the three JWT secrets because the smoke boots the
+whole module. After every `00_run_backfill.sh`, re-apply
+`apps/umi-api/test/integration/harness-roles.sql` to the new target (schema grants live inside
+the database) or identity-normalization refuses to run, by design.
 
 The rehearsal command now names `APP_QR_SECRET`. It fails early if the value is absent.
 
@@ -513,6 +527,61 @@ bootstrap-holder enrolment itself is the D12 row, and it is not blocked on anyth
 moved; the local phone run proves Apple accepted a newly generated token and notification. The
 remaining continuity gate is a pass issued **before** cutover — that is the one carrying the old
 token and frozen URL, and it is the only case that can prove the flip preserved existing devices.
+
+#### ✅ UmiPOS integration merged into build-v3 (2026-08-22)
+
+`architectureUMIposIntegration-v2` (PR #94, 731 files, forked at `9e43c3c` on 2026-08-13) is
+merged. Rule applied: **umi-api keeps build-v3's architecture where build-v3 had moved on; the
+POS client (`apps/umi-pos`, Flutter) is the branch's, verbatim.** 41 files conflicted; the
+decisions that were not mechanical, recorded so nobody re-litigates them from the diff:
+
+- **Gift cards — schema union on build-v3's model.** Both sides reshaped `loyalty_gift_card`
+  after the fork. build-v3's (#127/#128: no clear code, `code_hash bytea`, delta ledger) is the
+  authority; `37_pos_customer_value.sql` is now additive on top of it (status, public_reference,
+  currency, projection columns; the ledger's POS fact columns; the balance projection and the
+  authorize/release functions). The `reason` CHECKs are supersets that keep `gift_card_redeem`
+  (the frozen source's replay value). The POS issuer computes `code_hash`/`masked_code` in SQL as
+  the register does. Four `public_reference NOT NULL` columns and `contact.contact_type` get
+  BEFORE INSERT defaults, because build-v3's writers predate them.
+- **Value ledgers — one write boundary.** `90_rls` (branch) revokes `api`'s and `worker`'s DML on
+  the four value ledgers; every write goes through the SECURITY DEFINER fact functions. The Cash
+  register's one ledger insert now goes through `append_gift_card_fact` with identical semantics.
+  Parameters inside `jsonb_build_object` are cast — Postgres cannot infer a bare one.
+- **Dashboard session — build-v3's `runtime.session` (AB#114) is the authority; the branch's
+  `runtime.dashboard_session` survives as a projection of the refresh FAMILY.** Its `id` is the
+  family id, signed into every token as `sid`, which is what the POS binds administrative
+  commands, elevation grants and gift-card secret delivery to — and what survives the dashboard's
+  own refresh cycle. One signer (`issueTokens`) serves dashboard and POS sessions. The guard
+  accepts the same access JWT as `Authorization: Bearer` (the POS holds tokens in the app);
+  the register-token opt-in path is tried first, as before. No per-request session lookup: an
+  access token lives for its TTL and revocation lands at refresh, as #130 decided. Password reset
+  now revokes every live dashboard session (the branch's improvement, kept).
+- **Staff screen stays a dashboard capability.** The branch had re-gated `admin/staff` behind
+  `@RequireProduct('pos')`; restored to build-v3's guards. The operator PIN it issues is the
+  till's credential for Cash cafés too (AB#118), so the product gate belongs on the POS routes.
+- **`ClassValidationPipe`.** Nest's global `ValidationPipe` handed zod-typed parameters to
+  class-transformer under SWC (vitest) and every POS route 500'd in the suites while the tsc
+  build answered correctly. The global pipe now validates classes only.
+- **`super_admin` holds every permission key on a pristine build**: the POS files seed 132 keys
+  onto the POS roles; `46_platform_bootstrap.sql` now sweeps them onto `super_admin` too, so the
+  gate does not depend on the backfill's `seed_rbac.sql` having run.
+- **`00_run_backfill.sh` applies the 17 POS DDL files** after the data phase and before
+  `50`/`90` (they are written as migrations over existing rows), then `47`/`48` after `90`.
+  Proven on the clone: reconcile 0 drift, 751 passes / 794 contacts / 783 customers / gift card
+  1/1 unchanged, all 783 customers and 794 contacts carry the POS columns, 135 permission keys,
+  `super_admin` missing 0, security gate 48 structural + behavioral, one acknowledged gap (MFA).
+- **Generated artifacts are regenerated, never merged**: `@umi/contract` 2.12.0, `pnpm-lock`.
+- **Dashboard**: build-v3's #119–#125 redesign wins (labels, platform-grant model, RegionHead);
+  the branch's `operations` screen, devices "Registrar UmiPOS", and `hasRequiredPermission` are
+  added beside it. The legacy Supabase login path is gone with its dependency. The dashboard build
+  now requires `VITE_UMI_ENVIRONMENT` (the branch's vite config; `test` mode is exempt, so
+  vitest is unaffected) — set it in the Vercel project env before the next dashboard deploy.
+  CI builds only `@umi/api...`, so no workflow change.
+
+AB#118 is largely delivered by the merge for the POS (`POST /api/v1/auth/pos/pin-login`, device
+enrolment, `merchant.staff.operator_pin_*` issued from the staff screen); the register's own PIN
+door is still to wire. AB#119's elevation grant is wired for the POS (`pos-entry`,
+`manager_approval` / `operator_pin`); the Cash register path remains.
 
 #### ✅ Dashboard refresh rotation and logout revocation complete
 

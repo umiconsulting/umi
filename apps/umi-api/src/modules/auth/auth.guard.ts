@@ -34,22 +34,51 @@ export class AuthGuard implements CanActivate {
     if (isPublic) return true;
 
     const req = context.switchToHttp().getRequest<AuthedRequest>();
-    const token = req.cookies?.[ACCESS_COOKIE];
-
-    if (!token) {
+    const cookieToken = req.cookies?.[ACCESS_COOKIE];
+    // The POS holds its tokens in the app, not in a cookie, and sends the SAME
+    // access JWT as `Authorization: Bearer`. Same key, same claims, same
+    // verification — only the transport differs, and a header cannot be forged
+    // by a cross-site form, so this admits nothing the cookie did not.
+    const authorization = req.headers?.authorization;
+    const bearer =
+      typeof authorization === 'string' && authorization.startsWith('Bearer ')
+        ? authorization.slice(7)
+        : undefined;
+    // No cookie: on a route that opted in, the header may be the till's token.
+    // Tried FIRST, as before the POS arrived — the till pays no failed JWT verify,
+    // and a request carrying both credentials is still judged as the dashboard.
+    // A Bearer that is NOT a till token (or a route that did not opt in) falls
+    // through to the one verification below.
+    if (!cookieToken && bearer) {
       const accepts = this.reflector.getAllAndOverride<boolean>(ACCEPT_REGISTER_TOKEN, [
         context.getHandler(),
         context.getClass(),
       ]);
       if (accepts && (await this.authenticateRegister(req))) return true;
-      throw new UnauthorizedException('authentication_required');
     }
 
+    const token = cookieToken ?? bearer;
+    if (!token) throw new UnauthorizedException('authentication_required');
+
     const claims = await this.jwt.verifyAccess(token);
-    req.authUser = { id: claims.sub, email: claims.email };
+
+    // No per-request session lookup for a dashboard token. A dashboard access
+    // token is valid for its own TTL (15 min); revocation takes effect at the next
+    // refresh, where the family is checked and rotated (auth.service.ts, AB#114).
+    // The POS validates its device-bound session on refresh the same way.
+    req.authUser = {
+      id: claims.sub,
+      email: claims.email,
+      sessionId: claims.sessionId,
+      deviceId: claims.deviceId,
+      commandContextType: claims.deviceId ? 'pos_device' : 'dashboard_administrative',
+    };
 
     const ctx = getRequestContext();
-    if (ctx) ctx.userId = claims.sub;
+    if (ctx) {
+      ctx.userId = claims.sub;
+      ctx.deviceId = claims.deviceId;
+    }
 
     return true;
   }
@@ -79,7 +108,8 @@ export class AuthGuard implements CanActivate {
 
     // No email in a till token, and none is needed: every register route reads
     // `user.id`. An empty string here would read as an address nobody has.
-    req.authUser = { id: claims.subjectId, email: null };
+    // No durable session id in a till token either; see `AuthUser.sessionId`.
+    req.authUser = { id: claims.subjectId, email: null, sessionId: '', deviceId: null };
     req.registerMerchantId = claims.merchantId;
 
     const ctx = getRequestContext();

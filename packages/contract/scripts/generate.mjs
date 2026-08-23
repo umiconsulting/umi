@@ -135,11 +135,25 @@ const tsOutput =
   `export const apiMajorVersion = ${JSON.stringify(API_MAJOR_VERSION)} as const;\n` +
   `export const contractContentHash = ${JSON.stringify(contentHash)} as const;\n\n${tsModels}\n`;
 
+/**
+ * Dart has no union type. When every member of a true union renders to the SAME
+ * Dart type — two object shapes, or two arrays of object shapes — that type is
+ * honest: the caller still branches on a field. Members that disagree leave only
+ * `Object?`. Taking the first member instead would name one shape and hide the
+ * other. `dartDecode` consults this too, so a field and its decoder cannot
+ * disagree (`KitchenBoardResponse.data` is two arrays, and once published as a
+ * map that was decoded as a list).
+ */
+function unionDartType(input) {
+  const members = new Set(branches(input).map((item) => dartType(item).replace(/\?$/, '')));
+  return members.size === 1 ? [...members][0] : 'Object?';
+}
+
 function dartType(input) {
-  // Dart has no union type. A true union becomes the open map, which is honest:
-  // the caller must branch on a field. Taking the first member instead would
-  // name one shape and hide the other.
-  if (branches(input).length > 1) return 'Map<String, Object?>';
+  if (branches(input).length > 1) {
+    const value = unionDartType(input);
+    return nullable(input) && value !== 'Object?' ? `${value}?` : value;
+  }
   const schema = withoutNull(input);
   let value = 'Object?';
   if (schema?.type === 'string' || schema?.enum) value = 'String';
@@ -152,6 +166,9 @@ function dartType(input) {
 }
 
 function dartDecode(input, expression) {
+  // A true union whose members disagree is `Object?`: there is nothing to cast
+  // to. When they agree, the first member decodes for all of them.
+  if (branches(input).length > 1 && unionDartType(input) === 'Object?') return expression;
   const schema = withoutNull(input);
   const optional = nullable(input);
   const wrap = (value) => (optional ? `${expression} == null ? null : ${value}` : value);

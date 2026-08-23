@@ -13,7 +13,10 @@ export interface ModuleConfig {
   section: 'OPERATIONS' | 'GROWTH' | 'CONFIGURATION';
   product: string;
   locationScoped?: boolean;
+  /** The CAFÉ-role gate (owner/admin/staff/viewer). See `hasRequiredRole`. */
   role?: string;
+  /** The permission-key gate the POS/operations modules use. See `hasRequiredPermission`. */
+  permissions?: string[];
 }
 
 export interface CapabilitiesShape {
@@ -29,12 +32,38 @@ export const MODULES: Record<string, ModuleConfig> = {
     section: 'OPERATIONS',
     product: 'dashboard',
   },
+  operations: {
+    id: 'operations',
+    label: 'Centro operativo',
+    icon: 'Activity',
+    section: 'OPERATIONS',
+    product: 'dashboard',
+    permissions: [
+      'merchant.manage',
+      'audit.read',
+      'hardware.read',
+      'hardware.diagnostics',
+      'inventory.read',
+      'sale.lifecycle',
+      'sale.exception.read',
+      'cash.shift.read',
+      'customer.read',
+      'loyalty.read',
+      'wallet.read',
+      'gift_card.read',
+      'kitchen.read',
+      'device.enroll',
+      'catalog.read',
+    ],
+    locationScoped: true,
+  },
   orders: {
     id: 'orders',
     label: 'Pedidos',
     icon: 'Receipt',
     section: 'OPERATIONS',
     product: 'kds',
+    permissions: ['kitchen.read'],
     locationScoped: true,
   },
   devices: {
@@ -42,7 +71,8 @@ export const MODULES: Record<string, ModuleConfig> = {
     label: 'Devices',
     icon: 'Tablet',
     section: 'OPERATIONS',
-    product: 'kds',
+    product: 'dashboard',
+    permissions: ['device.enroll'],
     locationScoped: true,
   },
   staff: {
@@ -51,6 +81,7 @@ export const MODULES: Record<string, ModuleConfig> = {
     icon: 'Users',
     section: 'OPERATIONS',
     product: 'dashboard',
+    permissions: ['merchant.manage'],
   },
   customers: {
     id: 'customers',
@@ -58,6 +89,7 @@ export const MODULES: Record<string, ModuleConfig> = {
     icon: 'Users2',
     section: 'OPERATIONS',
     product: 'dashboard',
+    permissions: ['customer.read'],
   },
   members: {
     id: 'members',
@@ -65,6 +97,7 @@ export const MODULES: Record<string, ModuleConfig> = {
     icon: 'CreditCard',
     section: 'GROWTH',
     product: 'cash',
+    permissions: ['loyalty.read'],
   },
   'gift-cards': {
     id: 'gift-cards',
@@ -72,6 +105,7 @@ export const MODULES: Record<string, ModuleConfig> = {
     icon: 'Gift',
     section: 'GROWTH',
     product: 'cash',
+    permissions: ['gift_card.read'],
   },
   hours: {
     id: 'hours',
@@ -79,6 +113,7 @@ export const MODULES: Record<string, ModuleConfig> = {
     icon: 'Clock',
     section: 'CONFIGURATION',
     product: 'conversaflow',
+    permissions: ['merchant.manage'],
     locationScoped: true,
   },
   settings: {
@@ -87,6 +122,7 @@ export const MODULES: Record<string, ModuleConfig> = {
     icon: 'Settings',
     section: 'CONFIGURATION',
     product: 'dashboard',
+    permissions: ['merchant.manage'],
   },
   'products-billing': {
     id: 'products-billing',
@@ -105,6 +141,7 @@ export const MODULES: Record<string, ModuleConfig> = {
 
 export const MODULE_ORDER = [
   'overview',
+  'operations',
   'orders',
   'devices',
   'staff',
@@ -118,7 +155,7 @@ export const MODULE_ORDER = [
 
 export type ModuleAvailability =
   | { available: true; locationScoped: boolean }
-  | { available: false; reason: string; product?: string; role?: string; locationScoped?: boolean };
+  | { available: false; reason: string; product?: string; locationScoped?: boolean };
 
 function isProductActive(productKey: string, cap: CapabilitiesShape): boolean {
   const status = cap.products?.[productKey]?.status;
@@ -140,6 +177,19 @@ function hasRequiredRole(moduleConfig: ModuleConfig, cap: CapabilitiesShape): bo
   return membership?.role === moduleConfig.role || !!membership?.permissions?.includes('*');
 }
 
+/**
+ * The PERMISSION gate, and the one the POS/operations modules use: a module names
+ * the `umi.permission` keys that open it, and the café membership must hold one.
+ * A third axis beside `role` (café role) and `platform` (platform grant).
+ */
+function hasRequiredPermission(moduleConfig: ModuleConfig, cap: CapabilitiesShape): boolean {
+  if (!moduleConfig.permissions?.length) return true;
+  const permissions = cap.membership?.permissions ?? [];
+  return (
+    permissions.includes('*') || moduleConfig.permissions.some((key) => permissions.includes(key))
+  );
+}
+
 export function getModuleAvailability(
   moduleKey: string,
   cap: CapabilitiesShape,
@@ -154,11 +204,21 @@ export function getModuleAvailability(
       locationScoped: !!moduleConfig.locationScoped,
     };
   }
+  // Three gates, three axes. The café role (build-v3; unused by any module today,
+  // kept for the one that will want it), then the permission keys (the POS and
+  // operations modules). The PLATFORM grant is not decided here — the client reads
+  // it off `SessionEnvelope.platformRole`; see the products-billing entry.
   if (!hasRequiredRole(moduleConfig, cap)) {
     return {
       available: false,
       reason: 'role_required',
-      role: moduleConfig.role,
+      locationScoped: !!moduleConfig.locationScoped,
+    };
+  }
+  if (!hasRequiredPermission(moduleConfig, cap)) {
+    return {
+      available: false,
+      reason: 'permission_required',
       locationScoped: !!moduleConfig.locationScoped,
     };
   }

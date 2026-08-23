@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ClassValidationPipe } from './shared/http/class-validation.pipe';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import fastifyCookie from '@fastify/cookie';
 import { Client } from 'pg';
@@ -69,7 +69,58 @@ const EXPECTED: readonly Expectation[] = [
     status: 404,
     why: 'The read matrix supplies SMOKECODE. The database has no matching bearer code.',
   },
+  // ── Routes that arrived with the UmiPOS integration (architectureUMIposIntegration-v2) ──
+  {
+    match: /\/health\/diagnostics$/,
+    status: 403,
+    why:
+      'Operator diagnostics need `x-umi-operations-token`; this suite sends none. 403 is ' +
+      'the correct answer, and the PIN: the day this answers without the token, the ' +
+      'check was dropped.',
+  },
+  {
+    match: /\/kds\/routes$/,
+    status: 400,
+    why:
+      'Same species as geocode: the kitchen routing list is per location and this suite ' +
+      'sends no `?locationId=`; `location_required` is the right refusal to the call made.',
+  },
+  {
+    match: /\/api\/v1\/devices\/status$|\/api\/v1\/pos\/entry-context$/,
+    status: 401,
+    why:
+      'A POS device route. It authenticates the enrolled terminal by `x-umi-device-id` + ' +
+      '`x-umi-device-credential`; a dashboard staff cookie is not a device and is refused.',
+  },
+  {
+    match: /\/api\/v1\/pos\/merchants\/|\/api\/v1\/merchants\/[^/]+\/devices\/enrollment-requests$/,
+    status: 403,
+    why:
+      "POS routes are `@RequireProduct('pos')` (and device enrolment needs `device.enroll`). " +
+      'No rehearsal café holds the pos product — the snapshot predates UmiPOS — so the ' +
+      'EntitlementGuard answers 403 for every one of them, which is what it is for. ' +
+      'When a rehearsal café is entitled to pos, these entries stop matching and must be ' +
+      'retired in favour of real reads.',
+  },
 ];
+
+/**
+ * READINESS IS DECIDED BY THE DEPLOYMENT'S DECLARED RELEASE, NOT BY THE SCHEMA.
+ * `/health` and `/health/ready` compare the database's applied schema version with
+ * `EXPECTED_SCHEMA_VERSION`, and answer 503 until the deployment states what it
+ * expects. A rehearsal that sets it (the documented command does) gets 200; one that
+ * does not gets an honest 503 that says nothing about the migration.
+ */
+function readinessExceptions(): Expectation[] {
+  if (process.env.EXPECTED_SCHEMA_VERSION) return [];
+  return [
+    {
+      match: /\/health$|\/health\/ready$/,
+      status: 503,
+      why: 'EXPECTED_SCHEMA_VERSION is not set here, so readiness cannot be declared.',
+    },
+  ];
+}
 
 /**
  * ROUTES WHOSE ANSWER IS DECIDED BY CONFIGURATION, NOT BY THE SCHEMA.
@@ -290,7 +341,7 @@ describe('build-v3 smoke · every read endpoint', () => {
       { logger: false },
     );
     await app.register(fastifyCookie);
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(new ClassValidationPipe({ whitelist: true, transform: true }));
     const fastify = app.getHttpAdapter().getInstance();
     fastify.addHook('onRoute', (r: { method: string | string[]; url: string }) => {
       const methods = Array.isArray(r.method) ? r.method : [r.method];
@@ -307,12 +358,22 @@ describe('build-v3 smoke · every read endpoint', () => {
     // REAL sessions, signed with the app's own keys, so the guard chain runs for
     // real rather than being stubbed out.
     const jwt = app.get(JwtService);
-    staffCookie = `umi_access=${await jwt.signAccess({ sub: fx.userId, email: fx.email })}`;
+    staffCookie = `umi_access=${await jwt.signAccess({
+      sub: fx.userId,
+      email: fx.email,
+      // A dashboard staff cookie: names a session family, carries no device.
+      sessionId: '00000000-0000-4000-8000-00000000a11e',
+      deviceId: null,
+    })}`;
     customerBearer = await app
       .get(CustomerSessionService)
       .signAccessToken(fx.customerId, 'CUSTOMER', fx.merchantId);
 
-    expected = [...EXPECTED, ...environmentExceptions(app.get(WalletPassService))];
+    expected = [
+      ...EXPECTED,
+      ...environmentExceptions(app.get(WalletPassService)),
+      ...readinessExceptions(),
+    ];
   }, 120_000);
 
   afterAll(async () => {

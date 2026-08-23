@@ -1,45 +1,106 @@
 import { Injectable } from '@nestjs/common';
 import type { PoolClient } from 'pg';
-import { PgService } from '../../shared/database/pg.service';
 import {
-  BOARD_ACTIVE_STATUSES,
-  KdsHttpError,
+  deriveKitchenOrderStatus,
+  type KitchenItemStatus,
+  type KitchenOrderStatus,
+  validateKitchenTransition,
+} from './kitchen-domain';
+import { PgService } from '../../shared/database/pg.service';
+import { getRequestContext } from '../../shared/database/request-context';
+import {
+  type KdsDeviceSession,
   type KitchenStatus,
-  mapKitchenToOrderStatus,
-  mapOrderToKitchenStatus,
   randomHex,
   sha256Hex,
-  TERMINAL_STATUSES,
-  validateTransition,
 } from './dto/kds-contract';
 
-/**
- * All KDS SQL. Everything runs on the **worker pool** (`pg.query` / `pg.workerTx`)
- * with an explicit `merchant_id = $1` predicate in every statement — NOT the RLS
- * `withMerchant` path — for three reasons (spec §9.1/§11.2):
- *   1. the iPad path has no authenticated member user, so RLS would hide rows;
- *   2. sessions/pairing live in the SEALED `runtime` schema (auth secrets
- *      `token_hash`/`pin_hash`/`pin_salt`) with NO `umi_app` USAGE;
- *   3. transitions write `runtime.outbox_event` (service-role-only schema).
- * Cross-merchant isolation is enforced by the explicit predicate + the guard stack
- * on the dashboard routes / the device-session scope on the iPad routes — the
- * same model the public cash routes use.
- *
- * build-v2 mapping: stations `kitchen.stations`→`merchant.station`, devices
- * `device.devices`→`merchant.device`, sessions `device.sessions`→`runtime.session`
- * (`device_id`→`principal_id`, `principal_type='device'`), pairing
- * `device.pairing_requests`→`runtime.pairing`. Tickets are the `merchant.order_ticket`
- * projection over `customer_order`/`order_item` — ONE live projection, read here with
- * the frozen iPad's shape applied on top (see TICKET_SELECT). The kitchen lifecycle is
- * COLLAPSED onto `customer_order.status`; `merchant.order_event` is the ordered change
- * FEED a puller reads, carrying status transitions AND line-level upserts.
- */
+/** The repository enforces the merchant, location, station, and device scope. */
 
 export interface StationRow {
   id: string;
   merchant_id: string;
   location_id: string | null;
   name: string;
+}
+
+async function finishKitchenCommand(
+  client: PoolClient,
+  commandId: string,
+  status: 'succeeded' | 'conflict',
+  result: Record<string, unknown>,
+): Promise<void> {
+  await client.query(
+    `UPDATE merchant.kitchen_command SET status=$2,result=$3::jsonb,completed_at=clock_timestamp()
+      WHERE id=$1::uuid`,
+    [commandId, status, JSON.stringify(result)],
+  );
+}
+
+async function auditKitchenConfiguration(
+  client: PoolClient,
+  input: {
+    merchantId: string;
+    locationId: string | null;
+    eventType: string;
+    entityType: string;
+    entityId: string;
+    publicData?: Record<string, unknown>;
+  },
+): Promise<void> {
+  await client.query(
+    `INSERT INTO merchant.audit_event
+       (merchant_id,location_id,actor_user_id,command_id,event_type,entity_type,entity_id,
+        outcome,public_data,correlation_id,event_hash)
+     VALUES ($1::uuid,$2::uuid,$3::uuid,gen_random_uuid(),$4,$5,$6::uuid,
+             'success',$7::jsonb,'kds-config-'||$6::text,'')`,
+    [
+      input.merchantId,
+      input.locationId,
+      getRequestContext()?.userId ?? null,
+      input.eventType,
+      input.entityType,
+      input.entityId,
+      JSON.stringify(input.publicData ?? {}),
+    ],
+  );
+}
+
+function kitchenEventKind(commandType: string): string {
+  if (commandType === 'recall') return 'order_recalled';
+  if (commandType === 'change_priority') return 'priority_changed';
+  if (commandType === 'cancel_ack') return 'order_cancelled';
+  if (commandType === 'mark_item_ready') return 'item_updated';
+  return 'order_updated';
+}
+
+function commandTarget(
+  commandType: string,
+  _current: KitchenOrderStatus,
+): KitchenOrderStatus | null {
+  if (commandType === 'start_preparation' || commandType === 'recall') return 'in_preparation';
+  if (commandType === 'mark_item_ready' || commandType === 'mark_order_ready') return 'ready';
+  if (commandType === 'complete') return 'completed';
+  if (commandType === 'cancel_ack') return 'cancelled';
+  if (commandType === 'change_priority') return null;
+  return null;
+}
+
+function mapCanonicalKitchenStatus(status: KitchenOrderStatus): KitchenStatus {
+  switch (status) {
+    case 'queued':
+      return 'new';
+    case 'in_preparation':
+      return 'preparing';
+    case 'partially_ready':
+      return 'partial_cancelled';
+    case 'ready':
+    case 'completed':
+    case 'cancelled':
+      return status;
+    case 'exception':
+      return 'new';
+  }
 }
 
 export interface PairingRow {
@@ -89,25 +150,30 @@ export interface OrderScopeRow {
   merchant_id: string;
   location_id: string | null;
   station_id: string | null;
+  station_ids?: string[];
   kitchen_status: KitchenStatus | null;
+  kitchen_order_status?: KitchenOrderStatus;
+  version?: number;
   person_id: string | null;
   source_transaction_id: string | null;
+  public_reference?: string;
 }
 
-/** A merchant.order_ticket row shaped for the frozen contract. Remapped in the service. */
+/** A preparation-safe kitchen row for the iPad and dashboard adapters. */
 export interface TicketRow {
   ticket_id: string;
   source_transaction_id: string | null;
+  public_reference?: string;
   merchant_id: string;
   source_channel: string | null;
-  status: KitchenStatus;
+  location_id?: string;
+  priority?: string;
+  business_date?: string;
+  preparation_started_at?: string | null;
+  version?: number;
+  status: KitchenStatus | KitchenOrderStatus;
   station_id: string | null;
   station_name: string | null;
-  customer_name: string | null;
-  customer_phone: string | null;
-  pickup_person: string | null;
-  customer_note: string | null;
-  total_amount: string | number;
   created_at: string;
   updated_at: string;
   last_event_sequence: string | number;
@@ -124,6 +190,10 @@ export interface EventRow {
   occurred_at: string;
   source: string | null;
   payload: unknown;
+  location_id?: string;
+  station_id?: string | null;
+  aggregate_version?: number;
+  correlation_id?: string;
 }
 
 export interface DeviceListRow {
@@ -138,86 +208,124 @@ export interface DeviceListRow {
   metadata: Record<string, unknown>;
 }
 
-// The customer name (merchant.customer) + best reply phone (merchant.contact) for a
-// ticket — prefers the WhatsApp as-received raw_phone_number (avoids Twilio 63015),
-// else the phone-channel normalized E.164. Shared by board reads.
-// REPLY channels are ('whatsapp','phone') — deliberately NOT the identity dedup family
-// ('phone','whatsapp','sms'): we never reply over SMS.
-const CUSTOMER_NAME_PHONE_JOIN = `LEFT JOIN merchant.customer cu
-    ON cu.merchant_id = t.merchant_id AND cu.id = t.customer_id
-  LEFT JOIN LATERAL (
-    SELECT COALESCE(ct.raw_phone_number, ct.normalized_value) AS phone
-      FROM merchant.contact ct
-      JOIN umi.channel_type pch ON pch.id = ct.channel_id
-     WHERE ct.merchant_id = cu.merchant_id AND ct.customer_id = cu.id
-       AND pch.key IN ('whatsapp', 'phone')
-     ORDER BY (pch.key = 'whatsapp') DESC, ct.is_primary DESC, ct.updated_at DESC
-     LIMIT 1
-  ) ph ON true`;
-
-/**
- * The frozen `KDSEventRow` projection, shared by the cursor and the ticker so the two
- * cannot drift.
- *
- * Three of these columns are SYNTHESISED because build-v3's `order_event` is a thin
- * status spine — "real status transitions only, not a catch-all event log" — while the
- * Swift model declares all three NON-OPTIONAL:
- *   kind    -> REAL COLUMN now, no longer a synthesised constant. order_event carries
- *              status_changed | order_upserted, and both are values
- *              `KitchenEventKind(kdsValue:)` already accepts — the frozen client routes
- *              order_upserted straight to refreshSnapshot(), which is exactly what a
- *              line-level void needs and required no app change.
- *   source  -> the old `order_event.source` free-text is gone; a KDS-visible transition
- *              is written by the KDS.
- *   payload -> the old actor/reason blob is gone. Empty object, not null: Swift decodes
- *              a dictionary, and null fails the whole payload.
- * `merchant_id` comes from the parent order — `order_event` deliberately has no
- * merchant_id (RLS reaches it through customer_order), which is also why every query
- * here filters on `o.merchant_id`, not `e.merchant_id`.
- */
-/**
- * The frozen `KDSSnapshotRow` projection over merchant.order_ticket.
- *
- * These four columns are the ADAPTER — they exist because of what the iPad's Swift model
- * declares, and for no other reason, so they live here rather than in the schema:
- *   source_transaction_id -> coalesced to the order id. `external_ref` is nullable (a
- *       pos/web/dashboard order has none) while Swift declares it NON-optional, and a
- *       null fails the decode of the whole payload, not one ticket.
- *   station_id / station_name -> always null. The order carries no station; the KDS
- *       scopes by the device's paired station at query time. The frozen contract has the
- *       keys, so they are emitted as nulls (both are optional in Swift).
- *   total_amount -> the ticket carries NO money (ORDER_MODEL §4). Callers that legitimately
- *       need a total join merchant.order_total themselves; the board passes null, which is
- *       what a kitchen ticket is.
- */
-const TICKET_SELECT = `t.ticket_id,
-              COALESCE(t.external_ref, t.ticket_id::text) AS source_transaction_id,
-              t.merchant_id        AS merchant_id,
-              t.source             AS source_channel,
-              t.status,
-              NULL::uuid           AS station_id,
-              NULL::text           AS station_name,
-              cu.name              AS customer_name,
-              ph.phone             AS customer_phone,
-              t.pickup_person,
-              t.notes              AS customer_note,
-              t.created_at,
-              t.updated_at,
-              t.items`;
-
-const EVENT_SELECT = `e.sequence,
-              e.order_id                           AS ticket_id,
-              o.merchant_id                        AS merchant_id,
-              COALESCE(o.external_ref, o.id::text) AS source_transaction_id,
-              e.kind,
-              e.status,
-              e.occurred_at,
-              'kds'                                AS source,
-              '{}'::jsonb                          AS payload`;
-
 @Injectable()
 export class KdsRepository {
   constructor(private readonly pg: PgService) {}
+
+  async dashboardLocationAllowed(userId: string, merchantId: string, locationId: string) {
+    const { rowCount } = await this.pg.query(
+      `SELECT 1 FROM merchant.staff
+        WHERE user_id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+          AND status='active'
+        LIMIT 1`,
+      [userId, merchantId, locationId],
+    );
+    return (rowCount ?? 0) === 1;
+  }
+
+  async dashboardResourceLocation(
+    merchantId: string,
+    resource: {
+      stationId?: string;
+      routeId?: string;
+      deviceId?: string;
+      pairingId?: string;
+      ticketId?: string;
+    },
+  ): Promise<{ found: boolean; locationId: string | null }> {
+    const entries = Object.entries(resource).filter((entry) => entry[1]);
+    if (entries.length !== 1) return { found: false, locationId: null };
+    const [kind, id] = entries[0];
+    const queries: Record<string, string> = {
+      stationId: `SELECT location_id::text FROM merchant.station
+                   WHERE merchant_id=$1::uuid AND id::text=$2`,
+      routeId: `SELECT location_id::text FROM merchant.kitchen_route
+                 WHERE merchant_id=$1::uuid AND id::text=$2`,
+      deviceId: `SELECT metadata->>'location_id' AS location_id FROM runtime.session
+                  WHERE merchant_id=$1::uuid AND id::text=$2 AND principal_type='device'`,
+      pairingId: `SELECT location_id::text FROM runtime.pairing
+                   WHERE merchant_id=$1::uuid AND id::text=$2`,
+      ticketId: `SELECT location_id::text FROM merchant.kitchen_order
+                  WHERE merchant_id=$1::uuid AND (id::text=$2 OR public_reference=$2)`,
+    };
+    const sql = queries[kind];
+    if (!sql) return { found: false, locationId: null };
+    const { rows } = await this.pg.query<{ location_id: string | null }>(sql, [merchantId, id]);
+    return rows[0]
+      ? { found: true, locationId: rows[0].location_id }
+      : { found: false, locationId: null };
+  }
+
+  async authorizePos(
+    userId: string,
+    sessionId: string,
+    deviceId: string,
+    merchantId: string,
+    locationId: string,
+    operatorSessionId: string,
+  ): Promise<boolean> {
+    return this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      async (client) => {
+        const result = await client.query(
+          `SELECT 1 FROM runtime.operator_session os
+            JOIN merchant.device d ON d.id=os.device_id
+           WHERE os.id=$6::uuid AND os.durable_session_id=$2::uuid
+             AND os.user_id=$1::uuid AND os.device_id=$3::uuid
+             AND os.merchant_id=$4::uuid AND os.location_id=$5::uuid
+             AND os.state='active' AND os.expires_at>now() AND d.status='active'
+             AND ('kitchen.read'=ANY(os.permissions) OR '*'=ANY(os.permissions))
+             AND EXISTS (
+               SELECT 1 FROM jsonb_array_elements(os.entitlements) e
+                WHERE e->>'featureKey'='pos'
+                  AND coalesce((e->>'enabled')::boolean,false)
+             )`,
+          [userId, sessionId, deviceId, merchantId, locationId, operatorSessionId],
+        );
+        return (result.rowCount ?? 0) === 1;
+      },
+      locationId,
+    );
+  }
+
+  async posKitchenStatus(merchantId: string, locationId: string, sourceOrderId: string) {
+    const { rows } = await this.pg.query<{
+      kitchen_order_id: string;
+      source_order_id: string;
+      public_reference: string;
+      status: KitchenOrderStatus;
+      priority: string;
+      version: string;
+      station_ids: string[];
+      updated_at: string;
+    }>(
+      `SELECT ko.id::text AS kitchen_order_id,ko.source_order_id::text,
+              ko.public_reference,ko.status,ko.priority,ko.version::text,
+              array_agg(DISTINCT i.station_id::text) FILTER (WHERE i.station_id IS NOT NULL)
+                AS station_ids,
+              ko.updated_at
+         FROM merchant.kitchen_order ko
+         JOIN merchant.kitchen_order_item i
+           ON i.merchant_id=ko.merchant_id AND i.kitchen_order_id=ko.id
+        WHERE ko.merchant_id=$1::uuid AND ko.location_id=$2::uuid
+          AND ko.source_order_id=$3::uuid
+        GROUP BY ko.id`,
+      [merchantId, locationId, sourceOrderId],
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      kitchenOrderId: row.kitchen_order_id,
+      sourceOrderId: row.source_order_id,
+      publicReference: row.public_reference,
+      status: row.status,
+      priority: row.priority,
+      version: Number(row.version),
+      stationIds: row.station_ids ?? [],
+      updatedAt: row.updated_at,
+    };
+  }
 
   // ── Stations (merchant.station; location_id -> location_id) ─────────────────────
 
@@ -312,20 +420,31 @@ export class KdsRepository {
     sort_order: number;
     location_id: string | null;
   }> {
-    const { rows } = await this.pg.query(
-      `INSERT INTO merchant.station (merchant_id, location_id, key, name)
-         VALUES ($1, $2, $3, $4)
-       RETURNING id, key AS station_key, name, status, sort_order, location_id AS location_id`,
-      [input.merchantId, input.locationId, input.stationKey, input.name],
-    );
-    return rows[0] as {
-      id: string;
-      station_key: string;
-      name: string;
-      status: string;
-      sort_order: number;
-      location_id: string | null;
-    };
+    return this.pg.workerTx(async (client) => {
+      const { rows } = await client.query(
+        `INSERT INTO merchant.station (merchant_id, location_id, key, name)
+           VALUES ($1, $2, $3, $4)
+         RETURNING id, key AS station_key, name, status, sort_order, location_id AS location_id`,
+        [input.merchantId, input.locationId, input.stationKey, input.name],
+      );
+      const station = rows[0] as {
+        id: string;
+        station_key: string;
+        name: string;
+        status: string;
+        sort_order: number;
+        location_id: string | null;
+      };
+      await auditKitchenConfiguration(client, {
+        merchantId: input.merchantId,
+        locationId: input.locationId,
+        eventType: 'kitchen_station_changed',
+        entityType: 'kitchen_station',
+        entityId: station.id,
+        publicData: { action: 'created', stationKey: input.stationKey },
+      });
+      return station;
+    });
   }
 
   /** Rename an active/disabled station. Returns null if not found. */
@@ -337,23 +456,35 @@ export class KdsRepository {
     sort_order: number;
     location_id: string | null;
   } | null> {
-    const { rows } = await this.pg.query(
-      `UPDATE merchant.station
+    return this.pg.workerTx(async (client) => {
+      const { rows } = await client.query(
+        `UPDATE merchant.station
           SET name = $3, updated_at = now()
         WHERE id = $1 AND merchant_id = $2 AND status <> 'archived'
       RETURNING id, key AS station_key, name, status, sort_order, location_id AS location_id`,
-      [input.stationId, input.merchantId, input.name],
-    );
-    return (
-      (rows[0] as {
-        id: string;
-        station_key: string;
-        name: string;
-        status: string;
-        sort_order: number;
-        location_id: string | null;
-      }) ?? null
-    );
+        [input.stationId, input.merchantId, input.name],
+      );
+      const station =
+        (rows[0] as {
+          id: string;
+          station_key: string;
+          name: string;
+          status: string;
+          sort_order: number;
+          location_id: string | null;
+        }) ?? null;
+      if (station) {
+        await auditKitchenConfiguration(client, {
+          merchantId: input.merchantId,
+          locationId: station.location_id,
+          eventType: 'kitchen_station_changed',
+          entityType: 'kitchen_station',
+          entityId: station.id,
+          publicData: { action: 'renamed' },
+        });
+      }
+      return station;
+    });
   }
 
   /**
@@ -363,13 +494,133 @@ export class KdsRepository {
    * archived.
    */
   async archiveStation(merchantId: string, stationId: string): Promise<boolean> {
-    const { rowCount } = await this.pg.query(
-      `UPDATE merchant.station
+    return this.pg.workerTx(async (client) => {
+      const { rows } = await client.query<{ location_id: string | null }>(
+        `UPDATE merchant.station
           SET status = 'archived', updated_at = now()
-        WHERE id = $1 AND merchant_id = $2 AND status <> 'archived'`,
-      [stationId, merchantId],
+        WHERE id = $1 AND merchant_id = $2 AND status <> 'archived'
+        RETURNING location_id`,
+        [stationId, merchantId],
+      );
+      if (!rows[0]) return false;
+      await auditKitchenConfiguration(client, {
+        merchantId,
+        locationId: rows[0].location_id,
+        eventType: 'kitchen_station_changed',
+        entityType: 'kitchen_station',
+        entityId: stationId,
+        publicData: { action: 'archived' },
+      });
+      return true;
+    });
+  }
+
+  async listRoutes(merchantId: string, locationId: string) {
+    const { rows } = await this.pg.query(
+      `SELECT r.id,r.location_id,r.product_id,r.category_id,r.station_id,
+              r.requires_preparation,r.route_priority,r.target_seconds,r.active,r.version,
+              s.name AS station_name
+         FROM merchant.kitchen_route r
+         JOIN merchant.station s ON s.merchant_id=r.merchant_id AND s.id=r.station_id
+        WHERE r.merchant_id=$1::uuid AND r.location_id=$2::uuid
+        ORDER BY r.route_priority,r.id`,
+      [merchantId, locationId],
     );
-    return (rowCount ?? 0) > 0;
+    return rows;
+  }
+
+  async createRoute(input: {
+    merchantId: string;
+    locationId: string;
+    productId: string | null;
+    categoryId: string | null;
+    stationId: string;
+    routePriority: number;
+    targetSeconds: number | null;
+  }) {
+    return this.pg.workerTx(async (client) => {
+      const station = await client.query(
+        `SELECT 1 FROM merchant.station
+          WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND id=$3::uuid AND status='active'`,
+        [input.merchantId, input.locationId, input.stationId],
+      );
+      if (!station.rowCount) return null;
+      const { rows } = await client.query(
+        `INSERT INTO merchant.kitchen_route
+           (merchant_id,location_id,product_id,category_id,station_id,route_priority,target_seconds)
+         VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7)
+         RETURNING id,location_id,product_id,category_id,station_id,requires_preparation,
+                   route_priority,target_seconds,active,version`,
+        [
+          input.merchantId,
+          input.locationId,
+          input.productId,
+          input.categoryId,
+          input.stationId,
+          input.routePriority,
+          input.targetSeconds,
+        ],
+      );
+      const route = rows[0] ?? null;
+      if (route) {
+        await auditKitchenConfiguration(client, {
+          merchantId: input.merchantId,
+          locationId: input.locationId,
+          eventType: 'kitchen_station_changed',
+          entityType: 'kitchen_route',
+          entityId: route.id,
+          publicData: { action: 'route_created', stationId: input.stationId },
+        });
+      }
+      return route;
+    });
+  }
+
+  async updateRoute(input: {
+    merchantId: string;
+    routeId: string;
+    stationId: string;
+    active: boolean;
+    routePriority: number;
+    targetSeconds: number | null;
+    expectedVersion: number;
+  }) {
+    return this.pg.workerTx(async (client) => {
+      const { rows } = await client.query(
+        `UPDATE merchant.kitchen_route r
+          SET station_id=$3::uuid,active=$4,route_priority=$5,target_seconds=$6,
+              version=version+1,updated_at=clock_timestamp()
+        WHERE r.merchant_id=$1::uuid AND r.id=$2::uuid AND r.version=$7
+          AND EXISTS (
+            SELECT 1 FROM merchant.station s
+             WHERE s.merchant_id=r.merchant_id AND s.location_id=r.location_id
+               AND s.id=$3::uuid AND s.status='active'
+          )
+      RETURNING id,location_id,product_id,category_id,station_id,requires_preparation,
+                route_priority,target_seconds,active,version`,
+        [
+          input.merchantId,
+          input.routeId,
+          input.stationId,
+          input.active,
+          input.routePriority,
+          input.targetSeconds,
+          input.expectedVersion,
+        ],
+      );
+      const route = rows[0] ?? null;
+      if (route) {
+        await auditKitchenConfiguration(client, {
+          merchantId: input.merchantId,
+          locationId: route.location_id,
+          eventType: 'kitchen_station_changed',
+          entityType: 'kitchen_route',
+          entityId: route.id,
+          publicData: { action: 'route_updated', stationId: input.stationId },
+        });
+      }
+      return route;
+    });
   }
 
   // ── Pairing (runtime.pairing) ──────────────────────────────────────────────
@@ -384,25 +635,35 @@ export class KdsRepository {
     maxAttempts: number;
     expiresAt: string;
   }): Promise<PairingRow> {
-    const { rows } = await this.pg.query<PairingRow>(
-      `INSERT INTO runtime.pairing
+    return this.pg.workerTx(async (client) => {
+      const { rows } = await client.query<PairingRow>(
+        `INSERT INTO runtime.pairing
          (merchant_id, location_id, station_id, device_name,
           pin_hash, pin_salt, status, max_attempts, expires_at)
        VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8)
        RETURNING id, merchant_id, location_id, station_id, device_name,
                  status, expires_at, created_at`,
-      [
-        input.merchantId,
-        input.locationId,
-        input.stationId,
-        input.deviceName,
-        input.pinHash,
-        input.pinSalt,
-        input.maxAttempts,
-        input.expiresAt,
-      ],
-    );
-    return rows[0];
+        [
+          input.merchantId,
+          input.locationId,
+          input.stationId,
+          input.deviceName,
+          input.pinHash,
+          input.pinSalt,
+          input.maxAttempts,
+          input.expiresAt,
+        ],
+      );
+      await auditKitchenConfiguration(client, {
+        merchantId: input.merchantId,
+        locationId: input.locationId,
+        eventType: 'kitchen_station_changed',
+        entityType: 'kds_pairing',
+        entityId: rows[0].id,
+        publicData: { action: 'pairing_created', stationId: input.stationId },
+      });
+      return rows[0];
+    });
   }
 
   async listPairingRequests(
@@ -444,15 +705,32 @@ export class KdsRepository {
     // list (status is still 'pending' until dismissed) and would otherwise be
     // impossible to remove.
     const freshnessClause = action === 'approve' ? `AND expires_at > now()` : '';
-    const { rows } = await this.pg.query<{ id: string; status: string }>(
-      `UPDATE runtime.pairing
+    return this.pg.workerTx(async (client) => {
+      const { rows } = await client.query<{
+        id: string;
+        status: string;
+        location_id: string | null;
+      }>(
+        `UPDATE runtime.pairing
           SET ${patch}
         WHERE id = $1 AND merchant_id = $2 AND status = 'pending'
           ${freshnessClause}
-        RETURNING id, status`,
-      params,
-    );
-    return rows[0] ?? null;
+        RETURNING id,status,location_id`,
+        params,
+      );
+      const pairing = rows[0] ?? null;
+      if (pairing) {
+        await auditKitchenConfiguration(client, {
+          merchantId,
+          locationId: pairing.location_id,
+          eventType: 'kitchen_station_changed',
+          entityType: 'kds_pairing',
+          entityId: pairing.id,
+          publicData: { action },
+        });
+      }
+      return pairing;
+    });
   }
 
   /** Newest pending non-expired requests, for the global PIN match (kds_start). */
@@ -468,7 +746,7 @@ export class KdsRepository {
     return rows;
   }
 
-  /** Record the device's chosen name after a PIN match (does not touch attempts). */
+  /** Record the device name after a PIN match. */
   async setPairingRequestedName(pairingId: string, requestedName: string): Promise<void> {
     await this.pg.query(
       `UPDATE runtime.pairing
@@ -478,7 +756,7 @@ export class KdsRepository {
     );
   }
 
-  /** Read a pairing by id only (the iPad polls by pairing_id). */
+  /** Read one pairing for the iPad status request. */
   async getPairing(pairingId: string): Promise<PairingStatusRow | null> {
     const { rows } = await this.pg.query<PairingStatusRow>(
       `SELECT id, merchant_id, location_id, station_id, device_name, requested_name,
@@ -500,13 +778,7 @@ export class KdsRepository {
     );
   }
 
-  /**
-   * Atomically claim an approved pairing (guards concurrent device claims) and
-   * stamp the device it produced. The device row is created first (createDeviceSession),
-   * so its id is in hand here; writing it in the SAME update that flips status to
-   * 'used' is what satisfies runtime.pairing's `pairing_device_is_outcome` CHECK —
-   * a 'used' pairing must carry the device it minted.
-   */
+  /** Claim an approved pairing once and record its device. */
   async claimPairing(pairingId: string, deviceRegistryId: string): Promise<boolean> {
     const { rows } = await this.pg.query<{ id: string }>(
       `UPDATE runtime.pairing
@@ -518,17 +790,7 @@ export class KdsRepository {
     return rows.length > 0;
   }
 
-  // ── Device sessions (runtime.session + merchant.device) ──────────────────────
-
-  /**
-   * Provision a device for a claimed pairing in ONE worker transaction: a durable
-   * `merchant.device` registry row (typed `kds`) + a `runtime.session` row
-   * (`principal_type='device'`, `principal_id` = the registry id). Returns the
-   * one-time plaintext token (never stored — only its sha256 hash is) and the
-   * registry id (`device_registry_id`) for race cleanup. The session `id` stays the
-   * frozen `device_session.device_id` the iPad sees. `runtime.session` has no
-   * `location_id`, so the location is parked in `metadata`.
-   */
+  /** Create the registry device and its runtime session in one transaction. */
   async createDeviceSession(input: {
     merchantId: string;
     locationId: string | null;
@@ -563,7 +825,13 @@ export class KdsRepository {
            (merchant_id, principal_type, principal_id, station_id, device_name,
             token_hash, is_active, metadata)
          VALUES ($1, 'device', $2, $3, $4, $5, true,
-                 jsonb_build_object('location_id', $6::text))
+                 jsonb_build_object(
+                   'location_id', $6::text,
+                   'permissions', jsonb_build_array(
+                     'kitchen.read','kitchen.prepare','kitchen.ready','kitchen.complete',
+                     'kitchen.recall','kitchen.cancel_ack'
+                   )
+                 ))
          RETURNING id, merchant_id, station_id, device_name`,
         [
           input.merchantId,
@@ -574,6 +842,22 @@ export class KdsRepository {
           input.locationId,
         ],
       );
+      if (input.locationId && input.stationId) {
+        await client.query(
+          `INSERT INTO merchant.kitchen_device_station
+             (merchant_id,location_id,device_id,station_id)
+           VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid)`,
+          [input.merchantId, input.locationId, deviceRegistryId, input.stationId],
+        );
+      }
+      await auditKitchenConfiguration(client, {
+        merchantId: input.merchantId,
+        locationId: input.locationId,
+        eventType: 'kitchen_station_changed',
+        entityType: 'kds_device',
+        entityId: deviceRegistryId,
+        publicData: { action: 'registered', stationId: input.stationId },
+      });
       return { ...sess.rows[0], token, device_registry_id: deviceRegistryId };
     });
   }
@@ -597,9 +881,16 @@ export class KdsRepository {
   /** Device-auth lookup by token hash (the token itself is never stored). */
   async findSessionByToken(tokenHash: string): Promise<SessionRow | null> {
     const { rows } = await this.pg.query<SessionRow>(
-      `SELECT id, merchant_id, station_id, device_name, is_active, metadata
-         FROM runtime.session
-        WHERE token_hash = $1 AND principal_type = 'device'
+      `SELECT s.id,s.merchant_id,coalesce(a.station_id,s.station_id) AS station_id,
+              s.device_name,s.is_active,s.metadata
+         FROM runtime.session s
+         JOIN merchant.device d
+           ON d.id=s.principal_id AND d.merchant_id=s.merchant_id AND d.status='active'
+         LEFT JOIN merchant.kitchen_device_station a
+           ON a.device_id=d.id AND a.merchant_id=d.merchant_id
+          AND a.station_id=s.station_id AND a.active
+        WHERE s.token_hash = $1 AND s.principal_type = 'device'
+          AND (s.station_id IS NULL OR a.device_id IS NOT NULL)
         LIMIT 1`,
       [tokenHash],
     );
@@ -614,13 +905,13 @@ export class KdsRepository {
   }
 
   /** Heartbeat endpoint: touch + record source ip in metadata. */
-  async heartbeatTouch(deviceId: string, ip: string | null): Promise<boolean> {
+  async heartbeatTouch(sessionId: string, merchantId: string, ip: string | null): Promise<boolean> {
     const { rowCount } = await this.pg.query(
       `UPDATE runtime.session
           SET last_used_at = now(),
               metadata = metadata || jsonb_build_object('ip', $2::text)
-        WHERE id = $1 AND is_active = true`,
-      [deviceId, ip],
+        WHERE id = $1::uuid AND merchant_id=$3::uuid AND is_active = true`,
+      [sessionId, ip, merchantId],
     );
     return (rowCount ?? 0) > 0;
   }
@@ -667,7 +958,7 @@ export class KdsRepository {
                 revoked_at = coalesce(revoked_at, now()),
                 revoked_reason = coalesce(revoked_reason, 'device_retired')
           WHERE id = $1 AND merchant_id = $2
-        RETURNING principal_id`,
+        RETURNING principal_id,metadata->>'location_id' AS location_id`,
         [deviceId, merchantId],
       );
       if (sess.rowCount === 0) return false;
@@ -679,6 +970,14 @@ export class KdsRepository {
           [registryId, merchantId],
         );
       }
+      await auditKitchenConfiguration(client, {
+        merchantId,
+        locationId: sess.rows[0]?.location_id ?? null,
+        eventType: 'kitchen_station_changed',
+        entityType: 'kds_device',
+        entityId: registryId,
+        publicData: { action: 'revoked' },
+      });
       return true;
     });
   }
@@ -693,12 +992,12 @@ export class KdsRepository {
     // untouched (a rename must not wipe the assignment). An explicit null clears.
     const setStation = patch.stationId !== undefined;
     return this.pg.workerTx(async (client) => {
-      const sess = await client.query(
+      const sess = await client.query<{ principal_id: string; location_id: string | null }>(
         `UPDATE runtime.session
             SET device_name = COALESCE($3, device_name),
                 station_id  = CASE WHEN $5 THEN $4 ELSE station_id END
           WHERE id = $1 AND merchant_id = $2
-        RETURNING principal_id`,
+        RETURNING principal_id,metadata->>'location_id' AS location_id`,
         [deviceId, merchantId, patch.deviceName ?? null, patch.stationId ?? null, setStation],
       );
       if (sess.rowCount === 0) return false;
@@ -712,69 +1011,97 @@ export class KdsRepository {
             WHERE id = $1 AND merchant_id = $2`,
           [registryId, merchantId, patch.deviceName ?? null, patch.stationId ?? null, setStation],
         );
+        if (setStation) {
+          await client.query(
+            `UPDATE merchant.kitchen_device_station
+                SET active=false,configuration_version=configuration_version+1,
+                    updated_at=clock_timestamp()
+              WHERE merchant_id=$1::uuid AND device_id=$2::uuid AND active`,
+            [merchantId, registryId],
+          );
+          const locationId = sess.rows[0]?.location_id;
+          if (patch.stationId && locationId) {
+            await client.query(
+              `INSERT INTO merchant.kitchen_device_station
+                 (merchant_id,location_id,device_id,station_id,active)
+               VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,true)
+               ON CONFLICT (device_id,station_id) DO UPDATE SET
+                 active=true,configuration_version=merchant.kitchen_device_station.configuration_version+1,
+                 updated_at=clock_timestamp()`,
+              [merchantId, locationId, registryId, patch.stationId],
+            );
+          }
+        }
       }
+      await auditKitchenConfiguration(client, {
+        merchantId,
+        locationId: sess.rows[0]?.location_id ?? null,
+        eventType: 'kitchen_station_changed',
+        entityType: 'kds_device',
+        entityId: registryId,
+        publicData: {
+          action: 'updated',
+          assignmentChanged: setStation,
+          stationId: patch.stationId ?? null,
+        },
+      });
       return true;
     });
   }
 
-  // ── Board reads (merchant.order_ticket + merchant.order_event) ──────────────────
-
-  /**
-   * Board snapshot for a device: merchant.order_ticket filtered to the on-board
-   * (non-terminal) statuses, plus the customer's name and reply phone.
-   *
-   * No station argument, for the same reason ticketEvents has none: the order carries no
-   * station (ORDER_MODEL §5), so the old `station_id IS NULL OR = $n` predicate matched
-   * every row. It returns with per-line routing, on the LINE.
-   *
-   * The caller filters in the iPad's vocabulary and this translates on the way in — the
-   * view stores build-v3's.
-   */
+  // ── Exact station board and ordered event feed ─────────────────────────────
   async boardSnapshot(
     merchantId: string,
-    statuses: KitchenStatus[] = BOARD_ACTIVE_STATUSES,
+    locationId: string,
+    stationIds: string[],
   ): Promise<TicketRow[]> {
     const { rows } = await this.pg.query<TicketRow>(
-      `SELECT ${TICKET_SELECT},
-              NULL::numeric        AS total_amount,
-              t.last_event_sequence
-         FROM merchant.order_ticket t
-         ${CUSTOMER_NAME_PHONE_JOIN}
-        WHERE t.merchant_id = $1
-          AND t.status = ANY($2::text[])
-        ORDER BY t.created_at ASC`,
-      [merchantId, statuses.map(mapKitchenToOrderStatus)],
+      `SELECT v.id::text AS ticket_id,v.source_order_id::text AS source_transaction_id,
+              v.public_reference,
+              v.merchant_id::text AS merchant_id,v.source AS source_channel,v.status,
+              v.location_id::text,v.priority,v.business_date::text,
+              v.preparation_started_at,v.version,
+              v.station_id::text AS station_id,s.name AS station_name,
+              v.queued_at AS created_at,
+              v.updated_at AS updated_at,v.last_event_sequence,
+              v.items
+         FROM kds.station_order v
+         JOIN merchant.station s ON s.id=v.station_id AND s.merchant_id=v.merchant_id
+        WHERE v.merchant_id=$1::uuid AND v.location_id=$2::uuid
+          AND v.station_id=ANY($3::uuid[])
+          AND v.status IN ('queued','in_preparation','partially_ready','ready','exception')
+        ORDER BY CASE v.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END,
+                 v.queued_at,v.id`,
+      [merchantId, locationId, stationIds],
     );
     return rows;
   }
 
-  /**
-   * Event stream cursor (`merchant.order_event` ordered by its identity `sequence`).
-   *
-   * The station filter is GONE, not forgotten. It used to read `o.station_id`, and in
-   * build-v3 an order carries no station at all (ORDER_MODEL §5 — the KDS derives a
-   * ticket's station from the device login instead, and the column was null on 100% of
-   * source orders). The old predicate was `station_id IS NULL OR station_id = $n`, so
-   * with every order null it already matched everything: this is the same broadcast
-   * behaviour the board snapshot has, now stated instead of simulated. `stationId` is
-   * therefore no longer a parameter — a filter that cannot filter is worse than none,
-   * because it reads like a security boundary. It returns when per-line routing lands
-   * (deferred `order_item.station_id`), and then it belongs on the LINE, not the order.
-   */
   async ticketEvents(
     merchantId: string,
+    locationId: string,
+    stationIds: string[],
     afterSequence: number,
     limit: number,
   ): Promise<EventRow[]> {
     const { rows } = await this.pg.query<EventRow>(
-      `SELECT ${EVENT_SELECT}
-         FROM merchant.order_event e
-         JOIN merchant.customer_order o ON o.id = e.order_id
-        WHERE o.merchant_id = $1
-          AND e.sequence > $2
+      `SELECT e.sequence,e.kitchen_order_id::text AS ticket_id,
+              e.merchant_id::text AS merchant_id,ko.source_order_id::text AS source_transaction_id,
+              e.kind,e.status,e.occurred_at::text AS occurred_at,'umi_api'::text AS source,
+              e.safe_payload AS payload,e.location_id::text,e.station_id::text,
+              e.aggregate_version,e.correlation_id
+         FROM kds.station_event e
+         JOIN merchant.kitchen_order ko ON ko.id=e.kitchen_order_id AND ko.merchant_id=e.merchant_id
+        WHERE e.merchant_id=$1::uuid AND e.location_id=$2::uuid
+          AND e.sequence > $4
+          AND (e.station_id=ANY($3::uuid[]) OR EXISTS (
+            SELECT 1 FROM merchant.kitchen_order_item i
+             WHERE i.merchant_id=e.merchant_id AND i.kitchen_order_id=e.kitchen_order_id
+               AND i.station_id=ANY($3::uuid[])
+          ))
         ORDER BY e.sequence ASC
-        LIMIT LEAST(GREATEST($3, 1), 1000)`,
-      [merchantId, afterSequence, limit],
+        LIMIT LEAST(GREATEST($5, 1), 500)`,
+      [merchantId, locationId, stationIds, afterSequence, limit],
     );
     return rows;
   }
@@ -782,10 +1109,13 @@ export class KdsRepository {
   /** Most-recent events for the dashboard ticker. */
   async recentEvents(merchantId: string, limit: number): Promise<EventRow[]> {
     const { rows } = await this.pg.query<EventRow>(
-      `SELECT ${EVENT_SELECT}
-         FROM merchant.order_event e
-         JOIN merchant.customer_order o ON o.id = e.order_id
-        WHERE o.merchant_id = $1
+      `SELECT e.sequence,e.kitchen_order_id AS ticket_id,e.merchant_id,
+              ko.source_order_id AS source_transaction_id,e.kind,e.status,
+              e.occurred_at,'umi_api'::text AS source,e.safe_payload AS payload
+         FROM merchant.kitchen_event e
+         JOIN merchant.kitchen_order ko
+           ON ko.merchant_id=e.merchant_id AND ko.id=e.kitchen_order_id
+        WHERE e.merchant_id = $1::uuid
         ORDER BY e.sequence DESC
         LIMIT LEAST(GREATEST($2, 1), 200)`,
       [merchantId, limit],
@@ -803,40 +1133,47 @@ export class KdsRepository {
     const params: unknown[] = [merchantId, sinceHours];
     let statusClause = '';
     if (statuses && statuses.length) {
-      // The caller filters in the iPad's vocabulary; the view speaks build-v3's.
-      // Deduplicated because accepted/partial_cancelled/preparing all collapse onto
-      // `preparing` — without it, asking for two of them repeats the value in ANY().
-      params.push([...new Set(statuses.map(mapKitchenToOrderStatus))]);
-      statusClause = `AND t.status = ANY($${params.length}::text[])`;
+      const canonical = statuses.flatMap((status) => {
+        if (status === 'new' || status === 'accepted') return ['queued'];
+        if (status === 'preparing') return ['in_preparation'];
+        if (status === 'partial_cancelled') return ['partially_ready'];
+        return [status];
+      });
+      params.push([...new Set(canonical)]);
+      statusClause = `AND ko.status = ANY($${params.length}::text[])`;
     }
     let locClause = '';
     if (locationId) {
       params.push(locationId);
-      // NULL-escape the location filter: WhatsApp orders arrive with
-      // location_id = NULL (the channel account isn't location-bound), and the
-      // dashboard always sends a selected location (it defaults to the
-      // oldest-active location). A plain `location_id = $N` therefore hides every
-      // WhatsApp ticket. Unrouted (NULL) orders are merchant-wide and must surface
-      // on any location — same reason the iPad boardSnapshot query carries no
-      // location filter at all.
-      locClause = `AND (o.location_id = $${params.length} OR o.location_id IS NULL)`;
+      locClause = `AND ko.location_id = $${params.length}::uuid`;
     }
-    // This one is the HISTORY consumer, so it is the one that legitimately wants money —
-    // and it joins merchant.order_total itself rather than the ticket carrying a total for
-    // everyone. When the settled projection exists this moves to payment/refund (§4).
     const { rows } = await this.pg.query<TicketRow>(
-      `SELECT ${TICKET_SELECT},
-              (tot.total::numeric / 100) AS total_amount,
-              t.last_event_sequence
-         FROM merchant.order_ticket t
-         JOIN merchant.customer_order o ON o.id = t.ticket_id
-         LEFT JOIN merchant.order_total tot ON tot.order_id = t.ticket_id
-         ${CUSTOMER_NAME_PHONE_JOIN}
-        WHERE t.merchant_id = $1
-          AND t.created_at >= now() - make_interval(hours => $2)
+      `SELECT ko.id AS ticket_id,ko.source_order_id AS source_transaction_id,
+              ko.public_reference,
+              ko.merchant_id,ko.source AS source_channel,ko.status,
+              NULL::uuid AS station_id,NULL::text AS station_name,
+              ko.created_at,ko.updated_at,
+              coalesce(e.last_event_sequence,0) AS last_event_sequence,
+              coalesce(jsonb_agg(jsonb_build_object(
+                'id',i.id::text,'productName',i.product_name,'variantName',i.variant_name,
+                'modifiers',i.modifiers,'quantity',i.quantity,'preparationNote',i.preparation_note,
+                'displayOrder',i.display_order,'targetSeconds',i.target_seconds,
+                'status',i.status,'version',i.version
+              ) order by i.display_order,i.id) filter (where i.id is not null),'[]'::jsonb) AS items
+         FROM merchant.kitchen_order ko
+         JOIN merchant.kitchen_order_item i
+           ON i.merchant_id=ko.merchant_id AND i.kitchen_order_id=ko.id
+         LEFT JOIN LATERAL (
+           SELECT max(event.sequence) AS last_event_sequence
+             FROM merchant.kitchen_event event
+            WHERE event.merchant_id=ko.merchant_id AND event.kitchen_order_id=ko.id
+         ) e ON true
+        WHERE ko.merchant_id = $1::uuid
+          AND ko.created_at >= now() - make_interval(hours => $2)
           ${statusClause}
           ${locClause}
-        ORDER BY t.created_at DESC`,
+        GROUP BY ko.id,e.last_event_sequence
+        ORDER BY ko.created_at DESC`,
       params,
     );
     return rows;
@@ -850,267 +1187,343 @@ export class KdsRepository {
     ticketId: string,
     ticketUuid: string | null,
   ): Promise<OrderScopeRow | null> {
-    const { rows } = await this.pg.query<OrderScopeRow & { status: string }>(
-      `SELECT o.id, o.merchant_id, o.location_id AS location_id,
-              NULL::uuid AS station_id,
-              o.status,
-              o.customer_id AS person_id,
-              COALESCE(o.external_ref, o.id::text) AS source_transaction_id
-         FROM merchant.customer_order o
-        WHERE o.merchant_id = $3
-          AND (($2::uuid IS NOT NULL AND o.id = $2::uuid)
-               OR o.external_ref = $1)
-        ORDER BY CASE
-          WHEN $2::uuid IS NOT NULL AND o.id = $2::uuid THEN 0 ELSE 1
-        END
+    const { rows } = await this.pg.query<
+      OrderScopeRow & { status: KitchenOrderStatus; station_ids: string[]; version: string }
+    >(
+      `SELECT ko.id,ko.merchant_id,ko.location_id,
+              min(i.station_id::text) AS station_id,
+              array_agg(DISTINCT i.station_id::text) FILTER (WHERE i.station_id IS NOT NULL)
+                AS station_ids,
+              ko.status,ko.version::text,co.customer_id AS person_id,
+              coalesce(co.external_ref,co.id::text) AS source_transaction_id
+         FROM merchant.kitchen_order ko
+         JOIN merchant.customer_order co ON co.id=ko.source_order_id AND co.merchant_id=ko.merchant_id
+         JOIN merchant.kitchen_order_item i ON i.kitchen_order_id=ko.id AND i.merchant_id=ko.merchant_id
+        WHERE ko.merchant_id=$3::uuid
+          AND (($2::uuid IS NOT NULL AND ko.id=$2::uuid)
+               OR ko.public_reference=$1 OR co.external_ref=$1)
+        GROUP BY ko.id,co.id
         LIMIT 1`,
       [ticketId, ticketUuid, merchantId],
     );
     const row = rows[0];
     if (!row) return null;
-    // The kitchen status is no longer derived from the journal: build-v3 collapsed the
-    // two status axes onto customer_order.status, and order_event is the transition
-    // stream rather than the place the current value lives (ORDER_MODEL §1 — "the
-    // ticket reads the snapshot; the spine drives the change").
-    return { ...row, kitchen_status: mapOrderToKitchenStatus(row.status) };
+    return {
+      ...row,
+      version: Number(row.version),
+      kitchen_order_status: row.status,
+      kitchen_status: mapCanonicalKitchenStatus(row.status),
+    };
   }
 
-  /**
-   * Lock the order row (FOR UPDATE, serializing concurrent transitions) and derive
-   * its current kitchen status from the latest journal event. Returns null when the
-   * order does not exist. Replaces the old `SELECT kitchen_status FROM ops.orders
-   * FOR UPDATE` now that kitchen status lives in `merchant.order_event`.
-   */
-  private async lockOrderAndStatus(
-    client: PoolClient,
-    orderId: string,
-    merchantId: string,
-  ): Promise<{ kitchenStatus: KitchenStatus | null } | null> {
-    const locked = await client.query<{ status: string }>(
-      `SELECT status FROM merchant.customer_order
-        WHERE id = $1 AND merchant_id = $2 FOR UPDATE`,
-      [orderId, merchantId],
-    );
-    const row = locked.rows[0];
-    if (!row) return null;
-    // One query, not two: the lock and the current status now come from the same row.
-    // The old pair existed because kitchen status lived in the journal while the lock
-    // was on the order — build-v3 collapsed the axes, so the locked row already holds
-    // the authoritative value and there is no window between reading them.
-    return { kitchenStatus: mapOrderToKitchenStatus(row.status) };
-  }
-
-  private async customerPhone(
-    client: PoolClient,
-    merchantId: string,
-    personId: string | null,
-  ): Promise<string | null> {
-    if (!personId) return null;
-    // personId is a merchant.customer.id; the reply address is the customer's best
-    // reachability value — WhatsApp as-received display_value (avoids Twilio
-    // 63015) else the phone E.164.
-    const { rows } = await client.query<{ phone: string | null }>(
-      `SELECT COALESCE(ct.raw_phone_number, ct.normalized_value) AS phone
-         FROM merchant.customer cu
-         JOIN merchant.contact ct
-           ON ct.merchant_id = cu.merchant_id AND ct.customer_id = cu.id
-         JOIN umi.channel_type ch ON ch.id = ct.channel_id
-        WHERE cu.id = $1 AND cu.merchant_id = $2
-          AND ch.key IN ('whatsapp', 'phone')
-        ORDER BY (ch.key = 'whatsapp') DESC, ct.is_primary DESC, ct.updated_at DESC
-        LIMIT 1`,
-      [personId, merchantId],
-    );
-    return rows[0]?.phone ?? null;
-  }
-
-  /**
-   * Transition a ticket's kitchen_status in ONE worker transaction: set the
-   * order's merchant status + propagate to line items, APPEND the
-   * `merchant.order_event` journal row (carrying the new `kitchen_status` — the
-   * de-overloaded source of truth), and (when `notify` resolves a body) enqueue a
-   * `twilio.status_notification` outbox row. The append-only journal + the
-   * deterministic outbox idempotency key make re-runs safe.
-   */
-  async transitionTicket(input: {
+  async executeKitchenCommand(input: {
+    session: Omit<KdsDeviceSession, 'deviceId'> & { deviceId: string | null };
+    actorUserId?: string | null;
     order: OrderScopeRow;
-    targetStatus: KitchenStatus;
-    actorId: string | null;
-    actorChannel: string | null;
-    cancellationReasonCode: string | null;
-    cancellationReasonNote: string | null;
-    notifyBody: string | null;
-  }): Promise<{ sequence: number }> {
-    const { order, targetStatus } = input;
+    commandId: string;
+    idempotencyKey: string;
+    correlationId: string;
+    expectedVersion: number;
+    commandType:
+      | 'start_preparation'
+      | 'mark_item_ready'
+      | 'mark_order_ready'
+      | 'complete'
+      | 'recall'
+      | 'cancel_ack'
+      | 'change_priority';
+    targetStatus: KitchenOrderStatus | null;
+    itemIds: string[];
+    reasonCode: string | null;
+    reasonNote: string | null;
+    priority: 'normal' | 'high' | 'urgent' | null;
+    payloadFingerprint: string;
+  }): Promise<{ status: 'succeeded' | 'conflict'; result: Record<string, unknown> }> {
     return this.pg.workerTx(async (client) => {
-      // Lock + derive current status so a concurrent transition can't make this one
-      // overwrite stale state or emit a wrong old_status. The service pre-checks
-      // against a pre-transaction snapshot; this is the authoritative re-check.
-      const locked = await this.lockOrderAndStatus(client, order.id, order.merchant_id);
-      if (!locked) {
-        throw new KdsHttpError(404, { error: 'ticket_not_found' });
+      const replay = await client.query<{
+        id: string;
+        idempotency_key: string;
+        payload_fingerprint: string;
+        status: string;
+        result: Record<string, unknown> | null;
+      }>(
+        `SELECT id::text,idempotency_key,payload_fingerprint,status,result
+           FROM merchant.kitchen_command
+          WHERE merchant_id=$1::uuid AND (idempotency_key=$2 OR id=$3::uuid)
+          FOR UPDATE`,
+        [input.order.merchant_id, input.idempotencyKey, input.commandId],
+      );
+      if (replay.rows[0]) {
+        if (
+          replay.rows[0].id !== input.commandId ||
+          replay.rows[0].idempotency_key !== input.idempotencyKey ||
+          replay.rows[0].payload_fingerprint !== input.payloadFingerprint
+        ) {
+          return { status: 'conflict', result: { code: 'KITCHEN_FINGERPRINT_CONFLICT' } };
+        }
+        return {
+          status: replay.rows[0].status === 'succeeded' ? 'succeeded' : 'conflict',
+          result: replay.rows[0].result ?? { code: 'KITCHEN_COMMAND_CONFLICT' },
+        };
       }
-      const currentStatus = locked.kitchenStatus;
-      const invalid = validateTransition(currentStatus, targetStatus);
-      if (invalid) throw new KdsHttpError(422, { error: invalid });
 
-      const orderStatus = mapKitchenToOrderStatus(targetStatus);
-      const isCancel = targetStatus === 'cancelled';
-
-      // ONE status, not two. build-v3 collapsed the commercial and kitchen axes onto
-      // customer_order.status, so there is no per-line kitchen_status to propagate — the
-      // old second UPDATE is gone, and with it the window where the two could disagree.
-      await client.query(
-        `UPDATE merchant.customer_order
-            SET status = $3,
-                cancel_reason = CASE WHEN $4::text IS NOT NULL THEN $4 ELSE cancel_reason END,
-                updated_at = now()
-          WHERE id = $1 AND merchant_id = $2`,
-        [order.id, order.merchant_id, orderStatus, isCancel ? input.cancellationReasonCode : null],
+      const locked = await client.query<{
+        id: string;
+        status: KitchenOrderStatus;
+        version: string;
+        location_id: string;
+      }>(
+        `SELECT id::text,status,version::text,location_id::text
+           FROM merchant.kitchen_order
+          WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+          FOR UPDATE`,
+        [input.order.id, input.order.merchant_id, input.session.locationId],
       );
-
-      // The spine. `sequence` is an identity column, so the old MAX+1-under-advisory-lock
-      // allocation is gone: Postgres hands out the number, and it cannot collide.
-      const ev = await client.query<{ sequence: string }>(
-        `INSERT INTO merchant.order_event (order_id, kind, status)
-         VALUES ($1::uuid, 'status_changed', $2)
-         RETURNING sequence`,
-        [order.id, orderStatus],
+      const current = locked.rows[0];
+      const stationId = input.session.stationId;
+      if (!current || !stationId || !input.session.locationId) {
+        return { status: 'conflict', result: { code: 'KITCHEN_SCOPE_CONFLICT' } };
+      }
+      const assigned = await client.query(
+        `SELECT 1 FROM merchant.kitchen_order_item i
+          WHERE i.merchant_id=$1::uuid AND i.kitchen_order_id=$2::uuid
+            AND i.station_id=$3::uuid LIMIT 1`,
+        [input.order.merchant_id, input.order.id, stationId],
       );
-      const seq = Number(ev.rows[0]?.sequence ?? 0);
+      if (!assigned.rows[0]) {
+        return { status: 'conflict', result: { code: 'KITCHEN_STATION_SCOPE_CONFLICT' } };
+      }
 
-      if (input.notifyBody) {
-        const phone = await this.customerPhone(client, order.merchant_id, order.person_id);
-        if (phone) {
-          await client.query(
-            `INSERT INTO runtime.outbox_event
-               (merchant_id, topic, aggregate_id, idempotency_key, payload)
-             VALUES ($1, 'twilio.status_notification', $2, $3, $4::jsonb)
-             ON CONFLICT (merchant_id, idempotency_key) DO NOTHING`,
-            [
-              order.merchant_id,
-              order.id,
-              `kds:notify:${order.id}:${targetStatus}:${seq}`,
-              JSON.stringify({
-                to: phone,
-                body: input.notifyBody,
-                ticket_id: order.id,
-                target_status: targetStatus,
-                event_sequence: seq,
-                source_transaction_id: order.source_transaction_id,
-              }),
-            ],
+      const command = await client.query(
+        `INSERT INTO merchant.kitchen_command
+           (id,merchant_id,location_id,device_id,actor_user_id,kitchen_order_id,kitchen_order_item_id,
+            command_type,idempotency_key,payload_fingerprint,expected_version,status,
+            correlation_id)
+         VALUES ($1::uuid,$2::uuid,$3::uuid,
+                 (SELECT s.principal_id FROM runtime.session s
+                   WHERE s.id=$11::uuid AND s.merchant_id=$2::uuid AND s.is_active),
+                 $12::uuid,$4::uuid,$5::uuid,$6,$7,$8,$9,'pending',$10)
+         ON CONFLICT DO NOTHING`,
+        [
+          input.commandId,
+          input.order.merchant_id,
+          input.session.locationId,
+          input.order.id,
+          input.itemIds[0] ?? null,
+          input.commandType,
+          input.idempotencyKey,
+          input.payloadFingerprint,
+          input.expectedVersion,
+          input.correlationId,
+          input.session.deviceId,
+          input.actorUserId ?? null,
+        ],
+      );
+      if ((command.rowCount ?? 0) !== 1) {
+        const winner = await client.query<{
+          id: string;
+          idempotency_key: string;
+          payload_fingerprint: string;
+          status: string;
+          result: Record<string, unknown> | null;
+        }>(
+          `SELECT id::text,idempotency_key,payload_fingerprint,status,result
+             FROM merchant.kitchen_command
+            WHERE merchant_id=$1::uuid AND (idempotency_key=$2 OR id=$3::uuid)`,
+          [input.order.merchant_id, input.idempotencyKey, input.commandId],
+        );
+        const recovered = winner.rows[0];
+        if (
+          recovered?.id === input.commandId &&
+          recovered.idempotency_key === input.idempotencyKey &&
+          recovered.payload_fingerprint === input.payloadFingerprint
+        ) {
+          return {
+            status: recovered.status === 'succeeded' ? 'succeeded' : 'conflict',
+            result: recovered.result ?? { code: 'KITCHEN_COMMAND_CONFLICT' },
+          };
+        }
+        return { status: 'conflict', result: { code: 'KITCHEN_FINGERPRINT_CONFLICT' } };
+      }
+
+      if (Number(current.version) !== input.expectedVersion) {
+        const result = {
+          code: 'KITCHEN_VERSION_CONFLICT',
+          expectedVersion: input.expectedVersion,
+          currentVersion: Number(current.version),
+        };
+        await finishKitchenCommand(client, input.commandId, 'conflict', result);
+        return { status: 'conflict', result };
+      }
+
+      const requestedStatus = commandTarget(input.commandType, current.status);
+      if (
+        requestedStatus &&
+        !(
+          requestedStatus === current.status &&
+          ['start_preparation', 'mark_item_ready', 'mark_order_ready'].includes(input.commandType)
+        ) &&
+        validateKitchenTransition(current.status, requestedStatus, input.commandType === 'recall')
+      ) {
+        const result = { code: 'KITCHEN_INVALID_TRANSITION', currentStatus: current.status };
+        await finishKitchenCommand(client, input.commandId, 'conflict', result);
+        return { status: 'conflict', result };
+      }
+
+      let effectCount = 1;
+      if (input.commandType === 'start_preparation' || input.commandType === 'recall') {
+        const effect = await client.query(
+          `UPDATE merchant.kitchen_order_item SET status='preparing',version=version+1,
+                  preparation_started_at=coalesce(preparation_started_at,clock_timestamp()),
+                  updated_at=clock_timestamp()
+            WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid AND station_id=$3::uuid
+              AND status IN ('queued','ready')`,
+          [input.order.merchant_id, input.order.id, stationId],
+        );
+        effectCount = effect.rowCount ?? 0;
+      } else if (input.commandType === 'mark_item_ready') {
+        if (input.itemIds.length === 0) {
+          effectCount = 0;
+        } else {
+          const eligible = await client.query<{ count: string }>(
+            `SELECT count(*)::text AS count FROM merchant.kitchen_order_item
+              WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid AND station_id=$3::uuid
+                AND id=ANY($4::uuid[]) AND status IN ('queued','preparing')`,
+            [input.order.merchant_id, input.order.id, stationId, input.itemIds],
           );
+          if (Number(eligible.rows[0]?.count ?? 0) !== input.itemIds.length) {
+            effectCount = 0;
+          } else {
+            const effect = await client.query(
+              `UPDATE merchant.kitchen_order_item SET status='ready',version=version+1,
+                  ready_at=clock_timestamp(),updated_at=clock_timestamp()
+                WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid AND station_id=$3::uuid
+                  AND id=ANY($4::uuid[]) AND status IN ('queued','preparing')`,
+              [input.order.merchant_id, input.order.id, stationId, input.itemIds],
+            );
+            effectCount = effect.rowCount ?? 0;
+          }
+        }
+      } else if (input.commandType === 'mark_order_ready') {
+        const effect = await client.query(
+          `UPDATE merchant.kitchen_order_item SET status='ready',version=version+1,
+                  ready_at=clock_timestamp(),updated_at=clock_timestamp()
+            WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid AND station_id=$3::uuid
+              AND status IN ('queued','preparing')`,
+          [input.order.merchant_id, input.order.id, stationId],
+        );
+        effectCount = effect.rowCount ?? 0;
+      } else if (input.commandType === 'cancel_ack') {
+        const eligible =
+          input.itemIds.length === 0
+            ? null
+            : await client.query<{ count: string }>(
+                `SELECT count(*)::text AS count FROM merchant.kitchen_order_item
+                  WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid
+                    AND station_id=$3::uuid AND id=ANY($4::uuid[])
+                    AND status NOT IN ('cancelled','ready')`,
+                [input.order.merchant_id, input.order.id, stationId, input.itemIds],
+              );
+        if (eligible && Number(eligible.rows[0]?.count ?? 0) !== input.itemIds.length) {
+          effectCount = 0;
+        } else {
+          const effect = await client.query(
+            `UPDATE merchant.kitchen_order_item SET status='cancelled',version=version+1,
+                  cancelled_at=clock_timestamp(),updated_at=clock_timestamp()
+              WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid AND station_id=$3::uuid
+                AND (cardinality($4::uuid[])=0 OR id=ANY($4::uuid[]))
+                AND status NOT IN ('cancelled','ready')`,
+            [input.order.merchant_id, input.order.id, stationId, input.itemIds],
+          );
+          effectCount = effect.rowCount ?? 0;
         }
       }
-
-      return { sequence: seq };
-    });
-  }
-
-  /**
-   * Partial-cancel specific line items in ONE worker transaction: flag the
-   * items, recompute the order total, set the order's merchant status
-   * (partial_cancelled, or cancelled when nothing remains) + APPEND a
-   * `partial_cancellation` journal row (carrying the new kitchen_status + reason),
-   * and enqueue a `twilio.cancel_notification` outbox row.
-   */
-  async partialCancelItems(input: {
-    order: OrderScopeRow;
-    itemIds: string[];
-    reasonCode: string;
-    reasonNote: string | null;
-    actorId: string | null;
-    actorChannel: string | null;
-    buildNotifyBody: (
-      cancelled: Array<{ quantity: number; name: string }>,
-      remaining: Array<{ quantity: number; name: string }>,
-    ) => string | null;
-  }): Promise<{ sequence: number; newStatus: KitchenStatus }> {
-    const { order } = input;
-    return this.pg.workerTx(async (client) => {
-      // Lock + derive current status so a transition that committed just before this
-      // lock can't be overwritten and the event can't carry a stale old_status.
-      const locked = await this.lockOrderAndStatus(client, order.id, order.merchant_id);
-      if (!locked) {
-        throw new KdsHttpError(404, { error: 'ticket_not_found' });
-      }
-      const currentStatus = locked.kitchenStatus;
-      // A completed/cancelled order can't be partially cancelled.
-      if (currentStatus && TERMINAL_STATUSES.includes(currentStatus)) {
-        throw new KdsHttpError(422, {
-          error: `invalid_transition: ${currentStatus} -> partial_cancelled`,
-        });
+      if (effectCount === 0) {
+        const result = { code: 'KITCHEN_INVALID_TRANSITION', currentStatus: current.status };
+        await finishKitchenCommand(client, input.commandId, 'conflict', result);
+        return { status: 'conflict', result };
       }
 
-      // VOID the targeted lines. `voided_at` is the tombstone — the line stays on the
-      // ticket struck through so the barista stops pouring, and falls out of the derived
-      // total on its own. The order_item trigger appends the `order_upserted` event and
-      // bumps the order's version, so this loop does not have to remember to.
-      const cancelled = await client.query<{ quantity: number; name: string }>(
-        `UPDATE merchant.order_item
-            SET voided_at = now(), void_reason = $4
-          WHERE order_id = $1::uuid AND id = ANY($3::uuid[]) AND voided_at IS NULL
-            AND EXISTS (SELECT 1 FROM merchant.customer_order o
-                         WHERE o.id = order_id AND o.merchant_id = $2::uuid)
-        RETURNING quantity, name`,
-        [order.id, order.merchant_id, input.itemIds, input.reasonCode],
+      const itemRows = await client.query<{ status: KitchenItemStatus }>(
+        `SELECT status FROM merchant.kitchen_order_item
+          WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid`,
+        [input.order.merchant_id, input.order.id],
       );
-      // Every requested id must have matched an active line on this order;
-      // otherwise roll back rather than mutate the order / notify the customer.
-      if ((cancelled.rowCount ?? 0) !== input.itemIds.length) {
-        throw new KdsHttpError(422, { error: 'partial_cancel_items_not_found' });
-      }
-
-      // Remaining (non-cancelled) items → drives total + whole-order status.
-      const remaining = await client.query<{ quantity: number; name: string }>(
-        `SELECT i.quantity, i.name FROM merchant.order_item i
-           JOIN merchant.customer_order o ON o.id = i.order_id
-          WHERE i.order_id = $1::uuid AND o.merchant_id = $2::uuid AND i.voided_at IS NULL`,
-        [order.id, order.merchant_id],
+      let nextStatus: KitchenOrderStatus;
+      if (input.commandType === 'complete') nextStatus = 'completed';
+      else if (input.commandType === 'change_priority') nextStatus = current.status;
+      else nextStatus = deriveKitchenOrderStatus(itemRows.rows.map((row) => row.status));
+      const nextVersion = Number(current.version) + 1;
+      const updated = await client.query<{ updated_at: Date | string }>(
+        `UPDATE merchant.kitchen_order
+            SET status=$3,priority=coalesce($4,priority),version=$5,
+                preparation_started_at=CASE WHEN $3='in_preparation'
+                  THEN coalesce(preparation_started_at,clock_timestamp()) ELSE preparation_started_at END,
+                ready_at=CASE WHEN $3='ready' THEN clock_timestamp() ELSE ready_at END,
+                completed_at=CASE WHEN $3='completed' THEN clock_timestamp() ELSE completed_at END,
+                cancelled_at=CASE WHEN $3='cancelled' THEN clock_timestamp() ELSE cancelled_at END,
+                cancellation_code=coalesce($6,cancellation_code),
+                cancellation_note=coalesce($7,cancellation_note),updated_at=clock_timestamp()
+          WHERE id=$1::uuid AND merchant_id=$2::uuid
+          RETURNING updated_at`,
+        [
+          input.order.id,
+          input.order.merchant_id,
+          nextStatus,
+          input.priority,
+          nextVersion,
+          input.reasonCode,
+          input.reasonNote,
+        ],
       );
-
-      const newStatus: KitchenStatus =
-        remaining.rows.length === 0 ? 'cancelled' : 'partial_cancelled';
-
-      // NO total recompute. The total is derived (merchant.order_total sums live lines), so
-      // voiding the lines above already moved it — recomputing a stored copy is what this
-      // model removed.
+      const kind = kitchenEventKind(input.commandType);
+      const event = await client.query<{ sequence: string }>(
+        `INSERT INTO merchant.kitchen_event
+           (event_id,merchant_id,location_id,kitchen_order_id,kitchen_order_item_id,
+            station_id,kind,aggregate_version,status,safe_payload,correlation_id)
+         VALUES (gen_random_uuid(),$1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7,$8,
+                 jsonb_build_object('reasonCode',$9::text),$10)
+         RETURNING sequence::text`,
+        [
+          input.order.merchant_id,
+          input.session.locationId,
+          input.order.id,
+          input.itemIds[0] ?? null,
+          stationId,
+          kind,
+          nextVersion,
+          nextStatus,
+          input.reasonCode,
+          input.correlationId,
+        ],
+      );
       await client.query(
-        `UPDATE merchant.customer_order
-            SET status = $3, updated_at = now()
-          WHERE id = $1::uuid AND merchant_id = $2::uuid`,
-        [order.id, order.merchant_id, mapKitchenToOrderStatus(newStatus)],
+        `INSERT INTO merchant.audit_event
+           (merchant_id,location_id,actor_user_id,command_id,event_type,entity_type,entity_id,outcome,
+            public_data,correlation_id,event_hash)
+         VALUES ($1::uuid,$2::uuid,$9::uuid,$3::uuid,$4,'kitchen_order',$5::uuid,'success',
+                 jsonb_build_object('stationId',$6::text,'status',$7::text),$8,'')`,
+        [
+          input.order.merchant_id,
+          input.session.locationId,
+          input.commandId,
+          `kitchen.${input.commandType}`,
+          input.order.id,
+          stationId,
+          nextStatus,
+          input.correlationId,
+          input.actorUserId ?? null,
+        ],
       );
-
-      const ev = await client.query<{ sequence: string }>(
-        `INSERT INTO merchant.order_event (order_id, kind, status)
-         VALUES ($1::uuid, 'status_changed', $2)
-         RETURNING sequence`,
-        [order.id, mapKitchenToOrderStatus(newStatus)],
-      );
-      const seq = Number(ev.rows[0]?.sequence ?? 0);
-
-      const phone = await this.customerPhone(client, order.merchant_id, order.person_id);
-      // Only emit when notifications are enabled (buildNotifyBody returns null
-      // when KDS_STATUS_NOTIFY_ENABLED is off) AND a customer phone exists.
-      const body = phone ? input.buildNotifyBody(cancelled.rows, remaining.rows) : null;
-      if (phone && body) {
-        await client.query(
-          `INSERT INTO runtime.outbox_event
-             (merchant_id, topic, aggregate_id, idempotency_key, payload)
-           VALUES ($1, 'twilio.cancel_notification', $2, $3, $4::jsonb)
-           ON CONFLICT (merchant_id, idempotency_key) DO NOTHING`,
-          [
-            order.merchant_id,
-            order.id,
-            `kds:cancel:${order.id}:${seq}`,
-            JSON.stringify({ to: phone, body, ticket_id: order.id }),
-          ],
-        );
-      }
-
-      return { sequence: seq, newStatus };
+      const result = {
+        kitchenOrderId: input.order.id,
+        status: nextStatus,
+        version: nextVersion,
+        sequence: Number(event.rows[0]?.sequence ?? 0),
+        updatedAt: new Date(updated.rows[0].updated_at).toISOString(),
+      };
+      await finishKitchenCommand(client, input.commandId, 'succeeded', result);
+      return { status: 'succeeded', result };
     });
   }
 }
