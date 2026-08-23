@@ -501,14 +501,25 @@ The rehearsal command now names `APP_QR_SECRET`. It fails early if the value is 
 
 The current security gate passes **48 structural and 3 behavioral checks** and reports one
 acknowledged gap. The holder of the bootstrap role has no enrolled MFA. This check now measures an
-active holder. AB#115 tracks this P7 decision.
+active holder. AB#115 was the register-side half of this; it is DECIDED (below). The
+bootstrap-holder enrolment itself is the D12 row, and it is not blocked on anything.
 
 **What remains for P7:**
 
 1. Move and validate the APNs, WWDR, Apple signer, and Google service-account secrets under D9.
-2. Choose the MFA action under AB#115.
-   - Enroll the holder of the production bootstrap role.
-   - Approve a documented exception with a review date.
+2. ✅ **AB#115 DECIDED 2026-08-22 — option 2, measured first.** On the rehearsal: 9 users,
+   **0** enrolled, 8 active staff, 0 enrolled staff. The register bypass is latent, so the
+   work item's own rule applied. `CashAuthService` now **refuses an MFA-enrolled account** at
+   login (after the password verifies — not an enumeration oracle) and at refresh (so an
+   open till does not outlive enrolment). Refuses nobody today. Branch
+   `fix/ab115-register-refuses-mfa-enrolled`.
+   **Consequence, recorded so it is not discovered later:** a real-café manager who enrols
+   loses the till until the PIN door exists → **AB#118** (PIN login, MFA-rollout blocker) and
+   **AB#119** (`elevation_grant` wiring, depends on #118). **D12 is NOT blocked on them:**
+   `hola@umiconsulting.co`'s only staff membership is at the empty "Umi Cafe" demo merchant
+   (0 customers), so enrolling the bootstrap holder costs it nothing real. The remaining D12
+   step is therefore just: enrol `hola@` (email_otp is the only shipped method; the gate row
+   will read PASS but the `totp` criterion stays unmet — see SECURITY_GATE D12).
 3. Exercise the frozen `cash.umiconsulting.co` host through the production routing layer.
 4. Update a pass issued **before** cutover on a real phone after the production flip.
 
@@ -645,7 +656,8 @@ updates on a real device after the flip.**
   vacuous.** The clean rehearsal selected `hola@umiconsulting.co` as the bootstrap holder. The
   target has one active platform holder and zero enrolled holders. Across all nine users, zero have
   a non-null `mfa_method`; zero active staff memberships belong to an MFA-enrolled user. The Cash
-  bypass in AB#115 is therefore latent in this snapshot, while bootstrap-holder enrollment remains
+  bypass in AB#115 is therefore latent in this snapshot — and now CLOSED by refusal (see P7
+  item 2) — while bootstrap-holder enrollment remains
   a real P7 blocker. `umi.user` carries `mfa_method` and `mfa_enrolled_at`, and the dashboard
   understands the MFA challenge contract; production still needs the factor enrolled or an explicit
   owner-approved disposition.
