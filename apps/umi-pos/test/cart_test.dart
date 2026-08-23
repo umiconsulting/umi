@@ -41,7 +41,8 @@ final class _CartRepository implements CartRepository {
     RemoveCartLineRequest input,
   ) async => cart;
   @override
-  Future<Cart> prepare(String merchantId, PrepareSaleRequest input) async => cart;
+  Future<Cart> prepare(String merchantId, PrepareSaleRequest input) async =>
+      cart;
   @override
   Future<Cart> clear(String merchantId, ClearCartRequest input) async => cart;
 }

@@ -185,11 +185,12 @@ void main() {
 
   test('assigned POS executes one Dashboard remote command', () async {
     final repository = _HardwareRepository();
-    final remote = _printCommand(
-      '10000000-0000-4000-8000-000000000015',
-    );
+    final remote = _printCommand('10000000-0000-4000-8000-000000000015');
     repository.lastCommand = remote;
-    repository.remoteClaim = repository._result(remote.commandId, 'dispatching');
+    repository.remoteClaim = repository._result(
+      remote.commandId,
+      'dispatching',
+    );
     final printer = PrinterSimulatorAdapter();
     final service = HardwareService(
       repository: repository,
@@ -926,6 +927,7 @@ final class _HardwareRepository implements HardwareRepository {
     remoteClaim = null;
     return result;
   }
+
   final Map<String, String> statuses = {};
   final List<String> transitions = [];
   HardwareCommandRequest? lastCommand;

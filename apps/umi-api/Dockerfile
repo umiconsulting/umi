@@ -24,12 +24,19 @@ RUN --mount=type=cache,id=umipos-pnpm-store,target=/root/.local/share/pnpm/store
  && pnpm --filter=@umi/api --config.inject-workspace-packages=true deploy --prod /out
 
 FROM node:22-alpine AS runtime
+# Release identity is baked at build time (deploy-backend.yml passes the real
+# values). The defaults are VALID placeholders — config.schema.ts regex-checks
+# each value whenever it is set, so an obviously-fake-but-well-formed default
+# keeps a local `docker compose up --build` bootable, while the old
+# `unavailable` defaults failed validation on boot.
 ARG RELEASE_VERSION=development
-ARG RELEASE_GIT_COMMIT=unavailable
-ARG RELEASE_BUILD_TIMESTAMP=unavailable
+ARG RELEASE_GIT_COMMIT=0000000000000000000000000000000000000000
+ARG RELEASE_BUILD_TIMESTAMP=1970-01-01T00:00:00.000Z
+ARG CONTRACT_VERSION=0.0.0
 ENV RELEASE_VERSION=$RELEASE_VERSION \
     RELEASE_GIT_COMMIT=$RELEASE_GIT_COMMIT \
-    RELEASE_BUILD_TIMESTAMP=$RELEASE_BUILD_TIMESTAMP
+    RELEASE_BUILD_TIMESTAMP=$RELEASE_BUILD_TIMESTAMP \
+    CONTRACT_VERSION=$CONTRACT_VERSION
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build --chown=node:node /out/dist ./dist

@@ -83,7 +83,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          # Bake the immutable release identity into the image (config.schema.ts
+          # requires all four in staging/pilot/production; /health/live reports them).
+          # CONTRACT_VERSION's source of truth is packages/contract/src/catalog.ts.
+          CONTRACT_VERSION="$(sed -n "s/^export const CONTRACT_VERSION = '\(.*\)';$/\1/p" packages/contract/src/catalog.ts)"
+          test -n "$CONTRACT_VERSION" || { echo "CONTRACT_VERSION not found in packages/contract/src/catalog.ts"; exit 1; }
           docker build \
+            --build-arg RELEASE_VERSION="$(git describe --tags --always)" \
+            --build-arg RELEASE_GIT_COMMIT="${{ github.sha }}" \
+            --build-arg RELEASE_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" \
+            --build-arg CONTRACT_VERSION="$CONTRACT_VERSION" \
             -t "$IMAGE:sha-${{ github.sha }}" \
             -t "$IMAGE:latest" \
             -f "$DIR/Dockerfile" .
