@@ -422,11 +422,17 @@ that P5 preserved.
 ### P6 — Deployment-gate provisioning (`SECURITY_GATE.md §4`) ◑ PARTIAL
 
 **Done:** D1 (boot-guard role reconciliation, `PR #51`) · D2 (dual-GUC expand/contract) · D3
-(pooler SET-LOCAL isolation, 5/5 on the current rehearsal) · D11 (auth substrate worker-only +
+(pooler SET-LOCAL isolation, 5/5 on the current rehearsal) · D4 (TLS verify-full VPS→Supabase,
+LIVE 2026-08-07) · D5 (SCRAM verifiers confirmed on the login roles, 2026-08-07) · D10
+(request-path log redaction closed on both pools, 2026-08-07) · D11 (auth substrate worker-only +
 static AST gate, `PR #51`).
-**Pending:** D4 TLS verify-full (VPS→Supabase) · D5 SCRAM verifiers on
-login roles · D6 pg_hba/network · D7 extensions · D8 no FDW remnants · D9 secret rotation + history scrub
-([[project_cred_exposure_2026_06_20]]) · D10 request-path log redaction.
+**Pending:** D6 pg_hba/network — **blocked**: umi-cash egresses from Vercel, which has no fixed
+IP, so the Supabase network restriction cannot be turned on without cutting the register off ·
+D7 extensions and D8 no-FDW-remnants — evidence lands with the rehearsal/cutover replay (D8 is
+"zero foreign servers after replay" by construction) · D9 secret rotation + history scrub
+([[project_cred_exposure_2026_06_20]]; gitleaks already in CI).
+**Residual on D1:** the prod worker pool still connects as `postgres`; the flip to the `worker`
+login role is the cutover-day env change, recorded in P7.
 **DoD.** Every §4 row checked with recorded evidence.
 
 ### P7 — Cutover rehearsal → production cutover 🔄 IN PROGRESS
@@ -577,6 +583,15 @@ decisions that were not mechanical, recorded so nobody re-litigates them from th
   now requires `VITE_UMI_ENVIRONMENT` (the branch's vite config; `test` mode is exempt, so
   vitest is unaffected) — set it in the Vercel project env before the next dashboard deploy.
   CI builds only `@umi/api...`, so no workflow change.
+
+**Flutter client verified (2026-08-23), closing the merge's one unverified flag.** On
+Flutter 3.44.6, the README's toolchain: `dart format` clean (two test files the branch left
+unformatted are formatted here), `flutter analyze` 0 issues, **178/178 tests**, and
+`flutter build web --debug` builds — all against the regenerated `umi_contract` 2.12.0. CI
+still has no Flutter job; physical-iOS signing stays a Gate 13 item. The deploy pipeline now
+bakes `RELEASE_*`/`CONTRACT_VERSION` into the image (`deploy-backend.yml`), while
+`UMI_ENVIRONMENT` and `EXPECTED_SCHEMA_VERSION` are VPS `.env` state — see
+`apps/umi-api/docs/deploy-pipeline.md`.
 
 AB#118 is largely delivered by the merge for the POS (`POST /api/v1/auth/pos/pin-login`, device
 enrolment, `merchant.staff.operator_pin_*` issued from the staff screen); the register's own PIN
