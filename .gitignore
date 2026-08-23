@@ -57,6 +57,7 @@ packages/contract/generated/dart/pubspec.lock
 # project ref and a pooler URL. Machine-local state, not source — and umi-cash is
 # frozen, so nothing here should ever be committed.
 apps/*/supabase/.temp/
+supabase/.temp/
 
 # Python bytecode and test caches. Generated on import, version-stamped
 # (cpython-314), and useless on a machine with a different interpreter — the
