@@ -12,12 +12,38 @@ export const MODULES = {
     section: 'OPERATIONS',
     product: 'dashboard',
   },
+  operations: {
+    id: 'operations',
+    label: 'Centro operativo',
+    icon: 'Activity',
+    section: 'OPERATIONS',
+    product: 'dashboard',
+    permissions: [
+      'merchant.manage',
+      'audit.read',
+      'hardware.read',
+      'hardware.diagnostics',
+      'inventory.read',
+      'sale.lifecycle',
+      'sale.exception.read',
+      'cash.shift.read',
+      'customer.read',
+      'loyalty.read',
+      'wallet.read',
+      'gift_card.read',
+      'kitchen.read',
+      'device.enroll',
+      'catalog.read',
+    ],
+    locationScoped: true,
+  },
   orders: {
     id: 'orders',
     label: 'Pedidos',
     icon: 'Receipt',
     section: 'OPERATIONS',
     product: 'kds',
+    permissions: ['kitchen.read'],
     locationScoped: true,
   },
   devices: {
@@ -25,7 +51,8 @@ export const MODULES = {
     label: 'Dispositivos',
     icon: 'Tablet',
     section: 'OPERATIONS',
-    product: 'kds',
+    product: 'dashboard',
+    permissions: ['device.enroll'],
     locationScoped: true,
   },
   staff: {
@@ -34,6 +61,7 @@ export const MODULES = {
     icon: 'Users',
     section: 'OPERATIONS',
     product: 'dashboard',
+    permissions: ['merchant.manage'],
   },
   customers: {
     id: 'customers',
@@ -41,6 +69,7 @@ export const MODULES = {
     icon: 'Users2',
     section: 'OPERATIONS',
     product: 'dashboard',
+    permissions: ['customer.read'],
   },
   members: {
     id: 'members',
@@ -48,6 +77,7 @@ export const MODULES = {
     icon: 'CreditCard',
     section: 'GROWTH',
     product: 'cash',
+    permissions: ['loyalty.read'],
   },
   'gift-cards': {
     id: 'gift-cards',
@@ -55,6 +85,7 @@ export const MODULES = {
     icon: 'Gift',
     section: 'GROWTH',
     product: 'cash',
+    permissions: ['gift_card.read'],
   },
   hours: {
     id: 'hours',
@@ -62,6 +93,7 @@ export const MODULES = {
     icon: 'Clock',
     section: 'CONFIGURATION',
     product: 'conversaflow',
+    permissions: ['merchant.manage'],
     locationScoped: true,
   },
   settings: {
@@ -70,6 +102,7 @@ export const MODULES = {
     icon: 'Settings',
     section: 'CONFIGURATION',
     product: 'dashboard',
+    permissions: ['merchant.manage'],
   },
   'products-billing': {
     id: 'products-billing',
@@ -109,6 +142,7 @@ export const MODULES = {
 
 export const MODULE_ORDER = [
   'overview',
+  'operations',
   'orders',
   'devices',
   'staff',
@@ -155,6 +189,19 @@ export function hasRequiredRole(moduleConfig, capabilities) {
   return membership?.role === moduleConfig.role || membership?.permissions?.includes?.('*');
 }
 
+/**
+ * The PERMISSION gate, and the one the POS/operations modules use: a module names
+ * the `umi.permission` keys that open it, and the café membership must hold one.
+ * A third axis beside `role` (café role) and `platform` (platform grant).
+ */
+export function hasRequiredPermission(moduleConfig, capabilities) {
+  if (!moduleConfig?.permissions?.length) return true;
+  const permissions = capabilities?.membership?.permissions || [];
+  return (
+    permissions.includes('*') || moduleConfig.permissions.some((key) => permissions.includes(key))
+  );
+}
+
 export function getModuleAvailability(moduleKey, capabilities, platformRole = null) {
   const moduleConfig = MODULES[moduleKey];
   if (!moduleConfig) {
@@ -172,11 +219,10 @@ export function getModuleAvailability(moduleKey, capabilities, platformRole = nu
       locationScoped: !!moduleConfig.locationScoped,
     };
   }
-  if (!hasRequiredRole(moduleConfig, capabilities)) {
+  if (!hasRequiredPermission(moduleConfig, capabilities)) {
     return {
       available: false,
-      reason: 'role_required',
-      role: moduleConfig.role,
+      reason: 'permission_required',
       locationScoped: !!moduleConfig.locationScoped,
     };
   }

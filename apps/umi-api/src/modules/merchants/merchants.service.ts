@@ -86,21 +86,29 @@ export class MerchantsService {
     access: MerchantAccess,
     selectedLocationId: string | null,
   ): Promise<Capabilities> {
-    const [products, locations, branding] = await Promise.all([
+    const [products, allLocations, branding] = await Promise.all([
       this.repo.loadProducts(access.merchantId),
       this.repo.loadLocations(access.merchantId),
       this.repo.loadBranding(access.merchantId),
     ]);
 
-    const selectedLocation = selectedLocationId
-      ? (locations.find((l) => l.id === selectedLocationId) ?? null)
-      : (locations.find((l) => l.status === 'active') ?? locations[0] ?? null);
+    const locations = access.locationId
+      ? allLocations.filter((location) => location.id === access.locationId)
+      : allLocations;
+    const selectedLocation =
+      (selectedLocationId
+        ? locations.find((location) => location.id === selectedLocationId)
+        : null) ??
+      locations.find((location) => location.status === 'active') ??
+      locations[0] ??
+      null;
 
     const membership = {
       id: access.membershipId,
       role: access.role,
       roles: access.roles,
       permissions: access.permissions,
+      locationId: access.locationId,
     };
     const base = {
       merchant: {

@@ -1,7 +1,15 @@
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { PasswordService } from '../../shared/auth/password.service';
+import { posPinLookupHash } from '../../shared/auth/pos-pin';
 import { JwtService } from '../../shared/auth/jwt.service';
 import { EmailAdapter } from '../../shared/adapters/email.adapter';
 import type { AppConfig } from '../../shared/config/config.schema';
@@ -23,6 +31,7 @@ function narrowPlatformRole(role: string | null): PlatformRole {
 }
 import { AuthRepository, type MerchantMembershipSummary } from './auth.repository';
 import { MfaService } from './mfa.service';
+import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 
 export interface SessionUser {
   id: string;
@@ -33,6 +42,8 @@ export interface SessionUser {
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;
+  sessionId: string;
+  deviceId: string | null;
 }
 
 export interface LoginResult extends TokenPair {
@@ -84,6 +95,7 @@ export class AuthService {
     private readonly email: EmailAdapter,
     private readonly config: ConfigService<AppConfig, true>,
     private readonly mfa: MfaService,
+    private readonly rateLimit: RateLimitService,
   ) {}
 
   async login(usernameRaw: string, password: string): Promise<LoginOutcome> {
@@ -162,8 +174,8 @@ export class AuthService {
 
   /** Rotate a live dashboard session and return its new token pair. */
   async refresh(refreshToken: string): Promise<LoginResult> {
-    const userId = await this.jwt.verifyRefresh(refreshToken);
-    const summary = await this.repo.findUserById(userId);
+    const claims = await this.jwt.verifyRefresh(refreshToken);
+    const summary = await this.repo.findUserById(claims.sub);
     if (!summary) throw new UnauthorizedException('invalid_token');
     const user: SessionUser = {
       id: summary.userId,
@@ -177,12 +189,16 @@ export class AuthService {
       this.repo.findMerchantsForUser(user.id),
       this.repo.platformRole(user.id),
     ]);
-    const tokens = await this.signTokens(user);
+    // The new tokens keep the SAME `sid`: it is the refresh family, not the token
+    // row, and the POS binds administrative work to it across the dashboard's
+    // own refresh cycle. The repository verifies the old token belongs to it.
+    const tokens = await this.issueTokens(user, claims.sessionId);
     const rotated = await this.repo.rotateDashboardSession(
       user.id,
       hashToken(refreshToken),
       hashToken(tokens.refreshToken),
       this.jwt.refreshExpiresAt(tokens.refreshToken),
+      claims.sessionId,
     );
     if (!rotated) throw new UnauthorizedException('invalid_token');
 
@@ -193,6 +209,130 @@ export class AuthService {
   async logout(refreshToken: string | undefined): Promise<void> {
     if (!refreshToken) return;
     await this.repo.revokeDashboardSession(hashToken(refreshToken));
+  }
+
+  async pinLogin(input: {
+    pin: string;
+    merchantId: string;
+    locationId: string;
+    installationId: string;
+    deviceId: string | null;
+    deviceCredential: string | null;
+    ip: string | null;
+  }): Promise<LoginResult> {
+    if (!input.deviceId || !input.deviceCredential) {
+      throw new UnauthorizedException({ code: 'DEVICE_NOT_ALLOWED' });
+    }
+    this.enforcePinRateLimit(`pos-pin:ip:${input.ip ?? 'unknown'}`, 20, 5 * 60_000);
+    this.enforcePinRateLimit(`pos-pin:device:${input.deviceId}`, 10, 5 * 60_000);
+
+    const installationHash = sha256(input.installationId);
+    const credentialHash = sha256(input.deviceCredential);
+    const deviceAllowed = await this.repo.validatePosDevice({
+      deviceId: input.deviceId,
+      merchantId: input.merchantId,
+      locationId: input.locationId,
+      installationHash,
+      credentialHash,
+    });
+    if (!deviceAllowed) {
+      throw new UnauthorizedException({ code: 'DEVICE_NOT_ALLOWED' });
+    }
+
+    const secret = this.config.get('JWT_SECRET', { infer: true });
+    if (!secret) throw new Error('JWT_SECRET is required for POS PIN authentication');
+    const lookupHash = posPinLookupHash(secret, input.merchantId, input.pin);
+    const record = await this.repo.findPosPinStaff(input.merchantId, input.locationId, lookupHash);
+    if (!record || !this.passwords.verify(input.pin, record.pinSalt, record.pinHash)) {
+      await this.repo.recordPosPinFailure(input.deviceId);
+      throw new ForbiddenException({ code: 'PIN_INVALID' });
+    }
+    if (!record.email) {
+      throw new ForbiddenException({ code: 'OPERATOR_LOGIN_UNAVAILABLE' });
+    }
+    const entitlement = await this.repo.effectiveEntitlement(input.merchantId, 'pos');
+    if (!entitlement?.enabled || !['trialing', 'active'].includes(entitlement.subscriptionStatus)) {
+      throw new ForbiddenException({ code: 'ENTITLEMENT_DISABLED' });
+    }
+
+    await this.repo.clearPosPinFailures(input.deviceId);
+    const user: SessionUser = {
+      id: record.userId,
+      email: record.email,
+      displayName: record.displayName,
+    };
+    const sessionId = randomUUID();
+    const [merchants, tokens] = await Promise.all([
+      this.repo.findMerchantsForUser(user.id),
+      this.issueTokens(user, sessionId, input.deviceId),
+    ]);
+    await this.repo.createPosSession({
+      id: sessionId,
+      merchantId: input.merchantId,
+      locationId: input.locationId,
+      userId: user.id,
+      deviceId: input.deviceId,
+      tokenHash: sha256(tokens.refreshToken),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60_000),
+    });
+    // Same envelope as a dashboard login: the contract names `platformRole`, and a
+    // platform operator who signs in at a till is still a platform operator.
+    return {
+      user,
+      merchants,
+      platformRole: narrowPlatformRole(await this.repo.platformRole(user.id)),
+      ...tokens,
+    };
+  }
+
+  async posRefresh(input: {
+    refreshToken: string;
+    installationId: string;
+    deviceCredential: string | null;
+  }): Promise<LoginResult> {
+    if (!input.deviceCredential) {
+      throw new UnauthorizedException({ code: 'DEVICE_NOT_ALLOWED' });
+    }
+    const claims = await this.jwt.verifyRefresh(input.refreshToken);
+    const session = await this.repo.validatePosSession({
+      sessionId: claims.sessionId,
+      userId: claims.sub,
+      installationHash: sha256(input.installationId),
+      credentialHash: sha256(input.deviceCredential),
+    });
+    if (!session) throw new UnauthorizedException({ code: 'DEVICE_NOT_ALLOWED' });
+
+    const summary = await this.repo.findUserById(claims.sub);
+    if (!summary) throw new UnauthorizedException('invalid_token');
+    const user: SessionUser = {
+      id: summary.userId,
+      email: summary.email,
+      displayName: summary.displayName,
+    };
+    const [merchants, tokens] = await Promise.all([
+      this.repo.findMerchantsForUser(user.id),
+      this.issueTokens(user, claims.sessionId, session.deviceId),
+    ]);
+    if (!(await this.repo.rotatePosSessionToken(claims.sessionId, sha256(tokens.refreshToken)))) {
+      throw new UnauthorizedException('invalid_token');
+    }
+    // Same envelope as a dashboard login: the contract names `platformRole`, and a
+    // platform operator who signs in at a till is still a platform operator.
+    return {
+      user,
+      merchants,
+      platformRole: narrowPlatformRole(await this.repo.platformRole(user.id)),
+      ...tokens,
+    };
+  }
+
+  async posLogout(refreshToken: string): Promise<void> {
+    const claims = await this.jwt.verifyRefresh(refreshToken);
+    await this.repo.revokePosSession(claims.sessionId, claims.sub, sha256(refreshToken));
+  }
+
+  async posGlobalLogout(userId: string, sessionId: string, exceptCurrent: boolean): Promise<void> {
+    await this.repo.revokePosSessionsForOperator(userId, exceptCurrent ? sessionId : null);
   }
 
   /** Rehydrate the session for `/me` from a verified access cookie. */
@@ -229,22 +369,50 @@ export class AuthService {
     return { user, merchants, platformRole: narrowPlatformRole(platformRole), ...tokens };
   }
 
+  /**
+   * Open the dashboard's durable session. The family id is minted HERE and signed
+   * into both tokens as `sid` before the row exists, so the id the client holds and
+   * the id the database holds are one value — see `startDashboardSession`.
+   */
   private async issueSessionTokens(user: SessionUser): Promise<TokenPair> {
-    const tokens = await this.signTokens(user);
+    const familyId = randomUUID();
+    const tokens = await this.issueTokens(user, familyId);
     await this.repo.startDashboardSession(
       user.id,
       hashToken(tokens.refreshToken),
       this.jwt.refreshExpiresAt(tokens.refreshToken),
+      familyId,
     );
     return tokens;
   }
 
-  private async signTokens(user: SessionUser): Promise<TokenPair> {
+  /**
+   * The one signer. A dashboard session passes its family id and no device; a
+   * POS session passes its own session id and the enrolled device.
+   */
+  private async issueTokens(
+    user: SessionUser,
+    sessionId: string = randomUUID(),
+    deviceId: string | null = null,
+  ): Promise<TokenPair> {
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwt.signAccess({ sub: user.id, email: user.email }),
-      this.jwt.signRefresh(user.id),
+      this.jwt.signAccess({ sub: user.id, email: user.email, sessionId, deviceId }),
+      this.jwt.signRefresh(user.id, sessionId),
     ]);
-    return { accessToken, refreshToken };
+    return { accessToken, refreshToken, sessionId, deviceId };
+  }
+
+  private enforcePinRateLimit(key: string, max: number, windowMs: number): void {
+    const result = this.rateLimit.hit(key, max, windowMs);
+    if (!result.allowed) {
+      throw new HttpException(
+        {
+          code: 'RATE_LIMITED',
+          retryAfterSeconds: Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1_000)),
+        },
+        429,
+      );
+    }
   }
 
   /**
@@ -307,9 +475,13 @@ export class AuthService {
     const { salt, hash } = this.passwords.hash(password);
     await this.repo.updatePassword(record.userId, salt, hash);
     await this.repo.markResetTokenUsed(record.id);
+    await this.repo.revokeDashboardSessionsForUser(record.userId, 'credential_changed');
   }
 }
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
+
+/** Same digest, the POS code's name for it. One function, two call-site idioms. */
+const sha256 = hashToken;

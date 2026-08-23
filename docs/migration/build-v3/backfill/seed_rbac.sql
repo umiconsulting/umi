@@ -190,6 +190,47 @@ where not exists (
   where x.role_id = r.id and x.permission_id = p.id
 );
 
+-- Gate 3 cashier workflow. `staff` is the current front-of-house role.
+insert into umi.role_permission (role_id, permission_id)
+select r.id, p.id
+from (values
+  ('owner','sale.lifecycle'), ('owner','sale.resume.any'),
+  ('owner','checkout.discount.apply'), ('owner','checkout.discount.approve'),
+  ('owner','checkout.terminal.confirm'), ('owner','checkout.terminal.approve'),
+  ('owner','checkout.recover.any'),
+  ('admin','sale.lifecycle'), ('admin','sale.resume.any'),
+  ('admin','checkout.discount.apply'), ('admin','checkout.discount.approve'),
+  ('admin','checkout.terminal.confirm'), ('admin','checkout.terminal.approve'),
+  ('admin','checkout.recover.any'),
+  ('staff','sale.lifecycle'), ('staff','checkout.discount.apply'),
+  ('staff','checkout.terminal.confirm'),
+  ('owner','cash.register.use'), ('owner','cash.shift.open'),
+  ('owner','cash.shift.suspend'), ('owner','cash.shift.resume'),
+  ('owner','cash.shift.handoff'), ('owner','cash.movement.paid_in'),
+  ('owner','cash.movement.paid_out'), ('owner','cash.movement.safe_drop'),
+  ('owner','cash.drawer.no_sale'), ('owner','cash.count.submit'),
+  ('owner','cash.count.recount'), ('owner','cash.variance.approve'),
+  ('owner','cash.reconcile'), ('owner','cash.shift.close'), ('owner','cash.shift.read'),
+  ('admin','cash.register.use'), ('admin','cash.shift.open'),
+  ('admin','cash.shift.suspend'), ('admin','cash.shift.resume'),
+  ('admin','cash.shift.handoff'), ('admin','cash.movement.paid_in'),
+  ('admin','cash.movement.paid_out'), ('admin','cash.movement.safe_drop'),
+  ('admin','cash.drawer.no_sale'), ('admin','cash.count.submit'),
+  ('admin','cash.count.recount'), ('admin','cash.variance.approve'),
+  ('admin','cash.reconcile'), ('admin','cash.shift.close'), ('admin','cash.shift.read'),
+  ('staff','cash.register.use'), ('staff','cash.shift.open'),
+  ('staff','cash.shift.suspend'), ('staff','cash.shift.resume'),
+  ('staff','cash.movement.paid_in'), ('staff','cash.movement.paid_out'),
+  ('staff','cash.movement.safe_drop'), ('staff','cash.count.submit'),
+  ('staff','cash.reconcile'), ('staff','cash.shift.close'), ('staff','cash.shift.read')
+) as m(role_key, perm_key)
+join umi.role r       on r.key = m.role_key
+join umi.permission p on p.key = m.perm_key
+where not exists (
+  select 1 from umi.role_permission x
+  where x.role_id = r.id and x.permission_id = p.id
+);
+
 -- ---------------------------------------------------------------------------
 -- POS role -> permission grants (added 2026-07-28 with the UmiPOS integration).
 --

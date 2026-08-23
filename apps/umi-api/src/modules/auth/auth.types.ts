@@ -8,6 +8,17 @@ export interface AuthUser {
    * have it.
    */
   email: string | null;
+  /**
+   * The durable session this access token belongs to: the `runtime.session` row
+   * id for a dashboard login, the POS session id for a PIN login. `''` for a
+   * register session — the till's token (`JWT_ACCESS_SECRET`) names no session,
+   * and no route that reads `sessionId` admits a till token (`@AcceptRegisterToken`
+   * is opt-in and the POS controllers do not opt in).
+   */
+  sessionId: string;
+  /** The enrolled POS device, or null for a dashboard or register session. */
+  deviceId: string | null;
+  commandContextType?: 'pos_device' | 'dashboard_administrative';
 }
 
 /** Resolved merchant membership attached by MerchantAccessGuard. */
@@ -23,6 +34,8 @@ export interface MerchantAccess {
   role: string | null;
   roles: string[];
   permissions: string[];
+  /** Null grants merchant scope. A value limits this employment to one location. */
+  locationId: string | null;
 }
 
 /**
@@ -32,7 +45,10 @@ export interface MerchantAccess {
  */
 export interface AuthedRequest {
   cookies?: Record<string, string | undefined>;
+  headers?: Record<string, string | string[] | undefined>;
   params?: Record<string, string>;
+  query?: Record<string, unknown>;
+  body?: Record<string, unknown>;
   authUser?: AuthUser;
   merchantAccess?: MerchantAccess;
   /**

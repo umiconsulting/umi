@@ -18,9 +18,15 @@ import { StaffService } from './staff.service';
 import { CreateStaffDto, UpdateStaffDto } from './dto/staff.dto';
 
 /**
- * Staff CRUD over `merchant.staff`. Slug-routed; MerchantAccessGuard resolves
- * the reference → merchant and verifies membership (no membership check existed in
- * server.js — hardened here). No product entitlement gate, matching server.js.
+ * Staff CRUD over `merchant.staff`. MerchantAccessGuard resolves the reference
+ * and verifies membership.
+ *
+ * NOT gated on the POS product. The UmiPOS integration arrived with
+ * `@RequireProduct('pos')` on this class, which would have hidden the dashboard's
+ * staff screen (build-v3 #124) from every café that runs Cash without a POS —
+ * and the operator PIN this screen now issues is the till's credential for those
+ * cafés too (AB#118). Employment is a dashboard capability; the product gate
+ * belongs on the POS routes, where it is.
  */
 @UseGuards(AuthGuard, MerchantAccessGuard)
 @Controller('api/:merchantRef/admin/staff')

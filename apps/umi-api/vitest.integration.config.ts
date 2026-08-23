@@ -34,6 +34,9 @@ export default mergeConfig(
   defineConfig({
     test: {
       include: ['src/**/*.integration.ts'],
+      // The runtime refuses to boot without an explicit environment; the harness
+      // is one. Set here so the suite is self-sufficient on any machine and in CI.
+      env: { UMI_ENVIRONMENT: 'test' },
       testTimeout: 20_000,
       hookTimeout: 30_000,
       // One shared database — serialize so RLS/GUC state never overlaps across files.

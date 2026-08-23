@@ -164,11 +164,14 @@ export class CashWriteRepository {
    * Insert-only: writes ONE card_ledger row; balance is SUM(delta), never cached.
    */
   private async applyWalletDelta(c: PoolClient, d: WalletDelta): Promise<number> {
+    await c.query("SELECT set_config('app.current_merchant',$1,true)", [d.merchantId]);
     const ledger = await c.query(
-      `INSERT INTO merchant.loyalty_stored_value_ledger
-         (merchant_id, card_id, staff_id, delta, reason, external_ref, idempotency_key)
-       VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7)
-       ON CONFLICT (merchant_id, idempotency_key) DO NOTHING`,
+      // Every parameter inside jsonb_build_object is cast: Postgres cannot infer a
+      // bare parameter's type from a variadic "any" argument list, and PREPARE
+      // (sql-preflight) fails on it exactly as the live call does.
+      `SELECT merchant.append_stored_value_fact($1::uuid,$2::uuid,jsonb_build_object(
+        'staffId',$3::text,'delta',$4::bigint,'reason',$5::text,'externalRef',$6::text,
+        'idempotencyKey',$7::text,'sourceType','umi_cash'))`,
       [
         d.merchantId,
         d.cardId,
@@ -286,10 +289,16 @@ export class CashWriteRepository {
       const gc = { ...rows[0], code: input.code };
       await c.query(
         // 'load' is the Build v3 issue event. The runtime integration test executes
-        // this INSERT because PREPARE cannot evaluate a CHECK constraint.
-        `INSERT INTO merchant.loyalty_gift_card_ledger
-           (merchant_id, gift_card_id, delta, reason, source_type, source_id, idempotency_key)
-         VALUES ($1::uuid, $2::uuid, $3, 'load', 'gift_card', $2::text, $4)`,
+        // this call because PREPARE cannot evaluate a CHECK constraint.
+        //
+        // Through the fact function, not a direct INSERT: since the UmiPOS integration
+        // every value-ledger write goes through one SECURITY DEFINER boundary (90_rls
+        // revokes api's DML on the four ledgers), and the register is no exception.
+        // The row is the same one — delta, reason, source, idempotency key — and the
+        // ledger's prepare trigger derives the POS fact columns from it.
+        `SELECT merchant.append_gift_card_fact($1::uuid, $2::uuid, jsonb_build_object(
+           'delta', $3::bigint, 'reason', 'load', 'sourceType', 'gift_card',
+           'sourceId', $2::text, 'idempotencyKey', $4::text))`,
         [input.merchantId, gc.id, input.amountCents, `giftissue_${gc.id}`],
       );
       return gc;
@@ -403,6 +412,7 @@ export class CashWriteRepository {
     senderName: string | null;
   }): Promise<number> {
     return this.pg.workerTx(async (c) => {
+      await c.query("SELECT set_config('app.current_merchant',$1,true)", [args.merchantId]);
       const claim = await c.query<Row>(
         `UPDATE merchant.loyalty_gift_card
          SET redeemed_at=now(), redeemed_card_id=$3::uuid
@@ -415,9 +425,9 @@ export class CashWriteRepository {
       await c.query(
         // gift_card_ledger.reason='redeem'; the wallet credit below uses card_ledger
         // reason 'gift_card_redeem' (its own CHECK allows it).
-        `INSERT INTO merchant.loyalty_gift_card_ledger
-           (merchant_id, gift_card_id, delta, reason, source_type, source_id, idempotency_key)
-         VALUES ($1::uuid, $2::uuid, $3, 'redeem', 'loyalty_card', $4::text, $5)`,
+        `SELECT merchant.append_gift_card_fact($1::uuid,$2::uuid,jsonb_build_object(
+          'delta',$3::bigint,'reason','redeem','sourceType','loyalty_card','sourceId',$4::text,
+          'idempotencyKey',$5::text))`,
         [
           args.merchantId,
           args.giftCardId,

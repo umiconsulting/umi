@@ -15,22 +15,24 @@ routing. What lives here is what no agent can infer.
 
 ## Product boundaries
 
-| Path                    | Owns                                                                                                                                        |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/umi-api`          | The canonical backend. Auth, cash, KDS, conversations, leads, and the wallet-pass layer for Apple and Google                                |
-| `apps/umi-kds`          | Native iPad Kitchen Display System client                                                                                                   |
-| `apps/umi-cash`         | Cash customer site and Cash-specific Prisma. It answers the frozen wallet-pass URL and forwards it to `umi-api`; it no longer builds passes |
-| `apps/umi-conversaflow` | Shared Supabase backend, workflow jobs, prompts, traces, cross-channel normalization                                                        |
-| `apps/umi-logs`         | ConversaFlow operational logs and trace UI                                                                                                  |
-| `apps/umi-dashboard`    | Owner dashboard app shell and live-data UI                                                                                                  |
-| `apps/umi-landing-page` | Public landing and lead capture                                                                                                             |
-| root `docs/`            | Architecture, migration, governance, cross-product planning                                                                                 |
+| Path                    | Owns                                                                                                                                                       |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/umi-api`          | The canonical backend. Auth, cash, KDS, conversations, leads, the wallet-pass layer for Apple and Google, and UmiPOS sale/inventory/stored-value authority |
+| `apps/umi-pos`          | Flutter UmiPOS client: enrolled-device + PIN operator login, sale, cart, checkout, cash shift, hardware, offline replay                                    |
+| `apps/umi-kds`          | Native iPad Kitchen Display System client                                                                                                                  |
+| `apps/umi-cash`         | Cash customer site and Cash-specific Prisma. It answers the frozen wallet-pass URL and forwards it to `umi-api`; it no longer builds passes                |
+| `apps/umi-conversaflow` | Shared Supabase backend, workflow jobs, prompts, traces, cross-channel normalization                                                                       |
+| `apps/umi-logs`         | ConversaFlow operational logs and trace UI                                                                                                                 |
+| `apps/umi-dashboard`    | Owner dashboard app shell and live-data UI                                                                                                                 |
+| `apps/umi-landing-page` | Public landing and lead capture                                                                                                                            |
+| root `docs/`            | Architecture, migration, governance, cross-product planning                                                                                                |
 
 ## Database ownership
 
 - `conversaflow` — operational runtime: conversations, orders, workflow jobs, outbox
 - `kds` — kitchen read models and projections only
-- `umi_cash` — loyalty and wallet tables
+- `umi_cash` — Cash consumer loyalty, wallet, and pass tables
+- build-v3 `merchant` — UmiPOS merchant loyalty and stored-value transaction facts
 - `platform` — shared organization data (contacts, users, tenants, leads)
 - `public` — temporary compatibility surface; do not add new product logic
 

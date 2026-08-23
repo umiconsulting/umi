@@ -21,7 +21,18 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
-### 2026-08-21 - Run the current Build v3 cutover rehearsal
+### 2026-08-22 - Merge the UmiPOS integration branch into build-v3
+- task type: cross-product branch merge with architectural reconciliation
+- request summary: Complete the merge of `architectureUMIposIntegration-v2` into `build-v3`; umi-api keeps the newer build-v3 architecture, the POS client follows the branch verbatim.
+- filesystem slice inspected: the 41 conflicting files across `apps/umi-api`, `apps/umi-dashboard`, `packages/contract`, `docs/migration/build-v3`, root meta; the 19 POS DDL files; both sides' auth, session, gift-card and guard code; the rehearsal and pristine DB targets
+- chosen owner: `build-v3` for umi-api and the schema; the branch for `apps/umi-pos`
+- chosen path: resolve by rule — build-v3 architecture wins, POS surfaces are added beside it; regenerate generated artifacts; prove on a pristine build and on the production-snapshot rehearsal
+- skill or subagent used: `task-router`, `resolving-merge-conflicts`, `tdd`, `pr-gates`; no subagents
+- files touched: 41 conflict resolutions; `37_pos_customer_value.sql` (schema union, default triggers); `46_platform_bootstrap.sql` (super_admin sweep); `90_rls.sql` (drop/create order); `backfill/00_run_backfill.sh` (POS DDL phase); auth service/repository/guard/types/controller; jwt service; cash-write; staff controller; new `ClassValidationPipe`; smoke exceptions; integration harness env and fixtures; dashboard registry/shell/app/data/devices/auth; `AGENTS.md`; lint baseline; cutover plan
+- tools used: Git, pnpm/turbo, Vitest, PostgreSQL (pristine builds, security gate, backfill rehearsal, reconcile), Prettier, ESLint, `@umi/contract` generator, CodeGraph
+- outcome: pristine DDL + security gate green; rehearsal from `umi_prod_snapshot_20260818` green with 0 drift and the same one acknowledged MFA gap; unit 1160/0; schema family 13/14 files (14th skip-only); migration family 24/24 with the smoke at 100 routes / 0 unexpected; `check:pr` green
+- reusable pattern observed: when both sides reshaped one table after the fork, merge at the SCHEMA level (the newer model is the authority, the other becomes additive with default triggers for the columns the old writers never set) before touching either module's code; and re-run the gate on a PRISTINE build, because a backfill-seeded sweep hides what a clean build lacks
+- promotion follow-up: none; `resolving-merge-conflicts` already says to prove on both targets
 - task type: cross-product migration-gate validation
 - request summary: Merge the dashboard-session PR and continue with the next cutover step.
 - filesystem slice inspected: `docs/migration/build-v3/**`, `apps/umi-api/src/smoke.integration.ts`, and the current PostgreSQL snapshot of production
@@ -201,6 +212,84 @@ Record successful and failed cross-workspace traces here before proposing new re
 - outcome: Se identificaron dos líneas activas y una diferencia entre sus fuentes de estado.
 - reusable pattern observed: Comparar el plan de cutover con la rama de integración antes de publicar un estado.
 - promotion follow-up: ninguno
+
+### 2026-08-13 - UmiPOS Gate 11 entrega al Owner
+- tipo de tarea: conocimiento del workspace y entrega operativa
+- resumen: crear una Base de Conocimiento en español para producto, operación, soporte y desarrollo
+- área inspeccionada: documentación y rutas de API, Dashboard, Flutter POS, KDS, worker, contratos, migraciones y versiones
+- owner seleccionado: `docs/knowledge-base/` con enlaces a owners de aplicación y certificación
+- ruta seleccionada: documentación directa; sin cambios de código, servicio, esquema o límite de producto
+- skills: `task-router` y `pr-gates`
+- archivos: Base de Conocimiento, certificación, índice, Owner review, roadmap y estado canónico
+- herramientas: `rg`, validación de enlaces, Prettier, validación JSON, Git y PR checks
+- resultado: Base de Conocimiento completa con dos P2 heredados; Gate 12 autorizado con P2
+- patrón observado: un índice conecta la guía del Owner con fuentes exactas de ingeniería
+- seguimiento: ninguno; conserva la estructura específica en `docs/knowledge-base/`
+
+### 2026-08-13 - UmiPOS Gate 10 product completion
+- task type: cross-workspace product and documentation closure
+- request summary: audit all UmiPOS software owners, close repository-controlled gaps, and defer physical evidence to Gate 13
+- filesystem slice inspected: root docs, `apps/umi-api`, `apps/umi-dashboard`, `apps/umi-pos`, `apps/umi-kds`, release scripts, migrations, and tests
+- chosen owner: root `docs/` for closure evidence; each existing app retains its runtime ownership
+- chosen path: direct audit and documentation corrections; no new service, repo, schema, or product boundary
+- skill or subagent used: `task-router`, `repository-cartographer`, `pr-gates`
+- files touched: product completion evidence, deferred register, glossary, documentation index, support and deployment docs, canonical roadmap, Owner review, and app README files
+- tools used: repository cartographer, `rg`, Flutter, Vitest, Vite, TypeScript, Prettier, JSON validation, Git, and PR checks
+- outcome: software product complete with two bounded P2 cleanup items; Gate 11 authorized with P2; Gate 13 deferred
+- reusable pattern observed: certification closure needs one inventory that separates software limitations from physical evidence
+- promotion follow-up: none; one Gate-specific trace is not sufficient for promotion
+
+### 2026-07-29 - UmiPOS Gate 3C cash shift operations
+- task type: product implementation and publication
+- request summary: Implement the physical register and cashier shift lifecycle.
+- filesystem slice inspected: UmiPOS, UMI API, contracts, migrations, scripts, and canonical product documents.
+- chosen owner: UMI API for cash authority and UmiPOS for the operator workflow.
+- chosen path: Extend the existing checkout, integrity, generated contract, and recovery boundaries.
+- skill or subagent used: task-router, workspace-boundary-check, tdd, code-review, and pr-gates.
+- files touched: Gate 3C contract, API, Flutter, migration, test, script, and canonical document files.
+- tools used: pnpm, Vitest, Flutter, Dart, Docker, PostgreSQL, Git, and GitHub CLI.
+- outcome: Gate 3C implementation and focused validation completed before publication.
+- reusable pattern observed: Store safe command identifiers and query the original command after response loss.
+- promotion follow-up: None.
+
+### 2026-07-29 - UmiPOS Gate 3B advanced checkout
+- task type: product implementation and publication
+- request summary: Implement the advanced checkout and tender lifecycle.
+- filesystem slice inspected: UmiPOS, UMI API, contracts, migrations, and canonical product documents.
+- chosen owner: UMI API for financial authority and UmiPOS for presentation.
+- chosen path: Extend the existing checkout module and generated contract boundary.
+- skill or subagent used: task-router, workspace-boundary-check, tdd, code-review, and pr-gates.
+- files touched: Gate 3B contract, API, Flutter, migration, test, script, and canonical document files.
+- tools used: pnpm, Vitest, Flutter, Dart, Docker, PostgreSQL, Git, and GitHub CLI.
+- outcome: Gate 3B implementation and focused validation completed before publication.
+- reusable pattern observed: Keep terminal assertions in a recoverable draft before financial commit.
+- promotion follow-up: None.
+
+### 2026-07-29 - UmiPOS Gate 3A sale lifecycle
+- task type: cross-app commercial workflow implementation
+- request summary: add the cashier sale lifecycle without changes to offline or device authority
+- filesystem slice inspected: contracts, UMI API POS modules, UmiPOS sale/cart/checkout surfaces, migrations, and canonical product memory
+- chosen owner: UMI API for sale authority; UmiPOS for presentation and operator workflow
+- chosen path: direct focused implementation with contract-first TDD
+- skill or subagent used: `task-router`, `tdd`, `pr-gates`
+- files touched: sale contracts, sale API module, cart and checkout integration, Flutter sale feature, focused tests, one migration, runbook, and canonical memory
+- tools used: pnpm, Vitest, Flutter, Dart, ESLint, disposable PostgreSQL, and Linux build tools
+- outcome: one editable sale, suspend/resume, cancellation, recovery, customer attachment, receipt navigation, and automatic next sale passed focused validation
+- reusable pattern observed: operator identity must own active-sale uniqueness across operator session replacement
+- promotion follow-up: none
+
+### 2026-07-29 - UmiPOS checkout and product dialog correction
+- task type: cross-app defect correction
+- request summary: fix the checkout HTTP 500 and the product dialog layout
+- filesystem slice inspected: `apps/umi-api` checkout and `apps/umi-pos` catalog, checkout, and recovery
+- chosen owner: UMI API for checkout authority; UmiPOS for presentation
+- chosen path: direct focused implementation
+- skill or subagent used: `task-router`, `diagnosing-bugs`, `tdd`, `baseline-ui`, `fixing-accessibility`, `webapp-testing`
+- files touched: checkout repository, service and tests; catalog surface and test
+- tools used: Flutter, Vitest, TypeScript, ESLint, curl, PostgreSQL
+- outcome: cash checkout completed; terminal ambiguity stayed query-only; product controls became responsive and contained
+- reusable pattern observed: resolve identity on the worker boundary before a tenant transaction
+- promotion follow-up: none
 
 ### 2026-07-29 - stashed documentation swept back into the tree
 - task type: root workspace documentation reconciliation (stash archaeology)
@@ -628,3 +717,6 @@ Record successful and failed cross-workspace traces here before proposing new re
 - outcome: SQL migration applied live. `search_products_text('horchata cafe')` now returns "Horchata Kafe" with word_similarity score 0.647. Client ranker now gives fuzzy matches score 90 (≥ band threshold). Remaining action: user must set VOYAGE_API_KEY in Supabase edge function secrets to re-enable the semantic stage for synonym-level misses.
 - reusable pattern observed: when a multi-stage search pipeline silently degrades (missing external API key), the intermediate stage (client-side scorer) must also handle fuzzy matching independently — don't assume the SQL and semantic layers are always healthy
 - promotion follow-up: none — fix is localized to conversaflow-functions; the pattern (missing Supabase secret disabling a search tier) is not yet recurrent enough to warrant a new skill
+
+- 2026-07-29: Routed UmiPOS device pairing to `packages/contract`, `umi-api`, `umi-dashboard`, `umi-pos`, and platform migrations. Used `workspace-boundary-check`. Implemented administrator-approved pairing.
+- 2026-08-13: Gate 12 se enrutó a la raíz para certificación transversal. `apps/umi-api` recibió la corrección del healthcheck. `docs/` recibió el cierre y RC3. No se creó un servicio ni una autoridad nueva.

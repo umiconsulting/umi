@@ -21,6 +21,14 @@ export * from './pos-catalog';
 export * from './pos-cart';
 export * from './pos-checkout';
 export * from './pos-offline';
+export * from './pos-sale';
+export * from './pos-cash';
+export * from './pos-exception';
+export * from './pos-inventory';
+export * from './pos-customer-value';
+export * from './pos-hardware';
+export * from './pos-kitchen';
+export * from './dashboard-operations';
 // The generated-artifact manifest: versions, error/route/model/invariant catalogues.
 export * from './catalog';
 // Zero-dep entitlement vocabulary. Also published as '@umi/contract/entitlements'

@@ -53,6 +53,136 @@ export const EnrollmentChallenge = z
   .strict();
 export type EnrollmentChallenge = z.infer<typeof EnrollmentChallenge>;
 
+export const DeviceEnrollmentRequestState = z.enum([
+  'created',
+  'awaiting_approval',
+  'approved',
+  'denied',
+  'credential_ready',
+  'credential_delivered',
+  'completed',
+  'expired',
+  'cancelled',
+]);
+export type DeviceEnrollmentRequestState = z.infer<typeof DeviceEnrollmentRequestState>;
+
+export const DeviceEnrollmentRequestCreated = z
+  .object({
+    enrollmentRequestId: Uuid,
+    setupCode: z.string().regex(/^[A-Z0-9]{8}$/),
+    qrPayload: z.string().min(1).max(512),
+    state: z.literal('created'),
+    expiresAt: IsoTimestamp,
+    pollAfterSeconds: z.number().int().min(1).max(30),
+  })
+  .strict();
+export type DeviceEnrollmentRequestCreated = z.infer<typeof DeviceEnrollmentRequestCreated>;
+
+export const ClaimDevicePairingRequest = z
+  .object({
+    setupCode: z
+      .string()
+      .trim()
+      .regex(/^[A-Z0-9]{8}$/),
+    installationId: Uuid,
+    platform: DevicePlatform,
+    deviceType: DeviceType,
+    ephemeralPublicKey: z.string().trim().min(32).max(2048).nullable().optional(),
+  })
+  .strict();
+export type ClaimDevicePairingRequest = z.infer<typeof ClaimDevicePairingRequest>;
+
+export const DevicePairingSession = z
+  .object({
+    pairingSessionId: Uuid,
+    pollingCredential: z.string().min(43).max(128),
+    state: z.literal('awaiting_approval'),
+    expiresAt: IsoTimestamp,
+    pollAfterSeconds: z.number().int().min(1).max(30),
+  })
+  .strict();
+export type DevicePairingSession = z.infer<typeof DevicePairingSession>;
+
+export const DeviceEnrollmentRequestView = z
+  .object({
+    id: Uuid,
+    merchantId: Uuid,
+    locationId: Uuid.nullable(),
+    displayName: z.string().min(1).max(120),
+    type: DeviceType,
+    platform: DevicePlatform,
+    requestedPlatform: DevicePlatform.nullable(),
+    state: DeviceEnrollmentRequestState,
+    expiresAt: IsoTimestamp,
+    claimedAt: IsoTimestamp.nullable(),
+    installationReference: z
+      .string()
+      .regex(/^[a-f0-9]{16}$/)
+      .nullable(),
+    createdAt: IsoTimestamp,
+  })
+  .strict();
+export type DeviceEnrollmentRequestView = z.infer<typeof DeviceEnrollmentRequestView>;
+
+export const DeviceEnrollmentRequestList = z
+  .object({ requests: z.array(DeviceEnrollmentRequestView).max(200) })
+  .strict();
+export type DeviceEnrollmentRequestList = z.infer<typeof DeviceEnrollmentRequestList>;
+
+export const DecideDeviceEnrollmentRequest = z.object({ idempotencyKey: Uuid }).strict();
+export type DecideDeviceEnrollmentRequest = z.infer<typeof DecideDeviceEnrollmentRequest>;
+
+export const DeviceEnrollmentDecision = z
+  .object({
+    enrollmentRequestId: Uuid,
+    state: z.enum(['credential_ready', 'denied']),
+    decidedAt: IsoTimestamp,
+  })
+  .strict();
+export type DeviceEnrollmentDecision = z.infer<typeof DeviceEnrollmentDecision>;
+
+export const PollDevicePairingRequest = z
+  .object({
+    pollingCredential: z.string().min(43).max(128),
+    installationId: Uuid,
+  })
+  .strict();
+export type PollDevicePairingRequest = z.infer<typeof PollDevicePairingRequest>;
+
+export const DevicePairingPollResponse = z
+  .object({
+    pairingSessionId: Uuid,
+    state: z.enum([
+      'awaiting_approval',
+      'credential_ready',
+      'credential_delivered',
+      'completed',
+      'denied',
+      'expired',
+      'cancelled',
+    ]),
+    expiresAt: IsoTimestamp,
+    pollAfterSeconds: z.number().int().min(1).max(30),
+    device: DeviceSummary.nullable(),
+    credential: z.string().min(43).max(128).nullable(),
+  })
+  .strict();
+export type DevicePairingPollResponse = z.infer<typeof DevicePairingPollResponse>;
+
+export const AcknowledgeDeviceCredentialRequest = PollDevicePairingRequest.extend({
+  deviceCredential: z.string().min(43).max(128),
+}).strict();
+export type AcknowledgeDeviceCredentialRequest = z.infer<typeof AcknowledgeDeviceCredentialRequest>;
+
+export const DevicePairingAcknowledgement = z
+  .object({
+    pairingSessionId: Uuid,
+    state: z.literal('completed'),
+    completedAt: IsoTimestamp,
+  })
+  .strict();
+export type DevicePairingAcknowledgement = z.infer<typeof DevicePairingAcknowledgement>;
+
 export const CompleteDeviceEnrollmentRequest = z
   .object({
     challengeId: Uuid,
@@ -87,6 +217,15 @@ export type ReplaceDeviceRequest = z.infer<typeof ReplaceDeviceRequest>;
 
 export const PosLoginRequest = LoginRequest.extend({ installationId: Uuid }).strict();
 export type PosLoginRequest = z.infer<typeof PosLoginRequest>;
+export const PosPinLoginRequest = z
+  .object({
+    pin: z.string().regex(/^\d{4,8}$/),
+    merchantId: Uuid,
+    locationId: Uuid,
+    installationId: Uuid,
+  })
+  .strict();
+export type PosPinLoginRequest = z.infer<typeof PosPinLoginRequest>;
 export const PosRefreshRequest = z
   .object({ refreshToken: z.string().min(1).max(4096), installationId: Uuid })
   .strict();
@@ -97,23 +236,11 @@ export const PosSessionTokens = z
     refreshToken: z.string().min(1).max(4096),
   })
   .strict();
-/**
- * The session envelope a POS device receives. It EXTENDS the shared browser
- * envelope rather than changing it.
- *
- * The POS needs two facts the dashboard has no use for: which durable session this
- * is (so an operator session can be bound to it and revoked with it) and which
- * device it was issued to. Adding them to the shared `SessionEnvelope` as required
- * fields would have been a breaking change to every dashboard consumer, in service
- * of a client that does not read them. Extending keeps one definition, one author,
- * and puts each field where it is meaningful.
- */
 export const PosSessionEnvelope = SessionEnvelope.extend({
   sessionId: Uuid,
   deviceId: Uuid.nullable(),
 });
 export type PosSessionEnvelope = z.infer<typeof PosSessionEnvelope>;
-
 export const PosSessionResponse = z
   .object({
     session: PosSessionEnvelope,
@@ -187,6 +314,11 @@ export const ManagerApprovalRequest = z
     permission: z.string().min(1).max(100),
     merchantId: Uuid,
     locationId: Uuid,
+    commandFingerprint: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .nullable()
+      .default(null),
   })
   .strict();
 export type ManagerApprovalRequest = z.infer<typeof ManagerApprovalRequest>;
@@ -198,6 +330,11 @@ export const ElevationGrantView = z
     locationId: Uuid,
     method: z.enum(['manager_approval', 'operator_pin']),
     expiresAt: IsoTimestamp,
+    commandFingerprint: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .nullable()
+      .default(null),
   })
   .strict();
 
@@ -208,12 +345,25 @@ export const deviceModels = {
   DeviceSummary,
   BeginDeviceEnrollmentRequest,
   EnrollmentChallenge,
+  DeviceEnrollmentRequestState,
+  DeviceEnrollmentRequestCreated,
+  ClaimDevicePairingRequest,
+  DevicePairingSession,
+  DeviceEnrollmentRequestView,
+  DeviceEnrollmentRequestList,
+  DecideDeviceEnrollmentRequest,
+  DeviceEnrollmentDecision,
+  PollDevicePairingRequest,
+  DevicePairingPollResponse,
+  AcknowledgeDeviceCredentialRequest,
+  DevicePairingAcknowledgement,
   CompleteDeviceEnrollmentRequest,
   DeviceCredentialEnvelope,
   RotateDeviceCredentialRequest,
   RevokeDeviceRequest,
   ReplaceDeviceRequest,
   PosLoginRequest,
+  PosPinLoginRequest,
   PosRefreshRequest,
   PosSessionTokens,
   PosSessionEnvelope,

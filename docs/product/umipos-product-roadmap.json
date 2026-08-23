@@ -1,0 +1,274 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-08-13",
+  "latestRelevantCommit": "HEAD (certificación final de Gate 12; artefactos RC3)",
+  "integrationState": "UMI POS está completo como software con dos P2. RC3 corrige el healthcheck del worker. Gate 13 conserva validación física.",
+  "items": [
+    {
+      "id": "platform-certification",
+      "status": "complete",
+      "dependencies": ["1A", "1B", "1C", "1D", "1E"],
+      "nextObjective": "Maintain certified authority",
+      "blockers": [],
+      "validationState": "Gate 1F certified"
+    },
+    {
+      "id": "2A",
+      "status": "complete",
+      "dependencies": ["platform-certification"],
+      "nextObjective": "Begin device trust and operator experience",
+      "blockers": [],
+      "validationState": "Focused Gate 2A validation passed"
+    },
+    {
+      "id": "2B",
+      "status": "complete",
+      "dependencies": ["2A"],
+      "nextObjective": "Maintain administrator-approved device trust",
+      "blockers": [],
+      "validationState": "Administrator-approved pairing and personal PIN operator entry passed focused contract, API, database, Flutter, and Web validation"
+    },
+    {
+      "id": "2C",
+      "status": "complete",
+      "dependencies": ["2B"],
+      "nextObjective": "Implement branch-aware read-only catalog",
+      "blockers": [],
+      "validationState": "Focused contract, API, migration, Flutter, cache and web validation passed"
+    },
+    {
+      "id": "2D",
+      "status": "complete",
+      "dependencies": ["2C"],
+      "nextObjective": "Maintain authoritative cart preparation",
+      "blockers": [],
+      "validationState": "Focused contract, API, migration, Flutter and web validation passed"
+    },
+    {
+      "id": "2E",
+      "status": "complete",
+      "dependencies": ["2D"],
+      "nextObjective": "Maintain authoritative online checkout",
+      "blockers": [],
+      "validationState": "Focused contract, API, migration, Flutter and web validation passed"
+    },
+    {
+      "id": "2F",
+      "status": "complete_with_documented_limitation",
+      "dependencies": ["2E"],
+      "nextObjective": "Preserve the certified offline authority boundary",
+      "blockers": [],
+      "validationState": "Focused contract, API, Flutter, Web, migration and PostgreSQL negative authorization checks passed; the historical Linux runner observation was resolved during Gate 3A; Web sensitive journal unsupported"
+    },
+    {
+      "id": "3A",
+      "status": "complete",
+      "dependencies": ["2F"],
+      "nextObjective": "Maintain the cashier sale lifecycle",
+      "blockers": [],
+      "validationState": "Focused contract, API, Flutter, accessibility, localization, Linux, and disposable PostgreSQL validation passed"
+    },
+    {
+      "id": "3B",
+      "status": "complete",
+      "dependencies": ["3A"],
+      "nextObjective": "Maintain the advanced checkout lifecycle",
+      "blockers": [],
+      "validationState": "Focused contract, API, Flutter, accessibility, localization, Linux, and disposable PostgreSQL validation passed"
+    },
+    {
+      "id": "3C",
+      "status": "complete",
+      "dependencies": ["3B"],
+      "nextObjective": "Approve the scope of the next commercial POS Gate",
+      "blockers": [],
+      "validationState": "Focused contract, API, Flutter, accessibility, localization, Linux, cash invariants, and disposable PostgreSQL validation passed"
+    },
+    {
+      "id": "3D",
+      "status": "complete",
+      "dependencies": ["3C"],
+      "nextObjective": "Approve Gate 3E inventory synchronization scope",
+      "blockers": [],
+      "validationState": "Focused contract, API, Flutter, accessibility, localization, Linux, Web, refund invariants, and disposable PostgreSQL validation passed"
+    },
+    {
+      "id": "3D.1",
+      "status": "complete",
+      "dependencies": ["3D"],
+      "nextObjective": "Approve Gate 3E inventory synchronization scope",
+      "blockers": [],
+      "validationState": "Pilot permission inventory, grant and approval matrices, deterministic seeds, focused API and Flutter authorization, PostgreSQL, RLS, and PR validation passed"
+    },
+    {
+      "id": "3E",
+      "status": "complete",
+      "dependencies": ["3D.1"],
+      "nextObjective": "Approve Gate 3F customers, loyalty, and stored value scope",
+      "blockers": [
+        "Production inventory thresholds and prepared-product disposition require Owner review"
+      ],
+      "validationState": "Contract, API, Flutter, inventory invariants, concurrency, disposable PostgreSQL, RLS, Linux, Web, and deterministic PR validation passed"
+    },
+    {
+      "id": "3F",
+      "status": "complete",
+      "dependencies": ["3E"],
+      "nextObjective": "Authorize Gate 3G hardware foundations",
+      "blockers": [],
+      "validationState": "Contract, API, Flutter, all 26 real PostgreSQL races, RLS, Linux, Web, and deterministic PR checks passed"
+    },
+    {
+      "id": "3G-A",
+      "status": "complete",
+      "dependencies": ["3F"],
+      "nextObjective": "Authorize Gate 3G-B pilot hardware integration",
+      "blockers": [],
+      "validationState": "Contract, API, Flutter, simulator, recovery, PostgreSQL, RLS, Linux, Web, and deterministic PR checks passed"
+    },
+    {
+      "id": "3G-B",
+      "status": "complete_with_observations",
+      "dependencies": ["3G-A"],
+      "nextObjective": "Authorize Gate 4A KDS operational integration",
+      "blockers": ["Physical pilot hardware validation was unavailable in the current runner"],
+      "validationState": "Generic printer, drawer, scanner, simulator, API, PostgreSQL, RLS, Flutter, Linux, Web, and deterministic PR checks passed"
+    },
+    {
+      "id": "4A",
+      "status": "complete_with_observations",
+      "dependencies": ["3G-B"],
+      "nextObjective": "Authorize Gate 5A Dashboard operational completion",
+      "blockers": [
+        "The Linux runner had no Xcode toolchain for the iPad build and focused Swift tests"
+      ],
+      "validationState": "Existing KDS static review, API, contract, POS status, all 10 real PostgreSQL races, reconnect, PostgreSQL, RLS, and deterministic PR checks passed"
+    },
+    {
+      "id": "5A",
+      "status": "complete",
+      "dependencies": ["4A"],
+      "nextObjective": "Authorize Gate 6A Pilot Deployment and Release Runtime",
+      "blockers": [],
+      "validationState": "Live Dashboard, session, CSRF, API, domain, PostgreSQL, RLS, inventory waste, 24-case authority matrix, P0 walkthrough, and no-mock guard passed"
+    },
+    {
+      "id": "6A",
+      "status": "complete_with_observations",
+      "dependencies": ["5A"],
+      "nextObjective": "Authorize Gate 6B Pilot Operations Kit",
+      "blockers": [
+        "Production DNS, TLS certificates, provider backups, signing tools, and physical devices require external infrastructure"
+      ],
+      "validationState": "Clean deployment, pilot smoke, release builds, migration, RLS, database backup, isolated restore, rollback, upgrade, support redaction, and deterministic PR checks passed"
+    },
+    {
+      "id": "6B",
+      "status": "complete_with_observations",
+      "dependencies": ["6A"],
+      "nextObjective": "Authorize Gate 7A Full End-to-End Operational Certification",
+      "blockers": ["Object storage provider policy remains an external decision"],
+      "validationState": "Clean bootstrap, Dashboard operations, KDS lifecycle, representative roles, smoke, RLS, readiness, and persisted evidence passed"
+    },
+    {
+      "id": "7A",
+      "status": "complete_with_observations",
+      "dependencies": ["6B"],
+      "nextObjective": "Authorize Gate 7B Resilience, Security, and Financial Certification",
+      "blockers": [
+        "Physical hardware, iPad, public infrastructure, providers, and final UX remain external"
+      ],
+      "validationState": "Wallet, gift card, mixed tender, native offline replay, full refund, shift close, Dashboard EOD, exact reconciliation, recovery, and audit passed"
+    },
+    {
+      "id": "7B",
+      "status": "complete_with_observations",
+      "dependencies": ["7A"],
+      "nextObjective": "Authorize Gate 8A POS UX/UI Certification",
+      "blockers": [
+        "Physical hardware, iPad, public infrastructure, providers, and final UX remain external"
+      ],
+      "validationState": "Service failures, revocation, rate limits, RLS, concurrency, 100 sales, exact reconciliation, backup, restore, recovery, and audit passed"
+    },
+    {
+      "id": "8A",
+      "status": "complete_with_observations",
+      "dependencies": ["7B"],
+      "nextObjective": "Authorize Gate 8B Dashboard and KDS UX Certification",
+      "blockers": [
+        "Physical touch, physical peripherals, Xcode/iPad, Owner aesthetics, and provider payment remain external"
+      ],
+      "validationState": "Enrollment, PIN, operator flows, failures, accessibility, localization, responsive layouts, builds, and Design Language V1 passed"
+    },
+    {
+      "id": "8B",
+      "status": "complete_with_observations",
+      "dependencies": ["8A"],
+      "nextObjective": "Authorize Gate 9A Pilot Dry Run",
+      "blockers": [
+        "Physical iPad, physical peripherals, Owner aesthetics, and provider payment remain external"
+      ],
+      "validationState": "Dashboard and KDS workflows, accessibility, responsive layouts, failure states, focused tests, and builds passed"
+    },
+    {
+      "id": "9A",
+      "status": "complete_with_observations",
+      "dependencies": ["8B"],
+      "nextObjective": "Authorize Gate 9B Pilot RC",
+      "blockers": [
+        "Physical iPad, peripherals, object storage, Owner preferences, and provider payment remain external"
+      ],
+      "validationState": "Clean bootstrap, business lifecycle, KDS, restart recovery, reconciliation, support, and readiness passed"
+    },
+    {
+      "id": "9B",
+      "status": "complete_with_observations",
+      "dependencies": ["9A"],
+      "nextObjective": "Authorize Gate 9C Pilot Certification",
+      "blockers": [
+        "Physical iPad, peripherals, enabled object storage, Owner preferences, and provider payment remain external"
+      ],
+      "validationState": "RC build, clean migration, bootstrap, backup, reconciliation, configuration, security, deployment, and rollback passed"
+    },
+    {
+      "id": "9C",
+      "status": "certified_for_controlled_pilot_with_conditions",
+      "dependencies": ["9B"],
+      "nextObjective": "Enter controlled real-world pilot under documented conditions",
+      "blockers": [],
+      "validationState": "RC2 fresh deployment, smoke, business truth, restart, backup, restore, support, boundaries, and activation conditions passed"
+    },
+    {
+      "id": "10",
+      "status": "software_product_complete_with_p2",
+      "dependencies": ["9C"],
+      "nextObjective": "Authorize Gate 11 Owner Knowledge Base and Operational Handoff",
+      "blockers": [],
+      "validationState": "Product inventory, software completion audit, documentation index, glossary, scope ledger, and Gate 13 deferred register completed"
+    },
+    {
+      "id": "11",
+      "status": "complete_with_p2",
+      "dependencies": ["10"],
+      "nextObjective": "Autorizar Gate 12, con la etiqueta formal Final Software Certification & Release Closure",
+      "blockers": [],
+      "validationState": "Base en español, operación, soporte, desarrollo, alcance, FAQ, diagramas y entrega completos"
+    },
+    {
+      "id": "12",
+      "status": "software_complete_with_p2",
+      "dependencies": ["11"],
+      "nextObjective": "Esperar Gate 13 hasta que existan hardware y un entorno real",
+      "blockers": [],
+      "validationState": "RC3, builds, pruebas, migración, reconciliación, recuperación y documentación pasaron"
+    },
+    {
+      "id": "13",
+      "status": "deferred_until_hardware_exists",
+      "dependencies": ["12", "hardware_availability"],
+      "nextObjective": "Run physical hardware, provider, network, and real-world certification",
+      "blockers": ["Hardware and real-world environment are not available"],
+      "validationState": "Deferred by Owner roadmap decision; does not block Gates 10 through 12"
+    }
+  ]
+}

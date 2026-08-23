@@ -19,38 +19,62 @@ const FULL = {
 describe('JwtService', () => {
   it('signs and verifies an access token round-trip', async () => {
     const svc = jwtWith(FULL);
-    const token = await svc.signAccess({ sub: 'u1', email: 'a@b.co' });
+    const token = await svc.signAccess({
+      sub: 'u1',
+      email: 'a@b.co',
+      sessionId: 's1',
+      deviceId: null,
+    });
     const claims = await svc.verifyAccess(token);
-    expect(claims).toEqual({ sub: 'u1', email: 'a@b.co' });
+    expect(claims).toEqual({
+      sub: 'u1',
+      email: 'a@b.co',
+      sessionId: 's1',
+      deviceId: null,
+    });
   });
 
   it('signs and verifies a refresh token round-trip', async () => {
     const svc = jwtWith(FULL);
-    const token = await svc.signRefresh('u9');
-    expect(await svc.verifyRefresh(token)).toBe('u9');
+    const token = await svc.signRefresh('u9', 's9');
+    expect(await svc.verifyRefresh(token)).toEqual({ sub: 'u9', sessionId: 's9' });
     expect(svc.refreshExpiresAt(token).getTime()).toBeGreaterThan(Date.now());
   });
 
-  it('makes two refresh tokens for one user distinct', async () => {
+  it('gives each refresh token a distinct identity', async () => {
     const svc = jwtWith(FULL);
-    expect(await svc.signRefresh('u9')).not.toBe(await svc.signRefresh('u9'));
+    const first = await svc.signRefresh('u9', 's9');
+    const second = await svc.signRefresh('u9', 's9');
+    expect(second).not.toBe(first);
   });
 
   it('rejects an access token presented as a refresh token (kind mismatch)', async () => {
     const svc = jwtWith(FULL);
-    const access = await svc.signAccess({ sub: 'u1', email: 'a@b.co' });
+    const access = await svc.signAccess({
+      sub: 'u1',
+      email: 'a@b.co',
+      sessionId: 's1',
+      deviceId: null,
+    });
     await expect(svc.verifyRefresh(access)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('rejects a token signed with a different secret', async () => {
     const a = jwtWith(FULL);
     const b = jwtWith({ ...FULL, JWT_SECRET: 'a-totally-different-secret-value' });
-    const token = await a.signAccess({ sub: 'u1', email: 'a@b.co' });
+    const token = await a.signAccess({
+      sub: 'u1',
+      email: 'a@b.co',
+      sessionId: 's1',
+      deviceId: null,
+    });
     await expect(b.verifyAccess(token)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('throws a config error (not 401) when JWT_SECRET is missing', async () => {
     const svc = jwtWith({ JWT_ACCESS_TTL: '15m', JWT_REFRESH_TTL: '30d' });
-    await expect(svc.signAccess({ sub: 'u1', email: 'a@b.co' })).rejects.toThrow(/JWT_SECRET/);
+    await expect(
+      svc.signAccess({ sub: 'u1', email: 'a@b.co', sessionId: 's1', deviceId: null }),
+    ).rejects.toThrow(/JWT_SECRET/);
   });
 });

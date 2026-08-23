@@ -13,25 +13,23 @@ import { AuthGuard } from '../auth/auth.guard';
 import { MerchantAccessGuard } from '../auth/merchant-access.guard';
 import { EntitlementGuard } from '../auth/entitlement.guard';
 import { RequireProduct } from '../auth/require-product.decorator';
+import { RequirePermission } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 import { CurrentUser, Merchant } from '../auth/current-user.decorator';
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
 import { KdsService } from './kds.service';
+import { KdsLocationGuard } from './kds-location.guard';
 
-/**
- * Owner-facing KDS surface the dashboard SPA calls
- * (`/api/merchants/:merchantId/kds/*`). Cookie-authed + membership-checked +
- * `kds`-entitlement gated by the shared guard stack (same trust model as the
- * cash admin routes — no extra per-action permission). This replaces the legacy
- * `server.js` `callKdsPairingBackend` proxy: it dispatches to the in-process
- * `KdsService` directly. All routes honor `?locationId=`.
- */
-@UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard)
+/** The Dashboard uses this permission-controlled KDS surface. */
+@UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard, RolesGuard, KdsLocationGuard)
 @RequireProduct('kds')
+@RequirePermission('kitchen.read')
 @Controller('api/merchants/:merchantId/kds')
 export class KdsDashboardController {
   constructor(private readonly kds: KdsService) {}
 
   @Get('devices')
+  @RequirePermission('kitchen.diagnostics')
   listDevices(@Merchant() t: MerchantAccess, @Query('locationId') locationId?: string) {
     return this.kds.listDevicesForDashboard(t.merchantId, locationId ?? null);
   }
@@ -51,11 +49,13 @@ export class KdsDashboardController {
   }
 
   @Get('stations')
+  @RequirePermission('kitchen.station.read')
   listStations(@Merchant() t: MerchantAccess, @Query('locationId') locationId?: string) {
     return this.kds.listStationsForDashboard(t.merchantId, locationId ?? null);
   }
 
   @Post('stations')
+  @RequirePermission('kitchen.station.manage')
   createStation(
     @Merchant() t: MerchantAccess,
     @Body() body: Record<string, unknown>,
@@ -65,6 +65,7 @@ export class KdsDashboardController {
   }
 
   @Patch('stations/:stationId')
+  @RequirePermission('kitchen.station.manage')
   updateStation(
     @Merchant() t: MerchantAccess,
     @Param('stationId') stationId: string,
@@ -74,17 +75,46 @@ export class KdsDashboardController {
   }
 
   @Delete('stations/:stationId')
+  @RequirePermission('kitchen.station.manage')
   archiveStation(@Merchant() t: MerchantAccess, @Param('stationId') stationId: string) {
     return this.kds.archiveStation(t.merchantId, stationId);
   }
 
+  @Get('routes')
+  @RequirePermission('kitchen.station.read')
+  listRoutes(@Merchant() t: MerchantAccess, @Query('locationId') locationId?: string) {
+    return this.kds.listRoutes(t.merchantId, locationId ?? null);
+  }
+
+  @Post('routes')
+  @RequirePermission('kitchen.station.manage')
+  createRoute(
+    @Merchant() t: MerchantAccess,
+    @Query('locationId') locationId: string | undefined,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.kds.createRoute(t.merchantId, locationId ?? null, body);
+  }
+
+  @Patch('routes/:routeId')
+  @RequirePermission('kitchen.station.manage')
+  updateRoute(
+    @Merchant() t: MerchantAccess,
+    @Param('routeId') routeId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.kds.updateRoute(t.merchantId, routeId, body);
+  }
+
   @Get('devices/pairing')
+  @RequirePermission('kitchen.station.manage')
   listPairings(@Merchant() t: MerchantAccess, @Query('locationId') locationId?: string) {
     return this.kds.listPairingsForDashboard(t.merchantId, locationId ?? null);
   }
 
-  // provision + pairing-pin both create a pairing PIN (the SPA's "add device").
+  // Both routes create one pairing PIN.
   @Post('devices/provision')
+  @RequirePermission('kitchen.station.manage')
   provision(
     @Merchant() t: MerchantAccess,
     @Body() body: Record<string, unknown>,
@@ -94,6 +124,7 @@ export class KdsDashboardController {
   }
 
   @Post('devices/pairing-pin')
+  @RequirePermission('kitchen.station.manage')
   pairingPin(
     @Merchant() t: MerchantAccess,
     @Body() body: Record<string, unknown>,
@@ -103,6 +134,7 @@ export class KdsDashboardController {
   }
 
   @Post('devices/pairing/:pairingId/approve')
+  @RequirePermission('kitchen.station.manage')
   approvePairing(
     @Merchant() t: MerchantAccess,
     @CurrentUser() user: AuthUser,
@@ -112,11 +144,13 @@ export class KdsDashboardController {
   }
 
   @Post('devices/pairing/:pairingId/deny')
+  @RequirePermission('kitchen.station.manage')
   denyPairing(@Merchant() t: MerchantAccess, @Param('pairingId') pairingId: string) {
     return this.kds.denyPairing(t.merchantId, pairingId);
   }
 
   @Patch('devices/:deviceId')
+  @RequirePermission('kitchen.station.manage')
   updateDevice(
     @Merchant() t: MerchantAccess,
     @Param('deviceId') deviceId: string,
@@ -126,11 +160,13 @@ export class KdsDashboardController {
   }
 
   @Post('devices/:deviceId/revoke')
+  @RequirePermission('kitchen.station.manage')
   revokeDevice(@Merchant() t: MerchantAccess, @Param('deviceId') deviceId: string) {
     return this.kds.revokeDevice(t.merchantId, deviceId);
   }
 
   @Post('orders/:ticketId/transition')
+  @RequirePermission('kitchen.recall')
   transition(
     @Merchant() t: MerchantAccess,
     @CurrentUser() user: AuthUser,
@@ -141,19 +177,16 @@ export class KdsDashboardController {
   }
 }
 
-/**
- * Legacy alias surface (`/api/:merchantRef/admin/devices`, `/orders`,
- * `/orders/:ticketId/transition`) so the dashboard's `/api/:merchantRef/admin/*`
- * device/order calls stop 404ing. Same service, same guard stack; reference→merchantId
- * is resolved by MerchantAccessGuard.
- */
-@UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard)
+/** These aliases keep the current Dashboard routes operational. */
+@UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard, RolesGuard, KdsLocationGuard)
 @RequireProduct('kds')
+@RequirePermission('kitchen.read')
 @Controller('api/:merchantRef/admin')
 export class KdsAdminController {
   constructor(private readonly kds: KdsService) {}
 
   @Get('devices')
+  @RequirePermission('kitchen.diagnostics')
   listDevices(@Merchant() t: MerchantAccess, @Query('locationId') locationId?: string) {
     return this.kds.listDevicesForDashboard(t.merchantId, locationId ?? null);
   }
@@ -168,6 +201,7 @@ export class KdsAdminController {
   }
 
   @Post('orders/:ticketId/transition')
+  @RequirePermission('kitchen.recall')
   transition(
     @Merchant() t: MerchantAccess,
     @CurrentUser() user: AuthUser,

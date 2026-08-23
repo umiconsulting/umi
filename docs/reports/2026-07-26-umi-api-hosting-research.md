@@ -1,6 +1,6 @@
 # Umi API hosting research: VPS, Railway, or Cloudflare
 
-**Date:** 2026-07-26  
+**Date:** 2026-07-26
 **Status:** Evidence report. This report does not change the accepted architecture.
 
 ## Executive finding

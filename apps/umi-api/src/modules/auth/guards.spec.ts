@@ -56,12 +56,52 @@ describe('AuthGuard', () => {
   it('attaches the principal from a valid cookie', async () => {
     (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     const jwt = {
-      verifyAccess: vi.fn().mockResolvedValue({ sub: 'u1', email: 'a@b.co' }),
+      verifyAccess: vi.fn().mockResolvedValue({
+        sub: 'u1',
+        email: 'a@b.co',
+        sessionId: 'session-1',
+        deviceId: null,
+      }),
     };
     const guard = new AuthGuard(jwt as never, reflector, noRegisterToken());
     const req: Record<string, unknown> = { cookies: { umi_access: 'tok' } };
     expect(await guard.canActivate(ctxFor(req))).toBe(true);
-    expect(req.authUser).toEqual({ id: 'u1', email: 'a@b.co' });
+    expect(req.authUser).toEqual({
+      id: 'u1',
+      email: 'a@b.co',
+      sessionId: 'session-1',
+      deviceId: null,
+      commandContextType: 'dashboard_administrative',
+    });
+  });
+
+  it('carries the session and device identity onto the request, with no database read', async () => {
+    // A dashboard access token is valid for its own TTL; revocation takes effect
+    // at the next refresh, where the family is checked and rotated (AB#114).
+    // The guard therefore consults no repository — the POS reads `sessionId`
+    // and `deviceId` straight off the claims.
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+    const guard = new AuthGuard(
+      {
+        verifyAccess: vi.fn().mockResolvedValue({
+          sub: 'u1',
+          email: 'a@b.co',
+          sessionId: 'session-1',
+          deviceId: null,
+        }),
+      } as never,
+      reflector,
+      noRegisterToken(),
+    );
+    const req = { cookies: { umi_access: 'tok' } } as never;
+    await expect(guard.canActivate(ctxFor(req))).resolves.toBe(true);
+    expect((req as { authUser?: unknown }).authUser).toEqual({
+      id: 'u1',
+      email: 'a@b.co',
+      sessionId: 'session-1',
+      deviceId: null,
+      commandContextType: 'dashboard_administrative',
+    });
   });
 });
 
@@ -97,6 +137,29 @@ describe('MerchantAccessGuard', () => {
     expect(await guard.canActivate(ctxFor(req))).toBe(true);
     expect(repo.merchantIdForHandle).toHaveBeenCalledWith('kala');
     expect((req.merchantAccess as { role: string }).role).toBe('owner');
+  });
+
+  it('resolves the merchant and location from a POS request body', async () => {
+    const repo = {
+      merchantIdForHandle: vi.fn(),
+      findMembershipAccess: vi.fn().mockResolvedValue({
+        membershipId: 'm1',
+        merchantId: ACCESS,
+        handle: 'kala',
+        name: 'Kala',
+        timezone: 'America/Mexico_City',
+        roles: ['staff'],
+        permissions: ['pos.use'],
+      }),
+    };
+    const guard = new MerchantAccessGuard(repo as never);
+    const req: Record<string, unknown> = {
+      authUser: { id: 'u1' },
+      params: {},
+      body: { merchantId: ACCESS, locationId: ACCESS },
+    };
+    expect(await guard.canActivate(ctxFor(req))).toBe(true);
+    expect(repo.findMembershipAccess).toHaveBeenCalledWith('u1', ACCESS);
   });
 });
 
