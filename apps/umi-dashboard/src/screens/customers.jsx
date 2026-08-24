@@ -1,8 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { I } from '@/icons.jsx';
 import { XSep } from '@/shell.jsx';
-import { useCustomerDetail, useCustomerInsights, useCustomersData } from '@/data.jsx';
+import {
+  creditLoyaltySeals,
+  useCustomerDetail,
+  useCustomerInsights,
+  useCustomersData,
+} from '@/data.jsx';
 
 const FILTERS = [
   { id: '', label: 'Todos' },
@@ -335,7 +340,100 @@ function OrdersList({ orders }) {
   );
 }
 
-function LoyaltyPanel({ cash }) {
+function SealsDialog({ account, onClose, onCredited }) {
+  const [seals, setSeals] = useState(1);
+  const [note, setNote] = useState('');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState(null);
+  const count = Number(seals);
+  const valid = Number.isInteger(count) && count >= 1 && count <= 50;
+  // One random nonce per dialog, composed with the intent (card + amount) into the
+  // idempotency key: a retry of the same amount reuses the key so a credit that
+  // commits but loses its response lands once, while a corrected amount yields a new
+  // key so it is a new credit, not a deduped no-op.
+  const nonce = useMemo(() => crypto.randomUUID(), []);
+  const idempotencyKey = `${nonce}:${account.loyaltyCardId}:${count}`;
+
+  async function submit() {
+    if (!valid || pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      await creditLoyaltySeals({
+        cardId: account.loyaltyCardId,
+        seals: count,
+        note: note.trim(),
+        idempotencyKey,
+      });
+      onCredited();
+    } catch (err) {
+      setError(err?.message || 'No se pudieron acreditar los sellos.');
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section
+        className="card modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Agregar sellos"
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Agregar sellos</h3>
+            <p style={{ color: 'var(--ink-3)' }}>
+              Acredita sellos a la tarjeta {account.cardNumber || 'de lealtad'}. Úsalo para poner al
+              día a un cliente que llega de otro programa.
+            </p>
+          </div>
+          <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
+            ×
+          </button>
+        </div>
+        <label style={{ display: 'block', marginTop: 12 }}>
+          <span>Sellos (1–50)</span>
+          <input
+            type="number"
+            min={1}
+            max={50}
+            value={seals}
+            onChange={(event) => setSeals(event.target.value)}
+            disabled={pending}
+          />
+        </label>
+        <label style={{ display: 'block', marginTop: 12 }}>
+          <span>Nota (opcional)</span>
+          <input
+            type="text"
+            maxLength={200}
+            value={note}
+            placeholder="p. ej. migración de cartón físico"
+            onChange={(event) => setNote(event.target.value)}
+            disabled={pending}
+          />
+        </label>
+        {error && (
+          <p className="danger-state" style={{ marginTop: 12 }}>
+            {error}
+          </p>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+          <button className="btn btn-secondary" type="button" onClick={onClose} disabled={pending}>
+            Cancelar
+          </button>
+          <button className="btn" type="button" onClick={submit} disabled={!valid || pending}>
+            {pending ? 'Acreditando…' : `Acreditar ${valid ? count : ''} sellos`}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function LoyaltyPanel({ cash, onCredited }) {
+  const [showSeals, setShowSeals] = useState(false);
   if (!cash?.available)
     return (
       <EmptyState
@@ -353,26 +451,48 @@ function LoyaltyPanel({ cash }) {
         detail="This customer does not have an active loyalty account yet."
       />
     );
+
+  function credited() {
+    setShowSeals(false);
+    onCredited?.();
+  }
+
   return (
-    <div className="loyalty-grid">
-      <Metric
-        label="Wallet balance"
-        value={account.balance || '$0.00'}
-        note={account.cardNumber || 'No card'}
-        icon={<I.Wallet size={18} />}
-      />
-      <Metric
-        label="Total visits"
-        value={account.totalVisits || 0}
-        note={`${account.visitsThisCycle || 0} this cycle`}
-        icon={<I.Stamp size={18} />}
-      />
-      <Metric
-        label="Pending rewards"
-        value={account.pendingRewards || 0}
-        note={account.status || 'loyalty'}
-        icon={<I.Gift size={18} />}
-      />
+    <div className="loyalty-panel">
+      <div className="loyalty-grid">
+        <Metric
+          label="Wallet balance"
+          value={account.balance || '$0.00'}
+          note={account.cardNumber || 'No card'}
+          icon={<I.Wallet size={18} />}
+        />
+        <Metric
+          label="Total visits"
+          value={account.totalVisits || 0}
+          note={`${account.visitsThisCycle || 0} this cycle`}
+          icon={<I.Stamp size={18} />}
+        />
+        <Metric
+          label="Pending rewards"
+          value={account.pendingRewards || 0}
+          note={account.status || 'loyalty'}
+          icon={<I.Gift size={18} />}
+        />
+      </div>
+      {account.loyaltyCardId && (
+        <div style={{ marginTop: 12 }}>
+          <button
+            className="btn btn-secondary btn-sm"
+            type="button"
+            onClick={() => setShowSeals(true)}
+          >
+            <I.Plus size={14} /> Agregar sellos
+          </button>
+        </div>
+      )}
+      {showSeals && (
+        <SealsDialog account={account} onClose={() => setShowSeals(false)} onCredited={credited} />
+      )}
     </div>
   );
 }
@@ -463,7 +583,8 @@ function EmptyState({ icon, title, detail }) {
 
 function CustomerProfile({ customerId }) {
   const [tab, setTab] = useState('overview');
-  const { data, loading, error } = useCustomerDetail(customerId);
+  const [refresh, setRefresh] = useState(0);
+  const { data, loading, error } = useCustomerDetail(customerId, refresh);
   const customer = data?.customer;
 
   if (!customerId) {
@@ -588,7 +709,9 @@ function CustomerProfile({ customerId }) {
         )}
         {activeTab === 'whatsapp' && <ConversationList conversations={data?.conversations || []} />}
         {activeTab === 'orders' && <OrdersList orders={data?.orders || []} />}
-        {activeTab === 'loyalty' && <LoyaltyPanel cash={data?.cash} />}
+        {activeTab === 'loyalty' && (
+          <LoyaltyPanel cash={data?.cash} onCredited={() => setRefresh((n) => n + 1)} />
+        )}
         {activeTab === 'notes' && (
           <Timeline items={(data?.timeline || []).filter((item) => item.type === 'memory')} />
         )}

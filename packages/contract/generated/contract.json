@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "43d0ecc22959256bde000001b16fa700f3b0dae4058f33ccd9547077c45d86e9",
-  "contractVersion": "2.12.0",
+  "contentHash": "f4ca66cde5633f4deb0f9676263f42f48a6ef56e5a992eda4dd4d83b9b905e63",
+  "contractVersion": "2.13.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -65957,6 +65957,34 @@
       ],
       "type": "object"
     },
+    "ScanSealsRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "cardId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "maxLength": 200,
+          "minLength": 8,
+          "type": "string"
+        },
+        "note": {
+          "maxLength": 200,
+          "type": "string"
+        },
+        "seals": {
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cardId",
+        "seals"
+      ],
+      "type": "object"
+    },
     "SessionApplication": {
       "enum": [
         "dashboard",
@@ -74175,6 +74203,23 @@
       "permission": null,
       "pin": false,
       "request": "ScanRequest",
+      "response": null
+    },
+    "POST /api/:merchantRef/admin/scan/seals": {
+      "approval": false,
+      "auth": "session",
+      "errors": [
+        "VALIDATION_FAILED",
+        "PERMISSION_DENIED",
+        "RESOURCE_NOT_FOUND"
+      ],
+      "idempotent": true,
+      "locationContext": false,
+      "merchantContext": true,
+      "offline": false,
+      "permission": null,
+      "pin": false,
+      "request": "ScanSealsRequest",
       "response": null
     },
     "POST /api/:merchantRef/admin/staff": {

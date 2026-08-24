@@ -14,7 +14,7 @@ export function resolveDashboardBuildConfig(env) {
     VITE_RELEASE_BUILD_TIMESTAMP: env.VERCEL_BUILD_TIMESTAMP
       ? new Date(Number(env.VERCEL_BUILD_TIMESTAMP)).toISOString()
       : new Date().toISOString(),
-    VITE_CONTRACT_VERSION: '2.12.0',
+    VITE_CONTRACT_VERSION: '2.13.0',
     VITE_CONFIG_SCHEMA_VERSION: '1',
   };
 }

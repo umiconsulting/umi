@@ -566,6 +566,29 @@ async function deleteStaffMember(id) {
   return _apiFetch(routes.staff.remove(merchantId, id), { method: 'DELETE' });
 }
 
+// Credit several loyalty stamps to one card at once — the catch-up an operator does
+// for a customer migrated from another loyalty program (the recurring "Agregar sellos"
+// case). Writes merchant.loyalty_visit through the SAME endpoint the register uses;
+// the merchant UUID is a valid `:merchantRef`. The server caps `seals` at 50 and the
+// role guard already limits who may bulk-credit.
+//
+// The caller OWNS `idempotencyKey` and keeps it stable across retries: a credit that
+// commits but loses its response must land once, not twice, when the operator clicks
+// again. A fresh key per click would double-credit a money-adjacent balance.
+async function creditLoyaltySeals({ cardId, seals, note, idempotencyKey }) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(routes.cash.byRef.scanSeals(merchantId), {
+    method: 'POST',
+    body: JSON.stringify({
+      cardId,
+      seals,
+      note: note || undefined,
+      idempotencyKey: idempotencyKey || crypto.randomUUID(),
+    }),
+  });
+}
+
 // Build a merchant-scoped API path with the active location as `?locationId`.
 // Centralizes the localStorage merchant/location lookup + missing-merchant guard
 // that every KDS mutation shares.
@@ -1038,6 +1061,9 @@ export {
   createStaffMember,
   updateStaffMember,
   deleteStaffMember,
+  // Data-module function, not a component. Keeps the react-refresh baseline flat.
+  // eslint-disable-next-line react-refresh/only-export-components
+  creditLoyaltySeals,
   provisionDevice,
   generateDevicePairingPin,
   createPosEnrollmentRequest,

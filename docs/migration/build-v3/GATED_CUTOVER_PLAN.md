@@ -510,6 +510,19 @@ acknowledged gap. The holder of the bootstrap role has no enrolled MFA. This che
 active holder. AB#115 was the register-side half of this; it is DECIDED (below). The
 bootstrap-holder enrolment itself is the D12 row, and it is not blocked on anything.
 
+**D12 mechanism proven on the rehearsal (2026-08-23).** Enrolled `hola@umiconsulting.co` in
+`email_otp` on `umi_merge_rehearsal` (schema `build-v3-48`): the security gate's platform-MFA row
+flips WARN→**PASS** and the gate reports **49 structural / 0 acknowledged gaps / 0 unmeasured**.
+The full two-step login was exercised against a booted API on that clone — `POST
+/api/auth/local/login` returns `{mfaRequired, method:'email_otp', challengeToken}` and no session,
+and `POST /api/auth/local/mfa/verify` returns `201` with the access/refresh cookies. The rehearsal
+credential and OTP rows were reverted; the enrolment stays. **Two things this does NOT close:**
+(a) the cutover backfill leaves `umi.user.mfa_method` NULL (it is a build-v3 column with no prod
+source), so the **production** enrolment is a post-flip owner step through the dashboard, and it
+needs live SMTP (Brevo) so the code actually mails to the holder; (b) `email_otp` satisfies the
+gate's SQL but not PCI DSS 8.4.1 — `totp` is the compliant method and is not shipped yet
+(`mfa.service.ts` is shaped for it; only `issueChallenge`/`verifyCode` change).
+
 **What remains for P7:**
 
 1. Move and validate the APNs, WWDR, Apple signer, and Google service-account secrets under D9.

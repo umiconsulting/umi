@@ -64,6 +64,7 @@ export const routes = {
     // surfaces call; not an exhaustive mirror of every GET.
     byRef: {
       scan: (ref: string): string => buildPath('cash.byRef.scan', { merchantRef: ref }),
+      scanSeals: (ref: string): string => buildPath('cash.byRef.scanSeals', { merchantRef: ref }),
       topup: (ref: string): string => buildPath('cash.byRef.topup', { merchantRef: ref }),
       purchase: (ref: string): string => buildPath('cash.byRef.purchase', { merchantRef: ref }),
       giftCards: (ref: string): string => buildPath('cash.byRef.giftCards', { merchantRef: ref }),
