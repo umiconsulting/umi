@@ -21,7 +21,8 @@ function RegisterMemberDialog({ onClose, onRegistered }) {
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const digits = national.replace(/\D/g, '');
-  const valid = name.trim().length >= 2 && digits.length >= 6 && /^\d{4}-\d{2}-\d{2}$/.test(birthDate);
+  const valid =
+    name.trim().length >= 2 && digits.length >= 6 && /^\d{4}-\d{2}-\d{2}$/.test(birthDate);
 
   async function submit() {
     if (!valid || pending) return;
@@ -39,11 +40,18 @@ function RegisterMemberDialog({ onClose, onRegistered }) {
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="card modal-card" role="dialog" aria-modal="true" aria-label="Registrar miembro">
+      <section
+        className="card modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Registrar miembro"
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
             <h3 style={{ margin: 0 }}>Registrar miembro</h3>
-            <p style={{ color: 'var(--ink-3)' }}>Inscribe a un cliente en el programa de lealtad.</p>
+            <p style={{ color: 'var(--ink-3)' }}>
+              Inscribe a un cliente en el programa de lealtad.
+            </p>
           </div>
           <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
             ×
@@ -52,7 +60,8 @@ function RegisterMemberDialog({ onClose, onRegistered }) {
         {result ? (
           <div style={{ marginTop: 16 }}>
             <p>
-              {result.message || 'Miembro registrado.'} Tarjeta: <strong>{result.cardNumber}</strong>.
+              {result.message || 'Miembro registrado.'} Tarjeta:{' '}
+              <strong>{result.cardNumber}</strong>.
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
               <button className="btn" type="button" onClick={onClose}>
@@ -64,7 +73,13 @@ function RegisterMemberDialog({ onClose, onRegistered }) {
           <>
             <label style={{ display: 'block', marginTop: 12 }}>
               <span>Nombre</span>
-              <input type="text" maxLength={100} value={name} onChange={(e) => setName(e.target.value)} disabled={pending} />
+              <input
+                type="text"
+                maxLength={100}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={pending}
+              />
             </label>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <select value={dial} onChange={(e) => setDial(e.target.value)} disabled={pending}>
@@ -85,7 +100,12 @@ function RegisterMemberDialog({ onClose, onRegistered }) {
             </div>
             <label style={{ display: 'block', marginTop: 12 }}>
               <span>Fecha de nacimiento</span>
-              <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} disabled={pending} />
+              <input
+                type="date"
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                disabled={pending}
+              />
             </label>
             {error && (
               <p className="danger-state" style={{ marginTop: 12 }}>
@@ -93,7 +113,12 @@ function RegisterMemberDialog({ onClose, onRegistered }) {
               </p>
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-              <button className="btn btn-secondary" type="button" onClick={onClose} disabled={pending}>
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={onClose}
+                disabled={pending}
+              >
                 Cancelar
               </button>
               <button className="btn" type="button" onClick={submit} disabled={!valid || pending}>
@@ -126,7 +151,12 @@ const MembersScreen = () => {
     return () => clearTimeout(t);
   }, [search]);
 
-  const { data: result, loading } = useMembersData({ page, search: debouncedSearch, sort, refresh });
+  const { data: result, loading } = useMembersData({
+    page,
+    search: debouncedSearch,
+    sort,
+    refresh,
+  });
   const customers = (result && result.customers) || [];
   const total = (result && result.total) || 0;
   const totalPages = (result && result.totalPages) || 1;

@@ -32,7 +32,12 @@ function RedeemGiftCardDialog({ onClose, onRedeemed }) {
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="card modal-card" role="dialog" aria-modal="true" aria-label="Canjear tarjeta de regalo">
+      <section
+        className="card modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Canjear tarjeta de regalo"
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
             <h3 style={{ margin: 0 }}>Canjear tarjeta de regalo</h3>
@@ -57,10 +62,20 @@ function RedeemGiftCardDialog({ onClose, onRedeemed }) {
           <>
             <label style={{ display: 'block', marginTop: 12 }}>
               <span>Código</span>
-              <input type="text" value={code} onChange={(e) => setCode(e.target.value)} disabled={pending} placeholder="XXXX-XXXX-…" />
+              <input
+                type="text"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                disabled={pending}
+                placeholder="XXXX-XXXX-…"
+              />
             </label>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <select value={channel} onChange={(e) => setChannel(e.target.value)} disabled={pending}>
+              <select
+                value={channel}
+                onChange={(e) => setChannel(e.target.value)}
+                disabled={pending}
+              >
                 <option value="phone">Teléfono</option>
                 <option value="email">Email</option>
               </select>
@@ -79,7 +94,12 @@ function RedeemGiftCardDialog({ onClose, onRedeemed }) {
               </p>
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-              <button className="btn btn-secondary" type="button" onClick={onClose} disabled={pending}>
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={onClose}
+                disabled={pending}
+              >
                 Cancelar
               </button>
               <button className="btn" type="button" onClick={submit} disabled={!valid || pending}>
@@ -130,11 +150,18 @@ function IssueGiftCardDialog({ onClose, onIssued }) {
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="card modal-card" role="dialog" aria-modal="true" aria-label="Emitir tarjeta de regalo">
+      <section
+        className="card modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Emitir tarjeta de regalo"
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
             <h3 style={{ margin: 0 }}>Emitir tarjeta de regalo</h3>
-            <p style={{ color: 'var(--ink-3)' }}>La API genera el código; se muestra una sola vez.</p>
+            <p style={{ color: 'var(--ink-3)' }}>
+              La API genera el código; se muestra una sola vez.
+            </p>
           </div>
           <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
             ×
@@ -143,7 +170,9 @@ function IssueGiftCardDialog({ onClose, onIssued }) {
 
         {issued ? (
           <div style={{ marginTop: 16 }}>
-            <p>Tarjeta emitida por {issued.amountMXN || `$${pesos}`}. Entrega este código al cliente:</p>
+            <p>
+              Tarjeta emitida por {issued.amountMXN || `$${pesos}`}. Entrega este código al cliente:
+            </p>
             <div
               style={{
                 fontSize: 28,
@@ -179,10 +208,20 @@ function IssueGiftCardDialog({ onClose, onIssued }) {
             </label>
             <label style={{ display: 'block', marginTop: 12 }}>
               <span>Nombre del destinatario (opcional)</span>
-              <input type="text" maxLength={100} value={recipientName} onChange={(e) => setRecipientName(e.target.value)} disabled={pending} />
+              <input
+                type="text"
+                maxLength={100}
+                value={recipientName}
+                onChange={(e) => setRecipientName(e.target.value)}
+                disabled={pending}
+              />
             </label>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <select value={channel} onChange={(e) => setChannel(e.target.value)} disabled={pending}>
+              <select
+                value={channel}
+                onChange={(e) => setChannel(e.target.value)}
+                disabled={pending}
+              >
                 <option value="email">Email</option>
                 <option value="phone">Teléfono</option>
               </select>
@@ -197,11 +236,23 @@ function IssueGiftCardDialog({ onClose, onIssued }) {
             </div>
             <label style={{ display: 'block', marginTop: 12 }}>
               <span>De parte de (opcional)</span>
-              <input type="text" maxLength={100} value={senderName} onChange={(e) => setSenderName(e.target.value)} disabled={pending} />
+              <input
+                type="text"
+                maxLength={100}
+                value={senderName}
+                onChange={(e) => setSenderName(e.target.value)}
+                disabled={pending}
+              />
             </label>
             <label style={{ display: 'block', marginTop: 12 }}>
               <span>Mensaje (opcional)</span>
-              <input type="text" maxLength={300} value={message} onChange={(e) => setMessage(e.target.value)} disabled={pending} />
+              <input
+                type="text"
+                maxLength={300}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                disabled={pending}
+              />
             </label>
             {error && (
               <p className="danger-state" style={{ marginTop: 12 }}>
@@ -209,7 +260,12 @@ function IssueGiftCardDialog({ onClose, onIssued }) {
               </p>
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-              <button className="btn btn-secondary" type="button" onClick={onClose} disabled={pending}>
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={onClose}
+                disabled={pending}
+              >
                 Cancelar
               </button>
               <button className="btn" type="button" onClick={submit} disabled={!valid || pending}>
@@ -238,7 +294,14 @@ const GiftCardsScreen = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 16,
+        }}
+      >
         <RegionHead
           title="Tarjetas de regalo"
           note={loading ? 'Cargando…' : 'Emitidas desde Umi Cash.'}

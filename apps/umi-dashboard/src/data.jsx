@@ -892,7 +892,14 @@ function useGiftCardsData(opts) {
 // (`admin/gift-cards`, staff-guarded); the merchant UUID is a valid `:merchantRef`.
 // The clear code comes back ONCE, in the response — it is never stored in clear and
 // never returned by a later read, so the caller must show it to the operator now.
-async function issueGiftCard({ amountCentavos, recipientName, recipientEmail, recipientPhone, senderName, message }) {
+async function issueGiftCard({
+  amountCentavos,
+  recipientName,
+  recipientEmail,
+  recipientPhone,
+  senderName,
+  message,
+}) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
   if (!merchantId) throw new Error('No active merchant selected');
   return _apiFetch(routes.cash.byRef.giftCards(merchantId), {

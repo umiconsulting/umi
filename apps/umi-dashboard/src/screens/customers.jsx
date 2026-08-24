@@ -465,7 +465,12 @@ function TopupDialog({ account, onClose, onCredited }) {
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="card modal-card" role="dialog" aria-modal="true" aria-label="Recargar saldo">
+      <section
+        className="card modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Recargar saldo"
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
             <h3 style={{ margin: 0 }}>Recargar saldo</h3>
@@ -490,7 +495,13 @@ function TopupDialog({ account, onClose, onCredited }) {
         </label>
         <label style={{ display: 'block', marginTop: 12 }}>
           <span>Nota (opcional)</span>
-          <input type="text" maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} disabled={pending} />
+          <input
+            type="text"
+            maxLength={200}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            disabled={pending}
+          />
         </label>
         {error && (
           <p className="danger-state" style={{ marginTop: 12 }}>
