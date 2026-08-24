@@ -606,6 +606,20 @@ async function topupWallet({ cardId, amountCentavos, note, idempotencyKey }) {
   });
 }
 
+// Register a loyalty visit or redeem a reward from the dashboard. Same endpoint the
+// register scans into (`admin/scan`, staff-guarded): its resolver falls back from a
+// signed QR to a plain CARD NUMBER, so the dashboard passes the card number it already
+// shows. `action` is 'VISIT' (add a stamp) or 'REDEEM' (claim an earned reward); the
+// API enforces the reward-cycle math and rejects a redeem with nothing to claim.
+async function loyaltyScan({ cardNumber, action }) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(routes.cash.byRef.scan(merchantId), {
+    method: 'POST',
+    body: JSON.stringify({ qrPayload: cardNumber, action }),
+  });
+}
+
 // Build a merchant-scoped API path with the active location as `?locationId`.
 // Centralizes the localStorage merchant/location lookup + missing-merchant guard
 // that every KDS mutation shares.
@@ -1137,6 +1151,8 @@ export {
   creditLoyaltySeals,
   // eslint-disable-next-line react-refresh/only-export-components
   topupWallet,
+  // eslint-disable-next-line react-refresh/only-export-components
+  loyaltyScan,
   // eslint-disable-next-line react-refresh/only-export-components
   issueGiftCard,
   // eslint-disable-next-line react-refresh/only-export-components
