@@ -4,6 +4,7 @@ import { I } from '@/icons.jsx';
 import { XSep } from '@/shell.jsx';
 import {
   creditLoyaltySeals,
+  loyaltyScan,
   topupWallet,
   useCustomerDetail,
   useCustomerInsights,
@@ -524,6 +525,8 @@ function TopupDialog({ account, onClose, onCredited }) {
 function LoyaltyPanel({ cash, onCredited }) {
   const [showSeals, setShowSeals] = useState(false);
   const [showTopup, setShowTopup] = useState(false);
+  const [scanBusy, setScanBusy] = useState(null); // 'VISIT' | 'REDEEM' | null
+  const [scanError, setScanError] = useState(null);
   if (!cash?.available)
     return (
       <EmptyState
@@ -544,7 +547,22 @@ function LoyaltyPanel({ cash, onCredited }) {
 
   function credited() {
     setShowSeals(false);
+    setShowTopup(false);
     onCredited?.();
+  }
+
+  async function runScan(action) {
+    if (scanBusy) return;
+    setScanBusy(action);
+    setScanError(null);
+    try {
+      await loyaltyScan({ cardNumber: account.cardNumber, action });
+      onCredited?.();
+    } catch (err) {
+      setScanError(err?.message || 'No se pudo registrar la acción.');
+    } finally {
+      setScanBusy(null);
+    }
   }
 
   return (
@@ -585,7 +603,30 @@ function LoyaltyPanel({ cash, onCredited }) {
           >
             <I.Wallet size={14} /> Recargar saldo
           </button>
+          <button
+            className="btn btn-secondary btn-sm"
+            type="button"
+            disabled={scanBusy != null}
+            onClick={() => runScan('VISIT')}
+          >
+            <I.Activity size={14} /> {scanBusy === 'VISIT' ? 'Registrando…' : 'Registrar visita'}
+          </button>
+          {account.pendingRewards > 0 && (
+            <button
+              className="btn btn-sm"
+              type="button"
+              disabled={scanBusy != null}
+              onClick={() => runScan('REDEEM')}
+            >
+              <I.Gift size={14} /> {scanBusy === 'REDEEM' ? 'Canjeando…' : 'Canjear recompensa'}
+            </button>
+          )}
         </div>
+      )}
+      {scanError && (
+        <p className="danger-state" style={{ marginTop: 8 }}>
+          {scanError}
+        </p>
       )}
       {showSeals && (
         <SealsDialog account={account} onClose={() => setShowSeals(false)} onCredited={credited} />
