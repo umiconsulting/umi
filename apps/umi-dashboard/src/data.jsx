@@ -589,6 +589,23 @@ async function creditLoyaltySeals({ cardId, seals, note, idempotencyKey }) {
   });
 }
 
+// Add money to a customer's wallet from the dashboard. Same endpoint the register
+// uses (`admin/topup`, staff-guarded). The caller owns `idempotencyKey` so a retried
+// top-up after a lost response lands once, not twice, on a money balance.
+async function topupWallet({ cardId, amountCentavos, note, idempotencyKey }) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(routes.cash.byRef.topup(merchantId), {
+    method: 'POST',
+    body: JSON.stringify({
+      cardId,
+      amountCentavos,
+      note: note || undefined,
+      idempotencyKey: idempotencyKey || crypto.randomUUID(),
+    }),
+  });
+}
+
 // Build a merchant-scoped API path with the active location as `?locationId`.
 // Centralizes the localStorage merchant/location lookup + missing-merchant guard
 // that every KDS mutation shares.
@@ -1085,6 +1102,8 @@ export {
   // Data-module function, not a component. Keeps the react-refresh baseline flat.
   // eslint-disable-next-line react-refresh/only-export-components
   creditLoyaltySeals,
+  // eslint-disable-next-line react-refresh/only-export-components
+  topupWallet,
   // eslint-disable-next-line react-refresh/only-export-components
   issueGiftCard,
   provisionDevice,
