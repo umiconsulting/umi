@@ -208,6 +208,8 @@ export class CashRepository {
         activeRow,
         totalsRow,
         activeRewardConfigRow,
+        highBalanceRow,
+        birthdayRow,
       ] = await Promise.all([
         c.query<Row>(
           `SELECT occurred_at AS "scannedAt" FROM merchant.loyalty_visit
@@ -278,6 +280,26 @@ export class CashRepository {
            ORDER BY created_at DESC NULLS LAST LIMIT 1`,
           [merchantId],
         ),
+        // Cards whose wallet balance (SUM of the value ledger) is over $1,000.
+        // Grouped per card, then counted, so a card with many ledger rows counts once.
+        c.query<Row>(
+          `SELECT count(*)::int AS n FROM (
+             SELECT ca.id, COALESCE(sum(l.delta), 0) AS bal
+             FROM merchant.loyalty_card AS ca
+             LEFT JOIN merchant.loyalty_stored_value_ledger AS l
+               ON l.merchant_id = ca.merchant_id AND l.card_id = ca.id
+             WHERE ca.merchant_id = $1::uuid
+             GROUP BY ca.id
+           ) AS t WHERE t.bal > 100000`,
+          [merchantId],
+        ),
+        // Birthday rewards a customer can still redeem: an 'active' grant whose
+        // window has not closed. 'redeemed'/'expired' and past-window grants drop out.
+        c.query<Row>(
+          `SELECT count(*)::int AS n FROM merchant.loyalty_birthday_grant
+           WHERE merchant_id = $1::uuid AND status = 'active' AND expires_at > now()`,
+          [merchantId],
+        ),
       ]);
       return {
         recentVisits: recentVisits.rows,
@@ -289,6 +311,8 @@ export class CashRepository {
         activeRow: activeRow.rows,
         totalsRow: totalsRow.rows,
         activeRewardConfigRow: activeRewardConfigRow.rows,
+        highBalanceRow: highBalanceRow.rows,
+        birthdayRow: birthdayRow.rows,
       };
     });
   }

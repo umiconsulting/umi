@@ -193,10 +193,36 @@ export class CashReadService {
     const marginPercent =
       revenuePerCycle > 0 ? Math.round((marginPerCycle / revenuePerCycle) * 100) : null;
 
+    // Member panel (the dashboard overview reads these; before, it read them off
+    // an object that never carried them, so the headline count showed a dash).
+    const memberHistory = newCustomersByWeek.map((w) => w.count);
+    const newThisWeek = memberHistory[memberHistory.length - 1] ?? 0;
+    // Membership growth over the 8-week window: members added in the window as a
+    // share of the base that predated it. Non-negative, so it matches the up-arrow
+    // the overview renders — a week-over-week delta on migrated data swings
+    // negative and would render "↑ -95%".
+    const windowNew = memberHistory.reduce((a, b) => a + b, 0);
+    const baseBeforeWindow = Math.max(0, totalCustomers - windowNew);
+    const memberDeltaPct =
+      baseBeforeWindow > 0
+        ? Math.round((windowNew / baseBeforeWindow) * 100)
+        : windowNew > 0
+          ? 100
+          : null;
+    const highBalanceCount = Number((d.highBalanceRow as Row[])[0]?.n ?? 0);
+    const birthdayActivatable = Number((d.birthdayRow as Row[])[0]?.n ?? 0);
+
     return {
       visitsByDay,
       topCustomers,
       newCustomersByWeek,
+      totalCustomers,
+      activeCustomersLast30,
+      memberHistory,
+      newThisWeek,
+      memberDeltaPct,
+      highBalanceCount,
+      birthdayActivatable,
       totalBalance: formatMxn(totalBalanceCentavos),
       topupsThisMonth: formatMxn(Number((d.topupsRow as Row[])[0]?.sum ?? 0)),
       rewardsRedeemedThisMonth: Number((d.rewardsRow as Row[])[0]?.n ?? 0),

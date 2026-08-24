@@ -56,6 +56,8 @@ describe('CashReadService.getAnalytics', () => {
       activeRow: [{ n: 5 }],
       totalsRow: [{ totalCustomers: 10, totalRevenueCentavos: 1000000, totalAllTimeVisits: 100 }],
       activeRewardConfigRow: [{ visitsRequired: 10, rewardCostCentavos: 5000 }],
+      highBalanceRow: [{ n: 3 }],
+      birthdayRow: [{ n: 2 }],
     });
     const r = await h.svc.getAnalytics('t1');
     expect(r.visitsByDay).toHaveLength(30);
@@ -64,6 +66,31 @@ describe('CashReadService.getAnalytics', () => {
     expect(r.avgVisitsPerCustomer).toBe(10); // 100/10
     expect(r.profitability.visitsRequired).toBe(10);
     expect(r.profitability.rewardCostConfigured).toBe(true);
+  });
+
+  it('surfaces the member panel the overview reads (count, history, delta, high-balance, birthdays)', async () => {
+    const h = make();
+    h.repo.analytics.mockResolvedValue({
+      recentVisits: [],
+      topCards: [],
+      recentUsers: [], // no new members in the window
+      balanceRow: [{ sum: 0 }],
+      topupsRow: [{ sum: 0 }],
+      rewardsRow: [{ n: 0 }],
+      activeRow: [{ n: 61 }],
+      totalsRow: [{ totalCustomers: 471, totalRevenueCentavos: 0, totalAllTimeVisits: 0 }],
+      activeRewardConfigRow: [{ visitsRequired: 10, rewardCostCentavos: 0 }],
+      highBalanceRow: [{ n: 4 }],
+      birthdayRow: [{ n: 7 }],
+    });
+    const r = await h.svc.getAnalytics('t1');
+    expect(r.totalCustomers).toBe(471);
+    expect(r.activeCustomersLast30).toBe(61);
+    expect(r.memberHistory).toHaveLength(8); // eight weekly buckets
+    expect(r.newThisWeek).toBe(0);
+    expect(r.memberDeltaPct).toBe(0); // window added 0 on a base of 471 → 0%, never negative
+    expect(r.highBalanceCount).toBe(4);
+    expect(r.birthdayActivatable).toBe(7);
   });
 });
 
