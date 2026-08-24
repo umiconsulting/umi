@@ -829,11 +829,12 @@ function useMembersData(opts) {
   var page = opts && opts.page ? opts.page : 1;
   var search = opts && opts.search ? opts.search : '';
   var sort = opts && opts.sort ? opts.sort : 'recent';
+  var refresh = (opts && opts.refresh) || 0;
   return _useAsync(
     function () {
       return _loadMembers(ctx, { page: page, search: search, sort: sort });
     },
-    _deps(ctx, [page, search, sort]),
+    _deps(ctx, [page, search, sort, refresh]),
     EMPTY_MEMBERS,
   );
 }
@@ -904,6 +905,19 @@ async function issueGiftCard({ amountCentavos, recipientName, recipientEmail, re
       senderName: senderName || undefined,
       message: message || undefined,
     }),
+  });
+}
+
+// Register a new loyalty member from the dashboard. Same endpoint the customer
+// self-service page uses; it returns the new card in the BODY (no cookies), so it
+// does not touch the operator's dashboard session. `phone` is the assembled
+// `+<dial><national>` the API validates against the country's digit count.
+async function registerMember({ name, phone, birthDate }) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(routes.cash.byRef.registerMember(merchantId), {
+    method: 'POST',
+    body: JSON.stringify({ name, phone, birthDate }),
   });
 }
 
@@ -1120,6 +1134,8 @@ export {
   issueGiftCard,
   // eslint-disable-next-line react-refresh/only-export-components
   redeemGiftCardByCode,
+  // eslint-disable-next-line react-refresh/only-export-components
+  registerMember,
   provisionDevice,
   generateDevicePairingPin,
   createPosEnrollmentRequest,
