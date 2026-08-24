@@ -589,6 +589,23 @@ async function creditLoyaltySeals({ cardId, seals, note, idempotencyKey }) {
   });
 }
 
+// Add money to a customer's wallet from the dashboard. Same endpoint the register
+// uses (`admin/topup`, staff-guarded). The caller owns `idempotencyKey` so a retried
+// top-up after a lost response lands once, not twice, on a money balance.
+async function topupWallet({ cardId, amountCentavos, note, idempotencyKey }) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(routes.cash.byRef.topup(merchantId), {
+    method: 'POST',
+    body: JSON.stringify({
+      cardId,
+      amountCentavos,
+      note: note || undefined,
+      idempotencyKey: idempotencyKey || crypto.randomUUID(),
+    }),
+  });
+}
+
 // Build a merchant-scoped API path with the active location as `?locationId`.
 // Centralizes the localStorage merchant/location lookup + missing-merchant guard
 // that every KDS mutation shares.
@@ -812,11 +829,12 @@ function useMembersData(opts) {
   var page = opts && opts.page ? opts.page : 1;
   var search = opts && opts.search ? opts.search : '';
   var sort = opts && opts.sort ? opts.sort : 'recent';
+  var refresh = (opts && opts.refresh) || 0;
   return _useAsync(
     function () {
       return _loadMembers(ctx, { page: page, search: search, sort: sort });
     },
-    _deps(ctx, [page, search, sort]),
+    _deps(ctx, [page, search, sort, refresh]),
     EMPTY_MEMBERS,
   );
 }
@@ -860,13 +878,66 @@ function useCustomerInsights(refresh) {
 function useGiftCardsData(opts) {
   const ctx = useMerchant();
   var page = opts && opts.page ? opts.page : 1;
+  var refresh = (opts && opts.refresh) || 0;
   return _useAsync(
     function () {
       return _loadGiftCards(ctx, { page: page });
     },
-    _deps(ctx, [page]),
+    _deps(ctx, [page, refresh]),
     EMPTY_GIFT_CARDS,
   );
+}
+
+// Issue a gift card from the dashboard. Same endpoint the register uses
+// (`admin/gift-cards`, staff-guarded); the merchant UUID is a valid `:merchantRef`.
+// The clear code comes back ONCE, in the response — it is never stored in clear and
+// never returned by a later read, so the caller must show it to the operator now.
+async function issueGiftCard({
+  amountCentavos,
+  recipientName,
+  recipientEmail,
+  recipientPhone,
+  senderName,
+  message,
+}) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(routes.cash.byRef.giftCards(merchantId), {
+    method: 'POST',
+    body: JSON.stringify({
+      amountCentavos,
+      recipientName: recipientName || undefined,
+      recipientEmail: recipientEmail || undefined,
+      recipientPhone: recipientPhone || undefined,
+      senderName: senderName || undefined,
+      message: message || undefined,
+    }),
+  });
+}
+
+// Register a new loyalty member from the dashboard. Same endpoint the customer
+// self-service page uses; it returns the new card in the BODY (no cookies), so it
+// does not touch the operator's dashboard session. `phone` is the assembled
+// `+<dial><national>` the API validates against the country's digit count.
+async function registerMember({ name, phone, birthDate }) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(routes.cash.byRef.registerMember(merchantId), {
+    method: 'POST',
+    body: JSON.stringify({ name, phone, birthDate }),
+  });
+}
+
+// Redeem a gift card by code onto the identified customer's wallet. The register
+// uses the same public endpoint; the operator supplies the code and the customer's
+// phone or email. The API rejects an already-redeemed / expired / empty code.
+async function redeemGiftCardByCode({ code, phone, email }) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(routes.cash.byRef.gift(merchantId, code.trim().toUpperCase()), {
+    method: 'POST',
+    body: JSON.stringify({ phone: phone || undefined, email: email || undefined }),
+  });
 }
 
 function useConversationsData(opts) {
@@ -1064,6 +1135,14 @@ export {
   // Data-module function, not a component. Keeps the react-refresh baseline flat.
   // eslint-disable-next-line react-refresh/only-export-components
   creditLoyaltySeals,
+  // eslint-disable-next-line react-refresh/only-export-components
+  topupWallet,
+  // eslint-disable-next-line react-refresh/only-export-components
+  issueGiftCard,
+  // eslint-disable-next-line react-refresh/only-export-components
+  redeemGiftCardByCode,
+  // eslint-disable-next-line react-refresh/only-export-components
+  registerMember,
   provisionDevice,
   generateDevicePairingPin,
   createPosEnrollmentRequest,

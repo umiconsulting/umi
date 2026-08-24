@@ -1,7 +1,136 @@
 import React, { useState, useEffect } from 'react';
 import { I } from '@/icons.jsx';
 import { RegionHead } from '@/shell.jsx';
-import { useMembersData } from '@/data.jsx';
+import { registerMember, useMembersData } from '@/data.jsx';
+
+// Dial codes the register form offers. Mexico first; the API validates the national
+// digit count per country (Mexico = exactly 10), so the picker and the check agree.
+const DIAL_CODES = [
+  { dial: '+52', label: '🇲🇽 +52' },
+  { dial: '+1', label: '🇺🇸 +1' },
+  { dial: '+34', label: '🇪🇸 +34' },
+  { dial: '+57', label: '🇨🇴 +57' },
+];
+
+function RegisterMemberDialog({ onClose, onRegistered }) {
+  const [name, setName] = useState('');
+  const [dial, setDial] = useState('+52');
+  const [national, setNational] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
+  const digits = national.replace(/\D/g, '');
+  const valid =
+    name.trim().length >= 2 && digits.length >= 6 && /^\d{4}-\d{2}-\d{2}$/.test(birthDate);
+
+  async function submit() {
+    if (!valid || pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      const res = await registerMember({ name: name.trim(), phone: `${dial}${digits}`, birthDate });
+      setResult(res);
+      onRegistered();
+    } catch (err) {
+      setError(err?.message || 'No se pudo registrar al miembro.');
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section
+        className="card modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Registrar miembro"
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Registrar miembro</h3>
+            <p style={{ color: 'var(--ink-3)' }}>
+              Inscribe a un cliente en el programa de lealtad.
+            </p>
+          </div>
+          <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
+            ×
+          </button>
+        </div>
+        {result ? (
+          <div style={{ marginTop: 16 }}>
+            <p>
+              {result.message || 'Miembro registrado.'} Tarjeta:{' '}
+              <strong>{result.cardNumber}</strong>.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+              <button className="btn" type="button" onClick={onClose}>
+                Listo
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <label style={{ display: 'block', marginTop: 12 }}>
+              <span>Nombre</span>
+              <input
+                type="text"
+                maxLength={100}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={pending}
+              />
+            </label>
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <select value={dial} onChange={(e) => setDial(e.target.value)} disabled={pending}>
+                {DIAL_CODES.map((d) => (
+                  <option key={d.dial} value={d.dial}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                style={{ flex: 1 }}
+                type="tel"
+                placeholder="Número, sin código de país"
+                value={national}
+                onChange={(e) => setNational(e.target.value)}
+                disabled={pending}
+              />
+            </div>
+            <label style={{ display: 'block', marginTop: 12 }}>
+              <span>Fecha de nacimiento</span>
+              <input
+                type="date"
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                disabled={pending}
+              />
+            </label>
+            {error && (
+              <p className="danger-state" style={{ marginTop: 12 }}>
+                {error}
+              </p>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={onClose}
+                disabled={pending}
+              >
+                Cancelar
+              </button>
+              <button className="btn" type="button" onClick={submit} disabled={!valid || pending}>
+                {pending ? 'Registrando…' : 'Registrar'}
+              </button>
+            </div>
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
 
 // Screen 7 — Miembros / Loyalty Members
 // Data: umi-cash GET /api/[merchantRef]/admin/customers (role: CUSTOMER)
@@ -12,6 +141,8 @@ const MembersScreen = () => {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('recent');
   const [detail, setDetail] = useState(null); // member id for slide-out
+  const [showRegister, setShowRegister] = useState(false);
+  const [refresh, setRefresh] = useState(0);
 
   // Debounce search
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -20,7 +151,12 @@ const MembersScreen = () => {
     return () => clearTimeout(t);
   }, [search]);
 
-  const { data: result, loading } = useMembersData({ page, search: debouncedSearch, sort });
+  const { data: result, loading } = useMembersData({
+    page,
+    search: debouncedSearch,
+    sort,
+    refresh,
+  });
   const customers = (result && result.customers) || [];
   const total = (result && result.total) || 0;
   const totalPages = (result && result.totalPages) || 1;
@@ -81,9 +217,19 @@ const MembersScreen = () => {
                 </option>
               ))}
             </select>
+            <button className="btn" type="button" onClick={() => setShowRegister(true)}>
+              <I.Plus size={14} /> Registrar miembro
+            </button>
           </>
         }
       />
+
+      {showRegister && (
+        <RegisterMemberDialog
+          onClose={() => setShowRegister(false)}
+          onRegistered={() => setRefresh((n) => n + 1)}
+        />
+      )}
 
       {/* Search + summary strip */}
       <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>

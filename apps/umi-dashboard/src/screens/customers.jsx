@@ -4,6 +4,7 @@ import { I } from '@/icons.jsx';
 import { XSep } from '@/shell.jsx';
 import {
   creditLoyaltySeals,
+  topupWallet,
   useCustomerDetail,
   useCustomerInsights,
   useCustomersData,
@@ -432,8 +433,97 @@ function SealsDialog({ account, onClose, onCredited }) {
   );
 }
 
+function TopupDialog({ account, onClose, onCredited }) {
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState(null);
+  const pesos = Number(amount);
+  const valid = Number.isFinite(pesos) && pesos >= 1;
+  // Stable key per (card, amount): a retry of the same amount dedups so a top-up
+  // that commits but loses its response lands once, not twice, on a money balance.
+  const nonce = useMemo(() => crypto.randomUUID(), []);
+  const idempotencyKey = `${nonce}:${account.loyaltyCardId}:${pesos}`;
+
+  async function submit() {
+    if (!valid || pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      await topupWallet({
+        cardId: account.loyaltyCardId,
+        amountCentavos: Math.round(pesos * 100),
+        note: note.trim(),
+        idempotencyKey,
+      });
+      onCredited();
+    } catch (err) {
+      setError(err?.message || 'No se pudo recargar el saldo.');
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section
+        className="card modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Recargar saldo"
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Recargar saldo</h3>
+            <p style={{ color: 'var(--ink-3)' }}>
+              Agrega saldo al monedero de la tarjeta {account.cardNumber || 'de lealtad'}.
+            </p>
+          </div>
+          <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
+            ×
+          </button>
+        </div>
+        <label style={{ display: 'block', marginTop: 12 }}>
+          <span>Monto (MXN)</span>
+          <input
+            type="number"
+            min={1}
+            step="1"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            disabled={pending}
+          />
+        </label>
+        <label style={{ display: 'block', marginTop: 12 }}>
+          <span>Nota (opcional)</span>
+          <input
+            type="text"
+            maxLength={200}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            disabled={pending}
+          />
+        </label>
+        {error && (
+          <p className="danger-state" style={{ marginTop: 12 }}>
+            {error}
+          </p>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+          <button className="btn btn-secondary" type="button" onClick={onClose} disabled={pending}>
+            Cancelar
+          </button>
+          <button className="btn" type="button" onClick={submit} disabled={!valid || pending}>
+            {pending ? 'Recargando…' : `Recargar${valid ? ` $${pesos}` : ''}`}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function LoyaltyPanel({ cash, onCredited }) {
   const [showSeals, setShowSeals] = useState(false);
+  const [showTopup, setShowTopup] = useState(false);
   if (!cash?.available)
     return (
       <EmptyState
@@ -480,7 +570,7 @@ function LoyaltyPanel({ cash, onCredited }) {
         />
       </div>
       {account.loyaltyCardId && (
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
           <button
             className="btn btn-secondary btn-sm"
             type="button"
@@ -488,10 +578,20 @@ function LoyaltyPanel({ cash, onCredited }) {
           >
             <I.Plus size={14} /> Agregar sellos
           </button>
+          <button
+            className="btn btn-secondary btn-sm"
+            type="button"
+            onClick={() => setShowTopup(true)}
+          >
+            <I.Wallet size={14} /> Recargar saldo
+          </button>
         </div>
       )}
       {showSeals && (
         <SealsDialog account={account} onClose={() => setShowSeals(false)} onCredited={credited} />
+      )}
+      {showTopup && (
+        <TopupDialog account={account} onClose={() => setShowTopup(false)} onCredited={credited} />
       )}
     </div>
   );
