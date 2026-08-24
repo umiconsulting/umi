@@ -1,7 +1,97 @@
 import React, { useState } from 'react';
 import { I } from '@/icons.jsx';
 import { RegionHead } from '@/shell.jsx';
-import { issueGiftCard, useGiftCardsData } from '@/data.jsx';
+import { issueGiftCard, redeemGiftCardByCode, useGiftCardsData } from '@/data.jsx';
+
+function RedeemGiftCardDialog({ onClose, onRedeemed }) {
+  const [code, setCode] = useState('');
+  const [channel, setChannel] = useState('phone');
+  const [contact, setContact] = useState('');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
+  const valid = code.trim().length >= 4 && contact.trim().length > 0;
+
+  async function submit() {
+    if (!valid || pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      const res = await redeemGiftCardByCode({
+        code,
+        phone: channel === 'phone' ? contact.trim() : '',
+        email: channel === 'email' ? contact.trim() : '',
+      });
+      setResult(res);
+      onRedeemed();
+    } catch (err) {
+      setError(err?.message || 'No se pudo canjear la tarjeta.');
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="card modal-card" role="dialog" aria-modal="true" aria-label="Canjear tarjeta de regalo">
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Canjear tarjeta de regalo</h3>
+            <p style={{ color: 'var(--ink-3)' }}>El saldo se abona al monedero del cliente.</p>
+          </div>
+          <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
+            ×
+          </button>
+        </div>
+        {result ? (
+          <div style={{ marginTop: 16 }}>
+            <p>
+              Canjeada por {result.amountMXN}. Nuevo saldo del cliente: {result.newBalanceMXN}.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+              <button className="btn" type="button" onClick={onClose}>
+                Listo
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <label style={{ display: 'block', marginTop: 12 }}>
+              <span>Código</span>
+              <input type="text" value={code} onChange={(e) => setCode(e.target.value)} disabled={pending} placeholder="XXXX-XXXX-…" />
+            </label>
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <select value={channel} onChange={(e) => setChannel(e.target.value)} disabled={pending}>
+                <option value="phone">Teléfono</option>
+                <option value="email">Email</option>
+              </select>
+              <input
+                style={{ flex: 1 }}
+                type={channel === 'email' ? 'email' : 'tel'}
+                placeholder={channel === 'email' ? 'cliente@correo.com' : '+52...'}
+                value={contact}
+                onChange={(e) => setContact(e.target.value)}
+                disabled={pending}
+              />
+            </div>
+            {error && (
+              <p className="danger-state" style={{ marginTop: 12 }}>
+                {error}
+              </p>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+              <button className="btn btn-secondary" type="button" onClick={onClose} disabled={pending}>
+                Cancelar
+              </button>
+              <button className="btn" type="button" onClick={submit} disabled={!valid || pending}>
+                {pending ? 'Canjeando…' : 'Canjear'}
+              </button>
+            </div>
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
 
 function IssueGiftCardDialog({ onClose, onIssued }) {
   const [amount, setAmount] = useState('');
@@ -137,6 +227,7 @@ const GiftCardsScreen = () => {
   const [page, setPage] = useState(1);
   const [refresh, setRefresh] = useState(0);
   const [showIssue, setShowIssue] = useState(false);
+  const [showRedeem, setShowRedeem] = useState(false);
   const { data, loading } = useGiftCardsData({ page, refresh });
   const cards = data?.giftCards || [];
   const total = data?.total || 0;
@@ -153,15 +244,27 @@ const GiftCardsScreen = () => {
           note={loading ? 'Cargando…' : 'Emitidas desde Umi Cash.'}
           count={{ value: total.toLocaleString('es-MX'), label: 'emitidas' }}
         />
-        <button className="btn" type="button" onClick={() => setShowIssue(true)}>
-          <I.Plus size={14} /> Emitir tarjeta
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-secondary" type="button" onClick={() => setShowRedeem(true)}>
+            <I.Check size={14} /> Canjear
+          </button>
+          <button className="btn" type="button" onClick={() => setShowIssue(true)}>
+            <I.Plus size={14} /> Emitir tarjeta
+          </button>
+        </div>
       </div>
 
       {showIssue && (
         <IssueGiftCardDialog
           onClose={() => setShowIssue(false)}
           onIssued={() => setRefresh((n) => n + 1)}
+        />
+      )}
+
+      {showRedeem && (
+        <RedeemGiftCardDialog
+          onClose={() => setShowRedeem(false)}
+          onRedeemed={() => setRefresh((n) => n + 1)}
         />
       )}
 

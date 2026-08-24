@@ -907,6 +907,18 @@ async function issueGiftCard({ amountCentavos, recipientName, recipientEmail, re
   });
 }
 
+// Redeem a gift card by code onto the identified customer's wallet. The register
+// uses the same public endpoint; the operator supplies the code and the customer's
+// phone or email. The API rejects an already-redeemed / expired / empty code.
+async function redeemGiftCardByCode({ code, phone, email }) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(routes.cash.byRef.gift(merchantId, code.trim().toUpperCase()), {
+    method: 'POST',
+    body: JSON.stringify({ phone: phone || undefined, email: email || undefined }),
+  });
+}
+
 function useConversationsData(opts) {
   const ctx = useMerchant();
   var page = opts && opts.page ? opts.page : 1;
@@ -1106,6 +1118,8 @@ export {
   topupWallet,
   // eslint-disable-next-line react-refresh/only-export-components
   issueGiftCard,
+  // eslint-disable-next-line react-refresh/only-export-components
+  redeemGiftCardByCode,
   provisionDevice,
   generateDevicePairingPin,
   createPosEnrollmentRequest,
