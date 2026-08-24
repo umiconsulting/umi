@@ -216,6 +216,18 @@ export const ScanRequest = z.object({
 });
 export type ScanRequest = z.infer<typeof ScanRequest>;
 
+/** POST /api/:merchantRef/admin/scan/seals — mirrors ScanSealsDto. A manual bulk
+ *  stamp credit (catch-up for a customer migrated from another loyalty program).
+ *  The card is named by id because the operator has already identified the card;
+ *  `seals` is capped at 50, the same bound `merchant.loyalty_visit.stamps` carries. */
+export const ScanSealsRequest = z.object({
+  cardId: z.string().uuid(),
+  seals: z.number().int().min(1).max(50),
+  note: z.string().max(200).optional(),
+  idempotencyKey: z.string().min(8).max(200).optional(),
+});
+export type ScanSealsRequest = z.infer<typeof ScanSealsRequest>;
+
 /** POST /api/:merchantRef/admin/topup — mirrors TopupDto (min $1.00). */
 export const TopupRequest = z.object({
   cardId: z.string(),
@@ -328,6 +340,7 @@ export const httpModels = {
   CreateStaffRequest,
   UpdateStaffRequest,
   ScanRequest,
+  ScanSealsRequest,
   TopupRequest,
   PurchaseRequest,
   GiftCardCreateRequest,
