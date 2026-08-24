@@ -860,13 +860,34 @@ function useCustomerInsights(refresh) {
 function useGiftCardsData(opts) {
   const ctx = useMerchant();
   var page = opts && opts.page ? opts.page : 1;
+  var refresh = (opts && opts.refresh) || 0;
   return _useAsync(
     function () {
       return _loadGiftCards(ctx, { page: page });
     },
-    _deps(ctx, [page]),
+    _deps(ctx, [page, refresh]),
     EMPTY_GIFT_CARDS,
   );
+}
+
+// Issue a gift card from the dashboard. Same endpoint the register uses
+// (`admin/gift-cards`, staff-guarded); the merchant UUID is a valid `:merchantRef`.
+// The clear code comes back ONCE, in the response — it is never stored in clear and
+// never returned by a later read, so the caller must show it to the operator now.
+async function issueGiftCard({ amountCentavos, recipientName, recipientEmail, recipientPhone, senderName, message }) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(routes.cash.byRef.giftCards(merchantId), {
+    method: 'POST',
+    body: JSON.stringify({
+      amountCentavos,
+      recipientName: recipientName || undefined,
+      recipientEmail: recipientEmail || undefined,
+      recipientPhone: recipientPhone || undefined,
+      senderName: senderName || undefined,
+      message: message || undefined,
+    }),
+  });
 }
 
 function useConversationsData(opts) {
@@ -1064,6 +1085,8 @@ export {
   // Data-module function, not a component. Keeps the react-refresh baseline flat.
   // eslint-disable-next-line react-refresh/only-export-components
   creditLoyaltySeals,
+  // eslint-disable-next-line react-refresh/only-export-components
+  issueGiftCard,
   provisionDevice,
   generateDevicePairingPin,
   createPosEnrollmentRequest,
