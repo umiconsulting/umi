@@ -15,8 +15,9 @@ interface CustomerDetail {
   ltvCentavos: number; ltvMXN: string;
   totalTopupCentavos: number; totalTopupMXN: string;
   recentVisits: { id: string; scannedAt: string }[];
-  recentRedemptions: { id: string; redeemedAt: string; note: string | null }[];
+  recentRedemptions: { id: string; redeemedAt: string; note: string | null; revertedAt: string | null }[];
   recentTransactions: { id: string; type: string; amountCentavos: number; description: string | null; createdAt: string }[];
+  viewerIsAdmin: boolean;
 }
 
 function initialsFrom(name: string | null) {
@@ -42,6 +43,9 @@ export default function CustomerDetailPage() {
   const [message, setMessage] = useState('');
   const [messageIsSuccess, setMessageIsSuccess] = useState(false);
   const [confirmRedeem, setConfirmRedeem] = useState(false);
+  // Two-tap revert (same pattern as confirmRedeem): first tap arms one row, second executes.
+  const [revertArmedId, setRevertArmedId] = useState<string | null>(null);
+  const [revertLoadingId, setRevertLoadingId] = useState<string | null>(null);
 
   async function loadCustomer() {
     const res = await authedFetch(slug, `/api/${slug}/admin/customers/${id}`);
@@ -98,6 +102,24 @@ export default function CustomerDetailPage() {
     } finally {
       // Always clear the loading flag so the button can never get stuck disabled.
       setRedeemLoading(false);
+    }
+  }
+
+  async function handleRevert(redemptionId: string) {
+    setRevertLoadingId(redemptionId);
+    setMessage('');
+    try {
+      const res = await authedFetch(slug, `/api/${slug}/admin/redemptions/${redemptionId}/revert`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (res.ok) { setMessage(data.message); setMessageIsSuccess(true); loadCustomer(); }
+      else { setMessage(data.error || 'No se pudo revertir el canje'); setMessageIsSuccess(false); }
+    } catch {
+      setMessage('Error de conexión'); setMessageIsSuccess(false);
+    } finally {
+      setRevertLoadingId(null);
+      setRevertArmedId(null);
     }
   }
 
@@ -319,13 +341,43 @@ export default function CustomerDetailPage() {
                   >
                     ★
                   </span>
-                  <span className="truncate" style={{ color: 'var(--color-ink)' }}>
+                  <span
+                    className="truncate"
+                    style={{
+                      color: r.revertedAt ? 'var(--color-ink-light)' : 'var(--color-ink)',
+                      textDecoration: r.revertedAt ? 'line-through' : undefined,
+                    }}
+                  >
                     {r.note || 'Recompensa canjeada'}
                   </span>
                 </div>
-                <span className="shrink-0" style={{ color: 'var(--color-ink-light)' }}>
-                  {formatDateTimeMX(new Date(r.redeemedAt))}
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span style={{ color: 'var(--color-ink-light)' }}>
+                    {formatDateTimeMX(new Date(r.redeemedAt))}
+                  </span>
+                  {r.revertedAt ? (
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full font-medium"
+                      style={{ background: 'var(--color-surface-dark)', color: 'var(--color-ink-light)' }}
+                    >
+                      Revertido · {formatDateShortMX(new Date(r.revertedAt))}
+                    </span>
+                  ) : customer.viewerIsAdmin ? (
+                    <button
+                      onClick={() =>
+                        revertArmedId === r.id ? handleRevert(r.id) : setRevertArmedId(r.id)
+                      }
+                      disabled={revertLoadingId !== null}
+                      className="text-xs px-2 py-0.5 rounded-full font-medium"
+                      style={{
+                        background: revertArmedId === r.id ? 'var(--color-danger-soft)' : 'var(--color-surface-dark)',
+                        color: revertArmedId === r.id ? 'var(--color-danger)' : 'var(--color-ink)',
+                      }}
+                    >
+                      {revertLoadingId === r.id ? '…' : revertArmedId === r.id ? '¿Confirmar?' : 'Revertir'}
+                    </button>
+                  ) : null}
+                </div>
               </div>
             ))}
           </div>

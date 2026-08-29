@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getTenant } from '@/lib/tenant';
 import { formatMXN } from '@/lib/currency';
 import { getActiveRewardConfig, rewardConfigDefaults } from '@/lib/prisma-helpers';
+import { resolveRangeDays } from '@/lib/analytics-range';
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
   const staff = await requireAuth(['STAFF', 'ADMIN'])(req);
@@ -16,7 +17,21 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
 
+  // Selected range (7/30/90/365). Visits, the canjes count, and the canjes bitácora
+  // follow it; retention stays a fixed 30-day metric so its meaning doesn't drift.
+  const days = resolveRangeDays(req.nextUrl.searchParams.get('days'));
+
   const now = new Date();
+
+  // Start of the selected window
+  const rangeStart = new Date(now);
+  rangeStart.setDate(rangeStart.getDate() - days);
+  rangeStart.setHours(0, 0, 0, 0);
+
+  // Start of the window before it (for the vs-previous-period delta)
+  const prevRangeStart = new Date(now);
+  prevRangeStart.setDate(prevRangeStart.getDate() - days * 2);
+  prevRangeStart.setHours(0, 0, 0, 0);
 
   // 30 days ago
   const thirtyDaysAgo = new Date(now);
@@ -37,16 +52,18 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     recentPeople,
     allCards,
     topupsThisMonth,
-    rewardsThisMonth,
     activeCustomersLast30,
     totalCustomers,
     totalPurchasesAgg,
     totalVisitsAgg,
     activeRewardConfig,
+    prevPeriodVisits,
+    rewardsInRange,
+    redemptionLog,
   ] = await Promise.all([
-    // All visits in last 30 days
+    // All visits in the selected range
     prisma.visit_events.findMany({
-      where: { tenant_id: tenant.id, occurred_at: { gte: thirtyDaysAgo } },
+      where: { tenant_id: tenant.id, occurred_at: { gte: rangeStart } },
       select: { occurred_at: true },
     }),
 
@@ -80,11 +97,6 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       _sum: { amount_cents: true },
     }),
 
-    // Reward redemptions this month
-    prisma.reward_redemptions.count({
-      where: { tenant_id: tenant.id, redeemed_at: { gte: monthStart } },
-    }),
-
     // Distinct customers who had a visit in last 30 days
     prisma.visit_events.findMany({
       where: { tenant_id: tenant.id, occurred_at: { gte: thirtyDaysAgo } },
@@ -109,6 +121,27 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
     // Active reward config for cost
     getActiveRewardConfig(tenant.id),
+
+    // Visits in the window BEFORE the selected range, for the vs-previous delta
+    prisma.visit_events.count({
+      where: { tenant_id: tenant.id, occurred_at: { gte: prevRangeStart, lt: rangeStart } },
+    }),
+
+    // Redemptions inside the selected range (the tile follows the range chips)
+    prisma.reward_redemptions.count({
+      where: { tenant_id: tenant.id, redeemed_at: { gte: rangeStart } },
+    }),
+
+    // Bitácora de canjes: who redeemed, when, and whether it was reverted — so a
+    // register cut can be reconciled days later against named redemptions.
+    prisma.reward_redemptions.findMany({
+      where: { tenant_id: tenant.id, redeemed_at: { gte: rangeStart } },
+      orderBy: { redeemed_at: 'desc' },
+      take: 50,
+      include: {
+        cards: { include: { accounts: { include: { people: { select: { id: true, display_name: true } } } } } },
+      },
+    }),
   ]);
 
   // --- visitsByDay: group by date string ---
@@ -118,9 +151,9 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     visitCountByDay[dateStr] = (visitCountByDay[dateStr] ?? 0) + 1;
   }
 
-  // Fill in all 30 days (including zero-count days)
+  // Fill in every day of the range (including zero-count days)
   const visitsByDay: { date: string; count: number }[] = [];
-  for (let i = 29; i >= 0; i--) {
+  for (let i = days - 1; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
     const dateStr = d.toISOString().slice(0, 10);
@@ -194,11 +227,20 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
   return NextResponse.json({
     visitsByDay,
+    prevPeriodVisits,
     topCustomers,
     newCustomersByWeek,
     totalBalance: formatMXN(totalBalanceCentavos),
     topupsThisMonth: formatMXN(topupsThisMonth._sum.amount_cents ?? 0),
-    rewardsRedeemedThisMonth: rewardsThisMonth,
+    rewardsRedeemedInRange: rewardsInRange,
+    redemptions: redemptionLog.map((r) => ({
+      id: r.id,
+      redeemedAt: r.redeemed_at.toISOString(),
+      name: r.cards.accounts?.people?.display_name ?? null,
+      customerId: r.cards.accounts?.people?.id ?? null,
+      cardNumber: r.cards.card_number,
+      revertedAt: r.reverted_at?.toISOString() ?? null,
+    })),
     avgVisitsPerCustomer: trueAvg,
     retentionRate,
     profitability: {

@@ -168,11 +168,12 @@ export default function ScanPage() {
       if (res.ok) {
         lastPayloadRef.current = payload;
         setPreview(data);
-        // Default-check available loyalty actions so the common case (visit + redeem) is one tap
+        // Only the visit is pre-selected. Redemptions must be an explicit staff tap:
+        // pre-checking REDEEM turned a routine confirm into an accidental canje when
+        // the daily visit cap left it as the only armed action (a second scan of the
+        // same card redeemed the customer's reward without anyone noticing).
         const defaults = new Set<string>();
         if (!data.card.visitLimitReached) defaults.add('VISIT');
-        if (data.card.pendingRewards > 0) defaults.add('REDEEM');
-        if (data.birthdayReward) defaults.add('BIRTHDAY_REDEEM');
         setSelectedActions(defaults);
         stopCamera();
       } else {
