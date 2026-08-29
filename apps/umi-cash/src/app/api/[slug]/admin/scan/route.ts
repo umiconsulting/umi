@@ -7,7 +7,7 @@ import { getActiveRewardConfig, rewardConfigDefaults } from '@/lib/prisma-helper
 import { resolveScanTarget } from '@/lib/scan-resolve';
 import { lockCard } from '@/lib/wallet';
 import { DEFAULT_CUSTOMER_NAME, SCAN_ACTIONS } from '@/lib/constants';
-import { triggerWalletUpdates, buildCardSummary, readLifecycleMessage } from '@/lib/scan-helpers';
+import { triggerWalletUpdates, buildCardSummary, readLifecycleMessage, lifecycleMetadata } from '@/lib/scan-helpers';
 import { afterResponse } from '@/lib/after-response';
 import { getTenant, requireActiveSubscription } from '@/lib/tenant';
 import { tenantHour, tenantWeekday, tenantStartOfDay } from '@/lib/timezone';
@@ -137,6 +137,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       await lockCard(tx, card.id);
       const fresh = await tx.cards.findUniqueOrThrow({ where: { id: card.id } });
 
+      // The scan's single "moment" — the one lifecycle message this interaction leaves
+      // on the card (and pushes to the customer's lock screen). Written on EVERY scan,
+      // so a moment cached by a previous visit can never linger — or re-notify — after
+      // a redeem-only scan. Priority: reward_earned > reward_redeemed > first_visit >
+      // milestone_one_left > milestone_halfway.
+      let momentJourney: LifecycleJourneyKey | null = null;
+      let cycleForCopy = fresh.visits_this_cycle;
+
       if (includesBirthday) {
         // Atomic claim of the SINGLE previewed reward: only that active row flips; a
         // concurrent scan that already claimed it leaves count 0. Constraining to
@@ -183,9 +191,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
           data: { pending_rewards: { decrement: 1 } },
         });
         performed.push(SCAN_ACTIONS.REDEEM);
+        momentJourney = 'reward_redeemed';
       }
 
-      let momentMessage: string | null = null;
       if (includesVisit) {
         // 1 visit per card per calendar day (tenant tz) — re-checked under the lock,
         // so a concurrent duplicate scan sees the just-committed visit and is rejected.
@@ -202,50 +210,52 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         const earnedReward = newVisitsThisCycle >= visitsRequired;
         rewardEarnedThisCall = earnedReward;
 
-        // Pick the "moment" message based on what just happened. Priority:
-        //   reward_earned > first_visit > milestone_one_left > milestone_halfway
-        // The chosen message lives in card.metadata.lifecycle_message and fires a lock-screen
-        // notification via the pass's changeMessage hook. No lifecycle_sends row —
-        // these are responses to the customer's own scan, not cron-driven nudges.
-        let momentJourney: LifecycleJourneyKey | null = null;
+        // A reward earned by this visit outranks any moment chosen so far (including a
+        // redeem in the same scan — knowing another reward is pending is the headline);
+        // lesser visit moments only fill an empty slot.
         if (earnedReward) momentJourney = 'reward_earned';
-        else if (newTotalVisits === 1) momentJourney = 'first_visit';
-        else if (newVisitsThisCycle === visitsRequired - 1) momentJourney = 'milestone_one_left';
-        else if (visitsRequired >= 4 && newVisitsThisCycle === Math.floor(visitsRequired / 2)) momentJourney = 'milestone_halfway';
-
-        if (momentJourney) {
-          const template = resolveJourneyTemplate(tenant.lifecycleCopy, momentJourney);
-          momentMessage = renderTemplate(template, {
-            name: customerName || DEFAULT_CUSTOMER_NAME,
-            tenant: tenant.name,
-            rewardName,
-            visitsThisCycle: earnedReward ? visitsRequired : newVisitsThisCycle,
-            visitsRequired,
-          });
+        else if (momentJourney === null) {
+          if (newTotalVisits === 1) momentJourney = 'first_visit';
+          else if (newVisitsThisCycle === visitsRequired - 1) momentJourney = 'milestone_one_left';
+          else if (visitsRequired >= 4 && newVisitsThisCycle === Math.floor(visitsRequired / 2)) momentJourney = 'milestone_halfway';
         }
+        cycleForCopy = earnedReward ? visitsRequired : newVisitsThisCycle;
 
-        const existingMeta = (fresh.metadata ?? {}) as Record<string, unknown>;
         await tx.cards.update({
           where: { id: card.id },
           data: {
             total_visits: { increment: 1 },
             visits_this_cycle: earnedReward ? 0 : newVisitsThisCycle,
             pending_rewards: earnedReward ? { increment: 1 } : undefined,
-            // Set the moment message (or null if none fires — also clears any stale lifecycle nudge).
-            metadata: {
-              ...existingMeta,
-              lifecycle_message: momentMessage,
-              lifecycle_message_updated_at: momentMessage ? new Date().toISOString() : null,
-            },
           },
         });
         performed.push(SCAN_ACTIONS.VISIT);
       }
 
+      // Render the chosen moment (if any) and persist it with the QR rotation — one
+      // write covers every action combination, and a scan with no moment clears the
+      // previous one. The message lives in card.metadata.lifecycle_message and fires a
+      // lock-screen notification via the pass's changeMessage hook. No lifecycle_sends
+      // row — these are responses to the customer's own scan, not cron-driven nudges.
+      let momentMessage: string | null = null;
+      if (momentJourney) {
+        const template = resolveJourneyTemplate(tenant.lifecycleCopy, momentJourney);
+        momentMessage = renderTemplate(template, {
+          name: customerName || DEFAULT_CUSTOMER_NAME,
+          tenant: tenant.name,
+          rewardName,
+          visitsThisCycle: cycleForCopy,
+          visitsRequired,
+        });
+      }
       // Rotate QR token once for any successful interaction
       const rotated = await tx.cards.update({
         where: { id: card.id },
-        data: { qr_token: generateRandomToken(), qr_issued_at: new Date() },
+        data: {
+          qr_token: generateRandomToken(),
+          qr_issued_at: new Date(),
+          metadata: lifecycleMetadata(fresh.metadata, momentMessage),
+        },
         include: { accounts: true },
       });
       return rotated;
