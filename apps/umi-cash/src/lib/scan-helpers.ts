@@ -12,6 +12,27 @@ export function readLifecycleMessage(metadata: unknown): string | null {
 }
 
 /**
+ * The wallet object the customer actually saved (recorded at save time in
+ * loyalty.passes) — a card re-import mints a new uuid, so the id derived from the
+ * card can name an object nobody holds while the saved pass silently freezes.
+ * Null means "derive from cardId". On a lookup failure we log and fall back to
+ * the derived id — a possibly-stale target beats dropping the update.
+ */
+export async function findSavedGoogleObjectId(tenantId: string, cardId: string): Promise<string | null> {
+  if (!isGoogleWalletConfigured()) return null;
+  const pass = await prisma.passes
+    .findFirst({
+      where: { tenant_id: tenantId, loyalty_card_id: cardId, provider: 'google', status: 'active' },
+      select: { provider_object_id: true },
+    })
+    .catch((err) => {
+      console.warn('[Wallet Update] google pass lookup failed, falling back to derived object id:', err);
+      return null;
+    });
+  return pass?.provider_object_id ?? null;
+}
+
+/**
  * Canonical shape of the cached moment on cards.metadata — the jsonb key names live
  * here and nowhere else, so the scan and seals writers can't drift apart.
  */
@@ -66,30 +87,13 @@ export async function triggerWalletUpdates(
   birthdayRewardName: string | null,
   lifecycleMessage: string | null,
 ) {
-  // PATCH the object the customer actually saved: a card re-import mints a new uuid,
-  // so the id derived from cardId can point at an object nobody holds while the saved
-  // pass (its id recorded in loyalty.passes at save time) silently freezes. Tenant-first
-  // filter matches the passes unique key, which also caps the result at one row.
-  // On a lookup failure we still push with the derived id — a possibly-stale target
-  // beats dropping the update — but say so, since that's the exact silent-freeze mode
-  // this lookup exists to prevent.
-  const googlePass = isGoogleWalletConfigured()
-    ? await prisma.passes
-        .findFirst({
-          where: { tenant_id: card.tenant_id, loyalty_card_id: cardId, provider: 'google', status: 'active' },
-          select: { provider_object_id: true },
-        })
-        .catch((err) => {
-          console.warn('[Wallet Update] google pass lookup failed, falling back to derived object id:', err);
-          return null;
-        })
-    : null;
+  const savedObjectId = await findSavedGoogleObjectId(card.tenant_id, cardId);
 
   const _wallet = await Promise.allSettled([
     sendApplePushUpdate(cardId),
     updateGoogleWalletObject({
       cardId, cardNumber,
-      objectId: googlePass?.provider_object_id ?? null,
+      objectId: savedObjectId,
       customerName: customerName || DEFAULT_CUSTOMER_NAME,
       balanceCentavos: card.balance_cents,
       visitsThisCycle: card.visits_this_cycle,
