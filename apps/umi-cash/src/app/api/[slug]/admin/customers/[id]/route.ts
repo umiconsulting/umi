@@ -104,7 +104,10 @@ export async function GET(
     recentVisits: recentVisits.map((v) => ({ id: v.id, scannedAt: v.occurred_at.toISOString() })),
     recentRedemptions: recentRedemptions.map((r) => ({
       id: r.id, redeemedAt: r.redeemed_at.toISOString(), note: r.note,
+      revertedAt: r.reverted_at?.toISOString() ?? null,
     })),
+    // The revert button is ADMIN-only ("solo a mi"); the page needs to know who's looking.
+    viewerIsAdmin: user.role === 'ADMIN',
     recentTransactions: recentTransactions.map((t) => ({
       id: t.id, type: t.type, amountCentavos: t.amount_cents,
       description: t.description, createdAt: t.created_at.toISOString(),

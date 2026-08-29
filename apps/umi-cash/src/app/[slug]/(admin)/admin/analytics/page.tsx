@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useTenant } from '@/context/TenantContext';
 import { authedFetch } from '@/lib/authed-fetch';
+import { bucketTrend, type AnalyticsRange } from '@/lib/analytics-range';
+import { formatDateTimeMX, formatDateShortMX } from '@/lib/intl';
 
 interface VisitDay {
   date: string;
@@ -34,19 +36,30 @@ interface Profitability {
   rewardCostConfigured: boolean;
 }
 
+interface RedemptionEntry {
+  id: string;
+  redeemedAt: string;
+  name: string | null;
+  customerId: string | null;
+  cardNumber: string;
+  revertedAt: string | null;
+}
+
 interface AnalyticsData {
   visitsByDay: VisitDay[];
+  prevPeriodVisits: number;
   topCustomers: TopCustomer[];
   newCustomersByWeek: WeekEntry[];
   totalBalance: string;
   topupsThisMonth: string;
-  rewardsRedeemedThisMonth: number;
+  rewardsRedeemedInRange: number;
+  redemptions: RedemptionEntry[];
   avgVisitsPerCustomer: number;
   retentionRate: number;
   profitability: Profitability;
 }
 
-type Range = 7 | 30 | 90 | 365;
+type Range = AnalyticsRange;
 
 function Stat({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent?: boolean }) {
   return (
@@ -104,22 +117,31 @@ export default function AnalyticsPage() {
   const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState<Range>(30);
 
+  // The API scopes the data server-side, so every chip needs its own fetch —
+  // slicing a fixed 30-day payload client-side is what made 90d/Año dead buttons.
+  // The cleanup flag keeps a slow response for an old range from overwriting the
+  // one the user is actually looking at.
   useEffect(() => {
-    authedFetch(slug, `/api/${slug}/admin/analytics`)
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    authedFetch(slug, `/api/${slug}/admin/analytics?days=${range}`)
       .then((r) => {
         if (!r.ok) throw new Error('Error al cargar analíticas');
         return r.json();
       })
-      .then((d: AnalyticsData) => setData(d))
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Error desconocido'))
-      .finally(() => setLoading(false));
-  }, [slug]);
+      .then((d: AnalyticsData) => { if (!cancelled) setData(d); })
+      .catch((e: unknown) => { if (!cancelled) setError(e instanceof Error ? e.message : 'Error desconocido'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [slug, range]);
 
-  const trendValues = (data?.visitsByDay ?? []).slice(-range).map((v) => v.count);
-  const visitsTotal = trendValues.reduce((s, v) => s + v, 0);
+  const dailyCounts = (data?.visitsByDay ?? []).map((v) => v.count);
+  const visitsTotal = dailyCounts.reduce((s, v) => s + v, 0);
+  // 365 daily bars render as noise — bucket long ranges, totals preserved.
+  const trendValues = bucketTrend(dailyCounts, 60);
 
-  const prevTrend = (data?.visitsByDay ?? []).slice(-range * 2, -range).map((v) => v.count);
-  const prevTotal = prevTrend.reduce((s, v) => s + v, 0);
+  const prevTotal = data?.prevPeriodVisits ?? 0;
   const delta = prevTotal > 0 ? Math.round(((visitsTotal - prevTotal) / prevTotal) * 100) : null;
 
   const rangeLabel: Record<Range, string> = { 7: '7d', 30: '30d', 90: '90d', 365: 'Año' };
@@ -173,7 +195,7 @@ export default function AnalyticsPage() {
               sub={`${data?.avgVisitsPerCustomer ?? 0} vis/cliente`}
               accent
             />
-            <Stat label="Canjes (mes)" value={data?.rewardsRedeemedThisMonth ?? 0} />
+            <Stat label={`Canjes (${rangeLabel[range]})`} value={data?.rewardsRedeemedInRange ?? 0} />
             {tenant.topupEnabled ? (
               <Stat label="Recargas (mes)" value={data?.topupsThisMonth ?? '$0'} sub={`Saldo: ${data?.totalBalance ?? '$0'}`} />
             ) : (
@@ -199,6 +221,81 @@ export default function AnalyticsPage() {
           <p className="text-sm text-center py-6" style={{ color: 'var(--color-ink-light)' }}>Sin datos aún</p>
         ) : (
           <TrendChart values={trendValues} />
+        )}
+      </div>
+
+      {/* Bitácora de canjes — named, dated, so register cuts can be reconciled later */}
+      <div className="u-fade-up d3 u-surface p-5 mb-5">
+        <div className="u-eyebrow mb-3">Últimos canjes · {rangeLabel[range]}</div>
+        {loading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-6 rounded animate-pulse" style={{ background: 'var(--color-surface-dark)' }} />
+            ))}
+          </div>
+        ) : (data?.redemptions ?? []).length === 0 ? (
+          <p className="text-sm text-center py-4" style={{ color: 'var(--color-ink-light)' }}>
+            Sin canjes en el periodo
+          </p>
+        ) : (
+          <>
+            <div className="space-y-2">
+              {(data?.redemptions ?? []).map((r) => {
+                const row = (
+                  <div className="flex items-center justify-between text-sm gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0"
+                        style={{
+                          background: 'color-mix(in oklab, var(--color-brand) 15%, white)',
+                          color: 'var(--color-brand-dark)',
+                        }}
+                      >
+                        ★
+                      </span>
+                      <div className="min-w-0">
+                        <p
+                          className="truncate font-medium"
+                          style={{
+                            color: r.revertedAt ? 'var(--color-ink-light)' : 'var(--color-ink)',
+                            textDecoration: r.revertedAt ? 'line-through' : undefined,
+                          }}
+                        >
+                          {r.name || 'Sin nombre'}
+                        </p>
+                        <p className="text-xs" style={{ color: 'var(--color-ink-light)' }}>{r.cardNumber}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs" style={{ color: 'var(--color-ink-light)' }}>
+                        {formatDateTimeMX(new Date(r.redeemedAt))}
+                      </span>
+                      {r.revertedAt && (
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full font-medium"
+                          style={{ background: 'var(--color-surface-dark)', color: 'var(--color-ink-light)' }}
+                        >
+                          Revertido · {formatDateShortMX(new Date(r.revertedAt))}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+                return r.customerId ? (
+                  <Link key={r.id} href={`/${slug}/admin/customers/${r.customerId}`} className="block">
+                    {row}
+                  </Link>
+                ) : (
+                  <div key={r.id}>{row}</div>
+                );
+              })}
+            </div>
+            {(data?.rewardsRedeemedInRange ?? 0) > (data?.redemptions ?? []).length && (
+              <p className="text-xs mt-3" style={{ color: 'var(--color-ink-light)' }}>
+                Se muestran los últimos {(data?.redemptions ?? []).length} de {data?.rewardsRedeemedInRange}.
+              </p>
+            )}
+          </>
         )}
       </div>
 
