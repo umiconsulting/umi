@@ -24,6 +24,13 @@ export function isGoogleWalletConfigured(): boolean {
 
 export interface GooglePassData {
   cardId: string;
+  /**
+   * Full wallet object id the customer actually saved (loyalty.passes.provider_object_id).
+   * A card re-import mints a new uuid, so the id derived from cardId can name an object
+   * nobody holds — when the recorded id exists it wins; the derived id is the fallback
+   * for fresh passes that have no row yet.
+   */
+  objectId?: string | null;
   cardNumber: string;
   customerName: string;
   balanceCentavos: number;
@@ -46,9 +53,13 @@ function getClassId(tenantSlug?: string): string {
   return `${ISSUER_ID}.${tenantSlug ? `${tenantSlug}_${CLASS_ID_PREFIX}` : CLASS_ID_PREFIX}`;
 }
 
+function resolveObjectId(data: GooglePassData): string {
+  return data.objectId || `${ISSUER_ID}.card_${data.cardId}`;
+}
+
 function getLoyaltyObject(data: GooglePassData) {
   const remaining = data.visitsRequired - data.visitsThisCycle;
-  const objectId = `${ISSUER_ID}.card_${data.cardId}`;
+  const objectId = resolveObjectId(data);
 
   // Visual stamp progress lives in the heroImage (a rendered stamp strip); the
   // customer name lives in accountName. So the only text modules left are the
@@ -270,7 +281,7 @@ export async function updateGoogleWalletObject(data: GooglePassData): Promise<vo
   if (!isGoogleWalletConfigured()) return;
 
   try {
-    const objectId = `${ISSUER_ID}.card_${data.cardId}`;
+    const objectId = resolveObjectId(data);
     const object = getLoyaltyObject(data);
     const token = await withTimeout(getGoogleAuthToken(), GOOGLE_TIMEOUT_MS, 'google auth token');
 
