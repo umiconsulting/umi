@@ -162,25 +162,27 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     const customerName = card.person?.display_name ?? null;
     // Credit is committed — the wallet refresh must not delay the response (see
     // afterResponse: a slow Apple/Google hop surfaced as "Error de conexión" on a
-    // seal that had already landed).
-    await afterResponse(
-      'wallet:seals',
-      triggerWalletUpdates(
-        cardId,
-        card.card_number,
-        result.card,
-        customerName,
-        visitsRequired,
-        rewardName,
-        card.created_at,
-        tenant.name,
-        params.slug,
-        tenant.primaryColor,
-        birthdayRewardName,
-        // A replayed credit changed nothing — never re-notify its stale cached moment.
-        result.replayed ? null : readLifecycleMessage(result.card.metadata),
-      ),
-    );
+    // seal that had already landed). A replayed credit changed nothing, so there is
+    // nothing to push — skip the provider hops entirely rather than re-send stale state.
+    if (!result.replayed) {
+      await afterResponse(
+        'wallet:seals',
+        triggerWalletUpdates(
+          cardId,
+          card.card_number,
+          result.card,
+          customerName,
+          visitsRequired,
+          rewardName,
+          card.created_at,
+          tenant.name,
+          params.slug,
+          tenant.primaryColor,
+          birthdayRewardName,
+          readLifecycleMessage(result.card.metadata),
+        ),
+      );
+    }
 
     const sealWord = seals === 1 ? 'sello' : 'sellos';
     let message = result.replayed
