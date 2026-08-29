@@ -119,7 +119,10 @@ export default function AnalyticsPage() {
 
   // The API scopes the data server-side, so every chip needs its own fetch —
   // slicing a fixed 30-day payload client-side is what made 90d/Año dead buttons.
+  // The cleanup flag keeps a slow response for an old range from overwriting the
+  // one the user is actually looking at.
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(null);
     authedFetch(slug, `/api/${slug}/admin/analytics?days=${range}`)
@@ -127,9 +130,10 @@ export default function AnalyticsPage() {
         if (!r.ok) throw new Error('Error al cargar analíticas');
         return r.json();
       })
-      .then((d: AnalyticsData) => setData(d))
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Error desconocido'))
-      .finally(() => setLoading(false));
+      .then((d: AnalyticsData) => { if (!cancelled) setData(d); })
+      .catch((e: unknown) => { if (!cancelled) setError(e instanceof Error ? e.message : 'Error desconocido'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [slug, range]);
 
   const dailyCounts = (data?.visitsByDay ?? []).map((v) => v.count);

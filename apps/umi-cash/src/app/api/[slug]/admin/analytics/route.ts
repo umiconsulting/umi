@@ -23,15 +23,15 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
   const now = new Date();
 
-  // Start of the selected window
+  // Start of the selected window: midnight days-1 ago, so the window covers exactly
+  // the same `days` calendar dates the visitsByDay chart renders (today included).
   const rangeStart = new Date(now);
-  rangeStart.setDate(rangeStart.getDate() - days);
+  rangeStart.setDate(rangeStart.getDate() - (days - 1));
   rangeStart.setHours(0, 0, 0, 0);
 
-  // Start of the window before it (for the vs-previous-period delta)
-  const prevRangeStart = new Date(now);
-  prevRangeStart.setDate(prevRangeStart.getDate() - days * 2);
-  prevRangeStart.setHours(0, 0, 0, 0);
+  // The adjacent, equal-length window before it (for the vs-previous-period delta)
+  const prevRangeStart = new Date(rangeStart);
+  prevRangeStart.setDate(prevRangeStart.getDate() - days);
 
   // 30 days ago
   const thirtyDaysAgo = new Date(now);
