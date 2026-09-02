@@ -180,6 +180,10 @@ async function handleGetPass(req: NextRequest, slug: string, serial: string) {
   const tenant = await getTenant(slug);
   if (!tenant) return new NextResponse(null, { status: 404 });
 
+  if (card.tenant_id !== tenant.id) {
+    return NextResponse.json({ error: 'Tarjeta no encontrada' }, { status: 404 });
+  }
+
   const [{ visitsRequired, rewardName }, locations] = await Promise.all([
     getRewardProfileForCard(tenant.id, card),
     prisma.locations.findMany({ where: { tenant_id: tenant.id, status: 'active', lat: { not: null }, lng: { not: null } } }),

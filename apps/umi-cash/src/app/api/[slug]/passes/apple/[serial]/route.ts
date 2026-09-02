@@ -30,6 +30,10 @@ export async function GET(
   const tenant = await getTenant(params.slug);
   if (!tenant) return new NextResponse(null, { status: 404 });
 
+  if (card.tenant_id !== tenant.id) {
+    return NextResponse.json({ error: 'Tarjeta no encontrada' }, { status: 404 });
+  }
+
   const [{ visitsRequired, rewardName }, locations, activeBirthdayReward] = await Promise.all([
     getRewardProfileForCard(card.tenant_id, card),
     prisma.locations.findMany({ where: { tenant_id: tenant.id, status: 'active', lat: { not: null }, lng: { not: null } } }),
