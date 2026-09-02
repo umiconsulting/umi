@@ -18,6 +18,8 @@ interface CustomerDetail {
   recentRedemptions: { id: string; redeemedAt: string; note: string | null; revertedAt: string | null }[];
   recentTransactions: { id: string; type: string; amountCentavos: number; description: string | null; createdAt: string }[];
   viewerIsAdmin: boolean;
+  rewardName: string;
+  customReward: { name: string; description: string | null } | null;
 }
 
 function initialsFrom(name: string | null) {
@@ -46,6 +48,10 @@ export default function CustomerDetailPage() {
   // Two-tap revert (same pattern as confirmRedeem): first tap arms one row, second executes.
   const [revertArmedId, setRevertArmedId] = useState<string | null>(null);
   const [revertLoadingId, setRevertLoadingId] = useState<string | null>(null);
+  const [showRewardEdit, setShowRewardEdit] = useState(false);
+  const [rewardNameInput, setRewardNameInput] = useState('');
+  const [rewardDescInput, setRewardDescInput] = useState('');
+  const [savingReward, setSavingReward] = useState(false);
 
   async function loadCustomer() {
     const res = await authedFetch(slug, `/api/${slug}/admin/customers/${id}`);
@@ -123,6 +129,25 @@ export default function CustomerDetailPage() {
     }
   }
 
+  async function saveCustomReward(clear: boolean) {
+    setSavingReward(true);
+    try {
+      const res = await authedFetch(slug, `/api/${slug}/admin/customers/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customReward: clear ? null : { name: rewardNameInput.trim(), description: rewardDescInput.trim() || null },
+        }),
+      });
+      if (res.ok) {
+        setShowRewardEdit(false);
+        await loadCustomer();
+      }
+    } finally {
+      setSavingReward(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="px-5 py-6 max-w-lg mx-auto animate-pulse space-y-4">
@@ -184,6 +209,64 @@ export default function CustomerDetailPage() {
         <div className="u-progress-track">
           <div className="u-progress-fill" style={{ width: `${progressPct}%` }} />
         </div>
+      </div>
+
+      <div className="u-surface p-4 mt-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="u-eyebrow" style={{ fontSize: 10 }}>Recompensa</span>
+            <p className="text-sm font-medium" style={{ color: 'var(--color-ink)' }}>
+              {customer.rewardName}
+              {customer.customReward && (
+                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Personalizada</span>
+              )}
+            </p>
+            {customer.customReward?.description && (
+              <p className="text-xs mt-0.5" style={{ color: 'var(--color-ink-light)' }}>{customer.customReward.description}</p>
+            )}
+          </div>
+          {customer.viewerIsAdmin && !showRewardEdit && (
+            <button
+              className="u-btn u-btn-secondary px-3"
+              onClick={() => {
+                setRewardNameInput(customer.customReward?.name ?? '');
+                setRewardDescInput(customer.customReward?.description ?? '');
+                setShowRewardEdit(true);
+              }}
+            >
+              Editar
+            </button>
+          )}
+        </div>
+        {customer.viewerIsAdmin && showRewardEdit && (
+          <div className="mt-3 space-y-2">
+            <input
+              type="text" value={rewardNameInput} onChange={(e) => setRewardNameInput(e.target.value)}
+              placeholder="Nombre de la recompensa" className="u-input" maxLength={80} autoFocus
+            />
+            <input
+              type="text" value={rewardDescInput} onChange={(e) => setRewardDescInput(e.target.value)}
+              placeholder="Descripción (opcional)" className="u-input" maxLength={200}
+            />
+            <div className="flex gap-2">
+              <button className="u-btn u-btn-secondary flex-1" onClick={() => setShowRewardEdit(false)} disabled={savingReward}>
+                Cancelar
+              </button>
+              {customer.customReward && (
+                <button className="u-btn u-btn-secondary flex-1" onClick={() => saveCustomReward(true)} disabled={savingReward}>
+                  Quitar personalizada
+                </button>
+              )}
+              <button
+                className="u-btn u-btn-primary flex-1"
+                onClick={() => saveCustomReward(false)}
+                disabled={savingReward || !rewardNameInput.trim()}
+              >
+                {savingReward ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className={`u-fade-up d2 grid gap-3 mb-4 ${tenant.topupEnabled ? 'grid-cols-2' : 'grid-cols-3'}`}>
