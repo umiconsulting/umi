@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateGoogleWalletURL, isGoogleWalletConfigured } from '@/lib/pass-google';
-import { getActiveRewardConfig, rewardConfigDefaults } from '@/lib/prisma-helpers';
+import { getRewardProfileForCard } from '@/lib/prisma-helpers';
 import { logError } from '@/lib/log';
 import { DEFAULT_CUSTOMER_NAME } from '@/lib/constants';
 import { getTenant } from '@/lib/tenant';
@@ -30,8 +30,8 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   });
   if (!card) return NextResponse.json({ error: 'Tarjeta no encontrada' }, { status: 404 });
 
-  const [rewardConfig, activeBirthdayReward, existingPass] = await Promise.all([
-    getActiveRewardConfig(tenant.id),
+  const [{ visitsRequired, rewardName }, activeBirthdayReward, existingPass] = await Promise.all([
+    getRewardProfileForCard(tenant.id, card),
     prisma.birthday_rewards.findFirst({
       where: { loyalty_card_id: card.id, status: 'active', expires_at: { gte: new Date() } },
     }),
@@ -39,8 +39,6 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       where: { tenant_id: tenant.id, loyalty_card_id: card.id, provider: 'google' },
     }),
   ]);
-
-  const { visitsRequired, rewardName } = rewardConfigDefaults(rewardConfig);
   const customerName = card.accounts?.people?.display_name || DEFAULT_CUSTOMER_NAME;
   const cardMeta = (card.metadata as Record<string, unknown>) ?? {};
   const lifecycleMessage = (cardMeta.lifecycle_message as string) ?? null;

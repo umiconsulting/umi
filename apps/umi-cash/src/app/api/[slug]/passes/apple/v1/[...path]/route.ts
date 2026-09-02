@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateApplePass, isAppleWalletConfigured } from '@/lib/pass-apple';
-import { getActiveRewardConfig, rewardConfigDefaults } from '@/lib/prisma-helpers';
+import { getRewardProfileForCard } from '@/lib/prisma-helpers';
 import { DEFAULT_CUSTOMER_NAME } from '@/lib/constants';
 import { getTenant, getActivePromo } from '@/lib/tenant';
 
@@ -180,11 +180,10 @@ async function handleGetPass(req: NextRequest, slug: string, serial: string) {
   const tenant = await getTenant(slug);
   if (!tenant) return new NextResponse(null, { status: 404 });
 
-  const [rewardConfig, locations] = await Promise.all([
-    getActiveRewardConfig(tenant.id),
+  const [{ visitsRequired, rewardName }, locations] = await Promise.all([
+    getRewardProfileForCard(tenant.id, card),
     prisma.locations.findMany({ where: { tenant_id: tenant.id, status: 'active', lat: { not: null }, lng: { not: null } } }),
   ]);
-  const { visitsRequired, rewardName } = rewardConfigDefaults(rewardConfig);
   const customerName = card.accounts?.people?.display_name || DEFAULT_CUSTOMER_NAME;
   const cardMeta = (card.metadata as Record<string, unknown>) ?? {};
   const lifecycleMessage = (cardMeta.lifecycle_message as string) ?? null;

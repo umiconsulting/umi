@@ -4,7 +4,7 @@ import { resolveRewardProfile, type RewardProfile } from './reward-profile';
 
 export async function getActiveRewardConfig(tenantId: string) {
   return prisma.reward_configs.findFirst({
-    where: { tenant_id: tenantId, is_active: true },
+    where: { tenant_id: tenantId, is_active: true, kind: 'standard' },
     orderBy: { activated_at: 'desc' },
   });
 }

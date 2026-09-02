@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { formatMXN } from '@/lib/currency';
-import { getActiveRewardConfig, rewardConfigDefaults } from '@/lib/prisma-helpers';
+import { getRewardProfileForCard } from '@/lib/prisma-helpers';
 import { getTenant } from '@/lib/tenant';
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   }
 
   // CUSTOMER session subject is the person id. Reach the card via person → account → card.
-  const [card, rewardConfig, person] = await Promise.all([
+  const [card, person] = await Promise.all([
     prisma.cards.findFirst({
       where: { tenant_id: tenant.id, accounts: { person_id: user.sub } },
       include: {
@@ -26,13 +26,12 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
         wallet_transactions: { orderBy: { created_at: 'desc' }, take: 5 },
       },
     }),
-    getActiveRewardConfig(tenant.id),
     prisma.people.findUnique({ where: { id: user.sub } }),
   ]);
 
   if (!card) return NextResponse.json({ error: 'Tarjeta no encontrada' }, { status: 404 });
 
-  const { visitsRequired, rewardName, rewardDescription } = rewardConfigDefaults(rewardConfig);
+  const { visitsRequired, rewardName, rewardDescription } = await getRewardProfileForCard(tenant.id, card);
   const progressPercent = Math.min(Math.round((card.visits_this_cycle / visitsRequired) * 100), 100);
 
   return NextResponse.json({
