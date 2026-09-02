@@ -218,6 +218,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
           if (newTotalVisits === 1) momentJourney = 'first_visit';
           else if (newVisitsThisCycle === visitsRequired - 1) momentJourney = 'milestone_one_left';
           else if (visitsRequired >= 4 && newVisitsThisCycle === Math.floor(visitsRequired / 2)) momentJourney = 'milestone_halfway';
+          // Plain mid-cycle visit still gets a moment: the lifecycle field is the
+          // pass's ONLY notification channel on Apple (see pass-apple.ts — multiple
+          // changed fields with changeMessage collapse to "Store Card changed"),
+          // so every visit must change it with meaningful copy.
+          else momentJourney = 'visit_recorded';
         }
         cycleForCopy = earnedReward ? visitsRequired : newVisitsThisCycle;
 

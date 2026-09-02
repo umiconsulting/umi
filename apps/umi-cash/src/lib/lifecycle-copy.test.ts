@@ -7,6 +7,30 @@ import {
   resolveJourneyTemplate,
 } from './lifecycle-copy';
 
+describe('visit_recorded journey', () => {
+  it('is registered across the whole journey registry', () => {
+    // Every plain visit renders this moment (the single Apple changeMessage
+    // channel) — missing registry entries would silence per-visit notifications.
+    expect(LIFECYCLE_JOURNEYS.map((j) => j.key)).toContain('visit_recorded');
+    expect(DEFAULT_LIFECYCLE_COPY.visit_recorded).toBeTruthy();
+    expect(LIFECYCLE_VARIABLES.visit_recorded).toEqual(['{name}', '{tenant}', '{rewardName}', '{visitsThisCycle}', '{visitsRequired}']);
+  });
+
+  it('renders progress with every variable substituted', () => {
+    const body = renderTemplate(resolveJourneyTemplate(null, 'visit_recorded'), {
+      name: 'Lucia',
+      tenant: 'Kalala Café',
+      rewardName: 'Bebida gratis',
+      visitsThisCycle: 4,
+      visitsRequired: 10,
+    });
+    expect(body).toContain('4/10');
+    expect(body).toContain('Bebida gratis');
+    expect(body).not.toMatch(/\{\w+\}/); // no unsubstituted placeholders
+    expect(body.length).toBeLessThanOrEqual(200); // wallet display budget (broadcast rule)
+  });
+});
+
 describe('reward_redeemed journey', () => {
   it('is registered across the whole journey registry', () => {
     // A journey missing from any of these maps silently renders nothing (or
