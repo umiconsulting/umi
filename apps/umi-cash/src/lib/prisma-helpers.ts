@@ -1,5 +1,6 @@
 import { prisma } from './prisma';
 import { DEFAULT_VISITS_REQUIRED, DEFAULT_REWARD_NAME } from './constants';
+import { resolveRewardProfile, type RewardProfile } from './reward-profile';
 
 export async function getActiveRewardConfig(tenantId: string) {
   return prisma.reward_configs.findFirst({
@@ -14,6 +15,24 @@ export function rewardConfigDefaults(config: Awaited<ReturnType<typeof getActive
     rewardName: config?.reward_name ?? DEFAULT_REWARD_NAME,
     rewardDescription: config?.reward_description ?? null,
   };
+}
+
+/**
+ * Card-scoped reward resolution: tenant active default + this card's override
+ * (if any). The override row is fetched by id but tenant-guarded so a stale or
+ * cross-tenant id can never leak another tenant's reward copy.
+ */
+export async function getRewardProfileForCard(
+  tenantId: string,
+  card: { reward_config_id: string | null },
+): Promise<RewardProfile> {
+  const [defaultConfig, overrideConfig] = await Promise.all([
+    getActiveRewardConfig(tenantId),
+    card.reward_config_id
+      ? prisma.reward_configs.findFirst({ where: { tenant_id: tenantId, id: card.reward_config_id } })
+      : Promise.resolve(null),
+  ]);
+  return resolveRewardProfile(defaultConfig, overrideConfig);
 }
 
 /**
