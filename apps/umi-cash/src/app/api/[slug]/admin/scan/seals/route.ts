@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getStaffMemberId } from '@/lib/identity';
-import { getActiveRewardConfig, rewardConfigDefaults, findCardByIdentifier } from '@/lib/prisma-helpers';
+import { getRewardProfileForCard, findCardByIdentifier } from '@/lib/prisma-helpers';
 import { lockCard } from '@/lib/wallet';
 import { getTenant, requireActiveSubscription } from '@/lib/tenant';
 import { triggerWalletUpdates, buildCardSummary, readLifecycleMessage, lifecycleMetadata } from '@/lib/scan-helpers';
@@ -79,8 +79,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     if (!staffMemberId) {
       return NextResponse.json({ error: 'Tu usuario no está registrado como personal' }, { status: 403 });
     }
-    const rewardConfig = await getActiveRewardConfig(tenant.id);
-    const { visitsRequired, rewardName } = rewardConfigDefaults(rewardConfig);
+    const rewardProfile = await getRewardProfileForCard(tenant.id, card);
+    const { visitsRequired, rewardName } = rewardProfile;
     const required = Math.max(1, visitsRequired); // guard divide-by-zero on a mis-set config
 
     // Keep the pass's birthday reward visible if one is still active (this action

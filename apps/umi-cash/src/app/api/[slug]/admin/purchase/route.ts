@@ -5,7 +5,7 @@ import { requireAuth, generateRandomToken } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getStaffMemberId } from '@/lib/identity';
 import { applyWalletDelta, lockCard } from '@/lib/wallet';
-import { findCardByIdentifier, getActiveRewardConfig, rewardConfigDefaults } from '@/lib/prisma-helpers';
+import { findCardByIdentifier, getRewardProfileForCard } from '@/lib/prisma-helpers';
 import { formatMXN } from '@/lib/currency';
 import { DEFAULT_CUSTOMER_NAME } from '@/lib/constants';
 import { getTenant, requireActiveSubscription } from '@/lib/tenant';
@@ -96,8 +96,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     });
 
     const customerName = card.person?.display_name ?? null;
-    const rewardConfig = await getActiveRewardConfig(tenant.id);
-    const { visitsRequired, rewardName } = rewardConfigDefaults(rewardConfig);
+    const { visitsRequired, rewardName } = await getRewardProfileForCard(tenant.id, card);
 
     // Await push inline — waitUntil + http2 is unreliable on Vercel
     await Promise.all([

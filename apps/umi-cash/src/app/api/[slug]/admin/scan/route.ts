@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireAuth, generateRandomToken } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getStaffMemberId } from '@/lib/identity';
-import { getActiveRewardConfig, rewardConfigDefaults } from '@/lib/prisma-helpers';
+import { getRewardProfileForCard } from '@/lib/prisma-helpers';
 import { resolveScanTarget } from '@/lib/scan-resolve';
 import { lockCard } from '@/lib/wallet';
 import { DEFAULT_CUSTOMER_NAME, SCAN_ACTIONS } from '@/lib/constants';
@@ -98,8 +98,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       console.warn(`[Scan] After-hours scan by staff ${staff.sub} for card ${card.id} at hour ${localHour} day ${localDay} (hours: ${dayHours ? dayHours.join('-') : 'closed'})`);
     }
 
-    const rewardConfig = await getActiveRewardConfig(tenant.id);
-    const { visitsRequired, rewardName } = rewardConfigDefaults(rewardConfig);
+    const rewardProfile = await getRewardProfileForCard(tenant.id, card);
+    const { visitsRequired, rewardName } = rewardProfile;
 
     // A NULL expires_at means "never expires" — treat it as active (NULL >= now() is
     // NULL in Postgres, so the old `expires_at >= now` filter silently hid it).
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     if (includesBirthday && !activeBirthdayReward) {
       return NextResponse.json({ error: 'No hay regalo de cumpleaños activo' }, { status: 400 });
     }
-    if (includesRedeem && !rewardConfig) {
+    if (includesRedeem && !rewardProfile.redemptionConfigId) {
       // A reward config is required to record a redemption (FK to reward_configs).
       return NextResponse.json({ error: 'No hay configuración de recompensa activa' }, { status: 400 });
     }
@@ -167,7 +167,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         performed.push(SCAN_ACTIONS.BIRTHDAY_REDEEM);
       }
 
-      if (includesRedeem && rewardConfig) {
+      if (includesRedeem && rewardProfile.redemptionConfigId) {
         if (fresh.pending_rewards <= 0) {
           throw new ScanError(400, 'No hay recompensas pendientes para canjear');
         }
@@ -182,7 +182,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
           data: {
             tenant_id: tenant.id,
             loyalty_card_id: card.id,
-            reward_config_id: rewardConfig.id,
+            reward_config_id: rewardProfile.redemptionConfigId,
             staff_member_id: staffMemberId,
           },
         });

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getStaffMemberId } from '@/lib/identity';
-import { getActiveRewardConfig, rewardConfigDefaults } from '@/lib/prisma-helpers';
+import { getRewardProfileForCard } from '@/lib/prisma-helpers';
 import { lockCard } from '@/lib/wallet';
 import { getTenant, requireActiveSubscription } from '@/lib/tenant';
 import { triggerWalletUpdates, readLifecycleMessage, lifecycleMetadata } from '@/lib/scan-helpers';
@@ -57,8 +57,11 @@ export async function POST(
     });
     if (!redemption) return NextResponse.json({ error: 'Canje no encontrado' }, { status: 404 });
 
-    const rewardConfig = await getActiveRewardConfig(tenant.id);
-    const { visitsRequired, rewardName } = rewardConfigDefaults(rewardConfig);
+    const cardForReward = await prisma.cards.findUnique({
+      where: { id: redemption.loyalty_card_id },
+      select: { reward_config_id: true },
+    });
+    const { visitsRequired, rewardName } = await getRewardProfileForCard(tenant.id, cardForReward ?? { reward_config_id: null });
 
     const card = await prisma.$transaction(async (tx) => {
       // Serialize against concurrent scans/redeems on this card and re-check the

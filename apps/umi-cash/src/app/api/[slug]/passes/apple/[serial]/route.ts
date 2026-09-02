@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateApplePass, isAppleWalletConfigured } from '@/lib/pass-apple';
-import { getActiveRewardConfig, rewardConfigDefaults } from '@/lib/prisma-helpers';
+import { getRewardProfileForCard } from '@/lib/prisma-helpers';
 import { DEFAULT_CUSTOMER_NAME } from '@/lib/constants';
 import { getTenant, getActivePromo } from '@/lib/tenant';
 
@@ -30,14 +30,17 @@ export async function GET(
   const tenant = await getTenant(params.slug);
   if (!tenant) return new NextResponse(null, { status: 404 });
 
-  const [rewardConfig, locations, activeBirthdayReward] = await Promise.all([
-    getActiveRewardConfig(card.tenant_id),
+  if (card.tenant_id !== tenant.id) {
+    return NextResponse.json({ error: 'Tarjeta no encontrada' }, { status: 404 });
+  }
+
+  const [{ visitsRequired, rewardName }, locations, activeBirthdayReward] = await Promise.all([
+    getRewardProfileForCard(card.tenant_id, card),
     prisma.locations.findMany({ where: { tenant_id: tenant.id, status: 'active', lat: { not: null }, lng: { not: null } } }),
     prisma.birthday_rewards.findFirst({
       where: { loyalty_card_id: card.id, status: 'active', expires_at: { gte: new Date() } },
     }),
   ]);
-  const { visitsRequired, rewardName } = rewardConfigDefaults(rewardConfig);
   const customerName = card.accounts?.people?.display_name || DEFAULT_CUSTOMER_NAME;
   const cardMeta = (card.metadata as Record<string, unknown>) ?? {};
   const lifecycleMessage = (cardMeta.lifecycle_message as string) ?? null;

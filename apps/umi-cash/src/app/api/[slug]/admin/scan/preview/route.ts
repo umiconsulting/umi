@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getActiveRewardConfig, rewardConfigDefaults } from '@/lib/prisma-helpers';
+import { getRewardProfileForCard } from '@/lib/prisma-helpers';
 import { resolveScanTarget } from '@/lib/scan-resolve';
 import { formatMXN } from '@/lib/currency';
 import { getTenant, requireActiveSubscription } from '@/lib/tenant';
@@ -41,8 +41,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       return NextResponse.json({ error: 'No puedes escanear tu propia tarjeta' }, { status: 403 });
     }
 
-    const [rewardConfig, activeBirthdayReward] = await Promise.all([
-      getActiveRewardConfig(tenant.id),
+    const [rewardProfile, activeBirthdayReward] = await Promise.all([
+      getRewardProfileForCard(tenant.id, card),
       prisma.birthday_rewards.findFirst({
         // NULL expires_at = never expires (Postgres NULL >= now() is NULL, not true).
         where: {
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         },
       }),
     ]);
-    const { visitsRequired, rewardName } = rewardConfigDefaults(rewardConfig);
+    const { visitsRequired, rewardName } = rewardProfile;
 
     // Check if already visited today (calendar day in tenant timezone)
     const recentVisit = await prisma.visit_events.findFirst({

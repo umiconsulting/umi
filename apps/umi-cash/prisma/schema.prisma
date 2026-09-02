@@ -556,6 +556,9 @@ model cards {
   qr_issued_at        DateTime?             @db.Timestamptz(6)
   status              String                @default("active")
   metadata            Json                  @default("{}")
+  // Per-client reward override (reward identity only — visits_required always
+  // comes from the tenant's active default config). NULL = standard reward.
+  reward_config_id    String?               @db.Uuid
   created_at          DateTime              @default(now()) @db.Timestamptz(6)
   // @updatedAt: every Prisma update must bump this — the Apple Wallet "passesUpdatedSince"
   // check (passes/apple registration route) only returns a pass as changed when
@@ -566,6 +569,7 @@ model cards {
   birthday_rewards    birthday_rewards[]
   accounts            accounts              @relation(fields: [tenant_id, account_id], references: [tenant_id, id], onDelete: Cascade, onUpdate: NoAction)
   tenants             tenants               @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  reward_override     reward_configs?       @relation("card_reward_override", fields: [tenant_id, reward_config_id], references: [tenant_id, id], onDelete: NoAction, onUpdate: NoAction)
   gift_cards          gift_cards[]
   lifecycle_sends     lifecycle_sends[]
   passes              passes[]
@@ -772,8 +776,13 @@ model reward_configs {
   is_active          Boolean              @default(true)
   activated_at       DateTime             @default(now()) @db.Timestamptz(6)
   created_at         DateTime             @default(now()) @db.Timestamptz(6)
+  // 'standard' = a tenant default (current or retired); 'override' = a per-client
+  // custom reward. Keeps override rows out of the rewards settings "history" list
+  // and out of getActiveRewardConfig's candidate pool by construction.
+  kind               String               @default("standard")
   tenants            tenants              @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   programs           programs?            @relation(fields: [tenant_id, program_id], references: [tenant_id, id], onDelete: SetNull, onUpdate: NoAction)
+  override_cards     cards[]              @relation("card_reward_override")
   reward_redemptions reward_redemptions[]
 
   @@unique([tenant_id, id])

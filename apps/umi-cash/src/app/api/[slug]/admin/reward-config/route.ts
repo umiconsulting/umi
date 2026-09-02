@@ -27,7 +27,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       orderBy: { activated_at: 'desc' },
     }),
     prisma.reward_configs.findMany({
-      where: { tenant_id: tenant.id, is_active: false },
+      where: { tenant_id: tenant.id, is_active: false, kind: 'standard' },
       orderBy: { activated_at: 'desc' },
       take: 10,
     }),
