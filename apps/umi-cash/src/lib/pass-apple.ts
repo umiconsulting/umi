@@ -238,17 +238,20 @@ export async function generateApplePass(data: PassData): Promise<{
     // 'stamps' passStyle — used by all seeded tenants (Ribera, Kalala, Néctar).
     // Pairs with the dynamic image strip generated above; text fields show
     // the count remaining and reward type.
+    // No changeMessage on the progress fields: a visit changes several of them at
+    // once, and iOS collapses multiple changed fields with changeMessage into the
+    // generic "Store Card changed" notification. The lifecycle back field (below)
+    // is the single notification channel — the scan writes a moment there on
+    // EVERY visit, so its changeMessage carries the real copy alone.
     pass.secondaryFields.push({
       key: 'remaining',
       label: 'VISITAS FALTANTES',
       value: `${remaining} visita${remaining !== 1 ? 's' : ''}`,
-      changeMessage: 'Visitas faltantes: %@',
     });
     pass.secondaryFields.push({
       key: 'rewards',
       label: 'RECOMPENSA',
       value: data.rewardName,
-      changeMessage: 'Recompensa: %@',
     });
     // Néctar Café shows the member name on the front of the stamps pass.
     if (data.tenantSlug === 'nectarcafe') {
@@ -260,7 +263,8 @@ export async function generateApplePass(data: PassData): Promise<{
     const filled = '●'.repeat(data.visitsThisCycle);
     const empty = '○'.repeat(data.visitsRequired - data.visitsThisCycle);
     pass.secondaryFields.push({ key: 'memberName', label: 'MIEMBRO', value: data.customerName });
-    pass.secondaryFields.push({ key: 'stamps', label: data.rewardName.toUpperCase(), value: `${filled}${empty} (${data.visitsThisCycle}/${data.visitsRequired})`, changeMessage: 'Progreso actualizado: %@' });
+    // No changeMessage — same single-notification-channel rule as the stamps style.
+    pass.secondaryFields.push({ key: 'stamps', label: data.rewardName.toUpperCase(), value: `${filled}${empty} (${data.visitsThisCycle}/${data.visitsRequired})` });
   }
 
   // Birthday reward — shown on front of pass with lock-screen notification
@@ -274,9 +278,10 @@ export async function generateApplePass(data: PassData): Promise<{
   }
 
   // Back fields
-  // Lifecycle message (welcome/winback/expiring) — placed first so it's the first thing
-  // a customer sees when flipping the pass. Always present so Apple reliably fires
-  // changeMessage when cron updates it from "" → text.
+  // Lifecycle message — the pass's ONE notification channel: scan moments (every
+  // visit writes one) and cron nudges (welcome/winback/expiring) both land here.
+  // Placed first so it's the first thing a customer sees when flipping the pass;
+  // always present so Apple reliably fires changeMessage on "" → text updates.
   pass.backFields.push({
     key: 'lifecycleMessage',
     label: 'Mensaje',

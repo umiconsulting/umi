@@ -126,6 +126,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       if (rewardsEarned > 0) momentJourney = 'reward_earned';
       else if (newCycle === required - 1) momentJourney = 'milestone_one_left';
       else if (required >= 4 && newCycle === Math.floor(required / 2)) momentJourney = 'milestone_halfway';
+      // Same rule as the scan route: every credit changes the lifecycle field —
+      // the single Apple notification channel — with real copy.
+      else momentJourney = 'visit_recorded';
       const momentMessage = momentJourney
         ? renderTemplate(resolveJourneyTemplate(tenant.lifecycleCopy, momentJourney), {
             name: card.person?.display_name || DEFAULT_CUSTOMER_NAME,
