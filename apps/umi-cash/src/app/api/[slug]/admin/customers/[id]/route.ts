@@ -6,7 +6,7 @@ import { formatMXN } from '@/lib/currency';
 import { getActiveRewardConfig, rewardConfigDefaults, getRewardProfileForCard } from '@/lib/prisma-helpers';
 import { triggerWalletUpdates, readLifecycleMessage } from '@/lib/scan-helpers';
 import { afterResponse } from '@/lib/after-response';
-import { getTenant } from '@/lib/tenant';
+import { getTenant, requireActiveSubscription } from '@/lib/tenant';
 
 export const maxDuration = 30;
 
@@ -147,6 +147,9 @@ export async function PATCH(
   const tenant = await getTenant(params.slug);
   if (!tenant) return NextResponse.json({ error: 'Tenant no encontrado' }, { status: 404 });
   if (user.tenantId !== tenant.id) return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+
+  const suspended = await requireActiveSubscription(tenant);
+  if (suspended) return suspended;
 
   try {
     const { customReward } = RewardOverrideSchema.parse(await req.json());
