@@ -131,6 +131,7 @@ export default function CustomerDetailPage() {
 
   async function saveCustomReward(clear: boolean) {
     setSavingReward(true);
+    setMessage('');
     try {
       const res = await authedFetch(slug, `/api/${slug}/admin/customers/${id}`, {
         method: 'PATCH',
@@ -139,10 +140,15 @@ export default function CustomerDetailPage() {
           customReward: clear ? null : { name: rewardNameInput.trim(), description: rewardDescInput.trim() || null },
         }),
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setShowRewardEdit(false);
         await loadCustomer();
+      } else {
+        setMessage(data.error || 'Error al actualizar la recompensa'); setMessageIsSuccess(false);
       }
+    } catch {
+      setMessage('Error de conexión'); setMessageIsSuccess(false);
     } finally {
       setSavingReward(false);
     }
