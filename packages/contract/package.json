@@ -32,6 +32,11 @@
       "types": "./dist/route-table.d.ts",
       "import": "./dist/route-table.js",
       "require": "./dist/route-table.cjs"
+    },
+    "./realtime-channels": {
+      "types": "./dist/realtime-channels.d.ts",
+      "import": "./dist/realtime-channels.js",
+      "require": "./dist/realtime-channels.cjs"
     }
   },
   "scripts": {

@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import { DASHBOARD_EVENT_DEVICES_CHANGED, DASHBOARD_REALTIME_NAMESPACE } from '@umi/contract';
+// The zero-dep entry, never the package root: the root re-exports the zod schemas,
+// and the Vercel build of this app has no zod (see packages/contract/src/index.ts).
+import {
+  DASHBOARD_EVENT_DEVICES_CHANGED,
+  DASHBOARD_REALTIME_NAMESPACE,
+} from '@umi/contract/realtime-channels';
 import { apiUrl } from './config.js';
 
 export const REALTIME_STATE = Object.freeze({
