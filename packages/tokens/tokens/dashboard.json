@@ -23,9 +23,17 @@
     "canvas-2": { "$type": "color", "$value": "#E4E9F3", "$themes": { "midnight": "#0D0D0D" } },
     "surface": { "$type": "color", "$value": "#ffffff", "$themes": { "midnight": "#000000" } },
     "surface-warm": { "$type": "color", "$value": "#FAF4EC", "$themes": { "midnight": "#000000" } },
-    "surface-warm-border": { "$type": "color", "$value": "#EAE0D3", "$themes": { "midnight": "#2A2A2A" } },
+    "surface-warm-border": {
+      "$type": "color",
+      "$value": "#EAE0D3",
+      "$themes": { "midnight": "#2A2A2A" }
+    },
     "sidebar-bg": { "$type": "color", "$value": "#1a2952", "$themes": { "midnight": "#000000" } },
-    "sidebar-bg-deep": { "$type": "color", "$value": "#131f44", "$themes": { "midnight": "#000000" } }
+    "sidebar-bg-deep": {
+      "$type": "color",
+      "$value": "#131f44",
+      "$themes": { "midnight": "#000000" }
+    }
   },
   "ink": {
     "$description": "Ink",
@@ -34,7 +42,11 @@
     "ink-3": { "$type": "color", "$value": "#5C678F", "$themes": { "midnight": "#8A8A8A" } },
     "ink-4": { "$type": "color", "$value": "#7D8AAE", "$themes": { "midnight": "#6A6A6A" } },
     "ink-warm": { "$type": "color", "$value": "#1F1410", "$themes": { "midnight": "#EDEDED" } },
-    "ink-warm-soft": { "$type": "color", "$value": "#6e5a4a", "$themes": { "midnight": "#A0A0A0" } },
+    "ink-warm-soft": {
+      "$type": "color",
+      "$value": "#6e5a4a",
+      "$themes": { "midnight": "#A0A0A0" }
+    },
     "ink-warm-mute": { "$type": "color", "$value": "#C4A882", "$themes": { "midnight": "#6E6E6E" } }
   },
   "sidebar-text": {
@@ -83,7 +95,9 @@
     "shadow-pop": {
       "$type": "shadow",
       "$value": "0 24px 60px -24px rgba(19, 31, 68, 0.32), 0 2px 8px rgba(19, 31, 68, 0.06)",
-      "$themes": { "midnight": "0 24px 60px -24px rgba(0, 0, 0, 0.8), 0 2px 8px rgba(0, 0, 0, 0.5)" }
+      "$themes": {
+        "midnight": "0 24px 60px -24px rgba(0, 0, 0, 0.8), 0 2px 8px rgba(0, 0, 0, 0.5)"
+      }
     },
     "shadow-inner": {
       "$type": "shadow",

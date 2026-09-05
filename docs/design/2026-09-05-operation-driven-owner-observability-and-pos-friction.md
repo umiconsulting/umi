@@ -11,30 +11,30 @@ Every real action a worker performs, tagged by who cares. **$ = money or excepti
 
 ### Front of house — cashier / barista
 
-| Physical action | Tag | Owner interest | Barista interest |
-| --- | --- | --- | --- |
-| Count opening float, load drawer | $ | opening cash on record | 1×/shift, quick |
-| Take order (verbal) | ⚡ | — | speed |
-| Input order to POS (tap product, modifiers) | ⚡ | — | fewest taps |
-| Make the drink (~20 motions/drink) | ⚡ | routed correctly | no software in hand |
-| Take payment — cash: open drawer, give change | $ ⚡ | every drawer open | one confirmation |
-| Hand off / call name | ⚡ | — | — |
-| Cash movement: paid-in / paid-out / safe-drop | $ | who, how much, why | occasional |
-| No-sale drawer open (open without a sale) | $ | the shrinkage signal | rare |
-| Void / cancel a sale | $ | who, why | rare |
-| Refund (cash back) | $ | who approved, why | rare |
-| Discount applied | $ | margin leak, who | occasional |
-| Close: count drawer, reconcile variance | $ | counted vs expected, variance | 1×/shift, guided |
+| Physical action                               | Tag  | Owner interest                | Barista interest    |
+| --------------------------------------------- | ---- | ----------------------------- | ------------------- |
+| Count opening float, load drawer              | $    | opening cash on record        | 1×/shift, quick     |
+| Take order (verbal)                           | ⚡   | —                             | speed               |
+| Input order to POS (tap product, modifiers)   | ⚡   | —                             | fewest taps         |
+| Make the drink (~20 motions/drink)            | ⚡   | routed correctly              | no software in hand |
+| Take payment — cash: open drawer, give change | $ ⚡ | every drawer open             | one confirmation    |
+| Hand off / call name                          | ⚡   | —                             | —                   |
+| Cash movement: paid-in / paid-out / safe-drop | $    | who, how much, why            | occasional          |
+| No-sale drawer open (open without a sale)     | $    | the shrinkage signal          | rare                |
+| Void / cancel a sale                          | $    | who, why                      | rare                |
+| Refund (cash back)                            | $    | who approved, why             | rare                |
+| Discount applied                              | $    | margin leak, who              | occasional          |
+| Close: count drawer, reconcile variance       | $    | counted vs expected, variance | 1×/shift, guided    |
 
 ### Back of house — kitchen / line
 
-| Physical action | Tag | Owner interest | Line-cook interest |
-| --- | --- | --- | --- |
-| Receive / read ticket | ⚡ | ticket age | legible, routed |
-| Make / assemble / cook (~10-20 hand actions) | ⚡ | station load | no software in hand |
-| Bump ticket (advance state) | ⚡ | ticket time | 1 tap |
-| Quality check / expo | ⚡ | — | — |
-| Hand to runner | ⚡ | order→handoff time | — |
+| Physical action                              | Tag | Owner interest     | Line-cook interest  |
+| -------------------------------------------- | --- | ------------------ | ------------------- |
+| Receive / read ticket                        | ⚡  | ticket age         | legible, routed     |
+| Make / assemble / cook (~10-20 hand actions) | ⚡  | station load       | no software in hand |
+| Bump ticket (advance state)                  | ⚡  | ticket time        | 1 tap               |
+| Quality check / expo                         | ⚡  | —                  | —                   |
+| Hand to runner                               | ⚡  | order→handoff time | —                   |
 
 **The concentration.** The owner's safety/observability/control interest is almost entirely the **$ rows**: opening float, cash movements, no-sale opens, voids, refunds, discounts, close variance, and **who did each**, plus throughput (order→handoff time). The barista's speed interest is the **⚡ rows**: order input, checkout, and the KDS bump. Design each side to its own column.
 
@@ -63,45 +63,45 @@ Why this is the right shape (codebase-design):
 
 Every "Engineering" note below is an instance of this one seam.
 
-### 2.1 Caja y turnos → Turnos de caja  (domain `cash_shifts`)
+### 2.1 Caja y turnos → Turnos de caja (domain `cash_shifts`)
 
 - **Physical actions reflected:** opening float, the live shift, the close variance.
 - **What to show:** live open shifts with operator, register, opening float, expected cash (`float + cash sales − payouts`), variance-to-date, time open, status. A closed shift shows counted vs expected vs variance and who closed it.
 - **UX:** a live "open shifts" strip at the top, coloured by variance against the policy tolerance (MXN 1.00) and the close-approval threshold (MXN 5000); a history list below.
 - **Engineering:** extend the `cash_shifts` operations query (`dashboard-operations.repository.ts`) to carry `{operatorName, register, openingFloat, expectedCash, counted, variance, status, openedAt, closedAt}`. Compute expected/variance from `cash_ledger_entry` (float + cash_sale − change − payouts — the same sum used to reconcile). Render a shift card, not the generic reference row. Data is already owner-readable.
 
-### 2.2 Caja y turnos → Registros  (domain `registers`, + a movement log)
+### 2.2 Caja y turnos → Registros (domain `registers`, + a movement log)
 
 - **Physical actions reflected:** paid-in / paid-out / safe-drop, and **no-sale drawer opens** — the theft/shrinkage signals.
 - **What to show:** every cash movement (type, amount, operator, reason, time) and every no-sale open, plus register status (`in_use`, `reconciliation_required`).
 - **UX:** a chronological movement log per shift; flag no-sale opens and paid-outs prominently. This is the single highest-value control surface, and today it is a generic table.
 - **Engineering:** feed the log from `merchant.cash_movement` + `merchant.no_sale_drawer_event`. Both are already owner-visible (no `device_scoping` — verified). Add the movement feed to the `registers` workspace.
 
-### 2.3 Caja y turnos → Ventas  (domain `sales`)
+### 2.3 Caja y turnos → Ventas (domain `sales`)
 
 - **Physical actions reflected:** each sale, and any discount applied.
 - **What to add:** the **operator** on each sale and the **discount** (amount + reason) as a visible flag — margin-leak observability. Sales already render (verified live).
 - **Engineering:** extend the `sales` row with `{operator, discountTotal, discountReason}` from `pos_committed_sale` + `order_discount`.
 
-### 2.4 Caja y turnos → Reembolsos  (domain `refunds_voids`)
+### 2.4 Caja y turnos → Reembolsos (domain `refunds_voids`)
 
 - **Physical actions reflected:** refund/void — money back, the top shrinkage risk.
 - **What to show:** each refund/void with operator, **approver** (manager PIN), reason, link to the original sale, and amount.
 - **Engineering:** surface approver + reason + original-sale link from `pos_sale_exception` / refund records.
 
-### 2.5 Pedidos  (screen `orders.jsx`)
+### 2.5 Pedidos (screen `orders.jsx`)
 
 - **Physical actions reflected:** order taken → made → handed off. Throughput and control over speed.
 - **What to add:** time-in-state (placed → ready → completed) and an **aging** highlight, so the owner sees where service slows. The order cards exist; they lack timing.
 - **Engineering:** compute age and time-to-ready from `merchant.order_event`; add a "tiempo" column and an aging colour on the card.
 
-### 2.6 Cocina  (screen `cocina.jsx`, domain `kitchen`)
+### 2.6 Cocina (screen `cocina.jsx`, domain `kitchen`)
 
 - **Physical actions reflected:** bump, station routing.
 - **What to add:** per-station ticket counts and average ticket time as an observability read. Live cook status stays on the KDS device; the owner sees load and timing, not live control.
 - **Engineering:** surface per-station counts + average ticket time from `merchant.kitchen_order` / items.
 
-### 2.7 Resumen  (screen `overview.jsx`)
+### 2.7 Resumen (screen `overview.jsx`)
 
 - **The "see everything" home.** Roll up the $ signals of the day: open shifts and their variance, cash movements, no-sale opens, refunds/voids, discount total, aging orders, order→handoff time. Each tile links into the screen above that owns it.
 
@@ -171,6 +171,7 @@ Still staged: single-tap add for no-modifier products, the close-flow recovery g
 Delivered and verified live: **a product with no size/variant and no modifier group now adds in one tap.** `catalog_surface.dart` `_showDetail` adds straight to the cart and skips the sheet when `detail.variants.isEmpty && detail.optionGroups.isEmpty` (and it is a new line the operator may write). Verified: tapping "Agua" put it in the cart with no sheet; "Americano" (has options) still opens the modifier sheet. Static analysis clean; formatted.
 
 ### Plan tally
+
 - **Owner quick wins (§4.1):** Turnos de caja, Ventas, Reembolsos delivered + verified. Registros movement log staged (needs an event-shaped query; no movement rows to verify against).
 - **Barista quick wins (§4.2):** checkout collapse and single-tap add delivered + verified.
 - **Bigger (§4.3):** order/ticket timing, Resumen roll-up, and the close-flow recovery gap remain — each a larger, own-cycle change.
