@@ -70,8 +70,13 @@ const DevicesScreen = () => {
   const [posRequests, setPosRequests] = useState([]);
   const [posRequestError, setPosRequestError] = useState(null);
   const [posDevices, setPosDevices] = useState([]);
-  const { capabilities, isProductActive, selectedMerchantId, selectedLocationId, setSelectedLocationId } =
-    useMerchant();
+  const {
+    capabilities,
+    isProductActive,
+    selectedMerchantId,
+    selectedLocationId,
+    setSelectedLocationId,
+  } = useMerchant();
   const locations = (capabilities?.locations || []).filter(
     (location) => location.status === 'active',
   );

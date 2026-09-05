@@ -6,6 +6,7 @@ implication for the Umi Dashboard (React SPA, Spanish-speaking cafe owners and
 managers, left sidebar that is growing crowded).
 
 Current Umi sidebar (baseline for the implications below):
+
 - Operacion: Overview, Operations hub, Orders, Devices, Staff, Customers
 - Crecimiento: Loyalty, Gift cards
 - Configuracion: Hours, Settings, Products and billing
@@ -19,6 +20,7 @@ dedicated screens.
 ## Q1. How to structure primary navigation so it stays legible as features grow
 
 ### P1.1 Group into a small number of sections; do not use a flat long list
+
 - Source: NN/G, "Top 3 IA Questions about Navigation Menus"
   (https://www.nngroup.com/articles/ia-questions-navigation-menus/)
 - Rule: The number of categories must be set by what makes information easiest
@@ -31,6 +33,7 @@ dedicated screens.
   the sidebar model itself.
 
 ### P1.2 Working-memory limit: keep a scannable group near 5-7 items
+
 - Source: Laws of UX, "Miller's Law" (https://lawsofux.com/millers-law/);
   Material Design bottom navigation uses 3-5 destinations and moves to a drawer
   at 5+ (https://m3.material.io/components/navigation-drawer/guidelines,
@@ -44,6 +47,7 @@ dedicated screens.
   ~7.
 
 ### P1.3 Choice cost rises with the number and complexity of options
+
 - Source: Laws of UX, "Hick's Law" (https://lawsofux.com/hicks-law/); origin
   Hick 1952 / Hyman.
 - Rule: Decision time grows with the number and complexity of choices; reduce
@@ -53,6 +57,7 @@ dedicated screens.
   level; do not reflexively add a new top-level entry.
 
 ### P1.4 Limit navigation depth; two tiers is the practical ceiling
+
 - Source: NN/G, "Menu-Design Checklist: 17 UX Guidelines"
   (https://www.nngroup.com/articles/menu-design/); IBM Carbon, UI shell left
   panel (https://carbondesignsystem.com/components/UI-shell-left-panel/usage/).
@@ -64,6 +69,7 @@ dedicated screens.
   destination page, never as a third nav indent.
 
 ### P1.5 When to introduce a second level
+
 - Source: NN/G, "Top 3 IA Questions about Navigation Menus" (URL above); IBM
   Carbon, UI shell left panel (URL above).
 - Rule: Introduce a second level when a list gets long (NN/G: consider grouping
@@ -75,6 +81,7 @@ dedicated screens.
   it to a collapsible second level rather than more top-level rows.
 
 ### P1.6 Never put unbounded, user-generated lists in the primary nav
+
 - Source: IBM Carbon, UI shell left panel (URL above).
 - Rule: "Do not place content that has no upper limit (such as created by users)
   within the shell's side navigation"; usability "drops rapidly" as item count
@@ -84,6 +91,7 @@ dedicated screens.
   shell, and keep "Cafes" as a single management entry.
 
 ### P1.7 On desktop, keep primary nav visible (no hamburger)
+
 - Source: NN/G, "Menu-Design Checklist" (URL above); NN/G, "Beyond the
   Hamburger: What Makes Navigation Discoverable on Desktops"
   (https://www.nngroup.com/articles/find-navigation-desktop-not-hamburger/).
@@ -94,6 +102,7 @@ dedicated screens.
   by default.
 
 ### P1.8 Overflow, not deletion: give surplus items a "View more"
+
 - Source: Shopify app design, "Navigation"
   (https://shopify.dev/docs/apps/design/navigation) — nav items 7+ convert to a
   "View more" button; Salesforce Lightning nav bar supports overflow and up to
@@ -108,6 +117,7 @@ dedicated screens.
 ## Q2. Command center / operations hub vs. dedicated task screens
 
 ### P2.1 Prefer a single, canonical entry point per task; avoid duplicate paths
+
 - Source: NN/G, "The Same Link Twice on the Same Page: Do Duplicates Help or
   Hurt?" (https://www.nngroup.com/articles/duplicate-links/).
 - Rule: Multiple links to the same destination are "generally" a net negative:
@@ -118,6 +128,7 @@ dedicated screens.
   home in the sidebar.
 
 ### P2.2 Duplicate paths cause pogo-sticking and doubt
+
 - Source: NN/G, "No More Pogo Sticking: Protect Users from Wasted Clicks"
   (https://www.nngroup.com/articles/pogo-sticking/); duplicate-links article
   (URL above).
@@ -128,7 +139,9 @@ dedicated screens.
   "Orders" will wonder if the two show different data. Remove the ambiguity.
 
 ### P2.3 When a hub IS the right call: a curated home / action surface, not a
+
 duplicate index
+
 - Source: Shopify admin overview — Home "highlights urgent actions or events,
   such as unpaid orders that still need to be captured"
   (https://help.shopify.com/en/manual/shopify-admin/shopify-admin-overview);
@@ -143,6 +156,7 @@ duplicate index
   separate destination. Result: one home that routes, and one home per task.
 
 ### P2.4 Trade-off to record
+
 - A command center reduces first-click cost for the daily routine (good for a
   cafe opening the shop). The risk is it becomes a parallel menu. The deciding
   test: does the hub OWN any screen, or only LINK to owners' canonical screens?
@@ -153,6 +167,7 @@ duplicate index
 ## Q3. Information scent and labeling
 
 ### P3.1 Labels must let a user predict the destination before clicking
+
 - Source: NN/G, "Information Scent" (https://www.nngroup.com/videos/information-scent/);
   NN/G, "3 Common IA Mistakes (that Are All Due to Low Information Scent)"
   (https://www.nngroup.com/articles/3-ia-mistakes/).
@@ -162,6 +177,7 @@ duplicate index
   cafe owner - it does not say what is behind it. Replace with concrete labels.
 
 ### P3.2 Avoid vague verbs, forced parallelism, and conversational labels
+
 - Source: NN/G, "3 Common IA Mistakes" (URL above).
 - Rule: Words like "Explore," "Discover," "Connect," "Hub" carry little meaning;
   do not force every label into a matching part of speech or an "I want to..."
@@ -171,6 +187,7 @@ duplicate index
   or "Centro" without a concrete noun.
 
 ### P3.3 Use standard, familiar words (match the user's mental model)
+
 - Source: NN/G, "Menu-Design Checklist" (URL above); Laws of UX, "Jakob's Law"
   (https://lawsofux.com/jakobs-law/).
 - Rule: Prefer clear, familiar, standard terms over internal jargon; users
@@ -180,6 +197,7 @@ duplicate index
   names (e.g., surface "Umi Cash" as "Lealtad"/"Monedero" if that reads clearer).
 
 ### P3.4 Organize by user goal/task, not by internal data model
+
 - Source: NN/G, "Intranet Information Architecture (IA) Trends" - by 2014 about
   86% of new intranet IAs were task/topic based
   (https://www.nngroup.com/articles/intranet-information-architecture-ia/);
@@ -193,6 +211,7 @@ duplicate index
   goal-based; keep that intent, tighten membership.
 
 ### P3.5 Order items by frequency of use, not alphabetically
+
 - Source: NN/G, "Top 3 IA Questions about Navigation Menus" (URL above).
 - Rule: Prioritize by frequency of use to help the most people reach what they
   most likely want; alphabetical is rarely the most meaningful order.
@@ -209,6 +228,7 @@ top for "today"; core daily operations next; growth/marketing separate;
 configuration/setup pushed to the bottom or behind a gear.
 
 ### Shopify Admin
+
 - Source: Shopify admin overview
   (https://help.shopify.com/en/manual/shopify-admin/shopify-admin-overview);
   Polaris Navigation (https://polaris.shopify.com/components/navigation/navigation);
@@ -223,6 +243,7 @@ configuration/setup pushed to the bottom or behind a gear.
   out of the daily flow.
 
 ### Stripe Dashboard
+
 - Source: Stripe "Dashboard update: May 2024"
   (https://support.stripe.com/questions/dashboard-update-may-2024); Stripe
   Dashboard basics (https://docs.stripe.com/dashboard/basics).
@@ -236,6 +257,7 @@ configuration/setup pushed to the bottom or behind a gear.
   entitlement-based nav, Q5); pinned/recent shortcuts help power users.
 
 ### Square Dashboard
+
 - Source: Square, "Updated Square POS and Square Dashboard app"
   (https://squareup.com/us/en/the-bottom-line/inside-square/updated-square-pos-and-square-dashboard-app);
   Square Dashboard app help
@@ -251,6 +273,7 @@ configuration/setup pushed to the bottom or behind a gear.
   click deep; do not bury Orders/Overview to tidy the rail.
 
 ### Toast (restaurant back office)
+
 - Source: Toast, "Getting Started with Analytics and Reports"
   (https://support.toasttab.com/en/article/Getting-Started-with-Analytics-and-Reports).
 - Structure: Toast Web left nav with heavy sections (Front of House setup,
@@ -262,6 +285,7 @@ configuration/setup pushed to the bottom or behind a gear.
   it its own landing page with sub-categories, not many sidebar rows.
 
 ### Design-system references for the shell itself
+
 - IBM Carbon UI shell left panel: max two tiers, promote to a second level past
   ~5 secondary items, never put unbounded content in the rail
   (https://carbondesignsystem.com/components/UI-shell-left-panel/usage/).
@@ -271,6 +295,7 @@ configuration/setup pushed to the bottom or behind a gear.
   https://help.salesforce.com/s/articleView?id=sf.user_userdisplay_tabs_lex_considerations.htm).
 
 Synthesized target shape for Umi:
+
 1. Home / "Hoy" (overview + alerts + shortcuts) - replaces Operations hub.
 2. Operacion: Pedidos, Dispositivos, KDS, Personal, Clientes.
 3. Crecimiento: Lealtad, Gift cards, WhatsApp/ConversaFlow.
@@ -283,6 +308,7 @@ Synthesized target shape for Umi:
 ## Q5. Role-based and entitlement-based navigation
 
 ### P5.1 Distinguish entitlement gating from audience self-selection
+
 - Source: NN/G, "Audience-Based Navigation: 5 Reasons to Avoid It"
   (https://www.nngroup.com/articles/audience-based-navigation/).
 - Rule: Do NOT make users pick "I am an owner / I am a manager" as primary
@@ -294,6 +320,7 @@ Synthesized target shape for Umi:
   themselves.
 
 ### P5.2 Hide what a role cannot use; do not show dead ends
+
 - Source: NN/G, "Progressive Disclosure"
   (https://www.nngroup.com/articles/progressive-disclosure/); Hick's Law
   (https://lawsofux.com/hicks-law/).
@@ -304,6 +331,7 @@ Synthesized target shape for Umi:
   billing rights should not see "Productos y facturacion."
 
 ### P5.3 But avoid an empty or "broken" feeling - keep the app legible
+
 - Source: Stripe entitlement-driven nav (items appear as products are enabled)
   (https://support.stripe.com/questions/dashboard-update-may-2024); Salesforce
   Lightning pinned-vs-personalizable nav
@@ -318,6 +346,7 @@ Synthesized target shape for Umi:
   consistent core (Overview, Orders) so no role lands on an empty shell.
 
 ### P5.4 Known trade-off: discoverability vs. clutter
+
 - Hiding unbought modules keeps the nav clean (Hick's Law) but hurts upsell
   discovery. Stripe resolves this with a dedicated "Products" area to discover
   features you do not yet use. Umi can mirror that: one "Descubrir / Activar"

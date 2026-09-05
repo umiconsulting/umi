@@ -16,6 +16,7 @@ app must feel trustworthy. The workflow must stay familiar as features grow.
 ## 1. Cognitive load and chunking
 
 ### Miller's Law (and its correction)
+
 - Source: "Miller's Law", Laws of UX — https://lawsofux.com/millers-law/
 - Source: "Working Memory", Laws of UX — https://lawsofux.com/working-memory/
 - Source: "How Chunking Helps Content Processing", Nielsen Norman Group — https://www.nngroup.com/articles/chunking/
@@ -27,6 +28,7 @@ app must feel trustworthy. The workflow must stay familiar as features grow.
   location, date range) so the owner never re-enters it.
 
 ### MISAPPLICATION TO FLAG
+
 - Laws of UX takeaway: "Don't use the 'magical number seven' to justify unnecessary design
   limitations." Do NOT cap navigation, menus, or a table's columns at 7 because of Miller.
   Menus rely on recognition, not recall — all options stay on screen, so there is no
@@ -38,6 +40,7 @@ app must feel trustworthy. The workflow must stay familiar as features grow.
 ## 2. Decision cost
 
 ### Hick's Law
+
 - Source: "Hick's Law", Laws of UX — https://lawsofux.com/hicks-law/
 - Source: "Choice Overload", Laws of UX — https://lawsofux.com/choice-overload/
 - Rule: Decision time grows with the number and complexity of choices (RT = a + b·log2(n)).
@@ -56,6 +59,7 @@ app must feel trustworthy. The workflow must stay familiar as features grow.
 ## 3. Motor cost and targets
 
 ### Fitts's Law
+
 - Source: "Fitts's Law and Its Applications in UX", Nielsen Norman Group — https://www.nngroup.com/articles/fitts-law/
 - Source: "Fitts's Law", Laws of UX — https://lawsofux.com/fittss-law/
 - Source: "Touch Targets on Touchscreens", Nielsen Norman Group — https://www.nngroup.com/articles/touch-target-size/
@@ -78,6 +82,7 @@ app must feel trustworthy. The workflow must stay familiar as features grow.
 ## 4. Familiarity and mental models
 
 ### Jakob's Law
+
 - Source: "Jakob's Law", Laws of UX — https://lawsofux.com/jakobs-law/
 - Source: "Mental Models and User Experience Design", Nielsen Norman Group — https://www.nngroup.com/articles/mental-models/
 - Rule: Users spend most of their time on other apps, so they expect yours to work like the
@@ -100,6 +105,7 @@ app must feel trustworthy. The workflow must stay familiar as features grow.
 ## 5. Recognition over recall, progressive disclosure, and defaults
 
 ### Recognition rather than recall
+
 - Source: "Memory Recognition and Recall in User Interfaces", Nielsen Norman Group — https://www.nngroup.com/articles/recognition-and-recall/
 - Rule: Recognizing is easier than recalling; keep needed information and options visible so
   users do not retrieve them from memory.
@@ -108,6 +114,7 @@ app must feel trustworthy. The workflow must stay familiar as features grow.
   visible state (which location, which shift) so the owner recognizes context.
 
 ### Progressive disclosure
+
 - Source: "Progressive Disclosure", Nielsen Norman Group — https://www.nngroup.com/articles/progressive-disclosure/
 - Rule: Show the few most important options first; reveal advanced or rare options on
   request. This improves learnability, efficiency, and error rate at once.
@@ -117,6 +124,7 @@ app must feel trustworthy. The workflow must stay familiar as features grow.
   usage data, not by guessing.
 
 ### Wizards (staged disclosure) vs inline
+
 - Source: "Progressive Disclosure", Nielsen Norman Group — https://www.nngroup.com/articles/progressive-disclosure/
 - Rule: Staged disclosure (a wizard) guides users linearly through a one-time or ordered
   task; progressive disclosure suits an interface used repeatedly.
@@ -125,6 +133,7 @@ app must feel trustworthy. The workflow must stay familiar as features grow.
   screens the owner revisits, so experts are not forced through steps every time.
 
 ### Sensible defaults
+
 - Source: "Progressive Disclosure", Nielsen Norman Group — https://www.nngroup.com/articles/progressive-disclosure/
 - Rule: Present the primary/default options by default; a good default lets most users
   proceed without a decision.
@@ -136,6 +145,7 @@ app must feel trustworthy. The workflow must stay familiar as features grow.
 ## 6. Gestalt principles for grouping and reading a screen
 
 ### Proximity
+
 - Source: "Proximity Principle in Visual Design", Nielsen Norman Group — https://www.nngroup.com/articles/gestalt-proximity/
 - Rule: Items placed close together are read as one group; whitespace alone can group and
   separate, and proximity can overpower color or shape.
@@ -144,6 +154,7 @@ app must feel trustworthy. The workflow must stay familiar as features grow.
   instead of reading every element.
 
 ### Similarity
+
 - Source: "Similarity Principle in Visual Design", Nielsen Norman Group — https://www.nngroup.com/articles/gestalt-similarity/
 - Rule: Elements that share color, shape, or size are read as related.
 - Implication: Give every primary action the same shape and color across the whole
@@ -151,6 +162,7 @@ app must feel trustworthy. The workflow must stay familiar as features grow.
   treatment. The owner learns one visual language once.
 
 ### Common region
+
 - Source: "The Principle of Common Region: Containers Create Groupings", Nielsen Norman Group — https://www.nngroup.com/articles/common-region/
 - Rule: Items inside a shared boundary (a card, a panel, a background) are read as one
   group; a border can overpower proximity.
@@ -159,6 +171,7 @@ app must feel trustworthy. The workflow must stay familiar as features grow.
   too many boxes create clutter and "false floors" that stop scrolling.
 
 ### Continuity (implied companion principle)
+
 - Source: Gestalt principles overview, Nielsen Norman Group — https://www.nngroup.com/videos/the-gestalt-principles-intro/
 - Rule: The eye follows aligned elements as a continuous path.
 - Implication: Align controls and text to a shared grid so the eye flows down a column
@@ -173,6 +186,7 @@ app must feel trustworthy. The workflow must stay familiar as features grow.
 - Source: "10 Usability Heuristics Applied to Complex Applications", Nielsen Norman Group — https://www.nngroup.com/articles/usability-heuristics-complex-applications/
 
 The 10 heuristics:
+
 1. Visibility of system status — keep users informed with timely feedback.
 2. Match between system and the real world — speak the users' language, not jargon.
 3. User control and freedom — provide a clear "emergency exit" (undo/cancel).
@@ -187,6 +201,7 @@ The 10 heuristics:
 10. Help and documentation — ideally not needed; provide it when it is.
 
 The one or two that matter most for a dense operations dashboard:
+
 - Visibility of system status (#1). An operations dashboard exists to answer "what is
   happening right now." Implication: show live order state, device online/offline, sync
   status, and last-updated time. Confirm every money action immediately.
@@ -200,6 +215,7 @@ The one or two that matter most for a dense operations dashboard:
 ## 8. Trust: consistency, feedback and system status, error prevention
 
 ### Consistency and standards
+
 - Source: "Maintain Consistency and Adhere to Standards (Usability Heuristic #4)", Nielsen Norman Group — https://www.nngroup.com/articles/consistency-and-standards/
 - Rule: Keep internal consistency (same patterns across all Umi screens) and external
   consistency (follow web and industry conventions). Consistency lets users transfer
@@ -209,6 +225,7 @@ The one or two that matter most for a dense operations dashboard:
   reuse the same components, so the app never feels bolted-on.
 
 ### Visibility of system status / feedback
+
 - Source: "Visibility of System Status (Usability Heuristic #1)", Nielsen Norman Group — https://www.nngroup.com/articles/visibility-system-status/
 - Source: "Progress Indicators Make a Slow System Less Insufferable", Nielsen Norman Group — https://www.nngroup.com/articles/progress-indicators/
 - Rule: Give feedback as fast as possible, ideally immediately; communicating state lets
@@ -219,6 +236,7 @@ The one or two that matter most for a dense operations dashboard:
   must feel current.
 
 ### Error prevention and recovery
+
 - Source: "10 Usability Heuristics", heuristics #5 and #9, Nielsen Norman Group — https://www.nngroup.com/articles/ten-usability-heuristics/
 - Rule: Prevent errors first (remove error-prone conditions, or confirm before commit);
   when an error occurs, explain it in plain language and suggest a fix.
@@ -228,6 +246,7 @@ The one or two that matter most for a dense operations dashboard:
   never a code. This is what makes an owner handling money trust the console.
 
 ### User control and freedom
+
 - Source: "10 Usability Heuristics", heuristic #3, Nielsen Norman Group — https://www.nngroup.com/articles/ten-usability-heuristics/
 - Rule: Users act by mistake and need a clearly marked exit — undo and redo.
 - Implication: Provide cancel on every flow and undo on reversible actions (a wrongly
@@ -239,6 +258,7 @@ The one or two that matter most for a dense operations dashboard:
 ## 9. Task-oriented vs data-oriented layout
 
 ### Design around jobs, not tables
+
 - Source: "Personas vs. Jobs-to-Be-Done", Nielsen Norman Group — https://www.nngroup.com/articles/personas-jobs-be-done/
 - Source: "Task Analysis: Support Users in Achieving Their Goals", Nielsen Norman Group — https://www.nngroup.com/articles/task-analysis/
 - Source: "8 Design Guidelines for Complex Applications", Nielsen Norman Group — https://www.nngroup.com/articles/complex-application-design/
@@ -252,6 +272,7 @@ The one or two that matter most for a dense operations dashboard:
   it. Do not expose the schema as the UI.
 
 ### At-a-glance overview vs drill-down
+
 - Source: "Dashboards: Making Charts and Graphs Easier to Understand", Nielsen Norman Group — https://www.nngroup.com/articles/dashboards-preattentive/
 - Rule: A dashboard has one job — communicate critical information fast, with minimal
   interaction. Operational dashboards serve time-sensitive monitoring; analytical
@@ -266,6 +287,7 @@ The one or two that matter most for a dense operations dashboard:
 ---
 
 ## Summary of misapplications to avoid
+
 - Do not cap navigation, menus, tabs, or table columns at "7" because of Miller's Law. It
   applies to memory, not to visible on-screen options. (Laws of UX; NN/G chunking)
 - Do not use Hick's Law to hide options the owner scans routinely. Categorize and group

@@ -47,8 +47,7 @@ function makeConfig(): ConfigService<AppConfig, true> {
   return { get: (k: string) => env[k] } as unknown as ConfigService<AppConfig, true>;
 }
 
-const sha256 = (value: string): string =>
-  createHash('sha256').update(value).digest('hex');
+const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 
 const MERCHANT = '9f000000-0000-4000-8000-0000000000e1';
 const LOCATION = '9f000000-0000-4000-8000-0000000000e2';
@@ -104,7 +103,14 @@ describe('pos device proof · the registered key survives the round trip', () =>
           credential_hash, credential_version, platform, mobility, ephemeral_public_key)
        VALUES ($1::uuid, $2::uuid, $3::uuid, 'Till A', 'pos_terminal', 'active', $4, $5, 1,
                'linux', 'static', $6)`,
-      [DEVICE_KEYED, MERCHANT, LOCATION, sha256(INSTALL_KEYED), sha256(CRED_KEYED), publicKeyB64Url],
+      [
+        DEVICE_KEYED,
+        MERCHANT,
+        LOCATION,
+        sha256(INSTALL_KEYED),
+        sha256(CRED_KEYED),
+        publicKeyB64Url,
+      ],
     );
     await pg.query(
       `INSERT INTO merchant.device
@@ -148,10 +154,7 @@ describe('pos device proof · the registered key survives the round trip', () =>
   it('accepts a proof freshly signed by the key the database returned', async () => {
     const device = await validateKeyed();
     const timestampIso = new Date().toISOString();
-    const message = Buffer.from(
-      deviceProofPayload(INSTALL_KEYED, timestampIso),
-      'utf8',
-    );
+    const message = Buffer.from(deviceProofPayload(INSTALL_KEYED, timestampIso), 'utf8');
     const signatureB64Url = cryptoSign(null, message, privateKey).toString('base64url');
 
     // The public key is the one round-tripped through Postgres, not an in-memory copy.
@@ -171,10 +174,7 @@ describe('pos device proof · the registered key survives the round trip', () =>
   it('rejects a tampered signature against the round-tripped key', async () => {
     const device = await validateKeyed();
     const timestampIso = new Date().toISOString();
-    const message = Buffer.from(
-      deviceProofPayload(INSTALL_KEYED, timestampIso),
-      'utf8',
-    );
+    const message = Buffer.from(deviceProofPayload(INSTALL_KEYED, timestampIso), 'utf8');
     const bytes = cryptoSign(null, message, privateKey);
     bytes[0] ^= 0xff;
     expect(

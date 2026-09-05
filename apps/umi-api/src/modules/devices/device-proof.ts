@@ -6,10 +6,7 @@ import { createPublicKey, verify as cryptoVerify } from 'node:crypto';
  * (`deviceProofPayload` in apps/umi-pos/lib/core/security/device_key.dart). If
  * one side changes the join, every proof stops verifying.
  */
-export function deviceProofPayload(
-  installationId: string,
-  timestampIso: string,
-): string {
+export function deviceProofPayload(installationId: string, timestampIso: string): string {
   return `${installationId}|${timestampIso}`;
 }
 
@@ -57,10 +54,7 @@ export interface DeviceProofOptions {
  * This proves possession of the private key; it does not by itself bind the
  * proof to one HTTP request. The freshness window limits replay.
  */
-export function verifyDeviceProof(
-  proof: DeviceProof,
-  options: DeviceProofOptions = {},
-): boolean {
+export function verifyDeviceProof(proof: DeviceProof, options: DeviceProofOptions = {}): boolean {
   const now = options.now ?? new Date();
   const maxSkewMs = options.maxSkewMs ?? 5 * 60_000;
 
@@ -69,10 +63,7 @@ export function verifyDeviceProof(
   if (Math.abs(now.getTime() - timestamp) > maxSkewMs) return false;
 
   const algorithm = proof.algorithm ?? 'ed25519';
-  const message = Buffer.from(
-    deviceProofPayload(proof.installationId, proof.timestampIso),
-    'utf8',
-  );
+  const message = Buffer.from(deviceProofPayload(proof.installationId, proof.timestampIso), 'utf8');
 
   let signature: Buffer;
   try {
@@ -117,12 +108,7 @@ export function verifyDeviceProof(
   }
   if (key.asymmetricKeyType !== 'ec') return false;
   try {
-    return cryptoVerify(
-      'sha256',
-      message,
-      { key, dsaEncoding: 'ieee-p1363' },
-      signature,
-    );
+    return cryptoVerify('sha256', message, { key, dsaEncoding: 'ieee-p1363' }, signature);
   } catch {
     return false;
   }

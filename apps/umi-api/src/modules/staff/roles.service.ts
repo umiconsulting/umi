@@ -72,7 +72,8 @@ export class RolesService {
     this.assertOwner(access);
     const result = await this.repo.archive(merchantId, roleId, actorUserId, expectedRevision);
     if (result === 'assigned') throw new ConflictException('Reassign the active staff first');
-    if (result === 'conflict') throw new ConflictException('The role changed. Reload it and try again');
+    if (result === 'conflict')
+      throw new ConflictException('The role changed. Reload it and try again');
   }
 
   private async normalize(merchantId: string, body: RoleInput, access: MerchantAccess) {
@@ -84,13 +85,18 @@ export class RolesService {
     if (description && description.length > 300) {
       throw new BadRequestException('description must contain at most 300 characters');
     }
-    if (!Array.isArray(body.permissionKeys) || body.permissionKeys.some((key) => typeof key !== 'string')) {
+    if (
+      !Array.isArray(body.permissionKeys) ||
+      body.permissionKeys.some((key) => typeof key !== 'string')
+    ) {
       throw new BadRequestException('permissionKeys must be an array of strings');
     }
     const permissionKeys = [...new Set(body.permissionKeys as string[])];
     const model = await this.repo.accessModel(merchantId);
     const catalog = new Set(
-      model.permissions.filter((permission) => permission.delegable).map((permission) => permission.key),
+      model.permissions
+        .filter((permission) => permission.delegable)
+        .map((permission) => permission.key),
     );
     const unknown = permissionKeys.filter((key) => !catalog.has(key));
     if (unknown.length) throw new BadRequestException(`Unknown permission: ${unknown[0]}`);
@@ -112,13 +118,15 @@ export class RolesService {
 }
 
 function slug(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 48) || 'role';
+  return (
+    value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 48) || 'role'
+  );
 }
 
 function cryptoSuffix(): string {

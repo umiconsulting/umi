@@ -53,25 +53,26 @@ Date: 2026-09-03. Branch: build-v3.
 
 ## 2. Target information architecture (recommended)
 
-| Section | Item (top level) | Sub-tabs (domains it absorbs) | New or exists |
-| --- | --- | --- | --- |
-| HOY | Panorama | role-aware cockpit | exists (overview) |
-| OPERACIÓN | Pedidos | live orders | exists (orders) |
-| OPERACIÓN | Caja y turnos | Ventas · Recibos · Reembolsos y anulaciones · Turnos de caja · Registros | NEW hub |
-| OPERACIÓN | Cocina | estaciones · ruta (KDS) | exists (part of orders) — optional tab |
-| CLIENTES | Clientes | perfil con pestañas | exists (customers) |
-| CLIENTES | Lealtad y valor | Lealtad · Recompensas · Gift cards · Wallet | NEW hub (absorbs members + gift-cards) |
-| NEGOCIO | Catálogo e inventario | Catálogo · Inventario | NEW hub |
-| NEGOCIO | Dispositivos | Dispositivos POS · Hardware | exists (devices) + absorbs hardware |
-| NEGOCIO | Equipo y accesos | usuarios · roles · permisos | exists (staff) |
-| CONFIGURACIÓN | Ajustes | Negocio (Organización · Ubicaciones) · Horarios · Productos y facturación | exists (settings) + absorbs hours + products-billing |
-| CONFIGURACIÓN | Diagnóstico (admin) | Centro de recuperación · Auditoría · Diagnóstico | NEW admin hub |
-| PLATAFORMA | Cafés | management + top switcher | exists (cafes) |
+| Section       | Item (top level)      | Sub-tabs (domains it absorbs)                                             | New or exists                                        |
+| ------------- | --------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------- |
+| HOY           | Panorama              | role-aware cockpit                                                        | exists (overview)                                    |
+| OPERACIÓN     | Pedidos               | live orders                                                               | exists (orders)                                      |
+| OPERACIÓN     | Caja y turnos         | Ventas · Recibos · Reembolsos y anulaciones · Turnos de caja · Registros  | NEW hub                                              |
+| OPERACIÓN     | Cocina                | estaciones · ruta (KDS)                                                   | exists (part of orders) — optional tab               |
+| CLIENTES      | Clientes              | perfil con pestañas                                                       | exists (customers)                                   |
+| CLIENTES      | Lealtad y valor       | Lealtad · Recompensas · Gift cards · Wallet                               | NEW hub (absorbs members + gift-cards)               |
+| NEGOCIO       | Catálogo e inventario | Catálogo · Inventario                                                     | NEW hub                                              |
+| NEGOCIO       | Dispositivos          | Dispositivos POS · Hardware                                               | exists (devices) + absorbs hardware                  |
+| NEGOCIO       | Equipo y accesos      | usuarios · roles · permisos                                               | exists (staff)                                       |
+| CONFIGURACIÓN | Ajustes               | Negocio (Organización · Ubicaciones) · Horarios · Productos y facturación | exists (settings) + absorbs hours + products-billing |
+| CONFIGURACIÓN | Diagnóstico (admin)   | Centro de recuperación · Auditoría · Diagnóstico                          | NEW admin hub                                        |
+| PLATAFORMA    | Cafés                 | management + top switcher                                                 | exists (cafes)                                       |
 
 Result: 6 sections, 11-12 items, each with strong scent, each a single home. The generic
 `operations` browser is gone. `Crecimiento` is gone. Every orphan domain has a home.
 
 Open owner decisions:
+
 - Fold `Cocina` into `Pedidos` as a tab, or keep it top level.
 - Put `Wallet` in `Lealtad y valor`, or as a `Clientes` tab.
 - Put `Registros` in `Caja y turnos`, or in `Dispositivos`.
@@ -124,14 +125,14 @@ Open owner decisions:
 ### D4. Build `Caja y turnos` (relocate sales, receipts, refunds, shifts, registers)
 
 - **Decision:** New hub screen with tabs `Ventas · Recibos · Reembolsos y anulaciones ·
-  Turnos de caja · Registros`. Reuse the existing dialogs (Refund, Receipt reprint,
+Turnos de caja · Registros`. Reuse the existing dialogs (Refund, Receipt reprint,
   Register).
 - **Research:** Jobs not tables; hub with in-page tabs; one primary action per tab; keep
   daily jobs shallow. (NN/G, Complex Application Design; IBM Carbon tabs; Design Language
   V1.)
 - **CodeGraph / code scope:**
   - Data: reuse `useOperationsData('sales' | 'receipts' | 'refunds_voids' | 'cash_shifts'
-    | 'registers')`. No new endpoint.
+| 'registers')`. No new endpoint.
   - Dialogs to move from `operations.jsx`: `RefundDialog`, `ReceiptReprintDialog`,
     `RegisterDialog`.
   - New file: `screens/cash-shifts.jsx` (or `caja-turnos.jsx`).
@@ -190,7 +191,7 @@ Open owner decisions:
 ### D8. Build `Diagnóstico` (admin) — recovery, audit, diagnostics
 
 - **Decision:** New admin-gated hub with tabs `Centro de recuperación · Auditoría ·
-  Diagnóstico`. Reuse `RecoveryDialog`.
+Diagnóstico`. Reuse `RecoveryDialog`.
 - **Research:** Move diagnostics into owner-safe views; technical codes only in
   Diagnostics; gate by permission. (owner-insights-migration skill; Design Language V1;
   NN/G, Audience-Based Navigation.)
@@ -207,7 +208,7 @@ Open owner decisions:
 ### D9. Absorb `organization`, `locations`, `hours`, `products-billing` into `Ajustes`
 
 - **Decision:** Make `Ajustes` a hub with tabs `Negocio (Organización · Ubicaciones) ·
-  Horarios · Productos y facturación`.
+Horarios · Productos y facturación`.
 - **Research:** Push setup to a bottom settings area; group by the setup job. (NN/G,
   Intranet IA.)
 - **CodeGraph / code scope:**
@@ -253,13 +254,13 @@ Open owner decisions:
 
 ## 4. Phase order (each phase ships and is reversible)
 
-| Phase | Content | Decisions | Risk | Gate |
-| --- | --- | --- | --- | --- |
-| 1 | Nav only: sections, order, remove Crecimiento, redirect /operations | D1, D2, D3, D10, D12 | low | unit tests + shell.spec + manual nav check |
-| 2 | Panorama cockpit | D11 | low-med | overview tests + UX validation |
-| 3 | Dissolve operations part A: Caja y turnos, Catálogo e inventario | D4, D5 | med | tests + UX validation + parity vs operations |
-| 4 | Dissolve operations part B: Lealtad y valor, Dispositivos+Hardware, Ajustes | D6, D7, D9 | med | tests + UX validation |
-| 5 | Diagnóstico (admin) + remove legacy operations.jsx | D8 + cleanup | med | owner-insights-migration rules + full suite |
+| Phase | Content                                                                     | Decisions            | Risk    | Gate                                         |
+| ----- | --------------------------------------------------------------------------- | -------------------- | ------- | -------------------------------------------- |
+| 1     | Nav only: sections, order, remove Crecimiento, redirect /operations         | D1, D2, D3, D10, D12 | low     | unit tests + shell.spec + manual nav check   |
+| 2     | Panorama cockpit                                                            | D11                  | low-med | overview tests + UX validation               |
+| 3     | Dissolve operations part A: Caja y turnos, Catálogo e inventario            | D4, D5               | med     | tests + UX validation + parity vs operations |
+| 4     | Dissolve operations part B: Lealtad y valor, Dispositivos+Hardware, Ajustes | D6, D7, D9           | med     | tests + UX validation                        |
+| 5     | Diagnóstico (admin) + remove legacy operations.jsx                          | D8 + cleanup         | med     | owner-insights-migration rules + full suite  |
 
 Ship gates every phase: `tdd` for new logic, `code-review` on the diff, `pr-gates` before
 merge, `dashboard-customer-ux-validation` for customer-facing hubs.
@@ -291,6 +292,7 @@ merge, `dashboard-customer-ux-validation` for customer-facing hubs.
 ## 7. Locked decisions (2026-09-03) and sequencing correction
 
 Owner decisions:
+
 - `Cocina` stays a top-level item. It is not a tab of `Pedidos`.
 - `Wallet` goes in `Lealtad y valor`.
 - `Registros` goes in `Caja y turnos`.
@@ -308,6 +310,7 @@ Implemented on branch build-v3, verified in the running app and by unit tests (3
 passing) and ESLint (clean).
 
 Done:
+
 - Phase 1 — nav regroup. Sections HOY, OPERACIÓN, CLIENTES, NEGOCIO, CONFIGURACIÓN,
   PLATAFORMA. `Crecimiento` removed; loyalty and gift cards moved under CLIENTES.
 - Shared foundation — extracted `DomainWorkspace` (data + table + 10 dialogs) into
@@ -318,9 +321,10 @@ Done:
   members + gift-cards; `/members` and `/gift-cards` redirect in); `Dispositivos` hub
   (Dispositivos + Hardware); `Cocina` top-level (kitchen).
 - Phase 5 (part) — `Diagnóstico` admin hub (recovery, audit, diagnostics). `Centro
-  operativo` removed from the sidebar; its `/operations` URL kept as a bridge.
+operativo` removed from the sidebar; its `/operations` URL kept as a bridge.
 
 Deferred, with reason:
+
 - `Ajustes` consolidation (settings + hours + products-billing into one tabbed hub).
   Reason: `settings.jsx` is large and `hours`/`products-billing` carry conditional
   entitlement (conversaflow product, platform grant), so a tabbed hub needs per-tab
@@ -349,6 +353,7 @@ Lealtad y valor, Catálogo e inventario, Diagnóstico).
 ### Correction (2026-09-03): remove hardware; keep only devices
 
 Owner decision: hardware is not used; Dispositivos is devices only. Changes:
+
 - Frontend: removed the `HardwareDialog` and the hardware domain from
   `operations-workspace.jsx`; removed `hardware.read`/`hardware.diagnostics` from the
   operations bridge module; deleted the `members`/`gift-cards` module entries folded

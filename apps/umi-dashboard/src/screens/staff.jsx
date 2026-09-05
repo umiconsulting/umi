@@ -90,20 +90,20 @@ const StaffScreen = () => {
         actions={
           section === 'people' ? (
             <>
-            <div className="seg" role="tablist" aria-label="Filtrar el equipo por rol">
-              {[{ id: 'ALL', name: 'Todos' }, ...roles].map((role) => (
-                <button
-                  key={role.id}
-                  className={filter === role.id ? 'on' : ''}
-                  onClick={() => setFilter(role.id)}
-                >
-                  {role.name}
-                </button>
-              ))}
-            </div>
-            <button className="btn btn-primary focusable" onClick={() => setInviteOpen(true)}>
-              <I.Plus size={16} /> Añadir persona
-            </button>
+              <div className="seg" role="tablist" aria-label="Filtrar el equipo por rol">
+                {[{ id: 'ALL', name: 'Todos' }, ...roles].map((role) => (
+                  <button
+                    key={role.id}
+                    className={filter === role.id ? 'on' : ''}
+                    onClick={() => setFilter(role.id)}
+                  >
+                    {role.name}
+                  </button>
+                ))}
+              </div>
+              <button className="btn btn-primary focusable" onClick={() => setInviteOpen(true)}>
+                <I.Plus size={16} /> Añadir persona
+              </button>
             </>
           ) : null
         }
@@ -111,160 +111,162 @@ const StaffScreen = () => {
 
       {section === 'people' ? (
         <>
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {rosterError ? (
-          <div
-            role="alert"
-            style={{
-              padding: '12px 20px',
-              fontSize: 12.5,
-              color: 'var(--danger)',
-              borderBottom: '1px solid var(--line)',
-            }}
-          >
-            {rosterError}
-          </div>
-        ) : null}
-        {filtered.length === 0 && !loading ? (
-          <div style={{ padding: '48px 32px', textAlign: 'center', color: 'var(--ink-3)' }}>
-            {filter === 'ALL'
-              ? 'No hay personas activas en el equipo.'
-              : `No hay personas con el rol ${roles.find((role) => role.id === filter)?.name || ''}.`}
-          </div>
-        ) : (
-          <table className="matrix">
-            <thead>
-              <tr>
-                <th style={{ width: '32%' }}>Persona</th>
-                <th>Rol</th>
-                <th>Acceso al POS</th>
-                <th>Teléfono</th>
-                <th>Desde</th>
-                <th style={{ width: 104 }}>
-                  <span className="sr-only">Acciones</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((person) => {
-                const hue = nameToHue(person.name || 'X');
-                const initials = (person.name || '?')
-                  .split(' ')
-                  .map((part) => part[0])
-                  .slice(0, 2)
-                  .join('')
-                  .toUpperCase();
-                return (
-                  <tr key={person.id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div
-                          className="avatar-lg"
-                          style={{
-                            background: `oklch(0.78 0.08 ${hue})`,
-                            color: `oklch(0.28 0.08 ${hue})`,
-                          }}
-                        >
-                          {initials}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 14 }}>{person.name}</div>
-                          <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
-                            {person.email || 'Sin correo'}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span
-                        className={`badge ${person.role === 'ADMIN' ? 'badge-admin' : 'badge-staff'}`}
-                      >
-                        {person.role === 'ADMIN' ? <I.Lock size={10} /> : null}
-                        {person.roleName || ROLE_LABELS[person.role] || person.role}
-                      </span>
-                    </td>
-                    <td>
-                      <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>
-                        {person.hasOperatorPin ? 'PIN configurado' : 'Sin PIN'}
-                      </span>
-                    </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5 }}>
-                      {person.phone || '—'}
-                    </td>
-                    <td style={{ color: 'var(--ink-2)', fontSize: 13 }}>
-                      {fmtRelative(person.createdAt)}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                        <button
-                          className="btn-icon"
-                          aria-label={`Administrar acceso de ${person.name}`}
-                          title={
-                            person.role === 'ADMIN' && !canAssignAdmin
-                              ? 'Solo el propietario puede administrar un acceso Admin.'
-                              : 'Administrar rol y PIN'
-                          }
-                          disabled={person.role === 'ADMIN' && !canAssignAdmin}
-                          onClick={() => setSelectedStaff(person)}
-                        >
-                          <I.Edit size={15} />
-                        </button>
-                        <button
-                          className="btn-icon"
-                          aria-label={`Desactivar a ${person.name}`}
-                          title={
-                            person.role === 'ADMIN' && !canAssignAdmin
-                              ? 'Solo el propietario puede administrar un acceso Admin.'
-                              : 'Desactivar acceso'
-                          }
-                          disabled={person.role === 'ADMIN' && !canAssignAdmin}
-                          onClick={async () => {
-                            try {
-                              setRosterError(null);
-                              await deleteStaffMember(person.id);
-                              reload();
-                            } catch (error) {
-                              setRosterError(error.message || 'No se pudo desactivar el acceso.');
-                            }
-                          }}
-                        >
-                          <I.Trash size={15} />
-                        </button>
-                      </div>
-                    </td>
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            {rosterError ? (
+              <div
+                role="alert"
+                style={{
+                  padding: '12px 20px',
+                  fontSize: 12.5,
+                  color: 'var(--danger)',
+                  borderBottom: '1px solid var(--line)',
+                }}
+              >
+                {rosterError}
+              </div>
+            ) : null}
+            {filtered.length === 0 && !loading ? (
+              <div style={{ padding: '48px 32px', textAlign: 'center', color: 'var(--ink-3)' }}>
+                {filter === 'ALL'
+                  ? 'No hay personas activas en el equipo.'
+                  : `No hay personas con el rol ${roles.find((role) => role.id === filter)?.name || ''}.`}
+              </div>
+            ) : (
+              <table className="matrix">
+                <thead>
+                  <tr>
+                    <th style={{ width: '32%' }}>Persona</th>
+                    <th>Rol</th>
+                    <th>Acceso al POS</th>
+                    <th>Teléfono</th>
+                    <th>Desde</th>
+                    <th style={{ width: 104 }}>
+                      <span className="sr-only">Acciones</span>
+                    </th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+                </thead>
+                <tbody>
+                  {filtered.map((person) => {
+                    const hue = nameToHue(person.name || 'X');
+                    const initials = (person.name || '?')
+                      .split(' ')
+                      .map((part) => part[0])
+                      .slice(0, 2)
+                      .join('')
+                      .toUpperCase();
+                    return (
+                      <tr key={person.id}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div
+                              className="avatar-lg"
+                              style={{
+                                background: `oklch(0.78 0.08 ${hue})`,
+                                color: `oklch(0.28 0.08 ${hue})`,
+                              }}
+                            >
+                              {initials}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: 14 }}>{person.name}</div>
+                              <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
+                                {person.email || 'Sin correo'}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <span
+                            className={`badge ${person.role === 'ADMIN' ? 'badge-admin' : 'badge-staff'}`}
+                          >
+                            {person.role === 'ADMIN' ? <I.Lock size={10} /> : null}
+                            {person.roleName || ROLE_LABELS[person.role] || person.role}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>
+                            {person.hasOperatorPin ? 'PIN configurado' : 'Sin PIN'}
+                          </span>
+                        </td>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5 }}>
+                          {person.phone || '—'}
+                        </td>
+                        <td style={{ color: 'var(--ink-2)', fontSize: 13 }}>
+                          {fmtRelative(person.createdAt)}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <button
+                              className="btn-icon"
+                              aria-label={`Administrar acceso de ${person.name}`}
+                              title={
+                                person.role === 'ADMIN' && !canAssignAdmin
+                                  ? 'Solo el propietario puede administrar un acceso Admin.'
+                                  : 'Administrar rol y PIN'
+                              }
+                              disabled={person.role === 'ADMIN' && !canAssignAdmin}
+                              onClick={() => setSelectedStaff(person)}
+                            >
+                              <I.Edit size={15} />
+                            </button>
+                            <button
+                              className="btn-icon"
+                              aria-label={`Desactivar a ${person.name}`}
+                              title={
+                                person.role === 'ADMIN' && !canAssignAdmin
+                                  ? 'Solo el propietario puede administrar un acceso Admin.'
+                                  : 'Desactivar acceso'
+                              }
+                              disabled={person.role === 'ADMIN' && !canAssignAdmin}
+                              onClick={async () => {
+                                try {
+                                  setRosterError(null);
+                                  await deleteStaffMember(person.id);
+                                  reload();
+                                } catch (error) {
+                                  setRosterError(
+                                    error.message || 'No se pudo desactivar el acceso.',
+                                  );
+                                }
+                              }}
+                            >
+                              <I.Trash size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
 
-      {inviteOpen ? (
-        <InvitePanel
-          roles={roles}
-          canAssignAdmin={canAssignAdmin}
-          onClose={() => setInviteOpen(false)}
-          onCreate={async (person) => {
-            await createStaffMember(person);
-            setInviteOpen(false);
-            reload();
-          }}
-        />
-      ) : null}
-      {selectedStaff ? (
-        <AccessPanel
-          person={selectedStaff}
-          roles={roles}
-          canAssignAdmin={canAssignAdmin}
-          onClose={() => setSelectedStaff(null)}
-          onUpdate={async (patch) => {
-            await updateStaffMember(selectedStaff.id, patch);
-            setSelectedStaff(null);
-            reload();
-          }}
-        />
-      ) : null}
+          {inviteOpen ? (
+            <InvitePanel
+              roles={roles}
+              canAssignAdmin={canAssignAdmin}
+              onClose={() => setInviteOpen(false)}
+              onCreate={async (person) => {
+                await createStaffMember(person);
+                setInviteOpen(false);
+                reload();
+              }}
+            />
+          ) : null}
+          {selectedStaff ? (
+            <AccessPanel
+              person={selectedStaff}
+              roles={roles}
+              canAssignAdmin={canAssignAdmin}
+              onClose={() => setSelectedStaff(null)}
+              onUpdate={async (patch) => {
+                await updateStaffMember(selectedStaff.id, patch);
+                setSelectedStaff(null);
+                reload();
+              }}
+            />
+          ) : null}
         </>
       ) : (
         <RolesWorkspace
@@ -320,7 +322,11 @@ function RolesWorkspace({ roles, permissions, canManage, onReload }) {
             <I.Plus size={15} />
           </button>
         </div>
-        {error ? <div role="alert" style={{ color: 'var(--danger)', padding: 8 }}>{error}</div> : null}
+        {error ? (
+          <div role="alert" style={{ color: 'var(--danger)', padding: 8 }}>
+            {error}
+          </div>
+        ) : null}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {roles.map((role) => (
             <button
@@ -328,7 +334,9 @@ function RolesWorkspace({ roles, permissions, canManage, onReload }) {
               className={`role-list-item ${selected?.id === role.id ? 'on' : ''}`}
               onClick={() => setSelectedId(role.id)}
             >
-              <span className={`badge ${role.key === 'owner' || role.key === 'admin' ? 'badge-admin' : 'badge-staff'}`}>
+              <span
+                className={`badge ${role.key === 'owner' || role.key === 'admin' ? 'badge-admin' : 'badge-staff'}`}
+              >
                 {role.key === 'owner' || role.key === 'admin' ? <I.Lock size={10} /> : null}
                 {role.name}
               </span>
@@ -454,7 +462,11 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
       <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--line)' }}>
         <div className="seg" role="tablist" aria-label="Filtrar permisos por producto">
           {['all', 'pos', 'dashboard', 'kds', 'cash'].map((value) => (
-            <button key={value} className={product === value ? 'on' : ''} onClick={() => setProduct(value)}>
+            <button
+              key={value}
+              className={product === value ? 'on' : ''}
+              onClick={() => setProduct(value)}
+            >
               {value === 'all' ? 'Todos' : value.toUpperCase()}
             </button>
           ))}
@@ -464,40 +476,68 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
         {groups.map((group) => (
           <div key={group}>
             <div className="permission-group-title">{group.replaceAll('_', ' ')}</div>
-            {visible.filter((permission) => permission.groupKey === group).map((permission) => (
-              <label key={permission.key} className="permission-row">
-                <input
-                  type="checkbox"
-                  checked={selectedKeys.has(permission.key)}
-                  disabled={locked || !permission.delegable}
-                  onChange={() => toggle(permission.key)}
-                />
-                <span style={{ flex: 1 }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5 }}>{permission.key}</span>
-                  {permission.description ? (
-                    <span style={{ display: 'block', color: 'var(--ink-3)', fontSize: 11.5 }}>
-                      {permission.description}
+            {visible
+              .filter((permission) => permission.groupKey === group)
+              .map((permission) => (
+                <label key={permission.key} className="permission-row">
+                  <input
+                    type="checkbox"
+                    checked={selectedKeys.has(permission.key)}
+                    disabled={locked || !permission.delegable}
+                    onChange={() => toggle(permission.key)}
+                  />
+                  <span style={{ flex: 1 }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5 }}>
+                      {permission.key}
                     </span>
-                  ) : null}
-                </span>
-                <span className={`risk-chip risk-${permission.riskLevel}`}>{permission.riskLevel}</span>
-              </label>
-            ))}
+                    {permission.description ? (
+                      <span style={{ display: 'block', color: 'var(--ink-3)', fontSize: 11.5 }}>
+                        {permission.description}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className={`risk-chip risk-${permission.riskLevel}`}>
+                    {permission.riskLevel}
+                  </span>
+                </label>
+              ))}
           </div>
         ))}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: 20, borderTop: '1px solid var(--line)' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: 12,
+          padding: 20,
+          borderTop: '1px solid var(--line)',
+        }}
+      >
         <div>
-          {error ? <span role="alert" style={{ color: 'var(--danger)', fontSize: 12 }}>{error}</span> : null}
+          {error ? (
+            <span role="alert" style={{ color: 'var(--danger)', fontSize: 12 }}>
+              {error}
+            </span>
+          ) : null}
           {!error && role.assignedCount ? (
-            <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>Reasigna al equipo antes de archivar.</span>
+            <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
+              Reasigna al equipo antes de archivar.
+            </span>
           ) : null}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-ghost" disabled={locked || Boolean(role.assignedCount) || saving} onClick={archive}>
+          <button
+            className="btn btn-ghost"
+            disabled={locked || Boolean(role.assignedCount) || saving}
+            onClick={archive}
+          >
             Archivar
           </button>
-          <button className="btn btn-primary" disabled={!changed || locked || saving || !name.trim()} onClick={save}>
+          <button
+            className="btn btn-primary"
+            disabled={!changed || locked || saving || !name.trim()}
+            onClick={save}
+          >
             {saving ? 'Guardando…' : 'Guardar rol'}
           </button>
         </div>

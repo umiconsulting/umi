@@ -9,7 +9,8 @@
       "react-refresh/only-export-components": 10
     },
     "src/lib/merchant-context.jsx": {
-      "react-refresh/only-export-components": 1
+      "react-refresh/only-export-components": 1,
+      "react-hooks/exhaustive-deps": 1
     },
     "src/tweaks-panel.jsx": {
       "react-refresh/only-export-components": 1

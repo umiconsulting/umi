@@ -117,14 +117,7 @@ export class RolesRepository {
                 updated_by=$5::uuid,updated_at=now()
           WHERE merchant_id=$1::uuid AND id=$2::uuid AND status='active'
             AND revision=$6 AND NOT is_system`,
-        [
-          merchantId,
-          roleId,
-          input.name,
-          input.description,
-          actorUserId,
-          input.expectedRevision,
-        ],
+        [merchantId, roleId, input.name, input.description, actorUserId, input.expectedRevision],
       );
       if (result.rowCount !== 1) return false;
       await this.replacePermissions(client, merchantId, roleId, input.permissionKeys);

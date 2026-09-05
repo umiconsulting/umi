@@ -205,19 +205,19 @@ grouped timeline. Reuse this pattern for the new hubs.
 
 Sidebar (concrete nouns, daily jobs on top, settings at the bottom):
 
-| Section | Item (hub) | Tabs / contents | Replaces / absorbs |
-| --- | --- | --- | --- |
-| HOY | Panorama | role-aware cockpit | overview |
-| OPERACIÓN | Ventas y caja | Pedidos · Ventas · Recibos · Reembolsos · Turnos y caja | orders + sales/receipts/refunds + cash_shifts/registers |
-| OPERACIÓN | Cocina | estaciones · ruta de cocina | kitchen (KDS) |
-| CLIENTES | Clientes | perfil con pestañas (ya existe) | customers |
-| CLIENTES | Lealtad y valor | Lealtad · Recompensas · Tarjetas de regalo · Wallet | members + gift-cards + rewards + wallet |
-| NEGOCIO | Catálogo e inventario | Catálogo · Inventario | catalog + inventory (orphans) |
-| NEGOCIO | Dispositivos | Dispositivos · Hardware · Registradoras | devices + hardware + registers |
-| NEGOCIO | Equipo y accesos | personal · roles · permisos | staff + memberships |
-| CONFIGURACIÓN | Ajustes | Negocio (organización/ubicaciones) · Horarios · Productos y facturación | settings + hours + products-billing + organization/locations |
-| CONFIGURACIÓN | Diagnóstico (admin) | Recuperación · Auditoría · Diagnósticos | recovery + audit + diagnostics (orphans) |
-| PLATAFORMA | Cafés | (also a top switcher) | cafes |
+| Section       | Item (hub)            | Tabs / contents                                                         | Replaces / absorbs                                           |
+| ------------- | --------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------ |
+| HOY           | Panorama              | role-aware cockpit                                                      | overview                                                     |
+| OPERACIÓN     | Ventas y caja         | Pedidos · Ventas · Recibos · Reembolsos · Turnos y caja                 | orders + sales/receipts/refunds + cash_shifts/registers      |
+| OPERACIÓN     | Cocina                | estaciones · ruta de cocina                                             | kitchen (KDS)                                                |
+| CLIENTES      | Clientes              | perfil con pestañas (ya existe)                                         | customers                                                    |
+| CLIENTES      | Lealtad y valor       | Lealtad · Recompensas · Tarjetas de regalo · Wallet                     | members + gift-cards + rewards + wallet                      |
+| NEGOCIO       | Catálogo e inventario | Catálogo · Inventario                                                   | catalog + inventory (orphans)                                |
+| NEGOCIO       | Dispositivos          | Dispositivos · Hardware · Registradoras                                 | devices + hardware + registers                               |
+| NEGOCIO       | Equipo y accesos      | personal · roles · permisos                                             | staff + memberships                                          |
+| CONFIGURACIÓN | Ajustes               | Negocio (organización/ubicaciones) · Horarios · Productos y facturación | settings + hours + products-billing + organization/locations |
+| CONFIGURACIÓN | Diagnóstico (admin)   | Recuperación · Auditoría · Diagnósticos                                 | recovery + audit + diagnostics (orphans)                     |
+| PLATAFORMA    | Cafés                 | (also a top switcher)                                                   | cafes                                                        |
 
 Result:
 
@@ -294,7 +294,7 @@ redirect, so no URL returns 404. Every phase reuses the existing components and 
 - **Phase 2: Panorama.** Make the overview a role-aware daily cockpit. Keep the honest
   states.
 - **Phase 3: dissolve `operations`.** Promote the orphan hubs first: `Catálogo e
-  inventario`, `Caja y turnos`, `Diagnóstico`. Reuse the `customers` hub pattern. Move
+inventario`, `Caja y turnos`, `Diagnóstico`. Reuse the `customers` hub pattern. Move
   the authorized commands into each hub as per-row actions with approvals and recovery.
   Redirect `/operations` to `Panorama`.
 - **Phase 4: consolidate.** Build `Lealtad y valor`, `Dispositivos`, and `Ajustes` as

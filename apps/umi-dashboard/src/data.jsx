@@ -152,7 +152,8 @@ function _useAsync(asyncFn, deps, seed) {
         return asyncFn();
       })
       .then(function (data) {
-        if (active) setState({ data: data, loading: false, error: null, errorCode: null, loaded: true });
+        if (active)
+          setState({ data: data, loading: false, error: null, errorCode: null, loaded: true });
       })
       .catch(function (err) {
         if (active)
@@ -394,10 +395,7 @@ async function _loadOrders(ctx, filter, channel) {
   const query = new URLSearchParams({ filter: filter || 'all' });
   if (channel) query.set('channel', channel);
   const result = await _apiFetch(
-    _withLocation(
-      ctx,
-      _merchantPath(ctx, '/orders?' + query.toString()),
-    ),
+    _withLocation(ctx, _merchantPath(ctx, '/orders?' + query.toString())),
   );
   return (result.orders || []).map(function (t) {
     return Object.assign({ items_count: 0, items: [] }, t);

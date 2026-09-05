@@ -9,9 +9,9 @@ import { MerchantRolesController } from './roles.controller';
 describe.each([StaffController, StaffMerchantController, MerchantRolesController])(
   '%s authorization',
   (controller) => {
-  it('requires merchant.manage through RolesGuard', () => {
-    expect(Reflect.getMetadata(PERMISSION_KEY, controller)).toBe('merchant.manage');
-    expect(Reflect.getMetadata(GUARDS_METADATA, controller)).toContain(RolesGuard);
-  });
+    it('requires merchant.manage through RolesGuard', () => {
+      expect(Reflect.getMetadata(PERMISSION_KEY, controller)).toBe('merchant.manage');
+      expect(Reflect.getMetadata(GUARDS_METADATA, controller)).toContain(RolesGuard);
+    });
   },
 );

@@ -163,7 +163,15 @@ const OrdersScreen = () => {
       </div>
 
       {/* Filter tabs + channel filter */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+          flexWrap: 'wrap',
+        }}
+      >
         <div className="seg" role="tablist">
           {[
             { id: 'active', label: 'Activos' },
@@ -345,9 +353,7 @@ const OrderRow = ({ order, onSelect, onTransition }) => {
 
         {/* Customer */}
         <div style={{ minWidth: 160 }}>
-          <div style={{ fontWeight: 600, fontSize: 14 }}>
-            {order.customer_name || 'Sin nombre'}
-          </div>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{order.customer_name || 'Sin nombre'}</div>
           <div style={{ fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
             {order.customer_phone || '—'}
           </div>
@@ -368,7 +374,9 @@ const OrderRow = ({ order, onSelect, onTransition }) => {
           <div className="eyebrow" style={{ fontSize: 10, marginBottom: 2 }}>
             Items
           </div>
-          <div style={{ fontWeight: 600, fontSize: 15 }}>{order.items_count ?? itemsCount(order)}</div>
+          <div style={{ fontWeight: 600, fontSize: 15 }}>
+            {order.items_count ?? itemsCount(order)}
+          </div>
         </div>
 
         {/* Amount */}

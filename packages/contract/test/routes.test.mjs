@@ -42,10 +42,7 @@ test('merchant id is URL-encoded (matches data.jsx _merchantPath)', () => {
 });
 
 test('dashboard device enrollment routes match the versioned controller', () => {
-  assert.equal(
-    routes.devices.beginEnrollment('abc'),
-    '/api/v1/merchants/abc/devices/enrollment',
-  );
+  assert.equal(routes.devices.beginEnrollment('abc'), '/api/v1/merchants/abc/devices/enrollment');
   assert.equal(
     routes.devices.enrollmentRequests('abc'),
     '/api/v1/merchants/abc/devices/enrollment-requests',

@@ -30,10 +30,7 @@ export class OrdersRepository {
   constructor(private readonly pg: PgService) {}
 
   /** Merchant-scoped commercial order list (newest first), with channel, customer, total, lines. */
-  async listOrders(
-    merchantId: string,
-    q: ListOrdersQuery,
-  ): Promise<{ rows: Row[] }> {
+  async listOrders(merchantId: string, q: ListOrdersQuery): Promise<{ rows: Row[] }> {
     const params: unknown[] = [merchantId];
 
     const statusSql = buildStatusClause(q.filter, params);
@@ -118,11 +115,7 @@ export class OrdersRepository {
   }
 
   /** Set the commercial status and append the spine event, in one transaction. */
-  async setStatus(
-    merchantId: string,
-    orderId: string,
-    target: string,
-  ): Promise<boolean> {
+  async setStatus(merchantId: string, orderId: string, target: string): Promise<boolean> {
     return this.pg.withMerchant(async (c) => {
       const res = await c.query(
         `UPDATE merchant.customer_order

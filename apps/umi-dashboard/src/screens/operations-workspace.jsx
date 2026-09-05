@@ -1349,236 +1349,218 @@ export function DomainWorkspace({ domain }) {
 
   return (
     <>
-        <section className="card" style={{ minWidth: 0 }} aria-live="polite">
-          <div style={{ padding: 20, borderBottom: '1px solid var(--line)' }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: 12,
-                alignItems: 'center',
-              }}
-            >
-              <div>
-                <h3 style={{ margin: 0 }}>{selected?.label || 'Operación'}</h3>
-                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 5 }}>
-                  Permiso: {selected?.requiredPermissions?.join(' o ') || '—'}
-                </div>
+      <section className="card" style={{ minWidth: 0 }} aria-live="polite">
+        <div style={{ padding: 20, borderBottom: '1px solid var(--line)' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              gap: 12,
+              alignItems: 'center',
+            }}
+          >
+            <div>
+              <h3 style={{ margin: 0 }}>{selected?.label || 'Operación'}</h3>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 5 }}>
+                Permiso: {selected?.requiredPermissions?.join(' o ') || '—'}
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {domain === 'catalog' && (
-                  <button className="btn" type="button" onClick={() => setCatalogRow(null)}>
-                    Crear producto
-                  </button>
-                )}
-                {domain === 'gift_cards' && (
-                  <button
-                    className="btn"
-                    type="button"
-                    onClick={() => setGiftCardRow({ id: crypto.randomUUID(), currency: 'MXN' })}
-                  >
-                    Emitir tarjeta
-                  </button>
-                )}
-                {domain === 'kitchen' && (
-                  <button className="btn" type="button" onClick={() => setKitchenRouteOpen(true)}>
-                    Configurar ruta
-                  </button>
-                )}
-                {ACTION_ROUTES[domain] && (
-                  <button
-                    className="btn"
-                    type="button"
-                    onClick={() => navigate(ACTION_ROUTES[domain])}
-                  >
-                    Administrar
-                  </button>
-                )}
-                {canUseMerchantScope && (
-                  <button
-                    className="btn"
-                    type="button"
-                    aria-pressed={merchantWide}
-                    onClick={() => {
-                      setMerchantWide((value) => !value);
-                      setCursor(0);
-                    }}
-                  >
-                    {merchantWide ? 'Ubicación' : 'Todo el negocio'}
-                  </button>
-                )}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {domain === 'catalog' && (
+                <button className="btn" type="button" onClick={() => setCatalogRow(null)}>
+                  Crear producto
+                </button>
+              )}
+              {domain === 'gift_cards' && (
                 <button
                   className="btn"
                   type="button"
-                  disabled={state.loading}
-                  onClick={() => setRefresh((value) => value + 1)}
+                  onClick={() => setGiftCardRow({ id: crypto.randomUUID(), currency: 'MXN' })}
                 >
-                  {state.loading ? 'Actualizando…' : 'Actualizar'}
+                  Emitir tarjeta
                 </button>
-              </div>
+              )}
+              {domain === 'kitchen' && (
+                <button className="btn" type="button" onClick={() => setKitchenRouteOpen(true)}>
+                  Configurar ruta
+                </button>
+              )}
+              {ACTION_ROUTES[domain] && (
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={() => navigate(ACTION_ROUTES[domain])}
+                >
+                  Administrar
+                </button>
+              )}
+              {canUseMerchantScope && (
+                <button
+                  className="btn"
+                  type="button"
+                  aria-pressed={merchantWide}
+                  onClick={() => {
+                    setMerchantWide((value) => !value);
+                    setCursor(0);
+                  }}
+                >
+                  {merchantWide ? 'Ubicación' : 'Todo el negocio'}
+                </button>
+              )}
+              <button
+                className="btn"
+                type="button"
+                disabled={state.loading}
+                onClick={() => setRefresh((value) => value + 1)}
+              >
+                {state.loading ? 'Actualizando…' : 'Actualizar'}
+              </button>
             </div>
-            {selected?.allowedActions?.length ? (
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 14 }}>
-                {selected.allowedActions.map((action) => (
-                  <span className="sub-pill" key={action}>
-                    {action.replaceAll('_', ' ')}
-                  </span>
-                ))}
-              </div>
-            ) : null}
           </div>
+          {selected?.allowedActions?.length ? (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 14 }}>
+              {selected.allowedActions.map((action) => (
+                <span className="sub-pill" key={action}>
+                  {action.replaceAll('_', ' ')}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
 
-          {selected && !selected.available ? (
-            <div style={{ padding: 28, color: 'var(--ink-3)' }}>
-              Requiere permiso: {selected.requiredPermissions?.join(' o ') || '—'}
-            </div>
-          ) : state.error ? (
-            <div style={{ padding: 28, color: 'var(--danger)' }}>
-              {ERROR_COPY[state.errorCode] || 'No fue posible cargar esta operación.'}
-            </div>
-          ) : state.loading && !state.data?.items?.length ? (
-            <div style={{ padding: 28, color: 'var(--ink-3)' }}>Cargando datos autorizados…</div>
-          ) : !state.data?.items?.length ? (
-            <div style={{ padding: 28, color: 'var(--ink-3)' }}>
-              No hay datos para este alcance.
-            </div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <thead>
-                  <tr style={{ textAlign: 'left', color: 'var(--ink-3)' }}>
-                    <th style={{ padding: '12px 16px' }}>Referencia</th>
-                    <th>Detalle</th>
-                    <th>Estado</th>
-                    <th>Importe</th>
-                    <th>Fecha</th>
-                    <th aria-label="Acciones" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {state.data.items.map((item) => (
-                    <tr key={item.id} style={{ borderTop: '1px solid var(--line)' }}>
-                      <td style={{ padding: '14px 16px' }}>
-                        <strong>{item.title}</strong>
-                        <div
-                          style={{
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: 10,
-                            color: 'var(--ink-3)',
-                            marginTop: 4,
-                          }}
-                        >
-                          {item.publicReference}
-                        </div>
-                      </td>
-                      <td>{item.detail || '—'}</td>
-                      <td>
-                        <Status value={item.status} />
-                      </td>
-                      <td>{formatOperationMoney(item.amountMinorUnits, item.currency)}</td>
-                      <td>{formatOperationDate(item.occurredAt)}</td>
-                      <td style={{ paddingRight: 14 }}>
-                        {domain === 'sales' && (
-                          <button className="btn" type="button" onClick={() => setRefundSale(item)}>
-                            Refund
-                          </button>
-                        )}
-                        {domain === 'inventory' && (
-                          <button
-                            className="btn"
-                            type="button"
-                            onClick={() => setInventoryRow(item)}
-                          >
-                            Operar
-                          </button>
-                        )}
-                        {domain === 'receipts' && item.status !== 'not_printed' && (
-                          <button className="btn" type="button" onClick={() => setReceiptRow(item)}>
-                            Reimprimir
-                          </button>
-                        )}
-                        {domain === 'loyalty' && (
-                          <button className="btn" type="button" onClick={() => setLoyaltyRow(item)}>
-                            Ajustar
-                          </button>
-                        )}
-                        {domain === 'gift_cards' && (
-                          <button
-                            className="btn"
-                            type="button"
-                            onClick={() => setGiftCardRow(item)}
-                          >
-                            Emitir
-                          </button>
-                        )}
-                        {domain === 'catalog' && (
-                          <button className="btn" type="button" onClick={() => setCatalogRow(item)}>
-                            Editar
-                          </button>
-                        )}
-                        {domain === 'registers' && (
-                          <button
-                            className="btn"
-                            type="button"
-                            onClick={() => setRegisterRow(item)}
-                          >
-                            Configurar
-                          </button>
-                        )}
-                        {domain === 'recovery' && (
-                          <button
-                            className="btn"
-                            type="button"
-                            onClick={() => setRecoveryRow(item)}
-                          >
-                            Recuperar
-                          </button>
-                        )}
-                        <button
-                          className="btn-icon"
-                          type="button"
-                          onClick={() => copy(item.correlationId || item.publicReference)}
-                          aria-label={`Copiar referencia ${item.publicReference}`}
-                        >
-                          {copied === (item.correlationId || item.publicReference) ? '✓' : '⧉'}
+        {selected && !selected.available ? (
+          <div style={{ padding: 28, color: 'var(--ink-3)' }}>
+            Requiere permiso: {selected.requiredPermissions?.join(' o ') || '—'}
+          </div>
+        ) : state.error ? (
+          <div style={{ padding: 28, color: 'var(--danger)' }}>
+            {ERROR_COPY[state.errorCode] || 'No fue posible cargar esta operación.'}
+          </div>
+        ) : state.loading && !state.data?.items?.length ? (
+          <div style={{ padding: 28, color: 'var(--ink-3)' }}>Cargando datos autorizados…</div>
+        ) : !state.data?.items?.length ? (
+          <div style={{ padding: 28, color: 'var(--ink-3)' }}>No hay datos para este alcance.</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ textAlign: 'left', color: 'var(--ink-3)' }}>
+                  <th style={{ padding: '12px 16px' }}>Referencia</th>
+                  <th>Detalle</th>
+                  <th>Estado</th>
+                  <th>Importe</th>
+                  <th>Fecha</th>
+                  <th aria-label="Acciones" />
+                </tr>
+              </thead>
+              <tbody>
+                {state.data.items.map((item) => (
+                  <tr key={item.id} style={{ borderTop: '1px solid var(--line)' }}>
+                    <td style={{ padding: '14px 16px' }}>
+                      <strong>{item.title}</strong>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 10,
+                          color: 'var(--ink-3)',
+                          marginTop: 4,
+                        }}
+                      >
+                        {item.publicReference}
+                      </div>
+                    </td>
+                    <td>{item.detail || '—'}</td>
+                    <td>
+                      <Status value={item.status} />
+                    </td>
+                    <td>{formatOperationMoney(item.amountMinorUnits, item.currency)}</td>
+                    <td>{formatOperationDate(item.occurredAt)}</td>
+                    <td style={{ paddingRight: 14 }}>
+                      {domain === 'sales' && (
+                        <button className="btn" type="button" onClick={() => setRefundSale(item)}>
+                          Refund
                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <div
-            style={{
-              padding: 14,
-              display: 'flex',
-              justifyContent: 'space-between',
-              borderTop: '1px solid var(--line)',
-            }}
-          >
-            <button
-              className="btn"
-              type="button"
-              disabled={cursor === 0 || state.loading}
-              onClick={() => setCursor(Math.max(0, cursor - 20))}
-            >
-              Anterior
-            </button>
-            <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-              Página {Math.floor(cursor / 20) + 1} · {permissions.length} permisos efectivos
-            </span>
-            <button
-              className="btn"
-              type="button"
-              disabled={!state.data?.page?.hasMore || state.loading}
-              onClick={() => setCursor(Number(state.data.page.nextCursor))}
-            >
-              Siguiente
-            </button>
+                      )}
+                      {domain === 'inventory' && (
+                        <button className="btn" type="button" onClick={() => setInventoryRow(item)}>
+                          Operar
+                        </button>
+                      )}
+                      {domain === 'receipts' && item.status !== 'not_printed' && (
+                        <button className="btn" type="button" onClick={() => setReceiptRow(item)}>
+                          Reimprimir
+                        </button>
+                      )}
+                      {domain === 'loyalty' && (
+                        <button className="btn" type="button" onClick={() => setLoyaltyRow(item)}>
+                          Ajustar
+                        </button>
+                      )}
+                      {domain === 'gift_cards' && (
+                        <button className="btn" type="button" onClick={() => setGiftCardRow(item)}>
+                          Emitir
+                        </button>
+                      )}
+                      {domain === 'catalog' && (
+                        <button className="btn" type="button" onClick={() => setCatalogRow(item)}>
+                          Editar
+                        </button>
+                      )}
+                      {domain === 'registers' && (
+                        <button className="btn" type="button" onClick={() => setRegisterRow(item)}>
+                          Configurar
+                        </button>
+                      )}
+                      {domain === 'recovery' && (
+                        <button className="btn" type="button" onClick={() => setRecoveryRow(item)}>
+                          Recuperar
+                        </button>
+                      )}
+                      <button
+                        className="btn-icon"
+                        type="button"
+                        onClick={() => copy(item.correlationId || item.publicReference)}
+                        aria-label={`Copiar referencia ${item.publicReference}`}
+                      >
+                        {copied === (item.correlationId || item.publicReference) ? '✓' : '⧉'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </section>
+        )}
+
+        <div
+          style={{
+            padding: 14,
+            display: 'flex',
+            justifyContent: 'space-between',
+            borderTop: '1px solid var(--line)',
+          }}
+        >
+          <button
+            className="btn"
+            type="button"
+            disabled={cursor === 0 || state.loading}
+            onClick={() => setCursor(Math.max(0, cursor - 20))}
+          >
+            Anterior
+          </button>
+          <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+            Página {Math.floor(cursor / 20) + 1} · {permissions.length} permisos efectivos
+          </span>
+          <button
+            className="btn"
+            type="button"
+            disabled={!state.data?.page?.hasMore || state.loading}
+            onClick={() => setCursor(Number(state.data.page.nextCursor))}
+          >
+            Siguiente
+          </button>
+        </div>
+      </section>
       {refundSale && (
         <RefundDialog
           sale={refundSale}

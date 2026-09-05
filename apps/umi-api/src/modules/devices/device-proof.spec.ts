@@ -6,10 +6,7 @@ const installationId = '00000000-0000-4000-8000-000000000001';
 
 function signedProof(timestampIso: string) {
   const { publicKey, privateKey } = generateKeyPairSync('ed25519');
-  const message = Buffer.from(
-    deviceProofPayload(installationId, timestampIso),
-    'utf8',
-  );
+  const message = Buffer.from(deviceProofPayload(installationId, timestampIso), 'utf8');
   const signature = cryptoSign(null, message, privateKey);
   const jwk = publicKey.export({ format: 'jwk' }) as { x: string };
   return {
@@ -29,10 +26,7 @@ function es256Proof(timestampIso: string) {
   const { publicKey, privateKey } = generateKeyPairSync('ec', {
     namedCurve: 'P-256',
   });
-  const message = Buffer.from(
-    deviceProofPayload(installationId, timestampIso),
-    'utf8',
-  );
+  const message = Buffer.from(deviceProofPayload(installationId, timestampIso), 'utf8');
   const signature = cryptoSign('sha256', message, {
     key: privateKey,
     dsaEncoding: 'ieee-p1363',
@@ -58,9 +52,7 @@ describe('verifyDeviceProof', () => {
 
   it('rejects a proof signed for a different installation id', () => {
     const { proof, now } = signedProof('2026-09-03T12:00:00.000Z');
-    expect(
-      verifyDeviceProof({ ...proof, installationId: 'someone-else' }, { now }),
-    ).toBe(false);
+    expect(verifyDeviceProof({ ...proof, installationId: 'someone-else' }, { now })).toBe(false);
   });
 
   it('rejects a stale timestamp beyond the skew window', () => {
@@ -74,10 +66,7 @@ describe('verifyDeviceProof', () => {
     const bytes = Buffer.from(proof.signatureB64Url, 'base64url');
     bytes[0] ^= 0xff;
     expect(
-      verifyDeviceProof(
-        { ...proof, signatureB64Url: bytes.toString('base64url') },
-        { now },
-      ),
+      verifyDeviceProof({ ...proof, signatureB64Url: bytes.toString('base64url') }, { now }),
     ).toBe(false);
   });
 
@@ -85,21 +74,14 @@ describe('verifyDeviceProof', () => {
     const { proof, now } = signedProof('2026-09-03T12:00:00.000Z');
     const other = signedProof('2026-09-03T12:00:00.000Z');
     expect(
-      verifyDeviceProof(
-        { ...proof, publicKeyB64Url: other.proof.publicKeyB64Url },
-        { now },
-      ),
+      verifyDeviceProof({ ...proof, publicKeyB64Url: other.proof.publicKeyB64Url }, { now }),
     ).toBe(false);
   });
 
   it('rejects malformed input without throwing', () => {
     const { proof, now } = signedProof('2026-09-03T12:00:00.000Z');
-    expect(
-      verifyDeviceProof({ ...proof, publicKeyB64Url: 'not-a-key' }, { now }),
-    ).toBe(false);
-    expect(
-      verifyDeviceProof({ ...proof, timestampIso: 'not-a-date' }, { now }),
-    ).toBe(false);
+    expect(verifyDeviceProof({ ...proof, publicKeyB64Url: 'not-a-key' }, { now })).toBe(false);
+    expect(verifyDeviceProof({ ...proof, timestampIso: 'not-a-date' }, { now })).toBe(false);
   });
 
   it('accepts a fresh es256 (hardware-keystore) proof', () => {
@@ -112,10 +94,7 @@ describe('verifyDeviceProof', () => {
     const bytes = Buffer.from(proof.signatureB64Url, 'base64url');
     bytes[0] ^= 0xff;
     expect(
-      verifyDeviceProof(
-        { ...proof, signatureB64Url: bytes.toString('base64url') },
-        { now },
-      ),
+      verifyDeviceProof({ ...proof, signatureB64Url: bytes.toString('base64url') }, { now }),
     ).toBe(false);
   });
 
@@ -138,8 +117,6 @@ describe('verifyDeviceProof', () => {
       signatureB64Url:
         'dbC2ISONYCoRJtEGtg7Xaw1qHHKRN1Keab5ueOv4JaLmJHbxmOf02Fw6W8kaYg_ao8-XlYHnSRcdhhdlaJGeDw==',
     };
-    expect(
-      verifyDeviceProof(proof, { now: new Date('2026-09-03T12:00:00.000Z') }),
-    ).toBe(true);
+    expect(verifyDeviceProof(proof, { now: new Date('2026-09-03T12:00:00.000Z') })).toBe(true);
   });
 });

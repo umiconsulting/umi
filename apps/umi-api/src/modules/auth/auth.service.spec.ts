@@ -1,14 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  BadRequestException,
-  ForbiddenException,
-  UnauthorizedException,
-} from '@nestjs/common';
-import {
-  createHash,
-  generateKeyPairSync,
-  sign as edSign,
-} from 'node:crypto';
+import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { createHash, generateKeyPairSync, sign as edSign } from 'node:crypto';
 
 function deviceProofFor(installationId: string, timestampIso: string) {
   const { publicKey, privateKey } = generateKeyPairSync('ed25519');
@@ -281,9 +273,7 @@ describe('AuthService.pinLogin — device possession proof', () => {
       ephemeralPublicKey: publicKey,
     });
     await expect(
-      h.svc.pinLogin(
-        pinLoginInput({ deviceProof: 'AAAA', deviceProofTimestamp: timestamp }),
-      ),
+      h.svc.pinLogin(pinLoginInput({ deviceProof: 'AAAA', deviceProofTimestamp: timestamp })),
     ).rejects.toMatchObject({ response: { code: 'DEVICE_PROOF_INVALID' } });
     expect(h.repo.findPosPinStaff).not.toHaveBeenCalled();
   });
@@ -315,9 +305,7 @@ describe('AuthService.pinLogin — device possession proof', () => {
       ephemeralPublicKey: null,
     });
     h.repo.findPosPinStaff.mockResolvedValue(undefined);
-    await expect(h.svc.pinLogin(pinLoginInput({}))).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(h.svc.pinLogin(pinLoginInput({}))).rejects.toBeInstanceOf(ForbiddenException);
     expect(h.repo.findPosPinStaff).toHaveBeenCalled();
   });
 });

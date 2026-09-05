@@ -41,9 +41,7 @@ export class DashboardRealtimeGateway implements OnGatewayInit, OnGatewayConnect
 
   onModuleInit(): void {
     this.events.stream$.subscribe((event) => {
-      this.server
-        ?.to(dashboardRoom(event.merchantId))
-        .emit(DASHBOARD_EVENT_DEVICES_CHANGED, event);
+      this.server?.to(dashboardRoom(event.merchantId)).emit(DASHBOARD_EVENT_DEVICES_CHANGED, event);
     });
   }
 

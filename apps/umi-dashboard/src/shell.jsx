@@ -243,8 +243,7 @@ const Topbar = ({
     'kitchen',
   ].includes(screen);
   const activeLocations = locations.filter((l) => l.status === 'active');
-  const showLocationSelect =
-    locationScoped && canSwitchLocations && activeLocations.length > 1;
+  const showLocationSelect = locationScoped && canSwitchLocations && activeLocations.length > 1;
   const branchName =
     activeLocations.find((l) => l.id === selectedLocationId)?.name ||
     (activeLocations.length === 1 ? activeLocations[0].name : null);

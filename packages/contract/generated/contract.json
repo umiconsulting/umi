@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "86620a7c79bb358b2ebe97242f763e70f09526b70532d5b0eb600a3d6dfdae5e",
+  "contentHash": "ebf698377c0e9030814fbc1afc06e55bc058cc4ac5764aef6d7cec77115ac419",
   "contractVersion": "2.17.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
@@ -26841,6 +26841,35 @@
         "recovery.query_original"
       ],
       "type": "string"
+    },
+    "DashboardDevicesChangedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "locationId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "occurredAt": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "merchantId",
+        "occurredAt"
+      ],
+      "type": "object"
     },
     "DashboardDomainCoverage": {
       "additionalProperties": false,
