@@ -231,7 +231,11 @@ jobs:
           DATABASE_URL_APP: postgresql://api_login:harness_api@localhost:5432/umi_build_v3_ci
           DATABASE_URL_WORKER: postgresql://worker_login:harness_worker@localhost:5432/umi_build_v3_ci
           REDIS_URL: redis://localhost:6379
-        run: pnpm run test:integration:realtime
+        # Device pairing HMACs its secret with JWT_SECRET (config requires >=16
+        # chars). Generate an ephemeral one per run instead of committing a
+        # secret-shaped literal — it only has to be self-consistent within this
+        # job's throwaway database.
+        run: JWT_SECRET="$(openssl rand -hex 24)" pnpm run test:integration:realtime
 
       # THE RE-RUNNABLE RULE, proven rather than written down.
       #
